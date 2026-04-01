@@ -5,205 +5,247 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Secure Chat</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--text:#ededed;--muted:#888;--quiet:#555;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
-body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased;height:100vh;display:flex;flex-direction:column}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0c0c0c; color: #ededed; font-family: 'SF Mono', 'Fira Code', monospace; height: 100vh; display: flex; flex-direction: column; }
+#lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 24px; }
+#lobby h1 { font-size: 13px; letter-spacing: .15em; color: #555; text-transform: uppercase; }
+#lobby .card { background: #111; border: 1px solid #1a1a1a; border-radius: 6px; padding: 32px; width: 420px; display: flex; flex-direction: column; gap: 16px; }
+#lobby input { background: #0c0c0c; border: 1px solid #222; color: #ededed; padding: 10px 14px; font-family: inherit; font-size: 13px; border-radius: 4px; outline: none; }
+#lobby input:focus { border-color: #444; }
+#lobby input::placeholder { color: #333; }
+#lobby button { background: #ededed; color: #0c0c0c; border: none; padding: 10px; font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 4px; cursor: pointer; letter-spacing: .05em; }
+#lobby button:hover { background: #fff; }
+.label { font-size: 11px; color: #444; letter-spacing: .08em; text-transform: uppercase; margin-bottom: -8px; }
+#invite-screen { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 24px; }
+#invite-screen .card { background: #111; border: 1px solid #1a1a1a; border-radius: 6px; padding: 32px; width: 420px; display: flex; flex-direction: column; gap: 16px; }
+.invite-url { background: #0c0c0c; border: 1px solid #222; border-radius: 4px; padding: 12px 14px; font-size: 12px; color: #888; word-break: break-all; line-height: 1.6; }
+.copy-btn { background: transparent; border: 1px solid #333; color: #ededed; padding: 10px; font-family: inherit; font-size: 12px; border-radius: 4px; cursor: pointer; letter-spacing: .05em; }
+.copy-btn:hover { border-color: #555; }
+.copy-btn.copied { border-color: #2a2; color: #4f4; }
+.room-label { font-size: 11px; color: #444; letter-spacing: .08em; text-transform: uppercase; }
+.room-name { font-size: 18px; color: #ededed; letter-spacing: .08em; }
+.enter-btn { background: #ededed; color: #0c0c0c; border: none; padding: 10px; font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 4px; cursor: pointer; }
+#join-screen { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 24px; }
+#join-screen .card { background: #111; border: 1px solid #1a1a1a; border-radius: 6px; padding: 32px; width: 420px; display: flex; flex-direction: column; gap: 16px; }
+#join-screen input { background: #0c0c0c; border: 1px solid #222; color: #ededed; padding: 10px 14px; font-family: inherit; font-size: 13px; border-radius: 4px; outline: none; }
+#join-screen input:focus { border-color: #444; }
+#join-screen input::placeholder { color: #333; }
+#join-screen button { background: #ededed; color: #0c0c0c; border: none; padding: 10px; font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 4px; cursor: pointer; }
+#chat-screen { display: none; flex-direction: column; height: 100vh; }
+#chat-header { display: flex; align-items: center; padding: 14px 20px; border-bottom: 1px solid #111; gap: 12px; }
+#chat-header .logo { font-size: 13px; font-weight: 600; letter-spacing: .1em; color: #ededed; }
+#chat-header .room-id { color: #444; font-size: 13px; }
+#chat-header .handle { margin-left: auto; color: #555; font-size: 12px; }
+#invite-btn { background: transparent; border: 1px solid #222; color: #888; padding: 6px 12px; font-family: inherit; font-size: 11px; border-radius: 3px; cursor: pointer; letter-spacing: .05em; }
+#invite-btn:hover { border-color: #444; color: #ededed; }
+#invite-btn.copied { border-color: #2a2; color: #4f4; }
+#leave-btn { background: transparent; border: 1px solid #222; color: #555; padding: 6px 12px; font-family: inherit; font-size: 11px; border-radius: 3px; cursor: pointer; }
+#leave-btn:hover { border-color: #f44; color: #f44; }
+#messages { flex: 1; overflow-y: auto; padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; }
+.msg { display: flex; flex-direction: column; gap: 4px; }
+.msg-meta { font-size: 11px; color: #444; }
+.msg-meta .handle { color: #888; margin-right: 8px; }
+.msg-text { font-size: 13px; color: #d0d0d0; line-height: 1.5; }
+.msg-text.own { color: #ededed; }
+.system-msg { font-size: 11px; color: #333; text-align: center; padding: 4px 0; }
+#input-area { display: flex; border-top: 1px solid #111; }
+#msg-input { flex: 1; background: #0c0c0c; border: none; color: #ededed; padding: 16px 20px; font-family: inherit; font-size: 13px; outline: none; }
+#msg-input::placeholder { color: #333; }
+#send-btn { background: transparent; border: none; border-left: 1px solid #111; color: #555; padding: 16px 20px; font-family: inherit; font-size: 12px; cursor: pointer; letter-spacing: .05em; }
+#send-btn:hover { color: #ededed; }
 </style>
 </head>
 <body>
-<div id="root" style="flex:1;display:flex;flex-direction:column"></div>
+
+<div id="lobby">
+  <h1>PARAMANT</h1>
+  <div class="card">
+    <div class="label">API Key</div>
+    <input id="api-key-input" type="password" placeholder="pgp_..." autocomplete="off">
+    <div class="label">Jouw naam</div>
+    <input id="handle-input" type="text" placeholder="naam" maxlength="24" autocomplete="off">
+    <button onclick="createRoom()">Maak beveiligde room aan →</button>
+  </div>
+</div>
+
+<div id="invite-screen">
+  <div class="card">
+    <div class="room-label">Room aangemaakt</div>
+    <div class="room-name" id="display-room-name"></div>
+    <div style="font-size:12px;color:#444;line-height:1.6">Deel deze link. Geen API key nodig om te joinen. Room verdwijnt na 30 minuten inactiviteit.</div>
+    <div class="invite-url" id="invite-url-display"></div>
+    <button class="copy-btn" id="copy-btn" onclick="copyLink()">⎘ Kopieer invite link</button>
+    <button class="enter-btn" onclick="enterChat()">Ga naar chat →</button>
+  </div>
+</div>
+
+<div id="join-screen">
+  <h1 style="font-size:13px;letter-spacing:.15em;color:#555;text-transform:uppercase;">PARAMANT</h1>
+  <div class="card">
+    <div class="label">Je bent uitgenodigd voor room</div>
+    <div class="room-name" id="join-room-display"></div>
+    <div style="font-size:12px;color:#444;line-height:1.6">Kies een naam om anoniem te chatten. Geen account nodig.</div>
+    <div class="label">Jouw naam</div>
+    <input id="join-handle" type="text" placeholder="naam" maxlength="24" autocomplete="off">
+    <button onclick="joinRoom()">Join chat →</button>
+  </div>
+</div>
+
+<div id="chat-screen">
+  <div id="chat-header">
+    <span class="logo">PARAMANT</span>
+    <span class="room-id"># <span id="header-room"></span></span>
+    <span class="handle" id="header-handle"></span>
+    <button id="invite-btn" onclick="copyInviteFromChat()">⎘ Invite</button>
+    <button id="leave-btn" onclick="leaveChat()">Leave</button>
+  </div>
+  <div id="messages"></div>
+  <div id="input-area">
+    <input id="msg-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()">
+    <button id="send-btn" onclick="sendMsg()">Send</button>
+  </div>
+</div>
+
 <script>
-const V={bg:"#0c0c0c",sur:"#111",b:"#1a1a1a",t:"#ededed",m:"#888",q:"#555",g:"#2d6a4f",
-  font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
-  mono:"'SF Mono','Fira Code','Cascadia Code',monospace"};
+const RELAY = 'wss://relay.paramant.app';
+let ws, currentRoom, currentHandle, currentApiKey, isOwner = false;
 
-let apiKey="",ws=null,room="",handle="",messages=[];
-
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}
-
-async function validateKey(key){
-  try{
-    const r=await fetch("https://health.paramant.app/v2/check-key?k="+key,{signal:AbortSignal.timeout(5000)});
-    const d=await r.json();return (d.valid && ["chat","pro","enterprise"].includes(d.plan))?d:{valid:false,reason:"This key does not include chat access. Upgrade at paramant.app/#pricing"};
-  }catch{return false}
+function generateRoomId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const arr = new Uint8Array(12);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => chars[b % chars.length]).join('');
 }
 
-function renderLogin(){
-  document.getElementById("root").innerHTML=`
-  <nav style="display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:52px;border-bottom:1px solid ${V.b};flex-shrink:0">
-    <a href="/" style="font-family:${V.mono};font-size:13px;font-weight:500;letter-spacing:.08em;color:${V.t};text-decoration:none">PARAMANT</a>
-    <span style="font-size:12px;color:${V.q};font-family:${V.mono}">/ secure chat</span>
-  </nav>
-  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px">
-    <div style="width:100%;max-width:360px">
-      <h2 style="font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px">Secure chat</h2>
-      <p style="font-size:13px;color:${V.m};margin-bottom:32px;line-height:1.6">End-to-end encrypted. Zero logs. For legal professionals, whistleblowers, and organisations that require confidential communication.</p>
-      <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">API key</label>
-      <input id="ki" placeholder="pgp_..." style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:16px;font-family:${V.mono}">
-      <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Room ID</label>
-      <input id="ri" placeholder="case-2026-001" style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:16px;font-family:${V.mono}">
-      <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Handle</label>
-      <input id="hi" placeholder="counsel-a" style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:24px;font-family:${V.mono}">
-      <button onclick="doLogin()" style="width:100%;background:${V.t};color:${V.bg};border:none;border-radius:5px;padding:11px;font-size:13px;font-weight:500;cursor:pointer">Enter room</button>
-      <p id="err" style="font-size:12px;color:#8c3a3a;margin-top:12px;text-align:center"></p>
-      <p style="font-size:11px;color:${V.q};margin-top:24px;text-align:center;line-height:1.6">No API key? <a href="/#pricing" style="color:${V.m}">Get one at paramant.app</a></p>
-    </div>
-  </div>`;
-  document.getElementById("ki").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("ri").focus()});
-  document.getElementById("ri").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("hi").focus()});
-  document.getElementById("hi").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin()});
+function show(id) {
+    ['lobby','invite-screen','join-screen','chat-screen'].forEach(s => {
+        const el = document.getElementById(s);
+        if (el) el.style.display = 'none';
+    });
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'flex';
 }
 
-async function doLogin(){
-  const k=document.getElementById("ki").value.trim();
-  const r=document.getElementById("ri").value.trim();
-  const h=document.getElementById("hi").value.trim();
-  const err=document.getElementById("err");
-  if(!k.startsWith("pgp_")){err.textContent="Invalid API key format";return}
-  if(!r){err.textContent="Room ID required";return}
-  if(!h){err.textContent="Handle required";return}
-  err.textContent="Validating...";
-  const valid=await validateKey(k);
-  if(valid===false){err.textContent="API key invalid or relay unreachable";return}
-if(!valid.valid){err.textContent=valid.reason||"No chat access for this plan";return}
-  apiKey=k;room=r;handle=h;
-  renderChat();connectWS();
+window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    if (roomParam) {
+        currentRoom = roomParam;
+        document.getElementById('join-room-display').textContent = roomParam;
+        show('join-screen');
+    }
+});
+
+function createRoom() {
+    const key = document.getElementById('api-key-input').value.trim();
+    const handle = document.getElementById('handle-input').value.trim();
+    if (!key || !handle) { alert('Vul API key en naam in'); return; }
+    currentApiKey = key;
+    currentHandle = handle;
+    currentRoom = generateRoomId();
+    isOwner = true;
+    const inviteUrl = window.location.origin + '/chat?room=' + currentRoom;
+    document.getElementById('display-room-name').textContent = currentRoom;
+    document.getElementById('invite-url-display').textContent = inviteUrl;
+    show('invite-screen');
 }
 
-function connectWS(){
-  const wsBase="wss://health.paramant.app";
-  try{
-    ws=new WebSocket(wsBase+"/v2/stream?k="+apiKey+"&room="+encodeURIComponent(room)+"&handle="+encodeURIComponent(handle));
-    ws.onopen=()=>{addMsg("system","Connected to room: "+room)};
-    ws.onmessage=e=>{
-      try{
-        const d=JSON.parse(e.data);
-        if(d.type==="message")addMsg(d.from,d.text,d.ts);
-        else if(d.type==="file_chunk")handleFileChunk(d);
-        else if(d.type==="join")addMsg("system",d.handle+" joined");
-        else if(d.type==="leave")addMsg("system",d.handle+" left");
-      }catch{}
+function copyLink() {
+    navigator.clipboard.writeText(window.location.origin + '/chat?room=' + currentRoom).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = '✓ Gekopieerd';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '⎘ Kopieer invite link'; btn.classList.remove('copied'); }, 2000);
+    });
+}
+
+function enterChat() { connectWS(); }
+
+function joinRoom() {
+    const handle = document.getElementById('join-handle').value.trim();
+    if (!handle) { alert('Kies een naam'); return; }
+    currentHandle = handle;
+    currentApiKey = null;
+    isOwner = false;
+    connectWS();
+}
+
+function connectWS() {
+    document.getElementById('header-room').textContent = currentRoom;
+    document.getElementById('header-handle').textContent = currentHandle;
+    show('chat-screen');
+
+    ws = new WebSocket(RELAY);
+    ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'join', chatHash: currentRoom, nick: currentHandle }));
     };
-    ws.onclose=()=>{addMsg("system","Disconnected — reconnecting in 3s...");setTimeout(connectWS,3000)};
-    ws.onerror=()=>{addMsg("system","Connection error")};
-  }catch(e){addMsg("system","WebSocket not available")}
+    ws.onmessage = (e) => {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch { return; }
+        if (msg.type === 'packet') {
+            const p = msg.payload || {};
+            if (p.pType === 'chat') appendMsg(msg.nick, p.text, msg.nick === currentHandle);
+        } else if (msg.type === 'peer_joined') {
+            appendSystem(msg.nick + ' heeft de chat betreden');
+        } else if (msg.type === 'peer_left') {
+            appendSystem(msg.nick + ' heeft de chat verlaten');
+        } else if (msg.type === 'flush') {
+            appendSystem('— berichten gewist —');
+        }
+    };
+    ws.onclose = () => appendSystem('Verbinding verbroken');
+    ws.onerror = () => appendSystem('Verbindingsfout');
 }
 
-function addMsg(from,text,ts){
-  messages.push({from,text,ts:ts||new Date().toISOString()});
-  if(messages.length>200)messages.shift();
-  renderMessages();
+function appendMsg(handle, text, own) {
+    if (!text) return;
+    const el = document.createElement('div');
+    el.className = 'msg';
+    const time = new Date().toTimeString().slice(0,5);
+    const h = String(handle).replace(/</g,'&lt;');
+    const t = String(text).replace(/</g,'&lt;');
+    el.innerHTML = '<div class="msg-meta"><span class="handle">' + h + '</span>' + time + '</div>'
+                 + '<div class="msg-text' + (own ? ' own' : '') + '">' + t + '</div>';
+    const msgs = document.getElementById('messages');
+    msgs.appendChild(el);
+    msgs.scrollTop = 999999;
 }
 
-const CHUNK=4*1024*1024;
-const incomingFiles={};
-
-async function handleFile(input){
-  const file=input.files[0];
-  if(!file)return;
-  if(!ws||ws.readyState!==1){addMsg("system","Not connected");return}
-  const totalChunks=Math.ceil(file.size/CHUNK);
-  const fileId=Date.now().toString(36);
-  const prog=document.getElementById("upload-progress");
-  addMsg("system","Sending: "+file.name+" ("+totalChunks+" chunk"+(totalChunks>1?"s":"")+", "+(file.size/1024/1024).toFixed(1)+"MB)");
-  for(let i=0;i<totalChunks;i++){
-    const buf=await file.slice(i*CHUNK,(i+1)*CHUNK).arrayBuffer();
-    const b64=btoa(String.fromCharCode(...new Uint8Array(buf)));
-    ws.send(JSON.stringify({type:"file_chunk",fileId,fileName:file.name,fileSize:file.size,
-      mimeType:file.type||"application/octet-stream",chunkIndex:i,totalChunks,data:b64,room,handle}));
-    if(prog)prog.textContent="Uploading "+file.name+": "+(i+1)+"/"+totalChunks;
-    await new Promise(r=>setTimeout(r,50));
-  }
-  if(prog)prog.textContent="";
-  addMsg(handle,"📎 Sent: "+file.name);
-  input.value="";
+function appendSystem(text) {
+    const el = document.createElement('div');
+    el.className = 'system-msg';
+    el.textContent = text;
+    const msgs = document.getElementById('messages');
+    msgs.appendChild(el);
+    msgs.scrollTop = 999999;
 }
 
-function handleFileChunk(d){
-  const id=d.fileId;
-  if(!incomingFiles[id])incomingFiles[id]={chunks:{},meta:d};
-  incomingFiles[id].chunks[d.chunkIndex]=d.data;
-  if(Object.keys(incomingFiles[id].chunks).length===d.totalChunks){
-    let combined="";
-    for(let i=0;i<d.totalChunks;i++)combined+=incomingFiles[id].chunks[i];
-    const bytes=Uint8Array.from(atob(combined),c=>c.charCodeAt(0));
-    const blob=new Blob([bytes],{type:d.mimeType});
-    const url=URL.createObjectURL(blob);
-    const isImg=d.mimeType.startsWith("image/");
-    const isVid=d.mimeType.startsWith("video/");
-    messages.push({from:d.handle,ts:new Date().toISOString(),isFile:true,
-      html:isImg?'<img src="'+url+'" style="max-width:300px;max-height:200px;border-radius:4px;display:block;margin-top:6px">':
-           isVid?'<video src="'+url+'" controls style="max-width:360px;border-radius:4px;display:block;margin-top:6px"></video>':
-           '<a href="'+url+'" download="'+d.fileName+'" style="color:#888;font-size:13px">⬇ '+d.fileName+' ('+(bytes.length/1024/1024).toFixed(1)+'MB)</a>'});
-    delete incomingFiles[id];
-    renderMessages();
-  }
+let msgSeq = 0;
+function sendMsg() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text || !ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: 'packet', chatHash: currentRoom, seq: ++msgSeq, payload: { pType: 'chat', text } }));
+    input.value = '';
 }
 
-function renderMessages(){
-  const el=document.getElementById("msg-list");
-  if(!el)return;
-  el.innerHTML=messages.map(m=>{
-    const isSystem=m.from==="system";
-    const isMe=m.from===handle;
-    const t=m.ts?m.ts.slice(11,19):"";
-    if(isSystem)return`<div style="text-align:center;font-size:11px;color:${V.q};font-family:${V.mono};padding:8px 0">${esc(m.text)}</div>`;
-    if(m.isFile)return`<div style="margin-bottom:12px">
-      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-        <span style="font-size:11px;font-family:${V.mono};color:${isMe?V.g:V.m};font-weight:500">${esc(m.from)}</span>
-        <span style="font-size:10px;color:${V.q};font-family:${V.mono}">${t}</span>
-      </div>
-      ${m.html}
-    </div>`;
-    return`<div style="margin-bottom:12px">
-      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-        <span style="font-size:11px;font-family:${V.mono};color:${isMe?V.g:V.m};font-weight:500">${esc(m.from)}</span>
-        <span style="font-size:10px;color:${V.q};font-family:${V.mono}">${t}</span>
-      </div>
-      <div style="font-size:13px;color:${isMe?V.t:V.m};line-height:1.5;max-width:600px">${esc(m.text)}</div>
-    </div>`;
-  }).join("");
-  el.scrollTop=el.scrollHeight;
+function copyInviteFromChat() {
+    navigator.clipboard.writeText(window.location.origin + '/chat?room=' + currentRoom).then(() => {
+        const btn = document.getElementById('invite-btn');
+        btn.textContent = '✓ Gekopieerd';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '⎘ Invite'; btn.classList.remove('copied'); }, 2000);
+    });
 }
 
-function sendMsg(){
-  const inp=document.getElementById("msg-input");
-  const text=inp.value.trim();
-  if(!text||!ws||ws.readyState!==1)return;
-  ws.send(JSON.stringify({type:"message",text,room,handle}));
-  addMsg(handle,text);
-  inp.value="";
+function leaveChat() {
+    if (ws) ws.close();
+    window.location.href = '/chat';
 }
 
-function renderChat(){
-  document.getElementById("root").innerHTML=`
-  <nav style="display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:1px solid ${V.b};flex-shrink:0">
-    <div style="display:flex;align-items:center;gap:16px">
-      <a href="/" style="font-family:${V.mono};font-size:13px;font-weight:500;letter-spacing:.08em;color:${V.t};text-decoration:none">PARAMANT</a>
-      <span style="font-size:12px;color:${V.q};font-family:${V.mono}"># ${esc(room)}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:16px">
-      <span style="font-size:11px;color:${V.g};font-family:${V.mono}">${esc(handle)}</span>
-      <button onclick="logout()" style="background:none;border:1px solid ${V.b};color:${V.q};border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer">Leave</button>
-    </div>
-  </nav>
-  <div id="msg-list" style="flex:1;overflow-y:auto;padding:24px 32px"></div>
-  <div style="border-top:1px solid ${V.b};padding:12px 20px;display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-    <div id="upload-progress" style="font-size:11px;font-family:${V.mono};color:${V.q};min-height:14px"></div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <label title="Attach file" style="cursor:pointer;padding:8px 10px;border:1px solid ${V.b};border-radius:5px;color:${V.q};font-size:14px;line-height:1;flex-shrink:0">
-        ⊕<input type="file" id="file-input" style="display:none" onchange="handleFile(this)">
-      </label>
-      <input id="msg-input" placeholder="Type a message..." style="flex:1;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none">
-      <button onclick="sendMsg()" style="background:${V.t};color:${V.bg};border:none;border-radius:5px;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;flex-shrink:0">Send</button>
-    </div>
-  </div>`;
-  document.getElementById("msg-input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey)sendMsg()});
-  renderMessages();
-}
-
-function logout(){apiKey="";if(ws)ws.close();ws=null;messages=[];renderLogin()}
-renderLogin();
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('join-screen').style.display !== 'none') joinRoom();
+});
 </script>
 </body>
 </html>
