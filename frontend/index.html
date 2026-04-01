@@ -430,35 +430,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   </div>
 </section>
 
-<hr class="divider">
-
-<section id="use-cases">
-  <div class="eyebrow">Use cases</div>
-  <h2>Built for regulated industries.</h2>
-  <p class="sub">Where a data breach has legal or medical consequences &mdash; and where proving data was not retained matters as much as the transfer itself.</p>
-  <div class="grid g2">
-    <div class="cell-s">
-      <h3>Healthcare</h3>
-      <p class="desc">DICOM files from MRI and CT scanners to PACS systems. HL7 FHIR resources between EPD systems. Patient vitals from ambulance to hospital. No data-at-rest, NEN 7510 ready.</p>
-      <span class="use-tag">health.paramant.app &middot; DICOM gateway &middot; FHIR bridge</span>
-    </div>
-    <div class="cell-s">
-      <h3>Legal &amp; notary</h3>
-      <p class="desc">Signed contracts between parties without a shared storage layer. Court documents, notarial deeds. Burn-on-read provides architectural proof that data was not retained after delivery.</p>
-      <span class="use-tag">legal.paramant.app &middot; Merkle audit &middot; DID auth</span>
-    </div>
-    <div class="cell-s">
-      <h3>Industrial IoT</h3>
-      <p class="desc">PLC and SCADA sensor data to cloud platforms without VPN overhead. NATS push, sub-100ms. Hardware-attested devices only. Works on Raspberry Pi, ESP32, and PLCs. IEC 62443 ready.</p>
-      <span class="use-tag">iot.paramant.app &middot; /v2/stream &middot; NATS &middot; TPM 2.0</span>
-    </div>
-    <div class="cell-s">
-      <h3>Finance</h3>
-      <p class="desc">Bank-to-notary document transport. Trading system compliance logging. Private key material transfer and signing ceremonies. Hosted on Hetzner DE &mdash; no US CLOUD Act exposure.</p>
-      <span class="use-tag">finance.paramant.app &middot; EU/DE jurisdiction only</span>
-    </div>
-  </div>
-</section>
 
 <hr class="divider">
 
@@ -501,7 +472,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       <p class="desc" style="margin-bottom:16px">MRI and CT scanners produce DICOM files that must reach the radiologist in milliseconds. Current solutions: SFTP (leaves files on server), S3 (plaintext at rest), VPN (complex, breaks at firewalls). A data breach in healthcare costs on average €4.2M and triggers NEN 7510 liability.</p>
       <h3>Solution</h3>
       <p class="desc">DICOM → Ghost Pipe → PACS. Zero storage. The file exists for the duration of the transfer, then burns. The radiologist receives it; no one else ever could. No NEN 7510 audit trail needed — there is nothing to audit.</p>
-      <span class="tag">health.paramant.app · DICOM gateway</span>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Legal &amp; Notary</div>
@@ -509,7 +480,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       <p class="desc" style="margin-bottom:16px">Lawyers exchange signed contracts over email (unencrypted), WeTransfer (stored), or secure email (still stored somewhere). The moment a file lands on a server, it can be subpoenaed, hacked, or leaked. Legal professional privilege does not survive a server breach.</p>
       <h3>Solution</h3>
       <p class="desc">Contract → Ghost Pipe → counterparty. Burn-on-read means after the notary retrieves the document, it is cryptographically gone. The Merkle audit log proves it was delivered without storing what was delivered.</p>
-      <span class="tag">legal.paramant.app · Merkle audit</span>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Industrial IoT</div>
@@ -517,7 +488,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       <p class="desc" style="margin-bottom:16px">PLCs and SCADA sensors produce sensitive operational data — energy consumption, production volumes, process temperatures. Sending this over plain MQTT or HTTP leaks competitive intelligence. VPNs add latency and fail at scale. IEC 62443 requires encrypted transport with device identity.</p>
       <h3>Solution</h3>
       <p class="desc">Sensor → Ghost Pipe → cloud dashboard. Sub-100ms via NATS push. Hardware-attested device identity via TPM 2.0. No VPN, no certificates to manage, no IT overhead. Works on ESP32 and Raspberry Pi.</p>
-      <span class="tag">iot.paramant.app · NATS · TPM 2.0</span>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Finance &amp; Compliance</div>
@@ -525,7 +496,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       <p class="desc" style="margin-bottom:16px">Banks sending documents to notaries, trading systems logging compliance data, private key material transfer between signing parties — all currently using TLS over HTTP, which means the transport provider can see metadata, timing, and payload size. US CLOUD Act means any US-hosted service can be compelled to hand over data.</p>
       <h3>Solution</h3>
       <p class="desc">All traffic on finance.paramant.app is hosted exclusively on Hetzner Frankfurt. No US infrastructure, no US CLOUD Act exposure. 5MB fixed padding means all transfers look identical — no metadata leakage.</p>
-      <span class="tag">finance.paramant.app · EU/DE only</span>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
   </div>
 
