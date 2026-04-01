@@ -97,48 +97,79 @@ async function runE2ETest(){
   if(testRunning){addTestLog("Test al actief","warn");return}
   if(!apiKey){addTestLog("Geen API key","error");return}
   testRunning=true;testLog=[];
-  addTestLog("E2E test gestart","info");
-  addTestLog("Relay: "+relay.u,"info");
+  addTestLog("E2E test gestart — "+relay.u,"info");
   try{
-    addTestLog("Stap 1/5 — relay health check","info");
-    const h=await fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)});
-    const hd=await h.json();
+    // Stap 1 — Health
+    addTestLog("1/6 — Relay health check","info");
+    const hd=await fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
     if(!hd.ok)throw new Error("Relay unhealthy");
     addTestLog("Relay v"+hd.version+" | uptime "+hd.uptime_s+"s","ok");
 
-    addTestLog("Stap 2/5 — API key valideren","info");
-    const k=await fetch(relay.u+"/v2/check-key?k="+apiKey,{signal:AbortSignal.timeout(5000)});
-    const kd=await k.json();
+    // Stap 2 — API key
+    addTestLog("2/6 — API key valideren","info");
+    const kd=await fetch(relay.u+"/v2/check-key?k="+apiKey,{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
     if(!kd.valid)throw new Error("API key ongeldig");
     addTestLog("Key geldig | plan: "+kd.plan,"ok");
 
-    addTestLog("Stap 3/5 — pubkey registreren","info");
-    const testDevice="dashboard-e2e-"+Date.now();
-    const pkBody=JSON.stringify({device_id:testDevice,ecdh_pub:"04"+Array(64).fill(0).map(()=>Math.floor(Math.random()*16).toString(16)).join("")});
-    const pk=await fetch(relay.u+"/v2/pubkey",{
-      method:"POST",headers:{"Content-Type":"application/json","X-Api-Key":apiKey},
-      body:pkBody,signal:AbortSignal.timeout(8000)
+    // Stap 3 — Upload blob (JSON format: sector relay verwacht {hash,payload,ttl_ms})
+    addTestLog("3/6 — 5MB testblob uploaden...","info");
+    const payload=new TextEncoder().encode("PARAMANT-E2E-"+Date.now());
+    const blobBuf=new Uint8Array(5242880);
+    blobBuf.set(payload);
+    // SHA-256 hash van raw blob
+    const hashBuf=await crypto.subtle.digest("SHA-256",blobBuf);
+    const hash=Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    // Base64 encode in chunks (5MB past niet in één btoa call)
+    let b64="";
+    const chunk=8192;
+    for(let i=0;i<blobBuf.length;i+=chunk){b64+=String.fromCharCode(...blobBuf.subarray(i,i+chunk));}
+    b64=btoa(b64);
+    const body=JSON.stringify({hash,payload:b64,ttl_ms:300000});
+    const t0=Date.now();
+    const up=await fetch(relay.u+"/v2/inbound",{
+      method:"POST",
+      headers:{"X-Api-Key":apiKey,"Content-Type":"application/json"},
+      body,signal:AbortSignal.timeout(30000)
     });
-    const pkd=await pk.json();
-    if(!pkd.ok)throw new Error("Pubkey registratie mislukt");
-    addTestLog("Pubkeys geregistreerd voor "+testDevice,"ok");
+    if(!up.ok){const err=await up.json().catch(()=>({}));throw new Error("Upload HTTP "+up.status+(err.error?" — "+err.error:""));}
+    const upRes=await up.json();
+    if(!upRes.ok&&!upRes.hash)throw new Error("Upload mislukt: "+(upRes.error||"onbekend"));
+    const upMs=Date.now()-t0;
+    addTestLog("Verstuurd in "+upMs+"ms | hash: "+hash.slice(0,16)+"...","ok");
 
-    addTestLog("Stap 4/5 — monitor data ophalen","info");
-    const m=await fetch(relay.u+"/v2/monitor?k="+apiKey,{signal:AbortSignal.timeout(8000)});
-    const md=await m.json();
-    if(md.ok){
-      const dl=md.delivery||{};
-      addTestLog("Monitor: "+(dl.total||0)+" verzonden, "+(dl.acked||0)+" bevestigd","ok");
-    }
+    // Stap 4 — Status check
+    addTestLog("4/6 — Status verificatie","info");
+    const st=await fetch(relay.u+"/v2/status/"+hash,{
+      headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)
+    }).then(r=>r.json());
+    if(!st.available)throw new Error("Blob niet beschikbaar na upload");
+    addTestLog("Blob aanwezig in RAM | "+Math.round((st.size||5*1024*1024)/1024)+"KB","ok");
 
-    addTestLog("Stap 5/5 — CT log controleren","info");
-    const ct=await fetch(relay.u+"/v2/ct/log?limit=3",{signal:AbortSignal.timeout(5000)});
-    const ctd=await ct.json();
-    addTestLog("CT log: "+(ctd.size||0)+" entries | root: "+(ctd.root||"").slice(0,16)+"...","ok");
+    // Stap 5 — Download + burn
+    addTestLog("5/6 — Download + burn-on-read","info");
+    const t1=Date.now();
+    const dl=await fetch(relay.u+"/v2/outbound/"+hash,{
+      headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(30000)
+    });
+    if(!dl.ok)throw new Error("Download HTTP "+dl.status);
+    const received=await dl.arrayBuffer();
+    const dlMs=Date.now()-t1;
+    addTestLog("Ontvangen in "+dlMs+"ms | "+Math.round(received.byteLength/1024)+"KB","ok");
 
+    // Stap 6 — Burn verificatie
+    addTestLog("6/6 — Burn verificatie","info");
+    await new Promise(r=>setTimeout(r,300));
+    const burned=await fetch(relay.u+"/v2/status/"+hash,{
+      headers:{"X-Api-Key":apiKey}
+    }).then(r=>r.json()).catch(()=>({available:false}));
+    if(burned.available)throw new Error("Blob nog beschikbaar na read — burn-on-read defect");
+    addTestLog("Blob vernietigd na download","ok");
+
+    const total=upMs+dlMs;
     addTestLog("","info");
-    addTestLog("E2E test geslaagd — alle systemen operationeel","ok");
-    data=md;lastPoll=new Date();softRender();
+    addTestLog("E2E geslaagd in "+(upMs+dlMs)+"ms | upload: "+upMs+"ms | download: "+dlMs+"ms","ok");
+    // Refresh monitor data
+    fetchMonitor();
   }catch(e){addTestLog("Test mislukt: "+e.message,"error")}
   testRunning=false;
 }
