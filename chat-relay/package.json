@@ -1,6 +1,0 @@
-{
-  "name": "paramant-chat-relay",
-  "version": "1.0.0",
-  "main": "relay.js",
-  "dependencies": { "ws": "^8.18.0" }
-}
