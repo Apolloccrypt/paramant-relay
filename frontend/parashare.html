@@ -613,7 +613,11 @@ async function doSend() {
       // Pad to exactly 5MB
       const padded = new Uint8Array(C.BLOCK);
       padded.set(encResult.packet);
-      padded.set(crypto.getRandomValues(new Uint8Array(C.BLOCK - encResult.packet.byteLength)), encResult.packet.byteLength);
+      // getRandomValues max 65536 bytes per call — fill padding in slices
+      const padOff = encResult.packet.byteLength;
+      for (let p = padOff; p < C.BLOCK; p += 65536) {
+        crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, C.BLOCK)));
+      }
 
       // Hash
       const hashBuf = await crypto.subtle.digest('SHA-256', padded);
