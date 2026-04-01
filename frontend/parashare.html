@@ -408,7 +408,7 @@ async function decryptBlob(raw) {
   return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
 }
 
-window.PARASHARE_CRYPTO = { encryptPQ, encryptAES, decryptBlob, toB64, BLOCK };
+window.PARASHARE_CRYPTO = { encryptPQ, encryptAES, decryptBlob, toB64, concat, BLOCK };
 window.dispatchEvent(new Event('crypto-ready'));
 </script>
 <script>
@@ -499,7 +499,8 @@ function setFile(f) {
   }
   file = f;
   $('fname').textContent = f.name;
-  $('fsize').textContent = fmt(f.size);
+  const chunks = Math.ceil(f.size / (4.9 * 1024 * 1024));
+  $('fsize').textContent = fmt(f.size) + (chunks > 1 ? ` · ${chunks} chunks` : '');
   dz.classList.add('filled');
   hide('drop-empty'); show('drop-filled');
   $('key-card').style.display = '';
@@ -559,75 +560,100 @@ async function doSend() {
   }
 
   try {
-    // Wait for crypto module (loaded async via type="module")
     if (!window.PARASHARE_CRYPTO) {
       await new Promise(r => window.addEventListener('crypto-ready', r, { once: true }));
     }
     const C = window.PARASHARE_CRYPTO;
+
+    // Chunk constants
+    const CHUNK_BYTES = 4.9 * 1024 * 1024; // 4.9MB plaintext per chunk
+    // Magic signature for metadata header inside each encrypted chunk
+    const META_MAGIC  = new Uint8Array([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
 
     setProgress(5, 'Validating key...');
     const kr = await fetch(`${RELAY}/v2/check-key?k=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(6000) });
     const kd = await kr.json();
     if (!kd.valid) throw new Error('API key invalid');
 
-    setProgress(15, 'Reading file...');
-    const fileBytes = new Uint8Array(await file.arrayBuffer());
+    setProgress(10, 'Reading file...');
+    const fileBytes   = new Uint8Array(await file.arrayBuffer());
+    const totalChunks = Math.ceil(fileBytes.length / CHUNK_BYTES) || 1;
+    const fileId      = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+    const ttl         = totalChunks > 1 ? 900000 : 300000; // 15 min for multi-chunk
 
-    setProgress(30, 'Fetching receiver keys...');
-    let receiverPubs = null;
-    try {
-      const rp = await fetch(`${RELAY}/v2/pubkey/parashare-relay`, {
-        headers: { 'X-Api-Key': apiKey, 'User-Agent': 'parashare/2.0' },
-        signal: AbortSignal.timeout(5000)
+    const tokens = [];
+
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkStart = Math.round(i * CHUNK_BYTES);
+      const chunkEnd   = Math.min(chunkStart + CHUNK_BYTES, fileBytes.length);
+      const chunkData  = fileBytes.slice(chunkStart, chunkEnd);
+
+      const pct = Math.round(12 + (i / totalChunks) * 72);
+      setProgress(pct, totalChunks > 1
+        ? `Encrypting chunk ${i + 1}/${totalChunks} (${fmt(chunkData.length)})...`
+        : 'Encrypting — AES-256-GCM...');
+
+      // Build payload: META_MAGIC(4) | metaLen(4) | meta JSON | chunkData
+      const metaJson  = JSON.stringify({
+        file_id: fileId, file_name: file.name, file_size: fileBytes.length,
+        chunk_index: i, total_chunks: totalChunks, chunk_size: chunkData.length,
       });
-      const rd = await rp.json();
-      if (rd.ok && rd.ecdh_pub) receiverPubs = rd;
-    } catch {}
+      const metaBytes = new TextEncoder().encode(metaJson);
+      const metaLen   = new Uint8Array(4);
+      new DataView(metaLen.buffer).setUint32(0, metaBytes.length, false);
+      const payload = C.concat(META_MAGIC, metaLen, metaBytes, chunkData);
 
-    let encResult;
-    if (receiverPubs) {
-      setProgress(45, 'Encrypting — ML-KEM-768 + ECDH P-256...');
-      encResult = await C.encryptPQ(fileBytes, receiverPubs);
-    } else {
-      setProgress(45, 'Encrypting — AES-256-GCM...');
-      encResult = await C.encryptAES(fileBytes);
+      // Encrypt with AES-256-GCM (0x01 format via encryptAES)
+      const encResult = await C.encryptAES(payload);
+
+      if (encResult.packet.byteLength > C.BLOCK) {
+        throw new Error(`Chunk ${i + 1} too large after encryption (${fmt(encResult.packet.byteLength)}).`);
+      }
+
+      // Pad to exactly 5MB
+      const padded = new Uint8Array(C.BLOCK);
+      padded.set(encResult.packet);
+      padded.set(crypto.getRandomValues(new Uint8Array(C.BLOCK - encResult.packet.byteLength)), encResult.packet.byteLength);
+
+      // Hash
+      const hashBuf = await crypto.subtle.digest('SHA-256', padded);
+      const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // Upload
+      const body = JSON.stringify({
+        hash, payload: C.toB64(padded), ttl_ms: ttl,
+        meta: {
+          device_id: 'parashare-web', file_name: file.name, file_size: file.size,
+          chunk_index: i, total_chunks: totalChunks, file_id: fileId,
+        }
+      });
+
+      const ur = await fetch(`${RELAY}/v2/inbound`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'User-Agent': 'parashare/2.0' },
+        body, signal: AbortSignal.timeout(120000),
+      });
+      const ud = await ur.json();
+      if (!ud.ok) {
+        if (ur.status === 503) throw new Error('Relay at capacity. Please try again in 10 seconds.');
+        throw new Error(ud.error || `Upload failed for chunk ${i + 1}`);
+      }
+      tokens.push(ud.download_token);
+      await sleep(30);
     }
 
-    if (encResult.packet.byteLength > C.BLOCK) {
-      throw new Error(`File too large after encryption (${fmt(encResult.packet.byteLength)}). Max ~4.9MB.`);
-    }
-
-    setProgress(62, 'Padding to fixed 5MB...');
-    const padded = new Uint8Array(C.BLOCK);
-    padded.set(encResult.packet);
-    padded.set(crypto.getRandomValues(new Uint8Array(C.BLOCK - encResult.packet.byteLength)), encResult.packet.byteLength);
-
-    setProgress(72, 'Computing hash...');
-    const hashBuf = await crypto.subtle.digest('SHA-256', padded);
-    const hash = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
-
-    setProgress(82, 'Uploading to relay...');
-    const body = JSON.stringify({
-      hash, payload: C.toB64(padded), ttl_ms: 300000,
-      meta: { device_id: 'parashare-web', file_name: file.name, file_size: file.size }
-    });
-
-    const ur = await fetch(`${RELAY}/v2/inbound`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'User-Agent': 'parashare/2.0' },
-      body, signal: AbortSignal.timeout(60000),
-    });
-    const ud = await ur.json();
-    if (!ud.ok) throw new Error(ud.error || 'Upload failed');
-
-    setProgress(100, 'Done');
-    await sleep(250);
+    setProgress(90, 'Generating link...');
+    await sleep(150);
 
     const encEl = $('enc-display');
-    if (encEl) encEl.textContent = encResult.alg;
+    if (encEl) encEl.textContent = 'AES-256-GCM' + (totalChunks > 1 ? ` · ${totalChunks} chunks` : '');
 
-    expiresAt = Date.now() + 300000;
-    $('share-link').textContent = `${BASE_URL}?t=${ud.download_token}`;
+    expiresAt = Date.now() + ttl;
+    const shareUrl = `${BASE_URL}?t=${encodeURIComponent(tokens.join(','))}&n=${encodeURIComponent(file.name)}&c=${totalChunks}`;
+    $('share-link').textContent = shareUrl;
+
+    setProgress(100, 'Done');
+    await sleep(200);
     startTTLCountdown('ttl-display');
     showScreen('screen-sent');
 
@@ -645,12 +671,21 @@ function showErr(msg) {
 
 // ── RECEIVE ──────────────────────────────────────────────────────────
 function initReceive(tok) {
-  const t = tok || params.get('t');
-  if (!t) return;
+  const raw = tok || params.get('t');
+  if (!raw) return;
 
-  // Probe token info (non-burning)
-  fetch(`${RELAY}/v2/dl/${t}/info`, {
-    headers: { 'User-Agent': 'parashare/1.0' },
+  // For multi-chunk: probe only first token for info
+  const firstToken = decodeURIComponent(raw).split(',')[0].trim();
+  const totalChunks = parseInt(params.get('c') || '1');
+  const fileName = params.get('n') ? decodeURIComponent(params.get('n')) : null;
+
+  if (totalChunks > 1 && fileName) {
+    $('recv-fname').textContent = fileName;
+    show('recv-file-info');
+  }
+
+  fetch(`${RELAY}/v2/dl/${firstToken}/info`, {
+    headers: { 'User-Agent': 'parashare/2.0' },
     signal: AbortSignal.timeout(8000)
   })
   .then(r => r.json())
@@ -660,52 +695,79 @@ function initReceive(tok) {
       hide('recv-loading'); show('recv-error'); return;
     }
     if (d.file_name) {
-      $('recv-fname').textContent = d.file_name;
+      $('recv-fname').textContent = d.file_name + (totalChunks > 1 ? ` (${totalChunks} chunks)` : '');
       $('recv-fsize').textContent = fmt(d.file_size || 0);
       show('recv-file-info');
     }
     expiresAt = Date.now() + (d.ttl_left_s || 300) * 1000;
     startTTLCountdown('recv-ttl');
   })
-  .catch(() => {
-    // relay unreachable or unknown token — show page anyway, let download button reveal the truth
-  });
+  .catch(() => {});
 
-  $('btn-download').addEventListener('click', () => doDownload(t));
+  $('btn-download').addEventListener('click', () => doDownload(raw));
 }
 
-async function doDownload(tok) {
+async function doDownload(rawTok) {
   hide('recv-loading'); show('recv-downloading');
+
+  const statusEl = $('recv-downloading');
+
   try {
-    // Wait for crypto module
     if (!window.PARASHARE_CRYPTO) {
       await new Promise(r => window.addEventListener('crypto-ready', r, { once: true }));
     }
     const C = window.PARASHARE_CRYPTO;
 
-    const r = await fetch(`${RELAY}/v2/dl/${tok}`, {
-      headers: { 'User-Agent': 'parashare/2.0' },
-      signal: AbortSignal.timeout(60000)
-    });
+    const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
+    const tokens     = decodeURIComponent(rawTok).split(',').map(t => t.trim()).filter(Boolean);
+    const fileName   = params.get('n') ? decodeURIComponent(params.get('n')) : 'parashare-download';
+    const allChunks  = [];
 
-    if (r.status === 404 || r.status === 410) {
-      hide('recv-downloading'); show('recv-error');
-      $('recv-err-msg').textContent = r.status === 410
-        ? 'This file has already been downloaded and destroyed.'
-        : 'This link has expired or the file no longer exists.';
-      return;
+    for (let i = 0; i < tokens.length; i++) {
+      // Update progress message
+      const pDiv = statusEl.querySelector('p.sub') || statusEl.querySelector('p');
+      if (pDiv) pDiv.textContent = tokens.length > 1
+        ? `Downloading chunk ${i + 1} of ${tokens.length}...`
+        : 'The file is being retrieved. This happens once.';
+
+      const r = await fetch(`${RELAY}/v2/dl/${tokens[i]}`, {
+        headers: { 'User-Agent': 'parashare/2.0' },
+        signal: AbortSignal.timeout(120000)
+      });
+
+      if (r.status === 404 || r.status === 410) {
+        hide('recv-downloading'); show('recv-error');
+        $('recv-err-msg').textContent = r.status === 410
+          ? 'This file has already been downloaded and destroyed.'
+          : 'This link has expired or the file no longer exists.';
+        return;
+      }
+      if (!r.ok) throw new Error('Server error: ' + r.status);
+
+      const raw   = new Uint8Array(await r.arrayBuffer());
+      const plain = await C.decryptBlob(raw);
+
+      // Check for PRSH metadata header
+      const hasMeta = plain[0] === 0x50 && plain[1] === 0x52 && plain[2] === 0x53 && plain[3] === 0x48;
+      let chunkData;
+      if (hasMeta) {
+        const metaLen = new DataView(plain.buffer).getUint32(4, false);
+        chunkData = plain.slice(8 + metaLen);
+      } else {
+        chunkData = plain; // legacy: full plaintext is the file
+      }
+      allChunks.push(chunkData);
     }
-    if (!r.ok) throw new Error('Server error: ' + r.status);
 
-    const raw   = new Uint8Array(await r.arrayBuffer());
-    const plain = await C.decryptBlob(raw);
+    // Reassemble
+    const totalSize = allChunks.reduce((s, c) => s + c.length, 0);
+    const assembled = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of allChunks) { assembled.set(chunk, offset); offset += chunk.length; }
 
-    const cd    = r.headers.get('Content-Disposition') || '';
-    const fname = cd.match(/filename="([^"]+)"/)?.[1] || 'parashare-download';
-
-    const url = URL.createObjectURL(new Blob([plain]));
+    const url = URL.createObjectURL(new Blob([assembled]));
     const a   = document.createElement('a');
-    a.href = url; a.download = fname; a.click();
+    a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
 
     hide('recv-downloading'); show('recv-done');
