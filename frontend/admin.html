@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Admin</title>
+<title>PARAMANT</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0c0c0c;--sur:#111;--b:#1a1a1a;--bs:#141414;--t:#ededed;--m:#888;--q:#555;--g:#2d6a4f;--r:#8c3a3a;--y:#8c7a2d;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
@@ -187,14 +187,18 @@ function render(){
     document.getElementById("root").innerHTML=
       '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">'+
       '<div style="width:100%;max-width:360px">'+
-      '<div style="font-family:'+V.mono+';font-size:13px;color:'+V.q+';margin-bottom:8px">PARAMANT / admin</div>'+
+      '<div style="font-family:'+V.mono+';font-size:13px;color:'+V.q+';margin-bottom:8px">PARAMANT / r34ct0r</div>'+
       '<h2 style="font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px">Admin panel</h2>'+
-      '<p style="font-size:13px;color:'+V.m+';margin-bottom:32px;line-height:1.6">Enter your admin API key to access relay monitoring, key management, and audit logs.</p>'+
+      '<p style="font-size:13px;color:'+V.m+';margin-bottom:32px;line-height:1.6">Two-factor authentication required.</p>'+
       '<label style="display:block;font-size:11px;font-family:'+V.mono+';color:'+V.q+';letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Admin API key</label>'+
-      '<input id="ki" placeholder="pgp_..." style="width:100%;background:'+V.sur+';border:1px solid '+V.b+';border-radius:5px;padding:10px 14px;color:'+V.t+';font-size:13px;outline:none;margin-bottom:24px;font-family:'+V.mono+'">'+
+      '<input id="ki" placeholder="pgp_..." style="width:100%;background:'+V.sur+';border:1px solid '+V.b+';border-radius:5px;padding:10px 14px;color:'+V.t+';font-size:13px;outline:none;margin-bottom:16px;font-family:'+V.mono+'">'+
+      '<label style="display:block;font-size:11px;font-family:'+V.mono+';color:'+V.q+';letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">TOTP code <span style="font-weight:400">(Authenticator app)</span></label>'+
+      '<input id="totp" placeholder="000000" maxlength="6" autocomplete="one-time-code" style="width:100%;background:'+V.sur+';border:1px solid '+V.b+';border-radius:5px;padding:10px 14px;color:'+V.t+';font-size:22px;outline:none;margin-bottom:24px;font-family:'+V.mono+';letter-spacing:.3em" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')">'+
       '<button onclick="doLogin()" style="width:100%;background:'+V.t+';color:'+V.bg+';border:none;border-radius:5px;padding:11px;font-size:13px;font-weight:500;cursor:pointer">Sign in</button>'+
+      '<p style="font-size:11px;color:'+V.q+';margin-top:16px;text-align:center">MFA required. Open Authenticator app for code.</p>'+
       '</div></div>';
-    document.getElementById("ki").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin()});
+    document.getElementById("ki").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("totp").focus()});
+    document.getElementById("totp").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin()});
     return;
   }
 
@@ -202,7 +206,7 @@ function render(){
   '<nav style="display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid '+V.b+';position:sticky;top:0;background:rgba(12,12,12,.95);z-index:100">'+
   '<div style="display:flex;align-items:center;gap:20px">'+
   '<span style="font-family:'+V.mono+';font-size:13px;font-weight:500;letter-spacing:.08em;color:'+V.t+'">PARAMANT</span>'+
-  '<span style="font-size:12px;color:'+V.q+';font-family:'+V.mono+'">/ admin</span></div>'+
+  '<span style="font-size:12px;color:'+V.q+';font-family:'+V.mono+'">/ r34ct0r</span></div>'+
   '<div style="display:flex;align-items:center;gap:12px">'+
   '<select onchange="selectedRelay=RELAYS.find(r=>r.u===this.value)||RELAYS[0];loadRelayData(selectedRelay)" style="background:'+V.sur+';border:1px solid '+V.b+';border-radius:4px;padding:5px 10px;color:'+V.t+';font-size:12px;font-family:'+V.mono+'">'+
   RELAYS.map(r=>'<option value="'+r.u+'">'+r.l+'</option>').join("")+
@@ -276,12 +280,23 @@ function render(){
 
 async function doLogin(){
   const k=document.getElementById("ki").value.trim();
-  if(!k.startsWith("pgp_"))return;
+  const totp=document.getElementById("totp").value.trim();
+  if(!k.startsWith("pgp_")){addLog("Invalid key format","error");return}
+  if(totp.length!==6){addLog("TOTP must be 6 digits","error");return}
+  addLog("Validating credentials...","info");
   const r=await fetch("https://health.paramant.app/v2/check-key?k="+k,{signal:AbortSignal.timeout(5000)});
   const d=await r.json().catch(()=>({}));
-  if(!d.valid){addLog("Invalid key","error");return}
+  if(!d.valid){addLog("Invalid API key","error");return}
+  const mfa=await fetch("https://health.paramant.app/v2/admin/verify-mfa",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-Api-Key":k,"X-Admin-Token":k},
+    body:JSON.stringify({totp_code:totp}),
+    signal:AbortSignal.timeout(5000)
+  });
+  const md=await mfa.json().catch(()=>({}));
+  if(!md.ok){addLog("Invalid TOTP code — check Authenticator app","error");return}
   adminKey=k;
-  addLog("Signed in | plan: "+d.plan,"ok");
+  addLog("Signed in | plan: "+d.plan+" | MFA verified","ok");
   render();
 }
 

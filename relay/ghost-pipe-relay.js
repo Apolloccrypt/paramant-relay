@@ -44,11 +44,11 @@ const ALLOWED = {
   ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
-               '/v2/did','/v2/ct','/v2/attest','/metrics'],
+               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
-               '/v2/did','/v2/ct','/v2/attest','/metrics'],
+               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics'],
   full:       null,
 };
 
@@ -192,6 +192,41 @@ function renderPrometheus() {
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
   return L.join('\n')+'\n';
+}
+
+// ── TOTP verificatie (RFC 6238) ───────────────────────────────────────────────
+const TOTP_SECRET = process.env.TOTP_SECRET || '';
+const TOTP_WINDOW = 1;
+
+function base32Decode(s) {
+  const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0, value = 0, output = [];
+  s = s.toUpperCase().replace(/=+$/, '');
+  for (const c of s) {
+    value = (value << 5) | alpha.indexOf(c);
+    bits += 5;
+    if (bits >= 8) { output.push((value >>> (bits - 8)) & 0xFF); bits -= 8; }
+  }
+  return Buffer.from(output);
+}
+
+function totpCode(secret, counter) {
+  const key = base32Decode(secret);
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64BE(BigInt(counter));
+  const mac = crypto.createHmac('sha1', key).update(buf).digest();
+  const offset = mac[mac.length - 1] & 0xf;
+  const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
+  return code.toString().padStart(6, '0');
+}
+
+function verifyTotp(token) {
+  if (!TOTP_SECRET) return false;
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
+    if (totpCode(TOTP_SECRET, counter + i) === token) return true;
+  }
+  return false;
 }
 
 // ── RAM-only stores ───────────────────────────────────────────────────────────
@@ -640,6 +675,67 @@ const server = http.createServer(async (req, res) => {
       log('info', 'ack_received', { hash: d.hash.slice(0,16) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, hash: d.hash }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/verify-mfa ─────────────────────────────────────────────
+  if (path === '/v2/admin/verify-mfa' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const tok = req.headers['x-admin-token'] || '';
+      if (!tok || !apiKeys.has(tok)) {
+        res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
+      }
+      const valid = verifyTotp(d.totp_code || '');
+      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: req.socket?.remoteAddress });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: valid, error: valid ? null : 'Invalid TOTP code' }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
+  if (path === '/v2/admin/keys' && req.method === 'POST') {
+    const tok = req.headers['x-admin-token'] || '';
+    if (!tok || !apiKeys.has(tok)) {
+      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
+    }
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      const newKey = 'pgp_' + crypto.randomBytes(16).toString('hex');
+      apiKeys.set(newKey, { plan: d.plan || 'pro', label: d.label || '', active: true });
+      log('info', 'key_created_via_admin', { label: d.label, plan: d.plan });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, key: newKey, plan: d.plan, label: d.label }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── GET /v2/admin/keys ────────────────────────────────────────────────────
+  if (path === '/v2/admin/keys' && req.method === 'GET') {
+    const tok = req.headers['x-admin-token'] || '';
+    if (!tok || !apiKeys.has(tok)) {
+      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
+    }
+    const keys = [...apiKeys.entries()].map(([k, v]) => ({
+      key: k, plan: v.plan, label: v.label, active: v.active
+    }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, count: keys.length, keys }));
+  }
+
+  // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
+  if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
+    const tok = req.headers['x-admin-token'] || '';
+    if (!tok || !apiKeys.has(tok)) {
+      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
+    }
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      if (apiKeys.has(d.key)) {
+        apiKeys.get(d.key).active = false;
+        log('info', 'key_revoked_via_admin', { key: d.key.slice(0,16) });
+        res.writeHead(200); return res.end(J({ ok: true }));
+      }
+      res.writeHead(404); return res.end(J({ error: 'Key not found' }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
