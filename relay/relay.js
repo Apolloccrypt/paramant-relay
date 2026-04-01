@@ -442,6 +442,9 @@ const server = http.createServer(async (req, res) => {
   const path    = parsed.pathname;
   const query   = parsed.query;
   const apiKey  = (req.headers['x-api-key'] || query.k || '').trim();
+  if (query.k) {
+    log('warn', 'key_in_querystring', { path: path.slice(0,40), ip: (req.socket?.remoteAddress||'').slice(0,15) });
+  }
   const didHeader = req.headers['x-did'] || '';
   const didSig    = req.headers['x-did-signature'] || '';
   let didAuthEntry = null;
@@ -458,21 +461,23 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /health ─────────────────────────────────────────────────────────────
   if (path === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({
-      ok: true, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
-      blobs: blobStore.size, pubkeys: pubkeys.size,
-      webhooks: [...webhooks.values()].flat().length,
-      uptime_s: Math.floor(process.uptime()),
-      stats, ...ramStatus(),
-      protocol: 'ghost-pipe-v2',
+    const adminTok = (req.headers['x-admin-token'] || '').trim();
+    const adminOk  = adminTok && adminTok === (process.env.ADMIN_TOKEN || '');
+    const ram = ramStatus();
+    const base = { ok: true, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
+      uptime_s: Math.floor(process.uptime()), blobs: blobStore.size,
+      ram_ok: ram.ram_ok, available_slots: ram.available_slots };
+    const full = { ...base, ...ram, pubkeys: pubkeys.size,
+      webhooks: [...webhooks.values()].flat().length, stats,
+      quantum_ready: true, protocol: 'ghost-pipe-v2',
       encryption: 'ML-KEM-768 + ECDH P-256 + AES-256-GCM',
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
       padding: '5MB fixed (DPI-masking)',
-      jurisdiction: 'EU/DE, GDPR, no US CLOUD Act',
-    }));
+      jurisdiction: 'EU/DE, GDPR, no US CLOUD Act' };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J(adminOk ? full : base));
   }
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
@@ -720,6 +725,9 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/audit — Merkle chain audit log ───────────────────────────────────
   if (path === '/v2/audit') {
+    if (!apiKey || !apiKeys.has(apiKey) || apiKeys.get(apiKey)?.active === false) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' }));
+    }
     const limit   = Math.min(parseInt(query.limit || '100'), MAX_AUDIT);
     const entries = (auditChain.get(apiKey) || []).slice(-limit).reverse();
     const valid   = verifyChain([...(auditChain.get(apiKey) || [])]);
