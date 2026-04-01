@@ -79,6 +79,7 @@ function connectWS(){
       try{
         const d=JSON.parse(e.data);
         if(d.type==="message")addMsg(d.from,d.text,d.ts);
+        else if(d.type==="file_chunk")handleFileChunk(d);
         else if(d.type==="join")addMsg("system",d.handle+" joined");
         else if(d.type==="leave")addMsg("system",d.handle+" left");
       }catch{}
@@ -94,6 +95,51 @@ function addMsg(from,text,ts){
   renderMessages();
 }
 
+const CHUNK=4*1024*1024;
+const incomingFiles={};
+
+async function handleFile(input){
+  const file=input.files[0];
+  if(!file)return;
+  if(!ws||ws.readyState!==1){addMsg("system","Not connected");return}
+  const totalChunks=Math.ceil(file.size/CHUNK);
+  const fileId=Date.now().toString(36);
+  const prog=document.getElementById("upload-progress");
+  addMsg("system","Sending: "+file.name+" ("+totalChunks+" chunk"+(totalChunks>1?"s":"")+", "+(file.size/1024/1024).toFixed(1)+"MB)");
+  for(let i=0;i<totalChunks;i++){
+    const buf=await file.slice(i*CHUNK,(i+1)*CHUNK).arrayBuffer();
+    const b64=btoa(String.fromCharCode(...new Uint8Array(buf)));
+    ws.send(JSON.stringify({type:"file_chunk",fileId,fileName:file.name,fileSize:file.size,
+      mimeType:file.type||"application/octet-stream",chunkIndex:i,totalChunks,data:b64,room,handle}));
+    if(prog)prog.textContent="Uploading "+file.name+": "+(i+1)+"/"+totalChunks;
+    await new Promise(r=>setTimeout(r,50));
+  }
+  if(prog)prog.textContent="";
+  addMsg(handle,"📎 Sent: "+file.name);
+  input.value="";
+}
+
+function handleFileChunk(d){
+  const id=d.fileId;
+  if(!incomingFiles[id])incomingFiles[id]={chunks:{},meta:d};
+  incomingFiles[id].chunks[d.chunkIndex]=d.data;
+  if(Object.keys(incomingFiles[id].chunks).length===d.totalChunks){
+    let combined="";
+    for(let i=0;i<d.totalChunks;i++)combined+=incomingFiles[id].chunks[i];
+    const bytes=Uint8Array.from(atob(combined),c=>c.charCodeAt(0));
+    const blob=new Blob([bytes],{type:d.mimeType});
+    const url=URL.createObjectURL(blob);
+    const isImg=d.mimeType.startsWith("image/");
+    const isVid=d.mimeType.startsWith("video/");
+    messages.push({from:d.handle,ts:new Date().toISOString(),isFile:true,
+      html:isImg?'<img src="'+url+'" style="max-width:300px;max-height:200px;border-radius:4px;display:block;margin-top:6px">':
+           isVid?'<video src="'+url+'" controls style="max-width:360px;border-radius:4px;display:block;margin-top:6px"></video>':
+           '<a href="'+url+'" download="'+d.fileName+'" style="color:#888;font-size:13px">⬇ '+d.fileName+' ('+(bytes.length/1024/1024).toFixed(1)+'MB)</a>'});
+    delete incomingFiles[id];
+    renderMessages();
+  }
+}
+
 function renderMessages(){
   const el=document.getElementById("msg-list");
   if(!el)return;
@@ -102,6 +148,13 @@ function renderMessages(){
     const isMe=m.from===handle;
     const t=m.ts?m.ts.slice(11,19):"";
     if(isSystem)return`<div style="text-align:center;font-size:11px;color:${V.q};font-family:${V.mono};padding:8px 0">${esc(m.text)}</div>`;
+    if(m.isFile)return`<div style="margin-bottom:12px">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+        <span style="font-size:11px;font-family:${V.mono};color:${isMe?V.g:V.m};font-weight:500">${esc(m.from)}</span>
+        <span style="font-size:10px;color:${V.q};font-family:${V.mono}">${t}</span>
+      </div>
+      ${m.html}
+    </div>`;
     return`<div style="margin-bottom:12px">
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
         <span style="font-size:11px;font-family:${V.mono};color:${isMe?V.g:V.m};font-weight:500">${esc(m.from)}</span>
@@ -135,9 +188,15 @@ function renderChat(){
     </div>
   </nav>
   <div id="msg-list" style="flex:1;overflow-y:auto;padding:24px 32px"></div>
-  <div style="border-top:1px solid ${V.b};padding:16px 32px;display:flex;gap:12px;flex-shrink:0">
-    <input id="msg-input" placeholder="Type a message..." style="flex:1;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none">
-    <button onclick="sendMsg()" style="background:${V.t};color:${V.bg};border:none;border-radius:5px;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer">Send</button>
+  <div style="border-top:1px solid ${V.b};padding:12px 20px;display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+    <div id="upload-progress" style="font-size:11px;font-family:${V.mono};color:${V.q};min-height:14px"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label title="Attach file" style="cursor:pointer;padding:8px 10px;border:1px solid ${V.b};border-radius:5px;color:${V.q};font-size:14px;line-height:1;flex-shrink:0">
+        ⊕<input type="file" id="file-input" style="display:none" onchange="handleFile(this)">
+      </label>
+      <input id="msg-input" placeholder="Type a message..." style="flex:1;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none">
+      <button onclick="sendMsg()" style="background:${V.t};color:${V.bg};border:none;border-radius:5px;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;flex-shrink:0">Send</button>
+    </div>
   </div>`;
   document.getElementById("msg-input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey)sendMsg()});
   renderMessages();
