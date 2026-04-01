@@ -24,7 +24,7 @@ function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}
 async function validateKey(key){
   try{
     const r=await fetch("https://health.paramant.app/v2/check-key?k="+key,{signal:AbortSignal.timeout(5000)});
-    const d=await r.json();return d.valid?d:false;
+    const d=await r.json();return (d.valid && ["chat","pro","enterprise"].includes(d.plan))?d:{valid:false,reason:"This key does not include chat access. Upgrade at paramant.app/#pricing"};
   }catch{return false}
 }
 
@@ -64,7 +64,8 @@ async function doLogin(){
   if(!h){err.textContent="Handle required";return}
   err.textContent="Validating...";
   const valid=await validateKey(k);
-  if(!valid){err.textContent="API key invalid or relay unreachable";return}
+  if(valid===false){err.textContent="API key invalid or relay unreachable";return}
+if(!valid.valid){err.textContent=valid.reason||"No chat access for this plan";return}
   apiKey=k;room=r;handle=h;
   renderChat();connectWS();
 }
