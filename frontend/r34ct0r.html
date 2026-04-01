@@ -297,6 +297,8 @@ async function doLogin(){
   adminKey=k;
   addLog("Signed in | plan: "+d.plan+" | MFA verified","ok");
   render();
+  loadAllRelays();
+  loadKeys();
 }
 
 render();
