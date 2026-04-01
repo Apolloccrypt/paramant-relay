@@ -191,6 +191,11 @@ function renderPrometheus() {
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
+  const rs = ramStatus();
+  for(const [k,v] of [['ram_slots_available',rs.available_slots],['ram_blobs_max',rs.blobs_max],['ram_blob_mb',rs.blob_ram_mb],['ram_rss_mb',rs.rss_mb],['ram_heap_mb',rs.heap_mb]]){
+    L.push(`# TYPE paramant_${k} gauge`);
+    L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
+  }
   return L.join('\n')+'\n';
 }
 
@@ -240,6 +245,54 @@ setInterval(() => {
   }
 }, 60000);
 
+
+// ── RAM guard ────────────────────────────────────────────────────────────────
+const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
+const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
+const BLOB_SIZE_MB    = 5;
+const MAX_BLOBS       = Math.floor(RAM_LIMIT_MB / BLOB_SIZE_MB);
+
+function ramStats() {
+  const mem    = process.memoryUsage();
+  const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
+  const rssMB  = Math.round(mem.rss      / 1024 / 1024);
+  let blobBytes = 0;
+  for (const e of blobStore.values()) blobBytes += (e.size || 0);
+  const blobMB  = Math.round(blobBytes / 1024 / 1024);
+  return { heapMB, rssMB, blobMB, blobCount: blobStore.size };
+}
+
+function ramOk() {
+  const { rssMB, blobCount } = ramStats();
+  if (blobCount >= MAX_BLOBS) return false;
+  if (rssMB + BLOB_SIZE_MB > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  return true;
+}
+
+function ramStatus() {
+  const s = ramStats();
+  return {
+    blobs_in_flight:  s.blobCount,
+    blobs_max:        MAX_BLOBS,
+    blob_ram_mb:      s.blobMB,
+    heap_mb:          s.heapMB,
+    rss_mb:           s.rssMB,
+    ram_limit_mb:     RAM_LIMIT_MB,
+    ram_ok:           ramOk(),
+    available_slots:  Math.max(0, MAX_BLOBS - s.blobCount),
+  };
+}
+
+setInterval(() => {
+  const r = ramStatus();
+  if (!r.ram_ok) {
+    log('warn', 'ram_pressure', r);
+  } else if (r.blobs_in_flight > MAX_BLOBS * 0.7) {
+    log('info', 'ram_high', r);
+  }
+}, 60000);
+
+// ── RAM_GUARD marker
 // ── RAM-only stores ───────────────────────────────────────────────────────────
 const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub}
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
@@ -411,7 +464,7 @@ const server = http.createServer(async (req, res) => {
       blobs: blobStore.size, pubkeys: pubkeys.size,
       webhooks: [...webhooks.values()].flat().length,
       uptime_s: Math.floor(process.uptime()),
-      stats,
+      stats, ...ramStatus(),
       protocol: 'ghost-pipe-v2',
       encryption: 'ML-KEM-768 + ECDH P-256 + AES-256-GCM',
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
@@ -549,6 +602,22 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/inbound — Upload versleuteld blok + optioneel ML-DSA handtekening
   if (path === '/v2/inbound' && req.method === 'POST') {
+    if (!ramOk()) {
+      const r = ramStatus();
+      res.writeHead(503, {
+        'Content-Type': 'application/json',
+        'Retry-After': '10',
+        'X-Ram-Slots': String(r.available_slots),
+      });
+      log('warn', 'inbound_rejected_ram', r);
+      return res.end(J({
+        ok: false,
+        error: 'Relay at capacity. Retry in 10 seconds.',
+        retry_after_s: 10,
+        slots_available: r.available_slots,
+        blobs_in_flight: r.blobs_in_flight,
+      }));
+    }
     try {
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
