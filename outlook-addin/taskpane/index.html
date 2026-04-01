@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParaShare</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#f7f7f5;height:100vh;overflow:hidden}
+.pane{display:flex;flex-direction:column;height:100vh;padding:16px}
+.logo{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e8e8e5}
+.logo-mark{width:24px;height:24px;background:#0c0c0c;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-name{font-weight:700;font-size:14px;letter-spacing:-.01em}
+.logo-by{font-size:10px;color:#999;background:#f0f0ee;padding:1px 6px;border-radius:10px;border:1px solid #e0e0dc}
+.section{margin-bottom:14px}
+.label{font-size:10px;font-weight:600;color:#999;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px}
+.key-row{display:flex;gap:6px;align-items:center}
+.inp{flex:1;background:#fff;border:1px solid #e0e0dc;border-radius:6px;padding:7px 10px;font-size:12px;color:#1a1a1a;outline:none;font-family:'SF Mono','Fira Code',monospace}
+.inp:focus{border-color:#888}
+.key-ok{color:#2d8a5c;font-size:16px}
+.attachments{background:#fff;border:1px solid #e8e8e5;border-radius:8px;overflow:hidden;min-height:60px}
+.att-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f0f0ee;font-size:12px}
+.att-item:last-child{border-bottom:none}
+.att-check{width:14px;height:14px;accent-color:#0c0c0c;cursor:pointer}
+.att-icon{width:24px;height:24px;background:#f0f0ee;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.att-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-size{color:#999;flex-shrink:0}
+.att-status{font-size:10px;flex-shrink:0;padding:2px 6px;border-radius:10px}
+.att-pending{background:#f0f0ee;color:#888}
+.att-done{background:#e8f5ee;color:#2d8a5c}
+.att-err{background:#fef0ee;color:#e07060}
+.no-att{padding:20px;text-align:center;color:#bbb;font-size:12px}
+.btn{width:100%;background:#0c0c0c;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-ghost{background:none;border:1px solid #e0e0dc;color:#666;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;width:100%}
+.progress{margin-top:10px}
+.progress-bar-bg{height:3px;background:#e8e8e5;border-radius:2px;overflow:hidden;margin-top:6px}
+.progress-bar{height:100%;background:#0c0c0c;border-radius:2px;transition:width .4s}
+.progress-txt{display:flex;justify-content:space-between;font-size:11px;color:#888}
+.result{background:#e8f5ee;border:1px solid #b0ddc0;border-radius:8px;padding:12px;margin-top:10px}
+.result-title{font-size:11px;font-weight:600;color:#1a5c3a;margin-bottom:6px}
+.result-link{font-size:11px;color:#2d8a5c}
+.err-box{background:#fef0ee;border:1px solid #fcd0c8;border-radius:6px;padding:8px 10px;font-size:11px;color:#c0503a;margin-top:8px}
+.status-row{display:flex;align-items:center;gap:6px;font-size:11px;color:#888;margin-bottom:10px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#ccc;flex-shrink:0}
+.relay-ok .status-dot{background:#2d8a5c}
+.relay-ok .status-txt{color:#2d8a5c}
+</style>
+</head>
+<body>
+<div class="pane">
+
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M6 1v7M6 1L4 3M6 1l2 2" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1 9v1a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V9" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="logo-name">ParaShare</span>
+    <span class="logo-by">by PARAMANT</span>
+  </div>
+
+  <div class="status-row" id="relay-status">
+    <div class="status-dot"></div>
+    <span class="status-txt">Checking relay...</span>
+  </div>
+
+  <div class="section">
+    <div class="label">API key</div>
+    <div class="key-row">
+      <input class="inp" id="api-key" type="password" placeholder="pgp_..." autocomplete="off">
+      <span class="key-ok" id="key-ok" style="display:none">&#10003;</span>
+    </div>
+    <div id="key-err" style="font-size:11px;color:#e07060;margin-top:4px;display:none">
+      Invalid key &mdash; <a href="https://paramant.app/#pricing" target="_blank" style="color:#e07060">get one</a>
+    </div>
+  </div>
+
+  <div class="section" style="flex:1;display:flex;flex-direction:column;min-height:0">
+    <div class="label">Attachments</div>
+    <div class="attachments" id="att-list" style="overflow-y:auto;flex:1">
+      <div class="no-att" id="no-att">Loading attachments...</div>
+    </div>
+  </div>
+
+  <div id="progress-wrap" style="display:none" class="progress">
+    <div class="progress-txt">
+      <span id="prog-step">Encrypting...</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
+  </div>
+
+  <div id="err-box" class="err-box" style="display:none"></div>
+
+  <div id="result-box" class="result" style="display:none">
+    <div class="result-title">&#10003; Links inserted into email</div>
+    <div class="result-link" id="result-links"></div>
+  </div>
+
+  <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+    <button class="btn" id="btn-send" disabled>Replace with ParaShare link &rarr;</button>
+    <button class="btn-ghost" id="btn-refresh">Refresh attachments</button>
+  </div>
+
+  <div style="margin-top:10px;font-size:10px;color:#bbb;text-align:center;line-height:1.5">
+    Burn-on-read &middot; AES-256-GCM &middot; EU/DE &middot; No storage
+  </div>
+</div>
+
+<script>
+const RELAY   = 'https://health.paramant.app';
+const PS_BASE = 'https://paramant.app/parashare';
+const CHUNK   = 4.9 * 1024 * 1024;
+const BLOCK   = 5 * 1024 * 1024;
+
+let apiKey = '', keyValid = false, attachments = [], sending = false;
+
+// Restore saved key
+try {
+  const saved = localStorage.getItem('parashare_key');
+  if (saved) { document.getElementById('api-key').value = saved; apiKey = saved; }
+} catch {}
+
+Office.onReady(info => {
+  if (info.host === Office.HostType.Outlook) {
+    if (apiKey) checkKey();
+    loadAttachments();
+    pollRelayStatus();
+  }
+});
+
+// ── Relay status ──────────────────────────────────────────────────────────
+async function pollRelayStatus() {
+  try {
+    const r  = await fetch(RELAY + '/health', { signal: AbortSignal.timeout(4000) });
+    const d  = await r.json();
+    const el = document.getElementById('relay-status');
+    el.className = 'status-row' + (d.ok ? ' relay-ok' : '');
+    el.querySelector('.status-txt').textContent = d.ok
+      ? 'Relay online \u00b7 ' + Math.floor((d.uptime_s || 0) / 3600) + 'h \u00b7 ' + (d.available_slots ?? '?') + ' slots free'
+      : 'Relay offline';
+  } catch {
+    const el = document.getElementById('relay-status');
+    if (el) el.querySelector('.status-txt').textContent = 'Relay unreachable';
+  }
+}
+
+// ── API key ───────────────────────────────────────────────────────────────
+let keyTimer = null;
+document.getElementById('api-key').addEventListener('input', e => {
+  apiKey = e.target.value.trim();
+  keyValid = false;
+  document.getElementById('key-ok').style.display = 'none';
+  document.getElementById('key-err').style.display = 'none';
+  updateBtn();
+  clearTimeout(keyTimer);
+  if (apiKey.length > 8 && apiKey.startsWith('pgp_')) keyTimer = setTimeout(checkKey, 700);
+});
+
+async function checkKey() {
+  try {
+    const r = await fetch(RELAY + '/v2/check-key?k=' + encodeURIComponent(apiKey), { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    keyValid = d.valid === true;
+    document.getElementById('key-ok').style.display = keyValid ? '' : 'none';
+    document.getElementById('key-err').style.display = keyValid ? 'none' : '';
+    if (keyValid) try { localStorage.setItem('parashare_key', apiKey); } catch {}
+  } catch { keyValid = false; }
+  updateBtn();
+}
+
+// ── Attachments ───────────────────────────────────────────────────────────
+function loadAttachments() {
+  const item = Office.context.mailbox.item;
+  if (!item || !item.attachments) {
+    document.getElementById('no-att').textContent = 'No attachments. Add files to your email first.';
+    return;
+  }
+  attachments = item.attachments.filter(a => a.attachmentType === 'file');
+  renderAttachments();
+}
+
+function renderAttachments() {
+  const list = document.getElementById('att-list');
+  if (!attachments.length) {
+    list.innerHTML = '<div class="no-att">No file attachments. Add files first.</div>';
+    updateBtn(); return;
+  }
+  list.innerHTML = attachments.map((a, i) => `
+    <div class="att-item" id="att-${i}">
+      <input type="checkbox" class="att-check" id="chk-${i}" checked onchange="updateBtn()">
+      <div class="att-icon">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M7 1H3a.5.5 0 00-.5.5v9a.5.5 0 00.5.5h6a.5.5 0 00.5-.5V4L7 1z" stroke="#888" stroke-width="1" fill="none"/>
+          <path d="M7 1v3h3" stroke="#888" stroke-width="1" fill="none"/>
+        </svg>
+      </div>
+      <span class="att-name" title="${esc(a.name)}">${esc(a.name)}</span>
+      <span class="att-size">${fmt(a.size)}</span>
+      <span class="att-status att-pending" id="status-${i}">pending</span>
+    </div>
+  `).join('');
+  updateBtn();
+}
+
+function updateBtn() {
+  const anyChecked = attachments.some((_, i) => {
+    const c = document.getElementById('chk-' + i);
+    return c && c.checked;
+  });
+  document.getElementById('btn-send').disabled = !(keyValid && anyChecked && !sending);
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────
+document.getElementById('btn-send').addEventListener('click', doSend);
+document.getElementById('btn-refresh').addEventListener('click', () => { loadAttachments(); pollRelayStatus(); });
+
+async function doSend() {
+  sending = true; updateBtn();
+  document.getElementById('err-box').style.display = 'none';
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('progress-wrap').style.display = '';
+
+  function setProg(p, msg) {
+    document.getElementById('prog-bar').style.width = p + '%';
+    document.getElementById('prog-pct').textContent = p + '%';
+    document.getElementById('prog-step').textContent = msg;
+  }
+
+  try {
+    const item     = Office.context.mailbox.item;
+    const selected = attachments.filter((_, i) => {
+      const c = document.getElementById('chk-' + i);
+      return c && c.checked;
+    });
+
+    const insertLines = [];
+
+    for (let ai = 0; ai < selected.length; ai++) {
+      const att = selected[ai];
+      const idx = attachments.indexOf(att);
+      document.getElementById('status-' + idx).textContent = 'uploading...';
+      document.getElementById('status-' + idx).className = 'att-status att-pending';
+      setProg(Math.round((ai / selected.length) * 80), 'Uploading: ' + att.name);
+
+      // Read attachment content via Office.js
+      const attData = await new Promise((resolve, reject) => {
+        item.getAttachmentContentAsync(att.id, result => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) resolve(result.value);
+          else reject(new Error('Could not read: ' + att.name));
+        });
+      });
+
+      // Decode base64 → bytes
+      const raw   = atob(attData.content);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+      // Chunk + encrypt + upload
+      const totalChunks = Math.ceil(bytes.length / CHUNK) || 1;
+      const fileId = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
+      const tokens = [];
+
+      for (let ci = 0; ci < totalChunks; ci++) {
+        const chunkData = bytes.slice(ci * CHUNK, (ci + 1) * CHUNK);
+
+        // Build payload: PRSH(4) | metaLen(4) | meta | chunkData
+        const metaJson  = JSON.stringify({ file_id: fileId, file_name: att.name, file_size: bytes.length, chunk_index: ci, total_chunks: totalChunks });
+        const metaBytes = new TextEncoder().encode(metaJson);
+        const PRSH      = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
+        const metaLen   = new Uint8Array(4);
+        new DataView(metaLen.buffer).setUint32(0, metaBytes.length, false);
+
+        const payloadLen = 4 + 4 + metaBytes.length + chunkData.length;
+        const payload    = new Uint8Array(payloadLen);
+        payload.set(PRSH, 0);
+        payload.set(metaLen, 4);
+        payload.set(metaBytes, 8);
+        payload.set(chunkData, 8 + metaBytes.length);
+
+        // AES-256-GCM encrypt
+        const symKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+        const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', symKey));
+        const nonce  = crypto.getRandomValues(new Uint8Array(12));
+        const ct     = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, symKey, payload));
+
+        // 0x01 packet: magic(1) | nonce(12) | rawKey(32) | ctLen(4) | ct
+        const ctLenBuf = new Uint8Array(4);
+        new DataView(ctLenBuf.buffer).setUint32(0, ct.length, false);
+        const packet = new Uint8Array(1 + 12 + 32 + 4 + ct.length);
+        packet[0] = 0x01;
+        packet.set(nonce, 1);
+        packet.set(rawKey, 13);
+        packet.set(ctLenBuf, 45);
+        packet.set(ct, 49);
+
+        // Pad to 5MB (65536-byte slices)
+        const blob5 = new Uint8Array(BLOCK);
+        blob5.set(packet.slice(0, Math.min(packet.length, BLOCK)));
+        for (let p = Math.min(packet.length, BLOCK); p < BLOCK; p += 65536) {
+          crypto.getRandomValues(blob5.subarray(p, Math.min(p + 65536, BLOCK)));
+        }
+
+        // SHA-256 hash
+        const hashBuf = await crypto.subtle.digest('SHA-256', blob5);
+        const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+        // Base64 encode
+        let b64 = '';
+        for (let p = 0; p < blob5.length; p += 8192) {
+          b64 += btoa(String.fromCharCode(...blob5.subarray(p, p + 8192)));
+        }
+
+        const body = JSON.stringify({
+          hash, payload: b64, ttl_ms: 600000,
+          meta: { device_id: 'outlook-addin', file_name: att.name, file_size: bytes.length, chunk_index: ci, total_chunks: totalChunks, file_id: fileId }
+        });
+
+        const ur = await fetch(RELAY + '/v2/inbound', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'User-Agent': 'parashare-outlook/1.0' },
+          body, signal: AbortSignal.timeout(120000),
+        });
+        const ud = await ur.json();
+        if (!ud.ok) {
+          if (ur.status === 503) throw new Error('Relay at capacity. Try again in 10 seconds.');
+          throw new Error(ud.error || `Upload failed for chunk ${ci + 1}`);
+        }
+        tokens.push(ud.download_token);
+      }
+
+      const shareUrl = PS_BASE + '?t=' + encodeURIComponent(tokens.join(',')) + '&n=' + encodeURIComponent(att.name) + '&c=' + totalChunks;
+      insertLines.push({ name: att.name, size: att.size, url: shareUrl, attId: att.id });
+      document.getElementById('status-' + idx).textContent = 'done \u2713';
+      document.getElementById('status-' + idx).className = 'att-status att-done';
+    }
+
+    setProg(90, 'Inserting links into email...');
+
+    // Build HTML block to insert
+    const linkHtml = insertLines.map(l => `
+      <table style="border:1px solid #e0e0dc;border-radius:6px;padding:12px 16px;margin:8px 0;background:#f7f7f5;font-family:sans-serif;font-size:13px;max-width:480px;border-collapse:collapse">
+        <tr>
+          <td style="padding-right:12px;vertical-align:top;padding-top:2px">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11 2H5a1 1 0 00-1 1v14a1 1 0 001 1h10a1 1 0 001-1V8l-5-6z" stroke="#888" stroke-width="1.3" fill="none"/>
+              <path d="M11 2v6h6" stroke="#888" stroke-width="1.3" fill="none"/>
+            </svg>
+          </td>
+          <td>
+            <div style="font-weight:600;color:#1a1a1a">${esc(l.name)}</div>
+            <div style="font-size:11px;color:#888;margin-top:2px">${fmt(l.size)} &middot; Self-destructs after download &middot; Expires in 10 min</div>
+            <a href="${l.url}" style="display:inline-block;margin-top:8px;background:#0c0c0c;color:#fff;text-decoration:none;padding:6px 14px;border-radius:5px;font-size:12px;font-weight:600">Download securely &rarr;</a>
+          </td>
+        </tr>
+        <tr><td colspan="2" style="padding-top:8px;font-size:10px;color:#bbb">AES-256-GCM encrypted &middot; Burn-on-read &middot; EU/DE servers &middot; by PARAMANT</td></tr>
+      </table>
+    `).join('');
+
+    // Remove original attachments
+    for (const l of insertLines) {
+      await new Promise(resolve => item.removeAttachmentAsync(l.attId, () => resolve()));
+    }
+
+    // Prepend links to email body
+    await new Promise((resolve, reject) => {
+      item.body.prependAsync(
+        '<div style="margin-bottom:16px">' + linkHtml + '<p style="font-size:11px;color:#999;margin-top:4px">Sent via ParaShare by PARAMANT &mdash; files self-destruct after one download.</p></div>',
+        { coercionType: Office.CoercionType.Html },
+        result => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+          else reject(new Error('Could not insert links into email'));
+        }
+      );
+    });
+
+    setProg(100, 'Done');
+    document.getElementById('progress-wrap').style.display = 'none';
+    document.getElementById('result-box').style.display = '';
+    document.getElementById('result-links').textContent =
+      insertLines.length + ' attachment' + (insertLines.length > 1 ? 's' : '') + ' replaced with secure links.';
+
+  } catch (e) {
+    document.getElementById('err-box').textContent = e.message || 'Something went wrong.';
+    document.getElementById('err-box').style.display = '';
+    document.getElementById('progress-wrap').style.display = 'none';
+  }
+
+  sending = false; updateBtn();
+}
+
+function fmt(b) {
+  if (!b) return '';
+  if (b < 1024) return b + 'B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + 'KB';
+  return (b / 1048576).toFixed(1) + 'MB';
+}
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
