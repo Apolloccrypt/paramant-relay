@@ -1004,7 +1004,7 @@ try {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '127.0.0.1', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });
 });
