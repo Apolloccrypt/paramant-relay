@@ -44,11 +44,11 @@ const ALLOWED = {
   ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
-               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics'],
+               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
-               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics'],
+               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl'],
   full:       null,
 };
 
@@ -228,6 +228,17 @@ function verifyTotp(token) {
   }
   return false;
 }
+
+// ── Download tokens — one-time public download links
+const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
+
+// Cleanup expired tokens elke 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [t, d] of downloadTokens.entries()) {
+    if (d.used || now > d.expires_ms) downloadTokens.delete(t);
+  }
+}, 60000);
 
 // ── RAM-only stores ───────────────────────────────────────────────────────────
 const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub}
@@ -455,6 +466,55 @@ const server = http.createServer(async (req, res) => {
     return res.end(J(entry.doc));
   }
 
+  // ── GET /v2/dl/:token — publieke one-time download (geen API key) ───────
+  const dlm = path.match(/^\/v2\/dl\/([a-f0-9]{48})$/);
+  if (dlm && req.method === 'GET') {
+    const token = dlm[1];
+    const td = downloadTokens.get(token);
+    if (!td) {
+      res.writeHead(404); return res.end(J({ error: 'Link not found or already used' }));
+    }
+    if (td.used) {
+      res.writeHead(410); return res.end(J({ error: 'This link has already been used' }));
+    }
+    if (Date.now() > td.expires_ms) {
+      downloadTokens.delete(token);
+      res.writeHead(410); return res.end(J({ error: 'Link expired' }));
+    }
+    const entry = blobStore.get(td.hash);
+    if (!entry) {
+      downloadTokens.delete(token);
+      res.writeHead(404); return res.end(J({ error: 'File not found — already burned' }));
+    }
+    // Mark als gebruikt VOOR het sturen (burn-on-read)
+    td.used = true;
+    const data = Buffer.from(entry.blob);
+    blobStore.delete(td.hash);
+    try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
+    try { entry.blob.fill(0); } catch {}
+    log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16) });
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': td.file_name ? `attachment; filename="${td.file_name}"` : 'attachment',
+      'X-Burned': 'true',
+      'X-Hash': td.hash,
+    });
+    return res.end(data);
+  }
+
+  // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
+  const dlim = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/info$/);
+  if (dlim && req.method === 'GET') {
+    const token = dlim[1];
+    const td = downloadTokens.get(token);
+    if (!td || td.used || Date.now() > td.expires_ms) {
+      res.writeHead(404); return res.end(J({ ok: false, error: 'Link not found, used, or expired' }));
+    }
+    const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, file_name: td.file_name, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
+  }
+
   if (!keyData?.active) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
@@ -524,8 +584,18 @@ const server = http.createServer(async (req, res) => {
       if (global.wsPush) global.wsPush(apiKey, { hash, size: blob.length, device: deviceId, sig_valid: sigResult.valid });
       natsPush(apiKey, deviceId || 'unknown', hash, blob.length);
 
+      // Genereer one-time download token
+      const dlToken = require('crypto').randomBytes(24).toString('hex');
+      downloadTokens.set(dlToken, {
+        hash,
+        key: apiKey,
+        expires_ms: Date.now() + ttl,
+        used: false,
+        file_name: meta?.file_name || '',
+        file_size: blob.length,
+      });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid }));
+      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid, download_token: dlToken }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
