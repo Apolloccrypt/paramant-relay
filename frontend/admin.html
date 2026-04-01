@@ -68,23 +68,46 @@ async function loadAllRelays(){
 }
 
 async function createKey(label,plan,email){
+  if(!label){addLog("Label required","error");return}
   addLog("Creating key: "+label+" ("+plan+")...","info");
   const r=await apiCall(selectedRelay.u,"/v2/admin/keys","POST",{label,plan,email});
   if(r.ok&&r.data?.key){
-    addLog("Key created: "+r.data.key.slice(0,20)+"...","ok");
-    keys.unshift({key:r.data.key,label,plan,email,active:true,created:new Date().toISOString()});
-    renderKeys();
+    const fullKey=r.data.key;
+    addLog("Key created: "+fullKey,"ok");
+    showKeyOverlay(fullKey,label,plan,email);
+    if(email){
+      const mailR=await apiCall(selectedRelay.u,"/v2/admin/send-welcome","POST",{key:fullKey,label,plan,email});
+      addLog(mailR.ok?"Welcome mail sent to "+email:"Mail failed: "+(mailR.data?.error||mailR.error),mailR.ok?"ok":"warn");
+    }
+    await loadKeys();
   }else{
     addLog("Key creation failed: "+(r.data?.error||r.error),"error");
   }
+}
+
+function showKeyOverlay(key,label,plan,email){
+  const o=document.createElement("div");
+  o.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:999;display:flex;align-items:center;justify-content:center;padding:24px";
+  o.innerHTML=
+    '<div style="background:'+V.sur+';border:1px solid '+V.b+';border-radius:8px;padding:32px;max-width:520px;width:100%">'+
+    '<div style="font-size:11px;font-family:'+V.mono+';color:'+V.g+';letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px">Key created</div>'+
+    '<div style="font-size:11px;font-family:'+V.mono+';color:'+V.q+';margin-bottom:12px">'+esc(label)+' · '+esc(plan)+'</div>'+
+    '<div style="background:'+V.bg+';border:1px solid '+V.b+';border-radius:5px;padding:16px;margin-bottom:12px;font-family:'+V.mono+';font-size:13px;color:'+V.t+';word-break:break-all;user-select:all">'+esc(key)+'</div>'+
+    '<div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:5px;padding:12px;margin-bottom:20px;font-size:12px;color:#888800">Save this key in a password manager. It is shown once and cannot be recovered.</div>'+
+    (email?'<div style="font-size:12px;color:'+V.q+';margin-bottom:20px">Welcome email will be sent to '+esc(email)+'</div>':'')+
+    '<button onclick="this.closest(\'[data-overlay]\').remove()" style="width:100%;background:'+V.t+';color:'+V.bg+';border:none;border-radius:5px;padding:10px;font-size:13px;font-weight:500;cursor:pointer">I have saved this key</button>'+
+    '</div>';
+  o.dataset.overlay="1";
+  o.addEventListener("click",e=>{if(e.target===o)o.remove();});
+  document.body.appendChild(o);
 }
 
 async function revokeKey(key){
   if(!confirm("Revoke "+key.slice(0,20)+"...?"))return;
   addLog("Revoking "+key.slice(0,16)+"...","warn");
   const r=await apiCall(selectedRelay.u,"/v2/admin/keys/revoke","POST",{key});
-  if(r.ok)addLog("Key revoked","ok");
-  else addLog("Revoke failed: "+r.error,"error");
+  if(r.ok){addLog("Key revoked","ok");await loadKeys();}
+  else addLog("Revoke failed: "+(r.data?.error||r.error),"error");
 }
 
 async function loadKeys(){
