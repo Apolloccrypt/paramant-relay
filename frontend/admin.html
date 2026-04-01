@@ -49,13 +49,14 @@ async function apiCall(relay,path,method="GET",body=null){
 
 async function loadRelayData(relay){
   addLog("Loading "+relay.l+"...","info");
-  const [health,monitor,audit,ct]=await Promise.all([
+  const [health,audit,ct]=await Promise.all([
     apiCall(relay.u,"/health"),
-    apiCall(relay.u,"/v2/monitor?k="+adminKey),
     apiCall(relay.u,"/v2/audit?k="+adminKey),
     apiCall(relay.u,"/v2/ct/log?limit=10"),
   ]);
-  relayData[relay.u]={health:health.data,monitor:monitor.data,audit:audit.data,ct:ct.data};
+  relayData[relay.u]={health:health.data,audit:audit.data,ct:ct.data};
+  const dot=document.getElementById("dot-"+relay.l.toLowerCase());
+  if(dot)dot.style.background=health.ok?"#2d6a4f":"#8c3a3a";
   if(health.ok)addLog(relay.l+": v"+health.data?.version+" | uptime "+Math.floor((health.data?.uptime_s||0)/3600)+"h","ok");
   else addLog(relay.l+": unreachable","error");
   renderMain();
@@ -137,9 +138,7 @@ function renderKeys(){
 function renderMain(){
   const rdata=relayData[selectedRelay.u]||{};
   const h=rdata.health||{};
-  const m=rdata.monitor||{};
-  const dl=m.delivery||{};
-  const st=m.stats||{};
+  const st=h.stats||{};
   const el=document.getElementById("relay-panel");
   if(!el)return;
   const cards=[
@@ -147,9 +146,9 @@ function renderMain(){
     ["Uptime",h.uptime_s?Math.floor(h.uptime_s/3600)+"h":"—",V.t],
     ["Blobs in flight",h.blobs||0,V.y],
     ["Pubkeys",h.pubkeys||0,V.t],
-    ["Sent",dl.total!=null?dl.total:st.inbound!=null?st.inbound:0,V.t],
+    ["Sent",st.inbound||0,V.t],
     ["Burned",st.burned||0,V.t],
-    ["ACK rate",dl.success_rate!=null?dl.success_rate+"%":"—",dl.success_rate>=95?V.g:V.y],
+    ["Webhooks",st.webhooks_sent||0,V.t],
     ["ML-DSA",h.signatures?.includes("ML-DSA")?"active":"—",V.g],
   ];
   el.innerHTML=
