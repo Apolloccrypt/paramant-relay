@@ -136,14 +136,14 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
     </div>
     <input type="file" id="file-input" style="display:none">
 
-    <div class="card" id="key-card" style="display:none">
+    <div class="card" id="key-card">
       <label class="lbl" for="api-key">Your API key</label>
       <div class="key-row">
         <input class="inp mono" id="api-key" type="password" placeholder="pgp_..." autocomplete="off">
         <span class="key-ok hide" id="key-ok">&#10003;</span>
       </div>
       <div class="key-err hide" id="key-err">Invalid key &mdash; <a href="https://paramant.app/#pricing" style="color:#e07060">get one at paramant.app</a></div>
-      <div class="key-hint" id="key-hint">No key? <a href="https://paramant.app/#pricing">Get one from &euro;9.99/mnd</a></div>
+      <div class="key-hint" id="key-hint">A paid key is required to send. Receivers need no key. <a href="https://paramant.app/#pricing" style="color:var(--q);text-decoration:underline">Get one from &euro;9.99/mnd &rarr;</a></div>
     </div>
 
     <div class="progress-wrap hide" id="progress-wrap">
@@ -542,8 +542,20 @@ async function checkKey() {
   updateSendBtn();
 }
 
+
+// Update send knop tekst op basis van key status
+function updateSendBtnLabel() {
+  const btn = document.getElementById('btn-send');
+  if(!btn) return;
+  if(!file) { btn.textContent = 'Select a file first'; return; }
+  if(keyValid !== true) { btn.textContent = 'API key required →'; return; }
+  if(sending) { btn.textContent = 'Sending...'; return; }
+  btn.textContent = 'Send file →';
+}
+
 function updateSendBtn() {
-  $('btn-send').disabled = !(file && keyValid && !sending);
+  $('btn-send').disabled = !(file && keyValid === true && !sending);
+  updateSendBtnLabel();
 }
 
 // ── SEND ──────────────────────────────────────────────────────────────
@@ -570,6 +582,10 @@ async function doSend() {
     // Magic signature for metadata header inside each encrypted chunk
     const META_MAGIC  = new Uint8Array([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
 
+    // Verplicht: geldige betaalde API key voor verzender
+    if(!apiKey || !apiKey.startsWith('pgp_') || keyValid !== true) {
+      throw new Error('A valid PARAMANT API key is required to send files. Get one at paramant.app/#pricing');
+    }
     setProgress(5, 'Validating key...');
     const kr = await fetch(`${RELAY}/v2/check-key?k=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(6000) });
     const kd = await kr.json();
