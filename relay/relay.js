@@ -739,6 +739,53 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
+  if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
+    const tok = req.headers['x-admin-token'] || '';
+    if (!tok || !apiKeys.has(tok)) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
+      const RESEND_KEY = process.env.RESEND_API_KEY || '';
+      if (!RESEND_KEY) { res.writeHead(503); return res.end(J({ error: 'RESEND_API_KEY not configured' })); }
+      const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
+        <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
+        <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
+          IMPORTANT: Save this API key in your password manager immediately. It is generated once and cannot be recovered. If you lose it, you need to purchase a new subscription.
+        </div>
+        <p style="color:#888;margin-bottom:24px">Your API key is ready.</p>
+        <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
+          <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — ${(d.plan||'').toUpperCase()}</div>
+          <div style="font-size:14px;color:#ededed;word-break:break-all">${d.key}</div>
+        </div>
+        <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install cryptography
+
+python3 paramant-receiver.py \\
+  --key ${d.key} \\
+  --device my-device \\
+  --output /tmp/received/</pre>
+        <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> · <a href="https://paramant.app/ct-log" style="color:#555">CT log</a></p>
+        <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 · Burn-on-read · EU/DE · BUSL-1.1</p>
+      </div>`;
+      const body = JSON.stringify({ from: 'PARAMANT <hello@paramant.app>', to: [d.email], subject: 'Your PARAMANT API key', html });
+      const resp = await new Promise((resolve, reject) => {
+        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({raw:data}); } }); });
+        req2.on('error', reject);
+        req2.write(body); req2.end();
+      });
+      if (resp.id) {
+        log('info', 'welcome_mail_sent', { email: d.email, id: resp.id, label: d.label });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, id: resp.id }));
+      } else {
+        log('warn', 'welcome_mail_failed', { email: d.email, resp });
+        res.writeHead(502); return res.end(J({ error: 'Resend error', detail: resp }));
+      }
+    } catch(e) { res.writeHead(500); return res.end(J({ error: e.message })); }
+  }
+
   // ── 404 ──────────────────────────────────────────────────────────────────────
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(J({ error: 'Not found', version: VERSION, docs: 'https://paramant.app/docs',
