@@ -142,6 +142,229 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <div class="proto-cell"><div class="label">Hetzner DE</div><div class="pdesc">EU jurisdiction</div></div>
 </div>
 
+
+<section id="network" style="max-width:960px;margin:0 auto;padding:64px 48px 0">
+  <div class="eyebrow">Live network</div>
+  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
+  <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- Pipeline -->
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>
+          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Relay pipeline</span>
+        </div>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)" id="pipe-ts"></span>
+      </div>
+      <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)">
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">—</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">—</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Finance</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-finance">—</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">IoT</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-iot">—</div></div>
+        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Fly.io</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-fly">—</div></div>
+      </div>
+    </div>
+
+    <!-- Europa kaart -->
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>
+          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Node map</span>
+        </div>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">EU/DE primary · anycast</span>
+      </div>
+      <canvas id="mapCanvas" style="width:100%;display:block;height:220px"></canvas>
+      <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">AMS · FRA · ARN · CDG · ORD</span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">Hetzner DE · Fly.io anycast</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const RELAYS = [
+    {name:"health",  url:"https://health.paramant.app",  stat:"ps-health"},
+    {name:"legal",   url:"https://legal.paramant.app",   stat:"ps-legal"},
+    {name:"finance", url:"https://finance.paramant.app", stat:"ps-finance"},
+    {name:"iot",     url:"https://iot.paramant.app",     stat:"ps-iot"},
+    {name:"fly.io",  url:"https://paramant-ghost-pipe.fly.dev", stat:"ps-fly"},
+  ];
+
+  const pc = document.getElementById("pipeCanvas");
+  const pctx = pc.getContext("2d");
+  let pdots = [], relayStatus = {};
+
+  function resizeCanvas(c){
+    const r = c.getBoundingClientRect();
+    c.width  = r.width  * devicePixelRatio;
+    c.height = r.height * devicePixelRatio;
+  }
+
+  function drawPipe(){
+    resizeCanvas(pc);
+    const cw = pc.width/devicePixelRatio, ch = pc.height/devicePixelRatio;
+    pctx.clearRect(0,0,cw,ch);
+    const LX = 90, RX = cw - 24;
+
+    RELAYS.forEach((r,i) => {
+      const y = ((i+1)/(RELAYS.length+1)) * ch;
+      const on = relayStatus[r.name]?.ok;
+
+      pctx.strokeStyle = "#1a1a1a";
+      pctx.lineWidth = 1;
+      pctx.setLineDash([3,6]);
+      pctx.beginPath(); pctx.moveTo(LX,y); pctx.lineTo(RX,y); pctx.stroke();
+      pctx.setLineDash([]);
+
+      pctx.fillStyle = "#111";
+      pctx.strokeStyle = on ? "#2d6a4f" : "#222";
+      pctx.lineWidth = 1;
+      pctx.beginPath(); pctx.arc(LX-20,y,10,0,Math.PI*2); pctx.fill(); pctx.stroke();
+      pctx.fillStyle = on ? "#2d6a4f" : "#333";
+      pctx.beginPath(); pctx.arc(LX-20,y,3,0,Math.PI*2); pctx.fill();
+
+      pctx.fillStyle = "#555";
+      pctx.font = "10px 'SF Mono','Fira Code',monospace";
+      pctx.textAlign = "left";
+      pctx.fillText(r.name.toUpperCase(), LX+4, y+4);
+
+      if(relayStatus[r.name]?.uptime_s != null){
+        pctx.fillStyle = "#333";
+        pctx.textAlign = "right";
+        pctx.fillText(Math.floor(relayStatus[r.name].uptime_s/3600)+"h", RX-4, y+4);
+      }
+    });
+
+    pdots.forEach(d => {
+      const y = ((d.relay+1)/(RELAYS.length+1)) * ch;
+      d.x += d.speed;
+      const alpha = Math.min(1, Math.min(d.x - LX, RX - d.x) / 30);
+      pctx.globalAlpha = Math.max(0,alpha) * 0.85;
+      pctx.fillStyle = "#2d6a4f";
+      pctx.beginPath(); pctx.arc(d.x, y, 3, 0, Math.PI*2); pctx.fill();
+      pctx.globalAlpha = 1;
+    });
+    pdots = pdots.filter(d => d.x < RX);
+  }
+
+  function spawnDot(i){ pdots.push({x:90,relay:i,speed:1.5+Math.random()*1.5}); }
+
+  async function pollRelay(r,i){
+    try{
+      const d = await fetch(r.url+"/health",{signal:AbortSignal.timeout(4000)}).then(x=>x.json());
+      relayStatus[r.name] = d;
+      const el = document.getElementById(r.stat);
+      if(el) el.textContent = "v"+d.version+" "+Math.floor(d.uptime_s/3600)+"h";
+      spawnDot(i);
+    }catch(e){
+      relayStatus[r.name]={ok:false};
+      const el=document.getElementById(r.stat);
+      if(el) el.textContent="offline";
+    }
+  }
+
+  RELAYS.forEach((r,i)=>{ pollRelay(r,i); setInterval(()=>pollRelay(r,i),20000); });
+  RELAYS.forEach((_,i)=>setTimeout(()=>spawnDot(i),i*300+100));
+  setInterval(()=>{
+    const online=RELAYS.map((r,i)=>({r,i})).filter(x=>relayStatus[x.r.name]?.ok);
+    if(online.length){ const pick=online[Math.floor(Math.random()*online.length)]; spawnDot(pick.i); }
+  },2500);
+
+  // ── EUROPA MAP ───────────────────────────────────────────────────────────
+  const mc = document.getElementById("mapCanvas");
+  const mctx = mc.getContext("2d");
+  let pulses = [];
+
+  const NODES = [
+    {label:"AMS", sub:"Amsterdam", rx:0.42, ry:0.38},
+    {label:"FRA", sub:"Frankfurt", rx:0.52, ry:0.50},
+    {label:"ARN", sub:"Stockholm", rx:0.60, ry:0.18},
+    {label:"CDG", sub:"Paris",     rx:0.36, ry:0.52},
+    {label:"HET", sub:"Hetzner DE",rx:0.54, ry:0.46},
+  ];
+
+  function drawMap(){
+    resizeCanvas(mc);
+    const cw=mc.width/devicePixelRatio, ch=mc.height/devicePixelRatio;
+    mctx.clearRect(0,0,cw,ch);
+
+    // Europa omtrek
+    mctx.strokeStyle="#1e1e1e";
+    mctx.lineWidth=1;
+    mctx.setLineDash([2,4]);
+    mctx.beginPath();
+    [[.08,.72],[.18,.58],[.22,.52],[.30,.58],[.36,.52],[.42,.38],[.52,.50],[.60,.18],[.72,.12],[.84,.28],[.90,.50],[.86,.68],[.70,.74],[.50,.78],[.30,.72],[.08,.72]]
+    .forEach(([x,y],i)=>i===0?mctx.moveTo(x*cw,y*ch):mctx.lineTo(x*cw,y*ch));
+    mctx.stroke();
+    mctx.setLineDash([]);
+
+    // Verbindingen
+    mctx.strokeStyle="#1a1a1a";
+    mctx.lineWidth=1;
+    for(let i=0;i<NODES.length;i++)
+      for(let j=i+1;j<NODES.length;j++){
+        mctx.beginPath();
+        mctx.moveTo(NODES[i].rx*cw,NODES[i].ry*ch);
+        mctx.lineTo(NODES[j].rx*cw,NODES[j].ry*ch);
+        mctx.stroke();
+      }
+
+    // Pulses
+    pulses.forEach(p=>{
+      mctx.globalAlpha=p.alpha;
+      mctx.strokeStyle="#2d6a4f";
+      mctx.lineWidth=1;
+      mctx.beginPath(); mctx.arc(p.x,p.y,p.r,0,Math.PI*2); mctx.stroke();
+      mctx.globalAlpha=1;
+      p.r+=0.8; p.alpha-=0.03;
+    });
+    pulses=pulses.filter(p=>p.alpha>0);
+
+    // Nodes
+    NODES.forEach(n=>{
+      const x=n.rx*cw, y=n.ry*ch;
+      mctx.fillStyle="#111";
+      mctx.strokeStyle="#2d6a4f";
+      mctx.lineWidth=1;
+      mctx.beginPath(); mctx.arc(x,y,8,0,Math.PI*2); mctx.fill(); mctx.stroke();
+      mctx.fillStyle="#2d6a4f";
+      mctx.beginPath(); mctx.arc(x,y,3,0,Math.PI*2); mctx.fill();
+      mctx.fillStyle="#888";
+      mctx.font="bold 10px 'SF Mono','Fira Code',monospace";
+      mctx.textAlign="center";
+      mctx.fillText(n.label,x,y-12);
+      mctx.fillStyle="#444";
+      mctx.font="9px 'SF Mono','Fira Code',monospace";
+      mctx.fillText(n.sub,x,y+18);
+    });
+  }
+
+  function spawnPulse(n){
+    const cw=mc.width/devicePixelRatio, ch=mc.height/devicePixelRatio;
+    pulses.push({x:n.rx*cw,y:n.ry*ch,r:6,alpha:.8});
+  }
+
+  NODES.forEach((n,i)=>setTimeout(()=>spawnPulse(n),i*400+200));
+  setInterval(()=>spawnPulse(NODES[Math.floor(Math.random()*NODES.length)]),2000);
+
+  function loop(){
+    drawPipe(); drawMap();
+    const el=document.getElementById("pipe-ts");
+    if(el) el.textContent=new Date().toLocaleTimeString();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+
+
 <hr class="divider">
 
 <section id="protocol">
@@ -381,186 +604,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   </div>
 </section>
 
-
-<hr class="divider">
-
-<section id="pipeline" style="max-width:960px;margin:0 auto;padding:80px 48px">
-  <div class="eyebrow">Live network</div>
-  <h2>Ghost Pipe — real-time transport</h2>
-  <p class="sub">Public feed. Every dot is an encrypted blob in transit. Data is destroyed on arrival.</p>
-
-  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block" id="feed-dot"></span>
-        <span style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">LIVE FEED</span>
-      </div>
-      <span style="font-size:11px;font-family:var(--mono);color:var(--quiet)" id="feed-stats">connecting...</span>
-    </div>
-    <canvas id="pipelineCanvas" style="width:100%;display:block;height:280px"></canvas>
-    <div style="padding:12px 20px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border)">
-      <div style="background:var(--surface);padding:10px 14px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Health</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-health">—</div>
-      </div>
-      <div style="background:var(--surface);padding:10px 14px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Legal</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-legal">—</div>
-      </div>
-      <div style="background:var(--surface);padding:10px 14px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Finance</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-finance">—</div>
-      </div>
-      <div style="background:var(--surface);padding:10px 14px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">IoT</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-iot">—</div>
-      </div>
-      <div style="background:var(--surface);padding:10px 14px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Anycast</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-fly">—</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<script>
-(function(){
-  const RELAYS = [
-    {name:"health",  url:"https://health.paramant.app",  statEl:"stat-health"},
-    {name:"legal",   url:"https://legal.paramant.app",   statEl:"stat-legal"},
-    {name:"finance", url:"https://finance.paramant.app", statEl:"stat-finance"},
-    {name:"iot",     url:"https://iot.paramant.app",     statEl:"stat-iot"},
-    {name:"fly.io",  url:"https://paramant-ghost-pipe.fly.dev", statEl:"stat-fly"},
-  ];
-
-  const canvas  = document.getElementById("pipelineCanvas");
-  const ctx     = canvas.getContext("2d");
-  let dots      = [];
-  let relayData = {};
-  let W, H;
-
-  function resize(){
-    const rect = canvas.getBoundingClientRect();
-    W = canvas.width  = rect.width  * window.devicePixelRatio;
-    H = canvas.height = rect.height * window.devicePixelRatio;
-  }
-  window.addEventListener("resize", resize);
-  resize();
-
-  function relayY(i){ return ((i + 1) / (RELAYS.length + 1)) * (H / window.devicePixelRatio); }
-
-  function draw(){
-    const cw = W / window.devicePixelRatio;
-    const ch = H / window.devicePixelRatio;
-    ctx.clearRect(0, 0, cw, ch);
-
-    RELAYS.forEach((r, i) => {
-      const y = relayY(i);
-
-      // Dashed line
-      ctx.strokeStyle = "#1a1a1a";
-      ctx.lineWidth   = 1;
-      ctx.setLineDash([4, 8]);
-      ctx.beginPath();
-      ctx.moveTo(120, y);
-      ctx.lineTo(cw - 40, y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Node
-      const online = relayData[r.name]?.ok;
-      ctx.fillStyle   = "#111";
-      ctx.strokeStyle = online ? "#2d6a4f" : "#333";
-      ctx.lineWidth   = 1;
-      ctx.beginPath();
-      ctx.arc(70, y, 18, 0, Math.PI*2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = online ? "#2d6a4f" : "#333";
-      ctx.beginPath();
-      ctx.arc(70, y, 4, 0, Math.PI*2);
-      ctx.fill();
-
-      // Label
-      ctx.fillStyle = "#555";
-      ctx.font = "11px 'SF Mono','Fira Code',monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(r.name.toUpperCase(), 98, y + 4);
-
-      // Uptime
-      if(relayData[r.name]?.uptime_s != null){
-        const uh = Math.floor(relayData[r.name].uptime_s / 3600);
-        ctx.fillStyle = "#333";
-        ctx.textAlign = "right";
-        ctx.fillText(uh + "h uptime", cw - 48, y + 4);
-      }
-    });
-
-    // Dots
-    dots.forEach(d => {
-      d.x += d.speed;
-      const alpha = Math.min(1, Math.min(d.x - 120, (cw - 60) - d.x) / 40);
-      ctx.globalAlpha = Math.max(0, alpha) * 0.9;
-      ctx.fillStyle = "#2d6a4f";
-      ctx.beginPath();
-      ctx.arc(d.x, relayY(d.relay), 3.5, 0, Math.PI*2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    });
-
-    dots = dots.filter(d => d.x < cw - 40);
-    requestAnimationFrame(draw);
-  }
-
-  function spawnDot(relayIndex){
-    dots.push({ x: 122, relay: relayIndex, speed: 1.2 + Math.random() * 1.8 });
-  }
-
-  async function pollRelay(relay, index){
-    try{
-      const r = await fetch(relay.url + "/health", {signal: AbortSignal.timeout(4000)});
-      const d = await r.json();
-      relayData[relay.name] = d;
-      const el = document.getElementById(relay.statEl);
-      if(el) el.textContent = "v" + d.version + " · " + d.uptime_s + "s";
-      if(d.stats && (d.stats.inbound > 0 || d.stats.outbound > 0)) spawnDot(index);
-    } catch(e){
-      relayData[relay.name] = {ok: false};
-      const el = document.getElementById(relay.statEl);
-      if(el) el.textContent = "offline";
-    }
-  }
-
-  async function pollCT(){
-    try{
-      const r = await fetch("https://health.paramant.app/v2/ct/log?limit=5", {signal: AbortSignal.timeout(4000)});
-      const d = await r.json();
-      if(d.size > 0) spawnDot(Math.floor(Math.random() * RELAYS.length));
-      const el = document.getElementById("feed-stats");
-      if(el) el.textContent = d.size + " registrations · " + new Date().toLocaleTimeString();
-    } catch(e){}
-  }
-
-  RELAYS.forEach((r, i) => {
-    pollRelay(r, i);
-    setInterval(() => pollRelay(r, i), 15000);
-  });
-
-  setInterval(pollCT, 5000);
-
-  // Startup dots
-  RELAYS.forEach((r, i) => setTimeout(() => spawnDot(i), i * 400 + 200));
-
-  // Idle dots
-  setInterval(() => {
-    const onlineIdx = RELAYS.map((r,i) => relayData[r.name]?.ok ? i : -1).filter(i => i >= 0);
-    if(onlineIdx.length > 0) spawnDot(onlineIdx[Math.floor(Math.random() * onlineIdx.length)]);
-  }, 3000);
-
-  draw();
-})();
-</script>
 <footer>
   <div class="footer-logo">PARAMANT</div>
   <div class="footer-links">
