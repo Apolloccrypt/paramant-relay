@@ -137,8 +137,18 @@ async function loadKeys(){
 async function reloadUsers(){
   addLog("Reloading users on all relays...","info");
   for(const relay of RELAYS){
-    const r=await apiCall(relay.u,"/v2/reload-users","POST",{});
-    addLog(relay.l+": "+(r.ok?"reloaded ✓":"failed ✗")+(r.data?.count?" ("+r.data.count+" keys)":""),r.ok?"ok":"error");
+    try{
+      const r=await fetch(relay.u+"/v2/reload-users",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","X-Admin-Token":adminKey,"X-Api-Key":adminKey},
+        body:"{}",
+        signal:AbortSignal.timeout(8000)
+      });
+      const d=await r.json().catch(()=>({}));
+      addLog(relay.l+": "+(r.ok?"reloaded ✓"+(d.count?" ("+d.count+" keys)":""):"failed "+r.status),r.ok?"ok":"error");
+    }catch(e){
+      addLog(relay.l+": "+e.message,"error");
+    }
   }
 }
 
