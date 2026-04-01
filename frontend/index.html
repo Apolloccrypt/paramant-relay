@@ -99,7 +99,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <ul class="nav-links">
     <li><a href="#protocol">Protocol</a></li>
     <li><a href="#identity">Identity</a></li>
-    <li><a href="#use-cases">Use cases</a></li>
+    <li><a href="#sectors">Use cases</a></li>
     <li><a href="#api">API</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="/parashare">ParaShare</a></li>
@@ -170,60 +170,63 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     </div>
 
     <!-- Europa kaart -->
-    <div id="node-map" style="flex:1;min-width:300px;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:4px;padding:20px;display:flex;flex-direction:column;">
-  <div style="font-size:10px;color:#333;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;">NODE MAP &middot; EU/DE PRIMARY &middot; ANYCAST</div>
-  <svg viewBox="0 0 340 260" style="width:100%;flex:1;" xmlns="http://www.w3.org/2000/svg">
-    <!-- Europa kustlijn ruw -->
-    <path d="M60,30 Q80,10 110,15 Q140,8 165,18 Q190,10 215,15 Q240,8 265,20 Q285,15 300,30
-             Q315,45 310,65 Q320,85 305,105 Q295,125 280,140 Q265,155 250,165
-             Q235,178 220,190 Q205,200 195,215 Q185,225 175,235
-             Q165,225 155,215 Q145,200 130,190 Q115,178 100,165
-             Q85,152 70,138 Q55,122 48,105 Q35,85 42,65 Q45,45 60,30Z"
-          fill="none" stroke="#1e1e1e" stroke-width="1.5"/>
-    <!-- Scandinavië -->
-    <path d="M190,10 Q205,5 215,15 Q220,30 210,45 Q200,55 195,70 Q185,60 180,45 Q175,30 190,10Z"
-          fill="none" stroke="#1a1a1a" stroke-width="1"/>
-    <!-- Iberisch schiereiland -->
-    <path d="M70,160 Q60,175 65,195 Q80,210 100,205 Q120,198 125,180 Q115,165 100,165Z"
-          fill="none" stroke="#1a1a1a" stroke-width="1"/>
-
-    <!-- AMS — Amsterdam -->
-    <circle cx="190" cy="105" r="6" fill="#111" stroke="#333" stroke-width="1.5"/>
-    <circle cx="190" cy="105" r="2.5" fill="#ededed"/>
-    <text x="198" y="102" fill="#777" font-size="9" font-family="monospace" letter-spacing=".05em">AMS</text>
-
-    <!-- FRA — Frankfurt -->
-    <circle cx="215" cy="125" r="6" fill="#111" stroke="#333" stroke-width="1.5"/>
-    <circle cx="215" cy="125" r="2.5" fill="#ededed"/>
-    <text x="223" y="122" fill="#777" font-size="9" font-family="monospace" letter-spacing=".05em">FRA &middot; Hetzner DE</text>
-
-    <!-- ARN — Stockholm -->
-    <circle cx="210" cy="55" r="6" fill="#111" stroke="#333" stroke-width="1.5"/>
-    <circle cx="210" cy="55" r="2.5" fill="#ededed"/>
-    <text x="218" y="52" fill="#777" font-size="9" font-family="monospace" letter-spacing=".05em">ARN &middot; Stockholm</text>
-
-    <!-- CDG — Parijs -->
-    <circle cx="170" cy="140" r="6" fill="#111" stroke="#333" stroke-width="1.5"/>
-    <circle cx="170" cy="140" r="2.5" fill="#ededed"/>
-    <text x="112" y="137" fill="#777" font-size="9" font-family="monospace" letter-spacing=".05em">CDG &middot; Paris</text>
-
-    <!-- ORD — Chicago (buiten EU, dimmed) -->
-    <circle cx="50" cy="200" r="4" fill="#0c0c0c" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,2"/>
-    <circle cx="50" cy="200" r="1.5" fill="#222"/>
-    <text x="18" y="215" fill="#2a2a2a" font-size="8" font-family="monospace">ORD &middot; GDPR eval</text>
-
-    <!-- Verbindingslijnen EU nodes -->
-    <line x1="190" y1="105" x2="215" y2="125" stroke="#1e1e1e" stroke-width="1"/>
-    <line x1="190" y1="105" x2="210" y2="55"  stroke="#1e1e1e" stroke-width="1"/>
-    <line x1="190" y1="105" x2="170" y2="140" stroke="#1e1e1e" stroke-width="1"/>
-    <line x1="215" y1="125" x2="170" y2="140" stroke="#1e1e1e" stroke-width="1"/>
-    <line x1="215" y1="125" x2="210" y2="55"  stroke="#1e1e1e" stroke-width="1"/>
-  </svg>
-  <div style="display:flex;justify-content:space-between;font-size:10px;color:#333;font-family:monospace;margin-top:12px;">
-    <span>AMS &middot; FRA &middot; ARN &middot; CDG &middot; <span style="color:#222">ORD</span></span>
-    <span>Fly.io anycast</span>
-  </div>
-</div>
+    <div id="node-map" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column;">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:5px;height:5px;border-radius:50%;background:var(--quiet);display:inline-block"></span>
+          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Node map</span>
+        </div>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">EU/DE · Anycast</span>
+      </div>
+      <svg viewBox="0 0 340 220" style="width:100%;height:220px;" xmlns="http://www.w3.org/2000/svg">
+        <!-- Europa kustlijn -->
+        <path d="M60,30 Q80,10 110,15 Q140,8 165,18 Q190,10 215,15 Q240,8 265,20 Q285,15 300,30
+                 Q315,45 310,65 Q320,85 305,105 Q295,125 280,140 Q265,155 250,165
+                 Q235,178 220,190 Q205,200 195,210
+                 Q185,200 175,190 Q160,178 145,165
+                 Q130,152 115,138 Q100,122 88,105 Q75,85 78,65 Q78,45 60,30Z"
+              fill="none" stroke="#252525" stroke-width="1.5"/>
+        <!-- Scandinavië -->
+        <path d="M190,10 Q205,5 215,15 Q220,30 210,45 Q200,55 195,68 Q185,58 180,45 Q175,30 190,10Z"
+              fill="none" stroke="#1e1e1e" stroke-width="1"/>
+        <!-- Iberisch schiereiland -->
+        <path d="M78,148 Q68,162 72,180 Q85,195 103,190 Q122,183 126,168 Q116,153 103,150Z"
+              fill="none" stroke="#1e1e1e" stroke-width="1"/>
+        <!-- Verbindingslijnen -->
+        <line x1="190" y1="95" x2="215" y2="115" stroke="#252525" stroke-width="1"/>
+        <line x1="190" y1="95" x2="210" y2="48"  stroke="#252525" stroke-width="1"/>
+        <line x1="190" y1="95" x2="168" y2="128" stroke="#252525" stroke-width="1"/>
+        <line x1="215" y1="115" x2="168" y2="128" stroke="#252525" stroke-width="1"/>
+        <line x1="215" y1="115" x2="210" y2="48"  stroke="#252525" stroke-width="1"/>
+        <!-- AMS -->
+        <circle cx="190" cy="95" r="5.5" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
+        <circle cx="190" cy="95" r="2" fill="#aaa"/>
+        <text x="198" y="92" fill="#666" font-size="9" font-family="monospace" letter-spacing=".04em">AMS</text>
+        <!-- FRA -->
+        <circle cx="215" cy="115" r="5.5" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
+        <circle cx="215" cy="115" r="2" fill="#aaa"/>
+        <text x="223" y="112" fill="#666" font-size="9" font-family="monospace" letter-spacing=".04em">FRA · Hetzner DE</text>
+        <!-- ARN -->
+        <circle cx="210" cy="48" r="5.5" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
+        <circle cx="210" cy="48" r="2" fill="#aaa"/>
+        <text x="218" y="45" fill="#666" font-size="9" font-family="monospace" letter-spacing=".04em">ARN · Stockholm</text>
+        <!-- CDG -->
+        <circle cx="168" cy="128" r="5.5" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
+        <circle cx="168" cy="128" r="2" fill="#aaa"/>
+        <text x="110" y="125" fill="#666" font-size="9" font-family="monospace" letter-spacing=".04em">CDG · Paris</text>
+        <!-- ORD dimmed -->
+        <circle cx="48" cy="188" r="3.5" fill="#111" stroke="#222" stroke-width="1" stroke-dasharray="3,2"/>
+        <circle cx="48" cy="188" r="1.5" fill="#2a2a2a"/>
+        <text x="16" y="202" fill="#2e2e2e" font-size="8" font-family="monospace">ORD · GDPR eval</text>
+      </svg>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)">
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">AMS</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">NL</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">FRA</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">DE</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ARN</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">SE</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">CDG</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">FR</div></div>
+        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ORD</div><div style="font-size:10px;font-family:var(--mono);color:#333">eval</div></div>
+      </div>
+    </div>
   </div>
 </section>
 
