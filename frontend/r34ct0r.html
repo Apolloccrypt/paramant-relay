@@ -16,11 +16,11 @@ a{color:var(--m);text-decoration:none}a:hover{color:var(--t)}
 <div id="root"></div>
 <script>
 const RELAYS=[
-  {l:"Health",u:"https://health.paramant.app"},
-  {l:"Finance",u:"https://finance.paramant.app"},
-  {l:"Legal",u:"https://legal.paramant.app"},
-  {l:"IoT",u:"https://iot.paramant.app"},
-  {l:"Fly.io",u:"https://paramant-ghost-pipe.fly.dev"}
+  {l:"Health",u:"/rp/health"},
+  {l:"Finance",u:"/rp/finance"},
+  {l:"Legal",u:"/rp/legal"},
+  {l:"IoT",u:"/rp/iot"},
+  {l:"Fly.io",u:"/rp/fly"}
 ];
 const V={bg:"#0c0c0c",sur:"#111",b:"#1a1a1a",t:"#ededed",m:"#888",q:"#555",g:"#2d6a4f",r:"#8c3a3a",y:"#8c7a2d",
   font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
@@ -283,10 +283,10 @@ async function doLogin(){
   if(!k.startsWith("pgp_")){addLog("Invalid key format","error");return}
   if(totp.length!==6){addLog("TOTP must be 6 digits","error");return}
   addLog("Validating credentials...","info");
-  const r=await fetch("https://health.paramant.app/v2/check-key?k="+k,{signal:AbortSignal.timeout(5000)});
+  const r=await fetch("/rp/health/v2/check-key?k="+k,{signal:AbortSignal.timeout(5000)});
   const d=await r.json().catch(()=>({}));
   if(!d.valid){addLog("Invalid API key","error");return}
-  const mfa=await fetch("https://health.paramant.app/v2/admin/verify-mfa",{
+  const mfa=await fetch("/rp/health/v2/admin/verify-mfa",{
     method:"POST",
     headers:{"Content-Type":"application/json","X-Api-Key":k,"X-Admin-Token":k},
     body:JSON.stringify({totp_code:totp}),
