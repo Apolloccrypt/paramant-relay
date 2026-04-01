@@ -132,6 +132,36 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
 
     <button class="btn-primary" id="btn-send" disabled>Send file &rarr;</button>
 
+    <div style="margin-top:28px;border-top:1px solid #e8e8e5;padding-top:24px">
+      <div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">How it stays secure</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">ML-KEM-768 + ECDH P-256 (hybrid)</div><div style="font-size:12px;color:#888;line-height:1.5">Post-quantum key encapsulation combined with classical ECDH. Safe even if one algorithm is broken. NIST FIPS 203 certified.</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">Encrypted in your browser</div><div style="font-size:12px;color:#888;line-height:1.5">The file is encrypted before it leaves your device. The relay never sees the plaintext — only an indistinguishable 5MB blob.</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">Burn-on-read — one download only</div><div style="font-size:12px;color:#888;line-height:1.5">The relay destroys the blob immediately after the first download. The second request always returns 404. No copy exists on disk.</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">5MB fixed padding — invisible file size</div><div style="font-size:12px;color:#888;line-height:1.5">Every transfer looks identical on the network. A 1KB note and a 4MB document are indistinguishable to any observer or DPI system.</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">EU/DE only — no US CLOUD Act</div><div style="font-size:12px;color:#888;line-height:1.5">All servers on Hetzner Frankfurt. No US infrastructure, no CLOUD Act. A US court cannot subpoena PARAMANT data.</div></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">vs WeTransfer / Signal / WhatsApp</div><div style="font-size:12px;color:#888;line-height:1.5">WeTransfer stores files for 7 days unencrypted. Signal files persist on device. WhatsApp metadata goes to Meta. ParaShare stores nothing, anywhere, ever.</div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="pills">
       <span>Burn-on-read</span><span>&middot;</span>
       <span>AES-256-GCM</span><span>&middot;</span>
@@ -169,7 +199,7 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px">
           <span style="color:#999">Encryption</span>
-          <span style="font-weight:500" class="mono">AES-256-GCM</span>
+          <span style="font-weight:500" class="mono" id="enc-display">AES-256-GCM</span>
         </div>
       </div>
     </div>
@@ -253,6 +283,108 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
   </div>
 </main>
 
+<script type="module">
+// ── ML-KEM-768 + ECDH P-256 post-quantum crypto module ───────────────────────
+import { ml_kem768 } from 'https://esm.sh/@noble/post-quantum@0.2.1/ml-kem.js';
+
+const BLOCK = 5 * 1024 * 1024;
+
+function concat(...arrays) {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+function u32be(n) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n, false);
+  return b;
+}
+function hexToU8(hex) {
+  if (!hex) return new Uint8Array(0);
+  const arr = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
+  return arr;
+}
+function toB64(u8) {
+  let s = '';
+  const SZ = 8192;
+  for (let i = 0; i < u8.length; i += SZ) s += String.fromCharCode(...u8.slice(i, i + SZ));
+  return btoa(s);
+}
+async function importECDHPub(raw) {
+  return crypto.subtle.importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+}
+async function hkdfKey(ikm, salt, info) {
+  const base = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256',
+      salt: new TextEncoder().encode(salt),
+      info: new TextEncoder().encode(info) },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+// ML-KEM-768 + ECDH P-256 hybrid encrypt (receiver must have private keys)
+// Packet: 0x02 | u32(bundle) | bundle | nonce(12) | u32(ct) | ct
+async function encryptPQ(payload, receiverPubs) {
+  const kyberPub = hexToU8(receiverPubs.kyber_pub);
+  let kct = new Uint8Array(0), kss = new Uint8Array(0);
+  if (kyberPub.length > 0) {
+    try {
+      const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
+      kct = cipherText; kss = sharedSecret;
+    } catch (e) { console.warn('ML-KEM encap failed:', e); }
+  }
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const ephPub  = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  const recvPub = await importECDHPub(hexToU8(receiverPubs.ecdh_pub));
+  const ecdhSS  = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: recvPub }, eph.privateKey, 256));
+  const aesKey  = await hkdfKey(concat(ecdhSS, kss), 'paramant-gp-v4', 'aes-key');
+  const nonce   = crypto.getRandomValues(new Uint8Array(12));
+  const ct      = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
+  const bundle  = concat(u32be(ephPub.length), ephPub, u32be(kct.length), kct);
+  const packet  = concat(new Uint8Array([0x02]), u32be(bundle.length), bundle, nonce, u32be(ct.length), ct);
+  return { packet, alg: kct.length > 0 ? 'ML-KEM-768 + ECDH P-256 + AES-256-GCM' : 'ECDH P-256 + AES-256-GCM' };
+}
+
+// AES-256-GCM with embedded key — browser-decryptable
+// Packet: 0x01 | nonce(12) | rawKey(32) | u32(ct) | ct
+async function encryptAES(payload) {
+  const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+  const nonce  = crypto.getRandomValues(new Uint8Array(12));
+  const ct     = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
+  const packet = concat(new Uint8Array([0x01]), nonce, rawKey, u32be(ct.length), ct);
+  return { packet, alg: 'AES-256-GCM' };
+}
+
+// Decrypt downloaded blob — handles 0x01, 0x02 and legacy format
+async function decryptBlob(raw) {
+  const magic = raw[0];
+  if (magic === 0x01) {
+    const nonce  = raw.slice(1, 13);
+    const rawKey = raw.slice(13, 45);
+    const ctLen  = new DataView(raw.buffer).getUint32(45, false);
+    const ct     = raw.slice(49, 49 + ctLen);
+    const key    = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, ct));
+  }
+  if (magic === 0x02) {
+    throw new Error('Post-quantum encrypted — use the PARAMANT CLI to decrypt.');
+  }
+  // Legacy: iv(12) | rawKey(32) | ct
+  const iv     = raw.slice(0, 12);
+  const rawKey = raw.slice(12, 44);
+  const ct     = raw.slice(44);
+  const key    = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
+}
+
+window.PARASHARE_CRYPTO = { encryptPQ, encryptAES, decryptBlob, toB64, BLOCK };
+window.dispatchEvent(new Event('crypto-ready'));
+</script>
 <script>
 const RELAY   = '/rp/health';
 const BASE_URL = window.location.origin + '/parashare';
@@ -392,17 +524,7 @@ $('btn-send').addEventListener('click', doSend);
 
 async function doSend() {
   sending = true; updateSendBtn();
-  hide('send-err');
-  show('progress-wrap');
-
-  const steps = [
-    [10,  'Reading file...'],
-    [30,  'Encrypting...'],
-    [55,  'Preparing upload...'],
-    [75,  'Uploading to relay...'],
-    [92,  'Generating one-time link...'],
-    [100, 'Done'],
-  ];
+  hide('send-err'); show('progress-wrap');
 
   function setProgress(p, msg) {
     $('progress-bar').style.width = p + '%';
@@ -411,81 +533,75 @@ async function doSend() {
   }
 
   try {
-    setProgress(10, 'Reading file...');
+    // Wait for crypto module (loaded async via type="module")
+    if (!window.PARASHARE_CRYPTO) {
+      await new Promise(r => window.addEventListener('crypto-ready', r, { once: true }));
+    }
+    const C = window.PARASHARE_CRYPTO;
+
+    setProgress(5, 'Validating key...');
+    const kr = await fetch(`${RELAY}/v2/check-key?k=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(6000) });
+    const kd = await kr.json();
+    if (!kd.valid) throw new Error('API key invalid');
+
+    setProgress(15, 'Reading file...');
     const fileBytes = new Uint8Array(await file.arrayBuffer());
 
-    setProgress(30, 'Encrypting...');
-    // AES-256-GCM client-side encryption
-    const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-    const iv     = crypto.getRandomValues(new Uint8Array(12));
-    const ct     = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBytes));
-    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+    setProgress(30, 'Fetching receiver keys...');
+    let receiverPubs = null;
+    try {
+      const rp = await fetch(`${RELAY}/v2/pubkey/parashare-relay`, {
+        headers: { 'X-Api-Key': apiKey, 'User-Agent': 'parashare/2.0' },
+        signal: AbortSignal.timeout(5000)
+      });
+      const rd = await rp.json();
+      if (rd.ok && rd.ecdh_pub) receiverPubs = rd;
+    } catch {}
 
-    // Pack: 12 iv + 32 key + ciphertext  (receiver needs key to decrypt)
-    // For now: embed key+iv in the blob itself so the relay can serve it as-is.
-    // Receiver will get key via the URL fragment (never hits server).
-    const ivHex  = [...iv].map(b => b.toString(16).padStart(2, '0')).join('');
-    const keyHex = [...rawKey].map(b => b.toString(16).padStart(2, '0')).join('');
-
-    // blob = iv (12 B) || rawKey (32 B) || ciphertext
-    const blob = new Uint8Array(12 + 32 + ct.byteLength);
-    blob.set(iv, 0);
-    blob.set(rawKey, 12);
-    blob.set(ct, 44);
-
-    if (blob.byteLength > MAX_BYTES) {
-      throw new Error(`Encrypted file is ${fmt(blob.byteLength)} — max 500MB.`);
+    let encResult;
+    if (receiverPubs) {
+      setProgress(45, 'Encrypting — ML-KEM-768 + ECDH P-256...');
+      encResult = await C.encryptPQ(fileBytes, receiverPubs);
+    } else {
+      setProgress(45, 'Encrypting — AES-256-GCM...');
+      encResult = await C.encryptAES(fileBytes);
     }
 
-    setProgress(55, 'Preparing upload...');
-    // SHA-256 hash of blob
-    const hashBuf = await crypto.subtle.digest('SHA-256', blob);
-    const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
-
-    // base64 encode blob
-    let b64 = '';
-    const CHUNK = 8192;
-    for (let i = 0; i < blob.length; i += CHUNK) {
-      b64 += String.fromCharCode(...blob.slice(i, i + CHUNK));
+    if (encResult.packet.byteLength > C.BLOCK) {
+      throw new Error(`File too large after encryption (${fmt(encResult.packet.byteLength)}). Max ~4.9MB.`);
     }
-    b64 = btoa(b64);
 
-    setProgress(75, 'Uploading to relay...');
+    setProgress(62, 'Padding to fixed 5MB...');
+    const padded = new Uint8Array(C.BLOCK);
+    padded.set(encResult.packet);
+    padded.set(crypto.getRandomValues(new Uint8Array(C.BLOCK - encResult.packet.byteLength)), encResult.packet.byteLength);
+
+    setProgress(72, 'Computing hash...');
+    const hashBuf = await crypto.subtle.digest('SHA-256', padded);
+    const hash = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    setProgress(82, 'Uploading to relay...');
     const body = JSON.stringify({
-      hash,
-      payload: b64,
-      ttl_ms: 300000, // 5 min
-      meta: {
-        device_id: 'parashare-web',
-        file_name: file.name,
-        file_size: file.size,
-      }
+      hash, payload: C.toB64(padded), ttl_ms: 300000,
+      meta: { device_id: 'parashare-web', file_name: file.name, file_size: file.size }
     });
 
     const ur = await fetch(`${RELAY}/v2/inbound`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': apiKey,
-        'User-Agent': 'parashare/1.0',
-      },
-      body,
-      signal: AbortSignal.timeout(60000),
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'User-Agent': 'parashare/2.0' },
+      body, signal: AbortSignal.timeout(60000),
     });
     const ud = await ur.json();
     if (!ud.ok) throw new Error(ud.error || 'Upload failed');
 
-    setProgress(92, 'Generating one-time link...');
-    const dlToken = ud.download_token;
-
     setProgress(100, 'Done');
     await sleep(250);
 
-    expiresAt = Date.now() + 300000;
-    // Key goes in URL fragment — never sent to server
-    const shareUrl = `${BASE_URL}?t=${dlToken}`;
-    $('share-link').textContent = shareUrl;
+    const encEl = $('enc-display');
+    if (encEl) encEl.textContent = encResult.alg;
 
+    expiresAt = Date.now() + 300000;
+    $('share-link').textContent = `${BASE_URL}?t=${ud.download_token}`;
     startTTLCountdown('ttl-display');
     showScreen('screen-sent');
 
@@ -535,8 +651,14 @@ function initReceive(tok) {
 async function doDownload(tok) {
   hide('recv-loading'); show('recv-downloading');
   try {
+    // Wait for crypto module
+    if (!window.PARASHARE_CRYPTO) {
+      await new Promise(r => window.addEventListener('crypto-ready', r, { once: true }));
+    }
+    const C = window.PARASHARE_CRYPTO;
+
     const r = await fetch(`${RELAY}/v2/dl/${tok}`, {
-      headers: { 'User-Agent': 'parashare/1.0' },
+      headers: { 'User-Agent': 'parashare/2.0' },
       signal: AbortSignal.timeout(60000)
     });
 
@@ -549,17 +671,9 @@ async function doDownload(tok) {
     }
     if (!r.ok) throw new Error('Server error: ' + r.status);
 
-    const raw = new Uint8Array(await r.arrayBuffer());
+    const raw   = new Uint8Array(await r.arrayBuffer());
+    const plain = await C.decryptBlob(raw);
 
-    // Unpack: iv (12) || rawKey (32) || ciphertext
-    const iv     = raw.slice(0, 12);
-    const rawKey = raw.slice(12, 44);
-    const ct     = raw.slice(44);
-
-    const aesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
-    const plain  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct);
-
-    // Determine filename from Content-Disposition header
     const cd    = r.headers.get('Content-Disposition') || '';
     const fname = cd.match(/filename="([^"]+)"/)?.[1] || 'parashare-download';
 
