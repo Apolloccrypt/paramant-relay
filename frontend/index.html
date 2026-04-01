@@ -381,6 +381,186 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   </div>
 </section>
 
+
+<hr class="divider">
+
+<section id="pipeline" style="max-width:960px;margin:0 auto;padding:80px 48px">
+  <div class="eyebrow">Live network</div>
+  <h2>Ghost Pipe — real-time transport</h2>
+  <p class="sub">Public feed. Every dot is an encrypted blob in transit. Data is destroyed on arrival.</p>
+
+  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block" id="feed-dot"></span>
+        <span style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">LIVE FEED</span>
+      </div>
+      <span style="font-size:11px;font-family:var(--mono);color:var(--quiet)" id="feed-stats">connecting...</span>
+    </div>
+    <canvas id="pipelineCanvas" style="width:100%;display:block;height:280px"></canvas>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border)">
+      <div style="background:var(--surface);padding:10px 14px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Health</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-health">—</div>
+      </div>
+      <div style="background:var(--surface);padding:10px 14px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Legal</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-legal">—</div>
+      </div>
+      <div style="background:var(--surface);padding:10px 14px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Finance</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-finance">—</div>
+      </div>
+      <div style="background:var(--surface);padding:10px 14px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">IoT</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-iot">—</div>
+      </div>
+      <div style="background:var(--surface);padding:10px 14px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Anycast</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="stat-fly">—</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const RELAYS = [
+    {name:"health",  url:"https://health.paramant.app",  statEl:"stat-health"},
+    {name:"legal",   url:"https://legal.paramant.app",   statEl:"stat-legal"},
+    {name:"finance", url:"https://finance.paramant.app", statEl:"stat-finance"},
+    {name:"iot",     url:"https://iot.paramant.app",     statEl:"stat-iot"},
+    {name:"fly.io",  url:"https://paramant-ghost-pipe.fly.dev", statEl:"stat-fly"},
+  ];
+
+  const canvas  = document.getElementById("pipelineCanvas");
+  const ctx     = canvas.getContext("2d");
+  let dots      = [];
+  let relayData = {};
+  let W, H;
+
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    W = canvas.width  = rect.width  * window.devicePixelRatio;
+    H = canvas.height = rect.height * window.devicePixelRatio;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function relayY(i){ return ((i + 1) / (RELAYS.length + 1)) * (H / window.devicePixelRatio); }
+
+  function draw(){
+    const cw = W / window.devicePixelRatio;
+    const ch = H / window.devicePixelRatio;
+    ctx.clearRect(0, 0, cw, ch);
+
+    RELAYS.forEach((r, i) => {
+      const y = relayY(i);
+
+      // Dashed line
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([4, 8]);
+      ctx.beginPath();
+      ctx.moveTo(120, y);
+      ctx.lineTo(cw - 40, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Node
+      const online = relayData[r.name]?.ok;
+      ctx.fillStyle   = "#111";
+      ctx.strokeStyle = online ? "#2d6a4f" : "#333";
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.arc(70, y, 18, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = online ? "#2d6a4f" : "#333";
+      ctx.beginPath();
+      ctx.arc(70, y, 4, 0, Math.PI*2);
+      ctx.fill();
+
+      // Label
+      ctx.fillStyle = "#555";
+      ctx.font = "11px 'SF Mono','Fira Code',monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(r.name.toUpperCase(), 98, y + 4);
+
+      // Uptime
+      if(relayData[r.name]?.uptime_s != null){
+        const uh = Math.floor(relayData[r.name].uptime_s / 3600);
+        ctx.fillStyle = "#333";
+        ctx.textAlign = "right";
+        ctx.fillText(uh + "h uptime", cw - 48, y + 4);
+      }
+    });
+
+    // Dots
+    dots.forEach(d => {
+      d.x += d.speed;
+      const alpha = Math.min(1, Math.min(d.x - 120, (cw - 60) - d.x) / 40);
+      ctx.globalAlpha = Math.max(0, alpha) * 0.9;
+      ctx.fillStyle = "#2d6a4f";
+      ctx.beginPath();
+      ctx.arc(d.x, relayY(d.relay), 3.5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
+    dots = dots.filter(d => d.x < cw - 40);
+    requestAnimationFrame(draw);
+  }
+
+  function spawnDot(relayIndex){
+    dots.push({ x: 122, relay: relayIndex, speed: 1.2 + Math.random() * 1.8 });
+  }
+
+  async function pollRelay(relay, index){
+    try{
+      const r = await fetch(relay.url + "/health", {signal: AbortSignal.timeout(4000)});
+      const d = await r.json();
+      relayData[relay.name] = d;
+      const el = document.getElementById(relay.statEl);
+      if(el) el.textContent = "v" + d.version + " · " + d.uptime_s + "s";
+      if(d.stats && (d.stats.inbound > 0 || d.stats.outbound > 0)) spawnDot(index);
+    } catch(e){
+      relayData[relay.name] = {ok: false};
+      const el = document.getElementById(relay.statEl);
+      if(el) el.textContent = "offline";
+    }
+  }
+
+  async function pollCT(){
+    try{
+      const r = await fetch("https://health.paramant.app/v2/ct/log?limit=5", {signal: AbortSignal.timeout(4000)});
+      const d = await r.json();
+      if(d.size > 0) spawnDot(Math.floor(Math.random() * RELAYS.length));
+      const el = document.getElementById("feed-stats");
+      if(el) el.textContent = d.size + " registrations · " + new Date().toLocaleTimeString();
+    } catch(e){}
+  }
+
+  RELAYS.forEach((r, i) => {
+    pollRelay(r, i);
+    setInterval(() => pollRelay(r, i), 15000);
+  });
+
+  setInterval(pollCT, 5000);
+
+  // Startup dots
+  RELAYS.forEach((r, i) => setTimeout(() => spawnDot(i), i * 400 + 200));
+
+  // Idle dots
+  setInterval(() => {
+    const onlineIdx = RELAYS.map((r,i) => relayData[r.name]?.ok ? i : -1).filter(i => i >= 0);
+    if(onlineIdx.length > 0) spawnDot(onlineIdx[Math.floor(Math.random() * onlineIdx.length)]);
+  }, 3000);
+
+  draw();
+})();
+</script>
 <footer>
   <div class="footer-logo">PARAMANT</div>
   <div class="footer-links">
