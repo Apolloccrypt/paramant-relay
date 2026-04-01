@@ -1087,7 +1087,7 @@ function keyAllowedOnRelay(keyData, reqHost) {
         const data = JSON.parse(body.toString());
         // Admin token: via header OF via body
         const tok = req.headers['x-admin-token'] || data.admin_token || '';
-        if (tok !== (process.env.ADMIN_TOKEN || 'change_me_in_production')) {
+        if (tok !== (process.env.ADMIN_TOKEN || (() => { throw new Error('ADMIN_TOKEN not set'); })())) {
           res.writeHead(401); return res.end(J({ error: 'Unauthorized' }));
         }
         const { email, plan = 'pro', label, send_email, allowed_relays } = data;
@@ -1271,7 +1271,7 @@ function keyAllowedOnRelay(keyData, reqHost) {
   // GET /admin/users — overzicht alle API keys (admin only)
   if (url.startsWith('/admin/users') && req.method === 'GET') {
     const adminToken = req.headers['x-admin-token'] || '';
-    if (adminToken !== (process.env.ADMIN_TOKEN || 'change_me_in_production')) {
+    if (adminToken !== (process.env.ADMIN_TOKEN || (() => { throw new Error('ADMIN_TOKEN not set'); })())) {
       res.writeHead(401); return res.end(J({ error: 'Unauthorized' }));
     }
     const users = [];
@@ -1978,7 +1978,7 @@ wss.on('connection', (ws, req) => {
 });
 
 // ── Start ────────────────────────────────────────────────────────────
-srv.listen(PORT, '0.0.0.0', () => {
+srv.listen(PORT, '127.0.0.1', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION });
 });
 
