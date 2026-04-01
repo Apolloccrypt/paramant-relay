@@ -1,0 +1,13 @@
+[Unit]
+Description=PARAMANT Ghost Pipe Relay
+After=network.target
+[Service]
+User=paramant
+WorkingDirectory=/home/paramant/relay-gp
+ExecStart=/usr/bin/node relay.js
+Environment=PORT=4001
+Environment=RELAY_MODE=full
+Environment=USERS_FILE=/home/paramant/relay-gp/users.json
+Restart=always
+[Install]
+WantedBy=multi-user.target
