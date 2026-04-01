@@ -102,6 +102,18 @@ function showKeyOverlay(key,label,plan,email){
   document.body.appendChild(o);
 }
 
+async function resendMail(key,label,plan,email){
+  if(!email){email=prompt("Email address for "+label+":");if(!email)return;}
+  addLog("Sending welcome mail to "+email+"...","info");
+  const r=await apiCall(selectedRelay.u,"/v2/admin/send-welcome","POST",{key,label,plan,email});
+  if(r.ok&&r.data?.ok){
+    addLog("Mail sent to "+email,"ok");
+  }else{
+    addLog("Mail failed: "+(r.data?.error||r.error||"unknown"),"error");
+    showKeyOverlay(key,label,plan,email);
+  }
+}
+
 async function revokeKey(key){
   if(!confirm("Revoke "+key.slice(0,20)+"...?"))return;
   addLog("Revoking "+key.slice(0,16)+"...","warn");
@@ -151,9 +163,12 @@ function renderKeys(){
     keys.map((k,i)=>'<tr style="background:'+(i%2===0?V.bg:V.sur)+'">'+
       '<td style="padding:8px 12px;color:'+V.m+'">'+esc(k.label||"—")+'</td>'+
       '<td style="padding:8px 12px;font-family:'+V.mono+';color:'+V.q+'">'+esc(k.plan||"—")+'</td>'+
-      '<td style="padding:8px 12px;font-family:'+V.mono+';color:'+V.q+';font-size:11px">'+esc((k.key||"").slice(0,24))+'...</td>'+
+      '<td style="padding:8px 12px;font-family:'+V.mono+';color:'+V.q+';font-size:11px;cursor:pointer" onclick="showKeyOverlay(\''+esc(k.key)+'\',\''+esc(k.label||'')+'\',\''+esc(k.plan||'')+'\',\''+esc(k.email||'')+'\')" title="Click to view full key">'+esc((k.key||"").slice(0,24))+'...</td>'+
       '<td style="padding:8px 12px"><span style="color:'+(k.active!==false?V.g:V.r)+'">'+(k.active!==false?"active":"revoked")+'</span></td>'+
-      '<td style="padding:8px 12px"><button onclick="revokeKey(\''+esc(k.key)+'\')" style="background:none;border:1px solid '+V.b+';color:'+V.q+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer">Revoke</button></td>'+
+      '<td style="padding:8px 12px;white-space:nowrap">'+
+        (k.email?'<button onclick="resendMail(\''+esc(k.key)+'\',\''+esc(k.label||'')+'\',\''+esc(k.plan||'')+'\',\''+esc(k.email)+'\')" style="background:none;border:1px solid '+V.b+';color:'+V.m+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer;margin-right:4px">Mail</button>':'')+
+        '<button onclick="revokeKey(\''+esc(k.key)+'\')" style="background:none;border:1px solid '+V.b+';color:'+V.q+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer">Revoke</button>'+
+      '</td>'+
     '</tr>').join("")+
     '</tbody></table>';
 }
