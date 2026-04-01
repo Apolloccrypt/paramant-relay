@@ -348,8 +348,12 @@ function authByDid(didStr, signature, payload) {
 }
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-function setHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
+const ALLOWED_ORIGINS = ['https://paramant.app', 'https://www.paramant.app'];
+function setHeaders(res, req) {
+  const origin = req?.headers?.origin || '';
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : 'https://paramant.app';
+  res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
+  res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-Admin-Token, X-DID, X-DID-Signature');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
@@ -369,7 +373,7 @@ function readBody(req, max = MAX_BLOB * 2) {
 
 // ── HTTP server ───────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
-  setHeaders(res);
+  setHeaders(res, req);
   const parsed  = url_.parse(req.url, true);
   const path    = parsed.pathname;
   const query   = parsed.query;
