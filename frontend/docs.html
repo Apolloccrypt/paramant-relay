@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Developer Documentatie</title>
+<meta name="robots" content="noindex">
+<style>
+:root{
+  --bg: #ffffff;--bg2: #f9fafb;--bg3: #f3f4f6;
+  --border: #e5e7eb;--border2: #d1d5db;
+  --text: #111827;--muted: #6b7280;--dim: #9ca3af;
+  --green: #059669;--purple: #7c3aed;--red: #dc2626;--yellow:#f59e0b;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.7}
+a{color:var(--purple);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--bg3);border:1px solid var(--border);padding:2px 6px;font-family:var(--mono);font-size:11px;color:var(--green)}
+pre{background:var(--bg2);border:1px solid var(--border);padding:16px 20px;overflow-x:auto;font-size:12px;line-height:1.8;margin:16px 0}
+pre code{background:none;border:none;padding:0;font-size:12px}
+h1{font-size:26px;font-weight:900;color:var(--text);margin-bottom:10px;line-height:1.2}
+h2{font-size:18px;font-weight:900;color:var(--text);margin:40px 0 12px;border-bottom:1px solid var(--border);padding-bottom:8px}
+h3{font-size:14px;font-weight:900;color:var(--text);margin:24px 0 8px}
+p{margin-bottom:12px;color:var(--muted)}
+strong{color:var(--text)}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}
+th{text-align:left;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);color:var(--dim);font-size:10px;letter-spacing:.06em;font-weight:400}
+td{padding:8px 12px;border:1px solid var(--border);vertical-align:top}
+td:first-child{color:var(--green);font-family:var(--mono);white-space:nowrap}
+
+/* NAV */
+.topnav{position:fixed;top:0;left:0;right:0;height:48px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:200;padding:0 20px;gap:0}
+.topnav a.logo{font-size:14px;font-weight:900;color:var(--text);padding-right:20px;border-right:1px solid var(--border);margin-right:0}
+.topnav a.logo span{color:var(--green)}
+.topnav a.nl{font-size:11px;color:var(--dim);padding:0 14px;height:48px;display:flex;align-items:center;border-left:1px solid var(--border);letter-spacing:.06em}
+.topnav a.nl:hover{color:var(--text)}
+.topnav a.cta{margin-left:auto;padding:7px 16px;background:var(--green);color:var(--bg);font-size:11px;font-weight:900;letter-spacing:.06em}
+.topnav a.cta:hover{text-decoration:none;opacity:.9}
+.topnav a.cta2{padding:7px 16px;border:1px solid var(--border2);color:var(--muted);font-size:11px;margin-left:8px;letter-spacing:.06em}
+
+/* LAYOUT */
+.layout{display:flex;min-height:100vh;padding-top:48px}
+.sidebar{width:220px;min-width:220px;flex-shrink:0;position:sticky;top:48px;height:calc(100vh - 48px);overflow-y:auto;border-right:1px solid var(--border);padding:20px 0}
+.content{flex:1;min-width:0;padding:48px 56px;max-width:860px}
+.sb-section{font-size:9px;color:var(--dim);letter-spacing:.1em;padding:16px 20px 6px;margin-top:8px}
+.sb-link{display:block;padding:5px 20px;font-size:11px;color:var(--dim);transition:color .1s}
+.sb-link:hover,.sb-link.active{color:var(--green);text-decoration:none}
+.sb-link.active{border-left:2px solid var(--green);padding-left:18px}
+
+/* CONTENT BLOCKS */
+.label{font-size:9px;color:var(--dim);letter-spacing:.1em;margin-bottom:8px}
+.badge{display:inline-block;padding:2px 8px;font-size:9px;letter-spacing:.08em;border:1px solid;margin-right:6px}
+.badge.get{color:var(--green);border-color:var(--green)}
+.badge.post{color:var(--purple);border-color:var(--purple)}
+.badge.del{color:var(--red);border-color:var(--red)}
+.endpoint{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;margin:12px 0;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px}
+.note{background:var(--bg3);border-left:3px solid var(--purple);padding:12px 16px;margin:16px 0;font-size:12px;color:var(--muted)}
+.note.warn{border-color:var(--yellow)}
+.note.success{border-color:var(--green)}
+.note strong{color:var(--text)}
+.step-num{display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);font-size:10px;color:var(--dim);flex-shrink:0}
+
+/* MOBILE */
+@media(max-width:720px){
+  .sidebar{display:none}
+  .content{padding:32px 24px}
+}
+
+/* ── Consistente navbar ── */
+nav.p-nav{position:sticky;top:0;z-index:1000;background:#ffffff;border-bottom:1px solid #e5e7eb;height:52px;display:flex;align-items:center;padding:0 32px}
+.p-nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
+.p-nav-logo{font-size:14px;font-weight:900;color:#111827;margin-right:40px;flex-shrink:0;letter-spacing:-.01em;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-links{display:flex;align-items:center;gap:2px;flex:1}
+.p-nav-link{padding:6px 14px;font-size:11px;color:#6b7280;letter-spacing:.05em;transition:color .15s;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-link:hover{color:#111827}
+.p-nav-ctas{display:flex;align-items:center;gap:8px;margin-left:auto}
+.p-btn-nav{padding:7px 14px;border:1px solid #d1d5db;color:#6b7280;font-size:11px;font-family:'JetBrains Mono',monospace;background:none;transition:all .15s;text-decoration:none}
+.p-btn-nav:hover{border-color:#111827;color:#111827}
+.p-btn-nav-solid{padding:7px 16px;background:#111827;color:#ffffff;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.04em;text-decoration:none;display:inline-block}
+.p-btn-nav-solid:hover{background:#374151}
+@media(max-width:768px){.p-nav-links{display:none}nav.p-nav{padding:0 16px}}
+</style>
+<style>
+/* ═══ PARAMANT LIGHT THEME OVERRIDE ═══ */
+:root {
+  --bg:      #ffffff !important;
+  --bg2:     #f9fafb !important;
+  --bg3:     #f3f4f6 !important;
+  --border:  #e5e7eb !important;
+  --border2: #d1d5db !important;
+  --text:    #111827 !important;
+  --muted:   #6b7280 !important;
+  --dim:     #9ca3af !important;
+  --green:   #059669 !important;
+  --purple:  #7c3aed !important;
+  --red:     #dc2626 !important;
+  --yellow:  #d97706 !important;
+  --teal:    #0d9488 !important;
+  --orange:  #ea580c !important;
+}
+body {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+</style>
+</head>
+<body>
+
+<style>
+#docs-guard {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #ffffff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+#docs-guard.hidden { display: none; }
+.guard-box {
+  width: 100%; max-width: 400px;
+  border: 1px solid #e5e7eb;
+  padding: 0;
+}
+.guard-head {
+  background: #111827; color: #ffffff;
+  padding: 20px 24px;
+}
+.guard-title { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+.guard-sub { font-size: 10px; color: #6b7280; letter-spacing: .06em; }
+.guard-body { padding: 24px; }
+.guard-label { font-size: 10px; color: #9ca3af; letter-spacing: .08em; display: block; margin-bottom: 8px; }
+.guard-input {
+  width: 100%; background: #f9fafb; border: 1px solid #e5e7eb;
+  color: #111827; padding: 11px 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  outline: none; margin-bottom: 12px;
+}
+.guard-input:focus { border-color: #111827; }
+.guard-btn {
+  width: 100%; padding: 12px; background: #111827; color: #ffffff;
+  border: none; font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; cursor: pointer;
+}
+.guard-btn:hover { background: #374151; }
+.guard-error { font-size: 11px; color: #dc2626; margin-top: 8px; display: none; }
+.guard-note { font-size: 10px; color: #9ca3af; margin-top: 14px; line-height: 1.8; }
+.guard-note a { color: #9ca3af; }
+</style>
+
+<div id="docs-guard">
+  <div class="guard-box">
+    <div class="guard-head">
+      <div class="guard-title">PARAMANT — API Documentatie</div>
+      <div class="guard-sub">TOEGANG VEREIST API KEY</div>
+    </div>
+    <div class="guard-body">
+      <label class="guard-label">UW API KEY</label>
+      <input class="guard-input" type="password" id="guard-key"
+        placeholder="pgp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        autocomplete="off" spellcheck="false">
+      <button class="guard-btn" onclick="docsLogin()">TOEGANG KRIJGEN →</button>
+      <div class="guard-error" id="guard-error">Ongeldige API key. Heeft u nog geen key? <a href="/#pricing">Bekijk de plannen →</a></div>
+      <div class="guard-note">
+        Geen API key? Bekijk de <a href="/#pricing">plannen</a> of
+        <a href="mailto:privacy@paramant.app">vraag toegang aan</a>.<br>
+        Investeerders en partners: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Check of key al opgeslagen is
+  var saved = sessionStorage.getItem('paramant_docs_key');
+  if (saved && /^pgp_[a-f0-9]{32}$/.test(saved)) {
+    document.getElementById('docs-guard').classList.add('hidden');
+  }
+  // Enter key support
+  document.addEventListener('DOMContentLoaded', function() {
+    var inp = document.getElementById('guard-key');
+    if (inp) inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') docsLogin();
+    });
+  });
+})();
+
+async function docsLogin() {
+  var key = document.getElementById('guard-key').value.trim();
+  var err = document.getElementById('guard-error');
+  var btn = document.querySelector('.guard-btn');
+  err.style.display = 'none';
+
+  if (!/^pgp_[a-f0-9]{32}$/.test(key)) {
+    err.style.display = 'block';
+    err.textContent = 'Ongeldige API key. Formaat: pgp_ gevolgd door 32 hex tekens.';
+    return;
+  }
+
+  btn.textContent = 'Verifiëren...';
+  btn.disabled = true;
+
+  // Check op alle relay endpoints
+  var relays = [
+    'https://relay.paramant.app',
+    'https://legal.paramant.app',
+    'https://finance.paramant.app',
+    'https://iot.paramant.app',
+    'https://health.paramant.app'
+  ];
+
+  var valid = false;
+  for (var i = 0; i < relays.length; i++) {
+    try {
+      var r = await fetch(relays[i] + '/v2/check-key?k=' + encodeURIComponent(key));
+      var ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) continue;
+      var d = await r.json();
+      if (d.valid) { valid = true; break; }
+    } catch(e) { continue; }
+  }
+
+  if (valid) {
+    sessionStorage.setItem('paramant_docs_key', key);
+    document.getElementById('docs-guard').classList.add('hidden');
+  } else {
+    err.style.display = 'block';
+    err.textContent = 'Ongeldige of inactieve API key. Heeft u een actief abonnement?';
+  }
+
+  btn.textContent = 'TOEGANG KRIJGEN →';
+  btn.disabled = false;
+}
+</script>
+
+
+<nav class="p-nav">
+ <div class="p-nav-inner">
+  <a href="/" class="p-nav-logo">PARAMANT</a>
+  <div class="p-nav-links">
+   <a href="/#sectoren" class="p-nav-link">SECTOREN</a>
+   <a href="/#pricing" class="p-nav-link">PRICING</a>
+   <a href="/#integratie" class="p-nav-link">INTEGRATIE</a>
+   <a href="/docs" class="p-nav-link">API DOCS</a>
+  </div>
+  <div class="p-nav-ctas">
+   <a href="/chat" class="p-btn-nav">Chat gratis</a>
+   <a href="/dashboard" class="p-btn-nav-solid">Dashboard &rarr;</a>
+  </div>
+ </div>
+</nav>
+
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sb-section">GETTING STARTED</div>
+  <a href="#intro" class="sb-link active">Introductie</a>
+  <a href="#quickstart" class="sb-link">Quickstart (5 min)</a>
+  <a href="#auth" class="sb-link">Authenticatie</a>
+
+  <div class="sb-section">GHOST PIPE</div>
+  <a href="#protocol" class="sb-link">Protocol</a>
+  <a href="#send" class="sb-link">Bestand versturen</a>
+  <a href="#receive" class="sb-link">Bestand ontvangen</a>
+  <a href="#chunked" class="sb-link">Grote bestanden (&gt;5MB)</a>
+
+  <div class="sb-section">CLI & SDK</div>
+  <a href="#cli" class="sb-link">CLI (Rust binary)</a>
+  <a href="#proxy" class="sb-link">Sidecar proxy</a>
+  <a href="#heartbeat" class="sb-link">Heartbeat</a>
+  <a href="#python" class="sb-link">Python SDK</a>
+
+  <div class="sb-section">API REFERENTIE</div>
+  <a href="#endpoints" class="sb-link">Alle endpoints</a>
+  <a href="#errors" class="sb-link">Foutcodes</a>
+  <a href="#webhooks" class="sb-link">Webhooks</a>
+  <a href="#audit" class="sb-link">Audit log</a>
+
+  <div class="sb-section">ENTERPRISE</div>
+  <a href="#self-hosted" class="sb-link">Self-hosted relay</a>
+  <a href="#ip-pinning" class="sb-link">IP pinning</a>
+  <a href="#crypto" class="sb-link">Cryptografie</a>
+</nav>
+
+<!-- CONTENT -->
+<main class="content">
+
+<!-- INTRO -->
+<div id="intro">
+  <div class="label">// PARAMANT GHOST PIPE PROTOCOL</div>
+  <h1>Developer Documentatie</h1>
+  <p>Post-quantum stateless bestandsoverdracht. Burn-on-read. Geen accounts, geen opslag.</p>
+
+  <div class="note success">
+    <strong>Relay:</strong> <code>https://relay.paramant.app</code> &nbsp;·&nbsp;
+    <a href="https://relay.paramant.app/health" target="_blank">Status checken →</a>
+  </div>
+
+  <h3>Wat is Ghost Pipe?</h3>
+  <p>Ghost Pipe is een eenmalige versleutelde bestandsoverdracht. De relay slaat nooit iets op schijf op — alleen in RAM, maximaal 300 seconden. Zodra de ontvanger het bestand ophaalt, wordt de kopie definitief vernietigd (<code>blob.fill(0)</code> + delete).</p>
+
+  <table>
+    <tr><th>Eigenschap</th><th>Waarde</th></tr>
+    <tr><td>Encryptie</td><td>ML-KEM-768 (NIST FIPS 203) + ECDH P-256 hybrid</td></tr>
+    <tr><td>Blokgrootte</td><td>Altijd exact 5.242.880 bytes (metadata masking)</td></tr>
+    <tr><td>TTL</td><td>300 seconden in RAM — daarna automatisch vernietigd</td></tr>
+    <tr><td>Burn-on-read</td><td>Tweede ophaalpoging → HTTP 404</td></tr>
+    <tr><td>Relay locatie</td><td>Hetzner DE (Neurenberg) — GDPR, geen US CLOUD Act</td></tr>
+    <tr><td>Opslag</td><td>RAM-only — nooit op disk</td></tr>
+  </table>
+</div>
+
+<!-- QUICKSTART -->
+<div id="quickstart">
+  <h2>Quickstart (5 minuten)</h2>
+
+  <div style="display:flex;align-items:flex-start;gap:12px;margin:16px 0">
+    <span class="step-num">1</span>
+    <div>
+      <h3 style="margin-top:0">API key kopen</h3>
+      <p>Ga naar <a href="/#pricing">paramant.app/#pricing</a> → kies Pro of Kantoor → Stripe checkout → je ontvangt een <code>pgp_...</code> key per email.</p>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:12px;margin:16px 0">
+    <span class="step-num">2</span>
+    <div>
+      <h3 style="margin-top:0">CLI downloaden</h3>
+<pre><code># Download binary
+curl -sL "https://relay.paramant.app/dl/paramant-linux-x64?token=pgp_JOUW_KEY" \
+  -o paramant
+
+# Verifieer checksum (ALTIJD doen voor een beveiligingsproduct)
+curl -sL "https://relay.paramant.app/dl/paramant-linux-x64.sha256?token=pgp_JOUW_KEY" \
+  -o paramant.sha256
+sha256sum --check paramant.sha256
+# paramant: OK
+# Verwachte hash: 3b3151eb4f44525637386ce40676bc01...
+
+chmod +x paramant
+./paramant verify --key pgp_JOUW_KEY
+# ✓ Geldig — plan: pro, gebruikt: 0/10000</code></pre>
+
+<div class="note">
+  <strong>Waarom checksum?</strong> Zonder verificatie kun je een gemanipuleerde binary installeren. De SHA256 hash is gesigneerd door Paramant en staat apart op de relay.
+</div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:12px;margin:16px 0">
+    <span class="step-num">3</span>
+    <div>
+      <h3 style="margin-top:0">Keypair genereren</h3>
+<pre><code>./paramant keygen --output keys.json
+# Publieke sleutel (deel met verzender):
+# 04abc...1249hexchars</code></pre>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:12px;margin:16px 0">
+    <span class="step-num">4</span>
+    <div>
+      <h3 style="margin-top:0">Bestand versturen</h3>
+<pre><code>./paramant send document.pdf \
+  --to 04abc...1249hexchars \
+  --api-key pgp_JOUW_KEY
+
+# Hash:  a3f8c2d1e7b4f6a9...
+# TTL:   300s</code></pre>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:12px;margin:16px 0">
+    <span class="step-num">5</span>
+    <div>
+      <h3 style="margin-top:0">Status checken</h3>
+<pre><code>./paramant status --hash a3f8c2d1e7b4f6a9...
+# ✓ Beschikbaar (287s resterend)</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH -->
+<div id="auth">
+  <h2>Authenticatie</h2>
+  <p>Ghost Pipe vereist altijd een geldige API key. Stuur de key mee als HTTP header of in de request body.</p>
+
+<pre><code># Via header (aanbevolen)
+curl -X POST https://relay.paramant.app/v2/inbound \
+  -H "X-Api-Key: pgp_JOUW_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"...","payload":"..."}'
+
+# Via request body
+curl -X POST https://relay.paramant.app/v2/inbound \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"...","payload":"...","api_key":"pgp_JOUW_KEY"}'</code></pre>
+
+  <h3>Key valideren</h3>
+<pre><code>curl -s -X POST https://relay.paramant.app/v2/verify-key \
+  -H "Content-Type: application/json" \
+  -d '{"api_key":"pgp_JOUW_KEY"}'
+
+# Response:
+{
+  "ok": true,
+  "valid": true,
+  "plan": "pro",
+  "used": 47,
+  "limit": 10000
+}</code></pre>
+
+  <table>
+    <tr><th>Plan</th><th>Transfers/mnd</th><th>Max bestand</th></tr>
+    <tr><td>Pro</td><td>10.000</td><td>500MB (100 blokken)</td></tr>
+    <tr><td>Kantoor</td><td>Onbeperkt</td><td>2GB (400 blokken)</td></tr>
+    <tr><td>Enterprise</td><td>Onbeperkt</td><td>Onbeperkt</td></tr>
+  </table>
+</div>
+
+<!-- PROTOCOL -->
+<div id="protocol">
+  <h2>Ghost Pipe Protocol</h2>
+
+  <h3>Wire format</h3>
+  <p>Elk versleuteld pakket heeft het volgende formaat vóór padding:</p>
+
+<pre><code>[4B]    Magic: "PQHB"
+[65B]   Ephemeral ECDH P-256 public key
+[1088B] ML-KEM-768 ciphertext
+[12B]   AES-GCM nonce
+[NB]    AES-256-GCM ciphertext + 16B authentication tag</code></pre>
+
+  <h3>5MB padding</h3>
+  <p>Na encryptie wordt het pakket gepadded naar exact <strong>5.242.880 bytes</strong>:</p>
+
+<pre><code>[8B]    Originele data lengte (big-endian uint64)
+[NB]    Wire format blob
+[RB]    Cryptografisch random padding
+= exact 5.242.880 bytes (altijd)</code></pre>
+
+  <div class="note">
+    <strong>Waarom vaste blokgrootte?</strong> DPI-systemen kunnen verkeerspatronen analyseren. Als elke transfer precies 5MB is, ziet niemand of het een SMS of een rechtbankdossier is.
+  </div>
+
+  <h3>Key derivation</h3>
+<pre><code>ikm  = ECDH_shared_secret || ML-KEM_shared_secret
+key  = HKDF-SHA256(ikm, salt=eph_pub, info="paramant-ghost-pipe-hybrid-v1")
+     → 32 bytes AES-256 sleutel</code></pre>
+</div>
+
+<!-- SEND -->
+<div id="send">
+  <h2>Bestand versturen</h2>
+
+  <div class="endpoint"><span class="badge post">POST</span><code>/v2/inbound</code></div>
+
+  <p>Twee upload methoden — kies op basis van omgeving:</p>
+
+  <h3>JSON + base64 (standaard, browser/SDK)</h3>
+<pre><code>{
+  "hash":    "sha256_van_ontvanger_pubkey_plus_nonce",
+  "payload": "base64_encoded_5mb_blob",
+  "api_key": "pgp_..."
+}
+Content-Type: application/json</code></pre>
+
+  <h3>Binary upload (IoT/CLI — 33% minder bandbreedte)</h3>
+<pre><code>curl -X POST https://relay.paramant.app/v2/inbound \
+  -H "Content-Type: application/octet-stream" \
+  -H "X-Hash: a3f8c2d1..." \
+  -H "X-Api-Key: pgp_..." \
+  --data-binary @bestand.gpb
+
+# Geen base64 overhead — raw 5MB binary
+# X-Hash: sha256 hex van de blob routing hash</code></pre>
+
+  <div class="note warn">
+    <strong>Hash privacy:</strong> De hash is <code>sha256(pubkey_bytes || 16_random_bytes)</code> — niet <code>sha256(pubkey)</code>.
+    Een nonce maakt de hash onvoorspelbaar. Zonder nonce kan een observeerder de <code>/v2/status</code> endpoint pollen
+    en communicatiefrequentie achterhalen. De nonce is ingebakken in de CLI en SDK — niets om zelf te doen.
+  </div>
+
+  <h3>Response</h3>
+<pre><code>{
+  "ok":          true,
+  "hash":        "a3f8c2d1e7b4...",
+  "size":        5242880,
+  "ttl_ms":      300000,
+  "expires_at":  1234567890123,
+  "burn_on_read": true,
+  "plan":        "pro"
+}</code></pre>
+
+  <div class="note warn">
+    <strong>Hash privacy:</strong> Gebruik niet puur <code>sha256(pubkey)</code> als hash — dit laat derden de /v2/status endpoint pollen om communicatiefrequentie te observeren.
+    Voeg een nonce toe: <code>hash = sha256(pubkey + ':' + random_nonce)</code> en stuur de nonce mee met de hash naar de ontvanger.
+  </div>
+
+  <h3>CLI</h3>
+<pre><code>./paramant send document.pdf \
+  --to 04abc...1249hexchars \
+  --api-key pgp_... \
+  [--json]</code></pre>
+
+  <h3>Python SDK</h3>
+<pre><code>from paramant_ghostpipe import send
+
+result = send(
+    data=open("document.pdf", "rb").read(),
+    recip_pub_hex="04abc...1249hexchars",
+    api_key="pgp_...",
+    relay_url="https://relay.paramant.app"
+)
+print(f"Hash: {result['hash']}")</code></pre>
+</div>
+
+<!-- RECEIVE -->
+<div id="receive">
+  <h2>Bestand ontvangen (burn-on-read)</h2>
+
+  <div class="endpoint"><span class="badge get">GET</span><code>/v2/outbound/:hash</code></div>
+
+  <p>Geeft de raw binary blob terug (5.242.880 bytes). Relay vernietigt de blob direct na verzending.</p>
+
+<pre><code>curl -s "https://relay.paramant.app/v2/outbound/a3f8c2d1..." \
+  --output bestand.enc
+
+# Tweede request:
+curl -s "https://relay.paramant.app/v2/outbound/a3f8c2d1..."
+# → HTTP 404 {"error":"Niet gevonden of al opgehaald"}</code></pre>
+
+  <h3>ACK mechanisme</h3>
+  <p>Zodra de relay de stream start, wordt de entry uit <code>gpMempool</code> verwijderd — een tweede <code>GET</code> geeft direct <code>404</code>. De originele blob blijft intern 30 seconden in <code>pendingBurn</code> voor fysieke cleanup:</p>
+  <ul style="font-size:12px;color:var(--muted);line-height:2;margin:12px 0 12px 20px">
+    <li>Client stuurt <code>POST /v2/ack/:hash</code> → <code>blob.fill(0)</code> + delete direct</li>
+    <li>Geen ACK binnen 30s → timeout → <code>blob.fill(0)</code> + delete automatisch</li>
+  </ul>
+  <p>Dit is geen "soft" burn — data is direct onbereikbaar. De 30s window is alleen voor gegarandeerde zero-overwrite na een geslaagde stream.</p>
+
+  <div class="endpoint"><span class="badge post">POST</span><code>/v2/ack/:hash</code></div>
+
+<pre><code>{
+  "ok": true,
+  "destroyed": true
+}</code></pre>
+
+  <h3>Status checken</h3>
+  <div class="endpoint"><span class="badge get">GET</span><code>/v2/status/:hash</code></div>
+<pre><code>{"available": true, "hash": "a3f8..."}</code></pre>
+</div>
+
+<!-- CHUNKED -->
+<div id="chunked">
+  <h2>Grote bestanden (&gt;5MB)</h2>
+  <p>Pro: max 500MB (100 blokken). Kantoor: max 2GB (400 blokken).</p>
+
+  <div class="endpoint"><span class="badge post">POST</span><code>/v2/manifest</code></div>
+
+<pre><code># Stap 1: registreer manifest
+POST /v2/manifest
+{
+  "total_blocks":   10,
+  "recipient_hash": "sha256...",
+  "api_key":        "pgp_..."
+}
+# Response: { "manifest_hash": "abc123...", "total_blocks": 10 }
+
+# Stap 2: stuur elk blok
+# Relay berekent block-hash automatisch via X-Block-Index header
+# Developer hoeft geen hash-logica te implementeren
+
+POST /v2/inbound
+Content-Type: application/octet-stream
+X-Api-Key: pgp_...
+X-Manifest-Hash: abc123...
+X-Block-Index: 0
+Body: &lt;raw 5MB blob&gt;
+
+# OF via JSON:
+{
+  "manifest_hash": "abc123...",
+  "block_index":   0,
+  "payload":       "base64_5mb_blok",
+  "api_key":       "pgp_..."
+}
+# hash wordt automatisch berekend: sha256("abc123...:0")</code></pre>
+
+  <div class="note warn">
+    <strong>Limiet:</strong> Gratis transfers zijn niet mogelijk — Ghost Pipe vereist altijd een API key.
+  </div>
+</div>
+
+<!-- CLI -->
+<div id="cli">
+  <h2>CLI — Rust binary</h2>
+
+  <h3>Installatie</h3>
+<pre><code>curl -sL "https://relay.paramant.app/dl/paramant-linux-x64?token=pgp_..." \
+  -o /usr/local/bin/paramant && chmod +x /usr/local/bin/paramant</code></pre>
+
+  <div class="note">
+    De download vereist een geldig <code>token=pgp_...</code>. Koop een API key via <a href="/#pricing">paramant.app/#pricing</a>.
+  </div>
+
+  <h3>Alle commando's</h3>
+<pre><code>paramant keygen [--output keys.json]
+  # Genereert ML-KEM-768 + ECDH P-256 keypair
+
+paramant send &lt;bestand&gt; --to &lt;pubkey&gt; --api-key pgp_... [--json]
+  # Versleutelt en verstuurt naar relay
+
+paramant receive --hash &lt;hash&gt; --key keys.json --out &lt;bestand&gt;
+  # Haalt op en ontsleutelt (burn-on-read)
+
+paramant proxy --listen :8765 --to &lt;pubkey&gt; --api-key pgp_...
+  # Sidecar proxy voor legacy devices
+
+paramant heartbeat --to &lt;pubkey&gt; --interval 60 --api-key pgp_...
+  # Dead-man-switch heartbeat
+
+paramant status --hash &lt;hash&gt;
+  # Beschikbaarheid checken
+
+paramant verify --key pgp_...
+  # API key valideren</code></pre>
+
+  <h3>Omgevingsvariabelen</h3>
+<pre><code>export PARAMANT_API_KEY=pgp_...
+./paramant send document.pdf --to &lt;pubkey&gt;</code></pre>
+</div>
+
+<!-- SIDECAR PROXY -->
+<div id="proxy">
+  <h2>Sidecar proxy (legacy devices)</h2>
+  <p>Legacy apparatuur (MRI scanners, PLC controllers, SCADA systemen) kan Ghost Pipe gebruiken zonder firmware aanpassing. De sidecar proxy ontvangt gewone HTTP en maakt Ghost Pipe transfers.</p>
+
+<pre><code># Start proxy
+./paramant proxy --listen 0.0.0.0:8765 --to &lt;ontvanger_pubkey&gt; --api-key pgp_...
+
+# Legacy device stuurt:
+POST http://localhost:8765/send
+Content-Type: application/octet-stream
+Body: &lt;raw data&gt;
+
+# Antwoord:
+{"ok": true, "hash": "a3f8...", "ttl_ms": 300000}
+
+# Health check:
+GET http://localhost:8765/health
+{"ok": true, "mode": "sidecar", "relay": "https://relay.paramant.app"}</code></pre>
+
+  <h3>Docker sidecar</h3>
+<pre><code>services:
+  mri-scanner:
+    image: legacy-mri:1.0
+
+  paramant-sidecar:
+    image: ghcr.io/apolloccrypt/paramant-agent:latest
+    environment:
+      PARAMANT_API_KEY: pgp_...
+      PARAMANT_RECIP_PUBKEY: 04abc...
+      PARAMANT_MODE: proxy
+    ports:
+      - "127.0.0.1:8765:8765"</code></pre>
+</div>
+
+<!-- HEARTBEAT -->
+<div id="heartbeat">
+  <h2>Heartbeat / Dead-man-switch</h2>
+  <p>Stuur een versleuteld heartbeat elke N seconden. Het pakket is niet te onderscheiden van een echte transfer — ook een heartbeat is een 5MB blob.</p>
+
+<pre><code>./paramant heartbeat \
+  --to &lt;monitor_pubkey&gt; \
+  --interval 60 \
+  --device-id mri-kamer-3 \
+  --alarm-url https://ops.ziekenhuis.nl/alert \
+  --api-key pgp_...
+
+# Na 3 gemiste pings:
+# [ALARM] 3 heartbeats gemist voor mri-kamer-3
+# POST https://ops.ziekenhuis.nl/alert {"device_id":"mri-kamer-3","missed":3}</code></pre>
+</div>
+
+<!-- PYTHON SDK -->
+<div id="python">
+  <h2>Python SDK</h2>
+
+<div class="note warn">
+  <strong>ML-KEM-768 in Python:</strong> De standaard <code>cryptography</code> library ondersteunt ML-KEM-768 nog niet. Gebruik <code>pqcrypto</code> (wrapper om liboqs) voor post-quantum operaties.
+</div>
+<pre><code># Voor volledig hybride ML-KEM-768 + ECDH P-256:
+pip install pqcrypto cryptography requests
+
+# Alternatief via liboqs Python bindings:
+pip install liboqs-python  # vereist liboqs C library
+
+# Controleer beschikbaarheid:
+python3 -c "import pqcrypto.kem.kyber768; print('ML-KEM-768: OK')"</code></pre>
+
+<pre><code>from paramant_ghostpipe import HybridKeypair, send, receive, check_status, verify_key
+
+# Keypair genereren
+keys = HybridKeypair()
+keys.save("paramant_keys.json")
+print(keys.public_key_hex)  # 2498 hex chars
+
+# Versturen
+result = send(
+    data=open("document.pdf", "rb").read(),
+    recipient_pub_hex=keys.public_key_hex,
+    api_key="pgp_...",
+    relay_url="https://relay.paramant.app"
+)
+print(f"Hash: {result['hash']}, TTL: {result['ttl_ms']}ms")
+
+# Ontvangen (burn-on-read)
+data = receive(result["hash"], keys.private_key_hex)
+open("ontvangen.pdf", "wb").write(data)
+
+# Status
+status = check_status(result["hash"])
+print(status["available"])  # True/False
+
+# Key valideren
+info = verify_key("pgp_...")
+print(info["plan"], info["used"], "/", info["limit"])</code></pre>
+</div>
+
+<!-- ENDPOINTS -->
+<div id="endpoints">
+  <h2>Alle endpoints</h2>
+
+  <h3>Publiek</h3>
+
+  <h3 style="font-size:12px;color:var(--green);letter-spacing:.06em">QUANTUM READINESS</h3>
+<pre><code>GET https://relay.paramant.app/health
+
+{
+  "ok":             true,
+  "version":        "5.4.0",
+  "quantum_ready":  true,
+  "algorithms": {
+    "kem":     "ML-KEM-768 (NIST FIPS 203)",
+    "classic": "ECDH P-256",
+    "sym":     "AES-256-GCM",
+    "kdf":     "HKDF-SHA-256"
+  },
+  "block_size_bytes": 5242880,
+  "burn_on_read":     true,
+  "relay_location":   "Hetzner DE (Nuremberg)"
+}</code></pre>
+
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Beschrijving</th></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/health</td><td>Relay status + quantum readiness</td></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/v2/stats</td><td>Mempool statistieken</td></tr>
+    <tr><td><span class="badge post">POST</span></td><td>/v2/inbound</td><td>Blob uploaden (API key vereist)</td></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/v2/outbound/:hash</td><td>Blob ophalen (burn-on-read)</td></tr>
+    <tr><td><span class="badge post">POST</span></td><td>/v2/ack/:hash</td><td>Ontvangst bevestigen</td></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/v2/status/:hash</td><td>Beschikbaarheid checken</td></tr>
+    <tr><td><span class="badge post">POST</span></td><td>/v2/verify-key</td><td>API key valideren</td></tr>
+    <tr><td><span class="badge post">POST</span></td><td>/v2/manifest</td><td>Multi-blok transfer registreren</td></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/v2/audit</td><td>Audit log (API key vereist)</td></tr>
+    <tr><td><span class="badge post">POST</span></td><td>/v2/webhook</td><td>Webhook registreren (API key vereist)</td></tr>
+  </table>
+
+  <h3>Noble crypto library</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Beschrijving</th></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/noble-mlkem.js</td><td>@noble/post-quantum v0.5.4 (ML-KEM-768)</td></tr>
+    <tr><td><span class="badge get">GET</span></td><td>/dl/paramant-linux-x64</td><td>CLI binary (token vereist)</td></tr>
+  </table>
+</div>
+
+<!-- ERRORS -->
+<div id="errors">
+  <h2>Foutcodes</h2>
+  <table>
+    <tr><th>HTTP</th><th>Betekenis</th><th>Oplossing</th></tr>
+    <tr><td>400</td><td>Ongeldige request body</td><td>Controleer hash formaat (hex, ≥32 chars) en payload (base64, 5MB)</td></tr>
+    <tr><td>401</td><td>Ongeldige API key</td><td>Controleer key via <code>/v2/verify-key</code></td></tr>
+    <tr><td>402</td><td>API key vereist</td><td>Koop een key op <a href="/#pricing">paramant.app/#pricing</a></td></tr>
+    <tr><td>403</td><td>IP niet toegestaan</td><td>IP pinning actief — voeg IP toe via admin endpoint</td></tr>
+    <tr><td>404</td><td>Hash niet gevonden</td><td>Verlopen (TTL 300s), al opgehaald, of ongeldig hash</td></tr>
+    <tr><td>409</td><td>Hash al in gebruik</td><td>Gebruik een andere hash (SHA-256 van pubkey)</td></tr>
+    <tr><td>413</td><td>Payload te groot</td><td>Max 5.242.880 bytes per blob</td></tr>
+    <tr><td>429</td><td>Rate limit</td><td>Plan limiet bereikt — wacht of upgrade</td></tr>
+    <tr><td>503</td><td>Read-only modus</td><td>Self-hosted relay: licentie verlopen</td></tr>
+  </table>
+</div>
+
+<!-- WEBHOOKS -->
+<div id="webhooks">
+  <h2>Webhooks</h2>
+  <p>Ontvang een HTTP callback zodra de ontvanger een blob ophaalt. Handig voor IoT systemen die asynchroon willen werken.</p>
+
+<pre><code># Registreer webhook na upload
+curl -X POST https://relay.paramant.app/v2/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hash":         "a3f8...",
+    "callback_url": "https://jouwsysteem.nl/ontvangen",
+    "api_key":      "pgp_..."
+  }'
+
+# Relay stuurt zodra ontvanger download:
+POST https://jouwsysteem.nl/ontvangen
+{
+  "event": "blob_retrieved",
+  "hash":  "a3f8...",
+  "ts":    1234567890123
+}</code></pre>
+</div>
+
+<!-- AUDIT LOG -->
+<div id="audit">
+  <h2>Audit log</h2>
+  <p>Exporteer een log van transfers (alleen hash + timestamp + bytes — nooit inhoud). Voor DORA en AVG compliance.</p>
+
+<pre><code># JSON
+curl "https://relay.paramant.app/v2/audit?api_key=pgp_...&limit=100"
+
+# CSV export
+curl "https://relay.paramant.app/v2/audit?api_key=pgp_...&format=csv" \
+  -o audit.csv
+
+# audit.csv:
+# hash_prefix,timestamp,bytes,direction
+# a3f8c2d1...,2026-03-29T10:23:41.000Z,5242880,in</code></pre>
+</div>
+
+<!-- SELF-HOSTED -->
+<div id="self-hosted">
+  <h2>Enterprise — Self-hosted relay</h2>
+  <p>Voor organisaties die data nooit via externe servers willen sturen. Vereist Kantoor of Enterprise plan.</p>
+
+<pre><code># docker-compose.yml
+services:
+  paramant-relay:
+    image: ghcr.io/apolloccrypt/paramant-relay:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      PARAMANT_LICENSE_KEY: "pgp_..."   # Kantoor/Enterprise key
+      ADMIN_TOKEN:          "eigen_token"
+      USERS_FILE:           /data/users.json
+    volumes:
+      - paramant_data:/data
+
+volumes:
+  paramant_data:</code></pre>
+
+  <div class="note warn">
+    <strong>Heartbeat licentie (standaard):</strong> De relay pings <code>relay.paramant.app</code> elke 24u. Na 3 mislukte checks: read-only modus. <strong>Niet geschikt voor air-gapped omgevingen.</strong>
+  </div>
+
+  <h3>Air-gapped licentie (Enterprise)</h3>
+  <p>Voor omgevingen zonder uitgaande internetverbinding (defensie, rechtbank, kritieke infra). Geen heartbeat nodig — relay verifieert een getekend licentiebestand lokaal.</p>
+<pre><code># Stap 1: vraag licentiebestand aan bij Paramant
+# Wij genereren een getekend bestand geldig voor 1 jaar:
+curl -X POST https://relay.paramant.app/admin/generate-airgap-license \
+  -H "Content-Type: application/json" \
+  -d '{"admin_token":"...","plan":"enterprise","valid_days":365,"label":"Rechtbank NL"}'
+
+# Response:
+{
+  "license": "eyJwbGFuIjoiZW50ZXJwcmlzZSI...&lt;base64&gt;.&lt;hmac&gt;",
+  "expires": "2027-03-29T00:00:00.000Z"
+}
+
+# Stap 2: stel in op self-hosted relay
+echo "PARAMANT_AIRGAP_LICENSE=eyJwbGFuIjoiZW50ZXJwcmlzZSI..." >> .env
+# Geen PARAMANT_LICENSE_KEY nodig — geen uitgaande verbinding</code></pre>
+
+<pre><code># Eigen relay URL gebruiken in CLI
+./paramant send document.pdf \
+  --to &lt;pubkey&gt; \
+  --api-key pgp_... \
+  --relay https://relay.uwbedrijf.nl</code></pre>
+</div>
+
+<!-- IP PINNING -->
+<div id="ip-pinning">
+  <h2>IP pinning (Kantoor/Enterprise)</h2>
+  <p>Beperk het gebruik van een API key tot specifieke IP-adressen of CIDR ranges.</p>
+
+<pre><code>curl -X POST https://relay.paramant.app/admin/set-ip-pin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "admin_token": "ADMIN_TOKEN",
+    "api_key":     "pgp_...",
+    "allowed_ips": [
+      "192.168.1.0/24",
+      "10.0.0.1",
+      "85.144.20.55"
+    ]
+  }'
+
+# Response:
+{"ok": true, "allowed_ips": ["192.168.1.0/24", "10.0.0.1"]}</code></pre>
+
+  <div class="note warn">
+    <strong>Alleen Kantoor/Enterprise:</strong> IP pinning is niet beschikbaar voor Pro plan.
+  </div>
+</div>
+
+<!-- CRYPTO -->
+<div id="crypto">
+  <h2>Cryptografie</h2>
+
+  <table>
+    <tr><th>Algoritme</th><th>Standaard</th><th>Rol</th></tr>
+    <tr><td>ML-KEM-768</td><td>NIST FIPS 203 (2024), Cat. 3</td><td>Post-quantum KEM</td></tr>
+    <tr><td>ECDH P-256</td><td>NIST SP 800-186</td><td>Klassieke KEM (harvest-now bescherming)</td></tr>
+    <tr><td>AES-256-GCM</td><td>NIST SP 800-38D</td><td>Symmetrische encryptie</td></tr>
+    <tr><td>HKDF-SHA-256</td><td>RFC 5869</td><td>Key derivation</td></tr>
+    <tr><td>SHA-256</td><td>FIPS 180-4</td><td>Routing hash</td></tr>
+  </table>
+
+  <h3>Publieke sleutel formaat</h3>
+<pre><code># 2498 hex chars = 1249 bytes:
+[65B]    ECDH P-256 public key (uncompressed)
+[1184B]  ML-KEM-768 public key</code></pre>
+
+  <h3>Noble library</h3>
+<pre><code>&lt;!-- Browser: self-hosted via relay --&gt;
+&lt;script type="module"&gt;
+const { ml_kem768 } = await import('https://relay.paramant.app/noble-mlkem.js');
+const { publicKey, secretKey } = ml_kem768.keygen();
+// publicKey: 1184 bytes
+// secretKey: 2400 bytes
+&lt;/script&gt;</code></pre>
+</div>
+
+</main>
+</div>
+
+<script>
+// Active sidebar link bij scrollen
+const sections = document.querySelectorAll('[id]');
+const links    = document.querySelectorAll('.sb-link');
+window.addEventListener('scroll', () => {
+  let curr = '';
+  sections.forEach(s => {
+    if(window.scrollY >= s.offsetTop - 80) curr = s.id;
+  });
+  links.forEach(l => {
+    l.classList.toggle('active', l.getAttribute('href') === '#'+curr);
+  });
+}, {passive:true});
+</script>
+
+<footer style="padding:24px 32px;border-top:1px solid var(--border,#e5e7eb)">
+ <div style="max-width:1000px;margin:0 auto">
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border,#e5e7eb);font-size:10px;color:var(--dim,#9ca3af);line-height:1.8">
+   © 2026 Mick Beer · PARAMANT is gelicenseerd onder de
+   <a href="/license" style="color:var(--dim,#9ca3af);text-decoration:underline">Business Source License 1.1</a>
+   · Commercieel gebruik vereist een schriftelijke licentieovereenkomst ·
+   <a href="mailto:privacy@paramant.app" style="color:var(--dim,#9ca3af);text-decoration:underline">privacy@paramant.app</a>
+  </div>
+ </div>
+</footer>
+</body>
+</html>

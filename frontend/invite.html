@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT // UITNODIGING</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg: #ffffff;--s1:#f9fafb;--s2:#f3f4f6;
+  --b1:#e5e7eb;--b2:#d1d5db;
+  --t1:#111827;--t2:#c8ccd4;--t3:#6b7280;--t4:#9ca3af;
+  --g:#059669;--gd:#4a7c59;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+body{background:var(--bg);color:var(--t2);font-family:var(--mono);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:var(--s1);border:1px solid var(--b1);max-width:480px;width:100%;padding:32px}
+.logo{font-size:13px;font-weight:800;color:var(--t1);letter-spacing:.04em;margin-bottom:28px}
+.logo span{color:var(--g)}
+.status{font-size:10px;color:var(--t4);letter-spacing:.1em;margin-bottom:16px}
+h1{font-size:20px;font-weight:700;color:var(--t1);margin-bottom:8px;line-height:1.3}
+.sub{font-size:13px;color:var(--t3);margin-bottom:24px;line-height:1.7}
+.info-row{display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--b2);padding:12px 14px;margin-bottom:10px}
+.info-label{font-size:10px;color:var(--t4);letter-spacing:.06em;min-width:60px}
+.info-val{font-size:13px;color:var(--t1)}
+.timer{font-size:32px;font-weight:700;color:var(--g);text-align:center;margin:20px 0;font-variant-numeric:tabular-nums}
+.timer.urgent{color:#f59e0b}
+.timer.expired{color:#dc2626}
+.btn{display:block;width:100%;padding:14px;background:var(--g);color:var(--bg);font-size:13px;font-weight:700;text-align:center;border:none;cursor:pointer;font-family:var(--mono);letter-spacing:.04em;margin-top:16px;text-decoration:none}
+.btn:hover{background:#00cc7a}
+.btn:disabled{background:var(--b2);color:var(--t4);cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--b2);color:var(--t3);margin-top:8px}
+.btn-ghost:hover{border-color:var(--g);color:var(--g);background:transparent}
+.error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);padding:16px;color:#f87171;font-size:13px;line-height:1.7;margin-top:16px}
+.success{background:rgba(0,255,157,.06);border:1px solid rgba(0,255,157,.2);padding:16px;color:var(--g);font-size:13px;line-height:1.7;margin-top:16px}
+.pill{display:inline-block;font-size:10px;padding:2px 8px;border:1px solid var(--b2);color:var(--t4);margin-right:6px;margin-bottom:6px}
+.pill.g{border-color:rgba(0,255,157,.3);color:var(--gd)}
+.sep{border:none;border-top:1px solid var(--b1);margin:20px 0}
+
+/* ── Consistente navbar ── */
+nav.p-nav{position:sticky;top:0;z-index:1000;background:#ffffff;border-bottom:1px solid #e5e7eb;height:52px;display:flex;align-items:center;padding:0 32px}
+.p-nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
+.p-nav-logo{font-size:14px;font-weight:900;color:#111827;margin-right:40px;flex-shrink:0;letter-spacing:-.01em;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-links{display:flex;align-items:center;gap:2px;flex:1}
+.p-nav-link{padding:6px 14px;font-size:11px;color:#6b7280;letter-spacing:.05em;transition:color .15s;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-link:hover{color:#111827}
+.p-nav-ctas{display:flex;align-items:center;gap:8px;margin-left:auto}
+.p-btn-nav{padding:7px 14px;border:1px solid #d1d5db;color:#6b7280;font-size:11px;font-family:'JetBrains Mono',monospace;background:none;transition:all .15s;text-decoration:none}
+.p-btn-nav:hover{border-color:#111827;color:#111827}
+.p-btn-nav-solid{padding:7px 16px;background:#111827;color:#ffffff;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.04em;text-decoration:none;display:inline-block}
+.p-btn-nav-solid:hover{background:#374151}
+@media(max-width:768px){.p-nav-links{display:none}nav.p-nav{padding:0 16px}}
+</style>
+<style>
+/* ═══ PARAMANT LIGHT THEME OVERRIDE ═══ */
+:root {
+  --bg:      #ffffff !important;
+  --bg2:     #f9fafb !important;
+  --bg3:     #f3f4f6 !important;
+  --border:  #e5e7eb !important;
+  --border2: #d1d5db !important;
+  --text:    #111827 !important;
+  --muted:   #6b7280 !important;
+  --dim:     #9ca3af !important;
+  --green:   #059669 !important;
+  --purple:  #7c3aed !important;
+  --red:     #dc2626 !important;
+  --yellow:  #d97706 !important;
+  --teal:    #0d9488 !important;
+  --orange:  #ea580c !important;
+}
+body {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+</style>
+</head>
+<body>
+<nav class="p-nav">
+ <div class="p-nav-inner">
+  <a href="/" class="p-nav-logo">PARAMANT</a>
+  <div class="p-nav-links">
+   <a href="/#sectoren" class="p-nav-link">SECTOREN</a>
+   <a href="/#pricing" class="p-nav-link">PRICING</a>
+   <a href="/#integratie" class="p-nav-link">INTEGRATIE</a>
+   <a href="/docs" class="p-nav-link">API DOCS</a>
+  </div>
+  <div class="p-nav-ctas">
+   <a href="/chat" class="p-btn-nav">Chat gratis</a>
+   <a href="/dashboard" class="p-btn-nav-solid">Dashboard &rarr;</a>
+  </div>
+ </div>
+</nav>
+
+<div class="card">
+  <div class="logo">PARA<span>MANT</span></div>
+
+  <div id="loading">
+    <div class="status">// INVITE_LOADING</div>
+    <h1>Uitnodiging laden...</h1>
+    <div class="sub">Verbinden met relay.paramant.app</div>
+  </div>
+
+  <div id="valid" style="display:none">
+    <div class="status">// INVITE_VALID</div>
+    <h1 id="invite-title">Uitnodiging van <span id="sender-nick" style="color:var(--g)">—</span></h1>
+    <div class="sub">Deze uitnodiging is éénmalig en verloopt automatisch. Open hem alleen als je verwacht een Paramant uitnodiging te ontvangen.</div>
+
+    <hr class="sep">
+
+    <div class="info-row">
+      <span class="info-label">VAN</span>
+      <span class="info-val" id="info-nick">—</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">VERLOOPT</span>
+      <span class="info-val" id="info-expiry">—</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ÉÉNMALIG</span>
+      <span class="info-val" style="color:var(--g)">Ja — link verdwijnt na gebruik</span>
+    </div>
+
+    <div class="timer" id="timer">5:00</div>
+
+    <div>
+      <span class="pill g">ML-KEM-768</span>
+      <span class="pill g">ECDH P-256</span>
+      <span class="pill g">AES-256-GCM</span>
+      <span class="pill">Geen account nodig</span>
+    </div>
+
+    <button class="btn" id="accept-btn" onclick="acceptInvite()">
+      >> ACCEPTEER &amp; OPEN PARAMANT
+    </button>
+    <button class="btn btn-ghost" onclick="window.location='/'">
+      Annuleer
+    </button>
+  </div>
+
+  <div id="error" style="display:none">
+    <div class="status">// INVITE_ERROR</div>
+    <h1>Uitnodiging ongeldig</h1>
+    <div class="error" id="error-msg">Deze link bestaat niet, is al gebruikt, of is verlopen.</div>
+    <a href="/" class="btn" style="margin-top:16px;display:block;text-align:center">
+      >> OPEN PARAMANT
+    </a>
+  </div>
+
+  <div id="expired-view" style="display:none">
+    <div class="status">// INVITE_EXPIRED</div>
+    <h1>Uitnodiging verlopen</h1>
+    <div class="error">Deze uitnodiging is verlopen. Vraag de afzender om een nieuwe.</div>
+    <a href="/" class="btn" style="margin-top:16px;display:block;text-align:center">
+      >> OPEN PARAMANT
+    </a>
+  </div>
+</div>
+
+<script>
+const RELAY = 'https://relay.paramant.app';
+let inviteData = null;
+let timerInterval = null;
+let expiryTs = null;
+
+async function loadInvite() {
+  const token = location.pathname.replace('/invite/','').replace('/invite','');
+  if (!token || token.length < 32) {
+    showError('Ongeldige uitnodigingslink.');
+    return;
+  }
+
+  try {
+    const r = await fetch(RELAY + '/invite/' + token);
+    const d = await r.json();
+
+    if (!r.ok || !d.ok) {
+      if (r.status === 410) showExpired();
+      else showError(d.error || 'Uitnodiging niet gevonden.');
+      return;
+    }
+
+    inviteData = d;
+    showValid(d);
+  } catch(e) {
+    showError('Kon relay niet bereiken. Probeer opnieuw.');
+  }
+}
+
+function showValid(d) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('valid').style.display = 'block';
+  document.getElementById('sender-nick').textContent = d.nick || 'Onbekend';
+  document.getElementById('info-nick').textContent = d.nick || 'Onbekend';
+  document.getElementById('info-expiry').textContent = '5 minuten na aanmaken';
+
+  // Start countdown — relay geeft geen expiry mee dus gebruik 5 min vanaf nu als fallback
+  expiryTs = Date.now() + 4 * 60 * 1000; // toon 4 min (1 min voor fetch verbruikt)
+  startTimer();
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    const left = expiryTs - Date.now();
+    if (left <= 0) {
+      clearInterval(timerInterval);
+      showExpired();
+      return;
+    }
+    const m = Math.floor(left/60000);
+    const s = Math.floor((left%60000)/1000);
+    const el = document.getElementById('timer');
+    el.textContent = m+':'+(s<10?'0':'')+s;
+    el.className = 'timer' + (left < 60000 ? ' urgent' : '');
+  }, 500);
+}
+
+function acceptInvite() {
+  if (!inviteData) return;
+  // Sla het adres op in sessionStorage en open de app
+  sessionStorage.setItem('paramant_invite', JSON.stringify({
+    ecdh: inviteData.ecdh,
+    nick: inviteData.nick
+  }));
+  window.location = '/?invite=1';
+}
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display = 'block';
+  document.getElementById('error-msg').textContent = msg;
+}
+
+function showExpired() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('valid').style.display = 'none';
+  document.getElementById('expired-view').style.display = 'block';
+  const t = document.getElementById('timer');
+  if(t){t.textContent='0:00';t.className='timer expired';}
+  const btn = document.getElementById('accept-btn');
+  if(btn){btn.disabled=true;btn.textContent='Verlopen';}
+  clearInterval(timerInterval);
+}
+
+loadInvite();
+</script>
+
+<footer style="padding:24px 32px;border-top:1px solid var(--border,#e5e7eb)">
+ <div style="max-width:1000px;margin:0 auto">
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border,#e5e7eb);font-size:10px;color:var(--dim,#9ca3af);line-height:1.8">
+   © 2026 Mick Beer · PARAMANT is gelicenseerd onder de
+   <a href="/license" style="color:var(--dim,#9ca3af);text-decoration:underline">Business Source License 1.1</a>
+   · Commercieel gebruik vereist een schriftelijke licentieovereenkomst ·
+   <a href="mailto:privacy@paramant.app" style="color:var(--dim,#9ca3af);text-decoration:underline">privacy@paramant.app</a>
+  </div>
+ </div>
+</footer>
+</body>
+</html>

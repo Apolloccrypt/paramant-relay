@@ -1,0 +1,8 @@
+node_modules/
+__pycache__/
+*.pyc
+dist/
+*.egg-info/
+.env
+*.json.bak
+users.json

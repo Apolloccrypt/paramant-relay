@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paramant-sdk"
+version = "1.0.0"
+description = "PARAMANT Ghost Pipe SDK — post-quantum burn-on-read secure transport"
+readme = "README.md"
+license = { text = "BUSL-1.1" }
+authors = [{ name = "PARAMANT", email = "hello@paramant.app" }]
+keywords = ["paramant", "ghost-pipe", "post-quantum", "ml-kem", "burn-on-read", "secure-messaging", "e2ee"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Communications",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+mlkem = ["pqcrypto"]
+
+[project.urls]
+Homepage = "https://paramant.app"
+Documentation = "https://paramant.app/docs"
+Repository = "https://github.com/paramant/sdk-py"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["paramant_sdk*"]

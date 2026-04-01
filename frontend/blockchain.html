@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT voor Blockchain & Crypto — Quantum-safe key transport</title>
+''<style>
+:root{--bg: #ffffff;--bg2: #f9fafb;--bg3: #f3f4f6;--border: #e5e7eb;--border2: #d1d5db;--text: #111827;--muted: #6b7280;--dim: #9ca3af;--green: #059669;--purple: #7c3aed;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);padding-top:52px}
+a{color:var(--purple);text-decoration:none}
+.hero{padding:80px 24px 60px;max-width:960px;margin:0 auto}
+.hero-label{font-size:10px;color:var(--dim);letter-spacing:.12em;margin-bottom:16px}
+.hero-h1{font-size:clamp(32px,5vw,56px);font-weight:900;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px}
+.hero-h1 .acc{color:var(--green)}
+.hero-sub{font-size:15px;color:var(--muted);max-width:600px;line-height:1.8;margin-bottom:32px}
+.ctas{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:48px}
+.btn-p{padding:12px 28px;background:var(--green);color:var(--bg);font-family:var(--mono);font-size:12px;font-weight:900;border:none;cursor:pointer;text-decoration:none;letter-spacing:.04em}
+.btn-s{padding:12px 24px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:12px;text-decoration:none;letter-spacing:.04em}
+.section{padding:60px 24px;border-top:1px solid var(--border)}
+.section-inner{max-width:960px;margin:0 auto}
+.section-label{font-size:10px;color:var(--dim);letter-spacing:.12em;margin-bottom:12px}
+.section-h2{font-size:clamp(20px,3vw,32px);font-weight:900;letter-spacing:-.01em;margin-bottom:24px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.card{background:var(--bg2);padding:24px}
+.card-label{font-size:10px;letter-spacing:.08em;margin-bottom:10px}
+.card-val{font-size:28px;font-weight:900;line-height:1;margin-bottom:6px}
+.card-sub{font-size:12px;color:var(--muted);line-height:1.8}
+.check{font-size:12px;color:var(--muted);line-height:2.4}
+.check .ok{color:var(--green)}
+.check .no{color:#dc2626}
+.demo-box{background:var(--bg2);border:1px solid var(--border);padding:24px;font-size:12px}
+.demo-label{font-size:10px;color:var(--dim);letter-spacing:.08em;margin-bottom:12px}
+pre{background:var(--bg);border:1px solid var(--border);padding:14px;overflow-x:auto;font-size:11px;color:var(--muted);line-height:1.9;margin:10px 0}
+.gp-demo{background:var(--bg2);border:1px solid var(--border);padding:24px;margin-top:24px}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:var(--mono);font-size:12px;box-sizing:border-box;margin-bottom:10px;outline:none}
+input:focus,textarea:focus{border-color:var(--purple)}
+.result{display:none;padding:12px;border:1px solid var(--green);color:var(--green);font-size:11px;line-height:1.9;margin-top:10px}
+.tag{display:inline-block;font-size:9px;padding:3px 8px;border:1px solid;letter-spacing:.06em;margin:2px}
+footer{padding:32px 24px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+@media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* ── Consistente navbar ── */
+nav.p-nav{position:sticky;top:0;z-index:1000;background:#ffffff;border-bottom:1px solid #e5e7eb;height:52px;display:flex;align-items:center;padding:0 32px}
+.p-nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
+.p-nav-logo{font-size:14px;font-weight:900;color:#111827;margin-right:40px;flex-shrink:0;letter-spacing:-.01em;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-links{display:flex;align-items:center;gap:2px;flex:1}
+.p-nav-link{padding:6px 14px;font-size:11px;color:#6b7280;letter-spacing:.05em;transition:color .15s;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-link:hover{color:#111827}
+.p-nav-ctas{display:flex;align-items:center;gap:8px;margin-left:auto}
+.p-btn-nav{padding:7px 14px;border:1px solid #d1d5db;color:#6b7280;font-size:11px;font-family:'JetBrains Mono',monospace;background:none;transition:all .15s;text-decoration:none}
+.p-btn-nav:hover{border-color:#111827;color:#111827}
+.p-btn-nav-solid{padding:7px 16px;background:#111827;color:#ffffff;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.04em;text-decoration:none;display:inline-block}
+.p-btn-nav-solid:hover{background:#374151}
+@media(max-width:768px){.p-nav-links{display:none}nav.p-nav{padding:0 16px}}
+</style>
+<style>
+/* ═══ PARAMANT LIGHT THEME OVERRIDE ═══ */
+:root {
+  --bg:      #ffffff !important;
+  --bg2:     #f9fafb !important;
+  --bg3:     #f3f4f6 !important;
+  --border:  #e5e7eb !important;
+  --border2: #d1d5db !important;
+  --text:    #111827 !important;
+  --muted:   #6b7280 !important;
+  --dim:     #9ca3af !important;
+  --green:   #059669 !important;
+  --purple:  #7c3aed !important;
+  --red:     #dc2626 !important;
+  --yellow:  #d97706 !important;
+  --teal:    #0d9488 !important;
+  --orange:  #ea580c !important;
+}
+body {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+</style>
+</head>
+<body>
+<nav class="p-nav">
+ <div class="p-nav-inner">
+  <a href="/" class="p-nav-logo">PARAMANT</a>
+  <div class="p-nav-links">
+   <a href="/#sectoren" class="p-nav-link">SECTOREN</a>
+   <a href="/#pricing" class="p-nav-link">PRICING</a>
+   <a href="/#integratie" class="p-nav-link">INTEGRATIE</a>
+   <a href="/docs" class="p-nav-link">API DOCS</a>
+  </div>
+  <div class="p-nav-ctas">
+   <a href="/chat" class="p-btn-nav">Chat gratis</a>
+   <a href="/dashboard" class="p-btn-nav-solid">Dashboard &rarr;</a>
+  </div>
+ </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-label">// BLOCKCHAIN & CRYPTO</div>
+  <h1 class="hero-h1">Private keys versturen<br><span class="acc">zonder harvest-now risico.</span></h1>
+  <p class="hero-sub">Seed phrases, multi-sig coördinatie, OTC deal terms — quantum-safe verstuurd. Huidige encryptie is kraakbaar met een kwantumcomputer in 2030. ML-KEM-768 niet.</p>
+  <div class="ctas">
+    <a href="/" class="btn-p">Ghost Pipe Demo</a>
+    <a href="/docs" class="btn-s">API Documentatie →</a>
+  </div>
+  <div class="grid3">
+    <div class="card"><div class="card-label" style="color:var(--green)">HARVEST-SAFE</div><div class="card-sub">ML-KEM-768 (NIST FIPS 203 (ML-KEM-768) 2024). Bestand tegen kwantumcomputer aanvallen tot 2050+.</div></div>
+    <div class="card"><div class="card-label" style="color:var(--green)">BURN-ON-READ</div><div class="card-sub">Seed phrase verstuurd → relay vernietigt na ophalen. Geen kopie op servers van beide partijen.</div></div>
+    <div class="card"><div class="card-label" style="color:var(--green)">API/CLI</div><div class="card-sub">Integreer in je eigen stack. Python SDK, JS SDK, Rust CLI. GitHub Actions voor CI/CD secrets.</div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-inner">
+    <div class="section-label">// USE CASES</div>
+    <h2 class="section-h2">Voor elke crypto workflow.</h2>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-label" style="color:var(--purple)">MULTI-SIG COÖRDINATIE</div>
+        <div class="card-sub">Deel gedeeltelijk gesigneerde transacties (PSBT) tussen co-signers zonder cloud exposure.</div>
+        <pre style="margin-top:12px">
+# Stuur PSBT naar co-signer
+paramant-cli send ./tx.psbt \
+  --to $COSIGNER_PUBKEY
+echo "Hash: $HASH"</pre>
+      </div>
+      <div class="card">
+        <div class="card-label" style="color:var(--purple)">OTC SETTLEMENT</div>
+        <div class="card-sub">Deal terms, escrow instructies, KYC documenten — stateless verstuurd, geen cloud opslag.</div>
+        <pre style="margin-top:12px">
+# Python SDK
+result = ghost_pipe_send(
+  open("deal_terms.pdf","rb").read(),
+  counterparty_pub_hex,
+  api_key="pgp_..."
+)</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>PARAMANT · ML-KEM-768 · NIST FIPS 203 (ML-KEM-768) · Hetzner DE</span>
+  <span><a href="/docs">API Docs</a> · <a href="/#pricing">Pricing</a></span>
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border,#e5e7eb);font-size:10px;color:var(--dim,#9ca3af);line-height:1.8">
+   © 2026 Mick Beer · PARAMANT is gelicenseerd onder de
+   <a href="/license" style="color:var(--dim,#9ca3af);text-decoration:underline">Business Source License 1.1</a>
+   · Commercieel gebruik vereist een schriftelijke licentieovereenkomst ·
+   <a href="mailto:privacy@paramant.app" style="color:var(--dim,#9ca3af);text-decoration:underline">privacy@paramant.app</a>
+  </div>
+</footer>
+</body></html>

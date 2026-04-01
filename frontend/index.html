@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARAMANT — Post-Quantum Transport</title>
+<meta name="description" content="Encrypted file transport that destroys itself after delivery. ML-KEM-768. Burn-on-read. EU/DE jurisdiction.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border-soft:#141414;--text:#ededed;--muted:#555;--quiet:#333;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
+.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text)}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px;text-decoration:none}
+.hero{max-width:680px;margin:0 auto;padding:112px 48px 80px;text-align:center}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:40px;font-family:var(--mono);letter-spacing:.04em}
+.status-dot{width:5px;height:5px;border-radius:50%;background:#333}
+h1{font-size:48px;font-weight:600;line-height:1.08;letter-spacing:-.03em;color:var(--text);margin-bottom:20px}
+h1 em{color:var(--muted);font-style:normal}
+.hero-sub{font-size:16px;color:var(--muted);max-width:460px;margin:0 auto 40px;line-height:1.7}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn-p{background:var(--text);color:var(--bg);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500}
+.btn-s{border:1px solid var(--border);color:var(--muted);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px}
+.btn-p:hover,.btn-s:hover{opacity:.8}
+.code-wrap{max-width:540px;margin:64px auto 0;padding:0 48px}
+.code-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
+.code-dots{display:flex;gap:6px}
+.code-dots span{width:10px;height:10px;border-radius:50%;background:#1e1e1e}
+.code-lang{font-size:11px;color:var(--quiet);font-family:var(--mono)}
+.code-body{padding:20px 24px;font-family:var(--mono);font-size:12.5px;line-height:2}
+.c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#888}.c-ok{color:var(--green)}
+.proto-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-top:80px;display:flex;overflow:hidden}
+.proto-cell{flex:1;padding:16px 20px;border-right:1px solid var(--border);min-width:0}
+.proto-cell:last-child{border-right:none}
+.proto-cell .label{font-size:11px;font-family:var(--mono);color:var(--text);letter-spacing:.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proto-cell .pdesc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+section{max-width:960px;margin:0 auto;padding:88px 48px}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
+h2{font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
+.sub{font-size:15px;color:var(--muted);margin-bottom:52px;max-width:540px}
+hr.divider{border:none;border-top:1px solid var(--border)}
+.grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+.cell{background:var(--bg);padding:28px 24px}
+.cell-s{background:var(--surface);padding:28px 24px}
+h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
+.desc{font-size:13px;color:var(--muted);line-height:1.6}
+.tag{display:inline-block;margin-top:14px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em}
+.use-tag{font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em;margin-top:16px;display:block}
+.api-table{width:100%;border-collapse:collapse;font-size:13px}
+.api-table thead th{text-align:left;padding:10px 0;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);border-bottom:1px solid var(--border);font-family:var(--mono)}
+.api-table tbody td{padding:12px 0;border-bottom:1px solid var(--border-soft);vertical-align:top}
+.api-table tbody tr:last-child td{border-bottom:none}
+.method{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 8px;border-radius:3px;min-width:44px;text-align:center}
+.get{background:#1a2a1a;color:#4a8c5c}.post{background:#1a1a2a;color:#4a6a9c}
+.ep{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.api-desc{color:var(--muted);font-size:13px;padding-left:8px}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:52px}
+.pc{background:var(--bg);padding:32px 28px}
+.pc.featured{background:var(--surface)}
+.price-name{font-size:11px;font-family:var(--mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+.price-amount{font-size:36px;font-weight:600;letter-spacing:-.03em;color:var(--text);margin-bottom:4px}
+.price-amount sub{font-size:14px;font-weight:400;color:var(--muted);vertical-align:baseline}
+.price-note{font-size:12px;color:var(--muted);margin-bottom:28px}
+.pf{list-style:none;margin-bottom:28px}
+.pf li{font-size:13px;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px}
+.pf li:last-child{border-bottom:none}
+.pf .check{color:var(--text);font-size:11px;flex-shrink:0}
+.price-btn{display:block;text-align:center;padding:10px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500}
+.price-btn.p{background:var(--text);color:var(--bg)}.price-btn.s{border:1px solid var(--border);color:var(--muted)}
+.price-btn:hover{opacity:.8}
+footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px}
+.footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:12px;color:var(--quiet);text-decoration:none}
+.footer-links a:hover{color:var(--muted)}
+.footer-meta{font-size:11px;color:var(--quiet);font-family:var(--mono);text-align:right;line-height:1.8}
+@media(max-width:768px){
+  nav{padding:0 20px}.nav-links{display:none}
+  .hero,.code-wrap{padding-left:24px;padding-right:24px}
+  h1{font-size:32px}
+  section{padding:64px 24px}
+  .g3,.g2,.pricing-grid{grid-template-columns:1fr}
+  .proto-bar{flex-wrap:wrap}
+  .proto-cell{flex:1 1 50%;border-bottom:1px solid var(--border)}
+  footer{flex-direction:column;align-items:flex-start;padding:32px 24px}
+  .footer-meta{text-align:left}
+}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">PARAMANT</div>
+  <ul class="nav-links">
+    <li><a href="#protocol">Protocol</a></li>
+    <li><a href="#identity">Identity</a></li>
+    <li><a href="#use-cases">Use cases</a></li>
+    <li><a href="#api">API</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="https://github.com/Apolloccrypt/paramant" target="_blank">GitHub</a></li>
+  </ul>
+  <a href="/dashboard" class="nav-cta">Dashboard</a>
+</nav>
+
+<div class="hero">
+  <div class="status"><span class="status-dot" id="sdot"></span><span id="stxt">Checking relay status...</span></div>
+  <h1>Encrypted transport<br><em>that burns itself.</em></h1>
+  <p class="hero-sub">Post-quantum file transfer for healthcare, legal, and critical infrastructure. Data lives in RAM only &mdash; retrieved once, then gone forever.</p>
+  <div class="btns">
+    <a href="#pricing" class="btn-p">Get API key</a>
+    <a href="#api" class="btn-s">View docs</a>
+  </div>
+</div>
+
+<div class="code-wrap" style="padding-bottom:80px">
+  <div class="code-block">
+    <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><span class="code-lang">python</span></div>
+    <div class="code-body">
+      <div><span class="c-comment"># pip install paramant-sdk</span></div>
+      <div><span class="c-kw">from</span> paramant_sdk <span class="c-kw">import</span> GhostPipe</div><br>
+      <div>gp   = GhostPipe(<span class="c-str">"pgp_xxx"</span>, <span class="c-str">"mri-scanner-001"</span>)</div>
+      <div>hash = gp.send(patient_record)<span class="c-comment">  # ML-KEM-768 encrypted</span></div>
+      <div>data = gp.receive(hash)        <span class="c-comment">  # burn-on-read &mdash; then gone</span></div><br>
+      <div><span class="c-ok"># delivered. destroyed. zero trace.</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="proto-bar">
+  <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">NIST FIPS 203</div></div>
+  <div class="proto-cell"><div class="label">ML-DSA-65</div><div class="pdesc">NIST FIPS 204</div></div>
+  <div class="proto-cell"><div class="label">AES-256-GCM</div><div class="pdesc">Symmetric</div></div>
+  <div class="proto-cell"><div class="label">HKDF-SHA256</div><div class="pdesc">Key derivation</div></div>
+  <div class="proto-cell"><div class="label">Burn-on-read</div><div class="pdesc">RAM-only</div></div>
+  <div class="proto-cell"><div class="label">5MB padding</div><div class="pdesc">DPI masking</div></div>
+  <div class="proto-cell"><div class="label">Hetzner DE</div><div class="pdesc">EU jurisdiction</div></div>
+</div>
+
+<hr class="divider">
+
+<section id="protocol">
+  <div class="eyebrow">Protocol</div>
+  <h2>Zero plaintext. Zero storage. Zero trust.</h2>
+  <p class="sub">Every blob is end-to-end encrypted before leaving your device. The relay sees only fixed-size, indistinguishable ciphertext.</p>
+  <div class="grid g3">
+    <div class="cell">
+      <h3>Post-quantum hybrid</h3>
+      <p class="desc">ML-KEM-768 and ECDH P-256 in a single handshake. Resistant to both classical and quantum adversaries. NIST FIPS 203 certified.</p>
+      <span class="tag">ML-KEM-768 + ECDH</span>
+    </div>
+    <div class="cell">
+      <h3>Burn-on-read</h3>
+      <p class="desc">Data is overwritten with random bytes immediately after the first retrieval. No disk writes, no persistence, no recovery after delivery.</p>
+      <span class="tag">RAM-only</span>
+    </div>
+    <div class="cell">
+      <h3>Sender authentication</h3>
+      <p class="desc">Every blob signed with ECDSA P-256 before upload. ML-DSA-65 post-quantum signatures supported. Retry with exponential backoff.</p>
+      <span class="tag">ECDSA + ML-DSA-65</span>
+    </div>
+    <div class="cell">
+      <h3>Global anycast</h3>
+      <p class="desc">Five Fly.io nodes across Amsterdam, Frankfurt, Stockholm, Paris, and Chicago. Minimum three always active. Session affinity per API key.</p>
+      <span class="tag">5 nodes &middot; EU primary</span>
+    </div>
+    <div class="cell">
+      <h3>Real-time push</h3>
+      <p class="desc">WebSocket stream at /v2/stream delivers blob_ready events without polling. NATS JetStream backend. Sub-100ms for IoT and medical vitals.</p>
+      <span class="tag">WebSocket &middot; NATS</span>
+    </div>
+    <div class="cell">
+      <h3>Merkle audit chain</h3>
+      <p class="desc">Every inbound and outbound event chained in a tamper-evident log. Verifiable chain integrity. Export as JSON or CSV for compliance.</p>
+      <span class="tag">Merkle &middot; CT log</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<section id="identity">
+  <div class="eyebrow">Identity &amp; PKI</div>
+  <h2>No central database. Every device proves itself.</h2>
+  <p class="sub">Devices authenticate with cryptographic proof instead of shared API keys. The relay does not need to know who you are.</p>
+  <div class="grid g3">
+    <div class="cell">
+      <h3>W3C Decentralized Identity</h3>
+      <p class="desc">Each device gets a DID instead of a shared key. Authentication works by signing the request. No central users.json, no single point of failure.</p>
+      <span class="tag">did:paramant:xxx</span>
+    </div>
+    <div class="cell">
+      <h3>Certificate Transparency log</h3>
+      <p class="desc">Every public key registration logged in a public Merkle tree. Anyone can verify a device is registered without seeing any data. Inclusion proofs on demand.</p>
+      <span class="tag">Public &middot; /v2/ct/log</span>
+    </div>
+    <div class="cell">
+      <h3>Hardware attestation</h3>
+      <p class="desc">TPM 2.0 and Apple Secure Enclave sign the sender public key. The relay verifies the key came from real hardware, not a software fake.</p>
+      <span class="tag">TPM 2.0 &middot; Secure Enclave</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<section id="use-cases">
+  <div class="eyebrow">Use cases</div>
+  <h2>Built for regulated industries.</h2>
+  <p class="sub">Where a data breach has legal or medical consequences &mdash; and where proving data was not retained matters as much as the transfer itself.</p>
+  <div class="grid g2">
+    <div class="cell-s">
+      <h3>Healthcare</h3>
+      <p class="desc">DICOM files from MRI and CT scanners to PACS systems. HL7 FHIR resources between EPD systems. Patient vitals from ambulance to hospital. No data-at-rest, NEN 7510 ready.</p>
+      <span class="use-tag">health.paramant.app &middot; DICOM gateway &middot; FHIR bridge</span>
+    </div>
+    <div class="cell-s">
+      <h3>Legal &amp; notary</h3>
+      <p class="desc">Signed contracts between parties without a shared storage layer. Court documents, notarial deeds. Burn-on-read provides architectural proof that data was not retained after delivery.</p>
+      <span class="use-tag">legal.paramant.app &middot; Merkle audit &middot; DID auth</span>
+    </div>
+    <div class="cell-s">
+      <h3>Industrial IoT</h3>
+      <p class="desc">PLC and SCADA sensor data to cloud platforms without VPN overhead. NATS push, sub-100ms. Hardware-attested devices only. Works on Raspberry Pi, ESP32, and PLCs. IEC 62443 ready.</p>
+      <span class="use-tag">iot.paramant.app &middot; /v2/stream &middot; NATS &middot; TPM 2.0</span>
+    </div>
+    <div class="cell-s">
+      <h3>Finance</h3>
+      <p class="desc">Bank-to-notary document transport. Trading system compliance logging. Private key material transfer and signing ceremonies. Hosted on Hetzner DE &mdash; no US CLOUD Act exposure.</p>
+      <span class="use-tag">finance.paramant.app &middot; EU/DE jurisdiction only</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<section id="api">
+  <div class="eyebrow">API reference</div>
+  <h2>REST &mdash; no SDK required.</h2>
+  <p class="sub">All endpoints accept <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">X-Api-Key</code> header or <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">?k=</code> query param. DID auth via <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">X-DID</code> + <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">X-DID-Signature</code>.</p>
+  <table class="api-table">
+    <thead><tr><th style="width:72px">Method</th><th style="width:260px">Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/health</td><td class="api-desc">Node status, version, crypto stack, uptime</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/pubkey</td><td class="api-desc">Register ML-KEM + ECDH receiver keypair</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/inbound</td><td class="api-desc">Upload encrypted 5MB blob</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/outbound/:hash</td><td class="api-desc">Download and burn &mdash; one retrieval only</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/status/:hash</td><td class="api-desc">Check availability without consuming</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/ack</td><td class="api-desc">Receiver confirms delivery, relay logs latency</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/monitor</td><td class="api-desc">Live delivery stats, latency, ACK rate</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/stream</td><td class="api-desc">WebSocket &mdash; push events, no polling</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/did/register</td><td class="api-desc">Register W3C Decentralized Identity</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/did/:did</td><td class="api-desc">Resolve DID document &mdash; public, no auth</td></tr>
+      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/attest</td><td class="api-desc">Hardware attestation &mdash; TPM 2.0, Secure Enclave</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/ct/log</td><td class="api-desc">Public Certificate Transparency log</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/audit</td><td class="api-desc">Merkle audit chain &mdash; JSON and CSV export</td></tr>
+      <tr><td><span class="method get">GET</span></td><td class="ep">/metrics</td><td class="api-desc">Prometheus scrape endpoint</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr class="divider">
+
+<section id="pricing">
+  <div class="eyebrow">Pricing</div>
+  <h2>Simple. Per relay. No data fees.</h2>
+  <p class="sub">You pay for access to the relay network. No fees per blob, no storage costs, no egress charges.</p>
+  <div class="pricing-grid">
+    <div class="pc">
+      <div class="price-name">Dev</div>
+      <div class="price-amount">Free</div>
+      <div class="price-note">No credit card required</div>
+      <ul class="pf">
+        <li><span class="check">+</span> 50 requests / min</li>
+        <li><span class="check">+</span> 1 device</li>
+        <li><span class="check">+</span> All API endpoints</li>
+        <li><span class="check">+</span> Fly.io relay</li>
+        <li><span class="check">+</span> CT log access</li>
+      </ul>
+      <a href="https://buy.stripe.com/price_1TGwtQJMhSdoTn1k6RM3agYr" class="price-btn s" target="_blank">Get started</a>
+    </div>
+    <div class="pc featured">
+      <div class="price-name">Pro</div>
+      <div class="price-amount">&euro;49<sub> / month</sub></div>
+      <div class="price-note">Cancel anytime</div>
+      <ul class="pf">
+        <li><span class="check">+</span> 500 requests / min</li>
+        <li><span class="check">+</span> Unlimited devices + DIDs</li>
+        <li><span class="check">+</span> All sector relays</li>
+        <li><span class="check">+</span> WebSocket streaming</li>
+        <li><span class="check">+</span> TPM hardware attestation</li>
+        <li><span class="check">+</span> Merkle audit CSV export</li>
+        <li><span class="check">+</span> Monitor dashboard</li>
+      </ul>
+      <a href="https://buy.stripe.com/price_1TGwqbJMhSdoTn1kCWWLN5KY" class="price-btn p" target="_blank">Get started</a>
+    </div>
+    <div class="pc">
+      <div class="price-name">Enterprise</div>
+      <div class="price-amount">Custom</div>
+      <div class="price-note">Volume and SLA pricing</div>
+      <ul class="pf">
+        <li><span class="check">+</span> 1000+ requests / min</li>
+        <li><span class="check">+</span> Dedicated relay nodes</li>
+        <li><span class="check">+</span> DICOM / FHIR gateway</li>
+        <li><span class="check">+</span> On-premise relay option</li>
+        <li><span class="check">+</span> NEN 7510 / IEC 62443</li>
+        <li><span class="check">+</span> SLA 99.9% + support</li>
+        <li><span class="check">+</span> Kubernetes operator</li>
+      </ul>
+      <a href="https://buy.stripe.com/price_1TGwrzJMhSdoTn1k502jeobI" class="price-btn s" target="_blank">Contact us</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">PARAMANT</div>
+  <div class="footer-links">
+    <a href="https://github.com/Apolloccrypt/paramant" target="_blank">GitHub</a>
+    <a href="mailto:hello@paramant.app">Contact</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/ct-log">CT log</a>
+    <a href="#api">Docs</a>
+  </div>
+  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204 &middot; Hetzner DE<br>BUSL-1.1 &middot; 2026 PARAMANT</div>
+</footer>
+
+<script>
+fetch('https://health.paramant.app/health',{signal:AbortSignal.timeout(5000)}).then(function(r){return r.json()}).then(function(d){
+  if(d.ok){
+    document.getElementById('sdot').style.background='#2d6a4f';
+    document.getElementById('stxt').textContent='All relays operational \u00b7 v'+d.version;
+  }else{
+    document.getElementById('stxt').textContent='Relay degraded';
+  }
+}).catch(function(){
+  document.getElementById('sdot').style.background='#555';
+  document.getElementById('stxt').textContent='Relay status unknown';
+});
+</script>
+</body>
+</html>

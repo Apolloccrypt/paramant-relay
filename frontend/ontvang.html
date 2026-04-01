@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bestand ontvangen — PARAMANT</title>
+<style>
+:root{--bg:#ffffff;--bg2:#f9fafb;--border:#e5e7eb;--text:#111827;--muted:#6b7280;--dim:#9ca3af;--green:#059669;--red:#dc2626;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;display:flex;flex-direction:column}
+nav{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 32px}
+.nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
+.nav-logo{font-size:14px;font-weight:900;color:var(--text);margin-right:40px;text-decoration:none}
+.nav-link{padding:6px 14px;font-size:11px;color:var(--muted);text-decoration:none;letter-spacing:.05em}
+.nav-link:hover{color:var(--text)}
+.nav-ctas{margin-left:auto;display:flex;gap:8px}
+.btn-nav{padding:7px 14px;border:1px solid var(--border);color:var(--muted);font-size:11px;font-family:var(--mono);background:none;text-decoration:none}
+.btn-solid{padding:7px 16px;background:var(--text);color:#fff;font-size:11px;font-family:var(--mono);font-weight:700;text-decoration:none}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 24px}
+.card{width:100%;max-width:520px}
+.card-head{padding:28px 32px;border:1px solid var(--border);border-bottom:none}
+.card-title{font-size:22px;font-weight:900;margin-bottom:6px}
+.card-sub{font-size:13px;color:var(--muted)}
+.card-body{padding:28px 32px;border:1px solid var(--border)}
+.field-label{font-size:10px;color:var(--dim);letter-spacing:.08em;display:block;margin-bottom:8px}
+.hash-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:12px 14px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:16px}
+.hash-input:focus{border-color:var(--text)}
+.btn-dl{width:100%;padding:13px;background:var(--text);color:#fff;border:none;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer}
+.btn-dl:hover{background:#374151}
+.btn-dl:disabled{background:var(--dim);cursor:not-allowed}
+.status{margin-top:14px;padding:12px 14px;font-size:12px;line-height:1.8;display:none}
+.status.ok{background:#f0fdf4;border:1px solid #a7f3d0;color:#065f46}
+.status.err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.status.loading{background:var(--bg2);border:1px solid var(--border);color:var(--muted)}
+.burn-note{margin-top:20px;padding:14px;background:var(--bg2);border:1px solid var(--border);font-size:11px;color:var(--dim);line-height:1.9}
+.burn-note strong{color:var(--text)}
+footer{padding:24px 32px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);text-align:center}
+</style>
+</head>
+<body>
+<nav>
+ <div class="nav-inner">
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <div style="display:flex">
+   <a href="/#sectoren" class="nav-link">SECTOREN</a>
+   <a href="/#pricing" class="nav-link">PRICING</a>
+  </div>
+  <div class="nav-ctas">
+   <a href="/chat" class="btn-nav">Chat gratis</a>
+   <a href="/dashboard" class="btn-solid">Dashboard →</a>
+  </div>
+ </div>
+</nav>
+
+<main>
+ <div class="card">
+  <div class="card-head">
+   <div class="card-title">Bestand ontvangen</div>
+   <div class="card-sub">Voer de hash in die de verzender u stuurde. Geen account vereist.</div>
+  </div>
+  <div class="card-body">
+   <label class="field-label">HASH (64 hex tekens)</label>
+   <input type="text" class="hash-input" id="hash-input"
+     placeholder="a3f8c2d1e7b4..."
+     autocomplete="off" spellcheck="false">
+   <button class="btn-dl" id="dl-btn" onclick="doReceive()">↓ Downloaden &amp; ontsleutelen</button>
+   <div class="status" id="status"></div>
+   <div class="burn-note">
+    <strong>Burn-on-read:</strong> elk bestand kan precies één keer worden gedownload.<br>
+    Na ophalen wordt de data op de relay vernietigd — een tweede poging geeft 404.<br>
+    De verzender moet een nieuwe overdracht starten als u de hash opnieuw nodig heeft.
+   </div>
+  </div>
+ </div>
+</main>
+
+<footer>
+ © 2026 PARAMANT · <a href="/privacy" style="color:var(--dim)">Privacy</a> · <a href="/license" style="color:var(--dim)">Licentie</a>
+</footer>
+
+<script>
+// Lees hash uit URL ?hash= parameter
+window.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(location.search);
+  var h = params.get('hash');
+  if (h) document.getElementById('hash-input').value = h;
+});
+
+document.getElementById('hash-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doReceive();
+});
+
+function showStatus(msg, type) {
+  var el = document.getElementById('status');
+  el.className = 'status ' + type;
+  el.style.display = 'block';
+  el.innerHTML = msg;
+}
+
+async function doReceive() {
+  var hash = document.getElementById('hash-input').value.trim();
+  var btn = document.getElementById('dl-btn');
+
+  if (!hash || hash.length < 32) {
+    showStatus('Voer een geldige hash in (minimaal 32 tekens).', 'err');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Downloaden...';
+  showStatus('Verbinden met relay...', 'loading');
+
+  try {
+    var r = await fetch('https://relay.paramant.app/v2/outbound/' + hash);
+
+    if (r.status === 404) {
+      showStatus('<strong>Niet gevonden of al opgehaald.</strong><br>Het bestand is verlopen of al eerder gedownload. Vraag de verzender een nieuwe overdracht te starten.', 'err');
+      btn.disabled = false;
+      btn.textContent = '↓ Downloaden & ontsleutelen';
+      return;
+    }
+
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+
+    showStatus('Ontsleutelen...', 'loading');
+    var raw = new Uint8Array(await r.arrayBuffer());
+
+    var downloadBlob;
+    var filename = 'paramant_' + hash.slice(0, 8);
+
+    // Controleer PQHB header
+    if (raw.length >= 52 && raw[0]===0x50 && raw[1]===0x51 && raw[2]===0x48 && raw[3]===0x42) {
+      var nonce      = raw.slice(4, 16);
+      var rawKey     = raw.slice(16, 48);
+      var ctLen      = new DataView(raw.buffer, raw.byteOffset + 48, 4).getUint32(0, false);
+
+      if (ctLen === 0 || ctLen > raw.length - 52) {
+        throw new Error('Ongeldige payload structuur');
+      }
+
+      var ciphertext = raw.slice(52, 52 + ctLen);
+      var encKey     = await crypto.subtle.importKey('raw', rawKey, {name:'AES-GCM',length:256}, false, ['decrypt']);
+      var decrypted  = await crypto.subtle.decrypt({name:'AES-GCM', iv:nonce}, encKey, ciphertext);
+      downloadBlob = new Blob([decrypted]);
+    } else {
+      downloadBlob = new Blob([raw]);
+    }
+
+    // Download
+    var url = URL.createObjectURL(downloadBlob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showStatus('<strong>Gedownload en ontsleuteld.</strong><br>De data op de relay is vernietigd — dit was de enige keer dat dit bestand beschikbaar was.', 'ok');
+
+    // ACK
+    fetch('https://relay.paramant.app/v2/ack/' + hash, {method:'POST'}).catch(()=>{});
+
+  } catch(e) {
+    showStatus('<strong>Download mislukt:</strong> ' + e.message, 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '↓ Downloaden & ontsleutelen';
+}
+</script>
+</body>
+</html>

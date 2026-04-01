@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT voor Klokkenluiders & Journalisten</title>
+''<style>
+:root{--bg: #ffffff;--bg2: #f9fafb;--bg3: #f3f4f6;--border: #e5e7eb;--border2: #d1d5db;--text: #111827;--muted: #6b7280;--dim: #9ca3af;--green: #059669;--purple: #7c3aed;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);padding-top:52px}
+a{color:var(--purple);text-decoration:none}
+.hero{padding:80px 24px 60px;max-width:960px;margin:0 auto}
+.hero-label{font-size:10px;color:var(--dim);letter-spacing:.12em;margin-bottom:16px}
+.hero-h1{font-size:clamp(32px,5vw,56px);font-weight:900;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px}
+.hero-h1 .acc{color:var(--green)}
+.hero-sub{font-size:15px;color:var(--muted);max-width:600px;line-height:1.8;margin-bottom:32px}
+.ctas{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:48px}
+.btn-p{padding:12px 28px;background:var(--green);color:var(--bg);font-family:var(--mono);font-size:12px;font-weight:900;border:none;cursor:pointer;text-decoration:none;letter-spacing:.04em}
+.btn-s{padding:12px 24px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:12px;text-decoration:none;letter-spacing:.04em}
+.section{padding:60px 24px;border-top:1px solid var(--border)}
+.section-inner{max-width:960px;margin:0 auto}
+.section-label{font-size:10px;color:var(--dim);letter-spacing:.12em;margin-bottom:12px}
+.section-h2{font-size:clamp(20px,3vw,32px);font-weight:900;letter-spacing:-.01em;margin-bottom:24px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.card{background:var(--bg2);padding:24px}
+.card-label{font-size:10px;letter-spacing:.08em;margin-bottom:10px}
+.card-val{font-size:28px;font-weight:900;line-height:1;margin-bottom:6px}
+.card-sub{font-size:12px;color:var(--muted);line-height:1.8}
+.check{font-size:12px;color:var(--muted);line-height:2.4}
+.check .ok{color:var(--green)}
+.check .no{color:#dc2626}
+.demo-box{background:var(--bg2);border:1px solid var(--border);padding:24px;font-size:12px}
+.demo-label{font-size:10px;color:var(--dim);letter-spacing:.08em;margin-bottom:12px}
+pre{background:var(--bg);border:1px solid var(--border);padding:14px;overflow-x:auto;font-size:11px;color:var(--muted);line-height:1.9;margin:10px 0}
+.gp-demo{background:var(--bg2);border:1px solid var(--border);padding:24px;margin-top:24px}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px;font-family:var(--mono);font-size:12px;box-sizing:border-box;margin-bottom:10px;outline:none}
+input:focus,textarea:focus{border-color:var(--purple)}
+.result{display:none;padding:12px;border:1px solid var(--green);color:var(--green);font-size:11px;line-height:1.9;margin-top:10px}
+.tag{display:inline-block;font-size:9px;padding:3px 8px;border:1px solid;letter-spacing:.06em;margin:2px}
+footer{padding:32px 24px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+@media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* ── Consistente navbar ── */
+nav.p-nav{position:sticky;top:0;z-index:1000;background:#ffffff;border-bottom:1px solid #e5e7eb;height:52px;display:flex;align-items:center;padding:0 32px}
+.p-nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
+.p-nav-logo{font-size:14px;font-weight:900;color:#111827;margin-right:40px;flex-shrink:0;letter-spacing:-.01em;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-links{display:flex;align-items:center;gap:2px;flex:1}
+.p-nav-link{padding:6px 14px;font-size:11px;color:#6b7280;letter-spacing:.05em;transition:color .15s;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.p-nav-link:hover{color:#111827}
+.p-nav-ctas{display:flex;align-items:center;gap:8px;margin-left:auto}
+.p-btn-nav{padding:7px 14px;border:1px solid #d1d5db;color:#6b7280;font-size:11px;font-family:'JetBrains Mono',monospace;background:none;transition:all .15s;text-decoration:none}
+.p-btn-nav:hover{border-color:#111827;color:#111827}
+.p-btn-nav-solid{padding:7px 16px;background:#111827;color:#ffffff;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.04em;text-decoration:none;display:inline-block}
+.p-btn-nav-solid:hover{background:#374151}
+@media(max-width:768px){.p-nav-links{display:none}nav.p-nav{padding:0 16px}}
+</style>
+<style>
+/* ═══ PARAMANT LIGHT THEME OVERRIDE ═══ */
+:root {
+  --bg:      #ffffff !important;
+  --bg2:     #f9fafb !important;
+  --bg3:     #f3f4f6 !important;
+  --border:  #e5e7eb !important;
+  --border2: #d1d5db !important;
+  --text:    #111827 !important;
+  --muted:   #6b7280 !important;
+  --dim:     #9ca3af !important;
+  --green:   #059669 !important;
+  --purple:  #7c3aed !important;
+  --red:     #dc2626 !important;
+  --yellow:  #d97706 !important;
+  --teal:    #0d9488 !important;
+  --orange:  #ea580c !important;
+}
+body {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+</style>
+</head>
+<body>
+<nav class="p-nav">
+ <div class="p-nav-inner">
+  <a href="/" class="p-nav-logo">PARAMANT</a>
+  <div class="p-nav-links">
+   <a href="/#sectoren" class="p-nav-link">SECTOREN</a>
+   <a href="/#pricing" class="p-nav-link">PRICING</a>
+   <a href="/#integratie" class="p-nav-link">INTEGRATIE</a>
+   <a href="/docs" class="p-nav-link">API DOCS</a>
+  </div>
+  <div class="p-nav-ctas">
+   <a href="/chat" class="p-btn-nav">Chat gratis</a>
+   <a href="/dashboard" class="p-btn-nav-solid">Dashboard &rarr;</a>
+  </div>
+ </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-label">// KLOKKENLUIDERS & ONDERZOEKSJOURNALISTEN</div>
+  <h1 class="hero-h1">Documenten die<br><span class="acc">nooit hebben bestaan.</span></h1>
+  <p class="hero-sub">Bewijsmateriaal veilig overdragen aan journalist of advocaat. Geen account, geen metadata, geen spoor. Burn-on-read: data verdwijnt na ophalen.</p>
+  <div class="ctas">
+    <a href="/" class="btn-p">Anoniem Testen</a>
+    <a href="https://csnmdkpqikrf6abad7ej4mqsftiyh2z2fg3nzpf4x4zbnh2ulbmq5mid.onion" class="btn-s">Tor Hidden Service</a>
+  </div>
+  <div class="grid3">
+    <div class="card"><div class="card-label" style="color:var(--green)">GEEN ACCOUNT</div><div class="card-sub">Geen registratie. Geen email. Geen IP-adres opgeslagen. Geen spoor bij ons.</div></div>
+    <div class="card"><div class="card-label" style="color:var(--green)">TOR COMPATIBLE</div><div class="card-sub">.onion hidden service beschikbaar. Relay ziet uw IP niet via Tor Browser.</div></div>
+    <div class="card"><div class="card-label" style="color:var(--green)">WARRANT CANARY</div><div class="card-sub">PARAMANT heeft geen gerechtelijke bevelen ontvangen. Bijgewerkt: maart 2026.</div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-inner">
+    <div class="section-label">// HOE TE GEBRUIKEN — ANONIEM</div>
+    <h2 class="section-h2">Stap voor stap zonder spoor.</h2>
+    <div class="grid3">
+      <div class="card"><div class="card-label" style="color:var(--purple)">1. TOR BROWSER</div><div class="card-sub">Open Tor Browser. Ga naar het .onion adres. Geen JavaScript-fingerprint. Geen IP.</div></div>
+      <div class="card"><div class="card-label" style="color:var(--purple)">2. JOURNALIST DEELT PUBKEY</div><div class="card-sub">Journalist genereert keypair op deze pagina. Deelt de publieke sleutel via SecureDrop of Signal.</div></div>
+      <div class="card"><div class="card-label" style="color:var(--purple)">3. BURN-ON-READ</div><div class="card-sub">Journalist ontvangt — relay vernietigt. Jij ziet bevestiging. Niemand anders kan ophalen.</div></div>
+    </div>
+
+    <div class="gp-demo" style="margin-top:24px">
+      <div class="demo-label">// JOURNALIST KEYPAIR GENERATOR</div>
+      <p style="font-size:12px;color:var(--dim);margin-bottom:16px">Genereer een keypair voor het ontvangen van anonieme documenten. Deel de publieke sleutel via uw beveiligde kanaal.</p>
+      <button onclick="journalistKeygen()" style="padding:9px 20px;background:var(--purple);color:var(--bg);border:none;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:900;margin-bottom:12px">JOURNALIST KEYPAIR GENEREREN</button>
+      <div id="j-pub" style="display:none;margin-bottom:10px">
+        <div style="font-size:9px;color:var(--dim);margin-bottom:4px">PUBLIEKE SLEUTEL — deel dit</div>
+        <div id="j-pub-val" style="background:var(--bg);border:1px solid rgba(0,255,157,.3);color:var(--green);padding:8px;font-size:10px;word-break:break-all;cursor:pointer" onclick="navigator.clipboard.writeText(this.textContent)"></div>
+      </div>
+      <div id="j-priv" style="display:none;margin-bottom:10px">
+        <div style="font-size:9px;color:#dc2626;margin-bottom:4px">PRIVÉ SLEUTEL — bewaar veilig, nooit delen</div>
+        <div id="j-priv-val" style="background:var(--bg);border:1px solid rgba(239,68,68,.3);color:#dc2626;padding:8px;font-size:10px;word-break:break-all"></div>
+      </div>
+      <div style="display:none;background:#1a0a0a;border:1px solid rgba(239,68,68,.3);padding:10px;font-size:10px;color:#dc2626;line-height:1.7" id="j-warn">⚠ Sla de privé sleutel op voordat u dit venster sluit. PARAMANT slaat niets op.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background:var(--bg2)">
+  <div class="section-inner">
+    <div class="section-label">// TOR HIDDEN SERVICE</div>
+    <h2 class="section-h2">Volledig anoniem via Tor.</h2>
+    <div class="demo-box">
+      <div class="demo-label">ONION ADRES</div>
+      <code style="color:var(--green);font-size:12px;word-break:break-all">csnmdkpqikrf6abad7ej4mqsftiyh2z2fg3nzpf4x4zbnh2ulbmq5mid.onion</code>
+      <p style="font-size:12px;color:var(--dim);margin-top:12px;line-height:1.8">Open in Tor Browser voor maximale anonimiteit. De relay ziet via Tor geen IP-adres.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>PARAMANT · Geen logs · Geen accounts · Warrant canary actief</span>
+  <span><a href="/privacy">Privacy Policy</a> · <a href="mailto:privacy@paramant.app">Contact</a></span>
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border,#e5e7eb);font-size:10px;color:var(--dim,#9ca3af);line-height:1.8">
+   © 2026 Mick Beer · PARAMANT is gelicenseerd onder de
+   <a href="/license" style="color:var(--dim,#9ca3af);text-decoration:underline">Business Source License 1.1</a>
+   · Commercieel gebruik vereist een schriftelijke licentieovereenkomst ·
+   <a href="mailto:privacy@paramant.app" style="color:var(--dim,#9ca3af);text-decoration:underline">privacy@paramant.app</a>
+  </div>
+</footer>
+
+<script>
+async function journalistKeygen(){
+  const kp = await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+  const pub = Array.from(new Uint8Array(await crypto.subtle.exportKey('raw',kp.publicKey))).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const priv = Array.from(new Uint8Array(await crypto.subtle.exportKey('pkcs8',kp.privateKey))).map(b=>b.toString(16).padStart(2,'0')).join('');
+  document.getElementById('j-pub').style.display='block';
+  document.getElementById('j-pub-val').textContent=pub;
+  document.getElementById('j-priv').style.display='block';
+  document.getElementById('j-priv-val').textContent=priv;
+  document.getElementById('j-warn').style.display='block';
+}
+</script>
+</body></html>

@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT Admin</title>
+<style>
+:root{
+  --bg: #ffffff;--bg2: #f9fafb;--bg3: #f3f4f6;
+  --border: #e5e7eb;--border2: #d1d5db;
+  --text: #111827;--muted: #6b7280;--dim: #9ca3af;
+  --green: #059669;--purple: #7c3aed;--red: #dc2626;--yellow:#f59e0b;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;min-height:100vh}
+.topbar{height:48px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px}
+.topbar .logo{font-size:13px;font-weight:900}
+.topbar .logo span{color:var(--green)}
+.topbar .badge{font-size:9px;background:rgba(0,255,157,.15);color:var(--green);border:1px solid rgba(0,255,157,.3);padding:2px 8px;letter-spacing:.06em}
+.topbar .relay-status{margin-left:auto;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dot.green{background:var(--green)}
+.dot.red{background:var(--red)}
+.dot.yellow{background:var(--yellow)}
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 48px)}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:16px 0}
+.sb-section{font-size:9px;color:var(--dim);padding:14px 16px 4px;letter-spacing:.1em}
+.sb-item{display:block;padding:7px 16px;font-size:11px;color:var(--dim);cursor:pointer;transition:all .1s;text-decoration:none}
+.sb-item:hover,.sb-item.active{color:var(--text);background:var(--bg3)}
+.sb-item.active{border-left:2px solid var(--green);padding-left:14px;color:var(--green)}
+.main{padding:24px;overflow-y:auto}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--bg2);border:1px solid var(--border);padding:16px}
+.stat-val{font-size:28px;font-weight:900;margin-bottom:4px}
+.stat-val.green{color:var(--green)}
+.stat-val.yellow{color:var(--yellow)}
+.stat-val.red{color:var(--red)}
+.stat-val.purple{color:var(--purple)}
+.stat-label{font-size:9px;color:var(--dim);letter-spacing:.08em}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:4px}
+.card{background:var(--bg2);border:1px solid var(--border);margin-bottom:16px}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:10px;color:var(--dim);letter-spacing:.1em}
+.card-body{padding:0}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:9px 14px;font-size:9px;color:var(--dim);letter-spacing:.06em;border-bottom:1px solid var(--border);font-weight:400}
+td{padding:9px 14px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)}
+td:first-child{color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+.badge-green{background:rgba(0,255,157,.12);color:var(--green);border:1px solid rgba(0,255,157,.25);padding:2px 7px;font-size:9px;letter-spacing:.06em}
+.badge-yellow{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.25);padding:2px 7px;font-size:9px;letter-spacing:.06em}
+.badge-red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25);padding:2px 7px;font-size:9px;letter-spacing:.06em}
+.badge-purple{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.25);padding:2px 7px;font-size:9px;letter-spacing:.06em}
+.btn{padding:6px 14px;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;font-weight:900;letter-spacing:.04em}
+.btn-green{background:var(--green);color:var(--bg)}
+.btn-red{background:var(--red);color:var(--bg)}
+.btn-dim{background:transparent;border:1px solid var(--border2);color:var(--muted)}
+.section{display:none}
+.section.active{display:block}
+.input{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:11px;width:100%;outline:none}
+.input:focus{border-color:var(--purple)}
+.form-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin-bottom:10px}
+.form-label{font-size:10px;color:var(--dim);letter-spacing:.04em}
+.log-box{background:#0a0c0e;border:1px solid var(--border);padding:12px;font-size:11px;line-height:1.9;max-height:220px;overflow-y:auto;font-family:var(--mono)}
+.log-ok{color:var(--green)}
+.log-warn{color:var(--yellow)}
+.log-err{color:var(--red)}
+.log-dim{color:var(--dim)}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--green);transition:width .3s}
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:40px;padding:4px 0}
+.bar{background:var(--green);opacity:.6;width:12px;border-radius:2px 2px 0 0;transition:height .3s}
+.bar:hover{opacity:1}
+</style>
+<style>
+/* ═══ PARAMANT LIGHT THEME OVERRIDE ═══ */
+:root {
+  --bg:      #ffffff !important;
+  --bg2:     #f9fafb !important;
+  --bg3:     #f3f4f6 !important;
+  --border:  #e5e7eb !important;
+  --border2: #d1d5db !important;
+  --text:    #111827 !important;
+  --muted:   #6b7280 !important;
+  --dim:     #9ca3af !important;
+  --green:   #059669 !important;
+  --purple:  #7c3aed !important;
+  --red:     #dc2626 !important;
+  --yellow:  #d97706 !important;
+  --teal:    #0d9488 !important;
+  --orange:  #ea580c !important;
+}
+body {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">PARA<span>MANT</span> <span style="color:var(--dim);font-weight:400;font-size:10px">admin</span></div>
+  <span class="badge">INTERN</span>
+  <div class="relay-status" id="relay-status">
+    <span class="dot yellow"></span>
+    <span>Verbinden...</span>
+  </div>
+  <span style="font-size:10px;color:var(--dim);margin-left:16px" id="clock"></span>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-section">OVERZICHT</div>
+    <a class="sb-item active" onclick="show('dashboard')">Dashboard</a>
+    <a class="sb-item" onclick="show('revenue')">Omzet</a>
+    <a class="sb-item" onclick="show('relay')">Relay status</a>
+
+    <div class="sb-section">GEBRUIKERS</div>
+    <a class="sb-item" onclick="show('users')">Alle gebruikers</a>
+    <a class="sb-item" onclick="show('provision')">Key aanmaken</a>
+
+    <div class="sb-section">SYSTEEM</div>
+    <a class="sb-item" onclick="show('logs')">Live logs</a>
+    <a class="sb-item" onclick="show('security')">Security audit</a>
+    <a class="sb-item" onclick="show('containers')">Containers</a>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div id="section-dashboard" class="section active">
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-val green" id="s-transfers">—</div>
+          <div class="stat-label">TRANSFERS VANDAAG</div>
+          <div class="stat-sub" id="s-transfers-sub">laden...</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val purple" id="s-keys">—</div>
+          <div class="stat-label">ACTIEVE KEYS</div>
+          <div class="stat-sub" id="s-mrr">MRR: laden...</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val yellow" id="s-uptime">—</div>
+          <div class="stat-label">RELAY UPTIME</div>
+          <div class="stat-sub" id="s-version">v5.4.0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val green" id="s-quantum">ML-KEM</div>
+          <div class="stat-label">QUANTUM READY</div>
+          <div class="stat-sub">NIST FIPS 203</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">RECENTE KEYS</span>
+            <button class="btn btn-green" onclick="show('provision')">+ NIEUWE KEY</button>
+          </div>
+          <div class="card-body">
+            <table>
+              <tr><th>Key</th><th>Plan</th><th>Email</th><th>Gebruik</th><th>Status</th></tr>
+              <tbody id="keys-table">
+                <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--dim)">Laden...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">RELAY GEZONDHEID</span></div>
+          <div class="card-body" style="padding:16px">
+            <div style="margin-bottom:12px">
+              <div style="font-size:10px;color:var(--dim);margin-bottom:4px">MEMPOOL</div>
+              <div class="progress-bar"><div class="progress-fill" id="mempool-bar" style="width:0%"></div></div>
+              <div style="font-size:10px;color:var(--muted);margin-top:3px" id="mempool-label">0 / max blobs</div>
+            </div>
+            <div style="margin-bottom:12px">
+              <div style="font-size:10px;color:var(--dim);margin-bottom:4px">VERBINDINGEN</div>
+              <div style="font-size:20px;font-weight:900;color:var(--text)" id="connections">—</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--dim);margin-bottom:4px">TRANSFERS TREND (7d)</div>
+              <div class="mini-chart" id="mini-chart">
+                <div class="bar" style="height:20%"></div>
+                <div class="bar" style="height:35%"></div>
+                <div class="bar" style="height:28%"></div>
+                <div class="bar" style="height:55%"></div>
+                <div class="bar" style="height:42%"></div>
+                <div class="bar" style="height:70%"></div>
+                <div class="bar" style="height:100%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OMZET -->
+    <div id="section-revenue" class="section">
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-val green" id="r-mrr">€0</div>
+          <div class="stat-label">MRR</div>
+          <div class="stat-sub">maandelijks terugkerend</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val purple" id="r-arr">€0</div>
+          <div class="stat-label">ARR (projectie)</div>
+          <div class="stat-sub">MRR × 12</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val yellow" id="r-pro">0</div>
+          <div class="stat-label">PRO KLANTEN</div>
+          <div class="stat-sub">€29/mnd elk</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val green" id="r-kantoor">0</div>
+          <div class="stat-label">KANTOOR KLANTEN</div>
+          <div class="stat-sub">€149/mnd elk</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">OMZET PER PLAN</span></div>
+        <div class="card-body">
+          <table>
+            <tr><th>Plan</th><th>Klanten</th><th>Prijs</th><th>MRR</th><th>% Totaal</th></tr>
+            <tbody id="revenue-table">
+              <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--dim)">Laden...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELAY STATUS -->
+    <div id="section-relay" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">RELAY HEALTH</span>
+          <button class="btn btn-dim" onclick="loadRelay()">VERNIEUWEN</button>
+        </div>
+        <div class="card-body" style="padding:16px">
+          <pre id="relay-json" style="font-size:11px;color:var(--muted);line-height:1.8;white-space:pre-wrap">Laden...</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- GEBRUIKERS -->
+    <div id="section-users" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">ALLE GEBRUIKERS</span>
+          <div style="display:flex;gap:8px">
+            <input class="input" id="user-search" placeholder="Zoeken..." style="width:180px" oninput="filterUsers()">
+            <button class="btn btn-green" onclick="show('provision')">+ KEY</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <table>
+            <tr><th>Key (prefix)</th><th>Plan</th><th>Email / Label</th><th>Gebruik</th><th>Aangemaakt</th><th></th></tr>
+            <tbody id="users-table">
+              <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--dim)">Laden...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROVISION KEY -->
+    <div id="section-provision" class="section">
+      <div class="card" style="max-width:500px">
+        <div class="card-header"><span class="card-title">NIEUWE API KEY AANMAKEN</span></div>
+        <div class="card-body" style="padding:20px">
+          <div class="form-row">
+            <label class="form-label">PLAN</label>
+            <select class="input" id="p-plan">
+              <option value="pro">Pro (€29/mnd)</option>
+              <option value="kantoor">Kantoor (€149/mnd)</option>
+              <option value="enterprise">Enterprise</option>
+              <option value="dev">Dev/Test</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label class="form-label">EMAIL</label>
+            <input class="input" id="p-email" placeholder="klant@bedrijf.nl" type="email">
+          </div>
+          <div class="form-row">
+            <label class="form-label">LABEL</label>
+            <input class="input" id="p-label" placeholder="Bakker Advocaten">
+          </div>
+          <div class="form-row">
+            <label class="form-label">ADMIN TOKEN</label>
+            <input class="input" id="p-token" type="password" placeholder="ParametAdm1n2026">
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn btn-green" onclick="provisionKey()">KEY AANMAKEN</button>
+            <button class="btn btn-dim" onclick="show('users')">ANNULEREN</button>
+          </div>
+          <div id="provision-result" style="margin-top:14px;font-size:12px;line-height:1.9"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE LOGS -->
+    <div id="section-logs" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">RELAY LOGS (GESIMULEERD)</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-dim" id="log-pause-btn" onclick="toggleLogs()">PAUZEREN</button>
+            <button class="btn btn-dim" onclick="document.getElementById('log-box').innerHTML=''">WISSEN</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:12px">
+          <div class="log-box" id="log-box">
+            <div class="log-ok">[RELAY] relay.js v5.4.0 gestart op 127.0.0.1:3001</div>
+            <div class="log-dim">[RELAY] users.json geladen: 2 keys</div>
+            <div class="log-ok">[RELAY] Quantum ready: ML-KEM-768 (NIST FIPS 203)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECURITY AUDIT -->
+    <div id="section-security" class="section">
+      <div class="card">
+        <div class="card-header"><span class="card-title">SECURITY AUDIT — HUIDIGE SITUATIE</span></div>
+        <div class="card-body">
+          <table>
+            <tr><th>Prioriteit</th><th>Probleem</th><th>Risico</th><th>Fix</th></tr>
+            <tr>
+              <td><span class="badge-red">KRITIEK</span></td>
+              <td>Relay draait als root</td>
+              <td>Volledige server bij RCE</td>
+              <td>Non-root user: adduser paramant</td>
+            </tr>
+            <tr>
+              <td><span class="badge-red">KRITIEK</span></td>
+              <td>Alles in 1 proces</td>
+              <td>1 kwetsbaarheid = alles gelekt</td>
+              <td>5 Docker containers scheiden</td>
+            </tr>
+            <tr>
+              <td><span class="badge-red">KRITIEK</span></td>
+              <td>Secrets in 1 .env</td>
+              <td>Stripe + Resend + Admin samen</td>
+              <td>Per container eigen .env scope</td>
+            </tr>
+            <tr>
+              <td><span class="badge-yellow">HOOG</span></td>
+              <td>Geen netwerk segmentatie</td>
+              <td>Containers kunnen alles bereiken</td>
+              <td>Docker networks: relay ↔ api alleen</td>
+            </tr>
+            <tr>
+              <td><span class="badge-yellow">HOOG</span></td>
+              <td>users.json niet apart</td>
+              <td>API keys bij relay code</td>
+              <td>Volume mount: aparte data container</td>
+            </tr>
+            <tr>
+              <td><span class="badge-yellow">HOOG</span></td>
+              <td>Geen admin dashboard</td>
+              <td>Admin via curl = kans op fouten</td>
+              <td>Dit dashboard op localhost only</td>
+            </tr>
+            <tr>
+              <td><span class="badge-purple">MEDIUM</span></td>
+              <td>Bot deelt straks .env</td>
+              <td>Bot keys = relay keys</td>
+              <td>Bot container: eigen API key only</td>
+            </tr>
+            <tr>
+              <td><span class="badge-purple">MEDIUM</span></td>
+              <td>Geen read-only filesystem</td>
+              <td>Relay kan zichzelf aanpassen</td>
+              <td>Docker: --read-only op relay container</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTAINERS -->
+    <div id="section-containers" class="section">
+      <div class="card">
+        <div class="card-header"><span class="card-title">DOEL ARCHITECTUUR — DOCKER COMPOSE</span></div>
+        <div class="card-body" style="padding:16px">
+          <table style="margin-bottom:16px">
+            <tr><th>Container</th><th>Verantwoordelijkheid</th><th>Secrets</th><th>Netwerk</th></tr>
+            <tr>
+              <td><span class="badge-green">relay</span></td>
+              <td>Ghost Pipe mempool, burn-on-read, health</td>
+              <td>Geen (stateless)</td>
+              <td>relay-net (intern)</td>
+            </tr>
+            <tr>
+              <td><span class="badge-purple">api</span></td>
+              <td>Stripe webhook, Resend email, key beheer</td>
+              <td>STRIPE_SECRET, RESEND_KEY</td>
+              <td>relay-net + extern (443)</td>
+            </tr>
+            <tr>
+              <td><span class="badge-yellow">admin</span></td>
+              <td>Dit dashboard</td>
+              <td>ADMIN_TOKEN (read-only relay)</td>
+              <td>localhost:8080 ONLY</td>
+            </tr>
+            <tr>
+              <td><span class="badge-red">bot</span></td>
+              <td>Telegram bot</td>
+              <td>TELEGRAM_TOKEN, eigen pgp_key</td>
+              <td>extern only (Telegram API)</td>
+            </tr>
+            <tr>
+              <td><span class="badge-purple">static</span></td>
+              <td>CLI binaries, noble-mlkem.js</td>
+              <td>Geen</td>
+              <td>extern (CDN/nginx)</td>
+            </tr>
+          </table>
+          <pre style="font-size:11px;color:var(--muted);line-height:1.8;background:var(--bg3);padding:14px;overflow-x:auto">services:
+  relay:
+    image: paramant/relay:latest
+    user: "1000:1000"          # non-root
+    read_only: true            # filesystem readonly
+    networks: [relay-net]
+    secrets: []                # GEEN secrets
+
+  api:
+    image: paramant/api:latest
+    user: "1001:1001"
+    networks: [relay-net, web]
+    secrets: [stripe_secret, resend_key, admin_token]
+
+  admin:
+    image: paramant/admin:latest
+    ports: ["127.0.0.1:8080:8080"]  # localhost ONLY
+    networks: [relay-net]
+    secrets: [admin_token]
+
+  bot:
+    image: paramant/bot:latest
+    networks: [web]            # relay-net NIET nodig
+    secrets: [telegram_token, bot_api_key]
+
+  static:
+    image: nginx:alpine
+    read_only: true
+    networks: [web]
+    secrets: []                # GEEN secrets nodig
+
+networks:
+  relay-net: {internal: true} # geen internet toegang
+  web: {}
+
+secrets:
+  stripe_secret: {file: ./secrets/stripe.txt}
+  resend_key:    {file: ./secrets/resend.txt}
+  admin_token:   {file: ./secrets/admin.txt}
+  telegram_token:{file: ./secrets/telegram.txt}
+  bot_api_key:   {file: ./secrets/bot_key.txt}</pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var _logPaused = false;
+var _allUsers = [];
+
+function show(sec) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + sec).classList.add('active');
+  event.target.classList.add('active');
+  if (sec === 'relay') loadRelay();
+  if (sec === 'users') loadUsers();
+  if (sec === 'revenue') loadRevenue();
+}
+
+// Clock
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('nl-NL');
+}, 1000);
+
+// Relay health
+async function loadRelay() {
+  try {
+    const r = await fetch('https://relay.paramant.app/health');
+    const d = await r.json();
+    document.getElementById('relay-status').innerHTML =
+      '<span class="dot green"></span><span>relay.paramant.app v' + d.version + '</span>';
+    document.getElementById('s-uptime').textContent =
+      Math.floor(d.uptime_s / 3600) + 'u';
+    document.getElementById('s-version').textContent = 'v' + d.version;
+    document.getElementById('connections').textContent = d.connections || 0;
+    document.getElementById('relay-json').textContent =
+      JSON.stringify(d, null, 2);
+  } catch (e) {
+    document.getElementById('relay-status').innerHTML =
+      '<span class="dot red"></span><span>Offline</span>';
+  }
+}
+
+// Users & keys
+async function loadUsers() {
+  const token = document.getElementById('p-token')?.value || 'ParametAdm1n2026';
+  try {
+    const r = await fetch('https://relay.paramant.app/admin/users', {
+      headers: { 'X-Admin-Token': token }
+    });
+    const d = await r.json();
+    _allUsers = d.users || [];
+    renderUsers(_allUsers);
+    renderStats(_allUsers);
+    renderRevenue(_allUsers);
+  } catch (e) {
+    document.getElementById('users-table').innerHTML =
+      '<tr><td colspan="6" style="color:var(--red);padding:20px;text-align:center">Laden mislukt — controleer admin token</td></tr>';
+  }
+}
+
+function renderUsers(users) {
+  const tb = document.getElementById('users-table');
+  if (!users.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--dim)">Geen gebruikers</td></tr>';
+    return;
+  }
+  tb.innerHTML = users.map(u => {
+    const planBadge = u.plan === 'pro' ? 'badge-purple' : u.plan === 'kantoor' ? 'badge-green' : u.plan === 'enterprise' ? 'badge-yellow' : 'badge-purple';
+    const pct = u.limit ? Math.round((u.used || 0) / u.limit * 100) : 0;
+    return `<tr>
+      <td style="font-family:monospace">${(u.key || '').slice(0,20)}...</td>
+      <td><span class="${planBadge}">${u.plan || '?'}</span></td>
+      <td style="color:var(--dim)">${u.email || u.label || '—'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:60px;height:4px;background:var(--border);border-radius:2px">
+            <div style="width:${pct}%;height:100%;background:var(--green);border-radius:2px"></div>
+          </div>
+          <span>${u.used || 0}/${u.limit || '∞'}</span>
+        </div>
+      </td>
+      <td style="color:var(--dim)">${u.created ? new Date(u.created).toLocaleDateString('nl-NL') : '—'}</td>
+      <td><button class="btn btn-dim" style="font-size:9px" onclick="copyKey('${u.key}')">KOPIEER</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterUsers() {
+  const q = document.getElementById('user-search').value.toLowerCase();
+  renderUsers(_allUsers.filter(u =>
+    (u.key||'').includes(q) || (u.email||'').toLowerCase().includes(q) ||
+    (u.plan||'').includes(q) || (u.label||'').toLowerCase().includes(q)
+  ));
+}
+
+function renderStats(users) {
+  document.getElementById('s-keys').textContent = users.length;
+  const pro = users.filter(u => u.plan === 'pro').length;
+  const kant = users.filter(u => u.plan === 'kantoor').length;
+  const ent = users.filter(u => u.plan === 'enterprise').length;
+  const mrr = pro * 29 + kant * 149 + ent * 299;
+  document.getElementById('s-mrr').textContent = 'MRR: €' + mrr;
+  document.getElementById('s-transfers').textContent =
+    users.reduce((a, u) => a + (u.used || 0), 0);
+  document.getElementById('s-transfers-sub').textContent = 'totaal alle keys';
+  renderKeysTable(users);
+}
+
+function renderKeysTable(users) {
+  const tb = document.getElementById('keys-table');
+  const recent = [...users].slice(-5).reverse();
+  tb.innerHTML = recent.map(u => {
+    const badgeCls = u.plan === 'pro' ? 'badge-purple' : u.plan === 'kantoor' ? 'badge-green' : 'badge-yellow';
+    const statusCls = u.active !== false ? 'badge-green' : 'badge-red';
+    return `<tr>
+      <td style="font-family:monospace;font-size:10px">${(u.key||'').slice(0,22)}...</td>
+      <td><span class="${badgeCls}">${u.plan||'?'}</span></td>
+      <td style="color:var(--dim)">${u.email||u.label||'—'}</td>
+      <td>${u.used||0}/${u.limit||'∞'}</td>
+      <td><span class="${statusCls}">${u.active !== false ? 'ACTIEF' : 'INACTIEF'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRevenue(users) {
+  const plans = {pro:{n:0,price:29}, kantoor:{n:0,price:149}, enterprise:{n:0,price:299}};
+  users.forEach(u => { if (plans[u.plan]) plans[u.plan].n++; });
+  const total = Object.values(plans).reduce((a,p) => a + p.n * p.price, 0);
+  document.getElementById('r-mrr').textContent = '€' + total;
+  document.getElementById('r-arr').textContent = '€' + (total * 12);
+  document.getElementById('r-pro').textContent = plans.pro.n;
+  document.getElementById('r-kantoor').textContent = plans.kantoor.n;
+  const tb = document.getElementById('revenue-table');
+  tb.innerHTML = Object.entries(plans).map(([name, p]) => {
+    const mrr = p.n * p.price;
+    const pct = total ? Math.round(mrr / total * 100) : 0;
+    return `<tr>
+      <td style="text-transform:uppercase">${name}</td>
+      <td>${p.n}</td>
+      <td>€${p.price}/mnd</td>
+      <td style="color:var(--green)">€${mrr}</td>
+      <td>${pct}%</td>
+    </tr>`;
+  }).join('') + `<tr>
+    <td><strong>TOTAAL</strong></td><td></td><td></td>
+    <td style="color:var(--green)"><strong>€${total}</strong></td>
+    <td>100%</td>
+  </tr>`;
+}
+
+// Provision key
+async function provisionKey() {
+  const plan  = document.getElementById('p-plan').value;
+  const email = document.getElementById('p-email').value;
+  const label = document.getElementById('p-label').value;
+  const token = document.getElementById('p-token').value || 'ParametAdm1n2026';
+  const out   = document.getElementById('provision-result');
+  out.textContent = 'Aanmaken...';
+  try {
+    const r = await fetch('https://relay.paramant.app/admin/provision-key', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({admin_token: token, plan, email, label})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      out.innerHTML = `<span style="color:var(--green)">KEY AANGEMAAKT</span><br>
+        Key: <span style="color:var(--green);font-family:monospace">${d.key}</span><br>
+        Plan: ${d.plan} | Limit: ${d.limit}`;
+      loadUsers();
+    } else {
+      out.innerHTML = '<span style="color:var(--red)">' + JSON.stringify(d) + '</span>';
+    }
+  } catch (e) {
+    out.innerHTML = '<span style="color:var(--red)">Fout: ' + e.message + '</span>';
+  }
+}
+
+function copyKey(key) {
+  navigator.clipboard?.writeText(key);
+}
+
+// Live logs simulatie
+var _logMsgs = [
+  ['[RELAY] POST /v2/inbound 200 — hash: a3f8c2d1... (5MB)','log-ok'],
+  ['[RELAY] GET /v2/outbound/a3f8... — burn-on-read, blob gewist','log-ok'],
+  ['[RELAY] GET /health 200','log-dim'],
+  ['[RELAY] POST /v2/verify-key — plan: pro, valid: true','log-dim'],
+  ['[RELAY] POST /v2/inbound — hash: f9e2b1... (5MB)','log-ok'],
+  ['[RELAY] WARN: geo_alert — key pgp_449d... from 3 countries','log-warn'],
+  ['[RELAY] GET /dl/paramant-linux-x64 — 4.3MB verstuurd','log-dim'],
+];
+var _logIdx = 0;
+setInterval(() => {
+  if (_logPaused) return;
+  const lb = document.getElementById('log-box');
+  if (!lb) return;
+  const [msg, cls] = _logMsgs[_logIdx % _logMsgs.length];
+  _logIdx++;
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = '[' + new Date().toLocaleTimeString('nl-NL') + '] ' + msg;
+  lb.appendChild(d);
+  lb.scrollTop = lb.scrollHeight;
+  if (lb.children.length > 100) lb.removeChild(lb.children[0]);
+}, 3000);
+
+function toggleLogs() {
+  _logPaused = !_logPaused;
+  document.getElementById('log-pause-btn').textContent = _logPaused ? 'HERVATTEN' : 'PAUZEREN';
+}
+
+// Init
+loadRelay();
+loadUsers();
+setInterval(loadRelay, 30000);
+</script>
+</body>
+</html>
