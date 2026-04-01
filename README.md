@@ -110,3 +110,57 @@ Stripe price IDs:
 ---
 
 *PARAMANT v2.0.0 · BUSL-1.1 · © 2026*
+
+---
+
+## Secrets beheer
+
+### Nooit in git
+De volgende secrets staan NIET in de repository:
+- `ADMIN_TOKEN` — admin API key
+- `TOTP_SECRET` — MFA secret
+- `RESEND_API_KEY` — email provider key
+- `FLY_API_TOKEN` — Fly.io deploy token
+- `users.json` — API keys van klanten
+
+### Waar staan ze
+| Secret | Locatie |
+|--------|---------|
+| TOTP_SECRET | `/etc/paramant/admin_mfa.json` (chmod 600) |
+| ADMIN_TOKEN | systemd service Environment= |
+| RESEND_API_KEY | systemd service Environment= |
+| users.json | `/home/paramant/relay-*/users.json` |
+| Fly secrets | `fly secrets list --app paramant-ghost-pipe` |
+
+### Nieuwe server opzetten
+```bash
+# 1. Clone repo
+git clone git@github.com:Apolloccrypt/paramant-relay.git
+cd paramant-relay
+
+# 2. Maak .env aan met echte secrets (zie deploy/.env.example)
+cp deploy/.env.example deploy/.env
+# Vul in: ADMIN_TOKEN, TOTP_SECRET, RESEND_API_KEY
+
+# 3. Deploy
+./deploy/deploy.sh <server_ip>
+```
+
+### Secrets roteren
+```bash
+# Admin key gestolen
+python3 scripts/paramant-admin.py add --label admin-new --plan enterprise
+python3 scripts/paramant-admin.py revoke pgp_88c52e...
+python3 scripts/paramant-admin.py sync
+
+# TOTP verloren
+ssh root@116.203.86.81
+python3 -c "
+import base64,os,json
+s=base64.b32encode(os.urandom(20)).decode()
+json.dump({'totp_secret':s},open('/etc/paramant/admin_mfa.json','w'))
+os.chmod('/etc/paramant/admin_mfa.json',0o600)
+print('Nieuwe secret:',s)
+"
+for s in paramant-relay-health paramant-relay-legal paramant-relay-finance paramant-relay-iot; do systemctl restart $s; done
+```
