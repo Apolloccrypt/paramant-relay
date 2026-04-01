@@ -66,10 +66,15 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
         <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
     </div>
-    <span class="logo-name">ParaShare</span>
-    <span class="logo-by">by PARAMANT</span>
+    <a href="/parashare" style="text-decoration:none;display:flex;align-items:center;gap:10px">
+      <span class="logo-name">ParaShare</span>
+      <span class="logo-by">by PARAMANT</span>
+    </a>
   </div>
-  <button class="btn-ghost" id="nav-toggle">Receive a file</button>
+  <div style="display:flex;gap:10px;align-items:center">
+    <a href="/parashare" class="btn-ghost" id="nav-send" style="display:none">Send a file</a>
+    <button class="btn-ghost" id="nav-toggle">Receive a file</button>
+  </div>
 </nav>
 
 <!-- SEND SCREEN -->
@@ -87,7 +92,7 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
           </svg>
         </div>
         <div class="drop-title">Drop your file here</div>
-        <div class="drop-sub">or <span id="browse-link">browse to upload</span> &middot; max 5MB</div>
+        <div class="drop-sub">or <span id="browse-link">browse to upload</span> &middot; max 500MB</div>
       </div>
       <div id="drop-filled" class="file-row hide">
         <div class="file-icon">
@@ -251,7 +256,7 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
 <script>
 const RELAY   = 'https://health.paramant.app';
 const BASE_URL = window.location.origin + '/parashare';
-const MAX_BYTES = 5 * 1024 * 1024; // relay hard limit
+const MAX_BYTES = 500 * 1024 * 1024; // 500MB client limit
 
 let file = null, apiKey = '', keyValid = false, sending = false;
 let expiresAt = null, ttlInterval = null;
@@ -273,9 +278,21 @@ function fmtTTL(ms) {
 function $(id) { return document.getElementById(id); }
 function show(id) { $(id)?.classList.remove('hide'); }
 function hide(id) { $(id)?.classList.add('hide'); }
-function showScreen(s) {
+function showScreen(sc) {
   ['screen-send', 'screen-sent', 'screen-receive'].forEach(x => hide(x));
-  show(s);
+  show(sc);
+  const navSend   = $('nav-send');
+  const navToggle = $('nav-toggle');
+  if (sc === 'screen-send') {
+    if (navSend)   navSend.style.display = 'none';
+    if (navToggle) navToggle.textContent = 'Receive a file';
+  } else if (sc === 'screen-sent') {
+    if (navSend)   navSend.style.display = '';
+    if (navToggle) navToggle.textContent = 'Receive a file';
+  } else if (sc === 'screen-receive') {
+    if (navSend)   navSend.style.display = '';
+    if (navToggle) navToggle.textContent = 'Send a file';
+  }
 }
 
 // ── Route on load ──────────────────────────────────────────────────
@@ -284,7 +301,6 @@ const token  = params.get('t');
 
 if (token) {
   showScreen('screen-receive');
-  $('nav-toggle').textContent = 'Send a file';
   initReceive(token);
 } else {
   showScreen('screen-send');
@@ -296,7 +312,6 @@ $('nav-toggle').addEventListener('click', () => {
   if (onReceive) {
     window.location.href = '/parashare';
   } else {
-    $('nav-toggle').textContent = 'Send a file';
     showScreen('screen-receive');
     initReceive(null);
   }
@@ -321,7 +336,7 @@ $('file-input').addEventListener('change', e => {
 
 function setFile(f) {
   if (f.size > MAX_BYTES) {
-    showErr('File too large — relay limit is 5MB. Larger file support coming soon.');
+    showErr('File too large — max 500MB per file.');
     return;
   }
   file = f;
@@ -419,7 +434,7 @@ async function doSend() {
     blob.set(ct, 44);
 
     if (blob.byteLength > MAX_BYTES) {
-      throw new Error(`Encrypted file is ${fmt(blob.byteLength)} — relay limit is 5MB.`);
+      throw new Error(`Encrypted file is ${fmt(blob.byteLength)} — max 500MB.`);
     }
 
     setProgress(55, 'Preparing upload...');
@@ -597,7 +612,6 @@ $('btn-new')?.addEventListener('click', () => {
   hide('progress-wrap'); hide('send-err'); hide('key-ok'); hide('key-err');
   show('key-hint');
   showScreen('screen-send');
-  $('nav-toggle').textContent = 'Receive a file';
 });
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
