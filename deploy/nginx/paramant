@@ -1,0 +1,121 @@
+server {
+    listen 127.0.0.1:8080;
+    root /home/paramant/app;
+    index index.html;
+    access_log off;
+
+    location = /r34ct0r {
+        alias /home/paramant/app/r34ct0r.html;
+        default_type text/html;
+    }
+    location = /admin { return 301 https://$host/r34ct0r; }
+    location = /r34ct0r.html {
+        alias /home/paramant/app/r34ct0r.html;
+        default_type text/html;
+    }
+    location / {
+        try_files $uri $uri.html $uri/ /index.html;
+    }
+    # DICOM Gateway
+    location /dicom/ {
+        proxy_pass http://127.0.0.1:8090/;
+        proxy_set_header Host $host;
+        client_max_body_size 50M;
+    }
+
+
+    # Admin panel API proxy (same-origin, geen CORS issues)
+    location /rp/health/ {
+        proxy_pass http://127.0.0.1:3005/;
+        proxy_http_version 1.1;
+        proxy_set_header Host health.paramant.app;
+        proxy_set_header X-Api-Key $http_x_api_key;
+        proxy_set_header X-Admin-Token $http_x_admin_token;
+    }
+    location /rp/legal/ {
+        proxy_pass http://127.0.0.1:3002/;
+        proxy_http_version 1.1;
+        proxy_set_header Host legal.paramant.app;
+        proxy_set_header X-Api-Key $http_x_api_key;
+        proxy_set_header X-Admin-Token $http_x_admin_token;
+    }
+    location /rp/finance/ {
+        proxy_pass http://127.0.0.1:3003/;
+        proxy_http_version 1.1;
+        proxy_set_header Host finance.paramant.app;
+        proxy_set_header X-Api-Key $http_x_api_key;
+        proxy_set_header X-Admin-Token $http_x_admin_token;
+    }
+    location /rp/iot/ {
+        proxy_pass http://127.0.0.1:3004/;
+        proxy_http_version 1.1;
+        proxy_set_header Host iot.paramant.app;
+        proxy_set_header X-Api-Key $http_x_api_key;
+        proxy_set_header X-Admin-Token $http_x_admin_token;
+    }
+    location /rp/fly/ {
+        proxy_pass https://paramant-ghost-pipe.fly.dev/;
+        proxy_ssl_server_name on;
+        proxy_set_header Host paramant-ghost-pipe.fly.dev;
+        proxy_set_header X-Api-Key $http_x_api_key;
+        proxy_set_header X-Admin-Token $http_x_admin_token;
+    }
+
+    # FHIR Bridge
+    location /fhir/ {
+        proxy_pass http://127.0.0.1:8091/;
+        proxy_set_header Host $host;
+        client_max_body_size 50M;
+    }
+
+}
+
+server {
+    listen 127.0.0.1:8081;
+    access_log off;
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header X-Real-IP '';
+        proxy_set_header X-Forwarded-For '';
+        proxy_read_timeout 3600s;
+    }
+}
+
+server {
+    listen 127.0.0.1:8086;
+    root /home/paramant/app-legal;
+    index index.html;
+    access_log off;
+    location /v2/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection 'upgrade'; proxy_read_timeout 3600s; }
+    location /health { proxy_pass http://127.0.0.1:3002; }
+    location /admin/ { proxy_pass http://127.0.0.1:3002; }
+    location / { try_files $uri $uri.html /index.html; }
+}
+
+server {
+    listen 127.0.0.1:8083;
+    access_log off;
+    location / { proxy_pass http://127.0.0.1:3003; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection 'upgrade'; proxy_read_timeout 3600s; }
+}
+
+server {
+    listen 127.0.0.1:8084;
+    access_log off;
+    location / { proxy_pass http://127.0.0.1:3004; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection 'upgrade'; proxy_read_timeout 3600s; }
+}
+
+server {
+    listen 127.0.0.1:8085;
+    access_log off;
+    location / { proxy_pass http://127.0.0.1:3005; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection 'upgrade'; proxy_read_timeout 3600s; }
+}
+server {
+    listen 127.0.0.1:8090;
+    location / {
+        proxy_pass https://paramant-ghost-pipe.fly.dev;
+        proxy_set_header Host paramant-ghost-pipe.fly.dev;
+    }
+}

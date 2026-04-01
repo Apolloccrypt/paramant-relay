@@ -1,0 +1,16 @@
+[Unit]
+Description=PARAMANT Relay - finance
+After=network.target
+
+[Service]
+Environment=TOTP_SECRET=GGM3VTGW4DVPN7QHABQ7JXZP6RLUFSO7
+Environment=RESEND_API_KEY=re_K1YQYKj1_Lga3L33bGePcHua8ykJ7XZvA
+Type=simple
+User=paramant
+WorkingDirectory=/home/paramant/relay-finance
+ExecStart=/usr/bin/node relay.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
