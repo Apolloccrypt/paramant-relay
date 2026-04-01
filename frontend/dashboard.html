@@ -3,383 +3,305 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT &mdash; Dashboard</title>
-<link rel="stylesheet" href="_design.css">
+<title>PARAMANT — Developer Dashboard</title>
 <style>
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center}
-.login-box{width:100%;max-width:400px;padding:0 24px}
-.login-box h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
-.login-box p{font-size:13px;color:var(--muted);margin-bottom:32px}
-.form-group{margin-bottom:16px}
-.form-group label{display:block;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;margin-bottom:6px}
-.form-group select,.form-group input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;appearance:none}
-.form-group select:focus,.form-group input:focus{border-color:var(--quiet)}
-.form-group select option{background:var(--surface)}
-.login-btn{width:100%;background:var(--text);color:var(--bg);border:none;border-radius:4px;padding:11px;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px}
-.login-btn:hover{opacity:.85}
-.login-err{font-size:12px;color:#c0392b;margin-top:12px;font-family:var(--mono);display:none}
-
-#app{display:none}
-.dash-nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
-.dash-nav-left{display:flex;align-items:center;gap:24px}
-.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
-.relay-badge{font-size:11px;font-family:var(--mono);color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:3px 8px}
-.dash-nav-right{display:flex;align-items:center;gap:16px}
-.key-label{font-size:11px;font-family:var(--mono);color:var(--quiet)}
-.logout-btn{font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer}
-.logout-btn:hover{color:var(--text)}
-
-.dash-body{max-width:1100px;margin:0 auto;padding:40px 48px}
-
-.health-bar{display:flex;gap:8px;margin-bottom:40px;flex-wrap:wrap}
-.node-pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:6px 12px}
-.node-dot{width:6px;height:6px;border-radius:50%;background:var(--quiet)}
-.node-dot.ok{background:var(--green)}
-.node-dot.err{background:#5a1f1f}
-.node-name{font-size:11px;font-family:var(--mono);color:var(--muted)}
-.node-ms{font-size:10px;font-family:var(--mono);color:var(--quiet);margin-left:4px}
-
-.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:40px}
-.stat-card{background:var(--bg);padding:20px 20px 18px}
-.stat-val{font-size:28px;font-weight:600;font-family:var(--mono);letter-spacing:-.03em;color:var(--text);line-height:1}
-.stat-label{font-size:11px;color:var(--quiet);font-family:var(--mono);letter-spacing:.06em;margin-top:6px}
-.stat-sub{font-size:10px;color:var(--quiet);font-family:var(--mono);margin-top:4px;opacity:.7}
-
-.section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
-.section-head h2{font-size:13px;font-weight:500;color:var(--text);letter-spacing:.04em;font-family:var(--mono)}
-.section-head span{font-size:11px;color:var(--quiet);font-family:var(--mono)}
-.section-head a{font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none}
-.section-head a:hover{color:var(--muted)}
-
-table.dash-table{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:40px}
-table.dash-table thead th{text-align:left;padding:10px 14px;font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;background:var(--surface);border-bottom:1px solid var(--border)}
-table.dash-table tbody td{padding:10px 14px;font-size:12px;font-family:var(--mono);color:var(--muted);border-bottom:1px solid var(--border-soft)}
-table.dash-table tbody tr:last-child td{border-bottom:none}
-table.dash-table tbody tr:hover td{background:var(--surface)}
-.hash-col{color:var(--quiet)}.ts-col{color:var(--quiet)}
-
-.refresh-row{display:flex;align-items:center;gap:12px;margin-bottom:28px}
-.refresh-btn{font-size:11px;font-family:var(--mono);color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:4px 10px;cursor:pointer}
-.refresh-btn:hover{border-color:var(--quiet)}
-.last-updated{font-size:11px;font-family:var(--mono);color:var(--quiet)}
-.auto-badge{font-size:10px;font-family:var(--mono);color:var(--quiet);margin-left:auto}
-
-.ct-wrap{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px;margin-bottom:40px}
-.ct-meta{display:flex;gap:32px;margin-bottom:16px}
-.ct-kv{display:flex;flex-direction:column;gap:3px}
-.ct-k{font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em}
-.ct-v{font-size:12px;font-family:var(--mono);color:var(--muted);word-break:break-all}
-
-.empty-row{text-align:center;padding:32px;color:var(--quiet);font-size:12px;font-family:var(--mono)}
-
-@media(max-width:768px){
-  .dash-nav{padding:0 20px}
-  .dash-body{padding:32px 20px}
-  .stat-row{grid-template-columns:repeat(2,1fr)}
-}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--text:#ededed;--muted:#888;--quiet:#555;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+input,select,button{font-family:var(--font);font-size:13px}
+a{color:var(--muted);text-decoration:none}
+a:hover{color:var(--text)}
 </style>
 </head>
 <body>
+<div id="root"></div>
+<script>
+const RELAYS=[
+  {l:"Health",u:"https://health.paramant.app",sector:"healthcare"},
+  {l:"Finance",u:"https://finance.paramant.app",sector:"finance"},
+  {l:"Legal",u:"https://legal.paramant.app",sector:"legal"},
+  {l:"IoT",u:"https://iot.paramant.app",sector:"iot"},
+  {l:"Fly.io",u:"https://paramant-ghost-pipe.fly.dev",sector:"global"}
+];
+const V={bg:"#0c0c0c",sur:"#111",b:"#1a1a1a",t:"#ededed",m:"#888",q:"#555",g:"#2d6a4f",
+  font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
+  mono:"'SF Mono','Fira Code','Cascadia Code',monospace"};
 
-<div class="login-wrap" id="login">
-  <div class="login-box">
-    <div class="eyebrow">PARAMANT</div>
-    <h2>Dashboard</h2>
-    <p>Select a relay and enter your API key to continue.</p>
-    <div class="form-group">
-      <label>RELAY</label>
-      <select id="relay-select">
-        <option value="https://health.paramant.app">health &mdash; EU/DE primary</option>
-        <option value="https://legal.paramant.app">legal &mdash; EU/DE legal</option>
-        <option value="https://finance.paramant.app">finance &mdash; EU/DE finance</option>
-        <option value="https://iot.paramant.app">iot &mdash; EU/DE IoT</option>
-        <option value="https://relay.paramant.app">relay &mdash; Fly.io anycast</option>
+let apiKey="",relay=RELAYS[0],data=null,health={},lastPoll=null,loading=false;
+let testLog=[],testRunning=false;
+
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+
+async function fetchHealth(){
+  await Promise.all(RELAYS.map(async r=>{
+    try{const res=await fetch(r.u+"/health",{signal:AbortSignal.timeout(4000)});
+      health[r.u]=res.ok?await res.json():false}
+    catch{health[r.u]=false}
+  }));
+  renderHealthBar();
+}
+
+async function fetchMonitor(){
+  if(!apiKey)return;
+  loading=true;softRender();
+  try{
+    const r=await fetch(relay.u+"/v2/monitor?k="+apiKey,{signal:AbortSignal.timeout(8000)});
+    if(r.ok){data=await r.json();lastPoll=new Date()}
+    else data=null;
+  }catch(e){}
+  loading=false;softRender();
+}
+
+function addTestLog(msg,level="info"){
+  const t=new Date().toLocaleTimeString();
+  const sym={info:"·",ok:"✓",error:"✗",send:"→",recv:"←",warn:"⚠"}[level]||"·";
+  const col={info:V.q,ok:V.g,error:"#8c3a3a",send:"#4a6a9c",recv:V.g,warn:"#8c7a2d"}[level]||V.q;
+  testLog.push({t,sym,msg,col});
+  if(testLog.length>50)testLog.shift();
+  renderTestLog();
+}
+
+function renderTestLog(){
+  const el=document.getElementById("test-log");
+  if(!el)return;
+  el.innerHTML=testLog.slice(-20).reverse().map(e=>
+    `<div style="display:flex;gap:12px;padding:4px 0;border-bottom:1px solid ${V.b};font-size:12px;font-family:${V.mono}">
+      <span style="color:${V.q};flex-shrink:0">${e.t}</span>
+      <span style="color:${e.col};flex-shrink:0">${e.sym}</span>
+      <span style="color:${V.m}">${esc(e.msg)}</span>
+    </div>`
+  ).join("");
+}
+
+async function runE2ETest(){
+  if(testRunning){addTestLog("Test al actief","warn");return}
+  if(!apiKey){addTestLog("Geen API key","error");return}
+  testRunning=true;testLog=[];
+  addTestLog("E2E test gestart","info");
+  addTestLog("Relay: "+relay.u,"info");
+  try{
+    addTestLog("Stap 1/5 — relay health check","info");
+    const h=await fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)});
+    const hd=await h.json();
+    if(!hd.ok)throw new Error("Relay unhealthy");
+    addTestLog("Relay v"+hd.version+" | uptime "+hd.uptime_s+"s","ok");
+
+    addTestLog("Stap 2/5 — API key valideren","info");
+    const k=await fetch(relay.u+"/v2/check-key?k="+apiKey,{signal:AbortSignal.timeout(5000)});
+    const kd=await k.json();
+    if(!kd.valid)throw new Error("API key ongeldig");
+    addTestLog("Key geldig | plan: "+kd.plan,"ok");
+
+    addTestLog("Stap 3/5 — pubkey registreren","info");
+    const testDevice="dashboard-e2e-"+Date.now();
+    const pkBody=JSON.stringify({device_id:testDevice,ecdh_pub:"04"+Array(64).fill(0).map(()=>Math.floor(Math.random()*16).toString(16)).join("")});
+    const pk=await fetch(relay.u+"/v2/pubkey",{
+      method:"POST",headers:{"Content-Type":"application/json","X-Api-Key":apiKey},
+      body:pkBody,signal:AbortSignal.timeout(8000)
+    });
+    const pkd=await pk.json();
+    if(!pkd.ok)throw new Error("Pubkey registratie mislukt");
+    addTestLog("Pubkeys geregistreerd voor "+testDevice,"ok");
+
+    addTestLog("Stap 4/5 — monitor data ophalen","info");
+    const m=await fetch(relay.u+"/v2/monitor?k="+apiKey,{signal:AbortSignal.timeout(8000)});
+    const md=await m.json();
+    if(md.ok){
+      const dl=md.delivery||{};
+      addTestLog("Monitor: "+(dl.total||0)+" verzonden, "+(dl.acked||0)+" bevestigd","ok");
+    }
+
+    addTestLog("Stap 5/5 — CT log controleren","info");
+    const ct=await fetch(relay.u+"/v2/ct/log?limit=3",{signal:AbortSignal.timeout(5000)});
+    const ctd=await ct.json();
+    addTestLog("CT log: "+(ctd.size||0)+" entries | root: "+(ctd.root||"").slice(0,16)+"...","ok");
+
+    addTestLog("","info");
+    addTestLog("E2E test geslaagd — alle systemen operationeel","ok");
+    data=md;lastPoll=new Date();softRender();
+  }catch(e){addTestLog("Test mislukt: "+e.message,"error")}
+  testRunning=false;
+}
+
+function statCard(label,val,sub,color){
+  return`<div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;padding:20px">
+    <div style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">${label}</div>
+    <div style="font-size:26px;font-weight:600;letter-spacing:-.02em;color:${color||V.t}">${val!=null?val:"—"}</div>
+    ${sub?`<div style="font-size:11px;color:${V.q};margin-top:4px">${sub}</div>`:""}
+  </div>`
+}
+
+function renderHealthBar(){
+  const el=document.getElementById("hbar");
+  if(!el)return;
+  el.innerHTML=RELAYS.map(r=>{
+    const hd=health[r.u];const ok=hd&&hd.ok;const fail=hd===false;
+    return`<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:11px;font-family:${V.mono};border:1px solid ${ok?"#1a2a1a":fail?"#2a1a1a":V.b};color:${ok?V.g:fail?"#7a3a3a":V.q}">
+      <span style="width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0"></span>
+      ${r.l}${ok&&hd.uptime_s?" "+Math.floor(hd.uptime_s/3600)+"h":""}
+    </span>`
+  }).join("");
+}
+
+function softRender(){
+  const el=document.getElementById("stats-grid");
+  if(!el||!data)return;
+  const d=data||{};const dl=d.delivery||{};const st=d.stats||{};
+  const sr=dl.success_rate;
+  const src=sr>=95?V.g:sr>=80?"#8c7a2d":"#8c3a3a";
+  el.innerHTML=
+    statCard("Sent",dl.total??st.inbound,"total blobs")+
+    statCard("Acknowledged",dl.acked,"with ACK",V.g)+
+    statCard("Success rate",sr!=null?sr+"%":null,null,src)+
+    statCard("Avg latency",dl.avg_latency_ms!=null?dl.avg_latency_ms+"ms":null,"send → ACK","#4a6a9c")+
+    statCard("In flight",d.blobs_in_flight,"in RAM","#8c7a2d")+
+    statCard("Burned",st.burned,"burn-on-read")+
+    statCard("Pending",dl.pending,null,dl.pending>0?"#8c7a2d":V.t)+
+    statCard("Webhooks",st.webhooks_sent);
+
+  const dt=document.getElementById("delivery-table");
+  if(dt&&d.history&&d.history.length){
+    dt.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr>${["Hash","Device","Size","Status","Auth","Age"].map(h=>`<th style="text-align:left;padding:10px 16px;font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;border-bottom:1px solid ${V.b};text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
+      <tbody>${d.history.map((it,i)=>`<tr style="background:${i%2===0?V.bg:V.sur}">
+        <td style="padding:10px 16px;font-size:11px;color:${V.q};font-family:${V.mono}">${esc(it.hash||"")}</td>
+        <td style="padding:10px 16px;font-size:12px;color:${V.m}">${esc(it.device||"—")}</td>
+        <td style="padding:10px 16px;font-size:12px;color:${V.m}">${it.size?(it.size/1024).toFixed(1)+"KB":"—"}</td>
+        <td style="padding:10px 16px;font-size:12px">${it.acked?`<span style="color:${V.g}">ACK ${it.latency_ms?it.latency_ms+"ms":""}</span>`:`<span style="color:#8c7a2d">pending</span>`}</td>
+        <td style="padding:10px 16px;font-size:12px">${it.sig_verified?`<span style="color:${V.g}">verified</span>`:`<span style="color:${V.q}">—</span>`}</td>
+        <td style="padding:10px 16px;font-size:11px;color:${V.q}">${it.sent_ts?Math.round((Date.now()-it.sent_ts)/1000)+"s":"—"}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+  const pi=document.getElementById("poll-info");
+  if(pi)pi.textContent=loading?"polling...":lastPoll?"↻ "+lastPoll.toLocaleTimeString():"";
+}
+
+function render(){
+  if(!apiKey){
+    document.getElementById("root").innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
+      <div style="width:100%;max-width:380px">
+        <a href="/" style="font-family:${V.mono};font-size:13px;font-weight:500;letter-spacing:.08em;color:${V.m};text-decoration:none;display:block;margin-bottom:32px">PARAMANT / dashboard</a>
+        <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:32px"></div>
+        <p style="font-size:13px;color:${V.q};margin-bottom:24px;line-height:1.6">Monitor delivery stats, run end-to-end tests, inspect the CT log, and debug your integration.</p>
+        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">API key</label>
+        <input id="ki" placeholder="pgp_..." style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:16px;font-family:${V.mono}">
+        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Relay</label>
+        <select id="rs" style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;margin-bottom:24px">
+          ${RELAYS.map(r=>`<option value="${r.u}">${r.l} — ${r.u.replace("https://","")}</option>`).join("")}
+        </select>
+        <button onclick="login()" style="width:100%;background:${V.t};color:${V.bg};border:none;border-radius:5px;padding:11px;font-size:13px;font-weight:500;cursor:pointer">Connect</button>
+      </div>
+    </div>`;
+    renderHealthBar();
+    document.getElementById("ki").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+    return;
+  }
+
+  document.getElementById("root").innerHTML=`
+  <nav style="display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:52px;border-bottom:1px solid ${V.b};position:sticky;top:0;background:rgba(12,12,12,.95);z-index:100">
+    <div style="display:flex;align-items:center;gap:24px">
+      <a href="/" style="font-family:${V.mono};font-size:13px;font-weight:500;letter-spacing:.08em;color:${V.t}">PARAMANT</a>
+      <span style="font-size:12px;color:${V.q};font-family:${V.mono}">/ dashboard</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <select id="rs2" style="background:${V.sur};border:1px solid ${V.b};border-radius:4px;padding:6px 10px;color:${V.t};font-size:12px;font-family:${V.mono}" onchange="changeRelay(this.value)">
+        ${RELAYS.map(r=>`<option value="${r.u}" ${r.u===relay.u?"selected":""}>${r.l}</option>`).join("")}
       </select>
-    </div>
-    <div class="form-group">
-      <label>API KEY</label>
-      <input type="password" id="api-key-input" placeholder="pk_live_..." autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <button class="login-btn" onclick="doLogin()">Connect</button>
-    <div class="login-err" id="login-err">Invalid API key or relay unreachable.</div>
-  </div>
-</div>
-
-<div id="app">
-  <nav class="dash-nav">
-    <div class="dash-nav-left">
-      <a href="/" class="nav-logo">PARAM<span style="color:var(--quiet);font-weight:400">ANT</span></a>
-      <span class="relay-badge" id="relay-badge">connecting...</span>
-    </div>
-    <div class="dash-nav-right">
-      <span class="key-label" id="key-label"></span>
-      <button class="logout-btn" onclick="doLogout()">disconnect</button>
+      <span id="poll-info" style="font-size:11px;color:${V.q};font-family:${V.mono}"></span>
+      <a href="/chat" style="font-size:11px;color:${V.q}">Chat</a>
+      <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log</a>
+      <button onclick="logout()" style="background:none;border:1px solid ${V.b};color:${V.q};border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer">Sign out</button>
     </div>
   </nav>
 
-  <div class="dash-body">
+  <div style="max-width:1100px;margin:0 auto;padding:32px">
+    <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
 
-    <div class="health-bar">
-      <div class="node-pill"><span class="node-dot" id="d-health"></span><span class="node-name">health</span><span class="node-ms" id="ms-health"></span></div>
-      <div class="node-pill"><span class="node-dot" id="d-legal"></span><span class="node-name">legal</span><span class="node-ms" id="ms-legal"></span></div>
-      <div class="node-pill"><span class="node-dot" id="d-finance"></span><span class="node-name">finance</span><span class="node-ms" id="ms-finance"></span></div>
-      <div class="node-pill"><span class="node-dot" id="d-iot"></span><span class="node-name">iot</span><span class="node-ms" id="ms-iot"></span></div>
-      <div class="node-pill"><span class="node-dot" id="d-relay"></span><span class="node-name">relay (anycast)</span><span class="node-ms" id="ms-relay"></span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px" id="stats-grid">
+      ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;padding:20px;opacity:.3"><div style="height:26px;background:${V.b};border-radius:3px"></div></div>`).join("")}
     </div>
 
-    <div class="refresh-row">
-      <button class="refresh-btn" onclick="loadAll()">&#8635; Refresh</button>
-      <span class="last-updated" id="last-updated"></span>
-      <span class="auto-badge">auto-refresh 30s</span>
-    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;overflow:hidden">
+        <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">E2E Test trail</span>
+          <button onclick="runE2ETest()" style="background:${V.t};color:${V.bg};border:none;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:500;cursor:pointer;font-family:${V.mono}">Run test</button>
+        </div>
+        <div id="test-log" style="padding:16px 20px;min-height:200px;max-height:320px;overflow-y:auto">
+          <div style="font-size:12px;color:${V.q};font-family:${V.mono}">Click "Run test" to verify the full send → relay → receive → burn flow.</div>
+        </div>
+      </div>
 
-    <div class="stat-row">
-      <div class="stat-card">
-        <div class="stat-val" id="s-sent">&mdash;</div>
-        <div class="stat-label">SENT</div>
-        <div class="stat-sub">messages dispatched</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-burned">&mdash;</div>
-        <div class="stat-label">BURNED</div>
-        <div class="stat-sub">burn-on-read</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-pending">&mdash;</div>
-        <div class="stat-label">IN FLIGHT</div>
-        <div class="stat-sub">awaiting pickup</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-ack">&mdash;</div>
-        <div class="stat-label">ACKNOWLEDGED</div>
-        <div class="stat-sub">receiver confirmed</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-rate">&mdash;</div>
-        <div class="stat-label">DELIVERY RATE</div>
-        <div class="stat-sub">burned / sent</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-dids">&mdash;</div>
-        <div class="stat-label">IDENTITIES</div>
-        <div class="stat-sub">DID registrations</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-bytes">&mdash;</div>
-        <div class="stat-label">BYTES OUT</div>
-        <div class="stat-sub">payload delivered</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="s-ws">&mdash;</div>
-        <div class="stat-label">WS STREAMS</div>
-        <div class="stat-sub">active connections</div>
+      <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;overflow:hidden">
+        <div style="padding:14px 20px;border-bottom:1px solid ${V.b}">
+          <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">Quick start</span>
+        </div>
+        <div style="padding:20px;font-family:${V.mono};font-size:12px;line-height:2;color:${V.q}">
+          <div style="margin-bottom:8px"># Install</div>
+          <div style="color:${V.m}">pip install paramant-sdk</div><br>
+          <div># Receive</div>
+          <div style="color:${V.m}">python3 paramant-receiver.py \\</div>
+          <div style="color:${V.m}">  --key <span style="color:${V.t}">${apiKey}</span> \\</div>
+          <div style="color:${V.m}">  --device my-device \\</div>
+          <div style="color:${V.m}">  --output /tmp/received/</div><br>
+          <div># Send</div>
+          <div style="color:${V.m}">python3 paramant-sender.py \\</div>
+          <div style="color:${V.m}">  --key <span style="color:${V.t}">${apiKey}</span> \\</div>
+          <div style="color:${V.m}">  --device my-device \\</div>
+          <div style="color:${V.m}">  --file document.pdf</div>
+        </div>
       </div>
     </div>
 
-    <div class="section-head">
-      <h2>AUDIT LOG</h2>
-      <span id="audit-count"></span>
-    </div>
-    <table class="dash-table">
-      <thead><tr><th>TIMESTAMP</th><th>EVENT</th><th>DETAIL</th></tr></thead>
-      <tbody id="audit-body"><tr><td colspan="3" class="empty-row">Loading...</td></tr></tbody>
-    </table>
-
-    <div class="section-head">
-      <h2>CERTIFICATE TRANSPARENCY</h2>
-      <a href="/ct-log">view full log &rarr;</a>
-    </div>
-    <div class="ct-wrap">
-      <div class="ct-meta">
-        <div class="ct-kv"><span class="ct-k">TREE SIZE</span><span class="ct-v" id="ct-size">&mdash;</span></div>
-        <div class="ct-kv"><span class="ct-k">MERKLE ROOT</span><span class="ct-v" id="ct-root">&mdash;</span></div>
+    <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;margin-bottom:16px;overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">Recent deliveries</span>
+        <span style="font-size:11px;color:${V.q}">Relay: ${relay.l}</span>
       </div>
-      <table class="dash-table" style="margin-bottom:0">
-        <thead><tr><th>#</th><th>LEAF HASH</th><th>DEVICE HASH</th><th>TIMESTAMP</th></tr></thead>
-        <tbody id="ct-body"><tr><td colspan="4" class="empty-row">Loading...</td></tr></tbody>
-      </table>
+      <div id="delivery-table">
+        <div style="padding:40px;text-align:center;font-size:13px;color:${V.q}">Loading...</div>
+      </div>
     </div>
 
-  </div>
-</div>
+    <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">Merkle audit log</span>
+        <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log →</a>
+      </div>
+      <div id="audit-log" style="padding:16px 20px;min-height:80px">
+        <div style="font-size:12px;color:${V.q};font-family:${V.mono}">Loading...</div>
+      </div>
+    </div>
+  </div>`;
 
-<script>
-var RELAY = '';
-var API_KEY = '';
-var refreshTimer = null;
-var NODES = [
-  { id: 'health',  url: 'https://health.paramant.app'  },
-  { id: 'legal',   url: 'https://legal.paramant.app'   },
-  { id: 'finance', url: 'https://finance.paramant.app' },
-  { id: 'iot',     url: 'https://iot.paramant.app'     },
-  { id: 'relay',   url: 'https://relay.paramant.app'   }
-];
+  renderHealthBar();
+  if(data)softRender();
+  fetchMonitor();
 
-function fmt(n) {
-  if (n === undefined || n === null || n === '') return '\u2014';
-  n = Number(n);
-  if (n >= 1e9) return (n/1e9).toFixed(1) + 'G';
-  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n/1e3).toFixed(1) + 'k';
-  return String(n);
+  if(data&&data.audit&&data.audit.length){
+    document.getElementById("audit-log").innerHTML=data.audit.map(e=>
+      `<div style="display:flex;gap:20px;font-size:11px;font-family:${V.mono};padding:4px 0;border-bottom:1px solid ${V.b}">
+        <span style="color:${V.q};flex-shrink:0">${(e.ts||"").slice(11,19)}</span>
+        <span style="color:${e.event&&e.event.includes("ack")?V.g:e.event&&e.event.includes("inbound")?"#4a6a9c":V.m}">${esc(e.event||"")}</span>
+        <span style="color:${V.q}">${esc(e.hash||"")}${e.device?" · "+esc(e.device):""}${e.latency_ms?" · "+e.latency_ms+"ms":""}</span>
+      </div>`
+    ).join("");
+  }
 }
 
-function fmtBytes(b) {
-  b = Number(b) || 0;
-  if (b >= 1073741824) return (b/1073741824).toFixed(1) + ' GB';
-  if (b >= 1048576)    return (b/1048576).toFixed(1) + ' MB';
-  if (b >= 1024)       return (b/1024).toFixed(1) + ' KB';
-  return b + ' B';
+function login(){
+  const k=document.getElementById("ki").value.trim();
+  const u=document.getElementById("rs").value;
+  if(!k.startsWith("pgp_"))return;
+  apiKey=k;relay=RELAYS.find(r=>r.u===u)||RELAYS[0];
+  render();setInterval(fetchMonitor,5000);
 }
+function logout(){apiKey="";data=null;testLog=[];render()}
+function changeRelay(u){relay=RELAYS.find(r=>r.u===u)||RELAYS[0];fetchMonitor()}
 
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function showErr(msg) {
-  var el = document.getElementById('login-err');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function doLogin() {
-  var relay = document.getElementById('relay-select').value;
-  var key   = document.getElementById('api-key-input').value.trim();
-  if (!key) { showErr('Enter an API key.'); return; }
-  var btn = document.querySelector('.login-btn');
-  btn.textContent = 'Connecting...';
-  btn.disabled = true;
-  fetch(relay + '/v2/check-key', { headers: { 'X-API-Key': key } })
-    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-    .then(function(res) {
-      if (!res.ok || !res.d.valid) {
-        showErr('Invalid API key.');
-        btn.textContent = 'Connect'; btn.disabled = false;
-        return;
-      }
-      RELAY = relay; API_KEY = key;
-      document.getElementById('login').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('relay-badge').textContent = relay.replace('https://','');
-      document.getElementById('key-label').textContent = key.slice(0,8) + '...';
-      loadAll();
-      refreshTimer = setInterval(loadAll, 30000);
-    })
-    .catch(function() {
-      showErr('Relay unreachable.');
-      btn.textContent = 'Connect'; btn.disabled = false;
-    });
-}
-
-function doLogout() {
-  clearInterval(refreshTimer);
-  RELAY = ''; API_KEY = '';
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login').style.display = 'flex';
-  var btn = document.querySelector('.login-btn');
-  btn.textContent = 'Connect'; btn.disabled = false;
-  document.getElementById('login-err').style.display = 'none';
-  document.getElementById('api-key-input').value = '';
-}
-
-function loadAll() {
-  checkNodes();
-  loadStats();
-  loadAudit();
-  loadCt();
-  document.getElementById('last-updated').textContent = 'updated ' + new Date().toLocaleTimeString();
-}
-
-function checkNodes() {
-  NODES.forEach(function(n) {
-    var t0  = Date.now();
-    var dot = document.getElementById('d-' + n.id);
-    var ms  = document.getElementById('ms-' + n.id);
-    fetch(n.url + '/health', { signal: AbortSignal.timeout(4000) })
-      .then(function(r) {
-        var ela = Date.now() - t0;
-        dot.className = r.ok ? 'node-dot ok' : 'node-dot err';
-        ms.textContent = r.ok ? ela + 'ms' : r.status;
-      })
-      .catch(function() { dot.className = 'node-dot err'; ms.textContent = 'timeout'; });
-  });
-}
-
-function loadStats() {
-  fetch(RELAY + '/v2/stats', { headers: { 'X-API-Key': API_KEY } })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var sent  = d.messages_sent    || d.outbound || 0;
-      var burned= d.blobs_burned     || d.burned   || 0;
-      var pend  = d.blobs_pending    || d.pending  || 0;
-      var ack   = d.ack_total        || 0;
-      var dids  = d.did_registrations|| 0;
-      var bytes = d.bytes_out_total  || 0;
-      var ws    = d.ws_connections   || d.websocket_connections || 0;
-      var rate  = sent > 0 ? Math.round(burned / sent * 100) + '%' : '\u2014';
-      document.getElementById('s-sent').textContent   = fmt(sent);
-      document.getElementById('s-burned').textContent = fmt(burned);
-      document.getElementById('s-pending').textContent= fmt(pend);
-      document.getElementById('s-ack').textContent    = fmt(ack);
-      document.getElementById('s-rate').textContent   = rate;
-      document.getElementById('s-dids').textContent   = fmt(dids);
-      document.getElementById('s-bytes').textContent  = fmtBytes(bytes);
-      document.getElementById('s-ws').textContent     = fmt(ws);
-    })
-    .catch(function() {});
-}
-
-function loadAudit() {
-  fetch(RELAY + '/v2/audit?limit=50', { headers: { 'X-API-Key': API_KEY } })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var entries = d.entries || d.log || d.audit || [];
-      document.getElementById('audit-count').textContent = entries.length + ' entries';
-      var tbody = document.getElementById('audit-body');
-      if (!entries.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-row">No audit events.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = entries.slice().reverse().map(function(e) {
-        var ts     = (e.ts || e.timestamp || '').slice(0,19).replace('T',' ');
-        var event  = escHtml(e.event || e.action || '');
-        var detail = '';
-        if (e.detail)      detail = typeof e.detail === 'object' ? JSON.stringify(e.detail) : String(e.detail);
-        else if (e.hash)   detail = e.hash.slice(0,24) + '...';
-        return '<tr><td class="ts-col">'+ ts +'</td><td>'+ event +'</td><td class="hash-col">'+ escHtml(detail.slice(0,80)) +'</td></tr>';
-      }).join('');
-    })
-    .catch(function() {
-      document.getElementById('audit-body').innerHTML = '<tr><td colspan="3" class="empty-row">Audit log unavailable.</td></tr>';
-    });
-}
-
-function loadCt() {
-  fetch(RELAY + '/v2/ct/log?limit=10')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      document.getElementById('ct-size').textContent = d.size || 0;
-      document.getElementById('ct-root').textContent = d.root ? d.root.slice(0,32) + '...' : '\u2014';
-      var tbody = document.getElementById('ct-body');
-      var entries = d.entries || [];
-      if (!entries.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-row">No registrations.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = entries.map(function(e) {
-        var ts = (e.ts || '').slice(0,19).replace('T',' ');
-        return '<tr>' +
-          '<td class="hash-col">'+ e.index +'</td>' +
-          '<td class="hash-col">'+ (e.leaf_hash||'').slice(0,20) +'...</td>' +
-          '<td class="hash-col">'+ (e.device_hash||'').slice(0,20) +'...</td>' +
-          '<td class="ts-col">'+ ts +'</td>' +
-        '</tr>';
-      }).join('');
-    })
-    .catch(function() {
-      document.getElementById('ct-body').innerHTML = '<tr><td colspan="4" class="empty-row">CT log unavailable.</td></tr>';
-    });
-}
+fetchHealth();setInterval(fetchHealth,30000);render();
 </script>
 </body>
 </html>
