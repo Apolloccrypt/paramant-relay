@@ -3,8 +3,8 @@ Description=PARAMANT Relay - health
 After=network.target
 
 [Service]
-Environment=TOTP_SECRET=GGM3VTGW4DVPN7QHABQ7JXZP6RLUFSO7
-Environment=RESEND_API_KEY=re_xxxx_redacted
+Environment=TOTP_SECRET=REPLACE_TOTP_SECRET
+Environment=RESEND_API_KEY=REPLACE_RESEND_KEY
 Type=simple
 User=paramant
 WorkingDirectory=/home/paramant/relay-health
