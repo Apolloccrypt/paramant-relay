@@ -642,7 +642,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), 3_600_000);
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length, sig_valid: sigResult.valid });
+      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length, sig_valid: sigResult.valid, apiKey });
       setTimeout(() => {
         const e = blobStore.get(hash);
         if (e) { try { e.blob.fill(0); } catch {} blobStore.delete(hash); }
@@ -678,6 +678,7 @@ const server = http.createServer(async (req, res) => {
   if (outm && req.method === 'GET') {
     const entry = blobStore.get(outm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
+    if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     const data = Buffer.from(entry.blob);
     blobStore.delete(outm[1]);
     try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
@@ -697,6 +698,7 @@ const server = http.createServer(async (req, res) => {
     const e = blobStore.get(stm[1]);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     if (!e) return res.end(J({ available: false }));
+    if (e.apiKey && e.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     return res.end(J({ available: true, bytes: e.size, ttl_remaining_ms: Math.max(0, e.ttl - (Date.now() - e.ts)), sig_valid: e.sig_valid }));
   }
 
@@ -717,7 +719,7 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/stream-next ──────────────────────────────────────────────────────
   if (path === '/v2/stream-next') {
     const device = query.device || ''; const seq = parseInt(query.seq || '0');
-    const secret = apiKey.slice(0, 24); const next = seq + 1;
+    const secret = apiKey; const next = seq + 1; // FIX: volledige key als HMAC secret
     const h = crypto.createHmac('sha256', Buffer.from(secret)).update(`${device}|${next}`).digest('hex');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, device, seq: next, hash: h, available: blobStore.has(h) }));
