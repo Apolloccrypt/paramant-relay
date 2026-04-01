@@ -102,7 +102,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     <li><a href="#use-cases">Use cases</a></li>
     <li><a href="#api">API</a></li>
     <li><a href="#pricing">Pricing</a></li>
-    <li><a href="/chat">Chat</a></li>
     <li><a href="/parashare">ParaShare</a></li>
     <li><a href="/outlook">Outlook</a></li>
   </ul>
@@ -171,20 +170,43 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     </div>
 
     <!-- Europa kaart -->
-    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>
-          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Node map</span>
-        </div>
-        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">EU/DE primary · anycast</span>
-      </div>
-      <canvas id="mapCanvas" style="width:100%;display:block;height:220px"></canvas>
-      <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap">
-        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">AMS · FRA · ARN · CDG · ORD</span>
-        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">Hetzner DE · Fly.io anycast</span>
-      </div>
-    </div>
+    <div id="node-map" style="flex:1;min-width:280px;position:relative;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:4px;padding:16px;">
+  <div style="font-size:10px;color:#333;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;">NODE MAP · EU/DE PRIMARY · ANYCAST</div>
+  <svg viewBox="0 0 400 320" style="width:100%;height:220px;" xmlns="http://www.w3.org/2000/svg">
+    <!-- Europa outline simpel -->
+    <path d="M80,40 L120,20 L160,30 L200,20 L240,30 L280,20 L320,40 L340,80 L330,120 L310,140 L290,160 L260,180 L240,200 L220,220 L200,240 L180,220 L160,200 L140,180 L120,160 L100,140 L80,120 L70,80 Z" fill="none" stroke="#1e1e1e" stroke-width="1"/>
+    <!-- AMS — Amsterdam -->
+    <circle cx="175" cy="110" r="5" fill="#2a2a2a" stroke="#4a4a4a" stroke-width="1.5"/>
+    <circle cx="175" cy="110" r="2" fill="#ededed"/>
+    <text x="182" y="114" fill="#666" font-size="9" font-family="monospace">AMS</text>
+    <!-- FRA — Frankfurt -->
+    <circle cx="210" cy="130" r="5" fill="#2a2a2a" stroke="#4a4a4a" stroke-width="1.5"/>
+    <circle cx="210" cy="130" r="2" fill="#ededed"/>
+    <text x="217" y="134" fill="#666" font-size="9" font-family="monospace">FRA · Hetzner DE</text>
+    <!-- ARN — Stockholm -->
+    <circle cx="210" cy="60" r="5" fill="#2a2a2a" stroke="#4a4a4a" stroke-width="1.5"/>
+    <circle cx="210" cy="60" r="2" fill="#ededed"/>
+    <text x="217" y="64" fill="#666" font-size="9" font-family="monospace">ARN · Stockholm</text>
+    <!-- CDG — Parijs -->
+    <circle cx="165" cy="145" r="5" fill="#2a2a2a" stroke="#4a4a4a" stroke-width="1.5"/>
+    <circle cx="165" cy="145" r="2" fill="#ededed"/>
+    <text x="130" y="155" fill="#666" font-size="9" font-family="monospace">CDG · Paris</text>
+    <!-- ORD stippellijn (buiten EU) -->
+    <circle cx="50" cy="160" r="4" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="2,2"/>
+    <circle cx="50" cy="160" r="1.5" fill="#333"/>
+    <text x="20" y="175" fill="#333" font-size="8" font-family="monospace">ORD (GDPR eval)</text>
+    <!-- Verbindingslijnen -->
+    <line x1="175" y1="110" x2="210" y2="130" stroke="#222" stroke-width="1"/>
+    <line x1="175" y1="110" x2="210" y2="60" stroke="#222" stroke-width="1"/>
+    <line x1="175" y1="110" x2="165" y2="145" stroke="#222" stroke-width="1"/>
+    <line x1="210" y1="130" x2="165" y2="145" stroke="#222" stroke-width="1"/>
+    <line x1="210" y1="130" x2="210" y2="60" stroke="#222" stroke-width="1"/>
+  </svg>
+  <div style="display:flex;gap:16px;font-size:10px;color:#333;font-family:monospace;margin-top:8px;">
+    <span>AMS · FRA · ARN · CDG <span style="color:#222">· ORD</span></span>
+    <span style="margin-left:auto">Fly.io anycast</span>
+  </div>
+</div>
   </div>
 </section>
 
@@ -278,85 +300,9 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     if(online.length){ const pick=online[Math.floor(Math.random()*online.length)]; spawnDot(pick.i); }
   },2500);
 
-  // ── EUROPA MAP ───────────────────────────────────────────────────────────
-  const mc = document.getElementById("mapCanvas");
-  const mctx = mc.getContext("2d");
-  let pulses = [];
-
-  const NODES = [
-    {label:"AMS", sub:"Amsterdam", rx:0.42, ry:0.38},
-    {label:"FRA", sub:"Frankfurt", rx:0.52, ry:0.50},
-    {label:"ARN", sub:"Stockholm", rx:0.60, ry:0.18},
-    {label:"CDG", sub:"Paris",     rx:0.36, ry:0.52},
-    {label:"HET", sub:"Hetzner DE",rx:0.54, ry:0.46},
-  ];
-
-  function drawMap(){
-    resizeCanvas(mc);
-    const cw=mc.width/devicePixelRatio, ch=mc.height/devicePixelRatio;
-    mctx.clearRect(0,0,cw,ch);
-
-    // Europa omtrek
-    mctx.strokeStyle="#1e1e1e";
-    mctx.lineWidth=1;
-    mctx.setLineDash([2,4]);
-    mctx.beginPath();
-    [[.08,.72],[.18,.58],[.22,.52],[.30,.58],[.36,.52],[.42,.38],[.52,.50],[.60,.18],[.72,.12],[.84,.28],[.90,.50],[.86,.68],[.70,.74],[.50,.78],[.30,.72],[.08,.72]]
-    .forEach(([x,y],i)=>i===0?mctx.moveTo(x*cw,y*ch):mctx.lineTo(x*cw,y*ch));
-    mctx.stroke();
-    mctx.setLineDash([]);
-
-    // Verbindingen
-    mctx.strokeStyle="#1a1a1a";
-    mctx.lineWidth=1;
-    for(let i=0;i<NODES.length;i++)
-      for(let j=i+1;j<NODES.length;j++){
-        mctx.beginPath();
-        mctx.moveTo(NODES[i].rx*cw,NODES[i].ry*ch);
-        mctx.lineTo(NODES[j].rx*cw,NODES[j].ry*ch);
-        mctx.stroke();
-      }
-
-    // Pulses
-    pulses.forEach(p=>{
-      mctx.globalAlpha=p.alpha;
-      mctx.strokeStyle="#2d6a4f";
-      mctx.lineWidth=1;
-      mctx.beginPath(); mctx.arc(p.x,p.y,p.r,0,Math.PI*2); mctx.stroke();
-      mctx.globalAlpha=1;
-      p.r+=0.8; p.alpha-=0.03;
-    });
-    pulses=pulses.filter(p=>p.alpha>0);
-
-    // Nodes
-    NODES.forEach(n=>{
-      const x=n.rx*cw, y=n.ry*ch;
-      mctx.fillStyle="#111";
-      mctx.strokeStyle="#2d6a4f";
-      mctx.lineWidth=1;
-      mctx.beginPath(); mctx.arc(x,y,8,0,Math.PI*2); mctx.fill(); mctx.stroke();
-      mctx.fillStyle="#2d6a4f";
-      mctx.beginPath(); mctx.arc(x,y,3,0,Math.PI*2); mctx.fill();
-      mctx.fillStyle="#888";
-      mctx.font="bold 10px 'SF Mono','Fira Code',monospace";
-      mctx.textAlign="center";
-      mctx.fillText(n.label,x,y-12);
-      mctx.fillStyle="#444";
-      mctx.font="9px 'SF Mono','Fira Code',monospace";
-      mctx.fillText(n.sub,x,y+18);
-    });
-  }
-
-  function spawnPulse(n){
-    const cw=mc.width/devicePixelRatio, ch=mc.height/devicePixelRatio;
-    pulses.push({x:n.rx*cw,y:n.ry*ch,r:6,alpha:.8});
-  }
-
-  NODES.forEach((n,i)=>setTimeout(()=>spawnPulse(n),i*400+200));
-  setInterval(()=>spawnPulse(NODES[Math.floor(Math.random()*NODES.length)]),2000);
 
   function loop(){
-    drawPipe(); drawMap();
+    drawPipe();
     const el=document.getElementById("pipe-ts");
     if(el) el.textContent=new Date().toLocaleTimeString();
     requestAnimationFrame(loop);
@@ -570,19 +516,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       </ul>
       <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" class="price-btn p" target="_blank">Get started</a>
     </div>
-    <div class="pc">
-      <div class="price-name">Chat</div>
-      <div class="price-amount">&euro;24.99<sub> / month</sub></div>
-      <div class="price-note">Secure chat access only</div>
-      <ul class="pf">
-        <li><span class="check">+</span> End-to-end encrypted chat</li>
-        <li><span class="check">+</span> File transfer (4MB chunks)</li>
-        <li><span class="check">+</span> Zero logs, burn-on-read</li>
-        <li><span class="check">+</span> All sector relays</li>
-        <li><span class="check">+</span> Legal professionals &amp; NGOs</li>
-      </ul>
-      <a href="https://buy.stripe.com/bJe6oI1krgcqgcc2NFefC05" class="price-btn s" target="_blank">Get chat access</a>
-    </div>
+
     <div class="pc">
       <div class="price-name">Enterprise</div>
       <div class="price-amount">Custom</div>

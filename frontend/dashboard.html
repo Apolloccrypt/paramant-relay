@@ -48,8 +48,28 @@ async function fetchMonitor(){
     const r=await fetch(relay.u+"/v2/monitor?k="+apiKey,{signal:AbortSignal.timeout(8000)});
     if(r.ok){data=await r.json();lastPoll=new Date()}
     else data=null;
+    // Haal CT log op voor audit sectie
+    if(data){
+      try{
+        const ct=await fetch(relay.u+"/v2/ct/log?limit=10",{signal:AbortSignal.timeout(5000)});
+        if(ct.ok){const ctd=await ct.json();data.audit=ctd.entries||[]}
+      }catch{}
+    }
   }catch(e){}
   loading=false;softRender();
+  // Update audit log na fetch
+  const al=document.getElementById("audit-log");
+  if(al&&data&&data.audit&&data.audit.length){
+    al.innerHTML=data.audit.map(e=>
+      `<div style="display:flex;gap:20px;font-size:11px;font-family:${V.mono};padding:4px 0;border-bottom:1px solid ${V.b}">
+        <span style="color:${V.q};flex-shrink:0">${(e.iso||e.ts||"").slice(11,19)||"—"}</span>
+        <span style="color:${e.device_hash?"#4a6a9c":V.m}">${esc(e.leaf_hash?(e.leaf_hash).slice(0,16)+"…":"—")}</span>
+        <span style="color:${V.q}">index: ${e.index??""}</span>
+      </div>`
+    ).join("");
+  } else if(al&&data){
+    al.innerHTML=`<div style="font-size:12px;color:${V.q};font-family:${V.mono}">Geen audit entries</div>`;
+  }
 }
 
 function addTestLog(msg,level="info"){
@@ -160,18 +180,22 @@ function softRender(){
     statCard("Webhooks",st.webhooks_sent);
 
   const dt=document.getElementById("delivery-table");
-  if(dt&&d.history&&d.history.length){
-    dt.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
-      <thead><tr>${["Hash","Device","Size","Status","Auth","Age"].map(h=>`<th style="text-align:left;padding:10px 16px;font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;border-bottom:1px solid ${V.b};text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
-      <tbody>${d.history.map((it,i)=>`<tr style="background:${i%2===0?V.bg:V.sur}">
-        <td style="padding:10px 16px;font-size:11px;color:${V.q};font-family:${V.mono}">${esc(it.hash||"")}</td>
-        <td style="padding:10px 16px;font-size:12px;color:${V.m}">${esc(it.device||"—")}</td>
-        <td style="padding:10px 16px;font-size:12px;color:${V.m}">${it.size?(it.size/1024).toFixed(1)+"KB":"—"}</td>
-        <td style="padding:10px 16px;font-size:12px">${it.acked?`<span style="color:${V.g}">ACK ${it.latency_ms?it.latency_ms+"ms":""}</span>`:`<span style="color:#8c7a2d">pending</span>`}</td>
-        <td style="padding:10px 16px;font-size:12px">${it.sig_verified?`<span style="color:${V.g}">verified</span>`:`<span style="color:${V.q}">—</span>`}</td>
-        <td style="padding:10px 16px;font-size:11px;color:${V.q}">${it.sent_ts?Math.round((Date.now()-it.sent_ts)/1000)+"s":"—"}</td>
-      </tr>`).join("")}</tbody>
-    </table></div>`;
+  if(dt){
+    if(d.history&&d.history.length){
+      dt.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+        <thead><tr>${["Hash","Device","Size","Status","Auth","Age"].map(h=>`<th style="text-align:left;padding:10px 16px;font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;border-bottom:1px solid ${V.b};text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
+        <tbody>${d.history.map((it,i)=>`<tr style="background:${i%2===0?V.bg:V.sur}">
+          <td style="padding:10px 16px;font-size:11px;color:${V.q};font-family:${V.mono}">${esc(it.hash||"")}</td>
+          <td style="padding:10px 16px;font-size:12px;color:${V.m}">${esc(it.device||"—")}</td>
+          <td style="padding:10px 16px;font-size:12px;color:${V.m}">${it.size?(it.size/1024).toFixed(1)+"KB":"—"}</td>
+          <td style="padding:10px 16px;font-size:12px">${it.acked?`<span style="color:${V.g}">ACK ${it.latency_ms?it.latency_ms+"ms":""}</span>`:`<span style="color:#8c7a2d">pending</span>`}</td>
+          <td style="padding:10px 16px;font-size:12px">${it.sig_verified?`<span style="color:${V.g}">verified</span>`:`<span style="color:${V.q}">—</span>`}</td>
+          <td style="padding:10px 16px;font-size:11px;color:${V.q}">${it.sent_ts?Math.round((Date.now()-it.sent_ts)/1000)+"s":"—"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+    } else {
+      dt.innerHTML=`<div style="padding:24px 20px;font-size:12px;color:${V.q};font-family:${V.mono}">Geen bezorgingen in deze sessie</div>`;
+    }
   }
   const pi=document.getElementById("poll-info");
   if(pi)pi.textContent=loading?"polling...":lastPoll?"↻ "+lastPoll.toLocaleTimeString():"";
@@ -210,7 +234,6 @@ function render(){
         ${RELAYS.map(r=>`<option value="${r.u}" ${r.u===relay.u?"selected":""}>${r.l}</option>`).join("")}
       </select>
       <span id="poll-info" style="font-size:11px;color:${V.q};font-family:${V.mono}"></span>
-      <a href="/chat" style="font-size:11px;color:${V.q}">Chat</a>
       <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log</a>
       <button onclick="logout()" style="background:none;border:1px solid ${V.b};color:${V.q};border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer">Sign out</button>
     </div>
