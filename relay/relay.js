@@ -176,28 +176,6 @@ function auditPush(apiKey, event, data) {
 const rooms     = new Map();   // roomName → Set<ws>
 
 // ── Invite rooms ─────────────────────────────────────────────────────────────
-const inviteRooms = new Map(); // token → { creatorApiKey, expires, lastActivity }
-
-function sanitizeToken(t) {
-  if (typeof t !== 'string') return null;
-  const c = t.replace(/[^a-zA-Z0-9]/g, '').slice(0, 48);
-  return c.length === 32 ? c : null;
-}
-function invRoomKey(token) { return 'inv_' + token; }
-function isInvRoom(r)      { return typeof r === 'string' && r.startsWith('inv_'); }
-function cleanInvRoom(token) {
-  const rk = invRoomKey(token);
-  inviteRooms.delete(token);
-  const s = rooms.get(rk);
-  if (s) { s.forEach(c => { try { c.close(1001, 'Room closed'); } catch {} }); rooms.delete(rk); }
-  roomBuffer.delete(rk);
-}
-setInterval(() => {
-  const now = Date.now();
-  for (const [t, m] of inviteRooms) {
-    if (now > m.expires || now - m.lastActivity > 30 * 60_000) cleanInvRoom(t);
-  }
-}, 5 * 60_000);
 
 // ── Ghost Pipe Mempool ────────────────────────────────────────────
 // RAM-only, burn-on-read, TTL 300s, tot 5MB per pakket
@@ -470,13 +448,6 @@ function trackUsage(key, dir, bytes) {
   entry.last_used = Date.now();
 }
 
-// Demo key voor testen — in productie via admin endpoint of database
-apiKeys.set('pgp_test_key_dev_only', {
-  plan: 'dev', label: 'Development Test Key',
-  in: 0, out: 0, bytes_in: 0, bytes_out: 0,
-  created: Date.now(), last_used: null,
-  monthly_limit: 1000
-});
 
 function gpPut(hash, blob) {
   if (gpMempool.has(hash)) {
@@ -729,7 +700,7 @@ const srv = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-  const POST_OK = ['/v2/inbound','/v2/verify-key','/admin/provision-key','/admin/stripe-webhook','/admin/stripe-checkout','/v2/webhook','/v2/ack','/admin/generate-airgap-license','/admin/set-ip-pin','/v2/manifest','/admin/users','/v2/stream','/v2/stream-status','/v2/chat/create-room'];
+  const POST_OK = ['/v2/inbound','/v2/verify-key','/admin/provision-key','/admin/stripe-webhook','/admin/stripe-checkout','/v2/webhook','/v2/ack','/admin/generate-airgap-license','/admin/set-ip-pin','/v2/manifest','/admin/users','/v2/stream','/v2/stream-status'];
 
 // ─── RELAY RESTRICTION — check allowed_relays per key ─────────────────────
 function getRequestHost(req) {
@@ -1193,7 +1164,7 @@ function keyAllowedOnRelay(keyData, reqHost) {
           'line_items[0][quantity]': '1',
           'mode': 'subscription',
           'customer_email': email || '',
-          'success_url': 'https://paramant.app/chat?checkout=success',
+          'success_url': 'https://paramant.app/dashboard?checkout=success',
           'cancel_url': 'https://paramant.app/#pricing',
           'metadata[plan]': plan,
           'metadata[email]': email || ''
@@ -1729,24 +1700,6 @@ function keyAllowedOnRelay(keyData, reqHost) {
     return;
   }
 
-  // ── POST /v2/chat/create-room ──────────────────────────────────────────────
-  if (url === '/v2/chat/create-room' && req.method === 'POST') {
-    const apiKey = (req.headers['x-api-key'] || '').trim();
-    if (!apiKey || !validateApiKey(apiKey, ip)) {
-      res.writeHead(401); return res.end(J({ error: 'Geldige x-api-key vereist' }));
-    }
-    const token = require('crypto').randomBytes(16).toString('hex'); // 32 hex chars
-    const expires = Date.now() + 60 * 60_000; // 60 minuten
-    inviteRooms.set(token, { creatorApiKey: apiKey, expires, lastActivity: Date.now() });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({
-      ok: true,
-      token,
-      invite_url: 'https://paramant.app/chat?invite=' + token,
-      expires_iso: new Date(expires).toISOString(),
-    }));
-  }
-
   res.writeHead(404); res.end(J({error:'Not found'}));
 });
 
@@ -1833,15 +1786,9 @@ wss.on('connection', (ws, req) => {
     s.delete(ws);
     if (!s.size) {
       rooms.delete(r);
-      if (isInvRoom(r)) {
-        // Invite room: direct wisgsen bij laatste leave
-        const token = r.slice(4); // strip 'inv_'
-        cleanInvRoom(token);
-      } else {
-        // 60s TTL — late joiners in dezelfde sessie ontvangen nog gemiste pakketten
-        const _r = r;
-        setTimeout(() => roomBuffer.delete(_r), 60_000);
-      }
+      // 60s TTL — late joiners in dezelfde sessie ontvangen nog gemiste pakketten
+      const _r = r;
+      setTimeout(() => roomBuffer.delete(_r), 60_000);
     } else {
       bcastRoom(r, { type:'peer_left', nick, peers: s.size });
     }
@@ -1870,23 +1817,9 @@ wss.on('connection', (ws, req) => {
 
     // ── JOIN ─────────────────────────────────────────────────────
     if (msg.type === 'join') {
-      // Invite room join (geen API key vereist voor deelnemer)
       let r;
-      if (msg.inviteToken !== undefined) {
-        const token = sanitizeToken(msg.inviteToken);
-        if (!token) return send({ type:'error', code:400, msg:'Invalid inviteToken' });
-        const meta = inviteRooms.get(token);
-        if (!meta) return send({ type:'error', code:404, msg:'Room niet gevonden of verlopen' });
-        if (Date.now() > meta.expires) {
-          cleanInvRoom(token);
-          return send({ type:'error', code:410, msg:'Invite verlopen' });
-        }
-        meta.lastActivity = Date.now();
-        r = invRoomKey(token);
-      } else {
-        r = sanitize(msg.chatHash);
-        if (!r) return send({ type:'error', code:400, msg:'Invalid chatHash' });
-      }
+      r = sanitize(msg.chatHash);
+      if (!r) return send({ type:'error', code:400, msg:'Invalid chatHash' });
 
       // Al in deze room — bevestig maar stuur buffer NIET opnieuw
       // (buffer replay alleen bij eerste join, niet bij herverbinding of presence-cycle)
