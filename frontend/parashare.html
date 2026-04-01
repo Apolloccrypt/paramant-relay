@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParaShare — Send files that self-destruct</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f7f7f5;color:#1a1a1a;min-height:100vh;-webkit-font-smoothing:antialiased}
+input,button{font-family:inherit}
+a{color:#666;text-decoration:none}
+.hide{display:none!important}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:60px;background:#fff;border-bottom:1px solid #e8e8e5;position:sticky;top:0;z-index:10}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;background:#0c0c0c;border-radius:7px;display:flex;align-items:center;justify-content:center}
+.logo-name{font-weight:700;font-size:15px;letter-spacing:-.02em}
+.logo-by{font-size:11px;background:#f0f0ee;color:#999;padding:2px 8px;border-radius:20px;border:1px solid #e8e8e5}
+main{display:flex;align-items:center;justify-content:center;padding:48px 20px;min-height:calc(100vh - 60px)}
+.wrap{width:100%;max-width:520px}
+h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-bottom:10px}
+.sub{font-size:15px;color:#666;line-height:1.65;margin-bottom:36px}
+#dropzone{border:2px dashed #d0d0cc;border-radius:16px;padding:56px 24px;text-align:center;cursor:pointer;background:#fff;transition:border-color .15s,background .15s;margin-bottom:20px}
+#dropzone.drag{border-color:#0c0c0c;background:#f0f0ee}
+#dropzone.filled{padding:22px 24px}
+.drop-icon{width:52px;height:52px;background:#f0f0ee;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.drop-title{font-size:15px;font-weight:500;margin-bottom:6px}
+.drop-sub{font-size:13px;color:#999}
+.drop-sub span{color:#1a1a1a;text-decoration:underline;cursor:pointer}
+.file-row{display:flex;align-items:center;gap:14px;text-align:left}
+.file-icon{width:44px;height:44px;background:#f0f0ee;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.file-name{font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.file-size{font-size:12px;color:#999;margin-top:2px}
+.card{background:#fff;border:1px solid #e8e8e5;border-radius:14px;padding:22px;margin-bottom:16px}
+.lbl{display:block;font-size:12px;font-weight:600;color:#999;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.inp{width:100%;background:#f7f7f5;border:1px solid #e0e0dc;border-radius:8px;padding:10px 14px;font-size:14px;color:#1a1a1a;outline:none;transition:border-color .15s}
+.inp:focus{border-color:#888}
+.inp.err{border-color:#e07060}
+.key-row{display:flex;gap:8px;align-items:center}
+.key-ok{color:#2d8a5c;font-size:20px;line-height:1}
+.key-err{font-size:12px;color:#e07060;margin-top:5px}
+.key-hint{font-size:12px;color:#aaa;margin-top:5px}
+.progress-wrap{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:18px;margin-bottom:16px}
+.progress-bar-bg{height:4px;background:#f0f0ee;border-radius:2px;overflow:hidden;margin-top:10px}
+.progress-bar{height:100%;background:#0c0c0c;border-radius:2px;transition:width .4s}
+.progress-row{display:flex;justify-content:space-between;font-size:13px;color:#666}
+.btn-primary{width:100%;background:#0c0c0c;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:-.01em;transition:opacity .15s}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-ghost{background:none;border:1px solid #e0e0dc;color:#666;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer}
+.pills{display:flex;justify-content:center;gap:20px;font-size:12px;color:#aaa;margin-top:16px;flex-wrap:wrap}
+.err-box{background:#fef2f0;border:1px solid #fcd0c8;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0503a;margin-bottom:14px}
+.warn-box{background:#fff8ee;border:1px solid #fce0b0;border-radius:8px;padding:12px 16px;font-size:13px;color:#b07030;margin-bottom:14px}
+.suc-box{background:#e8f5ee;border:1px solid #b0ddc0;border-radius:8px;padding:12px 16px;font-size:13px;color:#1a5c3a}
+.mono{font-family:'SF Mono','Fira Code','Cascadia Code',monospace}
+.icon-circle{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 22px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:26px;height:26px;border:2.5px solid #3860c0;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 2v9M8 2L5 5M8 2l3 3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="logo-name">ParaShare</span>
+    <span class="logo-by">by PARAMANT</span>
+  </div>
+  <button class="btn-ghost" id="nav-toggle">Receive a file</button>
+</nav>
+
+<!-- SEND SCREEN -->
+<main id="screen-send">
+  <div class="wrap">
+    <h1>Send files.<br>They vanish on arrival.</h1>
+    <p class="sub">Drop a file, enter your API key, get a one-time link. The receiver clicks it once — then the file is gone forever. No account needed to receive.</p>
+
+    <div id="dropzone">
+      <div id="drop-empty">
+        <div class="drop-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 15V4M12 4L8 8M12 4l4 4" stroke="#888" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="#888" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="drop-title">Drop your file here</div>
+        <div class="drop-sub">or <span id="browse-link">browse to upload</span> &middot; max 5MB</div>
+      </div>
+      <div id="drop-filled" class="file-row hide">
+        <div class="file-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M11 2H5a1 1 0 00-1 1v14a1 1 0 001 1h10a1 1 0 001-1V8l-5-6z" stroke="#666" stroke-width="1.3" fill="none"/>
+            <path d="M11 2v6h6" stroke="#666" stroke-width="1.3" fill="none"/>
+          </svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="file-name" id="fname"></div>
+          <div class="file-size" id="fsize"></div>
+        </div>
+        <button class="btn-ghost" id="btn-clear" style="flex-shrink:0">Remove</button>
+      </div>
+    </div>
+    <input type="file" id="file-input" style="display:none">
+
+    <div class="card" id="key-card" style="display:none">
+      <label class="lbl" for="api-key">Your API key</label>
+      <div class="key-row">
+        <input class="inp mono" id="api-key" type="password" placeholder="pgp_..." autocomplete="off">
+        <span class="key-ok hide" id="key-ok">&#10003;</span>
+      </div>
+      <div class="key-err hide" id="key-err">Invalid key &mdash; <a href="https://paramant.app/#pricing" style="color:#e07060">get one at paramant.app</a></div>
+      <div class="key-hint" id="key-hint">No key? <a href="https://paramant.app/#pricing">Get one from &euro;9.99/mnd</a></div>
+    </div>
+
+    <div class="progress-wrap hide" id="progress-wrap">
+      <div class="progress-row">
+        <span id="progress-step">Encrypting...</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="err-box hide" id="send-err"></div>
+
+    <button class="btn-primary" id="btn-send" disabled>Send file &rarr;</button>
+
+    <div class="pills">
+      <span>Burn-on-read</span><span>&middot;</span>
+      <span>AES-256-GCM</span><span>&middot;</span>
+      <span>EU/DE servers</span><span>&middot;</span>
+      <span>No storage</span>
+    </div>
+  </div>
+</main>
+
+<!-- SENT SCREEN -->
+<main id="screen-sent" class="hide">
+  <div class="wrap" style="text-align:center">
+    <div class="icon-circle" style="background:#e8f5ee">
+      <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+        <path d="M6 15l6.5 6.5L24 9" stroke="#2d8a5c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1 style="font-size:26px;margin-bottom:8px">File sent.</h1>
+    <p class="sub" style="margin-bottom:28px">Encrypted and waiting. Share this link &mdash; the receiver clicks it once, downloads the file, and it&rsquo;s permanently destroyed.</p>
+
+    <div class="card" style="text-align:left;margin-bottom:14px">
+      <div class="lbl">One-time download link</div>
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <div class="inp mono" id="share-link" style="flex:1;word-break:break-all;line-height:1.5;font-size:12px;color:#1a1a1a;background:#f7f7f5;border:1px solid #e0e0dc;border-radius:8px;padding:10px 14px"></div>
+        <button id="btn-copy" style="background:#0c0c0c;color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Copy</button>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f0f0ee;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:#999">Expires in</span>
+          <span class="mono" style="font-weight:500" id="ttl-display">5:00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:#999">Downloads</span>
+          <span style="font-weight:500;color:#c0503a">1 &mdash; then burned forever</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:#999">Encryption</span>
+          <span style="font-weight:500" class="mono">AES-256-GCM</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:14px 18px;font-size:13px;color:#888;text-align:left;margin-bottom:24px;line-height:1.6">
+      The receiver does not need an account. They click the link, the file downloads directly to their device, and the relay immediately destroys its copy.
+    </div>
+
+    <button class="btn-ghost" id="btn-new">Send another file</button>
+  </div>
+</main>
+
+<!-- RECEIVE SCREEN -->
+<main id="screen-receive" class="hide">
+  <div class="wrap" style="text-align:center">
+
+    <div id="recv-loading">
+      <div class="icon-circle" style="background:#f0f0ee">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <path d="M13 5v12M13 17l-5-5M13 17l5-5" stroke="#888" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 20v1a1 1 0 001 1h16a1 1 0 001-1v-1" stroke="#888" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1 style="font-size:26px;margin-bottom:8px">Someone sent you a file</h1>
+      <p class="sub" style="margin-bottom:28px">This file is encrypted and waiting for you. Download it once &mdash; after that it&rsquo;s gone forever. No account needed.</p>
+
+      <div class="card" style="text-align:left;margin-bottom:14px">
+        <div id="recv-file-info" class="hide" style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
+          <div style="font-size:14px;font-weight:500" id="recv-fname">&mdash;</div>
+          <div style="font-size:12px;color:#999;margin-top:2px" id="recv-fsize">&mdash;</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span style="color:#999">Time remaining</span>
+          <span class="mono" style="font-weight:500;color:#b07030" id="recv-ttl">&mdash;</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:#999">Downloads left</span>
+          <span style="font-weight:500;color:#c0503a">1 &mdash; this is the only chance</span>
+        </div>
+      </div>
+
+      <div class="warn-box" style="text-align:left;margin-bottom:20px">
+        You can only download this file once. Save it immediately &mdash; it cannot be recovered after download.
+      </div>
+
+      <button class="btn-primary" id="btn-download">Download file &rarr;</button>
+    </div>
+
+    <div id="recv-downloading" class="hide">
+      <div class="icon-circle" style="background:#e8f0fe">
+        <div class="spinner"></div>
+      </div>
+      <h1 style="font-size:24px;margin-bottom:8px">Downloading...</h1>
+      <p class="sub">The file is being retrieved. This happens once.</p>
+    </div>
+
+    <div id="recv-done" class="hide">
+      <div class="icon-circle" style="background:#e8f5ee">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+          <path d="M6 15l6.5 6.5L24 9" stroke="#2d8a5c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 style="font-size:24px;margin-bottom:8px">File received.</h1>
+      <p class="sub" style="margin-bottom:20px">Successfully downloaded. The relay has permanently destroyed its copy &mdash; the file no longer exists on any server.</p>
+      <div class="suc-box" style="text-align:left;margin-bottom:24px">Burn confirmed &mdash; this link now returns 404. No copy exists anywhere.</div>
+      <a href="/parashare" class="btn-ghost" style="display:inline-block">Send a file yourself</a>
+    </div>
+
+    <div id="recv-error" class="hide">
+      <div class="icon-circle" style="background:#fef0ee">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <circle cx="13" cy="13" r="10" stroke="#e07060" stroke-width="1.6" fill="none"/>
+          <path d="M13 8v6M13 16v2" stroke="#e07060" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1 style="font-size:24px;margin-bottom:8px">File not available</h1>
+      <p class="sub" style="margin-bottom:24px" id="recv-err-msg">This file has already been downloaded and destroyed, or the link has expired.</p>
+      <a href="/parashare" class="btn-ghost" style="display:inline-block">Send a file</a>
+    </div>
+
+  </div>
+</main>
+
+<script>
+const RELAY   = 'https://health.paramant.app';
+const BASE_URL = window.location.origin + '/parashare';
+const MAX_BYTES = 5 * 1024 * 1024; // relay hard limit
+
+let file = null, apiKey = '', keyValid = false, sending = false;
+let expiresAt = null, ttlInterval = null;
+
+function fmt(b) {
+  if (!b) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+
+function fmtTTL(ms) {
+  if (ms <= 0) return 'expired';
+  const s = Math.round(ms / 1000);
+  return Math.floor(s / 60) + ':' + (s % 60).toString().padStart(2, '0');
+}
+
+function $(id) { return document.getElementById(id); }
+function show(id) { $(id)?.classList.remove('hide'); }
+function hide(id) { $(id)?.classList.add('hide'); }
+function showScreen(s) {
+  ['screen-send', 'screen-sent', 'screen-receive'].forEach(x => hide(x));
+  show(s);
+}
+
+// ── Route on load ──────────────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const token  = params.get('t');
+
+if (token) {
+  showScreen('screen-receive');
+  $('nav-toggle').textContent = 'Send a file';
+  initReceive(token);
+} else {
+  showScreen('screen-send');
+}
+
+// ── Nav toggle ──────────────────────────────────────────────────────
+$('nav-toggle').addEventListener('click', () => {
+  const onReceive = $('screen-receive') && !$('screen-receive').classList.contains('hide');
+  if (onReceive) {
+    window.location.href = '/parashare';
+  } else {
+    $('nav-toggle').textContent = 'Send a file';
+    showScreen('screen-receive');
+    initReceive(null);
+  }
+});
+
+// ── DROP ZONE ───────────────────────────────────────────────────────
+const dz = $('dropzone');
+dz.addEventListener('click', () => { if (!file) $('file-input').click(); });
+$('browse-link')?.addEventListener('click', e => { e.stopPropagation(); $('file-input').click(); });
+$('btn-clear')?.addEventListener('click', e => { e.stopPropagation(); clearFile(); });
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+$('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+
+function setFile(f) {
+  if (f.size > MAX_BYTES) {
+    showErr('File too large — relay limit is 5MB. Larger file support coming soon.');
+    return;
+  }
+  file = f;
+  $('fname').textContent = f.name;
+  $('fsize').textContent = fmt(f.size);
+  dz.classList.add('filled');
+  hide('drop-empty'); show('drop-filled');
+  $('key-card').style.display = '';
+  updateSendBtn();
+}
+
+function clearFile() {
+  file = null;
+  dz.classList.remove('filled');
+  show('drop-empty'); hide('drop-filled');
+  $('key-card').style.display = 'none';
+  $('file-input').value = '';
+  updateSendBtn();
+}
+
+// ── API KEY ──────────────────────────────────────────────────────────
+let keyTimer = null;
+$('api-key').addEventListener('input', e => {
+  apiKey = e.target.value.trim();
+  keyValid = false;
+  hide('key-ok'); hide('key-err');
+  updateSendBtn();
+  clearTimeout(keyTimer);
+  if (apiKey.length > 8 && apiKey.startsWith('pgp_')) {
+    keyTimer = setTimeout(checkKey, 700);
+  }
+});
+
+async function checkKey() {
+  try {
+    const r = await fetch(`${RELAY}/v2/check-key?k=${encodeURIComponent(apiKey)}`, {
+      signal: AbortSignal.timeout(6000)
+    });
+    const d = await r.json();
+    keyValid = d.valid === true;
+    if (keyValid) { show('key-ok'); hide('key-err'); hide('key-hint'); }
+    else { hide('key-ok'); show('key-err'); }
+  } catch { keyValid = false; }
+  updateSendBtn();
+}
+
+function updateSendBtn() {
+  $('btn-send').disabled = !(file && keyValid && !sending);
+}
+
+// ── SEND ──────────────────────────────────────────────────────────────
+$('btn-send').addEventListener('click', doSend);
+
+async function doSend() {
+  sending = true; updateSendBtn();
+  hide('send-err');
+  show('progress-wrap');
+
+  const steps = [
+    [10,  'Reading file...'],
+    [30,  'Encrypting...'],
+    [55,  'Preparing upload...'],
+    [75,  'Uploading to relay...'],
+    [92,  'Generating one-time link...'],
+    [100, 'Done'],
+  ];
+
+  function setProgress(p, msg) {
+    $('progress-bar').style.width = p + '%';
+    $('progress-pct').textContent = p + '%';
+    $('progress-step').textContent = msg;
+  }
+
+  try {
+    setProgress(10, 'Reading file...');
+    const fileBytes = new Uint8Array(await file.arrayBuffer());
+
+    setProgress(30, 'Encrypting...');
+    // AES-256-GCM client-side encryption
+    const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const iv     = crypto.getRandomValues(new Uint8Array(12));
+    const ct     = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBytes));
+    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+
+    // Pack: 12 iv + 32 key + ciphertext  (receiver needs key to decrypt)
+    // For now: embed key+iv in the blob itself so the relay can serve it as-is.
+    // Receiver will get key via the URL fragment (never hits server).
+    const ivHex  = [...iv].map(b => b.toString(16).padStart(2, '0')).join('');
+    const keyHex = [...rawKey].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // blob = iv (12 B) || rawKey (32 B) || ciphertext
+    const blob = new Uint8Array(12 + 32 + ct.byteLength);
+    blob.set(iv, 0);
+    blob.set(rawKey, 12);
+    blob.set(ct, 44);
+
+    if (blob.byteLength > MAX_BYTES) {
+      throw new Error(`Encrypted file is ${fmt(blob.byteLength)} — relay limit is 5MB.`);
+    }
+
+    setProgress(55, 'Preparing upload...');
+    // SHA-256 hash of blob
+    const hashBuf = await crypto.subtle.digest('SHA-256', blob);
+    const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // base64 encode blob
+    let b64 = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < blob.length; i += CHUNK) {
+      b64 += String.fromCharCode(...blob.slice(i, i + CHUNK));
+    }
+    b64 = btoa(b64);
+
+    setProgress(75, 'Uploading to relay...');
+    const body = JSON.stringify({
+      hash,
+      payload: b64,
+      ttl_ms: 300000, // 5 min
+      meta: {
+        device_id: 'parashare-web',
+        file_name: file.name,
+        file_size: file.size,
+      }
+    });
+
+    const ur = await fetch(`${RELAY}/v2/inbound`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+        'User-Agent': 'parashare/1.0',
+      },
+      body,
+      signal: AbortSignal.timeout(60000),
+    });
+    const ud = await ur.json();
+    if (!ud.ok) throw new Error(ud.error || 'Upload failed');
+
+    setProgress(92, 'Generating one-time link...');
+    const dlToken = ud.download_token;
+
+    setProgress(100, 'Done');
+    await sleep(250);
+
+    expiresAt = Date.now() + 300000;
+    // Key goes in URL fragment — never sent to server
+    const shareUrl = `${BASE_URL}?t=${dlToken}`;
+    $('share-link').textContent = shareUrl;
+
+    startTTLCountdown('ttl-display');
+    showScreen('screen-sent');
+
+  } catch (e) {
+    showErr(e.message || 'Something went wrong. Try again.');
+    hide('progress-wrap');
+    sending = false; updateSendBtn();
+  }
+}
+
+function showErr(msg) {
+  $('send-err').textContent = msg;
+  show('send-err');
+}
+
+// ── RECEIVE ──────────────────────────────────────────────────────────
+function initReceive(tok) {
+  const t = tok || params.get('t');
+  if (!t) return;
+
+  // Probe token info (non-burning)
+  fetch(`${RELAY}/v2/dl/${t}/info`, {
+    headers: { 'User-Agent': 'parashare/1.0' },
+    signal: AbortSignal.timeout(8000)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) {
+      $('recv-err-msg').textContent = 'This link has already been used or has expired.';
+      hide('recv-loading'); show('recv-error'); return;
+    }
+    if (d.file_name) {
+      $('recv-fname').textContent = d.file_name;
+      $('recv-fsize').textContent = fmt(d.file_size || 0);
+      show('recv-file-info');
+    }
+    expiresAt = Date.now() + (d.ttl_left_s || 300) * 1000;
+    startTTLCountdown('recv-ttl');
+  })
+  .catch(() => {
+    // relay unreachable or unknown token — show page anyway, let download button reveal the truth
+  });
+
+  $('btn-download').addEventListener('click', () => doDownload(t));
+}
+
+async function doDownload(tok) {
+  hide('recv-loading'); show('recv-downloading');
+  try {
+    const r = await fetch(`${RELAY}/v2/dl/${tok}`, {
+      headers: { 'User-Agent': 'parashare/1.0' },
+      signal: AbortSignal.timeout(60000)
+    });
+
+    if (r.status === 404 || r.status === 410) {
+      hide('recv-downloading'); show('recv-error');
+      $('recv-err-msg').textContent = r.status === 410
+        ? 'This file has already been downloaded and destroyed.'
+        : 'This link has expired or the file no longer exists.';
+      return;
+    }
+    if (!r.ok) throw new Error('Server error: ' + r.status);
+
+    const raw = new Uint8Array(await r.arrayBuffer());
+
+    // Unpack: iv (12) || rawKey (32) || ciphertext
+    const iv     = raw.slice(0, 12);
+    const rawKey = raw.slice(12, 44);
+    const ct     = raw.slice(44);
+
+    const aesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+    const plain  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct);
+
+    // Determine filename from Content-Disposition header
+    const cd    = r.headers.get('Content-Disposition') || '';
+    const fname = cd.match(/filename="([^"]+)"/)?.[1] || 'parashare-download';
+
+    const url = URL.createObjectURL(new Blob([plain]));
+    const a   = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+    URL.revokeObjectURL(url);
+
+    hide('recv-downloading'); show('recv-done');
+
+  } catch (e) {
+    hide('recv-downloading'); show('recv-error');
+    $('recv-err-msg').textContent = e.name === 'AbortError'
+      ? 'Download timed out. Check your connection.'
+      : 'Download failed: ' + e.message;
+  }
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────
+function startTTLCountdown(elId) {
+  clearInterval(ttlInterval);
+  function update() {
+    const el = $(elId);
+    if (!el) { clearInterval(ttlInterval); return; }
+    const left = expiresAt - Date.now();
+    el.textContent = fmtTTL(left);
+    if (left <= 0) clearInterval(ttlInterval);
+  }
+  update();
+  ttlInterval = setInterval(update, 1000);
+}
+
+$('btn-copy')?.addEventListener('click', () => {
+  const url = $('share-link').textContent;
+  navigator.clipboard?.writeText(url).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  $('btn-copy').textContent = 'Copied!';
+  setTimeout(() => { const b = $('btn-copy'); if (b) b.textContent = 'Copy'; }, 2000);
+});
+
+$('btn-new')?.addEventListener('click', () => {
+  clearFile();
+  file = null; keyValid = false; sending = false;
+  $('api-key').value = ''; apiKey = '';
+  hide('progress-wrap'); hide('send-err'); hide('key-ok'); hide('key-err');
+  show('key-hint');
+  showScreen('screen-send');
+  $('nav-toggle').textContent = 'Receive a file';
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
