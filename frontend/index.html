@@ -163,7 +163,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 
         <!-- Drop screen -->
         <div id="ps-screen-drop" style="padding:24px">
-          <div id="ps-dropzone" style="border:1px dashed var(--border);border-radius:6px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .15s" ondragover="event.preventDefault();this.style.borderColor='#4a8c5c'" ondragleave="this.style.borderColor=''" ondrop="psHandleDrop(event)">
+          <div id="ps-dropzone" style="border:1px dashed var(--border);border-radius:6px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .15s" ondragover="event.preventDefault();this.style.borderColor='#4a8c5c'" ondragleave="this.style.borderColor=''" ondrop="psHandleDrop(event)" onclick="document.getElementById('ps-file-input').click()">
             <div style="font-size:24px;color:var(--quiet);margin-bottom:10px">↑</div>
             <div style="font-size:13px;color:var(--muted)">Drop a file or <span style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="document.getElementById('ps-file-input').click()">browse</span></div>
             <div style="font-size:11px;color:var(--quiet);margin-top:5px">Max 5MB · Any file type · One-time link</div>
