@@ -113,10 +113,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <div class="status"><span class="status-dot" id="sdot"></span><span id="stxt">Checking relay status...</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum file transfer for healthcare, legal, and critical infrastructure. Data lives in RAM only &mdash; retrieved once, then gone forever.</p>
-  <div class="btns">
-    <a href="#pricing" class="btn-p">Get API key</a>
-    <a href="#api" class="btn-s">View docs</a>
-  </div>
 </div>
 
 <div class="proto-bar">
@@ -301,7 +297,11 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       // Pad to exactly 5MB
       const padded = new Uint8Array(BLOCK);
       padded.set(packet);
-      if (packet.length < BLOCK) crypto.getRandomValues(padded.subarray(packet.length));
+      if (packet.length < BLOCK) {
+        const tail = padded.subarray(packet.length);
+        for (let off = 0; off < tail.length; off += 65536)
+          crypto.getRandomValues(tail.subarray(off, Math.min(off + 65536, tail.length)));
+      }
 
       setProgress(55, 'Hashing…');
       const hashBuf = await crypto.subtle.digest('SHA-256', padded);
