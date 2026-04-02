@@ -1,0 +1,6 @@
+{
+  "name": "paramant-edge",
+  "version": "1.0.0",
+  "main": "relay.js",
+  "dependencies": {}
+}
