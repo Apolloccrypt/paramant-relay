@@ -28,7 +28,7 @@ const V={bg:"#0c0c0c",sur:"#111",b:"#1a1a1a",t:"#ededed",m:"#888",q:"#555",g:"#2
 
 let adminKey="",relayData={},keys=[],logs=[],selectedRelay=RELAYS[0];
 
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/'/g,"&#x27;").replace(/"/g,"&quot;")}
 function ts(){return new Date().toLocaleTimeString()}
 function addLog(msg,level="info"){
   const col={info:V.q,ok:V.g,error:V.r,warn:V.y}[level]||V.q;
@@ -137,18 +137,8 @@ async function loadKeys(){
 async function reloadUsers(){
   addLog("Reloading users on all relays...","info");
   for(const relay of RELAYS){
-    try{
-      const r=await fetch(relay.u+"/v2/reload-users",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","X-Admin-Token":adminKey,"X-Api-Key":adminKey},
-        body:"{}",
-        signal:AbortSignal.timeout(8000)
-      });
-      const d=await r.json().catch(()=>({}));
-      addLog(relay.l+": "+(r.ok?"reloaded ✓"+(d.count?" ("+d.count+" keys)":""):"failed "+r.status),r.ok?"ok":"error");
-    }catch(e){
-      addLog(relay.l+": "+e.message,"error");
-    }
+    const r=await apiCall(relay.u,"/v2/reload-users","POST",{});
+    addLog(relay.l+": "+(r.ok?"reloaded ✓":"failed ✗")+(r.data?.count?" ("+r.data.count+" keys)":""),r.ok?"ok":"error");
   }
 }
 
@@ -176,7 +166,7 @@ function renderKeys(){
       '<td style="padding:8px 12px;font-family:'+V.mono+';color:'+V.q+';font-size:11px;cursor:pointer" onclick="showKeyOverlay(\''+esc(k.key)+'\',\''+esc(k.label||'')+'\',\''+esc(k.plan||'')+'\',\''+esc(k.email||'')+'\')" title="Click to view full key">'+esc((k.key||"").slice(0,24))+'...</td>'+
       '<td style="padding:8px 12px"><span style="color:'+(k.active!==false?V.g:V.r)+'">'+(k.active!==false?"active":"revoked")+'</span></td>'+
       '<td style="padding:8px 12px;white-space:nowrap">'+
-        '<button onclick="resendMail(\''+esc(k.key)+'\',\''+esc(k.label||'')+'\',\''+esc(k.plan||'')+'\',\''+esc(k.email||'')+'\')" style="background:none;border:1px solid '+V.b+';color:'+V.m+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer;margin-right:4px">Mail</button>'+
+        (k.email?'<button onclick="resendMail(\''+esc(k.key)+'\',\''+esc(k.label||'')+'\',\''+esc(k.plan||'')+'\',\''+esc(k.email)+'\')" style="background:none;border:1px solid '+V.b+';color:'+V.m+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer;margin-right:4px">Mail</button>':'')+
         '<button onclick="revokeKey(\''+esc(k.key)+'\')" style="background:none;border:1px solid '+V.b+';color:'+V.q+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer">Revoke</button>'+
       '</td>'+
     '</tr>').join("")+

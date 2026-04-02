@@ -383,6 +383,14 @@ function loadUsers() {
 
 // TTL flush
 setInterval(() => {
+  // Clean freeRateLimits entries older than yesterday
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+  for (const [k, v] of freeRateLimits.entries()) {
+    if (v.date < yesterday) freeRateLimits.delete(k);
+  }
+}, 3600000);
+
+setInterval(() => {
   const now = Date.now();
   for (const [h, e] of blobStore.entries()) {
     if (now - e.ts > e.ttl) {
@@ -870,7 +878,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const tok = req.headers['x-admin-token'] || '';
-      if (!tok || !apiKeys.has(tok)) {
+      if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
         res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
       }
       const valid = verifyTotp(d.totp_code || '');
@@ -883,7 +891,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
@@ -899,7 +907,7 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
@@ -912,7 +920,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
@@ -929,7 +937,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
   if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }

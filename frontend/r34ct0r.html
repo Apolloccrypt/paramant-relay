@@ -28,7 +28,7 @@ const V={bg:"#0c0c0c",sur:"#111",b:"#1a1a1a",t:"#ededed",m:"#888",q:"#555",g:"#2
 
 let adminKey="",relayData={},keys=[],logs=[],selectedRelay=RELAYS[0];
 
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/'/g,"&#x27;").replace(/"/g,"&quot;")}
 function ts(){return new Date().toLocaleTimeString()}
 function addLog(msg,level="info"){
   const col={info:V.q,ok:V.g,error:V.r,warn:V.y}[level]||V.q;
