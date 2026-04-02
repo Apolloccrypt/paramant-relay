@@ -25,7 +25,10 @@ def send_welcome_mail(to_email, api_key, plan):
         return False
     html = f'''<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
   <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-  <p style="color:#555;margin-bottom:24px">Your API key is ready.</p>
+  <p style="color:#555;margin-bottom:24px"><div style="background:#1a1a00;border:1px solid #555500;border-radius:6px;padding:16px;margin-bottom:24px">
+  <div style="font-size:12px;color:#cccc00;font-family:monospace;letter-spacing:.04em">IMPORTANT — READ ONCE</div>
+  <div style="font-size:13px;color:#ededed;margin-top:8px;line-height:1.6">Save this API key in your password manager immediately. It is generated once and cannot be recovered. If you lose it, you need to purchase a new subscription.</div>
+</div>Your API key is ready.</p>
   <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
     <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY &mdash; {plan.upper()}</div>
     <div style="font-size:14px;color:#ededed;word-break:break-all">{api_key}</div>
@@ -233,6 +236,76 @@ def cmd_check(args):
             print(f'  {sector:10s} {Y}TIMEOUT/ERROR{E}  {e}')
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
+# ── Team commando's ───────────────────────────────────────────────────────────
+TTL_BY_PLAN = {'dev': 3_600_000, 'pro': 86_400_000, 'enterprise': 604_800_000}
+
+def cmd_team_create(args):
+    """Koppel bestaande key aan een nieuw team_id."""
+    sectors = [args.sector] if args.sector else list(SECTORS.keys())
+    for sector in sectors:
+        path = SECTORS.get(sector)
+        if not path: continue
+        data = load_users(path)
+        entry = next((k for k in data['api_keys'] if k.get('label') == args.label and k.get('active', True)), None)
+        if not entry:
+            warn(f'{sector}: key "{args.label}" niet gevonden'); continue
+        if entry.get('plan') == 'dev':
+            warn(f'{sector}: team keys vereisen Pro of Enterprise'); continue
+        team_id = 'team_' + secrets.token_hex(8)
+        entry['team_id'] = team_id
+        save_users(path, data)
+        ok(f'{sector}: team aangemaakt → {team_id}')
+        info(f'  Beheerder: {args.label}')
+        info(f'  Voeg toe: paramant-admin.py team-add --team {team_id} --label <device> --sector {sector}')
+
+def cmd_team_add(args):
+    """Voeg een nieuw device toe aan een bestaand team."""
+    sectors = [args.sector] if args.sector else list(SECTORS.keys())
+    for sector in sectors:
+        path = SECTORS.get(sector)
+        if not path: continue
+        data = load_users(path)
+        members = [k for k in data['api_keys'] if k.get('team_id') == args.team and k.get('active', True)]
+        if not members:
+            warn(f'{sector}: team {args.team} niet gevonden'); continue
+        plan = members[0].get('plan', 'pro')
+        new_key = gen_key()
+        data['api_keys'].append({
+            'key': new_key, 'label': args.label, 'plan': plan,
+            'team_id': args.team, 'active': True,
+            'max_ttl_ms': TTL_BY_PLAN.get(plan, TTL_BY_PLAN['dev']),
+            'created': int(datetime.now(timezone.utc).timestamp() * 1000),
+            'usage_in': 0, 'usage_out': 0, 'email': None, 'stripe_id': None
+        })
+        save_users(path, data)
+        ok(f'{sector}: device toegevoegd aan team {args.team}')
+        info(f'  Label: {args.label}')
+        info(f'  Key:   {new_key}')
+        info(f'  Plan:  {plan}')
+
+def cmd_team_list(args):
+    """Toon alle teams + devices per sector."""
+    sectors = [args.sector] if args.sector else list(SECTORS.keys())
+    for sector in sectors:
+        path = SECTORS.get(sector)
+        if not path: continue
+        data = load_users(path)
+        teams = {}
+        for k in data['api_keys']:
+            tid = k.get('team_id')
+            if tid:
+                teams.setdefault(tid, []).append(k)
+        if not teams:
+            info(f'{sector}: geen teams'); continue
+        print(f'\n{sector}:')
+        for tid, members in teams.items():
+            print(f'  Team: {tid}')
+            for m in members:
+                status = 'active' if m.get('active') else 'revoked'
+                print(f'    {m["label"]:22} {m.get("plan","?"):12} {status}')
+
+
 def main():
     p = argparse.ArgumentParser(description='PARAMANT Admin CLI v1.0')
     sub = p.add_subparsers(dest='cmd', required=True)
@@ -262,9 +335,26 @@ def main():
     pc.add_argument('--key',    required=True, help='Te controleren key')
     pc.add_argument('--sector', choices=list(SECTORS.keys()), help='Specifieke sector')
 
+
+    # team-create
+    ptc = sub.add_parser('team-create', help='Maak team van bestaande key')
+    ptc.add_argument('--label',  required=True, help='Label van de beheerder key')
+    ptc.add_argument('--sector', choices=list(SECTORS.keys()), help='Specifieke sector')
+
+    # team-add
+    pta = sub.add_parser('team-add', help='Voeg device toe aan team')
+    pta.add_argument('--team',   required=True, help='Team ID (team_...)')
+    pta.add_argument('--label',  required=True, help='Device label')
+    pta.add_argument('--sector', choices=list(SECTORS.keys()), help='Specifieke sector')
+
+    # team-list
+    ptl = sub.add_parser('team-list', help='Toon alle teams + devices')
+    ptl.add_argument('--sector', choices=list(SECTORS.keys()), help='Specifieke sector')
+
     args = p.parse_args()
     {'list': cmd_list, 'add': cmd_add, 'revoke': cmd_revoke,
-     'sync': cmd_sync, 'check': cmd_check}[args.cmd](args)
+     'sync': cmd_sync, 'check': cmd_check,
+     'team-create': cmd_team_create, 'team-add': cmd_team_add, 'team-list': cmd_team_list}[args.cmd](args)
 
 if __name__ == '__main__':
     main()
