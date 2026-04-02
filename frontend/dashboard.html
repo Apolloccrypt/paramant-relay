@@ -186,7 +186,7 @@ function renderHealthBar(){
   const el=document.getElementById("hbar");
   if(!el)return;
   el.innerHTML=RELAYS.map(r=>{
-    const hd=health[r.u];const ok=hd&&hd.ok;const fail=hd===false;
+    const hd=health[r.u];const ok=hd&&(hd.ok||hd.status==='ok');const fail=hd===false;
     return`<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:11px;font-family:${V.mono};border:1px solid ${ok?"#1a2a1a":fail?"#2a1a1a":V.b};color:${ok?V.g:fail?"#7a3a3a":V.q}">
       <span style="width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0"></span>
       ${r.l}${ok&&hd.uptime_s?" "+Math.floor(hd.uptime_s/3600)+"h":""}
