@@ -27,7 +27,7 @@ const VERSION    = '2.1.0';
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
-const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
+const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '20971520');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
 const RELAY_MODE = process.env.RELAY_MODE          || 'full';
 const SECTOR     = process.env.SECTOR              || 'relay';
@@ -251,7 +251,7 @@ setInterval(() => {
 // ── RAM guard ────────────────────────────────────────────────────────────────
 const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
 const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
-const BLOB_SIZE_MB    = 5;
+const BLOB_SIZE_MB    = 20;
 const MAX_BLOBS       = Math.floor(RAM_LIMIT_MB / BLOB_SIZE_MB);
 
 function ramStats() {
@@ -311,7 +311,7 @@ function checkTeamRateLimit(teamId, limit) {
 }
 const freeRateLimits = new Map(); // key → { count, date }  (server-side 5/day)
 function checkFreeRateLimit(apiKey) {
-  const LIMIT = 5;
+  const LIMIT = 10;
   const today = new Date().toISOString().slice(0,10);
   const b = freeRateLimits.get(apiKey) || { count: 0, date: today };
   if (b.date !== today) { b.count = 0; b.date = today; }
@@ -496,7 +496,7 @@ const server = http.createServer(async (req, res) => {
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
-      padding: '5MB fixed (DPI-masking)',
+      padding: '20MB fixed (DPI-masking)',
       jurisdiction: 'EU/DE, GDPR, no US CLOUD Act' };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
@@ -659,7 +659,8 @@ const server = http.createServer(async (req, res) => {
       if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
 
       const blob = Buffer.from(payload, 'base64');
-      if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: 'Max 5MB' })); }
+      const planMaxSize = keyData?.plan === 'free' ? 20 * 1024 * 1024 : MAX_BLOB;
+      if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
 
       // ML-DSA handtekening verificatie (optioneel maar gelogd)
       let sigResult = { valid: false, reason: 'not provided' };
@@ -667,7 +668,7 @@ const server = http.createServer(async (req, res) => {
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      const _planMaxTtl = { free: 300_000, dev: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
+      const _planMaxTtl = { free: 3_600_000, dev: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
       const _plan = keyData?.plan || 'dev';
       const _maxTtl = _planMaxTtl[_plan] || _planMaxTtl.dev;
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
