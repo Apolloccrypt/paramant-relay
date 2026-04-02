@@ -91,6 +91,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   footer{flex-direction:column;align-items:flex-start;padding:32px 24px}
   .footer-meta{text-align:left}
 }
+.price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -546,12 +547,12 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <p class="sub">You pay for access to the relay network. No fees per blob, no storage costs, no egress charges.</p>
   
         <div class="pricing-grid">
-          <div class="pricing-card">
-            <div class="plan-name">DEV</div>
-            <div class="plan-price">€9.99 <span class="per-month">/ month</span></div>
-            <div class="plan-tag">Cancel anytime</div>
-            <div class="plan-tagline">Send files. They vanish after opening.</div>
-            <ul class="plan-features">
+          <div class="pc">
+            <div class="price-name">DEV</div>
+            <div class="price-amount">€9.99 <span class="per-month">/ month</span></div>
+            <div class="price-note">Cancel anytime</div>
+            <div class="price-tagline">Send files. They vanish after opening.</div>
+            <ul class="pf">
               <li>+ Up to 500MB per transfer via ParaShare</li>
               <li>+ Post-quantum encrypted transport</li>
               <li>+ 1 device</li>
@@ -562,12 +563,12 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
             <a href="https://buy.stripe.com/price_1TGwtQJMhSdoTn1k6RM3agYr" class="price-btn s" target="_blank">Get started</a>
           </div>
 
-          <div class="pricing-card featured">
-            <div class="plan-name">PRO</div>
-            <div class="plan-price">€49 <span class="per-month">/ month</span></div>
-            <div class="plan-tag">Cancel anytime</div>
-            <div class="plan-tagline">For teams handling data that must never be seen twice.</div>
-            <ul class="plan-features">
+          <div class="pc featured">
+            <div class="price-name">PRO</div>
+            <div class="price-amount">€49 <span class="per-month">/ month</span></div>
+            <div class="price-note">Cancel anytime</div>
+            <div class="price-tagline">For teams handling data that must never be seen twice.</div>
+            <ul class="pf">
               <li>+ Everything in Dev</li>
               <li>+ Unlimited devices + unique device identities</li>
               <li>+ Automatic webhook — notify your system on delivery</li>
@@ -580,12 +581,12 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
             <a href="https://buy.stripe.com/price_1TGwqbJMhSdoTn1kCWWLN5KY" class="price-btn p" target="_blank">Get started</a>
           </div>
 
-          <div class="pricing-card">
-            <div class="plan-name">ENTERPRISE</div>
-            <div class="plan-price">Custom</div>
-            <div class="plan-tag">Volume and SLA pricing</div>
-            <div class="plan-tagline">For regulated industries — healthcare, legal, finance.</div>
-            <ul class="plan-features">
+          <div class="pc">
+            <div class="price-name">ENTERPRISE</div>
+            <div class="price-amount">Custom</div>
+            <div class="price-note">Volume and SLA pricing</div>
+            <div class="price-tagline">For regulated industries — healthcare, legal, finance.</div>
+            <ul class="pf">
               <li>+ Everything in Pro</li>
               <li>+ Dedicated relay — your data never shared with others</li>
               <li>+ DICOM / FHIR integration for medical systems</li>
