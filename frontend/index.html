@@ -610,44 +610,68 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 <section id="sectors">
   <div class="eyebrow">Sectors &amp; problems</div>
   <h2>Real problems. Real stakes.</h2>
-  <p class="sub">Each sector has a specific data transport problem that existing solutions cannot solve without leaving traces.</p>
+  <p class="sub">Each sector has a data transport problem existing solutions cannot solve without leaving traces. Ghost Pipe is running today — two commands and it works.</p>
 
   <div class="grid g2" style="margin-bottom:24px">
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Healthcare</div>
       <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">MRI and CT scanners produce DICOM files that must reach the radiologist in milliseconds. Current solutions: SFTP (leaves files on server), S3 (plaintext at rest), VPN (complex, breaks at firewalls). A data breach in healthcare costs on average €4.2M and triggers NEN 7510 liability.</p>
+      <p class="desc" style="margin-bottom:16px">MRI and CT scanners produce DICOM files that must reach the radiologist in milliseconds. SFTP leaves files on server. S3 is plaintext at rest. VPN breaks at firewalls. A breach costs €4.2M on average and triggers NEN 7510 liability.</p>
       <h3>Solution</h3>
-      <p class="desc">DICOM → Ghost Pipe → PACS. Zero storage. The file exists for the duration of the transfer, then burns. The radiologist receives it; no one else ever could. No NEN 7510 audit trail needed — there is nothing to audit.</p>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <p class="desc" style="margin-bottom:14px">DICOM → Ghost Pipe → PACS. The file exists only for the duration of the transfer, then burns. No NEN 7510 audit trail needed — there is nothing to audit.</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
+        <span style="color:var(--quiet)"># DICOM gateway — runs today</span><br>
+        python3 dicom-gateway.py --port 8090 --device mri-001<br>
+        <span style="color:var(--quiet)"># receiver → PACS</span><br>
+        python3 paramant-receiver.py --forward https://pacs.hospital/api
+      </div>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Legal &amp; Notary</div>
       <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">Lawyers exchange signed contracts over email (unencrypted), WeTransfer (stored), or secure email (still stored somewhere). The moment a file lands on a server, it can be subpoenaed, hacked, or leaked. Legal professional privilege does not survive a server breach.</p>
+      <p class="desc" style="margin-bottom:16px">Lawyers send contracts over email (unencrypted), WeTransfer (stored), or secure email (still stored somewhere). The moment a file lands on a server it can be subpoenaed, hacked, or leaked. Legal professional privilege does not survive a server breach.</p>
       <h3>Solution</h3>
-      <p class="desc">Contract → Ghost Pipe → counterparty. Burn-on-read means after the notary retrieves the document, it is cryptographically gone. The Merkle audit log proves it was delivered without storing what was delivered.</p>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <p class="desc" style="margin-bottom:14px">Contract → Ghost Pipe → counterparty. After the notary retrieves the document it is cryptographically gone. The Merkle audit log proves delivery without storing what was delivered — admissible under eIDAS.</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
+        <span style="color:var(--quiet)"># send signed contract</span><br>
+        python3 paramant-sender.py --key pgp_xxx --device notary-01 contract.pdf<br>
+        <span style="color:var(--quiet)"># counterparty receives once — then gone</span><br>
+        python3 paramant-receiver.py --key pgp_xxx --device counterparty-01
+      </div>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Industrial IoT</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Industrial IoT / OT</div>
       <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">PLCs and SCADA sensors produce sensitive operational data — energy consumption, production volumes, process temperatures. Sending this over plain MQTT or HTTP leaks competitive intelligence. VPNs add latency and fail at scale. IEC 62443 requires encrypted transport with device identity.</p>
+      <p class="desc" style="margin-bottom:16px">PLCs and SCADA sensors send energy consumption, process temperatures, and production volumes. Plain MQTT leaks competitive intelligence. VPNs add latency and fail at scale. IEC 62443 requires encrypted transport with device identity. OT networks cannot have direct IT connections.</p>
       <h3>Solution</h3>
-      <p class="desc">Sensor → Ghost Pipe → cloud dashboard. Sub-100ms via NATS push. Hardware-attested device identity via TPM 2.0. No VPN, no certificates to manage, no IT overhead. Works on ESP32 and Raspberry Pi.</p>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <p class="desc" style="margin-bottom:14px">Sensor → Ghost Pipe → SCADA dashboard. Sub-100ms via NATS push. No VPN, no certificates, no IT overhead. Works on ESP32 and Raspberry Pi. Ghost Pipe acts as a quantum-safe data diode — OT never touches IT directly.</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
+        <span style="color:var(--quiet)"># PLC heartbeat every 15s</span><br>
+        python3 paramant-sender.py --heartbeat 15 --device plc-factory-01<br>
+        <span style="color:var(--quiet)"># forward to SCADA</span><br>
+        python3 paramant-receiver.py --forward https://scada.intern/api
+      </div>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Finance &amp; Compliance</div>
       <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">Banks sending documents to notaries, trading systems logging compliance data, private key material transfer between signing parties — all currently using TLS over HTTP, which means the transport provider can see metadata, timing, and payload size. US CLOUD Act means any US-hosted service can be compelled to hand over data.</p>
+      <p class="desc" style="margin-bottom:16px">Banks send KYC documents and signing keys over TLS — but the transport provider still sees metadata, timing, and payload size. US CLOUD Act means any US-hosted service can be compelled to hand over data. NIS2 and DORA require an auditable, tamper-proof delivery chain.</p>
       <h3>Solution</h3>
-      <p class="desc">All traffic on finance.paramant.app is hosted exclusively on Hetzner Frankfurt. No US infrastructure, no US CLOUD Act exposure. 20MB fixed padding means all transfers look identical — no metadata leakage.</p>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;margin-top:16px;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <p class="desc" style="margin-bottom:14px">All traffic on finance.paramant.app runs exclusively on Hetzner Frankfurt. No US infrastructure. 20MB fixed padding means all transfers look identical. The Merkle audit chain gives per-transaction proof of delivery — verifiable without knowing the content.</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
+        <span style="color:var(--quiet)"># watch directory, auto-send new files</span><br>
+        python3 paramant-sender.py --watch /export/iso20022/ --device bank-nl-01<br>
+        <span style="color:var(--quiet)"># forward to compliance system</span><br>
+        python3 paramant-receiver.py --forward https://compliance.bank.nl/api
+      </div>
+      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
     </div>
   </div>
 
-  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
       <div style="background:var(--bg);padding:20px 24px">
         <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">9</div>
@@ -666,6 +690,14 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">delivery via NATS</div>
       </div>
     </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px">Works today. No SDK required.</div>
+      <div style="font-size:12px;font-family:var(--mono);color:var(--quiet)">pip install cryptography &nbsp;·&nbsp; two terminal commands &nbsp;·&nbsp; no infra changes</div>
+    </div>
+    <a href="/docs" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:8px 18px;border-radius:4px;text-decoration:none;white-space:nowrap">View API docs →</a>
   </div>
 </section>
 
