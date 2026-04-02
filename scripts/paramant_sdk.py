@@ -29,6 +29,19 @@ SECTOR_RELAYS = {
     'finance': 'https://finance.paramant.app',
     'relay':   'https://relay.paramant.app',
 }
+
+EDGE_RELAY = 'https://paramant-ghost-pipe.fly.dev'
+
+def get_relay_url(sector='health', use_edge=False):
+    """
+    Geef juiste relay URL terug.
+    use_edge=True  → via Fly.io edge (geo-routed, 6 regio's)
+    use_edge=False → direct naar sector relay (lager latency EU)
+    """
+    if use_edge:
+        return f"{EDGE_RELAY}/{sector}"
+    return SECTOR_RELAYS.get(sector, SECTOR_RELAYS['health'])
+
 BLOCK = 5 * 1024 * 1024
 UA    = f'paramant-sdk/{__version__}'
 
