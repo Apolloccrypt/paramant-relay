@@ -113,6 +113,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <div class="status"><span class="status-dot" id="sdot"></span><span id="stxt">Checking relay status...</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum file transfer for healthcare, legal, and critical infrastructure. Data lives in RAM only &mdash; retrieved once, then gone forever.</p>
+  <a href="#parashare-demo" style="display:inline-block;margin-top:20px;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-family:var(--mono)">Try free — 5 MB · no account ↓</a>
 </div>
 
 <div class="proto-bar">
@@ -132,16 +133,20 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     <div style="flex:1;min-width:260px;max-width:420px">
       <div class="eyebrow">ParaShare — free to try</div>
       <h2>Send files.<br>They vanish after opening.</h2>
-      <p class="sub" style="margin-bottom:20px">Drop a file. Get a one-time link. The receiver clicks once — file downloads, then burns permanently from RAM. No account needed.</p>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:28px">
+      <p class="sub" style="margin-bottom:20px">Drop a file. Get a one-time link. The receiver clicks once — file downloads, then burns after first download. No account needed.</p>
+      <div style="display:inline-flex;gap:6px;flex-wrap:wrap;margin-bottom:20px">
+        <span style="font-size:12px;font-family:var(--mono);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:4px 10px;color:var(--muted)">No registration</span>
+        <span style="font-size:12px;font-family:var(--mono);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:4px 10px;color:var(--muted)">No login</span>
+        <span style="font-size:12px;font-family:var(--mono);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:4px 10px;color:var(--muted)">Works in browser</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
         <div style="font-size:13px;color:var(--muted)">→ Encrypted in your browser before upload</div>
         <div style="font-size:13px;color:var(--muted)">→ Burn-on-read — file gone after first download</div>
-        <div style="font-size:13px;color:var(--muted)">→ No account, no login, no storage</div>
         <div style="font-size:13px;color:var(--muted)">→ Receiver needs nothing — just a browser</div>
       </div>
-      <div style="font-size:12px;color:var(--quiet);font-family:var(--mono);border:1px solid var(--border);border-radius:4px;padding:10px 14px;line-height:1.8">
-        Free tier: up to 5MB · 5× per day · back of queue<br>
-        <a href="#pricing" style="color:var(--muted);text-decoration:none">Upgrade for 500MB, priority &amp; webhook →</a>
+      <div style="font-size:12px;color:var(--quiet);font-family:var(--mono);border:1px solid var(--border);border-radius:4px;padding:10px 14px;line-height:1.9">
+        <strong style="color:var(--muted)">Free tier:</strong> max 5 MB · max 5 uploads/day · back of queue<br>
+        <span style="opacity:.7">Paid users get priority, 500 MB &amp; webhook.</span> <a href="#pricing" style="color:var(--muted);text-decoration:none">Upgrade →</a>
       </div>
     </div>
 
@@ -158,11 +163,14 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         </div>
 
         <!-- Drop screen -->
-        <div id="ps-screen-drop" style="padding:24px">
-          <div id="ps-dropzone" style="border:1px dashed var(--border);border-radius:6px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .15s" ondragover="event.preventDefault();this.style.borderColor='#4a8c5c'" ondragleave="this.style.borderColor=''" ondrop="psHandleDrop(event)" onclick="document.getElementById('ps-file-input').click()">
+        <div id="ps-screen-drop" style="padding:20px 24px 24px">
+          <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:10px;line-height:1.6">
+            <strong>Max 5 MB · 5× per day · gratis</strong> — betaald krijgt prioriteit &amp; 500 MB
+          </div>
+          <div id="ps-dropzone" style="border:1px dashed var(--border);border-radius:6px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .15s" ondragover="event.preventDefault();this.style.borderColor='#4a8c5c'" ondragleave="this.style.borderColor=''" ondrop="psHandleDrop(event)" onclick="document.getElementById('ps-file-input').click()">
             <div style="font-size:24px;color:var(--quiet);margin-bottom:10px">↑</div>
             <div style="font-size:13px;color:var(--muted)">Drop a file or <span style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="document.getElementById('ps-file-input').click()">browse</span></div>
-            <div style="font-size:11px;color:var(--quiet);margin-top:5px">Max 5MB · Any file type · One-time link</div>
+            <div style="font-size:11px;color:var(--quiet);margin-top:5px">Any file type · One-time burn-on-read link</div>
           </div>
           <input type="file" id="ps-file-input" style="display:none" onchange="psHandleFile(this.files[0])">
           <div id="ps-drop-err" style="display:none;margin-top:10px;font-size:12px;color:#c0392b;font-family:var(--mono);text-align:center"></div>
@@ -224,7 +232,9 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     const d = getUses();
     const rem = Math.max(0, MAX_DAILY - d.count);
     const el = document.getElementById('ps-uses-left');
-    if (el) el.textContent = rem + ' free left today';
+    if (!el) return;
+    el.textContent = rem + ' free left today';
+    el.style.color = rem === 0 ? '#c0392b' : rem <= 2 ? '#d4a017' : '';
   }
   updateUsesLabel();
 
@@ -282,7 +292,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     showScreen('ps-screen-progress');
     try {
       // 3-second queue delay for free tier
-      setProgress(5, 'Queued — free tier…', 'Back of queue · may take a few seconds');
+      setProgress(5, 'Queued — free tier…', 'Free uploads go last · paid users get instant priority');
       await new Promise(r => setTimeout(r, 3000));
 
       setProgress(20, 'Reading file…');
