@@ -44,11 +44,13 @@ const ALLOWED = {
   ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
-               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl'],
+               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
+               '/v2/key-sector','/v2/team','/v2/reload-users'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
-               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl'],
+               '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
+               '/v2/key-sector','/v2/team','/v2/reload-users'],
   full:       null,
 };
 
@@ -980,6 +982,19 @@ python3 paramant-receiver.py \\
       log('info', 'team_device_added', { label: d.label, team: kd.team_id });
       res.writeHead(201); return res.end(J({ ok: true, key: newKey, label: d.label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+
+  // ── GET /v2/key-sector — sector routing helper ────────────────────────────
+  if (path === '/v2/key-sector' && req.method === 'GET') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    const label = (kd.label || '').toLowerCase();
+    const sector = label.includes('legal')   ? 'legal'
+                 : label.includes('finance') ? 'finance'
+                 : label.includes('iot')     ? 'iot'
+                 : 'health';
+    res.writeHead(200); return res.end(J({ sector, plan: kd.plan, team_id: kd.team_id || null }));
   }
 
   // ── GET /v2/monitor — Dashboard data (vereist geldige API key) ──────────────

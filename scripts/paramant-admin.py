@@ -237,6 +237,60 @@ def cmd_check(args):
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
+# ── Stripe billing ────────────────────────────────────────────────────────────
+import urllib.parse as _up
+
+STRIPE_SECRET    = os.environ.get('STRIPE_SECRET_KEY', '')
+DEVICE_PRICE_ID  = os.environ.get('STRIPE_DEVICE_PRICE_ID', '')
+
+def _stripe(method, path, data=None):
+    """Minimale Stripe API helper."""
+    import urllib.request, json
+    url = f'https://api.stripe.com/v1{path}'
+    body = _up.urlencode(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, method=method,
+        headers={'Authorization': f'Bearer {STRIPE_SECRET}', 'Content-Type': 'application/x-www-form-urlencoded'})
+    return json.loads(urllib.request.urlopen(req, timeout=10).read())
+
+def stripe_add_device(subscription_id):
+    if not STRIPE_SECRET or not subscription_id:
+        warn('Stripe niet geconfigureerd — sla billing update over'); return False
+    try:
+        sub = _stripe('GET', f'/subscriptions/{subscription_id}')
+        items = sub.get('items', {}).get('data', [])
+        dev_item = next((i for i in items if i.get('price', {}).get('id') == DEVICE_PRICE_ID), None)
+        if dev_item:
+            _stripe('POST', f'/subscriptions/{subscription_id}', {
+                f'items[0][id]': dev_item['id'],
+                f'items[0][quantity]': str(dev_item.get('quantity', 1) + 1)
+            })
+        else:
+            _stripe('POST', f'/subscriptions/{subscription_id}', {
+                'items[0][price]': DEVICE_PRICE_ID, 'items[0][quantity]': '1'
+            })
+        ok('Stripe: extra device toegevoegd aan subscription'); return True
+    except Exception as e:
+        warn(f'Stripe fout: {e}'); return False
+
+def stripe_remove_device(subscription_id):
+    if not STRIPE_SECRET or not subscription_id:
+        return False
+    try:
+        sub = _stripe('GET', f'/subscriptions/{subscription_id}')
+        items = sub.get('items', {}).get('data', [])
+        dev_item = next((i for i in items if i.get('price', {}).get('id') == DEVICE_PRICE_ID), None)
+        if dev_item and dev_item.get('quantity', 1) > 1:
+            _stripe('POST', f'/subscriptions/{subscription_id}', {
+                f'items[0][id]': dev_item['id'],
+                f'items[0][quantity]': str(dev_item.get('quantity', 1) - 1)
+            })
+            ok('Stripe: device quantity verlaagd')
+        return True
+    except Exception as e:
+        warn(f'Stripe fout: {e}'); return False
+
+
 # ── Team commando's ───────────────────────────────────────────────────────────
 TTL_BY_PLAN = {'dev': 3_600_000, 'pro': 86_400_000, 'enterprise': 604_800_000}
 
@@ -283,6 +337,12 @@ def cmd_team_add(args):
         info(f'  Label: {args.label}')
         info(f'  Key:   {new_key}')
         info(f'  Plan:  {plan}')
+        # Stripe billing update
+        admin = next((k for k in data['api_keys'] if k.get('team_id') == args.team and k.get('stripe_subscription_id')), None)
+        if admin:
+            stripe_add_device(admin['stripe_subscription_id'])
+        else:
+            warn('Geen stripe_subscription_id gevonden — update billing handmatig')
 
 def cmd_team_list(args):
     """Toon alle teams + devices per sector."""
@@ -339,6 +399,7 @@ def main():
     # team-create
     ptc = sub.add_parser('team-create', help='Maak team van bestaande key')
     ptc.add_argument('--label',  required=True, help='Label van de beheerder key')
+    ptc.add_argument('--stripe-sub', default='', help='Stripe subscription ID (sub_xxx)')
     ptc.add_argument('--sector', choices=list(SECTORS.keys()), help='Specifieke sector')
 
     # team-add
