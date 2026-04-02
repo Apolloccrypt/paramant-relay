@@ -156,7 +156,20 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-
 
     <div class="err-box hide" id="send-err"></div>
 
-    <button class="btn-primary" id="btn-send" disabled>Send file &rarr;</button>
+
+    <div id="webhook-section" style="margin:0 0 14px;">
+      <label class="lbl" for="webhook-url">Webhook URL <span style="font-weight:400;text-transform:none;letter-spacing:0">(optioneel)</span></label>
+      <input class="inp" id="webhook-url" type="url" placeholder="https://jouw-server.nl/callback" autocomplete="off">
+      <div style="font-size:11px;color:#bbb;margin-top:4px;">Ontvangt een POST zodra de ontvanger downloadt.</div>
+    </div>
+
+    <div id="password-section" style="margin:0 0 14px;">
+      <label class="lbl" for="transfer-password">Wachtwoord <span style="font-weight:400;text-transform:none;letter-spacing:0">(optioneel)</span></label>
+      <input class="inp" id="transfer-password" type="password" placeholder="Laat leeg voor geen wachtwoord" autocomplete="off">
+      <div style="font-size:11px;color:#bbb;margin-top:4px;">Ontvanger moet dit invoeren voor download.</div>
+    </div>
+
+        <button class="btn-primary" id="btn-send" disabled>Send file &rarr;</button>
 
     <div style="margin-top:28px;border-top:1px solid #e8e8e5;padding-top:24px">
       <div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">How it stays secure</div>
@@ -659,6 +672,16 @@ async function doSend() {
         throw new Error(ud.error || `Upload failed for chunk ${i + 1}`);
       }
       tokens.push(ud.download_token);
+      if (i === 0) {
+        const _wh = $('webhook-url')?.value?.trim();
+        if (_wh) {
+          fetch(`${RELAY}/v2/webhook`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+            body: JSON.stringify({ hash, callback_url: _wh })
+          }).catch(() => {});
+        }
+      }
       await sleep(30);
     }
 
@@ -669,7 +692,8 @@ async function doSend() {
     if (encEl) encEl.textContent = 'AES-256-GCM' + (totalChunks > 1 ? ` · ${totalChunks} chunks` : '');
 
     expiresAt = Date.now() + ttl;
-    const shareUrl = `${BASE_URL}?t=${encodeURIComponent(tokens.join(','))}&n=${encodeURIComponent(file.name)}&c=${totalChunks}`;
+    const _pw = $('transfer-password')?.value?.trim() || '';
+    const shareUrl = `${BASE_URL}?t=${encodeURIComponent(tokens.join(','))}&n=${encodeURIComponent(file.name)}&c=${totalChunks}` + (_pw ? `#pwd=${btoa(encodeURIComponent(_pw))}` : '');
     $('share-link').textContent = shareUrl;
 
     setProgress(100, 'Done');
@@ -724,7 +748,22 @@ function initReceive(tok) {
   })
   .catch(() => {});
 
-  $('btn-download').addEventListener('click', () => doDownload(raw));
+  const _pwHash = new URLSearchParams(window.location.hash.replace('#','&')).get('pwd');
+  if (_pwHash) {
+    const _pwWrap = document.createElement('div');
+    _pwWrap.style.cssText = 'margin-bottom:16px';
+    _pwWrap.innerHTML = '<label class="lbl">Wachtwoord vereist</label><input class="inp" id="recv-password" type="password" placeholder="Voer wachtwoord in" autocomplete="off">';
+    const _dlBtn = $('btn-download');
+    _dlBtn.parentNode.insertBefore(_pwWrap, _dlBtn);
+  }
+  $('btn-download').addEventListener('click', () => {
+    if (_pwHash) {
+      const _required = decodeURIComponent(atob(_pwHash));
+      const _entered  = ($('recv-password')?.value || '').trim();
+      if (_entered !== _required) { alert('Onjuist wachtwoord.'); return; }
+    }
+    doDownload(raw);
+  });
 }
 
 async function doDownload(rawTok) {
@@ -851,7 +890,7 @@ async function pollRelayStatus() {
     const warn     = $('capacity-warning');
 
     const ramOk     = d.ram_ok !== false;
-    const slotsMax  = d.blobs_max  || (d.ram_limit_mb ? Math.floor(d.ram_limit_mb / 5) : null);
+    const slotsMax  = d.blobs_max  || (d.ram_limit_mb ? Math.floor(d.ram_limit_mb / 5) : 200);
     const slotsUsed = d.blobs_in_flight || d.blobs || 0;
     const slotsAvail = d.available_slots;
     const usePct    = slotsMax ? Math.round(slotsUsed / slotsMax * 100) : 0;
