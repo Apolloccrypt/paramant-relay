@@ -113,7 +113,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <div class="status"><span class="status-dot" id="sdot"></span><span id="stxt">Checking relay status...</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum file transfer for healthcare, legal, and critical infrastructure. Data lives in RAM only &mdash; retrieved once, then gone forever.</p>
-  <a href="#parashare-demo" style="display:inline-block;margin-top:20px;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-family:var(--mono)">Try free — 5 MB · no account ↓</a>
+  <a href="#parashare-demo" style="display:inline-block;margin-top:20px;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-family:var(--mono)">Try free — 20 MB · no account ↓</a>
 </div>
 
 <div class="proto-bar">
@@ -145,7 +145,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <div style="font-size:13px;color:var(--muted)">→ Receiver needs nothing — just a browser</div>
       </div>
       <div style="font-size:12px;color:var(--quiet);font-family:var(--mono);border:1px solid var(--border);border-radius:4px;padding:10px 14px;line-height:1.9">
-        <strong style="color:var(--muted)">Free tier:</strong> max 5 MB · max 10 uploads/day · back of queue<br>
+        <strong style="color:var(--muted)">Free tier:</strong> max 20 MB · max 10 uploads/day · back of queue<br>
         <span style="opacity:.7">Paid users get priority, 500 MB &amp; webhook.</span> <a href="#pricing" style="color:var(--muted);text-decoration:none">Upgrade →</a>
       </div>
     </div>
@@ -165,7 +165,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <!-- Drop screen -->
         <div id="ps-screen-drop" style="padding:20px 24px 24px">
           <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:10px;line-height:1.6">
-            <strong>Free: max 5 MB · 10× per day · back of queue</strong> — paid users get priority &amp; 500 MB
+            <strong>Free: max 20 MB · 10× per day · back of queue</strong> — paid users get priority &amp; 500 MB
           </div>
           <div id="ps-dropzone" style="border:1px dashed var(--border);border-radius:6px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .15s" ondragover="event.preventDefault();this.style.borderColor='#4a8c5c'" ondragleave="this.style.borderColor=''" ondrop="psHandleDrop(event)" onclick="document.getElementById('ps-file-input').click()">
             <div style="font-size:24px;color:var(--quiet);margin-bottom:10px">↑</div>
@@ -212,10 +212,11 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 (function(){
   const FREE_KEY  = 'pgp_ee0beaee58eff4d337f9281bbe90f74b';
   const RELAY     = '/rp/health';
-  const MAX_BYTES = 5 * 1024 * 1024;
-  const MAX_DAILY = 10;
-  const LS_KEY    = 'ps_free_uses';
-  const BLOCK     = 5 * 1024 * 1024;
+  const MAX_BYTES  = 20 * 1024 * 1024;
+  const MAX_DAILY  = 10;
+  const LS_KEY     = 'ps_free_uses';
+  const BLOCK      = 5 * 1024 * 1024;
+  const CHUNK_PLAIN = 4.9 * 1024 * 1024;
   const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
 
   function getUses() {
@@ -287,7 +288,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 
     const uses = getUses();
     if (uses.count >= MAX_DAILY) { setErr('Daily limit reached (10/day). Upgrade for unlimited access.'); return; }
-    if (file.size > MAX_BYTES) { setErr('File too large. Free tier: max 5 MB. Need more? Use full ParaShare.'); return; }
+    if (file.size > MAX_BYTES) { setErr('File too large. Free tier: max 20 MB. Need more? Use full ParaShare.'); return; }
 
     showScreen('ps-screen-progress');
     try {
@@ -295,45 +296,68 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       setProgress(5, 'Queued — free tier…', 'Free uploads go last · paid users get instant priority');
       await new Promise(r => setTimeout(r, 3000));
 
-      setProgress(20, 'Reading file…');
-      const fileBytes = new Uint8Array(await file.arrayBuffer());
+      setProgress(10, 'Reading file…');
+      const fileBytes  = new Uint8Array(await file.arrayBuffer());
+      const totalChunks = Math.max(1, Math.ceil(fileBytes.length / CHUNK_PLAIN));
+      const tokens     = [];
 
-      setProgress(35, 'Encrypting — AES-256-GCM…');
-      const metaBytes = new TextEncoder().encode(JSON.stringify({ file_name: file.name, file_size: file.size, chunk_index: 0, total_chunks: 1 }));
-      const metaLen   = u32be(metaBytes.length);
-      const payload   = concat(META_MAGIC, metaLen, metaBytes, fileBytes);
-      const { packet } = await encryptAES(payload);
+      for (let i = 0; i < totalChunks; i++) {
+        const pct = 15 + Math.round((i / totalChunks) * 70);
+        const label = totalChunks > 1
+          ? `Encrypting chunk ${i + 1}/${totalChunks}…`
+          : 'Encrypting — AES-256-GCM…';
+        setProgress(pct, label);
 
-      // Pad to exactly 5MB
-      const padded = new Uint8Array(BLOCK);
-      padded.set(packet);
-      if (packet.length < BLOCK) {
-        const tail = padded.subarray(packet.length);
-        for (let off = 0; off < tail.length; off += 65536)
-          crypto.getRandomValues(tail.subarray(off, Math.min(off + 65536, tail.length)));
+        const start     = Math.round(i * CHUNK_PLAIN);
+        const chunkData = fileBytes.slice(start, Math.min(start + CHUNK_PLAIN, fileBytes.length));
+        const metaBytes = new TextEncoder().encode(JSON.stringify({
+          file_name: file.name, file_size: file.size,
+          chunk_index: i, total_chunks: totalChunks
+        }));
+        const metaLen = u32be(metaBytes.length);
+        const payload = concat(META_MAGIC, metaLen, metaBytes, chunkData);
+        const { packet } = await encryptAES(payload);
+
+        // Pad chunk to exactly 5MB
+        const padded = new Uint8Array(BLOCK);
+        padded.set(packet);
+        if (packet.length < BLOCK) {
+          const tail = padded.subarray(packet.length);
+          for (let off = 0; off < tail.length; off += 65536)
+            crypto.getRandomValues(tail.subarray(off, Math.min(off + 65536, tail.length)));
+        }
+
+        const hashBuf = await crypto.subtle.digest('SHA-256', padded);
+        const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2,'0')).join('');
+
+        const uploadLabel = totalChunks > 1 ? `Uploading chunk ${i + 1}/${totalChunks}…` : 'Uploading…';
+        setProgress(pct + Math.round(5 / totalChunks), uploadLabel);
+
+        const body = JSON.stringify({
+          hash, payload: toB64(padded), ttl_ms: totalChunks > 1 ? 900000 : 300000,
+          meta: { device_id:'parashare-free', file_name:file.name, file_size:file.size,
+                  chunk_index:i, total_chunks:totalChunks }
+        });
+        const ur = await fetch(`${RELAY}/v2/inbound`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-Api-Key':FREE_KEY,'User-Agent':'parashare-free/1.0'},
+          body, signal: AbortSignal.timeout(60000)
+        });
+        if (!ur.ok) {
+          const txt = await ur.text();
+          let msg = 'Upload failed';
+          try { msg = JSON.parse(txt).error || msg; } catch {}
+          throw new Error(msg);
+        }
+        const ud = await ur.json();
+        if (!ud.ok) throw new Error(ud.error || 'Upload failed');
+        tokens.push(ud.download_token);
       }
-
-      setProgress(55, 'Hashing…');
-      const hashBuf = await crypto.subtle.digest('SHA-256', padded);
-      const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2,'0')).join('');
-
-      setProgress(70, 'Uploading…');
-      const body = JSON.stringify({
-        hash, payload: toB64(padded), ttl_ms: 300000,
-        meta: { device_id:'parashare-free', file_name:file.name, file_size:file.size, chunk_index:0, total_chunks:1 }
-      });
-      const ur = await fetch(`${RELAY}/v2/inbound`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Api-Key':FREE_KEY,'User-Agent':'parashare-free/1.0'},
-        body, signal: AbortSignal.timeout(60000)
-      });
-      const ud = await ur.json();
-      if (!ud.ok) throw new Error(ud.error || 'Upload failed');
 
       setProgress(95, 'Generating link…');
       await new Promise(r => setTimeout(r, 300));
 
-      const shareUrl = window.location.origin + '/parashare?t=' + encodeURIComponent(ud.download_token) + '&n=' + encodeURIComponent(file.name) + '&c=1';
+      const shareUrl = window.location.origin + '/parashare?t=' + encodeURIComponent(tokens.join(',')) + '&n=' + encodeURIComponent(file.name) + '&c=' + totalChunks;
       document.getElementById('ps-result-link').textContent = shareUrl;
       document.getElementById('ps-result-link')._url = shareUrl;
       showScreen('ps-screen-result');
