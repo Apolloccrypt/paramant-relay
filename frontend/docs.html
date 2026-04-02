@@ -151,8 +151,13 @@ curl -X POST https://health.paramant.app/v2/inbound \
 GET /v2/check-key?k=pgp_your_key_here</pre>
     <p>Keys are plan-based: <span class="badge">dev</span><span class="badge">pro</span><span class="badge">enterprise</span></p>
 
-    <h2 id="sdk">SDK</h2>
-    <p>The Python SDK handles encryption, chunking, retries, and DID auth automatically.</p>
+    <h2 id="sdk">SDK &amp; scripts</h2>
+    <p>The Python SDK and CLI scripts handle encryption, chunking, retries, and DID auth automatically. Download them below — your API key is required to use the relay.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 24px">
+      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ededed;background:#111;border:1px solid #1a1a1a;border-radius:5px;padding:8px 16px;text-decoration:none">&#8595; paramant-sender.py</a>
+      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ededed;background:#111;border:1px solid #1a1a1a;border-radius:5px;padding:8px 16px;text-decoration:none">&#8595; paramant-receiver.py</a>
+      <a href="/dl/scripts/paramant_sdk.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ededed;background:#111;border:1px solid #1a1a1a;border-radius:5px;padding:8px 16px;text-decoration:none">&#8595; paramant_sdk.py</a>
+    </div>
     <pre>gp = GhostPipe(
     api_key=<span class="st">"pgp_xxx"</span>,
     device=<span class="st">"device-001"</span>,
