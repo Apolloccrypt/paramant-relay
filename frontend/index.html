@@ -483,26 +483,12 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 </section>
 
 
-<div class="code-wrap" style="padding-bottom:80px">
-  <div class="code-block">
-    <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><span class="code-lang">python</span></div>
-    <div class="code-body">
-      <div><span class="c-comment"># pip install paramant-sdk</span></div>
-      <div><span class="c-kw">from</span> paramant_sdk <span class="c-kw">import</span> GhostPipe</div><br>
-      <div>gp   = GhostPipe(<span class="c-str">"pgp_xxx"</span>, <span class="c-str">"mri-scanner-001"</span>)</div>
-      <div>hash = gp.send(patient_record)<span class="c-comment">  # ML-KEM-768 encrypted</span></div>
-      <div>data = gp.receive(hash)        <span class="c-comment">  # burn-on-read &mdash; then gone</span></div><br>
-      <div><span class="c-ok"># delivered. destroyed. zero trace.</span></div>
-    </div>
-  </div>
-</div>
-
 <hr class="divider">
 
 <section id="pricing">
   <div class="eyebrow">Pricing</div>
   <h2>Simple. Per relay. No data fees.</h2>
-  <p class="sub">You pay for access to the relay network. No fees per blob, no storage costs, no egress charges.</p>
+  <p class="sub">You pay for access to the relay network — no fees per blob, no storage costs, no egress charges. <span style="color:var(--quiet)">Pay with money, not with your data. Or your customers'.</span></p>
   
         <div class="pricing-grid">
           <div class="pc">
