@@ -98,10 +98,10 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 <nav>
   <div class="nav-logo">PARAMANT</div>
   <ul class="nav-links">
-    <li><a href="#protocol">Protocol</a></li>
+    <li></li>
     <li><a href="#identity">Identity</a></li>
     <li><a href="#sectors">Use cases</a></li>
-    <li><a href="#api">API</a></li>
+    <li><a href="/docs">Docs</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="/parashare">ParaShare</a></li>
     <li><a href="/outlook">Outlook</a></li>
@@ -444,99 +444,50 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   </div>
 </section>
 
+
+
+
+
+
+
 <hr class="divider">
 
-<section id="protocol">
-  <div class="eyebrow">Protocol</div>
-  <h2>Zero plaintext. Zero storage. Zero trust.</h2>
-  <p class="sub">Every blob is end-to-end encrypted before leaving your device. The relay sees only fixed-size, indistinguishable ciphertext.</p>
-  <div class="grid g3">
-    <div class="cell">
-      <h3>Post-quantum hybrid</h3>
-      <p class="desc">ML-KEM-768 and ECDH P-256 in a single handshake. Resistant to both classical and quantum adversaries. NIST FIPS 203 certified.</p>
-      <span class="tag">ML-KEM-768 + ECDH</span>
+<section id="parashare-demo" style="padding:80px 0">
+  <div style="display:flex;gap:60px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:280px">
+      <div class="eyebrow">ParaShare</div>
+      <h2>Send files.<br>They vanish after opening.</h2>
+      <p class="sub">Drop a file. Get a one-time link. The receiver clicks once — file downloads, then burns permanently from RAM. No storage. No logs. No second chance.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin:28px 0">
+        <div style="font-size:13px;color:var(--muted)">→ Post-quantum encrypted before leaving your device</div>
+        <div style="font-size:13px;color:var(--muted)">→ Up to 500MB — chunked, encrypted, reassembled</div>
+        <div style="font-size:13px;color:var(--muted)">→ Password protection + webhook on delivery</div>
+        <div style="font-size:13px;color:var(--muted)">→ Certificate Transparency proof of delivery</div>
+      </div>
+      <a href="/parashare" style="display:inline-block;background:var(--text);color:var(--bg);padding:12px 28px;font-family:var(--mono);font-size:13px;font-weight:700;text-decoration:none;border-radius:4px;letter-spacing:.05em">Try ParaShare free →</a>
     </div>
-    <div class="cell">
-      <h3>Burn-on-read</h3>
-      <p class="desc">Data is overwritten with random bytes immediately after the first retrieval. No disk writes, no persistence, no recovery after delivery.</p>
-      <span class="tag">RAM-only</span>
-    </div>
-    <div class="cell">
-      <h3>Sender authentication</h3>
-      <p class="desc">Every blob signed with ECDSA P-256 before upload. ML-DSA-65 post-quantum signatures supported. Retry with exponential backoff.</p>
-      <span class="tag">ECDSA + ML-DSA-65</span>
-    </div>
-    <div class="cell">
-      <h3>Global anycast</h3>
-      <p class="desc">Five Fly.io nodes across Amsterdam, Frankfurt, Stockholm, Paris, and Chicago. Minimum three always active. Session affinity per API key.</p>
-      <span class="tag">5 nodes &middot; EU primary</span>
-    </div>
-    <div class="cell">
-      <h3>Real-time push</h3>
-      <p class="desc">WebSocket stream at /v2/stream delivers blob_ready events without polling. NATS JetStream backend. Sub-100ms for IoT and medical vitals.</p>
-      <span class="tag">WebSocket &middot; NATS</span>
-    </div>
-    <div class="cell">
-      <h3>Merkle audit chain</h3>
-      <p class="desc">Every inbound and outbound event chained in a tamper-evident log. Verifiable chain integrity. Export as JSON or CSV for compliance.</p>
-      <span class="tag">Merkle &middot; CT log</span>
+    <div style="flex:1;min-width:300px;max-width:460px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="padding:12px 20px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;gap:10px">
+          <div style="width:7px;height:7px;border-radius:50%;background:#2d8a5c"></div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em">PARASHARE · by PARAMANT</div>
+        </div>
+        <div style="padding:28px 24px">
+          <div style="border:1px dashed var(--border);border-radius:6px;padding:36px;text-align:center">
+            <div style="font-size:28px;color:var(--border);margin-bottom:12px">↑</div>
+            <div style="font-size:13px;color:var(--muted)">Drop a file or <a href="/parashare" style="color:var(--text);text-decoration:none">click to upload</a></div>
+            <div style="font-size:11px;color:var(--quiet);margin-top:6px">Up to 500MB · Any file type · One-time link</div>
+          </div>
+          <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">
+            <span class="tag">AES-256-GCM</span>
+            <span class="tag">Burn-on-read</span>
+            <span class="tag">CT proof</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
-
-<hr class="divider">
-
-<section id="identity">
-  <div class="eyebrow">Identity &amp; PKI</div>
-  <h2>No central database. Every device proves itself.</h2>
-  <p class="sub">Devices authenticate with cryptographic proof instead of shared API keys. The relay does not need to know who you are.</p>
-  <div class="grid g3">
-    <div class="cell">
-      <h3>W3C Decentralized Identity</h3>
-      <p class="desc">Each device gets a DID instead of a shared key. Authentication works by signing the request. No central users.json, no single point of failure.</p>
-      <span class="tag">did:paramant:xxx</span>
-    </div>
-    <div class="cell">
-      <h3>Certificate Transparency log</h3>
-      <p class="desc">Every public key registration logged in a public Merkle tree. Anyone can verify a device is registered without seeing any data. Inclusion proofs on demand.</p>
-      <span class="tag">Public &middot; /v2/ct/log</span>
-    </div>
-    <div class="cell">
-      <h3>Hardware attestation</h3>
-      <p class="desc">TPM 2.0 and Apple Secure Enclave sign the sender public key. The relay verifies the key came from real hardware, not a software fake.</p>
-      <span class="tag">TPM 2.0 &middot; Secure Enclave</span>
-    </div>
-  </div>
-</section>
-
-
-<hr class="divider">
-
-<section id="api">
-  <div class="eyebrow">API reference</div>
-  <h2>REST &mdash; no SDK required.</h2>
-  <p class="sub">All endpoints accept <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">X-Api-Key</code> header or <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">?k=</code> query param. DID auth via <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">X-DID</code> + <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">X-DID-Signature</code>.</p>
-  <table class="api-table">
-    <thead><tr><th style="width:72px">Method</th><th style="width:260px">Endpoint</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/health</td><td class="api-desc">Node status, version, crypto stack, uptime</td></tr>
-      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/pubkey</td><td class="api-desc">Register ML-KEM + ECDH receiver keypair</td></tr>
-      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/inbound</td><td class="api-desc">Upload encrypted 5MB blob</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/outbound/:hash</td><td class="api-desc">Download and burn &mdash; one retrieval only</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/status/:hash</td><td class="api-desc">Check availability without consuming</td></tr>
-      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/ack</td><td class="api-desc">Receiver confirms delivery, relay logs latency</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/monitor</td><td class="api-desc">Live delivery stats, latency, ACK rate</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/stream</td><td class="api-desc">WebSocket &mdash; push events, no polling</td></tr>
-      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/did/register</td><td class="api-desc">Register W3C Decentralized Identity</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/did/:did</td><td class="api-desc">Resolve DID document &mdash; public, no auth</td></tr>
-      <tr><td><span class="method post">POST</span></td><td class="ep">/v2/attest</td><td class="api-desc">Hardware attestation &mdash; TPM 2.0, Secure Enclave</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/ct/log</td><td class="api-desc">Public Certificate Transparency log</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/v2/audit</td><td class="api-desc">Merkle audit chain &mdash; JSON and CSV export</td></tr>
-      <tr><td><span class="method get">GET</span></td><td class="ep">/metrics</td><td class="api-desc">Prometheus scrape endpoint</td></tr>
-    </tbody>
-  </table>
-</section>
-
 
 
 <hr class="divider">
