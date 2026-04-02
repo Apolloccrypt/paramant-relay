@@ -27,7 +27,7 @@ const VERSION    = '2.1.0';
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
-const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '20971520');
+const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
 const RELAY_MODE = process.env.RELAY_MODE          || 'full';
 const SECTOR     = process.env.SECTOR              || 'relay';
@@ -251,7 +251,7 @@ setInterval(() => {
 // ── RAM guard ────────────────────────────────────────────────────────────────
 const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
 const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
-const BLOB_SIZE_MB    = 20;
+const BLOB_SIZE_MB    = 5;
 const MAX_BLOBS       = Math.floor(RAM_LIMIT_MB / BLOB_SIZE_MB);
 
 function ramStats() {
@@ -667,7 +667,7 @@ const server = http.createServer(async (req, res) => {
       if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
 
       const blob = Buffer.from(payload, 'base64');
-      const planMaxSize = keyData?.plan === 'free' ? 20 * 1024 * 1024 : MAX_BLOB;
+      const planMaxSize = MAX_BLOB;
       if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
 
       // ML-DSA handtekening verificatie (optioneel maar gelogd)
