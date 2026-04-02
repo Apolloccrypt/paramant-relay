@@ -51,7 +51,7 @@ async function loadRelayData(relay){
   addLog("Loading "+relay.l+"...","info");
   const [health,audit,ct]=await Promise.all([
     fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(d=>({ok:true,data:d})).catch(()=>({ok:false,data:null})),
-    apiCall(relay.u,"/v2/audit?k="+adminKey),
+    apiCall(relay.u,"/v2/audit"),
     apiCall(relay.u,"/v2/ct/log?limit=10"),
   ]);
   relayData[relay.u]={health:health.data,audit:audit.data,ct:ct.data};
@@ -118,11 +118,14 @@ async function revokeKey(key){
   if(!confirm("Revoke "+key.slice(0,20)+"...?"))return;
   addLog("Revoking "+key.slice(0,16)+"...","warn");
   const r=await apiCall(selectedRelay.u,"/v2/admin/keys/revoke","POST",{key});
-  if(r.ok){addLog("Key revoked","ok");await loadKeys();}
+  if(r.ok){addLog("Key revoked","ok");showToast("Key gerevoked");await loadKeys();}
   else addLog("Revoke failed: "+(r.data?.error||r.error),"error");
 }
 
 async function loadKeys(){
+  const btns=document.querySelectorAll('[onclick="loadKeys()"]');
+  btns.forEach(b=>{b.disabled=true;b.textContent='Loading...';});
+  setTimeout(()=>btns.forEach(b=>{b.disabled=false;b.textContent=b.textContent==='Loading...'?'Load keys':b.textContent;}),6000);
   addLog("Loading API keys...","info");
   const r=await apiCall(selectedRelay.u,"/v2/admin/keys");
   if(r.ok&&r.data?.keys){
@@ -135,17 +138,12 @@ async function loadKeys(){
 }
 
 async function reloadUsers(){
-  addLog("Reloading users on all relays...","info");
+  addLog("Pinging all relays...","info");
   for(const relay of RELAYS){
     try{
-      const r=await fetch(relay.u+"/v2/reload-users",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","X-Admin-Token":adminKey,"X-Api-Key":adminKey},
-        body:"{}",
-        signal:AbortSignal.timeout(8000)
-      });
+      const r=await fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)});
       const d=await r.json().catch(()=>({}));
-      addLog(relay.l+": "+(r.ok?"reloaded ✓"+(d.count?" ("+d.count+" keys)":""):"failed "+r.status),r.ok?"ok":"error");
+      addLog(relay.l+": "+(r.ok?"online v"+d.version+" | "+Math.floor((d.uptime_s||0)/3600)+"h uptime":"offline "+r.status),r.ok?"ok":"error");
     }catch(e){
       addLog(relay.l+": "+e.message,"error");
     }
@@ -192,7 +190,7 @@ function renderMain(){
   const cards=[
     ["Version",h.version||"—",V.t],
     ["Uptime",h.uptime_s?Math.floor(h.uptime_s/3600)+"h":"—",V.t],
-    ["Blobs in flight",h.blobs||0,V.y],
+    ["Blobs in flight",h.blobs_in_flight||h.blobs||0,V.y],
     ["Pubkeys",h.pubkeys||0,V.t],
     ["Sent",st.inbound||0,V.t],
     ["Burned",st.burned||0,V.t],
@@ -345,11 +343,21 @@ async function doLogin(){
   adminKey=k;
   addLog("Signed in | plan: "+d.plan+" | MFA verified","ok");
   render();
+setInterval(()=>{if(adminKey)loadAllRelays();},30000);
   loadAllRelays();
   loadKeys();
 }
 
 render();
+
+function showToast(msg,ok=true){
+  const t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:'+(ok?'#1a3a2a':'#3a1a1a')+';color:'+(ok?'#2d8a5c':'#e07060')+';border:1px solid '+(ok?'#2d4a3a':'#5a2a2a')+';padding:10px 18px;border-radius:4px;font-size:12px;font-family:monospace;z-index:9999;letter-spacing:.04em';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
 </script>
 </body>
 </html>
