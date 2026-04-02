@@ -1,184 +1,126 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PARAMANT // PRIVACY POLICY</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — PARAMANT</title>
 <style>
-
-:root{
-  --bg: #ffffff;--s1:#f9fafb;--s2:#f3f4f6;--b1:#e5e7eb;--b2:#d1d5db;
-  --t1:#111827;--t2:#d8dce4;--t3:#6b7280;--t4:#9ca3af;
-  --g:#059669;--gd:#4a7c59;--mono:'JetBrains Mono',ui-monospace,monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--t2);font-family:var(--mono);min-height:100vh}
-a{color:var(--g);text-decoration:none}
-h1,h2,h3{color:var(--t1);font-weight:700}
-
-main{padding-top:68px;max-width:760px;margin:0 auto;padding:68px 24px 80px}
-.page-header{padding:32px 0 28px;border-bottom:1px solid var(--b1);margin-bottom:40px}
-.page-title{font-size:10px;color:var(--t4);letter-spacing:.1em;margin-bottom:8px}
-h1{font-size:24px}
-.meta{font-size:11px;color:var(--t4);margin-top:8px}
-.section{margin-bottom:36px}
-.section-label{font-size:10px;color:var(--t4);letter-spacing:.1em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--b1)}
-h2{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:10px}
-p{font-size:13px;color:var(--t2);line-height:1.9;margin-bottom:10px}
-.data-table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}
-.data-table th{background:var(--s2);color:var(--t4);text-align:left;padding:8px 12px;font-weight:600;letter-spacing:.06em;font-size:10px;border:1px solid var(--b1)}
-.data-table td{padding:8px 12px;border:1px solid var(--b1);color:var(--t2);vertical-align:top;line-height:1.6}
-.data-table td.ok{color:var(--g)}
-.highlight{background:var(--s1);border:1px solid var(--b1);padding:16px;margin:16px 0;font-size:12px;line-height:1.9}
-.highlight strong{color:var(--t1)}
-.contact{background:var(--s1);border:1px solid var(--b1);padding:20px;margin-top:40px}
-
-/* ── Consistente navbar ── */
-nav.p-nav{position:sticky;top:0;z-index:1000;background:#ffffff;border-bottom:1px solid #e5e7eb;height:52px;display:flex;align-items:center;padding:0 32px}
-.p-nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
-.p-nav-logo{font-size:14px;font-weight:900;color:#111827;margin-right:40px;flex-shrink:0;letter-spacing:-.01em;text-decoration:none;font-family:'JetBrains Mono',monospace}
-.p-nav-links{display:flex;align-items:center;gap:2px;flex:1}
-.p-nav-link{padding:6px 14px;font-size:11px;color:#6b7280;letter-spacing:.05em;transition:color .15s;text-decoration:none;font-family:'JetBrains Mono',monospace}
-.p-nav-link:hover{color:#111827}
-.p-nav-ctas{display:flex;align-items:center;gap:8px;margin-left:auto}
-.p-btn-nav{padding:7px 14px;border:1px solid #d1d5db;color:#6b7280;font-size:11px;font-family:'JetBrains Mono',monospace;background:none;transition:all .15s;text-decoration:none}
-.p-btn-nav:hover{border-color:#111827;color:#111827}
-.p-btn-nav-solid{padding:7px 16px;background:#111827;color:#ffffff;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.04em;text-decoration:none;display:inline-block}
-.p-btn-nav-solid:hover{background:#374151}
-@media(max-width:768px){.p-nav-links{display:none}nav.p-nav{padding:0 16px}}
-</style>
-<style>
-/* ═══ PARAMANT LIGHT THEME OVERRIDE ═══ */
-:root {
-  --bg:      #ffffff !important;
-  --bg2:     #f9fafb !important;
-  --bg3:     #f3f4f6 !important;
-  --border:  #e5e7eb !important;
-  --border2: #d1d5db !important;
-  --text:    #111827 !important;
-  --muted:   #6b7280 !important;
-  --dim:     #9ca3af !important;
-  --green:   #059669 !important;
-  --purple:  #7c3aed !important;
-  --red:     #dc2626 !important;
-  --yellow:  #d97706 !important;
-  --teal:    #0d9488 !important;
-  --orange:  #ea580c !important;
-}
-body {
-  background: #ffffff !important;
-  color: #111827 !important;
-}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;--mono:"SF Mono","Fira Code",monospace}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.7}
+nav.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.95);backdrop-filter:blur(8px);z-index:100}
+.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none}
+.content{max-width:800px;margin:80px auto;padding:0 48px}
+h1{font-size:32px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
+h2{font-size:20px;margin:48px 0 16px;border-top:1px solid var(--border);padding-top:48px}
+p{margin-bottom:16px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:24px 0}
+th,td{padding:12px 0;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet)}
+ul{margin-left:24px;color:var(--muted)}
+li{margin-bottom:6px}
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;font-size:12px;color:var(--quiet)}
+@media(max-width:900px){nav.topbar{padding:0 24px}.nav-links{gap:16px}.content{padding:40px 24px}footer{padding:24px}}
+@media(max-width:600px){.nav-links{display:none}}
 </style>
 </head>
 <body>
-<nav class="p-nav">
- <div class="p-nav-inner">
-  <a href="/" class="p-nav-logo">PARAMANT</a>
-  <div class="p-nav-links">
-   <a href="/#sectoren" class="p-nav-link">SECTOREN</a>
-   <a href="/#pricing" class="p-nav-link">PRICING</a>
-   <a href="/#integratie" class="p-nav-link">INTEGRATIE</a>
-   <a href="/docs" class="p-nav-link">API DOCS</a>
-  </div>
-  <div class="p-nav-ctas">
-   <a href="/chat" class="p-btn-nav">Chat gratis</a>
-   <a href="/dashboard" class="p-btn-nav-solid">Dashboard &rarr;</a>
-  </div>
- </div>
+
+<nav class="topbar">
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/developers">Developers</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="/#pricing">Pricing</a></li>
+    <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/outlook">Outlook</a></li>
+    <li><a href="/dashboard">Dashboard</a></li>
+  </ul>
 </nav>
 
-<main>
-  <div class="page-header">
-    <div class="page-title">// LEGAL</div>
-    <h1>Privacy Policy</h1>
-    <p class="meta">PARAMANT &mdash; Mick Beer &mdash; Laatste update: maart 2026</p>
-  </div>
+<div class="content">
 
-  <div class="section">
-    <div class="section-label">// KERN</div>
-    <div class="highlight">
-      <strong>PARAMANT verzamelt geen persoonsgegevens.</strong><br>
-      Geen account. Geen e-mail. Geen telefoonnummer. Geen IP-opslag. Geen analytics.<br>
-      De relay verwerkt versleutelde berichten maar slaat ze niet op. Na 5 minuten worden ze automatisch verwijderd.
-    </div>
-  </div>
+<h1>Privacy Policy</h1>
+<p style="color:#2d6a4f;font-size:13px;margin-bottom:40px">Last updated: April 2, 2026</p>
 
-  <div class="section">
-    <div class="section-label">// WAT WE VERWERKEN</div>
-    <table class="data-table">
-      <tr><th>Gegeven</th><th>Doel</th><th>Opslag</th><th>Deelname</th></tr>
-      <tr><td>Versleuteld berichtpakket</td><td>Doorstuurbaarheid via relay</td><td>Max 5 min op relay, daarna auto-delete</td><td class="ok">NOOIT gedeeld</td></tr>
-      <tr><td>SHA-256 hash van chatroom</td><td>Routing zonder adressering</td><td>Niet opgeslagen</td><td class="ok">NOOIT gedeeld</td></tr>
-      <tr><td>Berichtgrootte + tijdstip</td><td>Relay statistieken (geanonimiseerd)</td><td>Aggregaat, geen IP</td><td class="ok">Geen persoonsdata</td></tr>
-      <tr><td>ECDH/KEM sleutelpaar</td><td>Versleuteling</td><td>Alleen lokaal (IndexedDB)</td><td class="ok">Verlaat nooit device</td></tr>
-    </table>
-  </div>
+<h2>Core principle</h2>
+<p><strong>PARAMANT collects no personal data.</strong></p>
+<p>No account required for ParaShare Free. No email. No phone number. No IP logging. No cookies. No tracking pixels. No analytics. No advertisements.</p>
 
-  <div class="section">
-    <div class="section-label">// WAT WE NIET DOEN</div>
-    <p>
-      PARAMANT gebruikt geen cookies, geen tracking pixels, geen fingerprinting en geen analytics.<br>
-      Er zijn geen advertenties. Er zijn geen investeerders. Er is geen bedrijf achter PARAMANT.<br>
-      De broncode is volledig open-source en verifieerbaar op GitHub.
-    </p>
-  </div>
+<h2>How Ghost Pipe &amp; ParaShare work</h2>
+<p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
+<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). There is zero persistent storage. Nothing is written to disk.</p>
+<p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
-  <div class="section">
-    <div class="section-label">// RELAY SERVER</div>
-    <p>
-      De relay draait op een Hetzner server in Neurenberg, Duitsland (EU/GDPR-jurisdictie).<br>
-      De relay ontvangt versleutelde pakketjes. De relay kan de inhoud <strong>nooit</strong> lezen &mdash; berichten zijn end-to-end versleuteld met ML-KEM-768 + AES-256-GCM voordat ze de relay bereiken.<br>
-      Pakketjes worden na maximaal 5 minuten automatisch verwijderd.
-    </p>
-    <p>
-      Een Tor hidden service is beschikbaar voor gebruikers die ook de relay-connectie willen anonimiseren.<br>
-      Via Tor ziet de relay het IP-adres niet.
-    </p>
-  </div>
+<h2>What we process</h2>
+<table>
+<thead><tr><th>Data</th><th>Purpose</th><th>Storage</th><th>Shared</th></tr></thead>
+<tbody>
+<tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
+<tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
+<tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
+<tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
+<tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
+</tbody>
+</table>
 
-  <div class="section">
-    <div class="section-label">// LOKALE OPSLAG</div>
-    <p>
-      PARAMANT slaat de volgende gegevens lokaal op in uw browser (IndexedDB):
-    </p>
-    <table class="data-table">
-      <tr><th>Key</th><th>Inhoud</th><th>Doel</th></tr>
-      <tr><td>identity</td><td>ECDH + KEM sleutelpaar</td><td>Identiteit tussen sessies bewaren</td></tr>
-      <tr><td>nonce-registry</td><td>Gebruikte nonces (hashes)</td><td>Replay-attack bescherming</td></tr>
-      <tr><td>pm-ext-checked</td><td>'1' (sessionStorage)</td><td>Browser-extensie check, verdwijnt bij sluiten tab</td></tr>
-    </table>
-    <p>U kunt alle lokale data verwijderen via: Browserinstellingen &rarr; Site-instellingen &rarr; paramant.app &rarr; Verwijder data.</p>
-  </div>
+<h2>What we never do</h2>
+<ul>
+<li>Store personal data of any kind</li>
+<li>Log or store IP addresses beyond what Cloudflare handles in transit</li>
+<li>Use cookies or browser fingerprinting</li>
+<li>Run advertising or tracking scripts</li>
+<li>Share any data with third parties</li>
+<li>Write file data to disk at any point</li>
+</ul>
 
-  <div class="section">
-    <div class="section-label">// EXTERNE DIENSTEN</div>
-    <p>
-      De website laadt momenteel twee externe JavaScript-bibliotheken via Cloudflare CDN: TailwindCSS (stijlen) en QRCode.js (QR-code generatie). Cloudflare verwerkt hierbij uw IP-adres als onderdeel van CDN-levering — dit is de enige externe verbinding die PARAMANT maakt bij het laden. Er worden geen andere externe servers gecontacteerd.<br>
-      Cloudflare verwerkt hierbij uw IP-adres als onderdeel van de CDN-levering. Dit wordt niet door PARAMANT gecontroleerd.<br>
-      Wij werken aan het volledig inline bundelen van deze bibliotheken om dit te elimineren.
-    </p>
-  </div>
+<h2>Local storage in your browser</h2>
+<p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
+<ul>
+<li><strong>ECDH + ML-KEM key pairs</strong> &mdash; generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
+<li><strong>Nonce registry</strong> &mdash; replay-attack protection (SDK sessions)</li>
+<li><strong>Free tier usage counter</strong> (<code style="font-family:var(--mono);font-size:13px">ps_free_uses</code>) &mdash; today's date and upload count, used to enforce the 10/day limit client-side</li>
+<li><strong>Docs access key</strong> (<code style="font-family:var(--mono);font-size:13px">pm_docs_key</code>) &mdash; stored if you authenticate to the Docs with a paid API key</li>
+</ul>
+<p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
 
-  <div class="section">
-    <div class="section-label">// AVG / GDPR</div>
-    <p>
-      Omdat PARAMANT geen persoonsgegevens verwerkt, is er formeel geen verwerkingsgrondslag vereist.<br>
-      Er is geen Data Protection Officer aangesteld, geen verwerkingsregister en geen cookiemelding &mdash; omdat er niets te melden valt.<br>
-      Betreffende GDPR artikel 5(1)(e): gegevens worden niet langer bewaard dan noodzakelijk. Relay: 5 minuten. Lokaal: op verzoek verwijderbaar.
-    </p>
-  </div>
+<h2>Servers &amp; jurisdiction</h2>
+<p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Frankfurt, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. No CLOUD Act exposure. All data is subject to EU/GDPR jurisdiction only.</p>
 
-  <div class="section">
-    <div class="section-label">// KINDEREN</div>
-    <p>
-      PARAMANT is niet specifiek gericht op kinderen onder de 13 jaar. Er worden geen gegevens van minderjarigen bewust verzameld.
-    </p>
-  </div>
+<h2>Cloudflare</h2>
+<p>Incoming traffic passes through a <strong>Cloudflare Tunnel</strong> for DDoS protection and SSL termination. Cloudflare acts as a reverse proxy and may log connection metadata (IP address, timestamp, bytes transferred) in accordance with their own privacy policy. PARAMANT does not receive, store, or use this metadata. No Cloudflare analytics, Workers, or tracking products are in use.</p>
 
-  <div class="contact">
-    <div class="section-label">// CONTACT</div>
-    <p style="font-size:12px;line-height:2">
-      Vragen over privacy: <a href="/cdn-cgi/l/email-protection#15787c767e77675565677a617a7b78747c793b767a78"><span class="__cf_email__" data-cfemail="c3aeaaa0a8a1b183b3b1acb7acadaea2aaafeda0acae">[email&#160;protected]</span></a><br>
-      Broncode: <a href="https://github.com/Apolloccrypt/paramant" target="_blank">github.com/Apolloccrypt/paramant</a><br>
-      Relay code: <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">github.com/Apolloccrypt/paramant-relay</a><br>
+<h2>Payments (Pro / Enterprise)</h2>
+<p>Payment processing is handled by <strong>Stripe</strong>. PARAMANT never sees or stores full card numbers. Stripe's privacy policy governs the payment data they handle. Only your chosen plan and an anonymised customer reference are stored on our side.</p>
+
+<h2>GDPR / AVG</h2>
+<p>Because virtually no personal data is processed, standard heavy administrative obligations under GDPR do not apply to most interactions. For Pro and Enterprise customers, we provide a <strong>Data Processing Agreement (DPA)</strong> on request.</p>
+<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Free, 24 hours for Pro, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
+
+<h2>Children</h2>
+<p>PARAMANT is not directed at children under 13. We do not knowingly collect data from minors.</p>
+
+<h2>Changes to this policy</h2>
+<p>We may update this policy. Material changes will be noted via the "Last updated" date above. Continued use of the service after a change constitutes acceptance.</p>
+
+<h2>Contact</h2>
+<p>Questions about this Privacy Policy? Email <strong>info@paramant.app</strong>.</p>
+
+</div>
+
+<footer>
+  <span style="font-family:var(--mono);font-size:12px;letter-spacing:.06em">PARAMANT</span>
+  <div style="display:flex;gap:24px">
+    <a href="/" style="color:var(--quiet);text-decoration:none">Home</a>
+    <a href="/parashare" style="color:var(--quiet);text-decoration:none">ParaShare</a>
+    <a href="/docs" style="color:var(--quiet);text-decoration:none">Docs</a>
+    <a href="/privacy" style="color:var(--quiet);text-decoration:none">Privacy</a>
+  </div>
+  <div style="text-align:right;line-height:1.4">Ghost Pipe v2.1.0 &middot; Zero storage &middot; Burn-on-read &middot; EU/DE only</div>
+</footer>
+
+</body>
+</html>
