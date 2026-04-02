@@ -119,7 +119,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   </div>
 </div>
 
-
 <div class="proto-bar">
   <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">NIST FIPS 203</div></div>
   <div class="proto-cell"><div class="label">ML-DSA-65</div><div class="pdesc">NIST FIPS 204</div></div>
@@ -130,6 +129,223 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <div class="proto-cell"><div class="label">Hetzner DE</div><div class="pdesc">EU jurisdiction</div></div>
 </div>
 
+<hr class="divider">
+
+<section id="parashare-demo" style="max-width:960px;margin:0 auto;padding:72px 48px">
+  <div style="display:flex;gap:60px;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1;min-width:260px;max-width:420px">
+      <div class="eyebrow">ParaShare — free to try</div>
+      <h2>Send files.<br>They vanish after opening.</h2>
+      <p class="sub" style="margin-bottom:20px">Drop a file. Get a one-time link. The receiver clicks once — file downloads, then burns permanently from RAM. No account needed.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:28px">
+        <div style="font-size:13px;color:var(--muted)">→ Encrypted in your browser before upload</div>
+        <div style="font-size:13px;color:var(--muted)">→ Burn-on-read — file gone after first download</div>
+        <div style="font-size:13px;color:var(--muted)">→ No account, no login, no storage</div>
+        <div style="font-size:13px;color:var(--muted)">→ Receiver needs nothing — just a browser</div>
+      </div>
+      <div style="font-size:12px;color:var(--quiet);font-family:var(--mono);border:1px solid var(--border);border-radius:4px;padding:10px 14px;line-height:1.8">
+        Free tier: up to 5MB · 5× per day · back of queue<br>
+        <a href="#pricing" style="color:var(--muted);text-decoration:none">Upgrade for 500MB, priority &amp; webhook →</a>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:300px;max-width:480px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden" id="ps-widget">
+
+        <!-- Header -->
+        <div style="padding:11px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:6px;height:6px;border-radius:50%;background:#2d8a5c"></div>
+            <span style="font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em">PARASHARE · FREE</span>
+          </div>
+          <span style="font-size:10px;color:var(--quiet);font-family:var(--mono)" id="ps-uses-left"></span>
+        </div>
+
+        <!-- Drop screen -->
+        <div id="ps-screen-drop" style="padding:24px">
+          <div id="ps-dropzone" style="border:1px dashed var(--border);border-radius:6px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .15s" ondragover="event.preventDefault();this.style.borderColor='#4a8c5c'" ondragleave="this.style.borderColor=''" ondrop="psHandleDrop(event)">
+            <div style="font-size:24px;color:var(--quiet);margin-bottom:10px">↑</div>
+            <div style="font-size:13px;color:var(--muted)">Drop a file or <span style="color:var(--text);cursor:pointer;text-decoration:underline" onclick="document.getElementById('ps-file-input').click()">browse</span></div>
+            <div style="font-size:11px;color:var(--quiet);margin-top:5px">Max 5MB · Any file type · One-time link</div>
+          </div>
+          <input type="file" id="ps-file-input" style="display:none" onchange="psHandleFile(this.files[0])">
+          <div id="ps-drop-err" style="display:none;margin-top:10px;font-size:12px;color:#c0392b;font-family:var(--mono);text-align:center"></div>
+        </div>
+
+        <!-- Progress screen -->
+        <div id="ps-screen-progress" style="display:none;padding:28px 24px;text-align:center">
+          <div style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:16px" id="ps-prog-msg">Encrypting…</div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;height:4px;overflow:hidden">
+            <div id="ps-prog-bar" style="height:100%;background:#3aaa70;width:0%;transition:width .3s"></div>
+          </div>
+          <div style="font-size:11px;color:var(--quiet);margin-top:10px;font-family:var(--mono)" id="ps-queue-msg"></div>
+        </div>
+
+        <!-- Result screen -->
+        <div id="ps-screen-result" style="display:none;padding:24px">
+          <div style="font-size:12px;font-family:var(--mono);color:var(--quiet);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">One-time link — share it</div>
+          <div id="ps-result-link" style="font-size:11px;font-family:var(--mono);color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px;word-break:break-all;line-height:1.6;cursor:pointer" onclick="psкопировать()" title="Click to copy"></div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button onclick="psCopy()" style="flex:1;background:var(--text);color:var(--bg);border:none;border-radius:4px;padding:9px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)" id="ps-copy-btn">Copy link</button>
+            <button onclick="psReset()" style="flex:1;background:none;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:9px;font-size:12px;cursor:pointer;font-family:var(--font)">Send another</button>
+          </div>
+          <div style="margin-top:12px;font-size:11px;color:var(--quiet);font-family:var(--mono);line-height:1.7">Burn-on-read · AES-256-GCM · expires in 5 min<br>
+          <a href="/parashare" style="color:var(--muted);text-decoration:none">Need 500MB or webhook? Use full ParaShare →</a></div>
+        </div>
+
+        <!-- Tags -->
+        <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap">
+          <span class="tag" style="margin-top:0">AES-256-GCM</span>
+          <span class="tag" style="margin-top:0">Burn-on-read</span>
+          <span class="tag" style="margin-top:0">No account</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const FREE_KEY  = 'pgp_ee0beaee58eff4d337f9281bbe90f74b';
+  const RELAY     = '/rp/health';
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const MAX_DAILY = 5;
+  const LS_KEY    = 'ps_free_uses';
+  const BLOCK     = 5 * 1024 * 1024;
+  const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
+
+  function getUses() {
+    try {
+      const d = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+      const today = new Date().toISOString().slice(0,10);
+      if (d.date !== today) return { date: today, count: 0 };
+      return d;
+    } catch(e) { return { date: new Date().toISOString().slice(0,10), count: 0 }; }
+  }
+  function saveUses(d) { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch(e){} }
+
+  function updateUsesLabel() {
+    const d = getUses();
+    const rem = Math.max(0, MAX_DAILY - d.count);
+    const el = document.getElementById('ps-uses-left');
+    if (el) el.textContent = rem + ' free left today';
+  }
+  updateUsesLabel();
+
+  function showScreen(id) {
+    ['ps-screen-drop','ps-screen-progress','ps-screen-result'].forEach(s => {
+      document.getElementById(s).style.display = s === id ? '' : 'none';
+    });
+  }
+  function setErr(msg) {
+    const el = document.getElementById('ps-drop-err');
+    el.textContent = msg; el.style.display = msg ? '' : 'none';
+  }
+  function setProgress(pct, msg, sub) {
+    document.getElementById('ps-prog-bar').style.width = pct + '%';
+    document.getElementById('ps-prog-msg').textContent = msg;
+    document.getElementById('ps-queue-msg').textContent = sub || '';
+  }
+
+  // Crypto helpers
+  function concat(...arrays) {
+    const total = arrays.reduce((s,a) => s + a.length, 0);
+    const out = new Uint8Array(total); let off = 0;
+    for (const a of arrays) { out.set(a, off); off += a.length; }
+    return out;
+  }
+  function u32be(n) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, false); return b; }
+  function toB64(u8) {
+    let s = ''; const SZ = 8192;
+    for (let i = 0; i < u8.length; i += SZ) s += String.fromCharCode(...u8.slice(i, i+SZ));
+    return btoa(s);
+  }
+  async function encryptAES(payload) {
+    const aesKey = await crypto.subtle.generateKey({ name:'AES-GCM', length:256 }, true, ['encrypt']);
+    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+    const nonce  = crypto.getRandomValues(new Uint8Array(12));
+    const ct     = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv:nonce }, aesKey, payload));
+    const packet = concat(new Uint8Array([0x01]), nonce, rawKey, u32be(ct.length), ct);
+    return { packet };
+  }
+
+  window.psHandleDrop = function(e) {
+    e.preventDefault();
+    document.getElementById('ps-dropzone').style.borderColor = '';
+    const f = e.dataTransfer.files[0];
+    if (f) psHandleFile(f);
+  };
+  window.psHandleFile = async function(file) {
+    if (!file) return;
+    setErr('');
+
+    const uses = getUses();
+    if (uses.count >= MAX_DAILY) { setErr('Daily limit reached (5/day). Upgrade for unlimited.'); return; }
+    if (file.size > MAX_BYTES) { setErr('File too large. Free tier: max 5MB. Need more? Use full ParaShare.'); return; }
+
+    showScreen('ps-screen-progress');
+    try {
+      // 3-second queue delay for free tier
+      setProgress(5, 'Queued — free tier…', 'Back of queue · may take a few seconds');
+      await new Promise(r => setTimeout(r, 3000));
+
+      setProgress(20, 'Reading file…');
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
+
+      setProgress(35, 'Encrypting — AES-256-GCM…');
+      const metaBytes = new TextEncoder().encode(JSON.stringify({ file_name: file.name, file_size: file.size, chunk_index: 0, total_chunks: 1 }));
+      const metaLen   = u32be(metaBytes.length);
+      const payload   = concat(META_MAGIC, metaLen, metaBytes, fileBytes);
+      const { packet } = await encryptAES(payload);
+
+      // Pad to exactly 5MB
+      const padded = new Uint8Array(BLOCK);
+      padded.set(packet);
+      if (packet.length < BLOCK) crypto.getRandomValues(padded.subarray(packet.length));
+
+      setProgress(55, 'Hashing…');
+      const hashBuf = await crypto.subtle.digest('SHA-256', padded);
+      const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2,'0')).join('');
+
+      setProgress(70, 'Uploading…');
+      const body = JSON.stringify({
+        hash, payload: toB64(padded), ttl_ms: 300000,
+        meta: { device_id:'parashare-free', file_name:file.name, file_size:file.size, chunk_index:0, total_chunks:1 }
+      });
+      const ur = await fetch(`${RELAY}/v2/inbound`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Api-Key':FREE_KEY,'User-Agent':'parashare-free/1.0'},
+        body, signal: AbortSignal.timeout(60000)
+      });
+      const ud = await ur.json();
+      if (!ud.ok) throw new Error(ud.error || 'Upload failed');
+
+      setProgress(95, 'Generating link…');
+      await new Promise(r => setTimeout(r, 300));
+
+      const shareUrl = window.location.origin + '/parashare?t=' + encodeURIComponent(ud.download_token) + '&n=' + encodeURIComponent(file.name) + '&c=1';
+      document.getElementById('ps-result-link').textContent = shareUrl;
+      document.getElementById('ps-result-link')._url = shareUrl;
+      showScreen('ps-screen-result');
+
+      uses.count++; saveUses(uses); updateUsesLabel();
+
+    } catch(e) {
+      showScreen('ps-screen-drop');
+      setErr(e.message || 'Something went wrong. Try again.');
+    }
+  };
+
+  window.psReset  = function() { showScreen('ps-screen-drop'); setErr(''); document.getElementById('ps-file-input').value=''; };
+  window.psCopy   = function() {
+    const url = document.getElementById('ps-result-link')._url || document.getElementById('ps-result-link').textContent;
+    navigator.clipboard.writeText(url).catch(()=>{});
+    const btn = document.getElementById('ps-copy-btn');
+    btn.textContent = 'Copied!'; setTimeout(()=>{ btn.textContent='Copy link'; }, 2000);
+  };
+  window.psкопировать = window.psCopy;
+})();
+</script>
 
 <section id="network" style="max-width:960px;margin:0 auto;padding:64px 48px 0">
   <div class="eyebrow">Live network</div>
@@ -447,46 +663,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 
 
 
-
-
-<hr class="divider">
-
-<section id="parashare-demo" style="padding:80px 0">
-  <div style="display:flex;gap:60px;align-items:center;flex-wrap:wrap">
-    <div style="flex:1;min-width:280px">
-      <div class="eyebrow">ParaShare</div>
-      <h2>Send files.<br>They vanish after opening.</h2>
-      <p class="sub">Drop a file. Get a one-time link. The receiver clicks once — file downloads, then burns permanently from RAM. No storage. No logs. No second chance.</p>
-      <div style="display:flex;flex-direction:column;gap:10px;margin:28px 0">
-        <div style="font-size:13px;color:var(--muted)">→ Post-quantum encrypted before leaving your device</div>
-        <div style="font-size:13px;color:var(--muted)">→ Up to 500MB — chunked, encrypted, reassembled</div>
-        <div style="font-size:13px;color:var(--muted)">→ Password protection + webhook on delivery</div>
-        <div style="font-size:13px;color:var(--muted)">→ Certificate Transparency proof of delivery</div>
-      </div>
-      <a href="/parashare" style="display:inline-block;background:var(--text);color:var(--bg);padding:12px 28px;font-family:var(--mono);font-size:13px;font-weight:700;text-decoration:none;border-radius:4px;letter-spacing:.05em">Try ParaShare →</a>
-    </div>
-    <div style="flex:1;min-width:300px;max-width:460px">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">
-        <div style="padding:12px 20px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;gap:10px">
-          <div style="width:7px;height:7px;border-radius:50%;background:#2d8a5c"></div>
-          <div style="font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em">PARASHARE · by PARAMANT</div>
-        </div>
-        <div style="padding:28px 24px">
-          <div style="border:1px dashed var(--border);border-radius:6px;padding:36px;text-align:center">
-            <div style="font-size:28px;color:var(--border);margin-bottom:12px">↑</div>
-            <div style="font-size:13px;color:var(--muted)">Drop a file or <a href="/parashare" style="color:var(--text);text-decoration:none">click to upload</a></div>
-            <div style="font-size:11px;color:var(--quiet);margin-top:6px">Up to 500MB · Any file type · One-time link</div>
-          </div>
-          <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">
-            <span class="tag">AES-256-GCM</span>
-            <span class="tag">Burn-on-read</span>
-            <span class="tag">CT proof</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
 
 
 <hr class="divider">
