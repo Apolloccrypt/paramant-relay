@@ -7,7 +7,7 @@
 <meta name="description" content="Encrypted file transport that destroys itself after delivery. ML-KEM-768. Burn-on-read. EU/DE jurisdiction.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border-soft:#141414;--text:#ededed;--muted:#888;--quiet:#555;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
+:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
@@ -33,7 +33,7 @@ h1 em{color:var(--muted);font-style:normal}
 .code-dots span{width:10px;height:10px;border-radius:50%;background:#1e1e1e}
 .code-lang{font-size:11px;color:var(--quiet);font-family:var(--mono)}
 .code-body{padding:20px 24px;font-family:var(--mono);font-size:12.5px;line-height:2}
-.c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#888}.c-ok{color:var(--green)}
+.c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#aaa}.c-ok{color:var(--green)}
 .proto-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-top:80px;display:flex;overflow:hidden}
 .proto-cell{flex:1;padding:16px 20px;border-right:1px solid var(--border);min-width:0}
 .proto-cell:last-child{border-right:none}
@@ -96,10 +96,10 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 </head>
 <body>
 <nav>
-  <div class="nav-logo">PARAMANT</div>
+  <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
   <ul class="nav-links">
     <li></li>
-    <li><a href="#identity">Identity</a></li>
+    <li><a href="/docs#identity">Identity</a></li>
     <li><a href="#sectors">Use cases</a></li>
     <li><a href="/docs">Docs</a></li>
     <li><a href="#pricing">Pricing</a></li>
@@ -228,46 +228,46 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
               fill="#161616" stroke="#222" stroke-width="1"/>
 
         <!-- Verbindingslijnen EU nodes -->
-        <line x1="220" y1="142" x2="252" y2="158" stroke="#1e1e1e" stroke-width="1.5"/>
-        <line x1="220" y1="142" x2="242" y2="92"  stroke="#1e1e1e" stroke-width="1.5"/>
-        <line x1="220" y1="142" x2="185" y2="168" stroke="#1e1e1e" stroke-width="1.5"/>
-        <line x1="252" y1="158" x2="242" y2="92"  stroke="#1e1e1e" stroke-width="1.5"/>
-        <line x1="252" y1="158" x2="185" y2="168" stroke="#1e1e1e" stroke-width="1.5"/>
+        <line x1="220" y1="142" x2="252" y2="158" stroke="#262626" stroke-width="1.5"/>
+        <line x1="220" y1="142" x2="242" y2="92"  stroke="#262626" stroke-width="1.5"/>
+        <line x1="220" y1="142" x2="185" y2="168" stroke="#262626" stroke-width="1.5"/>
+        <line x1="252" y1="158" x2="242" y2="92"  stroke="#262626" stroke-width="1.5"/>
+        <line x1="252" y1="158" x2="185" y2="168" stroke="#262626" stroke-width="1.5"/>
         <!-- ORD gestippeld -->
-        <line x1="55" y1="180" x2="185" y2="168" stroke="#181818" stroke-width="1" stroke-dasharray="4,3"/>
+        <line x1="55" y1="180" x2="185" y2="168" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="4,3"/>
 
         <!-- AMS — Amsterdam -->
         <circle cx="220" cy="142" r="7" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
         <circle cx="220" cy="142" r="3" fill="#aaa"/>
-        <text x="230" y="139" fill="#666" font-size="10" font-family="monospace" letter-spacing=".04em">AMS</text>
+        <text x="230" y="139" fill="#808080" font-size="10" font-family="monospace" letter-spacing=".04em">AMS</text>
         <!-- FRA — Frankfurt -->
         <circle cx="252" cy="158" r="7" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
         <circle cx="252" cy="158" r="3" fill="#aaa"/>
-        <text x="262" y="155" fill="#666" font-size="10" font-family="monospace" letter-spacing=".04em">FRA &middot; Hetzner DE</text>
+        <text x="262" y="155" fill="#808080" font-size="10" font-family="monospace" letter-spacing=".04em">FRA &middot; Hetzner DE</text>
         <!-- ARN — Stockholm -->
         <circle cx="242" cy="92" r="7" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
         <circle cx="242" cy="92" r="3" fill="#aaa"/>
-        <text x="252" y="89" fill="#666" font-size="10" font-family="monospace" letter-spacing=".04em">ARN &middot; Stockholm</text>
+        <text x="252" y="89" fill="#808080" font-size="10" font-family="monospace" letter-spacing=".04em">ARN &middot; Stockholm</text>
         <!-- CDG — Parijs -->
         <circle cx="185" cy="168" r="7" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="1.5"/>
         <circle cx="185" cy="168" r="3" fill="#aaa"/>
-        <text x="120" y="165" fill="#666" font-size="10" font-family="monospace" letter-spacing=".04em">CDG &middot; Paris</text>
+        <text x="120" y="165" fill="#808080" font-size="10" font-family="monospace" letter-spacing=".04em">CDG &middot; Paris</text>
         <!-- ORD dimmed -->
-        <circle cx="48" cy="180" r="4" fill="#111" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,2"/>
-        <circle cx="48" cy="180" r="1.5" fill="#252525"/>
-        <text x="15" y="195" fill="#252525" font-size="8" font-family="monospace">ORD</text>
+        <circle cx="48" cy="180" r="4" fill="#111" stroke="#262626" stroke-width="1" stroke-dasharray="3,2"/>
+        <circle cx="48" cy="180" r="1.5" fill="#303030"/>
+        <text x="15" y="195" fill="#303030" font-size="8" font-family="monospace">ORD</text>
         <!-- Fly.io anycast edge -->
-        <line x1="220" y1="142" x2="310" y2="268" stroke="#181818" stroke-width="1" stroke-dasharray="3,3"/>
-        <circle cx="310" cy="268" r="4" fill="#111" stroke="#2a2a2a" stroke-width="1"/>
-        <circle cx="310" cy="268" r="1.5" fill="#333"/>
-        <text x="318" y="272" fill="#444" font-size="8" font-family="monospace">Fly.io · 6 nodes</text>
+        <line x1="220" y1="142" x2="310" y2="268" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,3"/>
+        <circle cx="310" cy="268" r="4" fill="#111" stroke="#353535" stroke-width="1"/>
+        <circle cx="310" cy="268" r="1.5" fill="#424242"/>
+        <text x="318" y="272" fill="#565656" font-size="8" font-family="monospace">Fly.io · 6 nodes</text>
       </svg>
       <div style="display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)">
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">AMS</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">NL</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">FRA</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">DE</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ARN</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">SE</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">CDG</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">FR</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ORD</div><div style="font-size:10px;font-family:var(--mono);color:#333">eval</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ORD</div><div style="font-size:10px;font-family:var(--mono);color:#424242">eval</div></div>
         <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">Fly.io</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)">edge</div></div>
       </div>
     </div>
@@ -539,10 +539,10 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
               <li>+ Priority relay access</li>
             </ul>
             <a href="https://buy.stripe.com/price_1TGwqbJMhSdoTn1kCWWLN5KY" class="price-btn p" target="_blank">Get started</a>
-            <div style="margin-top:12px;padding:10px 12px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:4px;font-size:11px;color:#444;line-height:1.7;">
-              Extra device: <span style="color:#888;">€12/mo</span>
+            <div style="margin-top:12px;padding:10px 12px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:4px;font-size:11px;color:#565656;line-height:1.7;">
+              Extra device: <span style="color:#aaa;">€12/mo</span>
               <a href="https://buy.stripe.com/cNiaEY2ovd0ee449c3efC06" target="_blank"
-                 style="color:#666;margin-left:8px;text-decoration:none;border-bottom:1px solid #222;">
+                 style="color:#808080;margin-left:8px;text-decoration:none;border-bottom:1px solid #222;">
                 Add device →
               </a>
             </div>
@@ -570,7 +570,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 </section>
 
 <footer>
-  <div class="footer-logo">PARAMANT</div>
+  <a href="/" class="footer-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
   <div class="footer-links">
     <a href="https://github.com/Apolloccrypt/paramant" target="_blank">GitHub</a>
     <a href="mailto:privacy@paramant.app">Contact</a>
