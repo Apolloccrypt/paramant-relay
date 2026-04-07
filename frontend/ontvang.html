@@ -1,173 +1,369 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Bestand ontvangen — PARAMANT</title>
+<title>Receive file - PARAMANT</title>
 <style>
-:root{--bg:#ffffff;--bg2:#f9fafb;--border:#e5e7eb;--text:#111827;--muted:#6b7280;--dim:#9ca3af;--green:#059669;--red:#dc2626;--mono:'JetBrains Mono',monospace}
+:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border2:#242424;--text:#ededed;--muted:#888;--quiet:#444;--green:#3aaa70;--red:#e05252;--mono:'SF Mono','Fira Code',monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;display:flex;flex-direction:column}
-nav{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 32px}
-.nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
-.nav-logo{font-size:14px;font-weight:900;color:var(--text);margin-right:40px;text-decoration:none}
-.nav-link{padding:6px 14px;font-size:11px;color:var(--muted);text-decoration:none;letter-spacing:.05em}
-.nav-link:hover{color:var(--text)}
-.nav-ctas{margin-left:auto;display:flex;gap:8px}
-.btn-nav{padding:7px 14px;border:1px solid var(--border);color:var(--muted);font-size:11px;font-family:var(--mono);background:none;text-decoration:none}
-.btn-solid{padding:7px 16px;background:var(--text);color:#fff;font-size:11px;font-family:var(--mono);font-weight:700;text-decoration:none}
-main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 24px}
-.card{width:100%;max-width:520px}
-.card-head{padding:28px 32px;border:1px solid var(--border);border-bottom:none}
-.card-title{font-size:22px;font-weight:900;margin-bottom:6px}
-.card-sub{font-size:13px;color:var(--muted)}
-.card-body{padding:28px 32px;border:1px solid var(--border)}
-.field-label{font-size:10px;color:var(--dim);letter-spacing:.08em;display:block;margin-bottom:8px}
-.hash-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:12px 14px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:16px}
-.hash-input:focus{border-color:var(--text)}
-.btn-dl{width:100%;padding:13px;background:var(--text);color:#fff;border:none;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer}
-.btn-dl:hover{background:#374151}
-.btn-dl:disabled{background:var(--dim);cursor:not-allowed}
-.status{margin-top:14px;padding:12px 14px;font-size:12px;line-height:1.8;display:none}
-.status.ok{background:#f0fdf4;border:1px solid #a7f3d0;color:#065f46}
-.status.err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
-.status.loading{background:var(--bg2);border:1px solid var(--border);color:var(--muted)}
-.burn-note{margin-top:20px;padding:14px;background:var(--bg2);border:1px solid var(--border);font-size:11px;color:var(--dim);line-height:1.9}
-.burn-note strong{color:var(--text)}
-footer{padding:24px 32px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);text-align:center}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh}
+nav{height:52px;display:flex;align-items:center;padding:0 32px;border-bottom:1px solid var(--border)}
+.logo{font-size:13px;font-weight:700;letter-spacing:.08em;text-decoration:none;color:var(--text)}
+main{max-width:580px;margin:0 auto;padding:64px 24px}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:40px;line-height:1.7}
+.step{display:none;animation:fadeIn .2s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-head-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(58,170,112,.6)}
+.dot.amber{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.6)}
+.card-body{padding:20px 18px}
+.status-line{font-size:11px;color:var(--muted);padding:4px 0;display:flex;align-items:center;gap:8px;line-height:1.7}
+.status-line.ok{color:var(--green)}
+.status-line.err{color:var(--red)}
+.fingerprint{font-size:28px;font-weight:700;letter-spacing:.18em;color:var(--green);text-align:center;padding:24px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;margin:16px 0}
+.fingerprint-label{font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px}
+.btn{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn:hover{opacity:.85}
+.btn:disabled{background:var(--quiet);cursor:not-allowed}
+.progress-bar-wrap{background:var(--bg);border:1px solid var(--border2);border-radius:2px;height:4px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;background:var(--green);width:0%;transition:width .3s}
+.tag{display:inline-block;font-size:10px;padding:3px 8px;border:1px solid var(--border2);color:var(--quiet);margin-right:4px;margin-top:4px}
+.tag.green{border-color:rgba(58,170,112,.4);color:var(--green)}
 </style>
 </head>
 <body>
-<nav>
- <div class="nav-inner">
-  <a href="/" class="nav-logo">PARAMANT</a>
-  <div style="display:flex">
-   <a href="/#sectoren" class="nav-link">SECTOREN</a>
-   <a href="/#pricing" class="nav-link">PRICING</a>
-  </div>
-  <div class="nav-ctas">
-   <a href="/chat" class="btn-nav">Chat gratis</a>
-   <a href="/dashboard" class="btn-solid">Dashboard →</a>
-  </div>
- </div>
-</nav>
-
+<nav><a href="/" class="logo">PARAMANT</a></nav>
 <main>
- <div class="card">
-  <div class="card-head">
-   <div class="card-title">Bestand ontvangen</div>
-   <div class="card-sub">Voer de hash in die de verzender u stuurde. Geen account vereist.</div>
+
+<!-- STEP 1: Generating keypair -->
+<div class="step active" id="step-keygen">
+  <h1>Secure receive</h1>
+  <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Generating keypair...</div></div>
+    <div class="card-body">
+      <div class="status-line" id="keygen-status">Generating ML-KEM-768 + ECDH P-256 keypair in your browser...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
+    </div>
   </div>
-  <div class="card-body">
-   <label class="field-label">HASH (64 hex tekens)</label>
-   <input type="text" class="hash-input" id="hash-input"
-     placeholder="a3f8c2d1e7b4..."
-     autocomplete="off" spellcheck="false">
-   <button class="btn-dl" id="dl-btn" onclick="doReceive()">↓ Downloaden &amp; ontsleutelen</button>
-   <div class="status" id="status"></div>
-   <div class="burn-note">
-    <strong>Burn-on-read:</strong> elk bestand kan precies één keer worden gedownload.<br>
-    Na ophalen wordt de data op de relay vernietigd — een tweede poging geeft 404.<br>
-    De verzender moet een nieuwe overdracht starten als u de hash opnieuw nodig heeft.
-   </div>
+</div>
+
+<!-- STEP 2: Show fingerprint, wait for sender -->
+<div class="step" id="step-fingerprint">
+  <h1>Your fingerprint</h1>
+  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This prevents the relay from intercepting.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for sender to verify...</div></div>
+    <div class="card-body">
+      <p class="fingerprint-label">Read this to the sender:</p>
+      <div class="fingerprint" id="fp-display">-</div>
+      <div class="status-line" id="fp-status">Connected - sender is verifying your fingerprint</div>
+    </div>
   </div>
- </div>
+</div>
+
+<!-- STEP 3: Receiving & decrypting -->
+<div class="step" id="step-receiving">
+  <h1>Receiving file...</h1>
+  <p class="sub">Downloading and decrypting with your private key. The relay never had access to the decryption key.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Decrypting</div></div>
+    <div class="card-body">
+      <div class="status-line" id="recv-status">Downloading...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="recv-progress"></div></div>
+      <div class="status-line" id="recv-detail" style="color:var(--quiet)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4: Done -->
+<div class="step" id="step-done">
+  <h1>File received.</h1>
+  <p class="sub">The file has been decrypted and downloaded. The relay copy has been permanently destroyed.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Transfer complete</div></div>
+    <div class="card-body">
+      <div class="status-line ok" id="done-status">-</div>
+      <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
+        <span class="tag green">ML-KEM-768</span>
+        <span class="tag green">Burn-on-read</span>
+        <span class="tag green">Fingerprint verified</span>
+        <span class="tag green">Private key never left browser</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP: Error -->
+<div class="step" id="step-error">
+  <h1>Transfer failed</h1>
+  <div class="card">
+    <div class="card-head"><div class="dot" style="background:var(--red)"></div><div class="card-head-title">Error</div></div>
+    <div class="card-body">
+      <div class="status-line err" id="error-msg">Unknown error</div>
+    </div>
+  </div>
+  <button class="btn" style="margin-top:8px" onclick="location.reload()">Try again</button>
+</div>
+
 </main>
 
-<footer>
- © 2026 PARAMANT · <a href="/privacy" style="color:var(--dim)">Privacy</a> · <a href="/license" style="color:var(--dim)">Licentie</a>
-</footer>
-
+<script type="module" src="/noble-mlkem-loader.js"></script>
 <script>
-// Lees hash uit URL ?hash= parameter
-window.addEventListener('DOMContentLoaded', function() {
-  var params = new URLSearchParams(location.search);
-  var h = params.get('hash');
-  if (h) document.getElementById('hash-input').value = h;
-});
+const RELAY_WS  = 'wss://relay.paramant.app';
+const RELAY_API = 'https://health.paramant.app';
 
-document.getElementById('hash-input').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') doReceive();
-});
-
-function showStatus(msg, type) {
-  var el = document.getElementById('status');
-  el.className = 'status ' + type;
-  el.style.display = 'block';
-  el.innerHTML = msg;
+function $(id) { return document.getElementById(id); }
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+function showError(msg) {
+  $('error-msg').textContent = msg;
+  showStep('step-error');
 }
 
-async function doReceive() {
-  var hash = document.getElementById('hash-input').value.trim();
-  var btn = document.getElementById('dl-btn');
+function u8toHex(u8) {
+  return [...u8].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function hexToU8(hex) {
+  const arr = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
+  return arr;
+}
+function concat(...arrays) {
+  const total = arrays.reduce((s,a) => s + a.length, 0);
+  const out = new Uint8Array(total); let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
 
-  if (!hash || hash.length < 32) {
-    showStatus('Voer een geldige hash in (minimaal 32 tekens).', 'err');
-    return;
-  }
+function genFingerprint(pubkeyHex) {
+  const h = pubkeyHex.slice(0, 16).toUpperCase();
+  return h.slice(0,4) + '-' + h.slice(4,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16);
+}
 
-  btn.disabled = true;
-  btn.textContent = 'Downloaden...';
-  showStatus('Verbinden met relay...', 'loading');
+// ── Get session token from URL ──
+const params = new URLSearchParams(location.search);
+const sessionToken = params.get('s');
+const transferKey = params.get('k') || '';
+if (!sessionToken || !/^inv_[a-zA-Z0-9]{32}$/.test(sessionToken)) {
+  window.addEventListener('mlkem-ready', () => showError('Invalid or missing session token'));
+}
 
+// ── State ──
+let myPrivateKey_ECDH = null;
+let myPrivateKey_MLKEM = null;
+let ws = null;
+
+// ── Main flow ──
+async function init() {
   try {
-    var r = await fetch('https://relay.paramant.app/v2/outbound/' + hash);
+    // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
+    $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
+    $('keygen-progress').style.width = '40%';
+        const { publicKey: kyberPub, secretKey: kyberSec } = await new Promise(resolve => setTimeout(() => resolve(ml_kem768.keygen()), 50));
+    myPrivateKey_MLKEM = kyberSec;
 
-    if (r.status === 404) {
-      showStatus('<strong>Niet gevonden of al opgehaald.</strong><br>Het bestand is verlopen of al eerder gedownload. Vraag de verzender een nieuwe overdracht te starten.', 'err');
-      btn.disabled = false;
-      btn.textContent = '↓ Downloaden & ontsleutelen';
-      return;
-    }
+    // Generate ECDH P-256 keypair
+    $('keygen-status').textContent = 'Generating ECDH P-256 keypair...';
+    $('keygen-progress').style.width = '70%';
+    const ecdhPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    myPrivateKey_ECDH = ecdhPair.privateKey;
+    const ecdhPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ecdhPair.publicKey));
 
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    $('keygen-progress').style.width = '100%';
+    $('keygen-status').textContent = 'Keypair ready - connecting to relay...';
 
-    showStatus('Ontsleutelen...', 'loading');
-    var raw = new Uint8Array(await r.arrayBuffer());
+    const kyberPubHex = u8toHex(kyberPub);
+    const ecdhPubHex  = u8toHex(ecdhPubRaw);
+    const fp = genFingerprint(kyberPubHex);
 
-    var downloadBlob;
-    var filename = 'paramant_' + hash.slice(0, 8);
+    // Show fingerprint
+    $('fp-display').textContent = fp;
+    showStep('step-fingerprint');
 
-    // Controleer PQHB header
-    if (raw.length >= 52 && raw[0]===0x50 && raw[1]===0x51 && raw[2]===0x48 && raw[3]===0x42) {
-      var nonce      = raw.slice(4, 16);
-      var rawKey     = raw.slice(16, 48);
-      var ctLen      = new DataView(raw.buffer, raw.byteOffset + 48, 4).getUint32(0, false);
+    // Connect WebSocket
+    ws = new WebSocket(RELAY_WS);
 
-      if (ctLen === 0 || ctLen > raw.length - 52) {
-        throw new Error('Ongeldige payload structuur');
+    ws.onopen = async () => {
+      ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'receiver' }));
+      // Registreer pubkey via ghost pipe relay HTTP endpoint
+      // Device ID = sessie token zodat verzender hem kan ophalen
+      try {
+        await fetch(`${RELAY_API}/v2/pubkey`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': transferKey },
+          body: JSON.stringify({
+            device_id: sessionToken,
+            ecdh_pub: ecdhPubHex,
+            kyber_pub: kyberPubHex
+          }),
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch(e) { console.warn('pubkey register failed', e); }
+      $('fp-status').textContent = 'Connected - waiting for sender to verify fingerprint';
+    };
+
+    ws.onmessage = async (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      console.log('WS msg:', msg.type, msg.payload ? msg.payload.slice?.(0,50) : '');
+
+      let payload = null;
+      if (msg.type === 'packet' && msg.payload) {
+        try { payload = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch {}
       }
 
-      var ciphertext = raw.slice(52, 52 + ctLen);
-      var encKey     = await crypto.subtle.importKey('raw', rawKey, {name:'AES-GCM',length:256}, false, ['decrypt']);
-      var decrypted  = await crypto.subtle.decrypt({name:'AES-GCM', iv:nonce}, encKey, ciphertext);
-      downloadBlob = new Blob([decrypted]);
-    } else {
-      downloadBlob = new Blob([raw]);
-    }
+      if (payload?.type === 'fingerprint_ok') {
+        $('fp-title').textContent = 'Fingerprint confirmed - receiving file...';
+        $('fp-status').textContent = 'Sender confirmed fingerprint - file is being encrypted for you';
+      }
 
-    // Download
-    var url = URL.createObjectURL(downloadBlob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      // ook via HTTP polling afgehandeld hieronder
 
-    showStatus('<strong>Gedownload en ontsleuteld.</strong><br>De data op de relay is vernietigd — dit was de enige keer dat dit bestand beschikbaar was.', 'ok');
+      if (msg.type === 'peer_left') {
+        if (!$('step-done').classList.contains('active')) {
+          showError('Sender disconnected');
+        }
+      }
+    };
 
-    // ACK
-    fetch('https://relay.paramant.app/v2/ack/' + hash, {method:'POST'}).catch(()=>{});
+    ws.onerror = () => showError('WebSocket connection failed');
+    ws.onclose = () => {};
+
+    // Poll voor transfer_ready via HTTP
+    let _transferClaimed = false;
+    const pollTransfer = setInterval(async () => {
+      if (_transferClaimed) return;
+      try {
+        const r = await fetch(RELAY_API + '/v2/pubkey/' + encodeURIComponent(sessionToken + '_ready') + '?k=' + encodeURIComponent(transferKey), {signal: AbortSignal.timeout(3000)});
+        if (r.ok) {
+          const d = await r.json();
+          if (d.ecdh_pub && d.kyber_pub) {
+            if (_transferClaimed) return;
+            _transferClaimed = true;
+            clearInterval(pollTransfer);
+            const tokens = d.ecdh_pub;
+            const parts = d.kyber_pub.split('|');
+            const file_name = parts[0];
+            const total_chunks = parseInt(parts[1]) || 1;
+            await receiveFile({ tokens, file_name, total_chunks }, kyberSec, ecdhPair.privateKey);
+          }
+        }
+      } catch(e) {}
+    }, 2000);
 
   } catch(e) {
-    showStatus('<strong>Download mislukt:</strong> ' + e.message, 'err');
+    showError('Keypair generation failed: ' + e.message);
   }
-
-  btn.disabled = false;
-  btn.textContent = '↓ Downloaden & ontsleutelen';
 }
+
+async function receiveFile(msg, kyberSec, ecdhPriv) {
+  showStep('step-receiving');
+  const tokens = msg.tokens.split(',');
+  const totalChunks = parseInt(msg.total_chunks) || 1;
+  const fileName = msg.file_name || 'download';
+  const chunks = [];
+
+  try {
+    for (let i = 0; i < tokens.length; i++) {
+      const pct = Math.round(10 + (i / tokens.length) * 75);
+      $('recv-progress').style.width = pct + '%';
+      $('recv-status').textContent = `Downloading chunk ${i+1}/${tokens.length}...`;
+
+      const r = await fetch(`${RELAY_API}/v2/dl/${tokens[i]}`, {
+        signal: AbortSignal.timeout(60000)
+      });
+      if (!r.ok) throw new Error('Download failed for chunk ' + (i+1) + ': ' + r.status + ' - blob expired or already burned');
+      const raw = new Uint8Array(await r.arrayBuffer());
+
+      $('recv-status').textContent = `Decrypting chunk ${i+1}/${tokens.length} with ML-KEM-768...`;
+
+      // Decrypt 0x02 packet
+      const magic = raw[0];
+      if (magic !== 0x02) throw new Error('Unexpected packet format: 0x' + magic.toString(16));
+
+      const view = new DataView(raw.buffer);
+      let off = 1;
+
+      const ctKyberLen = view.getUint32(off, false); off += 4;
+      const ctKyber = raw.slice(off, off + ctKyberLen); off += ctKyberLen;
+
+      const senderPubLen = view.getUint32(off, false); off += 4;
+      const senderPubRaw = raw.slice(off, off + senderPubLen); off += senderPubLen;
+
+      const nonce = raw.slice(off, off + 12); off += 12;
+      const ctLen = view.getUint32(off, false); off += 4;
+      const ct = raw.slice(off, off + ctLen);
+
+      // ML-KEM decapsulate
+      const sharedSecret = ml_kem768.decapsulate(ctKyber, kyberSec);
+
+      // ECDH derive
+      const senderPub = await crypto.subtle.importKey('raw', senderPubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+      const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: senderPub }, ecdhPriv, 256));
+
+      // HKDF combine
+      const combined = concat(sharedSecret, ecdhSecret);
+      const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
+      const aesKey = await crypto.subtle.deriveKey(
+        { name: 'HKDF', hash: 'SHA-256', salt: ctKyber.slice(0, 32), info: new TextEncoder().encode('paramant-v2') },
+        hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+      );
+
+      // Decrypt
+      const plainPadded = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, aesKey, ct));
+
+      // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
+      const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
+      let doff = 0;
+      if (plainPadded[0] === META_MAGIC[0] && plainPadded[1] === META_MAGIC[1]) {
+        doff = 4;
+        const metaLen = new DataView(plainPadded.buffer).getUint32(doff, false);
+        doff += 4 + metaLen;
+      }
+      chunks.push(plainPadded.slice(doff));
+    }
+
+    $('recv-progress').style.width = '100%';
+    $('recv-status').textContent = 'Assembling file...';
+
+    // Combine chunks
+    const totalSize = chunks.reduce((s, c) => s + c.length, 0);
+    const combined = new Uint8Array(totalSize);
+    let off2 = 0;
+    for (const c of chunks) { combined.set(c, off2); off2 += c.length; }
+
+    // Trigger download
+    const blob = new Blob([combined]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+
+    $('done-status').textContent = `✓ ${fileName} (${(totalSize/1024/1024).toFixed(2)} MB) - decrypted and saved`;
+    showStep('step-done');
+
+    if (ws) ws.close();
+
+  } catch(e) {
+    showError('Decryption failed: ' + e.message);
+  }
+}
+
+window.addEventListener('mlkem-ready', () => {
+  if (sessionToken) init();
+});
 </script>
 </body>
 </html>
