@@ -1321,8 +1321,33 @@ server.listen(PORT, '127.0.0.1', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });
 });
-process.on('SIGTERM', () => {
-  for (const [, e] of blobStore.entries()) { zeroBuffer(e.blob); }
-  log('info', 'shutdown_clean', { burned: stats.burned });
-  process.exit(0);
+function emergencyZeroAndExit(reason, code = 0) {
+  // Zeroize all in-memory blobs before exit
+  try {
+    for (const [, e] of blobStore.entries()) {
+      if (e.blob) zeroBuffer(e.blob);
+    }
+    // Clear pubkeys (contain receiver public keys — not secret but clean up anyway)
+    pubkeys.clear();
+    // Clear download tokens (contain hashes, not plaintext, but scrub anyway)
+    downloadTokens.clear();
+    log('info', 'shutdown_clean', { reason, burned: stats.burned });
+  } catch (_) {}
+  process.exit(code);
+}
+
+// Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C)
+process.on('SIGTERM', () => emergencyZeroAndExit('SIGTERM'));
+process.on('SIGINT',  () => emergencyZeroAndExit('SIGINT'));
+
+// Catch unhandled promise rejections — log and exit cleanly so blobs are zeroized
+process.on('unhandledRejection', (reason) => {
+  log('error', 'unhandled_rejection', { reason: String(reason).slice(0, 200) });
+  emergencyZeroAndExit('unhandledRejection', 1);
+});
+
+// Catch synchronous uncaught exceptions (e.g. invalid header values)
+process.on('uncaughtException', (err) => {
+  log('error', 'uncaught_exception', { msg: err.message?.slice(0, 200), code: err.code });
+  emergencyZeroAndExit('uncaughtException', 1);
 });
