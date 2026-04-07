@@ -737,18 +737,31 @@ async function initGlobe() {
     .showAtmosphere(true)
     .atmosphereColor('#2d6a4f')
     .atmosphereAltitude(0.18)
-    // Locatiepunten
-    .pointsData([
-      { lat: userLat, lng: userLng, size: 0.6, color: '#3aaa70', label: 'Your Node' },
-      { lat: RELAY_LOC.lat, lng: RELAY_LOC.lng, size: 0.45, color: '#3aaa70', label: RELAY_LOC.label },
+    // Tile engine — ESRI World Imagery (satellite, infinite zoom quality)
+    .globeTileEngineUrl((x, y, z) =>
+      `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`)
+    // HTML dots — crisp DOM elements, no pixelation at any zoom
+    .htmlElementsData([
+      { lat: userLat,      lng: userLng,      label: 'Your Node',          type: 'user'  },
+      { lat: RELAY_LOC.lat, lng: RELAY_LOC.lng, label: RELAY_LOC.label,   type: 'relay' },
     ])
-    .pointAltitude(0.012)
-    .pointColor(d => d.color)
-    .pointRadius(d => d.size)
-    .pointsMerge(false)
-    .pointLabel(d => `<div style="font:10px/1.4 monospace;background:rgba(12,12,12,.9);
-      border:1px solid rgba(58,170,112,.3);padding:6px 10px;color:#3aaa70;
-      letter-spacing:.08em">${d.label}</div>`)
+    .htmlElement(d => {
+      const wrap = document.createElement('div');
+      const color = d.type === 'relay' ? '#3aaa70' : '#5ac98a';
+      wrap.innerHTML = `<div title="${d.label}" style="
+        width:14px;height:14px;border-radius:50%;
+        background:${color};
+        box-shadow:0 0 10px ${color},0 0 20px ${color}55;
+        border:2px solid rgba(255,255,255,.5);
+        cursor:pointer;position:relative">
+        <div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);
+          white-space:nowrap;font:9px/1.2 monospace;color:${color};
+          background:rgba(12,12,12,.8);padding:2px 5px;border-radius:2px;
+          pointer-events:none;letter-spacing:.06em">${d.label}</div>
+      </div>`;
+      return wrap.firstChild;
+    })
+    .htmlTransitionDuration(0)
     // Transfer arc gebruiker → relay
     .arcsData([
       {
