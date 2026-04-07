@@ -150,9 +150,12 @@ function concat(...arrays) {
   return out;
 }
 
-function genFingerprint(pubkeyHex) {
-  const h = pubkeyHex.slice(0, 16).toUpperCase();
-  return h.slice(0,4) + '-' + h.slice(4,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16);
+// Must match parashare.html: SHA-256(kyber_pub || ecdh_pub) → first 10 bytes → 5×4 hex
+async function genFingerprint(kyberPubHex, ecdhPubHex) {
+  const buf = hexToU8(kyberPubHex + (ecdhPubHex || ''));
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+  const h = [...hash.slice(0, 10)].map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}`;
 }
 
 // ── Get session token from URL ──
@@ -170,6 +173,11 @@ let ws = null;
 
 // ── Main flow ──
 async function init() {
+  // Guard: if ML-KEM library failed to load, refuse to proceed
+  if (typeof ml_kem768 === 'undefined' || !ml_kem768?.keygen) {
+    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
+    return;
+  }
   try {
     // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
     $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
@@ -189,7 +197,7 @@ async function init() {
 
     const kyberPubHex = u8toHex(kyberPub);
     const ecdhPubHex  = u8toHex(ecdhPubRaw);
-    const fp = genFingerprint(kyberPubHex);
+    const fp = await genFingerprint(kyberPubHex, ecdhPubHex);
 
     // Show fingerprint
     $('fp-display').textContent = fp;
