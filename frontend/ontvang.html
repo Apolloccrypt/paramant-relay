@@ -100,6 +100,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
         <span class="tag green">Burn-on-read</span>
         <span class="tag green">Fingerprint verified</span>
         <span class="tag green">Private key never left browser</span>
+        <span class="tag green" id="vault-badge" style="display:none">Vault</span>
       </div>
     </div>
   </div>
@@ -255,12 +256,16 @@ async function init() {
             if (_transferClaimed) return;
             _transferClaimed = true;
             clearInterval(pollTransfer);
-            const tokens = d.ecdh_pub;
             const parts = d.kyber_pub.split('|');
-            const file_name = parts[0];
-            const total_chunks = parseInt(parts[1]) || 1;
             const ttl_ms = parseInt(parts[2]) || 3600000;
-            await receiveFile({ tokens, file_name, total_chunks, ttl_ms }, kyberSec, ecdhPair.privateKey);
+            if (parts[0] === 'vault') {
+              // Vault mode: meerdere bestanden
+              const vaultFiles = JSON.parse(d.ecdh_pub);
+              await receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPair.privateKey);
+            } else {
+              // Enkelvoudig bestand
+              await receiveFile({ tokens: d.ecdh_pub, file_name: parts[0], total_chunks: parseInt(parts[1]) || 1, ttl_ms }, kyberSec, ecdhPair.privateKey);
+            }
           }
         }
       } catch(e) {}
@@ -271,7 +276,7 @@ async function init() {
   }
 }
 
-async function receiveFile(msg, kyberSec, ecdhPriv) {
+async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
   showStep('step-receiving');
   const tokens = msg.tokens.split(',');
   const totalChunks = parseInt(msg.total_chunks) || 1;
@@ -357,20 +362,21 @@ async function receiveFile(msg, kyberSec, ecdhPriv) {
     a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
 
-    $('done-status').textContent = '✓ ' + fileName + ' (' + (totalSize/1024/1024).toFixed(2) + ' MB) — decrypted and saved';
-    const receiptEl = $('burn-receipt');
-    if (receiptEl && burnedHashes.length) {
-      receiptEl.textContent = burnedHashes.map(b => 'chunk ' + b.chunk + '  hash:' + b.hash + '...  burned: ' + b.ts).join('\n');
-      receiptEl.style.display = 'block';
+    if (!opts.silent) {
+      $('done-status').textContent = '✓ ' + fileName + ' (' + (totalSize/1024/1024).toFixed(2) + ' MB) — decrypted and saved';
+      const receiptEl = $('burn-receipt');
+      if (receiptEl && burnedHashes.length) {
+        receiptEl.textContent = burnedHashes.map(b => 'chunk ' + b.chunk + '  hash:' + b.hash + '...  burned: ' + b.ts).join('\n');
+        receiptEl.style.display = 'block';
+      }
+      if (msg.ttl_ms) {
+        const exp = new Date(Date.now() + msg.ttl_ms);
+        $('ttl-note').textContent = 'Relay copy auto-expired at: ' + exp.toLocaleTimeString();
+        $('ttl-note').style.display = 'block';
+      }
+      showStep('step-done');
+      if (ws) ws.close();
     }
-    if (msg.ttl_ms) {
-      const exp = new Date(Date.now() + msg.ttl_ms);
-      $('ttl-note').textContent = 'Relay copy auto-expired at: ' + exp.toLocaleTimeString();
-      $('ttl-note').style.display = 'block';
-    }
-    showStep('step-done');
-
-    if (ws) ws.close();
 
     // Burn-on-tab-switch: wis decrypted data als tab verborgen wordt
     let _decryptedBlob = new Blob([combined]);
@@ -388,6 +394,31 @@ async function receiveFile(msg, kyberSec, ecdhPriv) {
   }
 }
 
+
+async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
+  showStep('step-receiving');
+  $('recv-status').textContent = 'Receiving vault — ' + vaultFiles.length + ' files...';
+
+  const burnedHashes = [];
+
+  for (let fi = 0; fi < vaultFiles.length; fi++) {
+    const vf = vaultFiles[fi];
+    await receiveFile(
+      { tokens: vf.tokens.join(','), file_name: vf.name, total_chunks: vf.tokens.length, ttl_ms, _vaultIdx: fi, _vaultTotal: vaultFiles.length },
+      kyberSec, ecdhPriv, { silent: fi < vaultFiles.length - 1 }
+    );
+    $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded — ' + vf.name;
+  }
+
+  $('done-status').textContent = '✓ Vault opened — ' + vaultFiles.length + ' files decrypted and saved';
+  const ttlNote = $('ttl-note');
+  if (ttlNote) {
+    ttlNote.textContent = 'All vault blobs burned. TTL: ' + (ttl_ms/1000) + 's';
+    ttlNote.style.display = 'block';
+  }
+  showStep('step-done');
+  if (ws) ws.close();
+}
 window.addEventListener('mlkem-ready', () => {
   if (sessionToken) init();
 });

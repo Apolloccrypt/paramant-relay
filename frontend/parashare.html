@@ -78,9 +78,10 @@ input[type=file]{cursor:pointer}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
     <div class="card-body">
-      <span class="label">Select file to send</span>
-      <input type="file" id="file-input" onchange="onFileSelect()">
+      <span class="label">Select file(s) — select multiple for vault mode</span>
+      <input type="file" id="file-input" multiple onchange="onFileSelect()">
       <div class="status-line" id="file-status">No file selected</div>
+      <div id="vault-list" style="margin-top:8px;display:none"></div>
     </div>
   </div>
 
@@ -157,6 +158,7 @@ input[type=file]{cursor:pointer}
         <span class="tag green">Burn-on-read</span>
         <span class="tag green">Fingerprint verified</span>
         <span class="tag green">Relay never saw key</span>
+        <span class="tag green" id="vault-badge" style="display:none">Vault mode</span>
       </div>
     </div>
   </div>
@@ -171,7 +173,7 @@ input[type=file]{cursor:pointer}
 const RELAY_WS  = 'wss://relay.paramant.app';
 const RELAY_API = 'https://health.paramant.app';
 
-let apiKey = '', keyValid = false, selectedFile = null;
+let apiKey = '', keyValid = false, selectedFile = null, selectedFiles = [];
 let sessionToken = '', ws = null;
 let receiverPubs = null;
 
@@ -251,16 +253,26 @@ async function onKeyInput() {
 }
 
 function onFileSelect() {
-  selectedFile = $('file-input').files[0];
-  if (selectedFile) {
-    const mb = (selectedFile.size / 1024 / 1024).toFixed(1);
-    setStatus('file-status', `✓ ${selectedFile.name} (${mb} MB)`, 'ok');
+  const files = $('file-input').files;
+  selectedFile = files[0] || null;
+  if (!files.length) { setStatus('file-status', 'No file selected'); $('vault-list').style.display='none'; updateBtn(); return; }
+  if (files.length === 1) {
+    setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
+    $('vault-list').style.display = 'none';
+  } else {
+    setStatus('file-status', '✓ ' + files.length + ' files selected — vault mode', 'ok');
+    const vl = $('vault-list');
+    vl.style.display = 'block';
+    vl.innerHTML = [...files].map(f =>
+      '<div style="font-size:10px;color:var(--quiet);padding:2px 0">' + f.name + ' <span style="color:var(--muted)">(' + (f.size/1024/1024).toFixed(1) + ' MB)</span></div>'
+    ).join('');
   }
   updateBtn();
 }
 
 function updateBtn() {
-  $('btn-create-session').disabled = !(keyValid && selectedFile);
+  selectedFiles = $('file-input') ? [...$('file-input').files] : [];
+  $('btn-create-session').disabled = !(keyValid && selectedFiles.length > 0);
 }
 
 // ── Session creation ──
@@ -346,111 +358,113 @@ async function confirmFingerprint() {
     const BLOCK = 5 * 1024 * 1024;
     const CHUNK_PLAIN = 4.5 * 1024 * 1024;
     const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
+    const ttlMs = parseInt($('ttl-select').value);
 
-    const fileBytes = new Uint8Array(await selectedFile.arrayBuffer());
-    const totalChunks = Math.ceil(fileBytes.length / CHUNK_PLAIN) || 1;
-    const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
-    const tokens = [];
-    const burnReceipts = [];
+    // Helper: encrypt + upload one file, returns token array
+    async function encryptFile(file, fileIndex, totalFiles) {
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
+      const totalChunks = Math.ceil(fileBytes.length / CHUNK_PLAIN) || 1;
+      const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
+      const tokens = [];
 
-    for (let i = 0; i < totalChunks; i++) {
-      const pct = Math.round(10 + (i / totalChunks) * 75);
-      $('enc-progress').style.width = pct + '%';
-      $('enc-status').textContent = totalChunks > 1
-        ? `Encrypting chunk ${i+1}/${totalChunks} with ML-KEM-768...`
-        : 'Encrypting with ML-KEM-768 + ECDH P-256...';
+      for (let i = 0; i < totalChunks; i++) {
+        const globalPct = Math.round(
+          ((fileIndex + (i / totalChunks)) / totalFiles) * 85
+        );
+        $('enc-progress').style.width = globalPct + '%';
+        $('enc-status').textContent = (totalFiles > 1 ? 'File ' + (fileIndex+1) + '/' + totalFiles + ' — ' : '') +
+          'Encrypting chunk ' + (i+1) + '/' + totalChunks + '...';
 
-      const start = Math.round(i * CHUNK_PLAIN);
-      const chunkData = fileBytes.slice(start, Math.min(start + CHUNK_PLAIN, fileBytes.length));
+        const start = Math.round(i * CHUNK_PLAIN);
+        const chunkData = fileBytes.slice(start, Math.min(start + CHUNK_PLAIN, fileBytes.length));
 
-      // Build payload with metadata header
-      const metaJson = JSON.stringify({
-        file_id: fileId, file_name: selectedFile.name,
-        file_size: fileBytes.length, chunk_index: i,
-        total_chunks: totalChunks, chunk_size: chunkData.length
-      });
-      const metaBytes = new TextEncoder().encode(metaJson);
-      const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
+        const metaJson = JSON.stringify({
+          file_id: fileId, file_name: file.name,
+          file_size: fileBytes.length, chunk_index: i,
+          total_chunks: totalChunks, chunk_size: chunkData.length
+        });
+        const metaBytes = new TextEncoder().encode(metaJson);
+        const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
 
-      // ML-KEM-768 encapsulation
-      const kyberPub = hexToU8(receiverPubs.kyber_pub);
-      const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
+        const kyberPub = hexToU8(receiverPubs.kyber_pub);
+        const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
 
-      // ECDH P-256 hybrid
-      const ecdhPubRaw = hexToU8(receiverPubs.ecdh_pub);
-      const recvECDH = await crypto.subtle.importKey('raw', ecdhPubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
-      const senderECDH = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']);
-      const senderPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', senderECDH.publicKey));
-      const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: recvECDH }, senderECDH.privateKey, 256));
+        const ecdhPubRaw = hexToU8(receiverPubs.ecdh_pub);
+        const recvECDH = await crypto.subtle.importKey('raw', ecdhPubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+        const senderECDH = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']);
+        const senderPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', senderECDH.publicKey));
+        const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: recvECDH }, senderECDH.privateKey, 256));
 
-      // HKDF combine ML-KEM + ECDH secrets
-      const combined = concat(sharedSecret, ecdhSecret);
-      const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
-      const aesKey = await crypto.subtle.deriveKey(
-        { name: 'HKDF', hash: 'SHA-256', salt: cipherText.slice(0, 32), info: new TextEncoder().encode('paramant-v2') },
-        hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
-      );
+        const combined = concat(sharedSecret, ecdhSecret);
+        const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
+        const aesKey = await crypto.subtle.deriveKey(
+          { name: 'HKDF', hash: 'SHA-256', salt: cipherText.slice(0, 32), info: new TextEncoder().encode('paramant-v2') },
+          hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+        );
 
-      // Encrypt
-      const nonce = crypto.getRandomValues(new Uint8Array(12));
-      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
+        const nonce = crypto.getRandomValues(new Uint8Array(12));
+        const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
 
-      // Packet: 0x02 | u32(ctLen_kyber) | cipherText | u32(senderPubLen) | senderPub | nonce(12) | u32(ct) | ct
-      const bundle = concat(cipherText, senderPubRaw);
-      const packet = concat(
-        new Uint8Array([0x02]),
-        u32be(cipherText.length),
-        cipherText,
-        u32be(senderPubRaw.length),
-        senderPubRaw,
-        nonce,
-        u32be(ct.length),
-        ct
-      );
+        const packet = concat(
+          new Uint8Array([0x02]),
+          u32be(cipherText.length), cipherText,
+          u32be(senderPubRaw.length), senderPubRaw,
+          nonce, u32be(ct.length), ct
+        );
 
-      // Pad to 5MB
-      const padded = new Uint8Array(BLOCK);
-      padded.set(packet.slice(0, Math.min(packet.length, BLOCK)));
-      for (let p = packet.length; p < BLOCK; p += 65536) {
-        crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, BLOCK)));
+        const padded = new Uint8Array(BLOCK);
+        padded.set(packet.slice(0, Math.min(packet.length, BLOCK)));
+        for (let p = packet.length; p < BLOCK; p += 65536)
+          crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, BLOCK)));
+
+        $('enc-status').textContent = (totalFiles > 1 ? 'File ' + (fileIndex+1) + '/' + totalFiles + ' — ' : '') +
+          'Uploading chunk ' + (i+1) + '/' + totalChunks + '...';
+        const hashBuf = await crypto.subtle.digest('SHA-256', padded);
+        const hash = u8toHex(new Uint8Array(hashBuf));
+
+        const ur = await fetch(RELAY_API + '/v2/inbound', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+          body: JSON.stringify({
+            hash, payload: toB64(padded), ttl_ms: ttlMs,
+            meta: { device_id: 'transfer-web', file_name: file.name, chunk_index: i, total_chunks: totalChunks, file_id: fileId }
+          }),
+          signal: AbortSignal.timeout(120000)
+        });
+        const ud = await ur.json();
+        if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
+        tokens.push(ud.download_token);
       }
+      return { name: file.name, size: file.size, tokens };
+    }
 
-      // Hash & upload
-      $('enc-status').textContent = `Uploading chunk ${i+1}/${totalChunks}...`;
-      const hashBuf = await crypto.subtle.digest('SHA-256', padded);
-      const hash = u8toHex(new Uint8Array(hashBuf));
-
-      const ur = await fetch(`${RELAY_API}/v2/inbound`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
-        body: JSON.stringify({
-          hash, payload: toB64(padded), ttl_ms: parseInt($("ttl-select").value),
-          meta: { device_id: 'transfer-web', file_name: selectedFile.name, chunk_index: i, total_chunks: totalChunks, file_id: fileId }
-        }),
-        signal: AbortSignal.timeout(120000)
-      });
-      const ud = await ur.json();
-      if (!ud.ok) throw new Error(ud.error || 'Upload failed');
-      tokens.push(ud.download_token);
-      burnReceipts.push({ hash: ud.hash, chunk: i, burned_at: null });
+    // Upload alle bestanden
+    const files = [...$('file-input').files];
+    const vaultFiles = [];
+    for (let fi = 0; fi < files.length; fi++) {
+      vaultFiles.push(await encryptFile(files[fi], fi, files.length));
     }
 
     $('enc-progress').style.width = '100%';
     $('enc-status').textContent = 'Notifying receiver...';
 
-    // Send download tokens to receiver via WebSocket
-    // Stuur transfer tokens via HTTP naar relay — ontvanger pollt dit op
+    const isVault = files.length > 1;
     await fetch(RELAY_API + '/v2/pubkey', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
       body: JSON.stringify({
         device_id: sessionToken + '_ready',
-        ecdh_pub: tokens.join(','),
-        kyber_pub: selectedFile.name + '|' + totalChunks + '|' + parseInt($('ttl-select').value)
+        ecdh_pub: isVault ? JSON.stringify(vaultFiles) : vaultFiles[0].tokens.join(','),
+        kyber_pub: isVault
+          ? 'vault|' + files.length + '|' + ttlMs
+          : files[0].name + '|' + vaultFiles[0].tokens.length + '|' + ttlMs
       })
     });
 
-    $('done-status').textContent = `✓ ${selectedFile.name} sent securely — receiver will be notified`;
+    const label = isVault
+      ? files.length + ' files sent — vault ready for receiver'
+      : files[0].name + ' sent securely';
+    $('done-status').textContent = '✓ ' + label;
     showStep('step-done');
 
   } catch(e) {
