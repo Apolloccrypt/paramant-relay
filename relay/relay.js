@@ -23,7 +23,13 @@ const https  = require('https');
 const fs     = require('fs');
 const url_   = require('url');
 
-const VERSION    = '2.1.0';
+const VERSION    = '2.2.0';
+
+// ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
+let argon2Lib = null;
+try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
+let bip39Lib  = null;
+try { bip39Lib  = require('bip39');  } catch(e) { /* npm install bip39  */ }
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
@@ -35,7 +41,7 @@ const SECTOR     = process.env.SECTOR              || 'relay';
 // Probeer @noble/post-quantum te laden voor ML-DSA
 let mlDsa = null;
 try {
-  const { ml_dsa65: mlDsaLib } = require('@noble/post-quantum/ml-dsa');
+  const { ml_dsa65: mlDsaLib } = require('@noble/post-quantum/ml-dsa.js');
   mlDsa = mlDsaLib || null;
   if (mlDsa) log('info', 'ml_dsa_loaded', { alg: 'ML-DSA-65 NIST FIPS 204' });
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'npm install @noble/post-quantum' }); }
@@ -45,12 +51,12 @@ const ALLOWED = {
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users'],
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users'],
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop'],
   full:       null,
 };
 
@@ -224,6 +230,7 @@ function totpCode(secret, counter) {
   const mac = crypto.createHmac('sha1', key).update(buf).digest();
   const offset = mac[mac.length - 1] & 0xf;
   const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
+  zeroBuffer(key); zeroBuffer(mac);
   return code.toString().padStart(6, '0');
 }
 
@@ -309,6 +316,24 @@ function checkTeamRateLimit(teamId, limit) {
   if (b.count >= limit) return false;
   b.count++; teamRateLimits.set(teamId, b); return true;
 }
+const freeRateLimits = new Map();       // key → { count, date }  — inbound uploads
+const freePubkeyRateLimits = new Map(); // key → { count, date }  — pubkey registrations
+function checkFreeRateLimit(apiKey) {
+  const LIMIT = 10;
+  const today = new Date().toISOString().slice(0,10);
+  const b = freeRateLimits.get(apiKey) || { count: 0, date: today };
+  if (b.date !== today) { b.count = 0; b.date = today; }
+  if (b.count >= LIMIT) return false;
+  b.count++; freeRateLimits.set(apiKey, b); return true;
+}
+function checkFreePubkeyRateLimit(apiKey) {
+  const LIMIT = 20;
+  const today = new Date().toISOString().slice(0,10);
+  const b = freePubkeyRateLimits.get(apiKey) || { count: 0, date: today };
+  if (b.date !== today) { b.count = 0; b.date = today; }
+  if (b.count >= LIMIT) return false;
+  b.count++; freePubkeyRateLimits.set(apiKey, b); return true;
+}
 const pubkeys    = new Map();  // device:key → {ecdh_pub, kyber_pub, dsa_pub, ts}
 const webhooks   = new Map();  // device:key → [{url, secret}]
 const auditChain = new Map();  // key → Merkle chain [{ts,event,hash,bytes,device,prev_hash,chain_hash}]
@@ -319,6 +344,43 @@ function log(level, msg, data = {}) {
 }
 
 function J(o) { return JSON.stringify(o); }
+
+// ── Key zeroization ───────────────────────────────────────────────────────────
+function zeroBuffer(buf) {
+  if (buf && Buffer.isBuffer(buf)) {
+    try { crypto.randomFillSync(buf); } catch {}
+    try { buf.fill(0); } catch {}
+  }
+}
+
+// ── HKDF-SHA256 — compatible met Python cryptography library ──────────────────
+function hkdf(ikm, salt, info, length) {
+  const s = typeof salt === 'string' ? Buffer.from(salt) : salt;
+  const i = typeof info === 'string' ? Buffer.from(info) : info;
+  try {
+    return Buffer.from(crypto.hkdfSync('sha256', ikm, s, i, length));
+  } catch(e) {
+    // Fallback voor Node < 15 (handmatige HKDF implementatie)
+    const prk = crypto.createHmac('sha256', s).update(ikm).digest();
+    let t = Buffer.alloc(0), okm = Buffer.alloc(0);
+    for (let n = 0; okm.length < length; n++) {
+      t = crypto.createHmac('sha256', prk).update(Buffer.concat([t, i, Buffer.from([n + 1])])).digest();
+      okm = Buffer.concat([okm, t]);
+    }
+    return okm.slice(0, length);
+  }
+}
+
+// Leid relay lookup-hash af van BIP39 mnemonic (zelfde als Python SDK)
+function mnemonicToLookupHash(phrase) {
+  if (!bip39Lib) throw new Error('bip39 niet beschikbaar (npm install bip39)');
+  if (!bip39Lib.validateMnemonic(phrase)) throw new Error('Ongeldige BIP39 mnemonic (checksum fout)');
+  const entropy = Buffer.from(bip39Lib.mnemonicToEntropy(phrase), 'hex');
+  const idBytes = hkdf(entropy, 'paramant-drop-v1', 'lookup-id', 32);
+  const hash    = crypto.createHash('sha256').update(idBytes).digest('hex');
+  zeroBuffer(entropy);
+  return hash;
+}
 
 // ── Merkle audit chain ────────────────────────────────────────────────────────
 // Elke entry bevat hash van vorige entry — tamper-evident log
@@ -374,11 +436,23 @@ function loadUsers() {
 
 // TTL flush
 setInterval(() => {
+  // Clean freeRateLimits entries older than yesterday
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+  for (const [k, v] of freeRateLimits.entries()) {
+    if (v.date < yesterday) freeRateLimits.delete(k);
+  }
+  for (const [k, v] of freePubkeyRateLimits.entries()) {
+    if (v.date < yesterday) freePubkeyRateLimits.delete(k);
+  }
+}, 3600000);
+
+setInterval(() => {
   const now = Date.now();
   for (const [h, e] of blobStore.entries()) {
     if (now - e.ts > e.ttl) {
-      try { e.blob.fill(0); } catch {}
+      zeroBuffer(e.blob);
       blobStore.delete(h);
+      log('info', 'blob_ttl_expired', { hash: h.slice(0,16) });
     }
   }
 }, 30_000);
@@ -432,7 +506,7 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-Admin-Token, X-DID, X-DID-Signature');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('X-Paramant-Version',           VERSION);
@@ -487,7 +561,7 @@ const server = http.createServer(async (req, res) => {
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
-      padding: '5MB fixed (DPI-masking)',
+      padding: '20MB fixed (DPI-masking)',
       jurisdiction: 'EU/DE, GDPR, no US CLOUD Act' };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
@@ -561,12 +635,16 @@ const server = http.createServer(async (req, res) => {
     td.used = true;
     const data = Buffer.from(entry.blob);
     blobStore.delete(td.hash);
-    try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
-    try { entry.blob.fill(0); } catch {}
+    zeroBuffer(entry.blob);
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': td.file_name ? `attachment; filename="${td.file_name}"` : 'attachment',
+      'Content-Disposition': (() => {
+        if (!td.file_name) return 'attachment';
+        const safe = td.file_name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\/]/g, '_');
+        const enc  = encodeURIComponent(td.file_name);
+        return `attachment; filename="${safe}"; filename*=UTF-8''${enc}`;
+      })(),
       'X-Burned': 'true',
       'X-Hash': td.hash,
     });
@@ -593,6 +671,10 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/pubkey — Registreer pubkeys (ML-KEM + ECDH + ML-DSA optioneel) ─
   if (path === '/v2/pubkey' && req.method === 'POST') {
+    if (keyData?.plan === 'free' && !checkFreePubkeyRateLimit(apiKey)) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+      return res.end(J({ error: 'Free tier limit reached (20 pubkey registrations/day)', retry_after_s: 86400 }));
+    }
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
@@ -637,16 +719,21 @@ const server = http.createServer(async (req, res) => {
       }));
     }
     try {
+      if (keyData?.plan === 'free' && !checkFreeRateLimit(apiKey)) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+        return res.end(JSON.stringify({ error: 'Free tier limit reached (10 uploads/day)', retry_after_s: 86400 }));
+      }
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
-      const { hash, payload, ttl_ms, meta, dsa_signature } = d;
+      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password } = d;
 
       if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
       if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
 
       const blob = Buffer.from(payload, 'base64');
-      if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: 'Max 5MB' })); }
+      const planMaxSize = MAX_BLOB;
+      if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
 
       // ML-DSA handtekening verificatie (optioneel maar gelogd)
       let sigResult = { valid: false, reason: 'not provided' };
@@ -654,14 +741,23 @@ const server = http.createServer(async (req, res) => {
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      const _planMaxTtl = { dev: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
+      const _planMaxTtl = { free: 3_600_000, dev: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
       const _plan = keyData?.plan || 'dev';
       const _maxTtl = _planMaxTtl[_plan] || _planMaxTtl.dev;
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length, sig_valid: sigResult.valid, apiKey });
+      // Access policies: max_views (default 1 = burn-on-read) + Argon2id wachtwoord
+      const _planMaxViews = { free: 1, pro: 10, enterprise: 100 };
+      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, _planMaxViews[keyData?.plan || 'free'] || 1));
+      let pw_hash = null;
+      if (password) {
+        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id niet beschikbaar op deze relay' })); }
+        pw_hash = await argon2Lib.hash(password, { type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
+      }
+      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+        sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash });
       setTimeout(() => {
         const e = blobStore.get(hash);
-        if (e) { try { e.blob.fill(0); } catch {} blobStore.delete(hash); }
+        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
       }, ttl);
 
       const deviceId = meta?.device_id;
@@ -689,22 +785,58 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── DELETE /v2/inbound/:hash — Caller-initiated abort (orphan cleanup) ────────
+  const delm = path.match(/^\/v2\/inbound\/([a-f0-9]{64})$/);
+  if (delm && req.method === 'DELETE') {
+    const entry = blobStore.get(delm[1]);
+    if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found' })); }
+    if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
+    zeroBuffer(entry.blob);
+    blobStore.delete(delm[1]);
+    // Remove associated download token if present
+    for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
+    auditAppend(apiKey, 'inbound_aborted', { hash: delm[1].slice(0,16)+'...' });
+    log('info', 'blob_aborted', { hash: delm[1].slice(0,16) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true }));
+  }
+
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
     const entry = blobStore.get(outm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
-    const data = Buffer.from(entry.blob);
-    blobStore.delete(outm[1]);
-    try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
-    try { entry.blob.fill(0); } catch {}
-    incMetric('blobs_burned'); incMetric('bytes_out_total', data.length);
-    stats.outbound++; stats.burned++; stats.bytes_out += data.length;
-    auditAppend(apiKey, 'outbound_burn', { hash: outm[1].slice(0,16)+'...', bytes: data.length });
-    log('info', 'blob_burned', { hash: outm[1].slice(0,16) });
-    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': data.length,
-                          'X-Paramant-Burned': 'true', 'X-Paramant-Hash': outm[1] });
+    // Argon2id wachtwoord verificatie (indien ingesteld)
+    if (entry.pw_hash) {
+      const reqPw = (req.headers['x-blob-password'] || '').trim();
+      if (!reqPw) { res.writeHead(401, { 'WWW-Authenticate': 'X-Blob-Password' }); return res.end(J({ error: 'Wachtwoord vereist (X-Blob-Password header)' })); }
+      if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id niet beschikbaar' })); }
+      const pwOk = await argon2Lib.verify(entry.pw_hash, reqPw);
+      if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
+    }
+    // Access policies: max_views — decrement, burn wanneer 0
+    entry.views_remaining = (entry.views_remaining ?? 1) - 1;
+    const burned = entry.views_remaining <= 0;
+    const data   = Buffer.from(entry.blob);
+    if (burned) {
+      blobStore.delete(outm[1]);
+      zeroBuffer(entry.blob);
+      incMetric('blobs_burned'); stats.burned++;
+    }
+    incMetric('bytes_out_total', data.length);
+    stats.outbound++; stats.bytes_out += data.length;
+    auditAppend(apiKey, burned ? 'outbound_burn' : 'outbound_view',
+      { hash: outm[1].slice(0,16)+'...', bytes: data.length, views_left: entry.views_remaining });
+    log('info', burned ? 'blob_burned' : 'blob_served',
+      { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': data.length,
+      'X-Paramant-Burned':     burned ? 'true' : 'false',
+      'X-Paramant-Views-Left': String(entry.views_remaining),
+      'X-Paramant-Hash':       outm[1],
+    });
     return res.end(data);
   }
 
@@ -720,6 +852,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/webhook ─────────────────────────────────────────────────────────
   if (path === '/v2/webhook' && req.method === 'POST') {
+    if (keyData?.plan === 'free') { res.writeHead(403); return res.end(JSON.stringify({ error: 'Webhooks require a paid plan' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
@@ -734,6 +867,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/stream-next ──────────────────────────────────────────────────────
   if (path === '/v2/stream-next') {
+    if (keyData?.plan === 'free') { res.writeHead(403); return res.end(JSON.stringify({ error: 'Streaming requires a paid plan' })); }
     const device = query.device || ''; const seq = parseInt(query.seq || '0');
     const secret = apiKey; const next = seq + 1; // FIX: volledige key als HMAC secret
     const h = crypto.createHmac('sha256', Buffer.from(secret)).update(`${device}|${next}`).digest('hex');
@@ -746,11 +880,12 @@ const server = http.createServer(async (req, res) => {
     if (!apiKey || !apiKeys.has(apiKey) || apiKeys.get(apiKey)?.active === false) {
       res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' }));
     }
-    const limit   = Math.min(parseInt(query.limit || '100'), MAX_AUDIT);
+    const limit   = Math.max(1, Math.min(parseInt(query.limit || '100') || 1, MAX_AUDIT));
     const entries = (auditChain.get(apiKey) || []).slice(-limit).reverse();
     const valid   = verifyChain([...(auditChain.get(apiKey) || [])]);
 
     if (query.format === 'csv') {
+      if (keyData?.plan === 'free') { res.writeHead(403); return res.end(JSON.stringify({ error: 'CSV audit export requires a paid plan' })); }
       res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="paramant_audit.csv"' });
       return res.end('ts,event,hash,bytes,device,chain_hash\n' +
         entries.map(e => `${e.ts},${e.event},${e.hash||''},${e.bytes||0},${e.device||''},${e.chain_hash}`).join('\n'));
@@ -761,6 +896,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/did/register ────────────────────────────────────────────────────
   if (path === '/v2/did/register' && req.method === 'POST') {
+    if (keyData?.plan === 'free') { res.writeHead(403); return res.end(JSON.stringify({ error: 'DID registration requires a paid plan' })); }
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
@@ -852,7 +988,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const tok = req.headers['x-admin-token'] || '';
-      if (!tok || !apiKeys.has(tok)) {
+      if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
         res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
       }
       const valid = verifyTotp(d.totp_code || '');
@@ -865,23 +1001,35 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = 'pgp_' + crypto.randomBytes(16).toString('hex');
-      apiKeys.set(newKey, { plan: d.plan || 'pro', label: d.label || '', active: true });
-      log('info', 'key_created_via_admin', { label: d.label, plan: d.plan });
+      const plan = d.plan || 'pro';
+      const label = d.label || '';
+      const email = d.email || '';
+      apiKeys.set(newKey, { plan, label, active: true });
+      // Persist to users.json so key survives relay restarts
+      try {
+        const usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+        usersData.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
+        usersData.updated = new Date().toISOString();
+        fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2));
+        log('info', 'key_created_via_admin', { label, plan, persisted: true });
+      } catch(we) {
+        log('warn', 'key_persist_failed', { err: we.message, label });
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, key: newKey, plan: d.plan, label: d.label }));
+      return res.end(J({ ok: true, key: newKey, plan, label }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
@@ -894,24 +1042,32 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
-      if (apiKeys.has(d.key)) {
-        apiKeys.get(d.key).active = false;
-        log('info', 'key_revoked_via_admin', { key: d.key.slice(0,16) });
-        res.writeHead(200); return res.end(J({ ok: true }));
+      if (!apiKeys.has(d.key)) { res.writeHead(404); return res.end(J({ error: 'Key not found' })); }
+      apiKeys.get(d.key).active = false;
+      // Persist revocation to users.json
+      try {
+        const usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+        const entry = usersData.api_keys.find(k => k.key === d.key);
+        if (entry) { entry.active = false; entry.revoked_at = new Date().toISOString(); }
+        usersData.updated = new Date().toISOString();
+        fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2));
+        log('info', 'key_revoked_via_admin', { key: d.key.slice(0,16), persisted: true });
+      } catch(we) {
+        log('warn', 'key_revoke_persist_failed', { err: we.message });
       }
-      res.writeHead(404); return res.end(J({ error: 'Key not found' }));
+      res.writeHead(200); return res.end(J({ ok: true }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
   if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
@@ -1026,6 +1182,105 @@ python3 paramant-receiver.py \\
     }));
   }
 
+  // ── POST /v2/drop/create — Anonieme burn-on-read drop met BIP39 + Argon2id ────
+  if (path === '/v2/drop/create' && req.method === 'POST') {
+    if (!ramOk()) {
+      const r = ramStatus();
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '10' });
+      return res.end(J({ ok: false, error: 'Relay at capacity', retry_after_s: 10, slots_available: r.available_slots }));
+    }
+    try {
+      const d = JSON.parse((await readBody(req)).toString());
+      const { hash, payload, ttl_ms, password } = d;
+      if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash en payload verplicht' })); }
+      if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash moet SHA-256 hex zijn' })); }
+      if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash al in gebruik' })); }
+      const blob = Buffer.from(payload, 'base64');
+      if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(MAX_BLOB/1048576)}MB` })); }
+      const _planDropTtl = { free: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
+      const ttl = Math.min(parseInt(ttl_ms || 3_600_000) || 3_600_000, _planDropTtl[keyData?.plan || 'free']);
+      // Argon2id wachtwoordbeveiliging
+      let pw_hash = null;
+      if (password) {
+        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id niet beschikbaar op deze relay' })); }
+        pw_hash = await argon2Lib.hash(password, {
+          type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1,
+        });
+      }
+      // Drops zijn altijd burn-on-read
+      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+        sig_valid: false, apiKey, max_views: 1, views_remaining: 1, pw_hash, is_drop: true });
+      setTimeout(() => {
+        const e = blobStore.get(hash);
+        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
+      }, ttl);
+      incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
+      stats.inbound++; stats.bytes_in += blob.length;
+      auditAppend(apiKey, 'drop_created', { hash: hash.slice(0,16)+'...', bytes: blob.length, pw_protected: !!pw_hash });
+      log('info', 'drop_created', { hash: hash.slice(0,16), size: blob.length, pw: !!pw_hash, ttl });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, pw_protected: !!pw_hash }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/drop/pickup — Haal drop op via BIP39 mnemonic + optioneel wachtwoord ──
+  if (path === '/v2/drop/pickup' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 8192)).toString());
+      const { mnemonic, password } = d;
+      if (!mnemonic) { res.writeHead(400); return res.end(J({ error: 'mnemonic verplicht' })); }
+      let lookupHash;
+      try { lookupHash = mnemonicToLookupHash(mnemonic.trim()); }
+      catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+      const entry = blobStore.get(lookupHash);
+      if (!entry) {
+        res.writeHead(404); return res.end(J({ error: 'Drop niet gevonden. Verlopen, al opgehaald, of ongeldige mnemonic.' }));
+      }
+      // Argon2id wachtwoord verificatie
+      if (entry.pw_hash) {
+        if (!password) { res.writeHead(401); return res.end(J({ error: 'Wachtwoord vereist (password veld)' })); }
+        if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id niet beschikbaar' })); }
+        const pwOk = await argon2Lib.verify(entry.pw_hash, password);
+        if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
+      }
+      // Burn-on-read
+      const data = Buffer.from(entry.blob);
+      blobStore.delete(lookupHash);
+      zeroBuffer(entry.blob);
+      incMetric('blobs_burned'); incMetric('bytes_out_total', data.length);
+      stats.outbound++; stats.burned++; stats.bytes_out += data.length;
+      auditAppend(apiKey, 'drop_pickup', { hash: lookupHash.slice(0,16)+'...', bytes: data.length });
+      log('info', 'drop_pickup', { hash: lookupHash.slice(0,16), size: data.length });
+      res.writeHead(200, {
+        'Content-Type':     'application/octet-stream',
+        'Content-Length':   data.length,
+        'X-Paramant-Burned': 'true',
+        'X-Paramant-Hash':   lookupHash,
+      });
+      return res.end(data);
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/drop/status — Controleer drop beschikbaarheid zonder te branden ─
+  if (path === '/v2/drop/status' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      if (!d.mnemonic) { res.writeHead(400); return res.end(J({ error: 'mnemonic verplicht' })); }
+      let lookupHash;
+      try { lookupHash = mnemonicToLookupHash(d.mnemonic.trim()); }
+      catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+      const entry = blobStore.get(lookupHash);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (!entry) return res.end(J({ available: false }));
+      return res.end(J({
+        available:        true,
+        size:             entry.size,
+        ttl_remaining_ms: Math.max(0, entry.ttl - (Date.now() - entry.ts)),
+        pw_protected:     !!entry.pw_hash,
+      }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
   // ── 404 ──────────────────────────────────────────────────────────────────────
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(J({ error: 'Not found', version: VERSION, docs: 'https://paramant.app/docs',
@@ -1067,7 +1322,7 @@ server.listen(PORT, '127.0.0.1', () => {
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });
 });
 process.on('SIGTERM', () => {
-  for (const [, e] of blobStore.entries()) { try { e.blob.fill(0); } catch {} }
+  for (const [, e] of blobStore.entries()) { zeroBuffer(e.blob); }
   log('info', 'shutdown_clean', { burned: stats.burned });
   process.exit(0);
 });
