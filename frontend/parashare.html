@@ -677,7 +677,7 @@ async function initGlobe() {
 
   // Dynamisch laden — alleen als globe geopend wordt
   try {
-    await loadScript('https://unpkg.com/globe.gl@2/dist/globe.gl.min.js');
+    await loadScript('/globe.gl.min.js');
   } catch(e) {
     document.getElementById('globe-loading').innerHTML =
       '<span style="color:#e05252">Failed to load Globe.gl — check network</span>';
