@@ -15,6 +15,14 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 source "$ENV_FILE"
 
+# Guard: check verplichte secrets
+for var in ADMIN_TOKEN TOTP_SECRET RESEND_API_KEY FLY_API_TOKEN; do
+  if [ -z "${!var}" ]; then
+    echo "FOUT: $var niet gezet in .env"
+    exit 1
+  fi
+done
+
 echo "==> Deploying to $SERVER"
 
 # 1. Relay JS
@@ -26,7 +34,6 @@ done
 
 # 2. Frontend
 echo "--- frontend"
-scp frontend/r34ct0r.html root@$SERVER:$APP_DIR/app/r34ct0r.html
 scp frontend/index.html   root@$SERVER:$APP_DIR/app/index.html
 
 # 3. Nginx config
