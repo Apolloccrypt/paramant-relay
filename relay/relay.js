@@ -51,12 +51,12 @@ const ALLOWED = {
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop'],
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop'],
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session'],
   full:       null,
 };
 
@@ -251,6 +251,19 @@ setInterval(() => {
   const now = Date.now();
   for (const [t, d] of downloadTokens.entries()) {
     if (d.used || now > d.expires_ms) downloadTokens.delete(t);
+  }
+}, 60000);
+
+// ── PSS Sessions — pre-shared-secret commitment scheme (Mattijs Flow 1) ────
+// session_id → { commitment: sha256hex, api_key: str, expires_ms: int,
+//               joined: bool, ecdh_pub?, kyber_pub?, joined_at? }
+const sessions = new Map();
+
+// Cleanup expired sessions elke 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, s] of sessions.entries()) {
+    if (now > s.expires_ms) sessions.delete(id);
   }
 }, 60000);
 
@@ -664,7 +677,45 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, file_name: td.file_name, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
   }
 
-  if (!keyData?.active) {
+  // ── POST /v2/session/join — Receiver bewijst kennis van PSS + bindt pubkeys ─
+  // Geen API key nodig — PSS is de authenticatie
+  // Relay verifieert: SHA-256(pss) == commitment  (relay kan dit NIET vervalsen)
+  // Na join: pubkeys gebonden aan sessie, niet overschrijfbaar
+  if (path === '/v2/session/join' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 65536)).toString());
+      if (!d.session_id || !d.pss || !d.ecdh_pub) {
+        res.writeHead(400);
+        return res.end(J({ error: 'session_id, pss, and ecdh_pub required' }));
+      }
+      const sess = sessions.get(d.session_id);
+      if (!sess)                    { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+      if (Date.now() > sess.expires_ms) {
+        sessions.delete(d.session_id);
+        res.writeHead(410); return res.end(J({ error: 'Session expired' }));
+      }
+      if (sess.joined)              { res.writeHead(409); return res.end(J({ error: 'Session already joined — first join wins' })); }
+
+      // Verifieer PSS commitment: SHA-256(pss) moet overeenkomen
+      const pssHash = crypto.createHash('sha256').update(d.pss).digest('hex');
+      if (pssHash !== sess.commitment) {
+        log('warn', 'session_join_bad_pss', { sid: d.session_id.slice(0, 12) });
+        res.writeHead(403); return res.end(J({ error: 'Pre-shared secret does not match commitment' }));
+      }
+
+      // PSS verified — bind pubkeys (first-join-wins, onveranderbaar)
+      sess.joined    = true;
+      sess.ecdh_pub  = d.ecdh_pub;
+      sess.kyber_pub = d.kyber_pub || '';
+      sess.joined_at = new Date().toISOString();
+
+      log('info', 'session_joined', { sid: d.session_id.slice(0, 12), kyber: !!d.kyber_pub });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, session_id: d.session_id, joined_at: sess.joined_at }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+    if (!keyData?.active) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
@@ -706,6 +757,67 @@ const server = http.createServer(async (req, res) => {
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device. Start receiver first.' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub, ts: entry.ts }));
+  }
+
+  // ── POST /v2/session/create — Sender maakt PSS-gebonden sessie ─────────────
+  // Vereist: geldige API key, commitment = SHA-256(pss) als hex
+  // Geeft: session_id (pss_<32hex>), expires_ms
+  // Relay ziet alleen de hash — kan PSS niet reconstrueren
+  if (path === '/v2/session/create' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401); return res.end(J({ error: 'Valid API key required' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      if (!d.commitment || !/^[a-f0-9]{64}$/.test(d.commitment)) {
+        res.writeHead(400);
+        return res.end(J({ error: 'commitment must be SHA-256 hex (64 chars) of your pre-shared secret' }));
+      }
+      const ttl  = Math.min(Math.max(parseInt(d.ttl_ms) || 600000, 60000), 3600000); // 1min–1h, default 10min
+      const sid  = 'pss_' + crypto.randomBytes(24).toString('hex');
+      sessions.set(sid, {
+        commitment:  d.commitment,
+        api_key:     apiKey,
+        expires_ms:  Date.now() + ttl,
+        joined:      false,
+        ecdh_pub:    null,
+        kyber_pub:   null,
+        joined_at:   null,
+      });
+      log('info', 'session_created', { sid: sid.slice(0, 12), ttl });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, session_id: sid, expires_ms: Date.now() + ttl, ttl_ms: ttl }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── GET /v2/session/:id/pubkey — Sender haalt PSS-gebonden pubkeys op ───────
+  // Vereist: geldige API key die de sessie aangemaakt heeft
+  // Geeft: ecdh_pub + kyber_pub van receiver — alleen na succesvolle join
+  // Relay KAN NIET vervalsen: pubkeys zijn gebonden aan PSS-verificatie
+  const sessPkm = path.match(/^\/v2\/session\/(pss_[a-f0-9]{48})\/pubkey$/);
+  if (sessPkm && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401); return res.end(J({ error: 'Valid API key required' })); }
+    const sess = sessions.get(sessPkm[1]);
+    if (!sess)               { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (sess.api_key !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Session belongs to a different API key' })); }
+    if (!sess.joined)        { res.writeHead(202); return res.end(J({ ok: false, joined: false, message: 'Receiver has not joined yet — poll again' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      ok: true, joined: true,
+      ecdh_pub:  sess.ecdh_pub,
+      kyber_pub: sess.kyber_pub,
+      joined_at: sess.joined_at,
+      expires_ms: sess.expires_ms,
+    }));
+  }
+
+  // ── GET /v2/session/:id/status — Poll of receiver al gejoind is ─────────────
+  const sessSm = path.match(/^\/v2\/session\/(pss_[a-f0-9]{48})\/status$/);
+  if (sessSm && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401); return res.end(J({ error: 'Valid API key required' })); }
+    const sess = sessions.get(sessSm[1]);
+    if (!sess)               { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (sess.api_key !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Session belongs to a different API key' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, joined: sess.joined, expires_ms: sess.expires_ms }));
   }
 
   // ── POST /v2/inbound — Upload versleuteld blok + optioneel ML-DSA handtekening
