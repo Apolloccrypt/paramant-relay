@@ -9,3 +9,6 @@ users.json
 deploy/.env
 poc_report_20260401_130841.txt
 frontend-live/
+config/users.json
+frontend-live/
+config/
