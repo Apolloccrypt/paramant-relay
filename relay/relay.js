@@ -678,8 +678,16 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      // Receiver sessions (device_id 'inv_*') gebruiken transfer key als session scope — geen API key nodig
+      // Alle overige pubkey registraties vereisen een geldige API key
+      const isReceiverSession = typeof d.device_id === 'string' && d.device_id.startsWith('inv_');
+      if (!keyData && !isReceiverSession) {
+        res.writeHead(401); return res.end(J({ error: 'Valid API key required for pubkey registration' }));
+      }
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
+      const existingPubkey = pubkeys.get(`${d.device_id}:${apiKey}`);
+      if (existingPubkey) { res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' })); }
       pubkeys.set(`${d.device_id}:${apiKey}`, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
         dsa_pub:  d.dsa_pub  || '',  // ML-DSA public key voor handtekening verificatie
@@ -900,6 +908,12 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      // Receiver sessions (device_id 'inv_*') gebruiken transfer key als session scope — geen API key nodig
+      // Alle overige pubkey registraties vereisen een geldige API key
+      const isReceiverSession = typeof d.device_id === 'string' && d.device_id.startsWith('inv_');
+      if (!keyData && !isReceiverSession) {
+        res.writeHead(401); return res.end(J({ error: 'Valid API key required for pubkey registration' }));
+      }
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
       didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
