@@ -57,9 +57,7 @@ input[type=file]{cursor:pointer}
 .warn{background:#1a1200;border:1px solid #3a2a00;color:#f59e0b;padding:12px 14px;font-size:11px;line-height:1.7;margin:12px 0}
 
 /* ── Globe HUD ── */
-#globe-overlay{position:fixed;inset:0;z-index:0;background:#0c0c0c;display:block;
-  font-family:'SF Mono','Fira Code',monospace;overflow:hidden;
-  --neon:#3aaa70;--neon2:#5ac98a;--amber:#f59e0b;--g:#3aaa70}
+#globe-overlay{position:fixed;inset:0;z-index:0;background:#000;display:block;}
 /* globe always visible as background */
 /* Globe background mode: HUD elements hidden unless fullscreen */
 #globe-overlay .hud-top,
@@ -156,9 +154,6 @@ input[type=file]{cursor:pointer}
   border-top-color:var(--neon);border-radius:50%;animation:globeSpin .8s linear infinite;
   box-shadow:0 0 20px rgba(58,170,112,.2)}
 
-/* Globe btn hover */
-#globe-btn:hover{background:rgba(58,170,112,.08)!important;border-color:var(--neon)!important;
-  box-shadow:0 0 12px rgba(58,170,112,.2)}
 
 
 /* Cards semi-transparent when globe is background */
@@ -170,14 +165,9 @@ main { background: transparent !important }
 </style>
 </head>
 <body>
-<nav style="justify-content:space-between;position:relative;z-index:10">
+<nav style="justify-content:space-between;position:relative;z-index:20">
   <a href="/" class="logo">PARAMANT</a>
-  <button id="globe-btn" onclick="toggleGlobe()" title="Globe (Ctrl+G)"
-    style="background:none;border:1px solid #1a3320;color:#3aaa70;padding:6px 14px;
-    font-family:var(--mono);font-size:11px;cursor:pointer;letter-spacing:.08em;
-    transition:all .2s;text-transform:uppercase">
-    ⬡ Globe
-  </button>
+  
 </nav>
 <main style="position:relative;z-index:10">
 
@@ -300,7 +290,7 @@ main { background: transparent !important }
   <div class="hud-top">
     <div class="hud-logo">⬡ PARAMANT // GHOST PIPE</div>
     <div class="hud-center">Secure Transfer Network · EU/DE Jurisdiction</div>
-    <button class="hud-close-btn" onclick="toggleGlobe()">✕ Close <kbd style="opacity:.5;font-size:9px">ESC</kbd></button>
+    
   </div>
 
   <!-- Globe canvas -->
@@ -685,16 +675,16 @@ function toggleGlobe() {
     // Fullscreen HUD mode: hide UI, show HUD panels
     overlay.classList.add('globe-fullscreen');
     if (mainEl) mainEl.style.display = 'none';
-    document.getElementById('globe-btn').style.color = '#3aaa70';
-    document.getElementById('globe-btn').style.boxShadow = '0 0 12px rgba(58,170,112,.3)';
-    document.getElementById('globe-btn').textContent = '✕ Close';
+    const _gb = document.getElementById('globe-btn'); if (_gb) _gb.style.color = '#3aaa70';
+    if (_gb) _gb.style.boxShadow = '0 0 12px rgba(58,170,112,.3)';
+    if (_gb) _gb.textContent = '✕ Close';
   } else {
     // Background mode: restore UI, hide HUD panels
     overlay.classList.remove('globe-fullscreen');
     if (mainEl) mainEl.style.display = '';
-    document.getElementById('globe-btn').style.color = '';
-    document.getElementById('globe-btn').style.boxShadow = '';
-    document.getElementById('globe-btn').textContent = '⬡ Globe';
+    const _gb2 = document.getElementById('globe-btn'); if (_gb2) _gb2.style.color = '';
+    if (_gb2) _gb2.style.boxShadow = '';
+    if (_gb2) _gb2.textContent = '⬡ Globe';
     if (globePollInterval) { clearInterval(globePollInterval); globePollInterval = null; }
   }
 }
