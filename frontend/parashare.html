@@ -229,10 +229,15 @@ main { background: transparent !important }
   <div class="card" id="fp-card" style="display:none">
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Receiver connected — verify fingerprint</div></div>
     <div class="card-body">
-      <p class="status-line" style="margin-bottom:8px">Ask the receiver: "What is your fingerprint?" — it should match exactly:</p>
+      <p class="status-line" style="margin-bottom:6px">Call or message the receiver via a <strong>separate channel</strong> (phone, Signal, etc.) and ask: <em>"What is your fingerprint?"</em></p>
+      <p class="status-line" style="margin-bottom:8px;color:rgba(245,158,11,.85);font-size:10px">⚠ A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
       <div class="fingerprint" id="fp-display">—</div>
+      <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:11px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="fp-confirm-check" onchange="$('fp-confirm-btn').disabled=!this.checked" style="width:14px;height:14px;accent-color:#3aaa70">
+        I have verified this fingerprint with the receiver via a separate channel
+      </label>
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-green" onclick="confirmFingerprint()">✓ Fingerprint matches — encrypt &amp; send</button>
+        <button class="btn btn-green" id="fp-confirm-btn" onclick="confirmFingerprint()" disabled>✓ Verified — encrypt &amp; send</button>
         <button class="btn btn-red btn-outline" onclick="rejectFingerprint()">✗ Mismatch — abort</button>
       </div>
     </div>
@@ -349,10 +354,13 @@ function setStatus(id, msg, cls) {
   el.className = 'status-line' + (cls ? ' ' + cls : '');
 }
 
-function genFingerprint(pubkeyHex) {
-  // Take first 16 hex chars, format as XXXX-XXXX-XXXX-XXXX
-  const h = pubkeyHex.slice(0, 16).toUpperCase();
-  return h.slice(0,4) + '-' + h.slice(4,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16);
+// SHA-256(kyber_pub || ecdh_pub) → first 10 bytes → 5×4 hex groups
+// Both parties compute independently; mismatch = relay MITM detected.
+async function genFingerprint(kyberPubHex, ecdhPubHex) {
+  const buf = hexToU8(kyberPubHex + (ecdhPubHex || ''));
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+  const h = [...hash.slice(0, 10)].map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}`;
 }
 
 function u8toHex(u8) {
@@ -468,7 +476,7 @@ function connectWebSocket() {
         if (d.kyber_pub && d.ecdh_pub) {
           clearInterval(pubkeyPollInterval);
           receiverPubs = { kyber_pub: d.kyber_pub, ecdh_pub: d.ecdh_pub };
-          const fp = genFingerprint(d.kyber_pub);
+          const fp = await genFingerprint(d.kyber_pub, d.ecdh_pub);
           $('fp-card').style.display = '';
           $('fp-display').textContent = fp;
           $('waiting-title').textContent = 'Receiver connected';
@@ -486,7 +494,7 @@ function connectWebSocket() {
     // Receiver joined and sent pubkey
     if (msg.type === 'pubkey_offer' && msg.kyber_pub && msg.ecdh_pub) {
       receiverPubs = { kyber_pub: msg.kyber_pub, ecdh_pub: msg.ecdh_pub };
-      const fp = genFingerprint(msg.kyber_pub);
+      const fp = await genFingerprint(msg.kyber_pub, msg.ecdh_pub);
 
       // Show fingerprint card
       $('fp-card').style.display = '';
@@ -508,6 +516,13 @@ function connectWebSocket() {
 // ── Fingerprint confirmed — encrypt & send ──
 async function confirmFingerprint() {
   if (!receiverPubs) return;
+  if (!document.getElementById('fp-confirm-check')?.checked) return;
+
+  // Guard: abort if ML-KEM library failed to load
+  if (typeof ml_kem768 === 'undefined' || !ml_kem768?.encapsulate) {
+    setStatus('waiting-status', 'ERROR: ML-KEM-768 library not loaded — cannot encrypt safely. Refresh and try again.', 'err');
+    return;
+  }
 
   // Tell receiver we confirmed
   ws.send(JSON.stringify({ type: 'packet', chatHash: sessionToken, seq: 0, payload: JSON.stringify({ type: 'fingerprint_ok' }) }));

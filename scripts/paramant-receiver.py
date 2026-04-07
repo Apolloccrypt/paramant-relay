@@ -54,8 +54,29 @@ def _derive_drop_keys(entropy: bytes) -> tuple:
                     salt=b'paramant-drop-v1', info=b'lookup-id', backend=be).derive(entropy)
     return aes_key, hashlib.sha256(id_bytes).hexdigest()
 
+def _is_v2_browser_packet(blob: bytes) -> bool:
+    """Detect browser Ghost Pipe v2 packet format (parashare.html / ontvang.html).
+    Format: 0x02 | u32be(ct_kyber_len) | ct_kyber | u32be(ecdh_pub_len) | ecdh_pub | nonce(12) | u32be(ct_len) | ct
+    This format requires an ML-KEM-768 private key to decrypt and is NOT compatible
+    with the symmetric CLI/SDK protocol (paramant-v6).
+    """
+    if len(blob) < 5 or blob[0] != 0x02:
+        return False
+    ct_kyber_len = struct.unpack(">I", blob[1:5])[0]
+    # Sanity: ML-KEM-768 ciphertext is 1088 bytes
+    return ct_kyber_len == 1088
+
 def decrypt(blob, key):
     aes_key = None
+    # Detect browser v2 format — incompatible with CLI symmetric protocol
+    if _is_v2_browser_packet(blob):
+        raise RuntimeError(
+            "Blob is encrypted with the browser Ghost Pipe v2 protocol (ML-KEM-768 + ECDH P-256).\n"
+            "  This requires the receiver's ML-KEM-768 private key — not an API key.\n"
+            "  The CLI receiver uses the symmetric paramant-v6 protocol.\n"
+            "  For browser↔CLI interoperability, use the Python SDK with --pubkey mode (coming soon).\n"
+            "  Tip: Use paramant-sender.py on both ends, or the browser widget on both ends."
+        )
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
