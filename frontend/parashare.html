@@ -55,10 +55,109 @@ input[type=file]{cursor:pointer}
 .tag.green{border-color:rgba(58,170,112,.4);color:var(--green)}
 
 .warn{background:#1a1200;border:1px solid #3a2a00;color:#f59e0b;padding:12px 14px;font-size:11px;line-height:1.7;margin:12px 0}
+
+/* ── Globe HUD ── */
+#globe-overlay{position:fixed;inset:0;z-index:9000;background:#000a12;display:none;
+  font-family:'SF Mono','Fira Code',monospace;overflow:hidden;
+  --neon:#00d4ff;--neon2:#00fff5;--amber:#f59e0b;--g:#3aaa70}
+#globe-overlay.active{display:block}
+
+/* scanlines */
+#globe-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,
+  rgba(0,212,255,.018) 3px,rgba(0,212,255,.018) 4px)}
+/* vignette */
+#globe-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:19;
+  background:radial-gradient(ellipse 80% 80% at 50% 50%,transparent 35%,#000a12 100%)}
+
+#globe-canvas-wrap{position:absolute;inset:0;z-index:1}
+#globe-canvas-wrap canvas{display:block}
+
+/* HUD corners */
+.hc{position:absolute;width:56px;height:56px;border-color:var(--neon);border-style:solid;
+  opacity:.55;z-index:25;transition:opacity .3s;animation:hcPulse 3s ease-in-out infinite}
+.hc:hover{opacity:.9}
+.hc-tl{top:16px;left:16px;border-width:2px 0 0 2px}
+.hc-tr{top:16px;right:16px;border-width:2px 2px 0 0}
+.hc-bl{bottom:16px;left:16px;border-width:0 0 2px 2px}
+.hc-br{bottom:16px;right:16px;border-width:0 2px 2px 0}
+@keyframes hcPulse{0%,100%{opacity:.4}50%{opacity:.7}}
+
+/* HUD top bar */
+.hud-top{position:absolute;top:0;left:0;right:0;height:52px;z-index:30;
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+  border-bottom:1px solid rgba(0,212,255,.15);
+  background:linear-gradient(to bottom,rgba(0,10,18,.9),transparent)}
+.hud-logo{font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--neon);
+  text-shadow:0 0 12px rgba(0,212,255,.6)}
+.hud-center{font-size:10px;letter-spacing:.22em;color:rgba(0,212,255,.5);text-transform:uppercase}
+.hud-close-btn{background:none;border:1px solid rgba(0,212,255,.3);color:rgba(0,212,255,.7);
+  padding:5px 14px;font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;
+  text-transform:uppercase;transition:all .2s}
+.hud-close-btn:hover{border-color:var(--neon);color:var(--neon);box-shadow:0 0 10px rgba(0,212,255,.3)}
+
+/* HUD bottom bar */
+.hud-bot{position:absolute;bottom:0;left:0;right:0;height:48px;z-index:30;
+  display:flex;align-items:center;justify-content:center;gap:40px;padding:0 24px;
+  border-top:1px solid rgba(0,212,255,.12);
+  background:linear-gradient(to top,rgba(0,10,18,.9),transparent)}
+.hud-stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.hud-stat-lbl{font-size:8px;letter-spacing:.16em;color:rgba(0,212,255,.4);text-transform:uppercase}
+.hud-stat-val{font-size:11px;color:var(--neon);letter-spacing:.06em}
+.hud-stat-val.ok{color:var(--g)}
+.hud-stat-val.amber{color:var(--amber)}
+
+/* Side panels */
+.hud-panel{position:absolute;z-index:30;background:rgba(0,10,18,.85);
+  border:1px solid rgba(0,212,255,.18);padding:14px 16px;min-width:200px;
+  backdrop-filter:blur(6px)}
+.hud-panel-title{font-size:8px;letter-spacing:.2em;color:rgba(0,212,255,.45);
+  text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;
+  border-bottom:1px solid rgba(0,212,255,.12)}
+.hud-panel-row{font-size:10px;color:rgba(0,212,255,.8);padding:4px 0;
+  display:flex;justify-content:space-between;gap:16px;letter-spacing:.04em}
+.hud-panel-row .val{color:var(--neon);text-shadow:0 0 6px rgba(0,212,255,.4)}
+
+/* Left panel */
+#hud-left{left:20px;top:50%;transform:translateY(-50%)}
+
+/* Right panel */
+#hud-right{right:20px;top:50%;transform:translateY(-50%)}
+
+/* Session items */
+.hud-session{font-size:10px;color:rgba(0,212,255,.75);padding:5px 0;
+  border-bottom:1px solid rgba(0,212,255,.08);display:flex;align-items:center;gap:8px}
+.hud-session:last-child{border:none}
+.hud-dot{width:5px;height:5px;border-radius:50%;background:var(--g);flex-shrink:0;
+  box-shadow:0 0 6px var(--g);animation:blink 2s ease-in-out infinite}
+.hud-dot.amber{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+@keyframes blink{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* Loading ring */
+@keyframes globeSpin{to{transform:rotate(360deg)}}
+#globe-loading{position:absolute;inset:0;z-index:5;display:flex;align-items:center;
+  justify-content:center;flex-direction:column;gap:16px;color:rgba(0,212,255,.6);
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+#globe-loading-ring{width:64px;height:64px;border:2px solid rgba(0,212,255,.15);
+  border-top-color:var(--neon);border-radius:50%;animation:globeSpin .8s linear infinite;
+  box-shadow:0 0 20px rgba(0,212,255,.2)}
+
+/* Globe btn hover */
+#globe-btn:hover{background:rgba(0,212,255,.08)!important;border-color:var(--neon)!important;
+  box-shadow:0 0 12px rgba(0,212,255,.2)}
+
 </style>
 </head>
 <body>
-<nav><a href="/" class="logo">PARAMANT</a></nav>
+<nav style="justify-content:space-between">
+  <a href="/" class="logo">PARAMANT</a>
+  <button id="globe-btn" onclick="toggleGlobe()" title="Globe (Ctrl+G)"
+    style="background:none;border:1px solid #1e3a4a;color:#00d4ff;padding:6px 14px;
+    font-family:var(--mono);font-size:11px;cursor:pointer;letter-spacing:.08em;
+    transition:all .2s;text-transform:uppercase">
+    ⬡ Globe
+  </button>
+</nav>
 <main>
 
 <!-- STEP 1: Setup -->
@@ -167,6 +266,55 @@ input[type=file]{cursor:pointer}
 </div>
 
 </main>
+
+<!-- Globe HUD overlay -->
+<div id="globe-overlay" role="dialog" aria-label="Globe HUD">
+  <!-- Corners -->
+  <div class="hc hc-tl"></div>
+  <div class="hc hc-tr"></div>
+  <div class="hc hc-bl"></div>
+  <div class="hc hc-br"></div>
+
+  <!-- Top bar -->
+  <div class="hud-top">
+    <div class="hud-logo">⬡ PARAMANT // GHOST PIPE</div>
+    <div class="hud-center">Secure Transfer Network · EU/DE Jurisdiction</div>
+    <button class="hud-close-btn" onclick="toggleGlobe()">✕ Close <kbd style="opacity:.5;font-size:9px">ESC</kbd></button>
+  </div>
+
+  <!-- Globe canvas -->
+  <div id="globe-canvas-wrap"></div>
+
+  <!-- Loading state -->
+  <div id="globe-loading">
+    <div id="globe-loading-ring"></div>
+    <span>Initializing secure globe...</span>
+  </div>
+
+  <!-- Left panel — active sessions -->
+  <div class="hud-panel" id="hud-left">
+    <div class="hud-panel-title">Active Sessions</div>
+    <div id="hud-sessions"><div class="hud-session"><span class="hud-dot amber"></span>Scanning relay...</div></div>
+  </div>
+
+  <!-- Right panel — location + transfer -->
+  <div class="hud-panel" id="hud-right">
+    <div class="hud-panel-title">Node Info</div>
+    <div class="hud-panel-row"><span>Location</span><span class="val" id="hud-loc">Locating...</span></div>
+    <div class="hud-panel-row"><span>Relay</span><span class="val ok">EU/DE · Online</span></div>
+    <div class="hud-panel-row"><span>Protocol</span><span class="val">Ghost Pipe v2</span></div>
+    <div class="hud-panel-row"><span>Encryption</span><span class="val">ML-KEM-768</span></div>
+    <div class="hud-panel-row"><span>Blobs in flight</span><span class="val" id="hud-blobs">—</span></div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="hud-bot">
+    <div class="hud-stat"><span class="hud-stat-lbl">Relay</span><span class="hud-stat-val ok">EU/DE · Online</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Jurisdiction</span><span class="hud-stat-val">GDPR · No US CLOUD Act</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Session</span><span class="hud-stat-val" id="hud-session-stat">—</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Uptime</span><span class="hud-stat-val" id="hud-uptime">—</span></div>
+  </div>
+</div>
 
 <script type="module" src="/noble-mlkem-loader.js"></script>
 <script>
@@ -487,6 +635,211 @@ function rejectFingerprint() {
   ws.close();
   showStep('step-setup');
   setStatus('key-status', 'Transfer aborted — fingerprint mismatch', 'err');
+}
+
+// ── Globe HUD ─────────────────────────────────────────────────────────────────
+let globeInstance = null, globeOpen = false, globePollInterval = null;
+const RELAY_LOC = { lat: 50.1109, lng: 8.6821, label: 'Relay · Frankfurt EU/DE' };
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'g') { e.preventDefault(); toggleGlobe(); }
+  if (e.key === 'Escape' && globeOpen) toggleGlobe();
+});
+
+function toggleGlobe() {
+  const overlay = document.getElementById('globe-overlay');
+  globeOpen = !globeOpen;
+  if (globeOpen) {
+    overlay.classList.add('active');
+    document.getElementById('globe-btn').style.color = '#00d4ff';
+    document.getElementById('globe-btn').style.boxShadow = '0 0 12px rgba(0,212,255,.3)';
+    initGlobe();
+  } else {
+    overlay.classList.remove('active');
+    document.getElementById('globe-btn').style.color = '';
+    document.getElementById('globe-btn').style.boxShadow = '';
+    if (globePollInterval) { clearInterval(globePollInterval); globePollInterval = null; }
+  }
+}
+
+function loadScript(src) {
+  return new Promise((ok, fail) => {
+    if (document.querySelector(`script[src="${src}"]`)) { ok(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = fail;
+    document.head.appendChild(s);
+  });
+}
+
+async function initGlobe() {
+  if (globeInstance) { startGlobePoll(); return; }
+
+  // Dynamisch laden — alleen als globe geopend wordt
+  try {
+    await loadScript('https://unpkg.com/globe.gl@2/dist/globe.gl.min.js');
+  } catch(e) {
+    document.getElementById('globe-loading').innerHTML =
+      '<span style="color:#e05252">Failed to load Globe.gl — check network</span>';
+    return;
+  }
+
+  // Gebruikerslocatie ophalen (IP-based, privacy-friendly)
+  let userLat = RELAY_LOC.lat + 0.5, userLng = RELAY_LOC.lng - 2; // fallback
+  let cityLabel = 'Unknown';
+  try {
+    const geo = await Promise.race([
+      fetch('https://ipapi.co/json/').then(r => r.json()),
+      new Promise((_, rej) => setTimeout(() => rej(), 3000))
+    ]);
+    if (geo && geo.latitude) {
+      userLat = geo.latitude; userLng = geo.longitude;
+      cityLabel = (geo.city || '') + (geo.country_code ? ' · ' + geo.country_code : '');
+    }
+  } catch(e) {}
+  document.getElementById('hud-loc').textContent = cityLabel || 'Unknown';
+
+  const wrap = document.getElementById('globe-canvas-wrap');
+
+  // Globe.gl instantiëren
+  globeInstance = Globe({ animateIn: true })
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+    .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .showAtmosphere(true)
+    .atmosphereColor('#00d4ff')
+    .atmosphereAltitude(0.18)
+    // Locatiepunten
+    .pointsData([
+      { lat: userLat, lng: userLng, size: 0.6, color: '#00d4ff', label: 'Your Node' },
+      { lat: RELAY_LOC.lat, lng: RELAY_LOC.lng, size: 0.45, color: '#3aaa70', label: RELAY_LOC.label },
+    ])
+    .pointAltitude(0.012)
+    .pointColor(d => d.color)
+    .pointRadius(d => d.size)
+    .pointsMerge(false)
+    .pointLabel(d => `<div style="font:10px/1.4 monospace;background:rgba(0,10,18,.9);
+      border:1px solid rgba(0,212,255,.3);padding:6px 10px;color:#00d4ff;
+      letter-spacing:.08em">${d.label}</div>`)
+    // Transfer arc gebruiker → relay
+    .arcsData([
+      {
+        startLat: userLat, startLng: userLng,
+        endLat: RELAY_LOC.lat, endLng: RELAY_LOC.lng,
+        color: ['rgba(0,212,255,0)', '#00d4ff', '#00d4ff', 'rgba(0,212,255,0)'],
+        label: 'Ghost Pipe · Encrypted Channel',
+      }
+    ])
+    .arcColor(d => d.color)
+    .arcDashLength(0.35)
+    .arcDashGap(0.18)
+    .arcDashAnimateTime(2200)
+    .arcStroke(0.4)
+    .arcAltitudeAutoScale(0.35)
+    .arcLabel(d => `<div style="font:10px monospace;background:rgba(0,10,18,.9);
+      border:1px solid rgba(0,212,255,.25);padding:4px 8px;color:#00d4ff">${d.label}</div>`)
+    // Pulserende ringen op knooppunten
+    .ringsData([
+      { lat: userLat, lng: userLng, maxR: 3, propagationSpeed: 2.5, repeatPeriod: 1200, color: () => 'rgba(0,212,255,' },
+      { lat: RELAY_LOC.lat, lng: RELAY_LOC.lng, maxR: 2.5, propagationSpeed: 2, repeatPeriod: 1600, color: () => 'rgba(58,170,112,' },
+    ])
+    .ringColor(d => t => `${d.color()}${1 - t})`)
+    .ringMaxRadius('maxR')
+    .ringPropagationSpeed('propagationSpeed')
+    .ringRepeatPeriod('repeatPeriod')
+    (wrap);
+
+  // Startpositie: tussen gebruiker en relay
+  globeInstance.pointOfView({ lat: (userLat + RELAY_LOC.lat) / 2, lng: (userLng + RELAY_LOC.lng) / 2, altitude: 2.0 }, 1200);
+
+  // Toon controls info
+  globeInstance.controls().autoRotate = true;
+  globeInstance.controls().autoRotateSpeed = 0.35;
+
+  // Stop autorotate bij interactie
+  wrap.addEventListener('mousedown', () => { globeInstance.controls().autoRotate = false; });
+  wrap.addEventListener('touchstart', () => { globeInstance.controls().autoRotate = false; });
+
+  // Verberg loading
+  document.getElementById('globe-loading').style.display = 'none';
+
+  // Poll relay stats
+  startGlobePoll();
+
+  // Live transfer arc bijwerken als er een actieve sessie is
+  updateGlobeTransfer(userLat, userLng);
+}
+
+function startGlobePoll() {
+  if (globePollInterval) return;
+  updateGlobeStats();
+  globePollInterval = setInterval(updateGlobeStats, 8000);
+}
+
+async function updateGlobeStats() {
+  // Health check
+  try {
+    const r = await fetch(RELAY_API + '/health', { signal: AbortSignal.timeout(4000) });
+    const d = await r.json();
+    const bl = document.getElementById('hud-blobs');
+    if (bl) bl.textContent = (d.blobs || 0) + ' blobs';
+    const up = document.getElementById('hud-uptime');
+    if (up && d.uptime_s) {
+      const h = Math.floor(d.uptime_s / 3600), m = Math.floor((d.uptime_s % 3600) / 60);
+      up.textContent = h + 'h ' + m + 'm';
+    }
+  } catch(e) {}
+
+  // Actieve sessie bijwerken
+  updateSessionsPanel();
+}
+
+function updateSessionsPanel() {
+  const el = document.getElementById('hud-sessions');
+  if (!el) return;
+  const sessions = [];
+
+  if (sessionToken) {
+    const step = document.querySelector('.step.active');
+    const stepId = step ? step.id : '';
+    let status = 'Idle';
+    if (stepId === 'step-waiting') status = receiverPubs ? 'Receiver connected' : 'Awaiting receiver';
+    else if (stepId === 'step-encrypting') status = 'Encrypting...';
+    else if (stepId === 'step-done') status = 'Transfer complete';
+    sessions.push({ label: 'Session · ' + sessionToken.slice(4,12) + '...', status, active: stepId !== 'step-done' });
+  }
+
+  const st = document.getElementById('hud-session-stat');
+  if (st) st.textContent = sessions.length ? sessions[0].status : 'No session';
+
+  el.innerHTML = sessions.length
+    ? sessions.map(s => `<div class="hud-session">
+        <span class="hud-dot${s.active ? '' : ' amber'}"></span>
+        <span style="flex:1">${s.label}</span>
+        <span style="color:rgba(0,212,255,.5);font-size:9px">${s.status}</span>
+      </div>`).join('')
+    : '<div class="hud-session"><span class="hud-dot amber"></span><span>No active session</span></div>';
+}
+
+function updateGlobeTransfer(userLat, userLng) {
+  if (!globeInstance) return;
+  const step = document.querySelector('.step.active');
+  const stepId = step ? step.id : '';
+  const isActive = stepId === 'step-waiting' || stepId === 'step-encrypting';
+
+  // Voeg extra arc toe als er een actieve overdracht is
+  const arcs = [{
+    startLat: userLat, startLng: userLng,
+    endLat: RELAY_LOC.lat, endLng: RELAY_LOC.lng,
+    color: isActive
+      ? ['rgba(0,212,255,0)', '#00fff5', '#00fff5', 'rgba(0,212,255,0)']
+      : ['rgba(0,212,255,0)', '#00d4ff', '#00d4ff', 'rgba(0,212,255,0)'],
+    speed: isActive ? 1400 : 2200,
+    label: isActive ? 'Ghost Pipe · Active Transfer' : 'Ghost Pipe · Encrypted Channel',
+  }];
+  globeInstance.arcsData(arcs)
+    .arcColor(d => d.color)
+    .arcDashAnimateTime(d => d.speed || 2200);
 }
 </script>
 </body>
