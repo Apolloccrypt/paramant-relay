@@ -16,11 +16,66 @@ Gebruik:
   gp = GhostPipe(api_key='pgp_xxx', device='mri-001')
   gp.listen(on_receive=lambda data, meta: save(data))
 """
-import base64, hashlib, json, os, struct, time
+import base64, ctypes, hashlib, json, os, struct, sys, time
 import urllib.request, urllib.error
 from typing import Callable, Optional
 
 __version__ = '1.0.0'
+
+# ── Blokgroottes voor padding ──────────────────────────────────────────────────
+BLOCKS = {
+    '4k':   4 * 1024,
+    '64k':  64 * 1024,
+    '512k': 512 * 1024,
+    '5m':   5 * 1024 * 1024,
+}
+
+# ── Sleutelzeroïsatie ─────────────────────────────────────────────────────────
+def _zero(b: bytes) -> None:
+    """Overschrijf sleutelmateriaal in geheugen met nullen (CPython, best-effort)."""
+    if not b:
+        return
+    try:
+        offset = sys.getsizeof(b) - len(b) - 1
+        ctypes.memset(id(b) + offset, 0, len(b))
+    except Exception:
+        pass
+
+# ── BIP39 helpers ─────────────────────────────────────────────────────────────
+def _bip39_encode(entropy: bytes) -> str:
+    """Zet 16 bytes entropy om naar 12-woord BIP39 mnemonic."""
+    try:
+        from mnemonic import Mnemonic
+        return Mnemonic('english').to_mnemonic(entropy)
+    except ImportError:
+        raise GhostPipeError('pip install mnemonic (vereist voor drop/pickup)')
+
+def _bip39_decode(phrase: str) -> bytes:
+    """Zet 12-woord BIP39 mnemonic terug naar 16 bytes entropy."""
+    try:
+        from mnemonic import Mnemonic
+        m = Mnemonic('english')
+        if not m.check(phrase):
+            raise GhostPipeError('Ongeldige BIP39 mnemonic (checksum fout)')
+        return bytes(m.to_entropy(phrase))
+    except ImportError:
+        raise GhostPipeError('pip install mnemonic (vereist voor drop/pickup)')
+
+def _derive_drop_keys(entropy: bytes) -> tuple:
+    """Leid AES sleutel en relay lookup-hash af van entropy."""
+    try:
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.backends import default_backend
+        be = default_backend()
+        aes_key  = HKDF(algorithm=hashes.SHA256(), length=32,
+                        salt=b'paramant-drop-v1', info=b'aes-key', backend=be).derive(entropy)
+        id_bytes = HKDF(algorithm=hashes.SHA256(), length=32,
+                        salt=b'paramant-drop-v1', info=b'lookup-id', backend=be).derive(entropy)
+        lookup_hash = hashlib.sha256(id_bytes).hexdigest()
+        return aes_key, lookup_hash
+    except ImportError:
+        raise GhostPipeError('pip install cryptography')
 
 SECTOR_RELAYS = {
     'health':  'https://health.paramant.app',
@@ -184,31 +239,37 @@ class GhostPipe:
         kyber_pub = bytes.fromhex(d['kyber_pub']) if d.get('kyber_pub') else None
         return ecdh_pub, kyber_pub
 
-    def _encrypt(self, data: bytes, ecdh_pub, kyber_pub) -> tuple:
-        """ML-KEM-768 + ECDH + AES-256-GCM + 5MB padding."""
+    def _encrypt(self, data: bytes, ecdh_pub, kyber_pub, pad_block: int = None) -> tuple:
+        """ML-KEM-768 + ECDH + AES-256-GCM + padding (configureerbare blokgrootte)."""
         c  = self._get_crypto(); K = self._try_kyber(); be = c['be']()
-        # ECDH
-        eph     = c['gen'](c['curve'](), be)
-        ecdh_ss = eph.exchange(c['ECDH'](), ecdh_pub)
-        eph_b   = eph.public_key().public_bytes(c['Enc'].DER, c['Pub'].SubjectPublicKeyInfo)
-        # ML-KEM
-        kct = b''; kss = b''
-        if K and kyber_pub:
-            try: kct, kss = K.enc(kyber_pub)
-            except Exception: pass
-        # HKDF
-        ikm = ecdh_ss + kss
-        ss  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
-                        salt=b'paramant-gp-v1', info=b'aes-key', backend=be).derive(ikm)
-        # AES-256-GCM
-        nonce  = os.urandom(12)
-        ct     = c['AES'](ss).encrypt(nonce, data, None)
-        bundle = struct.pack('>I', len(eph_b)) + eph_b + struct.pack('>I', len(kct)) + kct
-        packet = struct.pack('>I', len(bundle)) + bundle + nonce + struct.pack('>I', len(ct)) + ct
-        if len(packet) > BLOCK:
-            raise GhostPipeError(f'Data te groot: {len(data)} bytes (max ~4.9MB per blok)')
-        blob = packet + os.urandom(BLOCK - len(packet))
-        return blob, hashlib.sha256(blob).hexdigest(), bool(kct)
+        ecdh_ss = kss = ikm = ss = None
+        try:
+            # ECDH
+            eph     = c['gen'](c['curve'](), be)
+            ecdh_ss = eph.exchange(c['ECDH'](), ecdh_pub)
+            eph_b   = eph.public_key().public_bytes(c['Enc'].DER, c['Pub'].SubjectPublicKeyInfo)
+            # ML-KEM
+            kct = b''; kss = b''
+            if K and kyber_pub:
+                try: kct, kss = K.enc(kyber_pub)
+                except Exception: pass
+            # HKDF
+            ikm = ecdh_ss + kss
+            ss  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
+                            salt=b'paramant-gp-v1', info=b'aes-key', backend=be).derive(ikm)
+            # AES-256-GCM
+            nonce  = os.urandom(12)
+            ct     = c['AES'](ss).encrypt(nonce, data, None)
+            bundle = struct.pack('>I', len(eph_b)) + eph_b + struct.pack('>I', len(kct)) + kct
+            packet = struct.pack('>I', len(bundle)) + bundle + nonce + struct.pack('>I', len(ct)) + ct
+            target = pad_block or BLOCK
+            if len(packet) > target:
+                raise GhostPipeError(f'Data te groot voor dit blok ({len(data)} bytes, max {target} bytes)')
+            blob = packet + os.urandom(target - len(packet))
+            return blob, hashlib.sha256(blob).hexdigest(), bool(kct)
+        finally:
+            for b in (ecdh_ss, kss, ikm, ss):
+                if b: _zero(b)
 
     def _decrypt(self, blob: bytes) -> bytes:
         """Ontsleutel Ghost Pipe blob."""
@@ -225,49 +286,118 @@ class GhostPipe:
         nonce = blob[o:o+12]; o += 12
         ctlen = struct.unpack('>I', blob[o:o+4])[0]; o += 4
         ct    = blob[o:o+ctlen]
-        priv    = c['lpriv'](bytes.fromhex(kp['ecdh_priv']), None, be)
-        ecdh_ss = priv.exchange(c['ECDH'](), c['lpub'](epb, be))
-        kss = b''
-        if K and kct and kp.get('kyber_priv'):
-            try: kss = K.dec(bytes.fromhex(kp['kyber_priv']), kct)
-            except Exception: pass
-        ikm = ecdh_ss + kss
-        ss  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
-                        salt=b'paramant-gp-v1', info=b'aes-key', backend=be).derive(ikm)
-        return c['AES'](ss).decrypt(nonce, ct, None)
+        ecdh_ss = kss = ikm = ss = None
+        try:
+            priv    = c['lpriv'](bytes.fromhex(kp['ecdh_priv']), None, be)
+            ecdh_ss = priv.exchange(c['ECDH'](), c['lpub'](epb, be))
+            kss = b''
+            if K and kct and kp.get('kyber_priv'):
+                try: kss = K.dec(bytes.fromhex(kp['kyber_priv']), kct)
+                except Exception: pass
+            ikm = ecdh_ss + kss
+            ss  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
+                            salt=b'paramant-gp-v1', info=b'aes-key', backend=be).derive(ikm)
+            return c['AES'](ss).decrypt(nonce, ct, None)
+        finally:
+            for b in (ecdh_ss, kss, ikm, ss):
+                if b: _zero(b)
 
     # ── Publieke API ──────────────────────────────────────────────────────────
 
-    def send(self, data: bytes, ttl: int = 300) -> str:
+    def send(self, data: bytes, ttl: int = 300, max_views: int = 1,
+             pad_block: int = None) -> str:
         """
         Verstuur data via Ghost Pipe.
-        
-        Data wordt versleuteld met ML-KEM-768 + ECDH + AES-256-GCM,
-        gepad naar exact 5MB en geüpload naar de relay.
-        
+
         Args:
-            data: Bytes om te versturen (max ~4.9MB)
-            ttl:  Seconden beschikbaar op relay (default 300)
-        
+            data:      Bytes om te versturen
+            ttl:       Seconden beschikbaar op relay (default 300)
+            max_views: Max ophaalverzoeken voor burn (default 1)
+            pad_block: Blokgrootte voor padding in bytes (default 5MB)
+
         Returns:
             hash: SHA-256 hash — geef dit aan de ontvanger
-        
-        Raises:
-            GhostPipeError: Bij versleuteling of upload fouten
         """
         ecdh_pub, kyber_pub = self._fetch_receiver_pubkeys()
-        blob, h, used_kyber = self._encrypt(data, ecdh_pub, kyber_pub)
+        blob, h, used_kyber = self._encrypt(data, ecdh_pub, kyber_pub, pad_block=pad_block)
         body = json.dumps({
             'hash': h,
             'payload': base64.b64encode(blob).decode(),
             'ttl_ms': ttl * 1000,
+            'max_views': max_views,
             'meta': {'device_id': self.device},
         }).encode()
         status, resp = self._post('/v2/inbound', body)
         if status != 200:
             raise GhostPipeError(f'Upload mislukt: HTTP {status}: {resp.decode()[:100]}')
-        alg = 'ML-KEM-768+ECDH+AES-GCM' if used_kyber else 'ECDH+AES-GCM'
         return h
+
+    def drop(self, data: bytes, ttl: int = 3600, pad_block: int = None) -> str:
+        """
+        Stuur data als anonieme drop met 12-woord BIP39 mnemonic als access token.
+        Geen ECDH keypairs nodig — de mnemonic IS de gedeelde sleutel.
+        Altijd burn-on-read (max_views=1).
+
+        Args:
+            data:      Bytes om te droppen
+            ttl:       Seconden beschikbaar (default 3600)
+            pad_block: Blokgrootte voor padding (default 5MB)
+
+        Returns:
+            12-woord BIP39 mnemonic — geef dit aan de ontvanger
+        """
+        entropy = os.urandom(16)
+        phrase  = _bip39_encode(entropy)
+        aes_key, lookup_hash = _derive_drop_keys(entropy)
+        try:
+            c = self._get_crypto(); be = c['be']()
+            nonce  = os.urandom(12)
+            ct     = c['AES'](aes_key).encrypt(nonce, data, None)
+            packet = nonce + struct.pack('>I', len(ct)) + ct
+            target = pad_block or BLOCK
+            if len(packet) > target:
+                raise GhostPipeError(f'Data te groot voor drop-blok ({len(data)} bytes)')
+            blob = packet + os.urandom(target - len(packet))
+            body = json.dumps({
+                'hash':     lookup_hash,
+                'payload':  base64.b64encode(blob).decode(),
+                'ttl_ms':   ttl * 1000,
+                'max_views': 1,
+                'meta':     {'drop': True},
+            }).encode()
+            status, resp = self._post('/v2/inbound', body)
+            if status != 200:
+                raise GhostPipeError(f'Drop upload mislukt: HTTP {status}: {resp.decode()[:100]}')
+            return phrase
+        finally:
+            _zero(aes_key); _zero(entropy)
+
+    def pickup(self, phrase: str) -> bytes:
+        """
+        Ontvang een anonieme drop via 12-woord BIP39 mnemonic.
+        Burn-on-read — werkt maar één keer.
+
+        Args:
+            phrase: 12-woord BIP39 mnemonic (spaties als scheidingsteken)
+
+        Returns:
+            Ontsleutelde data
+        """
+        entropy = _bip39_decode(phrase.strip())
+        aes_key, lookup_hash = _derive_drop_keys(entropy)
+        try:
+            status, raw = self._get(f'/v2/outbound/{lookup_hash}')
+            if status == 404:
+                raise GhostPipeError('Drop niet gevonden. Verlopen, al opgehaald, of ongeldige mnemonic.')
+            if status != 200:
+                raise GhostPipeError(f'Drop ophalen mislukt: HTTP {status}')
+            nonce  = raw[:12]
+            ct_len = struct.unpack('>I', raw[12:16])[0]
+            ct     = raw[16:16 + ct_len]
+            c = self._get_crypto(); be = c['be']()
+            return c['AES'](aes_key).decrypt(nonce, ct, None)
+        finally:
+            _zero(aes_key); _zero(entropy)
 
     def receive(self, hash_: str) -> bytes:
         """
@@ -382,29 +512,49 @@ if __name__ == '__main__':
     import sys, argparse
 
     p = argparse.ArgumentParser(description=f'PARAMANT Ghost Pipe SDK v{__version__}')
-    p.add_argument('action', choices=['send','receive','status','listen','health','audit'])
-    p.add_argument('--key',    required=True)
-    p.add_argument('--device', required=True)
-    p.add_argument('--relay',  default='')
-    p.add_argument('--hash',   default='')
-    p.add_argument('--file',   default='')
-    p.add_argument('--ttl',    type=int, default=300)
-    p.add_argument('--output', default='')
-    p.add_argument('--webhook',default='')
+    p.add_argument('action', choices=['send','receive','status','listen','health','audit',
+                                      'drop','pickup'])
+    p.add_argument('--key',       required=True)
+    p.add_argument('--device',    default='cli')
+    p.add_argument('--relay',     default='')
+    p.add_argument('--hash',      default='')
+    p.add_argument('--mnemonic',  default='', help='12-woord BIP39 mnemonic (pickup)')
+    p.add_argument('--file',      default='')
+    p.add_argument('--ttl',       type=int, default=300, help='Levensduur in seconden')
+    p.add_argument('--max-views', type=int, default=1,   help='Max ophaalverzoeken (burn)')
+    p.add_argument('--pad-block', default='5m', choices=list(BLOCKS.keys()),
+                   help='Padding blokgrootte (default: 5m)')
+    p.add_argument('--output',    default='')
+    p.add_argument('--webhook',   default='')
     a = p.parse_args()
 
-    gp = GhostPipe(a.key, a.device, relay=a.relay)
+    pad = BLOCKS[a.pad_block]
+    gp  = GhostPipe(a.key, a.device, relay=a.relay)
 
     if a.action == 'send':
         data = open(a.file, 'rb').read() if a.file else sys.stdin.buffer.read()
         gp.receive_setup()
-        h = gp.send(data, ttl=a.ttl)
+        h = gp.send(data, ttl=a.ttl, max_views=a.max_views, pad_block=pad)
         print(f'OK hash={h}')
 
     elif a.action == 'receive':
         if not a.hash: sys.exit('--hash vereist')
         gp.receive_setup()
         data = gp.receive(a.hash)
+        if a.output:
+            with open(a.output, 'wb') as f: f.write(data)
+            print(f'OK opgeslagen in {a.output} ({len(data)} bytes)')
+        else:
+            sys.stdout.buffer.write(data)
+
+    elif a.action == 'drop':
+        data = open(a.file, 'rb').read() if a.file else sys.stdin.buffer.read()
+        phrase = gp.drop(data, ttl=a.ttl, pad_block=pad)
+        print(f'Mnemonic: {phrase}')
+
+    elif a.action == 'pickup':
+        if not a.mnemonic: sys.exit('--mnemonic vereist')
+        data = gp.pickup(a.mnemonic)
         if a.output:
             with open(a.output, 'wb') as f: f.write(data)
             print(f'OK opgeslagen in {a.output} ({len(data)} bytes)')
