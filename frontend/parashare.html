@@ -362,25 +362,34 @@ async function confirmFingerprint() {
 
     // Helper: encrypt + upload one file, returns token array
     async function encryptFile(file, fileIndex, totalFiles) {
-      const fileBytes = new Uint8Array(await file.arrayBuffer());
-      const totalChunks = Math.ceil(fileBytes.length / CHUNK_PLAIN) || 1;
+      const totalChunks = Math.ceil(file.size / CHUNK_PLAIN) || 1;
       const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
       const tokens = [];
+
+      // Grootte-waarschuwing bij > 500MB
+      if (file.size > 500 * 1024 * 1024) {
+        $('enc-status').textContent = 'Large file (' + (file.size/1024/1024/1024).toFixed(2) + ' GB) — streaming mode, reading chunk by chunk...';
+        await new Promise(r => setTimeout(r, 400));
+      }
 
       for (let i = 0; i < totalChunks; i++) {
         const globalPct = Math.round(
           ((fileIndex + (i / totalChunks)) / totalFiles) * 85
         );
         $('enc-progress').style.width = globalPct + '%';
+        const mbDone = Math.round((i * CHUNK_PLAIN) / 1024 / 1024);
+        const mbTotal = Math.round(file.size / 1024 / 1024);
         $('enc-status').textContent = (totalFiles > 1 ? 'File ' + (fileIndex+1) + '/' + totalFiles + ' — ' : '') +
-          'Encrypting chunk ' + (i+1) + '/' + totalChunks + '...';
+          'Encrypting ' + mbDone + '/' + mbTotal + ' MB (chunk ' + (i+1) + '/' + totalChunks + ')...';
 
         const start = Math.round(i * CHUNK_PLAIN);
-        const chunkData = fileBytes.slice(start, Math.min(start + CHUNK_PLAIN, fileBytes.length));
+        const end = Math.min(start + CHUNK_PLAIN, file.size);
+        // Stream-read: alleen dit chunk in RAM, niet het hele bestand
+        const chunkData = new Uint8Array(await file.slice(start, end).arrayBuffer());
 
         const metaJson = JSON.stringify({
           file_id: fileId, file_name: file.name,
-          file_size: fileBytes.length, chunk_index: i,
+          file_size: file.size, chunk_index: i,
           total_chunks: totalChunks, chunk_size: chunkData.length
         });
         const metaBytes = new TextEncoder().encode(metaJson);
@@ -417,8 +426,9 @@ async function confirmFingerprint() {
         for (let p = packet.length; p < BLOCK; p += 65536)
           crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, BLOCK)));
 
+        const mbUp = Math.round((i * CHUNK_PLAIN) / 1024 / 1024);
         $('enc-status').textContent = (totalFiles > 1 ? 'File ' + (fileIndex+1) + '/' + totalFiles + ' — ' : '') +
-          'Uploading chunk ' + (i+1) + '/' + totalChunks + '...';
+          'Uploading ' + mbUp + '/' + Math.round(file.size/1024/1024) + ' MB...';
         const hashBuf = await crypto.subtle.digest('SHA-256', padded);
         const hash = u8toHex(new Uint8Array(hashBuf));
 

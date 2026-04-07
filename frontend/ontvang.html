@@ -283,8 +283,19 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
   const fileName = msg.file_name || 'download';
   const chunks = [];
   const burnedHashes = [];
+  let fileWriter = null;  // File System Access API streaming writer
 
   try {
+    // Probeer File System Access API (Chrome/Edge) — true streaming, geen RAM limiet
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({ suggestedName: fileName, _startIn: 'downloads' });
+        fileWriter = await handle.createWritable();
+      } catch(e) {
+        // Gebruiker annuleerde of API niet beschikbaar — val terug op Blob
+        fileWriter = null;
+      }
+    }
     for (let i = 0; i < tokens.length; i++) {
       const pct = Math.round(10 + (i / tokens.length) * 75);
       $('recv-progress').style.width = pct + '%';
@@ -343,27 +354,36 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
         const metaLen = new DataView(plainPadded.buffer).getUint32(doff, false);
         doff += 4 + metaLen;
       }
-      chunks.push(plainPadded.slice(doff));
+      const decryptedChunk = plainPadded.slice(doff);
+      if (fileWriter) {
+        await fileWriter.write(decryptedChunk);
+      } else {
+        chunks.push(decryptedChunk);
+      }
     }
 
     $('recv-progress').style.width = '100%';
-    $('recv-status').textContent = 'Assembling file...';
+    $('recv-status').textContent = 'Saving file...';
 
-    // Combine chunks
-    const totalSize = chunks.reduce((s, c) => s + c.length, 0);
-    const combined = new Uint8Array(totalSize);
-    let off2 = 0;
-    for (const c of chunks) { combined.set(c, off2); off2 += c.length; }
-
-    // Trigger download
-    const blob = new Blob([combined]);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
+    let totalSize = 0;
+    if (fileWriter) {
+      // Streaming: sluit schrijfstream — bestand al opgeslagen op disk
+      await fileWriter.close();
+      fileWriter = null;
+      totalSize = chunks.length; // niet beschikbaar, gebruik 0
+    } else {
+      // Blob assembly: geef chunks direct aan Blob (efficienter dan concat)
+      const blob = new Blob(chunks);
+      totalSize = blob.size;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
 
     if (!opts.silent) {
-      $('done-status').textContent = '✓ ' + fileName + ' (' + (totalSize/1024/1024).toFixed(2) + ' MB) — decrypted and saved';
+      const sizeStr = totalSize > 0 ? ' (' + (totalSize/1024/1024).toFixed(2) + ' MB)' : '';
+      $('done-status').textContent = '✓ ' + fileName + sizeStr + ' — decrypted and saved';
       const receiptEl = $('burn-receipt');
       if (receiptEl && burnedHashes.length) {
         receiptEl.textContent = burnedHashes.map(b => 'chunk ' + b.chunk + '  hash:' + b.hash + '...  burned: ' + b.ts).join('\n');
@@ -390,6 +410,7 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
     document.addEventListener('visibilitychange', _burnOnHide);
 
   } catch(e) {
+    if (fileWriter) { try { await fileWriter.abort(); } catch(_) {} fileWriter = null; }
     showError('Decryption failed: ' + e.message);
   }
 }
