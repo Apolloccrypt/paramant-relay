@@ -84,6 +84,20 @@ input[type=file]{cursor:pointer}
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Self-destruct</div></div>
+    <div class="card-body">
+      <span class="label">Link expires after</span>
+      <select id="ttl-select" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px 12px;font-family:var(--mono);font-size:12px;outline:none;margin-bottom:10px;cursor:pointer">
+        <option value="30000">30 seconds</option>
+        <option value="300000">5 minutes</option>
+        <option value="3600000" selected>1 hour</option>
+        <option value="86400000">24 hours</option>
+      </select>
+      <div class="status-line" id="ttl-status" style="color:var(--quiet)">Relay permanently deletes blobs after expiry</div>
+    </div>
+  </div>
+
   <button class="btn" id="btn-create-session" disabled onclick="createSession()">Create secure session →</button>
 </div>
 
@@ -337,6 +351,7 @@ async function confirmFingerprint() {
     const totalChunks = Math.ceil(fileBytes.length / CHUNK_PLAIN) || 1;
     const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
     const tokens = [];
+    const burnReceipts = [];
 
     for (let i = 0; i < totalChunks; i++) {
       const pct = Math.round(10 + (i / totalChunks) * 75);
@@ -409,7 +424,7 @@ async function confirmFingerprint() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
         body: JSON.stringify({
-          hash, payload: toB64(padded), ttl_ms: 3600000,
+          hash, payload: toB64(padded), ttl_ms: parseInt($("ttl-select").value),
           meta: { device_id: 'transfer-web', file_name: selectedFile.name, chunk_index: i, total_chunks: totalChunks, file_id: fileId }
         }),
         signal: AbortSignal.timeout(120000)
@@ -417,6 +432,7 @@ async function confirmFingerprint() {
       const ud = await ur.json();
       if (!ud.ok) throw new Error(ud.error || 'Upload failed');
       tokens.push(ud.download_token);
+      burnReceipts.push({ hash: ud.hash, chunk: i, burned_at: null });
     }
 
     $('enc-progress').style.width = '100%';
@@ -430,7 +446,7 @@ async function confirmFingerprint() {
       body: JSON.stringify({
         device_id: sessionToken + '_ready',
         ecdh_pub: tokens.join(','),
-        kyber_pub: selectedFile.name + '|' + totalChunks
+        kyber_pub: selectedFile.name + '|' + totalChunks + '|' + parseInt($('ttl-select').value)
       })
     });
 
