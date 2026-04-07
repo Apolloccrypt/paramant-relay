@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # PARAMANT deploy script
+# BELANGRIJK: Vul YOUR_ADMIN_IP en X-Admin-Token in deploy/nginx/nginx-paramant.conf
+# vóór je dit script uitvoert. Commit die wijzigingen NOOIT terug.
 # Usage: ./deploy/deploy.sh [server_ip]
 # Example: ./deploy/deploy.sh YOUR_SERVER_IP
 
