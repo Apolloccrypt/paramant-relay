@@ -399,10 +399,9 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
     }
 
     // Burn-on-tab-switch: wis decrypted data als tab verborgen wordt
-    let _decryptedBlob = new Blob([combined]);
     const _burnOnHide = () => {
       if (document.hidden) {
-        _decryptedBlob = null;
+        chunks.length = 0;  // leeg de chunk array
         $('done-status').textContent += ' — memory cleared (tab hidden)';
         document.removeEventListener('visibilitychange', _burnOnHide);
       }
