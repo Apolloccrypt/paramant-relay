@@ -5,7 +5,7 @@ Gebruik: paramant-sender --key pgp_xxx --relay health --file document.pdf
          paramant-sender --key pgp_xxx --relay health --stdin
          paramant-sender --key pgp_xxx --relay health --text "bericht"
 """
-import argparse, base64, os, sys, json, time, hashlib, secrets, struct
+import argparse, base64, ctypes, os, sys, json, time, hashlib, secrets, struct
 import urllib.request, urllib.error
 
 VERSION = "6.0.0"
@@ -16,8 +16,19 @@ RELAYS = {
     "iot":     "https://iot.paramant.app",
     "fly":     "https://paramant-ghost-pipe.fly.dev",
 }
-BLOB_SIZE = 5 * 1024 * 1024
+BLOCKS = {"4k": 4*1024, "64k": 64*1024, "512k": 512*1024, "5m": 5*1024*1024}
+BLOB_SIZE = BLOCKS["5m"]
 UA = "paramant-sender/6.0"
+
+def _zero(b: bytes) -> None:
+    """Overschrijf sleutelmateriaal in geheugen met nullen (CPython, best-effort)."""
+    if not b:
+        return
+    try:
+        offset = sys.getsizeof(b) - len(b) - 1
+        ctypes.memset(id(b) + offset, 0, len(b))
+    except Exception:
+        pass
 
 G = "\033[92m"; Y = "\033[93m"; R = "\033[91m"; E = "\033[0m"; B = "\033[94m"
 
@@ -34,30 +45,61 @@ def pad(data, target=BLOB_SIZE):
         raise ValueError(f"Data te groot: {len(data)} bytes (max {max_data})")
     return struct.pack(">I", len(data)) + data + secrets.token_bytes(max_data - len(data))
 
-def encrypt(data, key):
+def encrypt(data, key, blob_size=BLOB_SIZE):
+    aes_key = None
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
         from cryptography.hazmat.primitives import hashes
-        salt = secrets.token_bytes(32)
-        hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=b"paramant-v6")
+        salt    = secrets.token_bytes(32)
+        hkdf    = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=b"paramant-v6")
         aes_key = hkdf.derive(key.encode())
-        nonce = secrets.token_bytes(12)
-        # Pad to BLOB_SIZE - AES_OVERHEAD so encrypted output is exactly BLOB_SIZE
-        padded = pad(data, BLOB_SIZE - AES_OVERHEAD)
-        ct = AESGCM(aes_key).encrypt(nonce, padded, None)
-        blob = salt + nonce + ct  # 32 + 12 + (BLOB_SIZE-AES_OVERHEAD+16) = BLOB_SIZE
+        nonce   = secrets.token_bytes(12)
+        padded  = pad(data, blob_size - AES_OVERHEAD)
+        ct      = AESGCM(aes_key).encrypt(nonce, padded, None)
+        blob    = salt + nonce + ct
         return blob, hashlib.sha256(blob).hexdigest()
     except ImportError:
         log(f"{Y}⚠ cryptography niet geinstalleerd — plaintext (pip install cryptography){E}")
-        return pad(data), hashlib.sha256(pad(data)).hexdigest()
+        return pad(data, blob_size), hashlib.sha256(pad(data, blob_size)).hexdigest()
+    finally:
+        if aes_key: _zero(aes_key)
 
-def send_blob(relay_url, key, blob):
-    h = hashlib.sha256(blob).hexdigest()
+def _bip39_encode(entropy: bytes) -> str:
+    try:
+        from mnemonic import Mnemonic
+        return Mnemonic('english').to_mnemonic(entropy)
+    except ImportError:
+        raise RuntimeError('pip install mnemonic (vereist voor drop)')
+
+def _bip39_decode(phrase: str) -> bytes:
+    try:
+        from mnemonic import Mnemonic
+        m = Mnemonic('english')
+        if not m.check(phrase):
+            raise RuntimeError('Ongeldige BIP39 mnemonic (checksum fout)')
+        return bytes(m.to_entropy(phrase))
+    except ImportError:
+        raise RuntimeError('pip install mnemonic (vereist voor drop)')
+
+def _derive_drop_keys(entropy: bytes) -> tuple:
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.backends import default_backend
+    be = default_backend()
+    aes_key  = HKDF(algorithm=hashes.SHA256(), length=32,
+                    salt=b'paramant-drop-v1', info=b'aes-key', backend=be).derive(entropy)
+    id_bytes = HKDF(algorithm=hashes.SHA256(), length=32,
+                    salt=b'paramant-drop-v1', info=b'lookup-id', backend=be).derive(entropy)
+    return aes_key, hashlib.sha256(id_bytes).hexdigest()
+
+def send_blob(relay_url, key, blob, ttl_ms=300000, max_views=1, lookup_hash=None):
+    h = lookup_hash or hashlib.sha256(blob).hexdigest()
     body = json.dumps({
-        "hash": h,
-        "payload": base64.b64encode(blob).decode(),
-        "ttl_ms": 300000,
+        "hash":      h,
+        "payload":   base64.b64encode(blob).decode(),
+        "ttl_ms":    ttl_ms,
+        "max_views": max_views,
     }).encode()
     req = urllib.request.Request(
         f"{relay_url}/v2/inbound", data=body, method="POST",
@@ -87,10 +129,19 @@ def main():
     p.add_argument("--stdin",      action="store_true")
     p.add_argument("--text",       help="Stuur tekst direct")
     p.add_argument("--no-encrypt", action="store_true")
+    p.add_argument("--ttl",        type=int, default=300,
+                   help="Levensduur in seconden (default: 300)")
+    p.add_argument("--max-views",  type=int, default=1,
+                   help="Max ophaalverzoeken voor burn (default: 1)")
+    p.add_argument("--pad-block",  default="5m", choices=list(BLOCKS.keys()),
+                   help="Padding blokgrootte (default: 5m)")
+    p.add_argument("--drop",       action="store_true",
+                   help="Verstuur als anonieme drop met BIP39 mnemonic")
     p.add_argument("--version",    action="version", version=f"%(prog)s {VERSION}")
     args = p.parse_args()
 
     relay_url = RELAYS[args.relay]
+    blob_size = BLOCKS[args.pad_block]
     log(f"{B}PARAMANT Sender v{VERSION}{E}")
     log(f"Relay: {relay_url}")
 
@@ -106,14 +157,41 @@ def main():
     else:
         log(f"{R}Geef --file, --stdin of --text{E}"); sys.exit(1)
 
+    if args.drop:
+        log("Drop — BIP39 mnemonic genereren...")
+        entropy = os.urandom(16)
+        aes_key = None
+        try:
+            phrase  = _bip39_encode(entropy)
+            aes_key, lookup_hash = _derive_drop_keys(entropy)
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            nonce  = secrets.token_bytes(12)
+            ct     = AESGCM(aes_key).encrypt(nonce, data, None)
+            packet = nonce + struct.pack(">I", len(ct)) + ct
+            blob   = packet + secrets.token_bytes(blob_size - len(packet))
+            log("Versturen...")
+            send_blob(relay_url, args.key, blob,
+                      ttl_ms=args.ttl * 1000, max_views=1, lookup_hash=lookup_hash)
+            log(f"{G}Drop verstuurd{E}")
+            log(f"{G}Mnemonic: {phrase}{E}")
+            log(f"\nOm op te halen:")
+            log(f"  paramant-receiver --key {args.key} --relay {args.relay} --pickup \"{phrase}\"")
+        except Exception as e:
+            log(f"{R}Drop mislukt: {e}{E}"); sys.exit(1)
+        finally:
+            if aes_key: _zero(aes_key)
+            _zero(entropy)
+        return
+
     if not args.no_encrypt:
-        log("Versleutelen..."); blob, _ = encrypt(data, args.key)
+        log("Versleutelen..."); blob, _ = encrypt(data, args.key, blob_size=blob_size)
     else:
-        blob = pad(data)
+        blob = pad(data, blob_size)
 
     log("Versturen...")
     try:
-        h = send_blob(relay_url, args.key, blob)
+        h = send_blob(relay_url, args.key, blob,
+                      ttl_ms=args.ttl * 1000, max_views=args.max_views)
         log(f"{G}Verstuurd{E}")
         log(f"{G}Hash: {h}{E}")
         log(f"\nOm te ontvangen:")
