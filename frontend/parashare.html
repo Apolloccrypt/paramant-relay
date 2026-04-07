@@ -71,7 +71,7 @@ input[type=file]{cursor:pointer}
   background:radial-gradient(ellipse 80% 80% at 50% 50%,transparent 35%,#0c0c0c 100%)}
 
 #globe-canvas-wrap{position:absolute;inset:0;z-index:1}
-#globe-canvas-wrap canvas{display:block}
+#globe-canvas-wrap canvas{display:block;width:100%!important;height:100%!important}
 
 /* HUD corners */
 .hc{position:absolute;width:56px;height:56px;border-color:var(--neon);border-style:solid;
@@ -752,6 +752,26 @@ async function initGlobe() {
     .ringPropagationSpeed('propagationSpeed')
     .ringRepeatPeriod('repeatPeriod')
     (wrap);
+
+  // Expliciete grootte na mount — Globe.gl leest offsetWidth/Height op mount moment
+  // gebruik requestAnimationFrame zodat de browser de reflow heeft verwerkt
+  requestAnimationFrame(() => {
+    const w = wrap.offsetWidth  || window.innerWidth;
+    const h = wrap.offsetHeight || window.innerHeight;
+    globeInstance.width(w).height(h);
+  });
+
+  // Resize handler
+  if (!window._globeResizeHandler) {
+    window._globeResizeHandler = () => {
+      if (!globeInstance) return;
+      const wr = document.getElementById('globe-canvas-wrap');
+      const w = wr.offsetWidth  || window.innerWidth;
+      const h = wr.offsetHeight || window.innerHeight;
+      globeInstance.width(w).height(h);
+    };
+    window.addEventListener('resize', window._globeResizeHandler);
+  }
 
   // Startpositie: tussen gebruiker en relay
   globeInstance.pointOfView({ lat: (userLat + RELAY_LOC.lat) / 2, lng: (userLng + RELAY_LOC.lng) / 2, altitude: 2.0 }, 1200);
