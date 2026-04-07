@@ -2,336 +2,194 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ParaShare — Send files that self-destruct</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Secure Transfer — PARAMANT</title>
 <style>
+:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border2:#242424;--text:#ededed;--muted:#888;--quiet:#444;--green:#3aaa70;--red:#e05252;--mono:'SF Mono','Fira Code',monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f7f7f5;color:#1a1a1a;min-height:100vh;-webkit-font-smoothing:antialiased}
-input,button{font-family:inherit}
-a{color:#666;text-decoration:none}
-.hide{display:none!important}
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:60px;background:#fff;border-bottom:1px solid #e8e8e5;position:sticky;top:0;z-index:10}
-.logo{display:flex;align-items:center;gap:10px}
-.logo-mark{width:30px;height:30px;background:#0c0c0c;border-radius:7px;display:flex;align-items:center;justify-content:center}
-.logo-name{font-weight:700;font-size:15px;letter-spacing:-.02em}
-.logo-by{font-size:11px;background:#f0f0ee;color:#999;padding:2px 8px;border-radius:20px;border:1px solid #e8e8e5}
-main{display:flex;align-items:center;justify-content:center;padding:48px 20px;min-height:calc(100vh - 60px)}
-.wrap{width:100%;max-width:520px}
-h1{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-bottom:10px}
-.sub{font-size:15px;color:#666;line-height:1.65;margin-bottom:36px}
-#dropzone{border:2px dashed #d0d0cc;border-radius:16px;padding:56px 24px;text-align:center;cursor:pointer;background:#fff;transition:border-color .15s,background .15s;margin-bottom:20px}
-#dropzone.drag{border-color:#0c0c0c;background:#f0f0ee}
-#dropzone.filled{padding:22px 24px}
-.drop-icon{width:52px;height:52px;background:#f0f0ee;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
-.drop-title{font-size:15px;font-weight:500;margin-bottom:6px}
-.drop-sub{font-size:13px;color:#999}
-.drop-sub span{color:#1a1a1a;text-decoration:underline;cursor:pointer}
-.file-row{display:flex;align-items:center;gap:14px;text-align:left}
-.file-icon{width:44px;height:44px;background:#f0f0ee;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.file-name{font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
-.file-size{font-size:12px;color:#999;margin-top:2px}
-.card{background:#fff;border:1px solid #e8e8e5;border-radius:14px;padding:22px;margin-bottom:16px}
-.lbl{display:block;font-size:12px;font-weight:600;color:#999;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
-.inp{width:100%;background:#f7f7f5;border:1px solid #e0e0dc;border-radius:8px;padding:10px 14px;font-size:14px;color:#1a1a1a;outline:none;transition:border-color .15s}
-.inp:focus{border-color:#888}
-.inp.err{border-color:#e07060}
-.key-row{display:flex;gap:8px;align-items:center}
-.key-ok{color:#2d8a5c;font-size:20px;line-height:1}
-.key-err{font-size:12px;color:#e07060;margin-top:5px}
-.key-hint{font-size:12px;color:#aaa;margin-top:5px}
-.progress-wrap{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:18px;margin-bottom:16px}
-.progress-bar-bg{height:4px;background:#f0f0ee;border-radius:2px;overflow:hidden;margin-top:10px}
-.progress-bar{height:100%;background:#0c0c0c;border-radius:2px;transition:width .4s}
-.progress-row{display:flex;justify-content:space-between;font-size:13px;color:#666}
-.btn-primary{width:100%;background:#0c0c0c;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:-.01em;transition:opacity .15s}
-.btn-primary:disabled{opacity:.35;cursor:not-allowed}
-.btn-ghost{background:none;border:1px solid #e0e0dc;color:#666;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer}
-.pills{display:flex;justify-content:center;gap:20px;font-size:12px;color:#aaa;margin-top:16px;flex-wrap:wrap}
-.err-box{background:#fef2f0;border:1px solid #fcd0c8;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0503a;margin-bottom:14px}
-.warn-box{background:#fff8ee;border:1px solid #fce0b0;border-radius:8px;padding:12px 16px;font-size:13px;color:#b07030;margin-bottom:14px}
-.suc-box{background:#e8f5ee;border:1px solid #b0ddc0;border-radius:8px;padding:12px 16px;font-size:13px;color:#1a5c3a}
-.mono{font-family:'SF Mono','Fira Code','Cascadia Code',monospace}
-.icon-circle{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 22px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.spinner{width:26px;height:26px;border:2.5px solid #3860c0;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh}
+nav{height:52px;display:flex;align-items:center;padding:0 32px;border-bottom:1px solid var(--border)}
+.logo{font-size:13px;font-weight:700;letter-spacing:.08em;text-decoration:none;color:var(--text)}
+main{max-width:640px;margin:0 auto;padding:64px 24px}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:40px;line-height:1.7}
+
+/* Steps */
+.step{display:none;animation:fadeIn .2s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.card{background:var(--surface);border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-head-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(58,170,112,.6)}
+.dot.red{background:var(--red);box-shadow:0 0 8px rgba(224,82,82,.6)}
+.dot.amber{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.6)}
+.card-body{padding:20px 18px}
+
+input[type=text],input[type=password],input[type=file]{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px 12px;font-family:var(--mono);font-size:12px;outline:none;margin-bottom:10px}
+input:focus{border-color:#3aaa70}
+input[type=file]{cursor:pointer}
+
+.btn{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn:hover{opacity:.85}
+.btn:disabled{background:var(--quiet);cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border2)}
+.btn-green{background:#2d6a4f;color:#e2f5ec}
+.btn-red{background:#5c1a1a;color:#f5c2c2}
+
+.fingerprint{font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--green);text-align:center;padding:20px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;margin:16px 0}
+
+.status-line{font-size:11px;color:var(--muted);padding:8px 0;display:flex;align-items:center;gap:8px}
+.status-line.ok{color:var(--green)}
+.status-line.err{color:var(--red)}
+
+.share-box{background:var(--bg);border:1px solid var(--border2);padding:12px;font-size:11px;color:var(--green);word-break:break-all;line-height:1.7;cursor:pointer;margin:12px 0}
+.share-box:hover{border-color:#3aaa70}
+
+.progress-bar-wrap{background:var(--bg);border:1px solid var(--border2);border-radius:2px;height:4px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;background:var(--green);width:0%;transition:width .3s}
+
+.label{font-size:10px;color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block}
+.tag{display:inline-block;font-size:10px;padding:3px 8px;border:1px solid var(--border2);color:var(--quiet);margin-right:4px;margin-top:4px}
+.tag.green{border-color:rgba(58,170,112,.4);color:var(--green)}
+
+.warn{background:#1a1200;border:1px solid #3a2a00;color:#f59e0b;padding:12px 14px;font-size:11px;line-height:1.7;margin:12px 0}
 </style>
 </head>
 <body>
+<nav><a href="/" class="logo">PARAMANT</a></nav>
+<main>
 
-<nav>
-  <div class="logo">
-    <div class="logo-mark">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M8 2v9M8 2L5 5M8 2l3 3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-    </div>
-    <a href="/parashare" style="text-decoration:none;display:flex;align-items:center;gap:10px">
-      <span class="logo-name">ParaShare</span>
-      <span class="logo-by">by PARAMANT</span>
-    </a>
-  </div>
-  <div style="display:flex;gap:10px;align-items:center">
-    <a href="/parashare" class="btn-ghost" id="nav-send" style="display:none">Send a file</a>
-    <button class="btn-ghost" id="nav-toggle">Receive a file</button>
-  </div>
-</nav>
+<!-- STEP 1: Setup -->
+<div class="step active" id="step-setup">
+  <h1>Secure file transfer</h1>
+  <p class="sub">The receiver gets a unique link. Their browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees the key.</p>
 
-<div id="relay-status-bar" style="background:#fff;border-bottom:1px solid #e8e8e5;padding:8px 32px;display:flex;align-items:center;justify-content:space-between;font-size:12px">
-  <div style="display:flex;align-items:center;gap:20px">
-    <div style="display:flex;align-items:center;gap:7px">
-      <div id="status-dot" style="width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0"></div>
-      <span id="status-text" style="color:#999">Checking relay...</span>
-    </div>
-    <div id="slot-info" style="color:#bbb;display:none">
-      <span id="slots-used">0</span> / <span id="slots-max">0</span> slots in use
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>
+    <div class="card-body">
+      <span class="label">API key</span>
+      <input type="password" id="api-key" placeholder="pgp_..." autocomplete="off" oninput="onKeyInput()">
+      <div class="status-line" id="key-status">Enter your API key to continue</div>
     </div>
   </div>
-  <div id="slot-bar-wrap" style="display:none;align-items:center;gap:10px">
-    <div style="width:120px;height:4px;background:#f0f0ee;border-radius:2px;overflow:hidden">
-      <div id="slot-bar" style="height:100%;border-radius:2px;transition:width .6s,background .3s;width:0%"></div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
+    <div class="card-body">
+      <span class="label">Select file to send</span>
+      <input type="file" id="file-input" onchange="onFileSelect()">
+      <div class="status-line" id="file-status">No file selected</div>
     </div>
-    <span id="slot-pct" style="color:#bbb;min-width:28px"></span>
+  </div>
+
+  <button class="btn" id="btn-create-session" disabled onclick="createSession()">Create secure session →</button>
+</div>
+
+<!-- STEP 2: Waiting for receiver -->
+<div class="step" id="step-waiting">
+  <h1>Share this link</h1>
+  <p class="sub">Send this link to the receiver. Their browser will generate a keypair. You'll see their fingerprint appear below — verify it with them before sending.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber" id="waiting-dot"></div><div class="card-head-title" id="waiting-title">Waiting for receiver...</div></div>
+    <div class="card-body">
+      <span class="label">One-time session link</span>
+      <div class="share-box" id="session-link" onclick="copyLink()">—</div>
+      <div class="status-line" id="waiting-status">Share this link with the receiver</div>
+    </div>
+  </div>
+
+  <div class="card" id="fp-card" style="display:none">
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Receiver connected — verify fingerprint</div></div>
+    <div class="card-body">
+      <p class="status-line" style="margin-bottom:8px">Ask the receiver: "What is your fingerprint?" — it should match exactly:</p>
+      <div class="fingerprint" id="fp-display">—</div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-green" onclick="confirmFingerprint()">✓ Fingerprint matches — encrypt &amp; send</button>
+        <button class="btn btn-red btn-outline" onclick="rejectFingerprint()">✗ Mismatch — abort</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<div id="capacity-warning" style="display:none;background:#fff8ee;border-bottom:1px solid #fce0b0;padding:10px 32px;font-size:13px;color:#b07030;align-items:center;justify-content:space-between">
-  <div style="display:flex;align-items:center;gap:8px">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0"><path d="M7 2L1 12h12L7 2z" stroke="#b07030" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M7 6v3M7 10.5v.5" stroke="#b07030" stroke-width="1.3" stroke-linecap="round"/></svg>
-    <span id="capacity-msg">Relay is busy — your upload will retry automatically.</span>
+<!-- STEP 3: Encrypting & uploading -->
+<div class="step" id="step-encrypting">
+  <h1>Encrypting &amp; sending</h1>
+  <p class="sub">File is being encrypted with the receiver's ML-KEM-768 public key. The relay will never see the plaintext or the key.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
+    <div class="card-body">
+      <div class="status-line" id="enc-status">Initializing...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="enc-progress"></div></div>
+      <div class="status-line" id="enc-detail" style="color:var(--quiet)"></div>
+    </div>
   </div>
-  <span id="capacity-retry" style="color:#b07030;font-weight:500"></span>
 </div>
 
-<!-- SEND SCREEN -->
-<main id="screen-send">
-  <div class="wrap">
-    <h1>Send files.<br>They vanish on arrival.</h1>
-    <p class="sub">Drop a file, enter your API key, get a one-time link. The receiver clicks it once — then the file is gone forever. No account needed to receive.</p>
+<!-- STEP 4: Done -->
+<div class="step" id="step-done">
+  <h1>Sent.</h1>
+  <p class="sub">The receiver can now download the file. After one download it is permanently destroyed.</p>
 
-    <div id="dropzone">
-      <div id="drop-empty">
-        <div class="drop-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M12 15V4M12 4L8 8M12 4l4 4" stroke="#888" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="#888" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <div class="drop-title">Drop your file here</div>
-        <div class="drop-sub">or <span id="browse-link">browse to upload</span> &middot; max 500MB</div>
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Transfer complete</div></div>
+    <div class="card-body">
+      <div class="status-line ok" id="done-status">—</div>
+      <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
+        <span class="tag green">ML-KEM-768</span>
+        <span class="tag green">Burn-on-read</span>
+        <span class="tag green">Fingerprint verified</span>
+        <span class="tag green">Relay never saw key</span>
       </div>
-      <div id="drop-filled" class="file-row hide">
-        <div class="file-icon">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M11 2H5a1 1 0 00-1 1v14a1 1 0 001 1h10a1 1 0 001-1V8l-5-6z" stroke="#666" stroke-width="1.3" fill="none"/>
-            <path d="M11 2v6h6" stroke="#666" stroke-width="1.3" fill="none"/>
-          </svg>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="file-name" id="fname"></div>
-          <div class="file-size" id="fsize"></div>
-        </div>
-        <button class="btn-ghost" id="btn-clear" style="flex-shrink:0">Remove</button>
-      </div>
-    </div>
-    <input type="file" id="file-input" style="display:none">
-
-    <div class="card" id="key-card">
-      <label class="lbl" for="api-key">Your API key</label>
-      <div class="key-row">
-        <input class="inp mono" id="api-key" type="password" placeholder="pgp_..." autocomplete="off">
-        <span class="key-ok hide" id="key-ok">&#10003;</span>
-      </div>
-      <div class="key-err hide" id="key-err">Invalid key &mdash; <a href="https://paramant.app/#pricing" style="color:#e07060">get one at paramant.app</a></div>
-      <div class="key-hint" id="key-hint">A paid key is required to send. Receivers need no key. <a href="https://paramant.app/#pricing" style="color:var(--q);text-decoration:underline">Get one from &euro;9.99/mnd &rarr;</a></div>
-    </div>
-
-    <div class="progress-wrap hide" id="progress-wrap">
-      <div class="progress-row">
-        <span id="progress-step">Encrypting...</span>
-        <span id="progress-pct">0%</span>
-      </div>
-      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
-    </div>
-
-    <div class="err-box hide" id="send-err"></div>
-
-
-    <div id="webhook-section" style="margin:0 0 14px;">
-      <label class="lbl" for="webhook-url">Webhook URL <span style="font-weight:400;text-transform:none;letter-spacing:0">(optioneel)</span></label>
-      <input class="inp" id="webhook-url" type="url" placeholder="https://jouw-server.nl/callback" autocomplete="off">
-      <div style="font-size:11px;color:#bbb;margin-top:4px;">Ontvangt een POST zodra de ontvanger downloadt.</div>
-    </div>
-
-    <div id="password-section" style="margin:0 0 14px;">
-      <label class="lbl" for="transfer-password">Wachtwoord <span style="font-weight:400;text-transform:none;letter-spacing:0">(optioneel)</span></label>
-      <input class="inp" id="transfer-password" type="password" placeholder="Laat leeg voor geen wachtwoord" autocomplete="off">
-      <div style="font-size:11px;color:#bbb;margin-top:4px;">Ontvanger moet dit invoeren voor download.</div>
-    </div>
-
-        <button class="btn-primary" id="btn-send" disabled>Send file &rarr;</button>
-
-    <div style="margin-top:28px;border-top:1px solid #e8e8e5;padding-top:24px">
-      <div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">How it stays secure</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">ML-KEM-768 + ECDH P-256 (hybrid)</div><div style="font-size:12px;color:#888;line-height:1.5">Post-quantum key encapsulation combined with classical ECDH. Safe even if one algorithm is broken. NIST FIPS 203 certified.</div></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">Encrypted in your browser</div><div style="font-size:12px;color:#888;line-height:1.5">The file is encrypted before it leaves your device. The relay never sees the plaintext — only an indistinguishable 5MB blob.</div></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">Burn-on-read — one download only</div><div style="font-size:12px;color:#888;line-height:1.5">The relay destroys the blob immediately after the first download. The second request always returns 404. No copy exists on disk.</div></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">5MB fixed padding — invisible file size</div><div style="font-size:12px;color:#888;line-height:1.5">Every transfer looks identical on the network. A 1KB note and a 4MB document are indistinguishable to any observer or DPI system.</div></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">EU/DE only — no US CLOUD Act</div><div style="font-size:12px;color:#888;line-height:1.5">All servers on Hetzner Frankfurt. No US infrastructure, no CLOUD Act. A US court cannot subpoena PARAMANT data.</div></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:20px;height:20px;background:#f0f0ee;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#2d8a5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">vs WeTransfer / Signal / WhatsApp</div><div style="font-size:12px;color:#888;line-height:1.5">WeTransfer stores files for 7 days unencrypted. Signal files persist on device. WhatsApp metadata goes to Meta. ParaShare stores nothing, anywhere, ever.</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="pills">
-      <span>Burn-on-read</span><span>&middot;</span>
-      <span>AES-256-GCM</span><span>&middot;</span>
-      <span>EU/DE servers</span><span>&middot;</span>
-      <span>No storage</span>
     </div>
   </div>
+
+  <button class="btn btn-outline" onclick="location.reload()" style="margin-top:8px">Send another file</button>
+</div>
+
 </main>
 
-<!-- SENT SCREEN -->
-<main id="screen-sent" class="hide">
-  <div class="wrap" style="text-align:center">
-    <div class="icon-circle" style="background:#e8f5ee">
-      <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-        <path d="M6 15l6.5 6.5L24 9" stroke="#2d8a5c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <h1 style="font-size:26px;margin-bottom:8px">File sent.</h1>
-    <p class="sub" style="margin-bottom:28px">Encrypted and waiting. Share this link &mdash; the receiver clicks it once, downloads the file, and it&rsquo;s permanently destroyed.</p>
+<script type="module" src="/noble-mlkem-loader.js"></script>
+<script>
+const RELAY_WS  = 'wss://relay.paramant.app';
+const RELAY_API = 'https://health.paramant.app';
 
-    <div class="card" style="text-align:left;margin-bottom:14px">
-      <div class="lbl">One-time download link</div>
-      <div style="display:flex;gap:8px;align-items:stretch">
-        <div class="inp mono" id="share-link" style="flex:1;word-break:break-all;line-height:1.5;font-size:12px;color:#1a1a1a;background:#f7f7f5;border:1px solid #e0e0dc;border-radius:8px;padding:10px 14px"></div>
-        <button id="btn-copy" style="background:#0c0c0c;color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0">Copy</button>
-      </div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f0f0ee;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;justify-content:space-between;font-size:13px">
-          <span style="color:#999">Expires in</span>
-          <span class="mono" style="font-weight:500" id="ttl-display">5:00</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px">
-          <span style="color:#999">Downloads</span>
-          <span style="font-weight:500;color:#c0503a">1 &mdash; then burned forever</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px">
-          <span style="color:#999">Encryption</span>
-          <span style="font-weight:500" class="mono" id="enc-display">AES-256-GCM</span>
-        </div>
-      </div>
-    </div>
+let apiKey = '', keyValid = false, selectedFile = null;
+let sessionToken = '', ws = null;
+let receiverPubs = null;
 
-    <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:14px 18px;font-size:13px;color:#888;text-align:left;margin-bottom:24px;line-height:1.6">
-      The receiver does not need an account. They click the link, the file downloads directly to their device, and the relay immediately destroys its copy.
-    </div>
+// ── Helpers ──
+function $(id) { return document.getElementById(id); }
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+function setStatus(id, msg, cls) {
+  const el = $(id);
+  el.textContent = msg;
+  el.className = 'status-line' + (cls ? ' ' + cls : '');
+}
 
-    <button class="btn-ghost" id="btn-new">Send another file</button>
-  </div>
-</main>
+function genFingerprint(pubkeyHex) {
+  // Take first 16 hex chars, format as XXXX-XXXX-XXXX-XXXX
+  const h = pubkeyHex.slice(0, 16).toUpperCase();
+  return h.slice(0,4) + '-' + h.slice(4,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16);
+}
 
-<!-- RECEIVE SCREEN -->
-<main id="screen-receive" class="hide">
-  <div class="wrap" style="text-align:center">
-
-    <div id="recv-loading">
-      <div class="icon-circle" style="background:#f0f0ee">
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-          <path d="M13 5v12M13 17l-5-5M13 17l5-5" stroke="#888" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M4 20v1a1 1 0 001 1h16a1 1 0 001-1v-1" stroke="#888" stroke-width="1.7" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <h1 style="font-size:26px;margin-bottom:8px">Someone sent you a file</h1>
-      <p class="sub" style="margin-bottom:28px">This file is encrypted and waiting for you. Download it once &mdash; after that it&rsquo;s gone forever. No account needed.</p>
-
-      <div class="card" style="text-align:left;margin-bottom:14px">
-        <div id="recv-file-info" class="hide" style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
-          <div style="font-size:14px;font-weight:500" id="recv-fname">&mdash;</div>
-          <div style="font-size:12px;color:#999;margin-top:2px" id="recv-fsize">&mdash;</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
-          <span style="color:#999">Time remaining</span>
-          <span class="mono" style="font-weight:500;color:#b07030" id="recv-ttl">&mdash;</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px">
-          <span style="color:#999">Downloads left</span>
-          <span style="font-weight:500;color:#c0503a">1 &mdash; this is the only chance</span>
-        </div>
-      </div>
-
-      <div class="warn-box" style="text-align:left;margin-bottom:20px">
-        You can only download this file once. Save it immediately &mdash; it cannot be recovered after download.
-      </div>
-
-      <button class="btn-primary" id="btn-download">Download file &rarr;</button>
-    </div>
-
-    <div id="recv-downloading" class="hide">
-      <div class="icon-circle" style="background:#e8f0fe">
-        <div class="spinner"></div>
-      </div>
-      <h1 style="font-size:24px;margin-bottom:8px">Downloading...</h1>
-      <p class="sub">The file is being retrieved. This happens once.</p>
-    </div>
-
-    <div id="recv-done" class="hide">
-      <div class="icon-circle" style="background:#e8f5ee">
-        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-          <path d="M6 15l6.5 6.5L24 9" stroke="#2d8a5c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <h1 style="font-size:24px;margin-bottom:8px">File received.</h1>
-      <p class="sub" style="margin-bottom:20px">Successfully downloaded. The relay has permanently destroyed its copy &mdash; the file no longer exists on any server.</p>
-      <div class="suc-box" style="text-align:left;margin-bottom:24px">Burn confirmed &mdash; this link now returns 404. No copy exists anywhere.</div>
-      <a href="/parashare" class="btn-ghost" style="display:inline-block">Send a file yourself</a>
-    </div>
-
-    <div id="recv-error" class="hide">
-      <div class="icon-circle" style="background:#fef0ee">
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-          <circle cx="13" cy="13" r="10" stroke="#e07060" stroke-width="1.6" fill="none"/>
-          <path d="M13 8v6M13 16v2" stroke="#e07060" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <h1 style="font-size:24px;margin-bottom:8px">File not available</h1>
-      <p class="sub" style="margin-bottom:24px" id="recv-err-msg">This file has already been downloaded and destroyed, or the link has expired.</p>
-      <a href="/parashare" class="btn-ghost" style="display:inline-block">Send a file</a>
-    </div>
-
-  </div>
-</main>
-
-<script type="module">
-// ── ML-KEM-768 + ECDH P-256 post-quantum crypto module ───────────────────────
-import { ml_kem768 } from 'https://esm.sh/@noble/post-quantum@0.2.1/ml-kem.js';
-
-const BLOCK = 5 * 1024 * 1024;
-
+function u8toHex(u8) {
+  return [...u8].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function hexToU8(hex) {
+  const arr = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
+  return arr;
+}
 function concat(...arrays) {
-  const total = arrays.reduce((s, a) => s + a.length, 0);
-  const out = new Uint8Array(total);
-  let off = 0;
+  const total = arrays.reduce((s,a) => s + a.length, 0);
+  const out = new Uint8Array(total); let off = 0;
   for (const a of arrays) { out.set(a, off); off += a.length; }
   return out;
 }
@@ -340,623 +198,256 @@ function u32be(n) {
   new DataView(b.buffer).setUint32(0, n, false);
   return b;
 }
-function hexToU8(hex) {
-  if (!hex) return new Uint8Array(0);
-  const arr = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i*2, i*2+2), 16);
-  return arr;
-}
 function toB64(u8) {
-  let s = '';
-  const SZ = 8192;
-  for (let i = 0; i < u8.length; i += SZ) s += String.fromCharCode(...u8.slice(i, i + SZ));
+  let s = ''; const SZ = 8192;
+  for (let i = 0; i < u8.length; i += SZ) s += String.fromCharCode(...u8.slice(i,i+SZ));
   return btoa(s);
 }
-async function importECDHPub(raw) {
-  return crypto.subtle.importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
-}
-async function hkdfKey(ikm, salt, info) {
-  const base = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    { name: 'HKDF', hash: 'SHA-256',
-      salt: new TextEncoder().encode(salt),
-      info: new TextEncoder().encode(info) },
-    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-  );
+
+async function copyLink() {
+  const url = $('session-link').textContent;
+  await navigator.clipboard.writeText(url).catch(()=>{});
+  $('session-link').textContent = '✓ Copied! — ' + url;
+  setTimeout(() => { $('session-link').textContent = url; }, 2000);
 }
 
-// ML-KEM-768 + ECDH P-256 hybrid encrypt (receiver must have private keys)
-// Packet: 0x02 | u32(bundle) | bundle | nonce(12) | u32(ct) | ct
-async function encryptPQ(payload, receiverPubs) {
-  const kyberPub = hexToU8(receiverPubs.kyber_pub);
-  let kct = new Uint8Array(0), kss = new Uint8Array(0);
-  if (kyberPub.length > 0) {
-    try {
-      const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
-      kct = cipherText; kss = sharedSecret;
-    } catch (e) { console.warn('ML-KEM encap failed:', e); }
+// ── Key validation ──
+async function onKeyInput() {
+  apiKey = $('api-key').value.trim();
+  if (apiKey.length < 10 || !apiKey.startsWith('pgp_')) {
+    setStatus('key-status', 'Invalid format');
+    keyValid = false; updateBtn(); return;
   }
-  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-  const ephPub  = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
-  const recvPub = await importECDHPub(hexToU8(receiverPubs.ecdh_pub));
-  const ecdhSS  = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: recvPub }, eph.privateKey, 256));
-  const aesKey  = await hkdfKey(concat(ecdhSS, kss), 'paramant-gp-v4', 'aes-key');
-  const nonce   = crypto.getRandomValues(new Uint8Array(12));
-  const ct      = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
-  const bundle  = concat(u32be(ephPub.length), ephPub, u32be(kct.length), kct);
-  const packet  = concat(new Uint8Array([0x02]), u32be(bundle.length), bundle, nonce, u32be(ct.length), ct);
-  return { packet, alg: kct.length > 0 ? 'ML-KEM-768 + ECDH P-256 + AES-256-GCM' : 'ECDH P-256 + AES-256-GCM' };
-}
-
-// AES-256-GCM with embedded key — browser-decryptable
-// Packet: 0x01 | nonce(12) | rawKey(32) | u32(ct) | ct
-async function encryptAES(payload) {
-  const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
-  const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
-  const nonce  = crypto.getRandomValues(new Uint8Array(12));
-  const ct     = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
-  const packet = concat(new Uint8Array([0x01]), nonce, rawKey, u32be(ct.length), ct);
-  return { packet, alg: 'AES-256-GCM' };
-}
-
-// Decrypt downloaded blob — handles 0x01, 0x02 and legacy format
-async function decryptBlob(raw) {
-  const magic = raw[0];
-  if (magic === 0x01) {
-    const nonce  = raw.slice(1, 13);
-    const rawKey = raw.slice(13, 45);
-    const ctLen  = new DataView(raw.buffer).getUint32(45, false);
-    const ct     = raw.slice(49, 49 + ctLen);
-    const key    = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
-    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, ct));
-  }
-  if (magic === 0x02) {
-    throw new Error('Post-quantum encrypted — use the PARAMANT CLI to decrypt.');
-  }
-  if (magic === 0x03) {
-    // PBKDF2 password-protected (from free widget) — format: 0x03 | salt(16) | nonce(12) | u32(ctLen) | ct
-    const salt  = raw.slice(1, 17);
-    const nonce = raw.slice(17, 29);
-    const ctLen = new DataView(raw.buffer).getUint32(29, false);
-    const ct    = raw.slice(33, 33 + ctLen);
-    const password = (document.getElementById('recv-password')?.value || '').trim()
-                  || (window.prompt('This file is password-protected. Enter password:') || '');
-    if (!password) throw new Error('Password required to decrypt this file.');
-    const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
-    const aesKey  = await crypto.subtle.deriveKey(
-      { name:'PBKDF2', salt, iterations:210000, hash:'SHA-256' },
-      baseKey, { name:'AES-GCM', length:256 }, false, ['decrypt']
-    );
-    return new Uint8Array(await crypto.subtle.decrypt({ name:'AES-GCM', iv:nonce }, aesKey, ct));
-  }
-  // Legacy: iv(12) | rawKey(32) | ct
-  const iv     = raw.slice(0, 12);
-  const rawKey = raw.slice(12, 44);
-  const ct     = raw.slice(44);
-  const key    = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
-  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
-}
-
-window.PARASHARE_CRYPTO = { encryptPQ, encryptAES, decryptBlob, toB64, concat, BLOCK };
-window.dispatchEvent(new Event('crypto-ready'));
-</script>
-<script>
-const RELAY   = '/rp/health';
-const BASE_URL = window.location.origin + '/parashare';
-const MAX_BYTES = 500 * 1024 * 1024; // 500MB client limit
-
-let file = null, apiKey = '', keyValid = false, sending = false;
-let expiresAt = null, ttlInterval = null;
-
-function fmt(b) {
-  if (!b) return '—';
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
-  return (b / 1073741824).toFixed(2) + ' GB';
-}
-
-function fmtTTL(ms) {
-  if (ms <= 0) return 'expired';
-  const s = Math.round(ms / 1000);
-  return Math.floor(s / 60) + ':' + (s % 60).toString().padStart(2, '0');
-}
-
-function $(id) { return document.getElementById(id); }
-function show(id) { $(id)?.classList.remove('hide'); }
-function hide(id) { $(id)?.classList.add('hide'); }
-function showScreen(sc) {
-  ['screen-send', 'screen-sent', 'screen-receive'].forEach(x => hide(x));
-  show(sc);
-  const navSend   = $('nav-send');
-  const navToggle = $('nav-toggle');
-  if (sc === 'screen-send') {
-    if (navSend)   navSend.style.display = 'none';
-    if (navToggle) navToggle.textContent = 'Receive a file';
-  } else if (sc === 'screen-sent') {
-    if (navSend)   navSend.style.display = '';
-    if (navToggle) navToggle.textContent = 'Receive a file';
-  } else if (sc === 'screen-receive') {
-    if (navSend)   navSend.style.display = '';
-    if (navToggle) navToggle.textContent = 'Send a file';
-  }
-}
-
-// ── Route on load ──────────────────────────────────────────────────
-const params = new URLSearchParams(window.location.search);
-const token  = params.get('t');
-
-if (token) {
-  showScreen('screen-receive');
-  initReceive(token);
-} else {
-  showScreen('screen-send');
-}
-
-// ── Nav toggle ──────────────────────────────────────────────────────
-$('nav-toggle').addEventListener('click', () => {
-  const onReceive = $('screen-receive') && !$('screen-receive').classList.contains('hide');
-  if (onReceive) {
-    window.location.href = '/parashare';
-  } else {
-    showScreen('screen-receive');
-    initReceive(null);
-  }
-});
-
-// ── DROP ZONE ───────────────────────────────────────────────────────
-const dz = $('dropzone');
-dz.addEventListener('click', () => { if (!file) $('file-input').click(); });
-$('browse-link')?.addEventListener('click', e => { e.stopPropagation(); $('file-input').click(); });
-$('btn-clear')?.addEventListener('click', e => { e.stopPropagation(); clearFile(); });
-
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-dz.addEventListener('drop', e => {
-  e.preventDefault(); dz.classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if (f) setFile(f);
-});
-$('file-input').addEventListener('change', e => {
-  if (e.target.files[0]) setFile(e.target.files[0]);
-});
-
-function setFile(f) {
-  if (f.size > MAX_BYTES) {
-    showErr('File too large — max 500MB per file.');
-    return;
-  }
-  file = f;
-  $('fname').textContent = f.name;
-  const chunks = Math.ceil(f.size / (4.9 * 1024 * 1024));
-  $('fsize').textContent = fmt(f.size) + (chunks > 1 ? ` · ${chunks} chunks` : '');
-  dz.classList.add('filled');
-  hide('drop-empty'); show('drop-filled');
-  $('key-card').style.display = '';
-  updateSendBtn();
-}
-
-function clearFile() {
-  file = null;
-  dz.classList.remove('filled');
-  show('drop-empty'); hide('drop-filled');
-  $('key-card').style.display = 'none';
-  $('file-input').value = '';
-  updateSendBtn();
-}
-
-// ── API KEY ──────────────────────────────────────────────────────────
-let keyTimer = null;
-$('api-key').addEventListener('input', e => {
-  apiKey = e.target.value.trim();
-  keyValid = false;
-  hide('key-ok'); hide('key-err');
-  updateSendBtn();
-  clearTimeout(keyTimer);
-  if (apiKey.length > 8 && apiKey.startsWith('pgp_')) {
-    keyTimer = setTimeout(checkKey, 700);
-  }
-});
-
-async function checkKey() {
+  setStatus('key-status', 'Checking...');
   try {
-    const r = await fetch(`${RELAY}/v2/check-key?k=${encodeURIComponent(apiKey)}`, {
-      signal: AbortSignal.timeout(6000)
-    });
+    const r = await fetch(`${RELAY_API}/v2/check-key?k=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(5000) });
     const d = await r.json();
-    keyValid = d.valid === true;
-    if (keyValid) { show('key-ok'); hide('key-err'); hide('key-hint'); }
-    else { hide('key-ok'); show('key-err'); }
-  } catch { keyValid = false; }
-  updateSendBtn();
-}
-
-
-// Update send knop tekst op basis van key status
-function updateSendBtnLabel() {
-  const btn = document.getElementById('btn-send');
-  if(!btn) return;
-  if(!file) { btn.textContent = 'Select a file first'; return; }
-  if(keyValid !== true) { btn.textContent = 'API key required →'; return; }
-  if(sending) { btn.textContent = 'Sending...'; return; }
-  btn.textContent = 'Send file →';
-}
-
-function updateSendBtn() {
-  $('btn-send').disabled = !(file && keyValid === true && !sending);
-  updateSendBtnLabel();
-}
-
-// ── SEND ──────────────────────────────────────────────────────────────
-$('btn-send').addEventListener('click', doSend);
-
-async function doSend() {
-  sending = true; updateSendBtn();
-  hide('send-err'); show('progress-wrap');
-
-  function setProgress(p, msg) {
-    $('progress-bar').style.width = p + '%';
-    $('progress-pct').textContent = p + '%';
-    $('progress-step').textContent = msg;
+    if (d.valid) {
+      setStatus('key-status', `✓ Valid — plan: ${d.plan}`, 'ok');
+      keyValid = true;
+    } else {
+      setStatus('key-status', 'Invalid or revoked key', 'err');
+      keyValid = false;
+    }
+  } catch(e) {
+    setStatus('key-status', 'Could not verify key', 'err');
+    keyValid = false;
   }
+  updateBtn();
+}
+
+function onFileSelect() {
+  selectedFile = $('file-input').files[0];
+  if (selectedFile) {
+    const mb = (selectedFile.size / 1024 / 1024).toFixed(1);
+    setStatus('file-status', `✓ ${selectedFile.name} (${mb} MB)`, 'ok');
+  }
+  updateBtn();
+}
+
+function updateBtn() {
+  $('btn-create-session').disabled = !(keyValid && selectedFile);
+}
+
+// ── Session creation ──
+async function createSession() {
+  // Generate random invite token
+  const tokenBytes = crypto.getRandomValues(new Uint8Array(16));
+  sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
+
+  // Build receiver URL
+  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&k=${encodeURIComponent(apiKey)}`;
+  $('session-link').textContent = recvUrl;
+
+  showStep('step-waiting');
+  connectWebSocket();
+}
+
+// ── WebSocket signaling ──
+function connectWebSocket() {
+  ws = new WebSocket(RELAY_WS);
+
+  ws.onopen = () => {
+    // Join the invite room
+    ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'sender' }));
+    setStatus('waiting-status', 'Waiting for receiver to open the link...');
+  };
+
+  // Poll voor receiver pubkey via ghost pipe relay
+  let pubkeyPollInterval = setInterval(async () => {
+    try {
+      const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}?k=${encodeURIComponent(apiKey)}`, {signal: AbortSignal.timeout(3000)});
+      if (r.ok) {
+        const d = await r.json();
+        if (d.kyber_pub && d.ecdh_pub) {
+          clearInterval(pubkeyPollInterval);
+          receiverPubs = { kyber_pub: d.kyber_pub, ecdh_pub: d.ecdh_pub };
+          const fp = genFingerprint(d.kyber_pub);
+          $('fp-card').style.display = '';
+          $('fp-display').textContent = fp;
+          $('waiting-title').textContent = 'Receiver connected';
+          $('waiting-dot').className = 'dot';
+          setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+        }
+      }
+    } catch(e) {}
+  }, 2000);
+
+  ws.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+
+    // Receiver joined and sent pubkey
+    if (msg.type === 'pubkey_offer' && msg.kyber_pub && msg.ecdh_pub) {
+      receiverPubs = { kyber_pub: msg.kyber_pub, ecdh_pub: msg.ecdh_pub };
+      const fp = genFingerprint(msg.kyber_pub);
+
+      // Show fingerprint card
+      $('fp-card').style.display = '';
+      $('fp-display').textContent = fp;
+      $('waiting-title').textContent = 'Receiver connected';
+      $('waiting-dot').className = 'dot';
+      setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+    }
+
+    if (msg.type === 'peer_left') {
+      setStatus('waiting-status', 'Receiver disconnected', 'err');
+    }
+  };
+
+  ws.onerror = () => setStatus('waiting-status', 'Connection error', 'err');
+  ws.onclose = () => { if (!receiverPubs) setStatus('waiting-status', 'Disconnected', 'err'); };
+}
+
+// ── Fingerprint confirmed — encrypt & send ──
+async function confirmFingerprint() {
+  if (!receiverPubs) return;
+
+  // Tell receiver we confirmed
+  ws.send(JSON.stringify({ type: 'packet', chatHash: sessionToken, seq: 0, payload: JSON.stringify({ type: 'fingerprint_ok' }) }));
+
+  showStep('step-encrypting');
 
   try {
-    if (!window.PARASHARE_CRYPTO) {
-      await new Promise(r => window.addEventListener('crypto-ready', r, { once: true }));
-    }
-    const C = window.PARASHARE_CRYPTO;
+    const BLOCK = 5 * 1024 * 1024;
+    const CHUNK_PLAIN = 4.5 * 1024 * 1024;
+    const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
 
-    // Chunk constants
-    const CHUNK_BYTES = 4.9 * 1024 * 1024; // 4.9MB plaintext per chunk
-    // Magic signature for metadata header inside each encrypted chunk
-    const META_MAGIC  = new Uint8Array([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
-
-    // Verplicht: geldige betaalde API key voor verzender
-    if(!apiKey || !apiKey.startsWith('pgp_') || keyValid !== true) {
-      throw new Error('A valid PARAMANT API key is required to send files. Get one at paramant.app/#pricing');
-    }
-    setProgress(5, 'Validating key...');
-    const kr = await fetch(`${RELAY}/v2/check-key?k=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(6000) });
-    const kd = await kr.json();
-    if (!kd.valid) throw new Error('API key invalid');
-
-    setProgress(10, 'Reading file...');
-    const fileBytes   = new Uint8Array(await file.arrayBuffer());
-    const totalChunks = Math.ceil(fileBytes.length / CHUNK_BYTES) || 1;
-    const fileId      = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
-    const ttl         = totalChunks > 1 ? 900000 : 300000; // 15 min for multi-chunk
-
+    const fileBytes = new Uint8Array(await selectedFile.arrayBuffer());
+    const totalChunks = Math.ceil(fileBytes.length / CHUNK_PLAIN) || 1;
+    const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
     const tokens = [];
 
     for (let i = 0; i < totalChunks; i++) {
-      const chunkStart = Math.round(i * CHUNK_BYTES);
-      const chunkEnd   = Math.min(chunkStart + CHUNK_BYTES, fileBytes.length);
-      const chunkData  = fileBytes.slice(chunkStart, chunkEnd);
+      const pct = Math.round(10 + (i / totalChunks) * 75);
+      $('enc-progress').style.width = pct + '%';
+      $('enc-status').textContent = totalChunks > 1
+        ? `Encrypting chunk ${i+1}/${totalChunks} with ML-KEM-768...`
+        : 'Encrypting with ML-KEM-768 + ECDH P-256...';
 
-      const pct = Math.round(12 + (i / totalChunks) * 72);
-      setProgress(pct, totalChunks > 1
-        ? `Encrypting chunk ${i + 1}/${totalChunks} (${fmt(chunkData.length)})...`
-        : 'Encrypting — AES-256-GCM...');
+      const start = Math.round(i * CHUNK_PLAIN);
+      const chunkData = fileBytes.slice(start, Math.min(start + CHUNK_PLAIN, fileBytes.length));
 
-      // Build payload: META_MAGIC(4) | metaLen(4) | meta JSON | chunkData
-      const metaJson  = JSON.stringify({
-        file_id: fileId, file_name: file.name, file_size: fileBytes.length,
-        chunk_index: i, total_chunks: totalChunks, chunk_size: chunkData.length,
+      // Build payload with metadata header
+      const metaJson = JSON.stringify({
+        file_id: fileId, file_name: selectedFile.name,
+        file_size: fileBytes.length, chunk_index: i,
+        total_chunks: totalChunks, chunk_size: chunkData.length
       });
       const metaBytes = new TextEncoder().encode(metaJson);
-      const metaLen   = new Uint8Array(4);
-      new DataView(metaLen.buffer).setUint32(0, metaBytes.length, false);
-      const payload = C.concat(META_MAGIC, metaLen, metaBytes, chunkData);
+      const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
 
-      // Encrypt with AES-256-GCM (0x01 format via encryptAES)
-      const encResult = await C.encryptAES(payload);
+      // ML-KEM-768 encapsulation
+      const kyberPub = hexToU8(receiverPubs.kyber_pub);
+      const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
 
-      if (encResult.packet.byteLength > C.BLOCK) {
-        throw new Error(`Chunk ${i + 1} too large after encryption (${fmt(encResult.packet.byteLength)}).`);
+      // ECDH P-256 hybrid
+      const ecdhPubRaw = hexToU8(receiverPubs.ecdh_pub);
+      const recvECDH = await crypto.subtle.importKey('raw', ecdhPubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+      const senderECDH = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']);
+      const senderPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', senderECDH.publicKey));
+      const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: recvECDH }, senderECDH.privateKey, 256));
+
+      // HKDF combine ML-KEM + ECDH secrets
+      const combined = concat(sharedSecret, ecdhSecret);
+      const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
+      const aesKey = await crypto.subtle.deriveKey(
+        { name: 'HKDF', hash: 'SHA-256', salt: cipherText.slice(0, 32), info: new TextEncoder().encode('paramant-v2') },
+        hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+      );
+
+      // Encrypt
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
+
+      // Packet: 0x02 | u32(ctLen_kyber) | cipherText | u32(senderPubLen) | senderPub | nonce(12) | u32(ct) | ct
+      const bundle = concat(cipherText, senderPubRaw);
+      const packet = concat(
+        new Uint8Array([0x02]),
+        u32be(cipherText.length),
+        cipherText,
+        u32be(senderPubRaw.length),
+        senderPubRaw,
+        nonce,
+        u32be(ct.length),
+        ct
+      );
+
+      // Pad to 5MB
+      const padded = new Uint8Array(BLOCK);
+      padded.set(packet.slice(0, Math.min(packet.length, BLOCK)));
+      for (let p = packet.length; p < BLOCK; p += 65536) {
+        crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, BLOCK)));
       }
 
-      // Pad to exactly 5MB
-      const padded = new Uint8Array(C.BLOCK);
-      padded.set(encResult.packet);
-      // getRandomValues max 65536 bytes per call — fill padding in slices
-      const padOff = encResult.packet.byteLength;
-      for (let p = padOff; p < C.BLOCK; p += 65536) {
-        crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, C.BLOCK)));
-      }
-
-      // Hash
+      // Hash & upload
+      $('enc-status').textContent = `Uploading chunk ${i+1}/${totalChunks}...`;
       const hashBuf = await crypto.subtle.digest('SHA-256', padded);
-      const hash    = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+      const hash = u8toHex(new Uint8Array(hashBuf));
 
-      // Upload
-      const body = JSON.stringify({
-        hash, payload: C.toB64(padded), ttl_ms: ttl,
-        meta: {
-          device_id: 'parashare-web', file_name: file.name, file_size: file.size,
-          chunk_index: i, total_chunks: totalChunks, file_id: fileId,
-        }
-      });
-
-      const ur = await fetch(`${RELAY}/v2/inbound`, {
+      const ur = await fetch(`${RELAY_API}/v2/inbound`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'User-Agent': 'parashare/2.0' },
-        body, signal: AbortSignal.timeout(120000),
-      });
-      const ud = await ur.json();
-      if (!ud.ok) {
-        if (ur.status === 503) throw new Error('Relay at capacity. Please try again in 10 seconds.');
-        throw new Error(ud.error || `Upload failed for chunk ${i + 1}`);
-      }
-      tokens.push(ud.download_token);
-      if (i === 0) {
-        const _wh = $('webhook-url')?.value?.trim();
-        if (_wh) {
-          fetch(`${RELAY}/v2/webhook`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
-            body: JSON.stringify({ hash, callback_url: _wh })
-          }).catch(() => {});
-        }
-      }
-      await sleep(30);
-    }
-
-    setProgress(90, 'Generating link...');
-    await sleep(150);
-
-    const encEl = $('enc-display');
-    if (encEl) encEl.textContent = 'AES-256-GCM' + (totalChunks > 1 ? ` · ${totalChunks} chunks` : '');
-
-    expiresAt = Date.now() + ttl;
-    const _pw = $('transfer-password')?.value?.trim() || '';
-    const shareUrl = `${BASE_URL}?t=${encodeURIComponent(tokens.join(','))}&n=${encodeURIComponent(file.name)}&c=${totalChunks}` + (_pw ? `#pwd=${btoa(encodeURIComponent(_pw))}` : '');
-    $('share-link').textContent = shareUrl;
-
-    setProgress(100, 'Done');
-    await sleep(200);
-    startTTLCountdown('ttl-display');
-    showScreen('screen-sent');
-
-  } catch (e) {
-    showErr(e.message || 'Something went wrong. Try again.');
-    hide('progress-wrap');
-    sending = false; updateSendBtn();
-  }
-}
-
-function showErr(msg) {
-  $('send-err').textContent = msg;
-  show('send-err');
-}
-
-// ── RECEIVE ──────────────────────────────────────────────────────────
-function initReceive(tok) {
-  const raw = tok || params.get('t');
-  if (!raw) return;
-
-  // For multi-chunk: probe only first token for info
-  const firstToken = decodeURIComponent(raw).split(',')[0].trim();
-  const totalChunks = parseInt(params.get('c') || '1');
-  const fileName = params.get('n') ? decodeURIComponent(params.get('n')) : null;
-
-  if (totalChunks > 1 && fileName) {
-    $('recv-fname').textContent = fileName;
-    show('recv-file-info');
-  }
-
-  fetch(`${RELAY}/v2/dl/${firstToken}/info`, {
-    headers: { 'User-Agent': 'parashare/2.0' },
-    signal: AbortSignal.timeout(8000)
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (!d.ok) {
-      $('recv-err-msg').textContent = 'This link has already been used or has expired.';
-      hide('recv-loading'); show('recv-error'); return;
-    }
-    if (d.file_name) {
-      $('recv-fname').textContent = d.file_name + (totalChunks > 1 ? ` (${totalChunks} chunks)` : '');
-      $('recv-fsize').textContent = fmt(d.file_size || 0);
-      show('recv-file-info');
-    }
-    expiresAt = Date.now() + (d.ttl_left_s || 300) * 1000;
-    startTTLCountdown('recv-ttl');
-  })
-  .catch(() => {});
-
-  const _pwHash = new URLSearchParams(window.location.hash.replace('#','&')).get('pwd');
-  if (_pwHash) {
-    const _pwWrap = document.createElement('div');
-    _pwWrap.style.cssText = 'margin-bottom:16px';
-    _pwWrap.innerHTML = '<label class="lbl">Wachtwoord vereist</label><input class="inp" id="recv-password" type="password" placeholder="Voer wachtwoord in" autocomplete="off">';
-    const _dlBtn = $('btn-download');
-    _dlBtn.parentNode.insertBefore(_pwWrap, _dlBtn);
-  }
-  $('btn-download').addEventListener('click', () => {
-    if (_pwHash) {
-      const _required = decodeURIComponent(atob(_pwHash));
-      const _entered  = ($('recv-password')?.value || '').trim();
-      if (_entered !== _required) { alert('Onjuist wachtwoord.'); return; }
-    }
-    doDownload(raw);
-  });
-}
-
-async function doDownload(rawTok) {
-  hide('recv-loading'); show('recv-downloading');
-
-  const statusEl = $('recv-downloading');
-
-  try {
-    if (!window.PARASHARE_CRYPTO) {
-      await new Promise(r => window.addEventListener('crypto-ready', r, { once: true }));
-    }
-    const C = window.PARASHARE_CRYPTO;
-
-    const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
-    const tokens     = decodeURIComponent(rawTok).split(',').map(t => t.trim()).filter(Boolean);
-    const fileName   = params.get('n') ? decodeURIComponent(params.get('n')) : 'parashare-download';
-    const allChunks  = [];
-
-    for (let i = 0; i < tokens.length; i++) {
-      // Update progress message
-      const pDiv = statusEl.querySelector('p.sub') || statusEl.querySelector('p');
-      if (pDiv) pDiv.textContent = tokens.length > 1
-        ? `Downloading chunk ${i + 1} of ${tokens.length}...`
-        : 'The file is being retrieved. This happens once.';
-
-      const r = await fetch(`${RELAY}/v2/dl/${tokens[i]}`, {
-        headers: { 'User-Agent': 'parashare/2.0' },
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+        body: JSON.stringify({
+          hash, payload: toB64(padded), ttl_ms: 3600000,
+          meta: { device_id: 'transfer-web', file_name: selectedFile.name, chunk_index: i, total_chunks: totalChunks, file_id: fileId }
+        }),
         signal: AbortSignal.timeout(120000)
       });
-
-      if (r.status === 404 || r.status === 410) {
-        hide('recv-downloading'); show('recv-error');
-        $('recv-err-msg').textContent = r.status === 410
-          ? 'This file has already been downloaded and destroyed.'
-          : 'This link has expired or the file no longer exists.';
-        return;
-      }
-      if (!r.ok) throw new Error('Server error: ' + r.status);
-
-      const raw   = new Uint8Array(await r.arrayBuffer());
-      const plain = await C.decryptBlob(raw);
-
-      // Check for PRSH metadata header
-      const hasMeta = plain[0] === 0x50 && plain[1] === 0x52 && plain[2] === 0x53 && plain[3] === 0x48;
-      let chunkData;
-      if (hasMeta) {
-        const metaLen = new DataView(plain.buffer).getUint32(4, false);
-        chunkData = plain.slice(8 + metaLen);
-      } else {
-        chunkData = plain; // legacy: full plaintext is the file
-      }
-      allChunks.push(chunkData);
+      const ud = await ur.json();
+      if (!ud.ok) throw new Error(ud.error || 'Upload failed');
+      tokens.push(ud.download_token);
     }
 
-    // Reassemble
-    const totalSize = allChunks.reduce((s, c) => s + c.length, 0);
-    const assembled = new Uint8Array(totalSize);
-    let offset = 0;
-    for (const chunk of allChunks) { assembled.set(chunk, offset); offset += chunk.length; }
+    $('enc-progress').style.width = '100%';
+    $('enc-status').textContent = 'Notifying receiver...';
 
-    const url = URL.createObjectURL(new Blob([assembled]));
-    const a   = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
+    // Send download tokens to receiver via WebSocket
+    // Stuur transfer tokens via HTTP naar relay — ontvanger pollt dit op
+    await fetch(RELAY_API + '/v2/pubkey', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+      body: JSON.stringify({
+        device_id: sessionToken + '_ready',
+        ecdh_pub: tokens.join(','),
+        kyber_pub: selectedFile.name + '|' + totalChunks
+      })
+    });
 
-    hide('recv-downloading'); show('recv-done');
+    $('done-status').textContent = `✓ ${selectedFile.name} sent securely — receiver will be notified`;
+    showStep('step-done');
 
-  } catch (e) {
-    hide('recv-downloading'); show('recv-error');
-    $('recv-err-msg').textContent = e.name === 'AbortError'
-      ? 'Download timed out. Check your connection.'
-      : 'Download failed: ' + e.message;
+  } catch(e) {
+    $('enc-status').textContent = 'Error: ' + e.message;
+    $('enc-status').className = 'status-line err';
   }
 }
 
-// ── UTILS ────────────────────────────────────────────────────────────
-function startTTLCountdown(elId) {
-  clearInterval(ttlInterval);
-  function update() {
-    const el = $(elId);
-    if (!el) { clearInterval(ttlInterval); return; }
-    const left = expiresAt - Date.now();
-    el.textContent = fmtTTL(left);
-    if (left <= 0) clearInterval(ttlInterval);
-  }
-  update();
-  ttlInterval = setInterval(update, 1000);
+function rejectFingerprint() {
+  ws.close();
+  showStep('step-setup');
+  setStatus('key-status', 'Transfer aborted — fingerprint mismatch', 'err');
 }
-
-$('btn-copy')?.addEventListener('click', () => {
-  const url = $('share-link').textContent;
-  navigator.clipboard?.writeText(url).catch(() => {
-    // fallback
-    const ta = document.createElement('textarea');
-    ta.value = url; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta);
-  });
-  $('btn-copy').textContent = 'Copied!';
-  setTimeout(() => { const b = $('btn-copy'); if (b) b.textContent = 'Copy'; }, 2000);
-});
-
-$('btn-new')?.addEventListener('click', () => {
-  clearFile();
-  file = null; keyValid = false; sending = false;
-  $('api-key').value = ''; apiKey = '';
-  hide('progress-wrap'); hide('send-err'); hide('key-ok'); hide('key-err');
-  show('key-hint');
-  showScreen('screen-send');
-});
-
-// ── Live relay status ──────────────────────────────────────────────────────
-async function pollRelayStatus() {
-  try {
-    const r = await fetch('/rp/health/health', { signal: AbortSignal.timeout(4000) });
-    const d = await r.json();
-
-    const dot      = $('status-dot');
-    const txt      = $('status-text');
-    const slotInfo = $('slot-info');
-    const barWrap  = $('slot-bar-wrap');
-    const bar      = $('slot-bar');
-    const pctEl    = $('slot-pct');
-    const warn     = $('capacity-warning');
-
-    const ramOk     = d.ram_ok !== false;
-    const slotsMax  = d.blobs_max  || (d.ram_limit_mb ? Math.floor(d.ram_limit_mb / 5) : 200);
-    const slotsUsed = d.blobs_in_flight || d.blobs || 0;
-    const slotsAvail = d.available_slots;
-    const usePct    = slotsMax ? Math.round(slotsUsed / slotsMax * 100) : 0;
-
-    if (!r.ok || !d.ok) {
-      dot.style.background = '#e07060';
-      txt.textContent = 'Relay offline — try again shortly';
-      txt.style.color = '#e07060';
-    } else if (!ramOk || slotsAvail === 0) {
-      dot.style.background = '#e09040';
-      txt.textContent = 'Relay at capacity — uploads queued';
-      txt.style.color = '#b07030';
-    } else if (usePct > 70) {
-      dot.style.background = '#e0c040';
-      txt.textContent = `Relay busy (${usePct}% full)`;
-      txt.style.color = '#9a8020';
-    } else {
-      dot.style.background = '#2d8a5c';
-      txt.textContent = 'Relay online' + (d.uptime_s ? ` — ${Math.floor(d.uptime_s / 3600)}h uptime` : '');
-      txt.style.color = '#2d8a5c';
-    }
-
-    if (slotsMax) {
-      slotInfo.style.display = '';
-      barWrap.style.display  = 'flex';
-      $('slots-used').textContent = slotsUsed;
-      $('slots-max').textContent  = slotsMax;
-      bar.style.width      = usePct + '%';
-      bar.style.background = usePct > 90 ? '#e07060' : usePct > 70 ? '#e09040' : '#2d8a5c';
-      pctEl.textContent    = usePct + '%';
-    }
-
-    if (!ramOk || slotsAvail === 0) {
-      warn.style.display = 'flex';
-      $('capacity-msg').textContent = 'Relay is at capacity. Your upload will retry automatically — max wait 10s.';
-      $('capacity-retry').textContent = slotsAvail != null ? `${slotsAvail} slots free` : '';
-    } else {
-      warn.style.display = 'none';
-    }
-  } catch {
-    const dot = $('status-dot'), txt = $('status-text');
-    if (dot) dot.style.background = '#ccc';
-    if (txt) { txt.textContent = 'Relay unreachable'; txt.style.color = '#999'; }
-  }
-}
-
-pollRelayStatus();
-setInterval(pollRelayStatus, 15000);
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 </script>
 </body>
 </html>
