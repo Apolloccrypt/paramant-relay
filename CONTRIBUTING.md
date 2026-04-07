@@ -39,4 +39,4 @@ Thanks for your interest in contributing.
 
 ## Questions?
 
-Open an issue or reach out at mick@paramant.app
+Open an issue or reach out at privacy@paramant.app
