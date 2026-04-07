@@ -330,6 +330,7 @@ function $(id) { return document.getElementById(id); }
 function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
+  globeOnStepChange(id);
 }
 function setStatus(id, msg, cls) {
   const el = $(id);
@@ -639,6 +640,7 @@ function rejectFingerprint() {
 
 // ── Globe HUD ─────────────────────────────────────────────────────────────────
 let globeInstance = null, globeOpen = false, globePollInterval = null;
+let _gUserLat = null, _gUserLng = null;  // set after geo lookup
 const RELAY_LOC = { lat: 50.1109, lng: 8.6821, label: 'Relay · Frankfurt EU/DE' };
 
 // Keyboard shortcut
@@ -686,6 +688,7 @@ async function initGlobe() {
 
   // Gebruikerslocatie ophalen (IP-based, privacy-friendly)
   let userLat = RELAY_LOC.lat + 0.5, userLng = RELAY_LOC.lng - 2; // fallback
+  _gUserLat = userLat; _gUserLng = userLng;
   let cityLabel = 'Unknown';
   try {
     const geo = await Promise.race([
@@ -694,6 +697,7 @@ async function initGlobe() {
     ]);
     if (geo && geo.latitude) {
       userLat = geo.latitude; userLng = geo.longitude;
+      _gUserLat = userLat; _gUserLng = userLng;
       cityLabel = (geo.city || '') + (geo.country_code ? ' · ' + geo.country_code : '');
     }
   } catch(e) {}
@@ -703,9 +707,9 @@ async function initGlobe() {
 
   // Globe.gl instantiëren
   globeInstance = Globe({ animateIn: true })
-    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
-    .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg')
+    .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
+    .backgroundImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png')
     .showAtmosphere(true)
     .atmosphereColor('#2d6a4f')
     .atmosphereAltitude(0.18)
@@ -821,25 +825,78 @@ function updateSessionsPanel() {
     : '<div class="hud-session"><span class="hud-dot amber"></span><span>No active session</span></div>';
 }
 
-function updateGlobeTransfer(userLat, userLng) {
-  if (!globeInstance) return;
-  const step = document.querySelector('.step.active');
-  const stepId = step ? step.id : '';
-  const isActive = stepId === 'step-waiting' || stepId === 'step-encrypting';
+// ── Globe state machine ───────────────────────────────────────────────────────
+const _GLOBE_STATES = {
+  idle:       { arcSpeed: 2800, arcColor: ['rgba(58,170,112,0)','#3aaa70','#3aaa70','rgba(58,170,112,0)'], ringSpeed: 1800, ringMax: 2.5, label: 'Ghost Pipe · Encrypted Channel' },
+  waiting:    { arcSpeed: 1800, arcColor: ['rgba(58,170,112,0)','#5ac98a','#5ac98a','rgba(58,170,112,0)'], ringSpeed: 1200, ringMax: 3,   label: 'Ghost Pipe · Receiver Connected' },
+  encrypting: { arcSpeed: 700,  arcColor: ['rgba(58,170,112,0)','#fff','#5ac98a','rgba(58,170,112,0)'],   ringSpeed: 600,  ringMax: 4,   label: 'Ghost Pipe · Transmitting ▶' },
+  done:       { arcSpeed: 2800, arcColor: ['rgba(58,170,112,0)','#3aaa70','#3aaa70','rgba(58,170,112,0)'], ringSpeed: 1800, ringMax: 2.5, label: 'Ghost Pipe · Transfer Complete ✓' },
+};
 
-  // Voeg extra arc toe als er een actieve overdracht is
-  const arcs = [{
-    startLat: userLat, startLng: userLng,
-    endLat: RELAY_LOC.lat, endLng: RELAY_LOC.lng,
-    color: isActive
-      ? ['rgba(58,170,112,0)', '#3aaa70', '#3aaa70', 'rgba(58,170,112,0)']
-      : ['rgba(58,170,112,0)', '#3aaa70', '#3aaa70', 'rgba(58,170,112,0)'],
-    speed: isActive ? 1400 : 2200,
-    label: isActive ? 'Ghost Pipe · Active Transfer' : 'Ghost Pipe · Encrypted Channel',
-  }];
-  globeInstance.arcsData(arcs)
+function _globeApplyState(name) {
+  if (!globeInstance || _gUserLat === null) return;
+  const s = _GLOBE_STATES[name] || _GLOBE_STATES.idle;
+  const uLat = _gUserLat, uLng = _gUserLng;
+  const rLat = RELAY_LOC.lat, rLng = RELAY_LOC.lng;
+
+  globeInstance
+    .arcsData([{
+      startLat: uLat, startLng: uLng,
+      endLat: rLat, endLng: rLng,
+      color: s.arcColor, label: s.label,
+    }])
     .arcColor(d => d.color)
-    .arcDashAnimateTime(d => d.speed || 2200);
+    .arcDashAnimateTime(s.arcSpeed)
+    .ringsData([
+      { lat: uLat, lng: uLng, maxR: s.ringMax, propagationSpeed: 2.5, repeatPeriod: s.ringSpeed, color: () => 'rgba(58,170,112,' },
+      { lat: rLat, lng: rLng, maxR: s.ringMax * 0.9, propagationSpeed: 2, repeatPeriod: s.ringSpeed * 1.15, color: () => 'rgba(58,170,112,' },
+    ])
+    .ringColor(d => t => `${d.color()}${1 - t})`)
+    .ringMaxRadius('maxR')
+    .ringPropagationSpeed('propagationSpeed')
+    .ringRepeatPeriod('repeatPeriod');
+}
+
+function _globeBurst() {
+  if (!globeInstance || _gUserLat === null) return;
+  const uLat = _gUserLat, uLng = _gUserLng;
+  const rLat = RELAY_LOC.lat, rLng = RELAY_LOC.lng;
+  // Big burst rings — 3 waves from relay and user
+  const burstRings = [];
+  for (let i = 0; i < 3; i++) {
+    burstRings.push({ lat: rLat, lng: rLng, maxR: 8 + i * 4, propagationSpeed: 5 + i, repeatPeriod: 99999, color: () => 'rgba(90,201,138,' });
+    burstRings.push({ lat: uLat, lng: uLng, maxR: 6 + i * 3, propagationSpeed: 4 + i, repeatPeriod: 99999, color: () => 'rgba(58,170,112,' });
+  }
+  globeInstance
+    .ringsData(burstRings)
+    .ringColor(d => t => `${d.color()}${1 - t})`)
+    .ringMaxRadius('maxR')
+    .ringPropagationSpeed('propagationSpeed')
+    .ringRepeatPeriod('repeatPeriod');
+
+  // Flash arc white then restore idle
+  globeInstance.arcsData([{
+    startLat: uLat, startLng: uLng,
+    endLat: rLat, endLng: rLng,
+    color: ['rgba(255,255,255,0)', '#fff', '#5ac98a', 'rgba(58,170,112,0)'],
+    label: 'Ghost Pipe · Transfer Complete ✓',
+  }]).arcDashAnimateTime(400);
+
+  setTimeout(() => _globeApplyState('done'), 3200);
+}
+
+function globeOnStepChange(stepId) {
+  if (!globeInstance) return;
+  if (stepId === 'step-waiting')    _globeApplyState('waiting');
+  else if (stepId === 'step-encrypting') _globeApplyState('encrypting');
+  else if (stepId === 'step-done')  _globeBurst();
+  else                              _globeApplyState('idle');
+  updateSessionsPanel();
+}
+
+function updateGlobeTransfer(userLat, userLng) {
+  _gUserLat = userLat; _gUserLng = userLng;
+  _globeApplyState('idle');
 }
 </script>
 </body>
