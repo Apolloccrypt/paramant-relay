@@ -5,11 +5,15 @@ server {
     access_log off;
 
     location = /r34ct0r {
+        allow YOUR_ADMIN_IP;
+        deny all;
         alias /home/paramant/app/r34ct0r.html;
         default_type text/html;
     }
     location = /admin { return 301 https://$host/r34ct0r; }
     location = /r34ct0r.html {
+        allow YOUR_ADMIN_IP;
+        deny all;
         alias /home/paramant/app/r34ct0r.html;
         default_type text/html;
     }
@@ -30,35 +34,35 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host health.paramant.app;
         proxy_set_header X-Api-Key $http_x_api_key;
-        proxy_set_header X-Admin-Token $http_x_admin_token;
+        proxy_set_header X-Admin-Token "";
     }
     location /rp/legal/ {
         proxy_pass http://127.0.0.1:3002/;
         proxy_http_version 1.1;
         proxy_set_header Host legal.paramant.app;
         proxy_set_header X-Api-Key $http_x_api_key;
-        proxy_set_header X-Admin-Token $http_x_admin_token;
+        proxy_set_header X-Admin-Token "";
     }
     location /rp/finance/ {
         proxy_pass http://127.0.0.1:3003/;
         proxy_http_version 1.1;
         proxy_set_header Host finance.paramant.app;
         proxy_set_header X-Api-Key $http_x_api_key;
-        proxy_set_header X-Admin-Token $http_x_admin_token;
+        proxy_set_header X-Admin-Token "";
     }
     location /rp/iot/ {
         proxy_pass http://127.0.0.1:3004/;
         proxy_http_version 1.1;
         proxy_set_header Host iot.paramant.app;
         proxy_set_header X-Api-Key $http_x_api_key;
-        proxy_set_header X-Admin-Token $http_x_admin_token;
+        proxy_set_header X-Admin-Token "";
     }
     location /rp/fly/ {
         proxy_pass https://paramant-ghost-pipe.fly.dev/;
         proxy_ssl_server_name on;
         proxy_set_header Host paramant-ghost-pipe.fly.dev;
         proxy_set_header X-Api-Key $http_x_api_key;
-        proxy_set_header X-Admin-Token $http_x_admin_token;
+        proxy_set_header X-Admin-Token "";
     }
 
     # FHIR Bridge
