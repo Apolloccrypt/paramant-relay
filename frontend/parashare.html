@@ -413,6 +413,22 @@ async function decryptBlob(raw) {
   if (magic === 0x02) {
     throw new Error('Post-quantum encrypted — use the PARAMANT CLI to decrypt.');
   }
+  if (magic === 0x03) {
+    // PBKDF2 password-protected (from free widget) — format: 0x03 | salt(16) | nonce(12) | u32(ctLen) | ct
+    const salt  = raw.slice(1, 17);
+    const nonce = raw.slice(17, 29);
+    const ctLen = new DataView(raw.buffer).getUint32(29, false);
+    const ct    = raw.slice(33, 33 + ctLen);
+    const password = (document.getElementById('recv-password')?.value || '').trim()
+                  || (window.prompt('This file is password-protected. Enter password:') || '');
+    if (!password) throw new Error('Password required to decrypt this file.');
+    const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    const aesKey  = await crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:210000, hash:'SHA-256' },
+      baseKey, { name:'AES-GCM', length:256 }, false, ['decrypt']
+    );
+    return new Uint8Array(await crypto.subtle.decrypt({ name:'AES-GCM', iv:nonce }, aesKey, ct));
+  }
   // Legacy: iv(12) | rawKey(32) | ct
   const iv     = raw.slice(0, 12);
   const rawKey = raw.slice(12, 44);

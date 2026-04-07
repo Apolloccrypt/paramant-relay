@@ -173,7 +173,14 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
             <div style="font-size:11px;color:var(--quiet);margin-top:5px">Any file type · One-time burn-on-read link</div>
           </div>
           <input type="file" id="ps-file-input" style="display:none" onchange="psHandleFile(this.files[0])">
+          <div id="ps-pw-wrap" style="margin-top:10px">
+            <input type="password" id="ps-password" placeholder="Optional password — receiver must enter this to download" oninput="psUpdateRelayTag()" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;box-sizing:border-box">
+            <div style="font-size:10px;color:var(--quiet);margin-top:4px;font-family:var(--mono)">With password: key derived locally via PBKDF2 — relay cannot decrypt. Without: relay theoretically has access.</div>
+          </div>
           <div id="ps-drop-err" style="display:none;margin-top:10px;font-size:12px;color:#c0392b;font-family:var(--mono);text-align:center"></div>
+          <div style="margin-top:14px;font-size:10px;color:var(--quiet);font-family:var(--mono);line-height:1.75;border-top:1px solid var(--border);padding-top:12px">
+            Encrypted in your browser before upload. No file data touches our disk — RAM only, burned after first download. No account or personal data collected. Hosted in EU/DE (Hetzner, Frankfurt). <strong style="color:#d4a017">Note: the encryption key is included in the upload — for full end-to-end encryption use the API with a password-protected transfer.</strong> <a href="/privacy" style="color:var(--quiet);text-decoration:underline">Privacy policy</a>
+          </div>
         </div>
 
         <!-- Progress screen -->
@@ -188,12 +195,12 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <!-- Result screen -->
         <div id="ps-screen-result" style="display:none;padding:24px">
           <div style="font-size:12px;font-family:var(--mono);color:var(--quiet);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">One-time link — share it</div>
-          <div id="ps-result-link" style="font-size:11px;font-family:var(--mono);color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px;word-break:break-all;line-height:1.6;cursor:pointer" onclick="psкопировать()" title="Click to copy"></div>
+          <div id="ps-result-link" style="font-size:11px;font-family:var(--mono);color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px;word-break:break-all;line-height:1.6;cursor:pointer" onclick="psCopy()" title="Click to copy"></div>
           <div style="margin-top:10px;display:flex;gap:8px">
             <button onclick="psCopy()" style="flex:1;background:var(--text);color:var(--bg);border:none;border-radius:4px;padding:9px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)" id="ps-copy-btn">Copy link</button>
             <button onclick="psReset()" style="flex:1;background:none;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:9px;font-size:12px;cursor:pointer;font-family:var(--font)">Send another</button>
           </div>
-          <div style="margin-top:12px;font-size:11px;color:var(--quiet);font-family:var(--mono);line-height:1.7">Burn-on-read · AES-256-GCM · expires in 5 min<br>
+          <div style="margin-top:12px;font-size:11px;color:var(--quiet);font-family:var(--mono);line-height:1.7">Burn-on-read · AES-256-GCM · expires in 1 hour<br>
           <a href="/parashare" style="color:var(--muted);text-decoration:none">Need 500MB or webhook? Use full ParaShare →</a></div>
         </div>
 
@@ -202,6 +209,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
           <span class="tag" style="margin-top:0">AES-256-GCM</span>
           <span class="tag" style="margin-top:0">Burn-on-read</span>
           <span class="tag" style="margin-top:0">No account</span>
+          <span class="tag" id="ps-relay-tag" style="margin-top:0;color:#d4a017">Key visible to relay without password</span>
         </div>
       </div>
     </div>
@@ -210,7 +218,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 
 <script>
 (function(){
-  const FREE_KEY  = 'pgp_xxx_redacted';
+  const FREE_KEY  = 'pgp_08609b1f1306dfc51ba74d38f5c5f607';
   const RELAY     = '/rp/health';
   const MAX_BYTES  = 20 * 1024 * 1024;
   const MAX_DAILY  = 10;
@@ -249,7 +257,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     el.textContent = msg; el.style.display = msg ? '' : 'none';
   }
   function setProgress(pct, msg, sub) {
-    document.getElementById('ps-prog-bar').style.width = pct + '%';
+    if (pct !== null) document.getElementById('ps-prog-bar').style.width = pct + '%';
     document.getElementById('ps-prog-msg').textContent = msg;
     document.getElementById('ps-queue-msg').textContent = sub || '';
   }
@@ -268,12 +276,30 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     return btoa(s);
   }
   async function encryptAES(payload) {
-    const aesKey = await crypto.subtle.generateKey({ name:'AES-GCM', length:256 }, true, ['encrypt']);
-    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
-    const nonce  = crypto.getRandomValues(new Uint8Array(12));
-    const ct     = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv:nonce }, aesKey, payload));
-    const packet = concat(new Uint8Array([0x01]), nonce, rawKey, u32be(ct.length), ct);
-    return { packet };
+    const password = document.getElementById('ps-password')?.value || '';
+    let aesKey, rawKey;
+    if (password) {
+      // PBKDF2 — relay cannot decrypt, key never leaves browser
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+      aesKey = await crypto.subtle.deriveKey(
+        { name:'PBKDF2', salt, iterations:210000, hash:'SHA-256' },
+        baseKey, { name:'AES-GCM', length:256 }, true, ['encrypt']
+      );
+      rawKey = salt; // store salt instead of key — receiver derives key from password+salt
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv:nonce }, aesKey, payload));
+      const packet = concat(new Uint8Array([0x03]), salt, nonce, u32be(ct.length), ct);
+      return { packet, passwordProtected: true };
+    } else {
+      // No password — key included in blob (relay theoretically has access)
+      aesKey = await crypto.subtle.generateKey({ name:'AES-GCM', length:256 }, true, ['encrypt']);
+      rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+      const nonce = crypto.getRandomValues(new Uint8Array(12));
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv:nonce }, aesKey, payload));
+      const packet = concat(new Uint8Array([0x01]), nonce, rawKey, u32be(ct.length), ct);
+      return { packet, passwordProtected: false };
+    }
   }
 
   window.psHandleDrop = function(e) {
@@ -282,6 +308,19 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     const f = e.dataTransfer.files[0];
     if (f) psHandleFile(f);
   };
+  // Upload met automatische retry bij 503 (relay vol)
+  async function uploadWithRetry(url, fetchOpts, chunkLabel) {
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const resp = await fetch(url, fetchOpts);
+      if (resp.status !== 503) return resp;
+      if (attempt < MAX_RETRIES) {
+        setProgress(null, `Relay busy — retrying in 10s… (${attempt}/${MAX_RETRIES})`, chunkLabel);
+        await new Promise(r => setTimeout(r, 10000));
+      } else return resp;
+    }
+  }
+
   window.psHandleFile = async function(file) {
     if (!file) return;
     setErr('');
@@ -291,15 +330,15 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     if (file.size > MAX_BYTES) { setErr('File too large. Free tier: max 20 MB. Need more? Use full ParaShare.'); return; }
 
     showScreen('ps-screen-progress');
+    const uploadedHashes = []; // track for orphan cleanup on failure
     try {
-      // 3-second queue delay for free tier
-      setProgress(5, 'Queued — free tier…', 'Free uploads go last · paid users get instant priority');
-      await new Promise(r => setTimeout(r, 3000));
+      setProgress(5, 'Queued…', 'Free uploads · paid users get instant priority');
+      await new Promise(r => setTimeout(r, 1500));
 
       setProgress(10, 'Reading file…');
-      const fileBytes  = new Uint8Array(await file.arrayBuffer());
+      const fileBytes   = new Uint8Array(await file.arrayBuffer());
       const totalChunks = Math.max(1, Math.ceil(fileBytes.length / CHUNK_PLAIN));
-      const tokens     = [];
+      const tokens      = [];
 
       for (let i = 0; i < totalChunks; i++) {
         const pct = 15 + Math.round((i / totalChunks) * 70);
@@ -334,15 +373,15 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         setProgress(pct + Math.round(5 / totalChunks), uploadLabel);
 
         const body = JSON.stringify({
-          hash, payload: toB64(padded), ttl_ms: totalChunks > 1 ? 900000 : 300000,
+          hash, payload: toB64(padded), ttl_ms: 3600000,
           meta: { device_id:'parashare-free', file_name:file.name, file_size:file.size,
                   chunk_index:i, total_chunks:totalChunks }
         });
-        const ur = await fetch(`${RELAY}/v2/inbound`, {
-          method:'POST',
-          headers:{'Content-Type':'application/json','X-Api-Key':FREE_KEY,'User-Agent':'parashare-free/1.0'},
-          body, signal: AbortSignal.timeout(60000)
-        });
+        const ur = await uploadWithRetry(
+          `${RELAY}/v2/inbound`,
+          { method:'POST', headers:{'Content-Type':'application/json','X-Api-Key':FREE_KEY,'User-Agent':'parashare-free/1.0'}, body, signal: AbortSignal.timeout(90000) },
+          uploadLabel
+        );
         if (!ur.ok) {
           const txt = await ur.text();
           let msg = 'Upload failed';
@@ -351,6 +390,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         }
         const ud = await ur.json();
         if (!ud.ok) throw new Error(ud.error || 'Upload failed');
+        uploadedHashes.push(hash);
         tokens.push(ud.download_token);
       }
 
@@ -365,11 +405,30 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       uses.count++; saveUses(uses); updateUsesLabel();
 
     } catch(e) {
+      // Cleanup orphan blobs that were already uploaded before the failure
+      for (const h of uploadedHashes) {
+        fetch(`${RELAY}/v2/inbound/${h}`, {
+          method: 'DELETE',
+          headers: { 'X-Api-Key': FREE_KEY }
+        }).catch(() => {});
+      }
       showScreen('ps-screen-drop');
       setErr(e.message || 'Something went wrong. Try again.');
     }
   };
 
+  window.psUpdateRelayTag = function() {
+    const pw = document.getElementById('ps-password')?.value || '';
+    const tag = document.getElementById('ps-relay-tag');
+    if (!tag) return;
+    if (pw.length > 0) {
+      tag.textContent = 'End-to-end encrypted — relay cannot decrypt';
+      tag.style.color = '#3aaa70';
+    } else {
+      tag.textContent = 'Key visible to relay without password';
+      tag.style.color = '#d4a017';
+    }
+  };
   window.psReset  = function() { showScreen('ps-screen-drop'); setErr(''); document.getElementById('ps-file-input').value=''; };
   window.psCopy   = function() {
     const url = document.getElementById('ps-result-link')._url || document.getElementById('ps-result-link').textContent;
@@ -377,7 +436,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     const btn = document.getElementById('ps-copy-btn');
     btn.textContent = 'Copied!'; setTimeout(()=>{ btn.textContent='Copy link'; }, 2000);
   };
-  window.psкопировать = window.psCopy;
 })();
 </script>
 
@@ -649,7 +707,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># receiver → PACS</span><br>
         python3 paramant-receiver.py --forward https://pacs.hospital/api
       </div>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Legal &amp; Notary</div>
@@ -663,7 +721,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># counterparty receives once — then gone</span><br>
         python3 paramant-receiver.py --key pgp_xxx --device counterparty-01
       </div>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Industrial IoT / OT</div>
@@ -677,7 +735,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># forward to SCADA</span><br>
         python3 paramant-receiver.py --forward https://scada.intern/api
       </div>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Finance &amp; Compliance</div>
@@ -691,7 +749,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># forward to compliance system</span><br>
         python3 paramant-receiver.py --forward https://compliance.bank.nl/api
       </div>
-      <a href="https://buy.stripe.com/28E6oIfbh9O29NO5ZRefC04" target="_blank" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Get Pro access →</a>
+      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
     </div>
   </div>
 
@@ -752,7 +810,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
               <li>+ Certificate Transparency log — proof of delivery</li>
               <li>+ No storage. No logs. No trace.</li>
             </ul>
-            <a href="https://buy.stripe.com/price_1TGwtQJMhSdoTn1k6RM3agYr" class="price-btn s" target="_blank">Get started</a>
+            <span class="price-btn s" style="opacity:0.45;cursor:not-allowed;pointer-events:none">Coming soon</span>
           </div>
 
           <div class="pc featured">
@@ -773,13 +831,10 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
               <li>+ WebSocket streaming — sub-100ms delivery</li>
               <li>+ Priority relay access</li>
             </ul>
-            <a href="https://buy.stripe.com/price_1TGwqbJMhSdoTn1kCWWLN5KY" class="price-btn p" target="_blank">Get started</a>
+            <span class="price-btn p" style="opacity:0.45;cursor:not-allowed;pointer-events:none">Coming soon</span>
             <div style="margin-top:12px;padding:10px 12px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:4px;font-size:11px;color:#565656;line-height:1.7;">
               Extra device: <span style="color:#aaa;">€12/mo</span>
-              <a href="https://buy.stripe.com/cNiaEY2ovd0ee449c3efC06" target="_blank"
-                 style="color:#808080;margin-left:8px;text-decoration:none;border-bottom:1px solid #222;">
-                Add device →
-              </a>
+              <span style="color:#555;margin-left:8px;cursor:not-allowed">Coming soon</span>
             </div>
 
           </div>
