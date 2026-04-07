@@ -57,10 +57,24 @@ input[type=file]{cursor:pointer}
 .warn{background:#1a1200;border:1px solid #3a2a00;color:#f59e0b;padding:12px 14px;font-size:11px;line-height:1.7;margin:12px 0}
 
 /* ── Globe HUD ── */
-#globe-overlay{position:fixed;inset:0;z-index:9000;background:#0c0c0c;display:none;
+#globe-overlay{position:fixed;inset:0;z-index:0;background:#0c0c0c;display:block;
   font-family:'SF Mono','Fira Code',monospace;overflow:hidden;
   --neon:#3aaa70;--neon2:#5ac98a;--amber:#f59e0b;--g:#3aaa70}
-#globe-overlay.active{display:block}
+/* globe always visible as background */
+/* Globe background mode: HUD elements hidden unless fullscreen */
+#globe-overlay .hud-top,
+#globe-overlay .hud-bot,
+#globe-overlay .hc,
+#globe-overlay .hud-panel,
+#globe-overlay #globe-loading { display:none!important }
+#globe-overlay.globe-fullscreen .hud-top,
+#globe-overlay.globe-fullscreen .hud-bot,
+#globe-overlay.globe-fullscreen .hc,
+#globe-overlay.globe-fullscreen .hud-panel,
+#globe-overlay.globe-fullscreen #globe-loading { display:flex!important }
+#globe-overlay.globe-fullscreen .hud-panel { display:block!important }
+#globe-overlay.globe-fullscreen #globe-loading { display:flex!important }
+
 
 /* scanlines */
 #globe-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;
@@ -146,10 +160,17 @@ input[type=file]{cursor:pointer}
 #globe-btn:hover{background:rgba(58,170,112,.08)!important;border-color:var(--neon)!important;
   box-shadow:0 0 12px rgba(58,170,112,.2)}
 
+
+/* Cards semi-transparent when globe is background */
+body { background: transparent !important }
+.card { background: rgba(12,12,12,.82) !important; backdrop-filter: blur(2px) }
+.share-box { background: rgba(12,12,12,.85) !important }
+nav { background: rgba(12,12,12,.90) !important; backdrop-filter: blur(4px) }
+main { background: transparent !important }
 </style>
 </head>
 <body>
-<nav style="justify-content:space-between">
+<nav style="justify-content:space-between;position:relative;z-index:10">
   <a href="/" class="logo">PARAMANT</a>
   <button id="globe-btn" onclick="toggleGlobe()" title="Globe (Ctrl+G)"
     style="background:none;border:1px solid #1a3320;color:#3aaa70;padding:6px 14px;
@@ -158,7 +179,7 @@ input[type=file]{cursor:pointer}
     ⬡ Globe
   </button>
 </nav>
-<main>
+<main style="position:relative;z-index:10">
 
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
@@ -649,18 +670,31 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && globeOpen) toggleGlobe();
 });
 
+// Auto-init globe as background on load
+document.addEventListener('DOMContentLoaded', () => {
+  // Small delay so DOM is fully painted before Globe.gl reads dimensions
+  setTimeout(() => initGlobe(), 400);
+});
+
 function toggleGlobe() {
   const overlay = document.getElementById('globe-overlay');
+  const mainEl  = document.querySelector('main');
+  const navEl   = document.querySelector('nav');
   globeOpen = !globeOpen;
   if (globeOpen) {
-    overlay.classList.add('active');
+    // Fullscreen HUD mode: hide UI, show HUD panels
+    overlay.classList.add('globe-fullscreen');
+    if (mainEl) mainEl.style.display = 'none';
     document.getElementById('globe-btn').style.color = '#3aaa70';
     document.getElementById('globe-btn').style.boxShadow = '0 0 12px rgba(58,170,112,.3)';
-    initGlobe();
+    document.getElementById('globe-btn').textContent = '✕ Close';
   } else {
-    overlay.classList.remove('active');
+    // Background mode: restore UI, hide HUD panels
+    overlay.classList.remove('globe-fullscreen');
+    if (mainEl) mainEl.style.display = '';
     document.getElementById('globe-btn').style.color = '';
     document.getElementById('globe-btn').style.boxShadow = '';
+    document.getElementById('globe-btn').textContent = '⬡ Globe';
     if (globePollInterval) { clearInterval(globePollInterval); globePollInterval = null; }
   }
 }
