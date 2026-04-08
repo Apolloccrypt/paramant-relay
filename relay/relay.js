@@ -1195,25 +1195,6 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, count: dids.length, dids }));
   }
 
-  // ── GET /v2/ct/log ───────────────────────────────────────────────────────────
-  if (path === '/v2/ct/log') {
-    const limit = Math.min(parseInt(query.limit || '100'), 1000);
-    const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
-  }
-
-  // ── GET /v2/ct/proof/:index ──────────────────────────────────────────────────
-  const ctpm = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
-  if (ctpm) {
-    const idx = parseInt(ctpm[1]);
-    const entry = ctLog[idx];
-    if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: entry.ts }));
-  }
-
   // ── POST /v2/attest ──────────────────────────────────────────────────────────
   if (path === '/v2/attest' && req.method === 'POST') {
     try {
