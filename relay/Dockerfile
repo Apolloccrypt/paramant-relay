@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-# argon2 needs build tools
+# Build tools for argon2 native module
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
@@ -10,10 +10,10 @@ RUN npm install --omit=dev
 
 COPY relay.js ./
 
-# Non-root user
 RUN addgroup -S relay && adduser -S relay -G relay
 USER relay
 
-EXPOSE 3000
+# Port is set via PORT env var per sector
+EXPOSE 3001 3002 3003 3004 3005
 
 CMD ["node", "relay.js"]
