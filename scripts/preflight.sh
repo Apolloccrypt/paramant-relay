@@ -19,12 +19,16 @@ check_port() {
     local port=$1
     local var=$2
     if ss -tlnp 2>/dev/null | awk '{print $4}' | grep -q ":${port}$"; then
-        local proc=$(ss -tlnp 2>/dev/null | grep ":${port}[^0-9]" | sed 's/.*users:(("//;s/".*//' | head -1)
-        echo -e "${YELLOW}⚠  Port ${port} is in use${proc:+ by $proc}${NC}"
+        # Try multiple methods to get process name (requires root on some systems)
+        local proc
+        proc=$(ss -tlnp 2>/dev/null | grep ":${port}[^0-9]" | grep -oP 'users:\(\("\K[^"]+' | head -1)
+        [ -z "$proc" ] && proc=$(lsof -i:"${port}" -n -P -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $1}')
+        [ -z "$proc" ] && proc="the process"
+        echo -e "${YELLOW}⚠  Port ${port} is in use by ${proc}${NC}"
         echo ""
         echo "   Options:"
         echo "   1) Use alternate ports (recommended)"
-        echo "   2) Stop $proc manually, then re-run"
+        echo "   2) Stop ${proc} manually, then re-run"
         echo "   3) Skip (may cause startup failure)"
         echo ""
         if [ -t 0 ]; then
@@ -44,6 +48,11 @@ check_port() {
                 while ss -tlnp 2>/dev/null | awk '{print $4}' | grep -q ":${alt_https}$"; do
                     alt_https=$((alt_https + 1))
                 done
+                # Replace (not append) to prevent stale duplicates on re-runs
+                if [ -f .env ]; then
+                    sed -i '/^HTTP_PORT=/d' .env
+                    sed -i '/^HTTPS_PORT=/d' .env
+                fi
                 echo "HTTP_PORT=${alt_http}" >> .env
                 echo "HTTPS_PORT=${alt_https}" >> .env
                 export HTTP_PORT=${alt_http}
