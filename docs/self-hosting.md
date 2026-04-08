@@ -134,11 +134,18 @@ python3 scripts/paramant-admin.py sync
 
 ### Plans
 
-| Plan | Uploads/day | Max file size | Priority |
-|------|-------------|---------------|----------|
-| `free` | 10 | 20 MB | Low |
-| `pro` | Unlimited | 500 MB | High |
-| `enterprise` | Unlimited | Unlimited | Highest |
+These are **end-user plans** — they control what a `pgp_` API key holder can do.
+Set when you create a key with `--plan`.
+
+| Plan | Uploads/day | Max file size | TTL | Views/blob | Priority |
+|------|-------------|---------------|-----|------------|----------|
+| `free` | 10 | 20 MB | 1 hour | 1 | Low |
+| `pro` | Unlimited | 500 MB | 24 hours | 10 | High |
+| `enterprise` | Unlimited | Unlimited | 7 days | 100 | Highest |
+
+> **Getting a free `pgp_` key on the managed relay:** email
+> [privacy@paramant.app](mailto:privacy@paramant.app?subject=Free+API+key+request)
+> with subject "Free API key request". No account or credit card needed.
 
 ---
 

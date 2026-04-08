@@ -495,6 +495,22 @@ paramant-master/
 
 BUSL-1.1 — see [LICENSE](LICENSE). Change Date: 2029-01-01 → Apache 2.0.
 
+### Who are you?
+
+```
+  ┌─ RELAY OPERATOR ────────────────────────────┐   ┌─ END USER ──────────────────────────────────┐
+  │  You run a relay for your team or customers  │   │  You use a relay to send/receive files      │
+  │                                              │   │                                              │
+  │  Key you receive:  plk_<64 hex>              │   │  Key you receive:  pgp_<64 hex>              │
+  │  Where it goes:    PARAMANT_LICENSE= in .env │   │  Where it goes:    X-Api-Key: header         │
+  │  What it does:     unlocks > 5 users         │   │  What it does:     authenticate API calls    │
+  │                                              │   │                                              │
+  │  Community: free, up to 5 users, no key      │   │  Free: 10 uploads/day, 1-hour TTL, €0        │
+  │  Licensed:  plk_ key → unlimited users       │   │  Pro:  unlimited, webhooks, 24h TTL          │
+  └──────────────────────────────────────────────┘   └──────────────────────────────────────────────┘
+         plk_ keys are for operators · pgp_ keys are for end users · never the same person
+```
+
 ### For relay operators (self-hosting)
 
 | Edition | Users per relay | License key | Price |
@@ -517,9 +533,13 @@ They never interact with `plk_` keys.
 
 | Plan | Features | Price |
 |------|----------|-------|
-| **Free** | 10 uploads/day, 1-hour TTL, 1 view per blob | Free |
-| **Pro** | Unlimited uploads, 24-hour TTL, webhooks, streaming | [paramant.app/pricing](https://paramant.app/pricing) |
-| **Enterprise** | 7-day TTL, SLA, compliance docs, dedicated support | [Contact us](mailto:privacy@paramant.app) |
+| **Free** | 10 uploads/day · 1-hour TTL · 1 view/blob · 20 MB max | Free — [request key](mailto:privacy@paramant.app?subject=Free+API+key+request) |
+| **Pro** | Unlimited uploads · 24-hour TTL · 10 views · webhooks · streaming | [paramant.app/pricing](https://paramant.app/pricing) |
+| **Enterprise** | 7-day TTL · 100 views · SLA · compliance docs · dedicated support | [Contact us](mailto:privacy@paramant.app) |
+
+**Free tier** — send an email to [privacy@paramant.app](mailto:privacy@paramant.app?subject=Free+API+key+request)
+with subject "Free API key request" and you'll receive a `pgp_` key by return mail.
+No account, no credit card, no sign-up form.
 
 **Enterprise** (managed) includes HA clustering, Prometheus/Grafana monitoring,
 SOC 2 audit support, custom data residency, and dedicated support.

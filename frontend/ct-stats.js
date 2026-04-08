@@ -18,3 +18,27 @@ fetch('https://health.paramant.app/health',{signal:AbortSignal.timeout(5000)}).t
   document.getElementById('sdot').style.background='#555';
   document.getElementById('stxt').textContent='Relay status unknown';
 });
+
+// Pricing tab toggle
+window.showTab = function(tab) {
+  var opPane  = document.getElementById('pane-op');
+  var userPane = document.getElementById('pane-user');
+  var opBtn   = document.getElementById('tab-op');
+  var userBtn = document.getElementById('tab-user');
+  if (!opPane || !userPane) return;
+  if (tab === 'op') {
+    opPane.style.display   = '';
+    userPane.style.display = 'none';
+    opBtn.style.background   = '#ededed';
+    opBtn.style.color        = '#111';
+    userBtn.style.background = 'transparent';
+    userBtn.style.color      = '#888';
+  } else {
+    opPane.style.display   = 'none';
+    userPane.style.display = '';
+    userBtn.style.background = '#ededed';
+    userBtn.style.color      = '#111';
+    opBtn.style.background   = 'transparent';
+    opBtn.style.color        = '#888';
+  }
+};
