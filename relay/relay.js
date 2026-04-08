@@ -666,9 +666,7 @@ const server = http.createServer(async (req, res) => {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     const adminOk  = adminTok && adminTok === (process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
-    const base = { ok: true, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
-      uptime_s: Math.floor(process.uptime()), blobs: blobStore.size,
-      ram_ok: ram.ram_ok, available_slots: ram.available_slots, edition: EDITION };
+    const base = { ok: true, version: VERSION, sector: SECTOR };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
@@ -709,8 +707,9 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
   }
   const ctpm0 = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
-  if (ctpm0) {
-    const idx = parseInt(ctpm0[1]);
+  const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
+  if (ctpm0 || (ctpq0 !== null && ctpq0 !== undefined)) {
+    const idx = parseInt(ctpm0 ? ctpm0[1] : ctpq0);
     const entry = ctLog[idx];
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1092,7 +1091,12 @@ const server = http.createServer(async (req, res) => {
       const reqPw = (req.headers['x-blob-password'] || '').trim();
       if (!reqPw) { res.writeHead(401, { 'WWW-Authenticate': 'X-Blob-Password' }); return res.end(J({ error: 'Wachtwoord vereist (X-Blob-Password header)' })); }
       if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id niet beschikbaar' })); }
+      // Guard against Argon2 async race: two concurrent requests could both
+      // read the same entry before the first one deletes it (pentest #1)
+      if (entry._verifying) { res.writeHead(429); return res.end(J({ error: 'Already being retrieved' })); }
+      entry._verifying = true;
       const pwOk = await argon2Lib.verify(entry.pw_hash, reqPw);
+      entry._verifying = false;
       if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
     }
     // Access policies: max_views — decrement, burn wanneer 0
@@ -1113,9 +1117,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': data.length,
-      'X-Paramant-Burned':     burned ? 'true' : 'false',
-      'X-Paramant-Views-Left': String(entry.views_remaining),
-      'X-Paramant-Hash':       outm[1],
+      'X-Paramant-Burned': burned ? 'true' : 'false',
+      'X-Paramant-Hash':   outm[1],
     });
     return res.end(data);
   }

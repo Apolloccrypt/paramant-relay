@@ -179,24 +179,52 @@ async function init() {
     return;
   }
   try {
-    // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
-    $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
-    $('keygen-progress').style.width = '40%';
-        const { publicKey: kyberPub, secretKey: kyberSec } = await new Promise(resolve => setTimeout(() => resolve(ml_kem768.keygen()), 50));
-    myPrivateKey_MLKEM = kyberSec;
+    // Restore keypair from sessionStorage (survives refresh, not tab-close)
+    const storageKey = 'paramant_kp_' + sessionToken;
+    const cached = sessionStorage.getItem(storageKey);
+    let kyberPubHex, ecdhPubHex;
 
-    // Generate ECDH P-256 keypair
-    $('keygen-status').textContent = 'Generating ECDH P-256 keypair...';
-    $('keygen-progress').style.width = '70%';
-    const ecdhPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-    myPrivateKey_ECDH = ecdhPair.privateKey;
-    const ecdhPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ecdhPair.publicKey));
+    if (cached) {
+      $('keygen-status').textContent = 'Restoring keypair...';
+      $('keygen-progress').style.width = '60%';
+      const kp = JSON.parse(cached);
+      kyberPubHex = kp.kyberPubHex;
+      ecdhPubHex  = kp.ecdhPubHex;
+      myPrivateKey_MLKEM = new Uint8Array(kp.kyberSec);
+      myPrivateKey_ECDH = await crypto.subtle.importKey(
+        'jwk', kp.ecdhSecJwk,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false, ['deriveBits']
+      );
+    } else {
+      // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
+      $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
+      $('keygen-progress').style.width = '40%';
+          const { publicKey: kyberPub, secretKey: kyberSec } = await new Promise(resolve => setTimeout(() => resolve(ml_kem768.keygen()), 50));
+      myPrivateKey_MLKEM = kyberSec;
+
+      // Generate ECDH P-256 keypair
+      $('keygen-status').textContent = 'Generating ECDH P-256 keypair...';
+      $('keygen-progress').style.width = '70%';
+      const ecdhPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+      myPrivateKey_ECDH = ecdhPair.privateKey;
+      const ecdhPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', ecdhPair.publicKey));
+
+      kyberPubHex = u8toHex(kyberPub);
+      ecdhPubHex  = u8toHex(ecdhPubRaw);
+
+      // Save to sessionStorage so refresh restores the same keypair
+      const ecdhSecJwk = await crypto.subtle.exportKey('jwk', ecdhPair.privateKey);
+      sessionStorage.setItem(storageKey, JSON.stringify({
+        kyberPubHex, ecdhPubHex,
+        kyberSec: Array.from(kyberSec),
+        ecdhSecJwk
+      }));
+    }
 
     $('keygen-progress').style.width = '100%';
     $('keygen-status').textContent = 'Keypair ready - connecting to relay...';
 
-    const kyberPubHex = u8toHex(kyberPub);
-    const ecdhPubHex  = u8toHex(ecdhPubRaw);
     const fp = await genFingerprint(kyberPubHex, ecdhPubHex);
 
     // Show fingerprint
