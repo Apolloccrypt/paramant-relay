@@ -90,6 +90,7 @@ services:
       - ./deploy/certs:/etc/nginx/certs:ro        # bring your own TLS
     networks:
       - relay-internal
+      - relay-external
     depends_on:
       - relay-health
       - relay-legal
@@ -106,3 +107,5 @@ networks:
   relay-internal:
     driver: bridge
     internal: true   # relays only reachable via nginx
+  relay-external:
+    driver: bridge   # nginx uses this for certbot ACME + upstream DNS
