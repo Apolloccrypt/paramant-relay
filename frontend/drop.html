@@ -801,8 +801,9 @@ function toB64(u8) { let s=''; for(let i=0;i<u8.length;i+=8192) s+=String.fromCh
 function fmtSize(n) { if(n<1024) return n+'B'; if(n<1048576) return (n/1024).toFixed(1)+'KB'; return (n/1048576).toFixed(1)+'MB'; }
 
 async function genFingerprint(kyberHex, ecdhHex) {
-  const data = new TextEncoder().encode(kyberHex + ecdhHex);
-  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+  // Must match ontvang.html: decode hex→bytes first, then hash bytes
+  const buf = hexToU8(kyberHex + (ecdhHex || ''));
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
   const h = u8toHex(hash.slice(0,10)).toUpperCase();
   return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}`;
 }

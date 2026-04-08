@@ -620,7 +620,8 @@ function authByDid(didStr, signature, payload) {
 const ALLOWED_ORIGINS = ['https://paramant.app', 'https://www.paramant.app'];
 function setHeaders(res, req) {
   const origin = req?.headers?.origin || '';
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : 'https://paramant.app';
+  // Reflect any origin — API key is the auth. Allows browser extensions (moz-extension://, chrome-extension://) and self-hosted frontends.
+  const allowOrigin = origin || '*';
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
