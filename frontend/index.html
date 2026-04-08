@@ -134,7 +134,25 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <hr class="divider">
 
-
+<!-- Two-path banner: relay operator vs end user -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
+  <a href="#selfhost" style="display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:var(--bg);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#111'" onmouseout="this.style.background='var(--bg)'">
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Relay operator</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text)">Run your own relay</div>
+      <div style="font-size:11px;color:var(--quiet);margin-top:2px">Community Edition — free forever, up to 5 users, BUSL-1.1</div>
+    </div>
+    <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;white-space:nowrap;margin-left:24px">Self-host ↓</div>
+  </a>
+  <a href="#pricing" style="display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1c1c1c'" onmouseout="this.style.background='var(--surface)'">
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">End user</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text)">Use a managed relay</div>
+      <div style="font-size:11px;color:var(--quiet);margin-top:2px">Free tier — 10 uploads/day, no account, pgp_ API key</div>
+    </div>
+    <div style="font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap;margin-left:24px">Pricing ↓</div>
+  </a>
+</div>
 
 <section id="network" style="max-width:960px;margin:0 auto;padding:64px 48px 0">
   <div class="eyebrow">Live network</div>
