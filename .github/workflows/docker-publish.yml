@@ -50,8 +50,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            paramant/relay:latest
-            ${{ steps.meta.outputs.version != 'latest' && format('paramant/relay:{0}', steps.meta.outputs.version) || '' }}
+            mtty001/relay:latest
+            ${{ steps.meta.outputs.version != 'latest' && format('mtty001/relay:{0}', steps.meta.outputs.version) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
