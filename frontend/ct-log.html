@@ -6,62 +6,98 @@
 <title>PARAMANT — Certificate Transparency Log</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:#0c0c0c; color:#ededed; font-family:'SF Mono','Fira Code',monospace; min-height:100vh; }
+body { background:#0c0c0c; color:#e0e0e0; font-family:'SF Mono','Fira Code',monospace; min-height:100vh; }
 
-nav { display:flex; align-items:center; padding:16px 40px; border-bottom:1px solid #111; }
-nav .logo { font-size:13px; font-weight:700; letter-spacing:.1em; text-decoration:none; color:#ededed; }
-nav a.back { margin-left:auto; font-size:12px; color:#333; text-decoration:none; }
-nav a.back:hover { color:#888; }
+nav { display:flex; align-items:center; padding:16px 40px; border-bottom:1px solid #1e1e1e; }
+nav .logo { font-size:13px; font-weight:700; letter-spacing:.1em; text-decoration:none; color:#e0e0e0; }
+nav a.back { margin-left:auto; font-size:12px; color:#666; text-decoration:none; }
+nav a.back:hover { color:#aaa; }
 
-.hero { padding:60px 40px 40px; max-width:900px; }
-.hero .tag { font-size:10px; color:#333; letter-spacing:.15em; text-transform:uppercase; margin-bottom:16px; }
-.hero h1 { font-size:36px; font-weight:700; line-height:1.2; margin-bottom:16px; }
-.hero h1 span { color:#444; }
-.hero p { font-size:14px; color:#555; line-height:1.7; max-width:560px; }
+.hero { padding:56px 40px 32px; max-width:900px; }
+.hero .tag { font-size:10px; color:#5eead4; letter-spacing:.2em; text-transform:uppercase; margin-bottom:14px; }
+.hero h1 { font-size:32px; font-weight:700; line-height:1.2; margin-bottom:14px; color:#fff; }
+.hero h1 span { color:#888; }
+.hero p { font-size:13px; color:#aaa; line-height:1.8; max-width:580px; }
 
-.stats { display:flex; gap:1px; background:#111; margin:0 40px 40px; border-radius:6px; overflow:hidden; border:1px solid #111; }
-.stat { flex:1; padding:24px; background:#0c0c0c; }
-.stat .val { font-size:28px; font-weight:700; color:#ededed; margin-bottom:4px; }
-.stat .lbl { font-size:10px; color:#333; letter-spacing:.1em; text-transform:uppercase; }
-.stat .val.green { color:#4a4; }
-.stat .val.dim { color:#333; font-size:13px; margin-top:6px; }
+/* RAM notice */
+.notice { margin:0 40px 32px; padding:14px 20px; background:#1a1300; border:1px solid #3d2e00; border-radius:6px;
+  display:flex; align-items:flex-start; gap:14px; }
+.notice .icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+.notice .body { font-size:12px; line-height:1.7; }
+.notice .body strong { color:#f59e0b; display:block; margin-bottom:4px; }
+.notice .body span { color:#999; }
 
-.search-bar { display:flex; gap:0; margin:0 40px 32px; }
-.search-bar input { flex:1; background:#111; border:1px solid #1a1a1a; border-right:none; color:#ededed; padding:12px 16px; font-family:inherit; font-size:12px; outline:none; border-radius:4px 0 0 4px; }
-.search-bar input::placeholder { color:#2a2a2a; }
-.search-bar input:focus { border-color:#2a2a2a; }
-.search-bar button { background:#ededed; color:#0c0c0c; border:none; padding:12px 24px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:.1em; cursor:pointer; border-radius:0 4px 4px 0; }
+.stats { display:flex; gap:1px; background:#1a1a1a; margin:0 40px 32px; border-radius:6px; overflow:hidden; border:1px solid #1a1a1a; }
+.stat { flex:1; padding:20px 24px; background:#0f0f0f; }
+.stat .val { font-size:22px; font-weight:700; color:#e0e0e0; margin-bottom:4px; }
+.stat .lbl { font-size:10px; color:#777; letter-spacing:.1em; text-transform:uppercase; }
+.stat .val.green { color:#5eead4; }
+.stat .val.dim { color:#aaa; font-size:12px; margin-top:4px; word-break:break-all; }
+.stat .val.offline { color:#f87171; }
+
+/* Verify tool */
+.verify-section { margin:0 40px 32px; }
+.verify-section h2 { font-size:12px; color:#888; letter-spacing:.12em; text-transform:uppercase; margin-bottom:12px; }
+.verify-bar { display:flex; gap:0; }
+.verify-bar input { flex:1; background:#111; border:1px solid #222; border-right:none; color:#e0e0e0;
+  padding:12px 16px; font-family:inherit; font-size:12px; outline:none; border-radius:4px 0 0 4px; }
+.verify-bar input::placeholder { color:#555; }
+.verify-bar input:focus { border-color:#5eead4; }
+.verify-bar button { background:#5eead4; color:#0c0c0c; border:none; padding:12px 20px;
+  font-family:inherit; font-size:11px; font-weight:700; letter-spacing:.08em; cursor:pointer;
+  border-radius:0 4px 4px 0; white-space:nowrap; }
+.verify-bar button:hover { background:#7ff0df; }
+.verify-result { margin-top:10px; font-size:12px; display:none; padding:14px 16px; border-radius:6px; }
+.verify-result.found { background:#0a1f1a; border:1px solid #1a3f30; color:#5eead4; }
+.verify-result.notfound { background:#1a0808; border:1px solid #3f1818; color:#f87171; }
+.verify-result pre { margin-top:10px; color:#aaa; font-size:11px; white-space:pre-wrap; word-break:break-all; line-height:1.7; }
+
+.search-bar { display:flex; gap:0; margin:0 40px 28px; }
+.search-bar input { flex:1; background:#111; border:1px solid #222; border-right:none; color:#e0e0e0;
+  padding:12px 16px; font-family:inherit; font-size:12px; outline:none; border-radius:4px 0 0 4px; }
+.search-bar input::placeholder { color:#555; }
+.search-bar input:focus { border-color:#333; }
+.search-bar button { background:#e0e0e0; color:#0c0c0c; border:none; padding:12px 20px;
+  font-family:inherit; font-size:11px; font-weight:700; letter-spacing:.1em; cursor:pointer; border-radius:0 4px 4px 0; }
 .search-bar button:hover { background:#fff; }
 
-.table-wrap { margin:0 40px 40px; border:1px solid #111; border-radius:6px; overflow:hidden; }
-.table-head { display:grid; grid-template-columns:48px 1fr 1fr 1fr 140px; gap:0; background:#111; padding:10px 16px; }
-.table-head span { font-size:10px; color:#333; letter-spacing:.1em; text-transform:uppercase; }
+.table-wrap { margin:0 40px 40px; border:1px solid #1a1a1a; border-radius:6px; overflow:hidden; }
+.table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; background:#111; padding:10px 16px; }
+.table-head span { font-size:10px; color:#666; letter-spacing:.1em; text-transform:uppercase; }
 
-.entry { display:grid; grid-template-columns:48px 1fr 1fr 1fr 140px; gap:0; padding:14px 16px; border-top:1px solid #0f0f0f; cursor:pointer; transition:background .1s; }
-.entry:hover { background:#0f0f0f; }
-.entry .idx { font-size:11px; color:#222; }
-.entry .hash { font-size:11px; color:#555; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.entry .hash.leaf { color:#777; }
-.entry .ts { font-size:11px; color:#2a2a2a; }
+.entry { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:14px 16px;
+  border-top:1px solid #131313; cursor:pointer; transition:background .1s; }
+.entry:hover { background:#111; }
+.entry .idx { font-size:11px; color:#666; }
+.entry .hash { font-size:11px; color:#999; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.entry .hash.leaf { color:#c0c0c0; }
+.entry .ts { font-size:11px; color:#777; }
 
-.entry-detail { display:none; padding:14px 16px 14px 64px; background:#080808; border-top:1px solid #111; font-size:11px; line-height:2.2; }
-.entry-detail .row { display:flex; gap:16px; }
-.entry-detail .key { color:#333; min-width:120px; flex-shrink:0; }
-.entry-detail .val { color:#666; word-break:break-all; }
+.entry-detail { display:none; padding:14px 16px 16px 68px; background:#080808; border-top:1px solid #1a1a1a; }
+.entry-detail .drow { display:flex; gap:16px; padding:4px 0; }
+.entry-detail .dkey { font-size:11px; color:#777; min-width:130px; flex-shrink:0; }
+.entry-detail .dval { font-size:11px; color:#bbb; word-break:break-all; line-height:1.6; }
+.entry-detail .proof-chain { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+.entry-detail .proof-hash { font-size:10px; background:#111; color:#888; padding:3px 8px; border-radius:3px; }
 
-.pagination { display:flex; align-items:center; justify-content:center; gap:16px; padding:24px 40px; border-top:1px solid #0f0f0f; font-size:12px; color:#333; }
-.pagination button { background:transparent; border:1px solid #1a1a1a; color:#555; padding:6px 16px; font-family:inherit; font-size:11px; border-radius:3px; cursor:pointer; }
-.pagination button:hover:not(:disabled) { border-color:#333; color:#ededed; }
+.pagination { display:flex; align-items:center; justify-content:center; gap:16px;
+  padding:20px 40px; border-top:1px solid #131313; font-size:12px; color:#666; }
+.pagination button { background:transparent; border:1px solid #222; color:#888;
+  padding:6px 16px; font-family:inherit; font-size:11px; border-radius:3px; cursor:pointer; }
+.pagination button:hover:not(:disabled) { border-color:#555; color:#e0e0e0; }
 .pagination button:disabled { opacity:.3; cursor:default; }
 
-.loading { text-align:center; padding:60px; color:#222; font-size:12px; letter-spacing:.1em; }
+.loading { text-align:center; padding:60px; color:#555; font-size:12px; letter-spacing:.1em; }
+.empty-state { text-align:center; padding:56px 40px; }
+.empty-state .big { font-size:32px; margin-bottom:16px; }
+.empty-state h3 { font-size:14px; color:#aaa; margin-bottom:10px; }
+.empty-state p { font-size:12px; color:#666; max-width:480px; margin:0 auto; line-height:1.8; }
 
 @media(max-width:700px) {
-  nav { padding:16px 20px; }
-  .hero, .search-bar, .pagination { padding-left:20px; padding-right:20px; }
-  .stats { flex-direction:column; gap:1px; margin:0 20px 40px; }
+  nav, .hero, .search-bar, .pagination, .notice, .verify-section { padding-left:20px; padding-right:20px; }
+  .stats { flex-direction:column; gap:1px; margin:0 20px 32px; }
   .table-wrap { margin:0 20px 40px; }
-  .table-head, .entry { grid-template-columns:36px 1fr 120px; }
+  .table-head, .entry { grid-template-columns:40px 1fr 130px; }
   .table-head span:nth-child(3), .table-head span:nth-child(4),
   .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
 }
@@ -75,33 +111,52 @@ nav a.back:hover { color:#888; }
 </nav>
 
 <div class="hero">
-  <div class="tag">Public Log</div>
+  <div class="tag">Public Audit Log</div>
   <h1>Certificate <span>Transparency</span></h1>
-  <p>Every public key registration is logged in a tamper-evident Merkle tree. Verify that a device is registered without seeing the payload &#8212; analogous to CT logs for HTTPS.</p>
+  <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered — without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
+</div>
+
+<div class="notice" id="persistence-notice">
+  <div class="icon">⚡</div>
+  <div class="body">
+    <strong>Persistent log — survives relay restarts</strong>
+    <span>Entries are written to disk (<code>/data/ct-log.json</code>) on each registration
+    and reloaded on startup. The log resets only when the relay volume is deleted.</span>
+  </div>
 </div>
 
 <div class="stats">
   <div class="stat">
-    <div class="val" id="stat-count">&#8212;</div>
+    <div class="val" id="stat-count">—</div>
     <div class="lbl">Registrations</div>
   </div>
   <div class="stat">
-    <div class="val dim" id="stat-root">&#8212;</div>
+    <div class="val dim" id="stat-root">—</div>
     <div class="lbl">Merkle Root</div>
   </div>
   <div class="stat">
-    <div class="val green" id="stat-relay">&#8212;</div>
+    <div class="val green" id="stat-relay">—</div>
     <div class="lbl">Relay</div>
   </div>
   <div class="stat">
-    <div class="val dim" id="stat-last">&#8212;</div>
+    <div class="val dim" id="stat-last">—</div>
     <div class="lbl">Last Entry</div>
   </div>
 </div>
 
+<!-- Hash Verification Tool -->
+<div class="verify-section">
+  <h2>Verify a hash</h2>
+  <div class="verify-bar">
+    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." oninput="clearVerify()">
+    <button onclick="verifyHash()">VERIFY</button>
+  </div>
+  <div class="verify-result" id="verify-result"></div>
+</div>
+
 <div class="search-bar">
-  <input id="search" placeholder="Search device_hash, leaf_hash, index..." oninput="filterEntries()">
-  <button onclick="filterEntries()">SEARCH</button>
+  <input id="search" placeholder="Filter entries by hash or index..." oninput="filterEntries()">
+  <button onclick="filterEntries()">FILTER</button>
 </div>
 
 <div class="table-wrap">
@@ -112,51 +167,62 @@ nav a.back:hover { color:#888; }
     <span>Device Hash</span>
     <span>Timestamp</span>
   </div>
-  <div id="entries"><div class="loading">Loading...</div></div>
+  <div id="entries"><div class="loading">Loading log…</div></div>
 </div>
 
 <div class="pagination">
   <button id="prev-btn" onclick="changePage(-1)" disabled>&#8592; Prev</button>
-  <span id="page-info">&#8212;</span>
+  <span id="page-info">—</span>
   <button id="next-btn" onclick="changePage(1)" disabled>Next &#8594;</button>
 </div>
 
 <script>
 const RELAY = 'https://health.paramant.app';
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 20;
 let allEntries = [], page = 0, filtered = [];
 
 async function load() {
   try {
     const [ctRes, hRes] = await Promise.all([
-      fetch(RELAY + '/v2/ct/log'),
+      fetch(RELAY + '/v2/ct/log?limit=1000'),
       fetch(RELAY + '/health', {signal: AbortSignal.timeout(4000)}).catch(() => null)
     ]);
     const d = await ctRes.json();
-    allEntries = (d.entries || d.log || []).slice().reverse();
-    filtered = allEntries;
+    allEntries = (d.entries || []).slice().reverse();
+    filtered   = allEntries;
 
-    document.getElementById('stat-count').textContent = allEntries.length;
-    const root = d.root || (allEntries[0] && allEntries[0].tree_hash) || '';
-    document.getElementById('stat-root').textContent = root ? root.slice(0, 16) + '...' : '\u2014';
+    document.getElementById('stat-count').textContent = d.size || allEntries.length;
+    const root = d.root || '';
+    document.getElementById('stat-root').textContent =
+      root && root !== '0'.repeat(64) ? root.slice(0,16)+'…' : '—';
 
     if (hRes && hRes.ok) {
       const h = await hRes.json();
-      document.getElementById('stat-relay').textContent = 'online v' + (h.version || '?');
+      const el = document.getElementById('stat-relay');
+      el.textContent = 'online v' + (h.version || '?');
+      el.className = 'val green';
     } else {
-      document.getElementById('stat-relay').textContent = 'offline';
-      document.getElementById('stat-relay').style.color = '#622';
+      const el = document.getElementById('stat-relay');
+      el.textContent = 'offline';
+      el.className = 'val offline';
     }
 
     if (allEntries.length > 0) {
-      const ts = allEntries[0].ts || allEntries[0].timestamp;
+      const ts = allEntries[0].ts;
       document.getElementById('stat-last').textContent = ts
-        ? new Date(ts).toLocaleString('nl-NL', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'2-digit'})
-        : '\u2014';
+        ? new Date(ts).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
+        : '—';
     }
+
+    // Update notice: check if persistent (file-backed) by seeing if log survived restart
+    if (d.size > 0) {
+      document.getElementById('persistence-notice').style.display = '';
+    }
+
     render();
   } catch(e) {
-    document.getElementById('entries').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+    document.getElementById('entries').innerHTML =
+      '<div class="loading">Error loading log: ' + e.message + '</div>';
   }
 }
 
@@ -166,62 +232,70 @@ function render() {
   const total = filtered.length;
 
   document.getElementById('page-info').textContent =
-    total === 0 ? 'no results' : (start + 1) + '\u2013' + Math.min(start + PAGE_SIZE, total) + ' of ' + total;
+    total === 0 ? 'no results' : (start+1) + '–' + Math.min(start+PAGE_SIZE, total) + ' of ' + total;
   document.getElementById('prev-btn').disabled = page === 0;
   document.getElementById('next-btn').disabled = start + PAGE_SIZE >= total;
 
   if (slice.length === 0) {
-    document.getElementById('entries').innerHTML = '<div class="loading">No results</div>';
+    document.getElementById('entries').innerHTML =
+      '<div class="empty-state">'
+      + '<div class="big">📋</div>'
+      + '<h3>' + (allEntries.length === 0 ? 'Log is empty' : 'No results') + '</h3>'
+      + '<p>' + (allEntries.length === 0
+          ? 'No public key registrations yet. The CT log records every device registration as an immutable entry. Entries appear here in real time.'
+          : 'No entries match your filter.')
+      + '</p></div>';
     return;
   }
 
   document.getElementById('entries').innerHTML = slice.map(function(e, i) {
-    var globalIdx = start + i;
-    var idx = (e.index !== undefined && e.index !== null) ? e.index : (filtered.length - 1 - globalIdx);
-    var ts = e.ts || e.timestamp;
+    var gi  = start + i;
+    var idx = e.index !== undefined ? e.index : (filtered.length - 1 - gi);
+    var ts  = e.ts;
     var time = ts
-      ? new Date(ts).toLocaleString('nl-NL', {hour:'2-digit', minute:'2-digit', second:'2-digit'})
-      : '\u2014';
-    var leaf   = ((e.leaf_hash   || e.hash        || '').slice(0, 20)) + '...';
-    var tree   = ((e.tree_hash   || e.merkle_root || '').slice(0, 20)) + '...';
-    var device = ((e.device_hash || e.pubkey_hash || '').slice(0, 20)) + '...';
-    var proof  = (e.proof && e.proof.length)
-      ? '<div class="row"><span class="key">Merkle proof</span><span class="val">' + e.proof.map(function(h){return h.slice(0,20)+'...';}).join(' &rarr; ') + '</span></div>'
-      : '';
-    return '<div class="entry" onclick="toggleDetail(' + globalIdx + ')">'
-      + '<div class="idx">' + idx + '</div>'
-      + '<div class="hash leaf">' + leaf + '</div>'
-      + '<div class="hash">' + tree + '</div>'
-      + '<div class="hash">' + device + '</div>'
-      + '<div class="ts">' + time + '</div>'
+      ? new Date(ts).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
+      : '—';
+    var leaf   = trunc(e.leaf_hash   || e.hash || '');
+    var tree   = trunc(e.tree_hash   || e.merkle_root || '');
+    var device = trunc(e.device_hash || e.pubkey_hash  || '');
+    var proofHtml = '';
+    if (e.proof && e.proof.length) {
+      proofHtml = '<div class="drow"><span class="dkey">Merkle proof</span>'
+        + '<span class="dval"><div class="proof-chain">'
+        + e.proof.map(function(h){return '<span class="proof-hash">'+h.slice(0,16)+'…</span>';}).join('')
+        + '</div></span></div>';
+    }
+    return '<div class="entry" onclick="toggle('+gi+')">'
+      + '<div class="idx">'+idx+'</div>'
+      + '<div class="hash leaf">'+leaf+'</div>'
+      + '<div class="hash">'+tree+'</div>'
+      + '<div class="hash">'+device+'</div>'
+      + '<div class="ts">'+time+'</div>'
       + '</div>'
-      + '<div class="entry-detail" id="detail-' + globalIdx + '">'
-      + '<div class="row"><span class="key">Leaf hash</span><span class="val">' + (e.leaf_hash || e.hash || '\u2014') + '</span></div>'
-      + '<div class="row"><span class="key">Tree hash</span><span class="val">' + (e.tree_hash || e.merkle_root || '\u2014') + '</span></div>'
-      + '<div class="row"><span class="key">Device hash</span><span class="val">' + (e.device_hash || e.pubkey_hash || '\u2014') + '</span></div>'
-      + '<div class="row"><span class="key">Index</span><span class="val">' + idx + '</span></div>'
-      + '<div class="row"><span class="key">Timestamp</span><span class="val">' + (ts ? new Date(ts).toISOString() : '\u2014') + '</span></div>'
-      + proof
+      + '<div class="entry-detail" id="d-'+gi+'">'
+      + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+(e.leaf_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+(e.tree_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+(e.device_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+idx+'</span></div>'
+      + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? new Date(ts).toISOString() : '—')+'</span></div>'
+      + proofHtml
       + '</div>';
   }).join('');
 }
 
-function toggleDetail(i) {
-  var el = document.getElementById('detail-' + i);
+function trunc(h) { return h ? h.slice(0,20)+'…' : '—'; }
+
+function toggle(i) {
+  var el = document.getElementById('d-'+i);
   if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
 }
 
 function filterEntries() {
   var q = document.getElementById('search').value.trim().toLowerCase();
-  filtered = q
-    ? allEntries.filter(function(e) {
-        return (e.leaf_hash   || '').includes(q)
-            || (e.tree_hash   || '').includes(q)
-            || (e.device_hash || '').includes(q)
-            || (e.hash        || '').includes(q)
-            || String(e.index || '').includes(q);
-      })
-    : allEntries;
+  filtered = q ? allEntries.filter(function(e) {
+    return (e.leaf_hash||'').includes(q) || (e.tree_hash||'').includes(q)
+        || (e.device_hash||'').includes(q) || String(e.index||'').includes(q);
+  }) : allEntries;
   page = 0;
   render();
 }
@@ -230,6 +304,44 @@ function changePage(dir) {
   page = Math.max(0, page + dir);
   render();
   window.scrollTo(0, 0);
+}
+
+function clearVerify() {
+  document.getElementById('verify-result').style.display = 'none';
+}
+
+function verifyHash() {
+  var q = document.getElementById('verify-input').value.trim().toLowerCase();
+  var el = document.getElementById('verify-result');
+  if (!q || q.length < 8) { el.style.display='none'; return; }
+
+  var match = allEntries.find(function(e) {
+    return (e.leaf_hash||'').startsWith(q) || (e.device_hash||'').startsWith(q)
+        || (e.tree_hash||'').startsWith(q);
+  });
+
+  el.style.display = 'block';
+  if (!match) {
+    el.className = 'verify-result notfound';
+    el.innerHTML = '<strong>✗ Not found in log</strong><br>'
+      + '<span style="color:#999;font-size:11px">This hash has no matching entry in the current log window. '
+      + 'If the log was recently reset, older entries may no longer be present.</span>';
+    return;
+  }
+
+  el.className = 'verify-result found';
+  var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
+             : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
+  el.innerHTML = '<strong>✓ Verified — found at index ' + match.index + '</strong>'
+    + '<pre>'
+    + 'Matched field : ' + field + '\n'
+    + 'Index         : ' + match.index + '\n'
+    + 'Leaf hash     : ' + (match.leaf_hash||'—') + '\n'
+    + 'Tree hash     : ' + (match.tree_hash||'—') + '\n'
+    + 'Device hash   : ' + (match.device_hash||'—') + '\n'
+    + 'Timestamp     : ' + (match.ts ? new Date(match.ts).toISOString() : '—') + '\n'
+    + (match.proof && match.proof.length ? 'Merkle proof  : ' + match.proof.join(' → ') : '')
+    + '</pre>';
 }
 
 load();
