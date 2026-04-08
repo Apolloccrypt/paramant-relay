@@ -297,10 +297,10 @@ async function init() {
             if (parts[0] === 'vault') {
               // Vault mode: meerdere bestanden
               const vaultFiles = JSON.parse(d.ecdh_pub);
-              await receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPair.privateKey);
+              await receiveVault(vaultFiles, ttl_ms, myPrivateKey_MLKEM, myPrivateKey_ECDH);
             } else {
               // Enkelvoudig bestand
-              await receiveFile({ tokens: d.ecdh_pub, file_name: parts[0], total_chunks: parseInt(parts[1]) || 1, ttl_ms }, kyberSec, ecdhPair.privateKey);
+              await receiveFile({ tokens: d.ecdh_pub, file_name: parts[0], total_chunks: parseInt(parts[1]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH);
             }
           }
         }
