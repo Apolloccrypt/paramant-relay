@@ -198,22 +198,31 @@ def cmd_revoke(args):
         print(f'\n{Y}Voer "paramant-admin.py sync" uit om relays te herladen.{E}')
 
 def cmd_sync(args):
-    """Herstart alle sector systemd services zodat de gewijzigde users.json ingeladen wordt."""
-    import subprocess
+    """Herlaad API keys in alle sector relays zonder downtime via /v2/reload-users."""
+    import urllib.request, urllib.error
+    admin_token = os.environ.get('ADMIN_TOKEN', '')
+    if not admin_token:
+        err('ADMIN_TOKEN niet ingesteld — export ADMIN_TOKEN=<token>')
+        sys.exit(1)
     sectors = [args.sector] if args.sector else list(SECTORS.keys())
     for sector in sectors:
-        svc = f'paramant-relay-{sector}'
+        base = RELAY_URLS.get(sector, '')
+        if not base:
+            warn(f'Geen URL voor sector {sector}, overgeslagen')
+            continue
+        url = f'{base}/v2/reload-users'
+        req = urllib.request.Request(url, method='POST',
+                                     data=b'{}',
+                                     headers={'X-Api-Key': admin_token,
+                                              'Content-Type': 'application/json'})
         try:
-            result = subprocess.run(['systemctl', 'restart', svc],
-                                    capture_output=True, text=True, timeout=15)
-            if result.returncode == 0:
-                ok(f'{svc} herstart')
-            else:
-                err(f'{svc}: {result.stderr.strip()}')
-        except FileNotFoundError:
-            warn(f'systemctl niet beschikbaar (lokaal?) — sla {svc} over')
-        except subprocess.TimeoutExpired:
-            err(f'{svc}: timeout bij herstarten')
+            resp = json.loads(urllib.request.urlopen(req, timeout=10).read())
+            ok(f'{sector}: {resp.get("loaded", "?")} keys geladen')
+        except urllib.error.HTTPError as e:
+            body = e.read().decode()
+            err(f'{sector}: HTTP {e.code} — {body}')
+        except Exception as e:
+            err(f'{sector}: {e}')
 
 def cmd_check(args):
     if not args.key:
