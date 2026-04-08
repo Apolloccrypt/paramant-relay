@@ -1,0 +1,15 @@
+{
+  "name": "paramant-relay",
+  "version": "5.0.0",
+  "main": "relay.js",
+  "scripts": {
+    "start": "node relay.js"
+  },
+  "dependencies": {
+    "@noble/post-quantum": "^0.6.0",
+    "argon2": "^0.44.0",
+    "bip39": "^3.1.0",
+    "nats": "^2.29.3",
+    "ws": "^8.20.0"
+  }
+}
