@@ -431,16 +431,7 @@ function checkTeamRateLimit(teamId, limit) {
   if (b.count >= limit) return false;
   b.count++; teamRateLimits.set(teamId, b); return true;
 }
-const freeRateLimits = new Map();       // key → { count, date }  — inbound uploads
 const freePubkeyRateLimits = new Map(); // key → { count, date }  — pubkey registrations
-function checkFreeRateLimit(apiKey) {
-  const LIMIT = 10;
-  const today = new Date().toISOString().slice(0,10);
-  const b = freeRateLimits.get(apiKey) || { count: 0, date: today };
-  if (b.date !== today) { b.count = 0; b.date = today; }
-  if (b.count >= LIMIT) return false;
-  b.count++; freeRateLimits.set(apiKey, b); return true;
-}
 function checkFreePubkeyRateLimit(apiKey) {
   const LIMIT = 20;
   const today = new Date().toISOString().slice(0,10);
@@ -552,13 +543,9 @@ function loadUsers() {
   } catch(e) { log('warn', 'no_users_file'); }
 }
 
-// TTL flush
+// TTL flush — clean pubkey rate limit map hourly
 setInterval(() => {
-  // Clean freeRateLimits entries older than yesterday
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
-  for (const [k, v] of freeRateLimits.entries()) {
-    if (v.date < yesterday) freeRateLimits.delete(k);
-  }
   for (const [k, v] of freePubkeyRateLimits.entries()) {
     if (v.date < yesterday) freePubkeyRateLimits.delete(k);
   }
@@ -1107,8 +1094,12 @@ const server = http.createServer(async (req, res) => {
       // read the same entry before the first one deletes it (pentest #1)
       if (entry._verifying) { res.writeHead(429); return res.end(J({ error: 'Already being retrieved' })); }
       entry._verifying = true;
-      const pwOk = await argon2Lib.verify(entry.pw_hash, reqPw);
-      entry._verifying = false;
+      let pwOk = false;
+      try {
+        pwOk = await argon2Lib.verify(entry.pw_hash, reqPw);
+      } finally {
+        entry._verifying = false; // always reset — prevents permanent lock if verify() throws
+      }
       if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
     }
     // Access policies: max_views — decrement, burn wanneer 0
@@ -1139,9 +1130,9 @@ const server = http.createServer(async (req, res) => {
   const stm = path.match(/^\/v2\/status\/([a-f0-9]{64})$/);
   if (stm && req.method === 'GET') {
     const e = blobStore.get(stm[1]);
+    if (!e) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ available: false })); }
+    if (e.apiKey && e.apiKey !== apiKey) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Forbidden' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    if (!e) return res.end(J({ available: false }));
-    if (e.apiKey && e.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     return res.end(J({ available: true, bytes: e.size, ttl_remaining_ms: Math.max(0, e.ttl - (Date.now() - e.ts)), sig_valid: e.sig_valid }));
   }
 
