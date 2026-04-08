@@ -879,7 +879,11 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size }));
   }
 
-  if (!keyData?.active) {
+  // Allow ADMIN_TOKEN (via X-Api-Key or X-Admin-Token) to reach admin endpoints
+  const adminTokenHeader = (req.headers['x-admin-token'] || '').trim();
+  const isAdminTokenKey = (apiKey.length > 0 && apiKey === (process.env.ADMIN_TOKEN || '')) ||
+                          (adminTokenHeader.length > 0 && adminTokenHeader === (process.env.ADMIN_TOKEN || ''));
+  if (!keyData?.active && !isAdminTokenKey) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
