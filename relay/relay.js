@@ -483,8 +483,8 @@ function hkdf(ikm, salt, info, length) {
 
 // Leid relay lookup-hash af van BIP39 mnemonic (zelfde als Python SDK)
 function mnemonicToLookupHash(phrase) {
-  if (!bip39Lib) throw new Error('bip39 niet beschikbaar (npm install bip39)');
-  if (!bip39Lib.validateMnemonic(phrase)) throw new Error('Ongeldige BIP39 mnemonic (checksum fout)');
+  if (!bip39Lib) throw new Error('bip39 not available (npm install bip39)');
+  if (!bip39Lib.validateMnemonic(phrase)) throw new Error('Invalid BIP39 mnemonic (checksum error)');
   const entropy = Buffer.from(bip39Lib.mnemonicToEntropy(phrase), 'hex');
   const idBytes = hkdf(entropy, 'paramant-drop-v1', 'lookup-id', 32);
   const hash    = crypto.createHash('sha3-256').update(idBytes).digest('hex');
@@ -1048,12 +1048,12 @@ const server = http.createServer(async (req, res) => {
       const _plan = keyData?.plan || 'dev';
       const _maxTtl = _planMaxTtl[_plan] || _planMaxTtl.dev;
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
-      // Access policies: max_views (default 1 = burn-on-read) + Argon2id wachtwoord
+      // Access policies: max_views (default 1 = burn-on-read) + Argon2id password
       const _planMaxViews = { free: 1, pro: 10, enterprise: 100 };
       const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, _planMaxViews[keyData?.plan || 'free'] || 1));
       let pw_hash = null;
       if (password) {
-        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id niet beschikbaar op deze relay' })); }
+        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
         pw_hash = await argon2Lib.hash(password, { type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
       }
       blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
@@ -1110,11 +1110,11 @@ const server = http.createServer(async (req, res) => {
     const entry = blobStore.get(outm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
-    // Argon2id wachtwoord verificatie (indien ingesteld)
+    // Argon2id password verification (if set)
     if (entry.pw_hash) {
       const reqPw = (req.headers['x-blob-password'] || '').trim();
-      if (!reqPw) { res.writeHead(401, { 'WWW-Authenticate': 'X-Blob-Password' }); return res.end(J({ error: 'Wachtwoord vereist (X-Blob-Password header)' })); }
-      if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id niet beschikbaar' })); }
+      if (!reqPw) { res.writeHead(401, { 'WWW-Authenticate': 'X-Blob-Password' }); return res.end(J({ error: 'Password required (X-Blob-Password header)' })); }
+      if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id not available' })); }
       // Guard against Argon2 async race: two concurrent requests could both
       // read the same entry before the first one deletes it (pentest #1)
       if (entry._verifying) { res.writeHead(429); return res.end(J({ error: 'Already being retrieved' })); }
@@ -1129,7 +1129,7 @@ const server = http.createServer(async (req, res) => {
         entry._verifying = false;
         res.writeHead(500); return res.end(J({ error: 'Password verification failed' }));
       }
-      if (!pwOk) { entry._verifying = false; res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
+      if (!pwOk) { entry._verifying = false; res.writeHead(403); return res.end(J({ error: 'Incorrect password' })); }
     }
     // Access policies: max_views — decrement, burn wanneer 0
     entry.views_remaining = (entry.views_remaining ?? 1) - 1;
@@ -1461,7 +1461,7 @@ python3 paramant-receiver.py \\
   if (path === '/v2/monitor') {
     const kd = apiKeys.get(apiKey);
     if (!kd || !kd.active) {
-      res.writeHead(401); return res.end(J({ error: 'Geldige x-api-key vereist' }));
+      res.writeHead(401); return res.end(J({ error: 'Valid X-Api-Key required' }));
     }
     const total      = stats.inbound;
     const acked      = stats.outbound;
@@ -1503,10 +1503,10 @@ python3 paramant-receiver.py \\
       if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(MAX_BLOB/1048576)}MB` })); }
       const _planDropTtl = { free: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
       const ttl = Math.min(parseInt(ttl_ms || 3_600_000) || 3_600_000, _planDropTtl[keyData?.plan || 'free']);
-      // Argon2id wachtwoordbeveiliging
+      // Argon2id password protection
       let pw_hash = null;
       if (password) {
-        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id niet beschikbaar op deze relay' })); }
+        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
         pw_hash = await argon2Lib.hash(password, {
           type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1,
         });
@@ -1538,14 +1538,14 @@ python3 paramant-receiver.py \\
       catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
       const entry = blobStore.get(lookupHash);
       if (!entry) {
-        res.writeHead(404); return res.end(J({ error: 'Drop niet gevonden. Verlopen, al opgehaald, of ongeldige mnemonic.' }));
+        res.writeHead(404); return res.end(J({ error: 'Drop not found. Expired, already retrieved, or invalid mnemonic.' }));
       }
-      // Argon2id wachtwoord verificatie
+      // Argon2id password verification
       if (entry.pw_hash) {
-        if (!password) { res.writeHead(401); return res.end(J({ error: 'Wachtwoord vereist (password veld)' })); }
-        if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id niet beschikbaar' })); }
+        if (!password) { res.writeHead(401); return res.end(J({ error: 'Password required (password field)' })); }
+        if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id not available' })); }
         const pwOk = await argon2Lib.verify(entry.pw_hash, password);
-        if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
+        if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Incorrect password' })); }
       }
       // Burn-on-read
       const data = Buffer.from(entry.blob);

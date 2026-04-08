@@ -212,7 +212,7 @@ def cmd_sync(args):
         try:
             resp = json.loads(urllib.request.urlopen(req, timeout=6).read())
             if resp.get('ok'):
-                ok(f'{sector}: {resp.get("keys_loaded", "?")} keys geladen (zero downtime)')
+                ok(f'{sector}: {resp.get("keys_loaded", "?")} keys loaded (zero downtime)')
             else:
                 err(f'{sector}: {resp}')
         except Exception as e:
@@ -390,7 +390,7 @@ def main():
     pr.add_argument('--sector', choices=list(SECTORS.keys()), help='Alleen deze sector (default: alle)')
 
     # sync
-    ps = sub.add_parser('sync', help='Herstart relays zodat users.json opnieuw ingeladen wordt')
+    ps = sub.add_parser('sync', help='Reload users.json across all relay sectors (zero downtime)')
     ps.add_argument('--sector', choices=list(SECTORS.keys()), help='Specifieke sector')
 
     # check
