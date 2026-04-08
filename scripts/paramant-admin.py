@@ -50,7 +50,7 @@ data  = gp.receive(hash_)</pre>
   <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 &middot; Burn-on-read &middot; EU/DE &middot; BUSL-1.1</p>
 </div>'''
     body = json.dumps({
-        'from':    'PARAMANT <hello@paramant.app>',
+        'from':    'PARAMANT <privacy@paramant.app>',
         'to':      [to_email],
         'subject': 'Your PARAMANT API key',
         'html':    html,

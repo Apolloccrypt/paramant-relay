@@ -323,7 +323,7 @@ curl -sk https://localhost/health | python3 -m json.tool
 - **Docs:** paramant.app/docs
 - **GitHub:** github.com/Apolloccrypt/paramant-relay
 - **Issues:** github.com/Apolloccrypt/paramant-relay/issues
-- **Email:** hello@paramant.app
+- **Email:** privacy@paramant.app
 
 Community Edition support is community-only (GitHub Issues).  
 Pro license includes email support.
