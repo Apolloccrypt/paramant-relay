@@ -28,8 +28,13 @@ check_port() {
         echo "   2) Stop $proc manually, then re-run"
         echo "   3) Skip (may cause startup failure)"
         echo ""
-        read -p "   Choose [1/2/3]: " choice
-        case $choice in
+        if [ -t 0 ]; then
+            read -p "   Choose [1/2/3]: " choice
+        else
+            choice=1
+            echo "   (non-interactive: auto-selecting option 1)"
+        fi
+        case ${choice:-1} in
             1)
                 local alt_http=8080
                 local alt_https=8443
@@ -103,9 +108,13 @@ if [ -n "$DISK_SWAP" ]; then
     echo ""
     read -p "   Disable disk swap now? [Y/n]: " disable_swap
     if [[ ! "$disable_swap" =~ ^[Nn]$ ]]; then
-        sudo swapoff -a
-        sudo sed -i '/swap/d' /etc/fstab
-        echo -e "${GREEN}✓  Disk swap disabled${NC}"
+        if sudo swapoff -a 2>/dev/null && sudo sed -i '/swap/d' /etc/fstab 2>/dev/null; then
+            echo -e "${GREEN}✓  Disk swap disabled${NC}"
+        else
+            echo -e "${YELLOW}⚠  Could not disable swap (sudo required)${NC}"
+            echo -e "${YELLOW}   Run manually: sudo swapoff -a && sudo sed -i '/swap/d' /etc/fstab${NC}"
+            ISSUES=$((ISSUES + 1))
+        fi
     else
         echo -e "${YELLOW}   Warning: RAM blobs may be paged to disk${NC}"
         ISSUES=$((ISSUES + 1))
@@ -124,7 +133,12 @@ if [ -f .env ] && grep -q "^ADMIN_TOKEN=.\+" .env; then
 else
     echo -e "${YELLOW}⚠  ADMIN_TOKEN not set${NC}"
     echo ""
-    read -p "   Generate a secure ADMIN_TOKEN now? [Y/n]: " gen_token
+    if [ -t 0 ]; then
+        read -p "   Generate a secure ADMIN_TOKEN now? [Y/n]: " gen_token
+    else
+        gen_token="y"
+        echo "   (non-interactive: auto-generating token)"
+    fi
     if [[ ! "$gen_token" =~ ^[Nn]$ ]]; then
         TOKEN=$(openssl rand -hex 32)
         if [ ! -f .env ]; then
