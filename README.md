@@ -302,23 +302,22 @@ PARAMANT relays are self-hostable. You can run a single relay or all four sector
 git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 
-cp .env.example .env
-# Required: set ADMIN_TOKEN (openssl rand -hex 32)
-nano .env
+# Step 1 — interactive preflight: detects port conflicts, generates ADMIN_TOKEN
+bash scripts/preflight.sh
 
-# Add your TLS certs (or use a self-signed cert for local testing)
-mkdir -p deploy/certs
-# copy cert.pem and key.pem to deploy/certs/
-
+# Step 2 — start the stack
 docker compose up -d
+
+# Step 3 — verify all sectors are live + get next-steps guide
+bash scripts/post-install.sh
 ```
 
-All four sector relays start behind nginx. Test with:
+The preflight handles port conflicts automatically (e.g. if 80/443 are taken by Caddy
+or nginx, it picks alternate ports and saves them to `.env`). `post-install.sh` reads
+the actual running ports, tests all four sectors, and shows how to create your first API key.
 
-```bash
-curl https://health.localhost/health
-# {"ok":true,"version":"2.2.0","sector":"health",...}
-```
+Self-signed TLS is generated automatically on first start. For Let's Encrypt, see
+[`docs/self-hosting.md`](docs/self-hosting.md).
 
 Add API keys without restarting:
 
