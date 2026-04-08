@@ -19,8 +19,7 @@ check_port() {
     local port=$1
     local var=$2
     if ss -tlnp 2>/dev/null | awk '{print $4}' | grep -q ":${port}$"; then
-        local proc=$(ss -tlnp 2>/dev/null | grep ":${port} " | \
-            grep -oP 'users:\(\("\K[^"]+' | head -1)
+        local proc=$(ss -tlnp 2>/dev/null | grep ":${port}[^0-9]" | sed 's/.*users:(("//;s/".*//' | head -1)
         echo -e "${YELLOW}⚠  Port ${port} is in use${proc:+ by $proc}${NC}"
         echo ""
         echo "   Options:"
