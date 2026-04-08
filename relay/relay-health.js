@@ -603,6 +603,22 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, file_name: td.file_name, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
   }
 
+  // ── POST /v2/reload-users — Zero-downtime API key reload ─────────────────
+  if (path === '/v2/reload-users' && req.method === 'POST') {
+    const tok = (req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ','')||'').trim();
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
+      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
+    }
+    if (process.env.USERS_JSON) {
+      res.writeHead(400); return res.end(J({ error: 'USERS_JSON env in gebruik — bestand reload niet van toepassing' }));
+    }
+    const prevCount = apiKeys.size;
+    apiKeys.clear();
+    loadUsers();
+    log('info', 'reload_users', { prev: prevCount, now: apiKeys.size });
+    res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size }));
+  }
+
   if (!keyData?.active) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
