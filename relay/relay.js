@@ -246,6 +246,89 @@ function verifyTotp(token) {
 // ── Download tokens — one-time public download links
 const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 
+// Known link-preview bots — serve safe HTML placeholder, never trigger burn
+const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
+
+function _dlConfirmPage(token, fileName, sizeStr, ttlStr) {
+  const name = fileName ? fileName.replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'Unnamed file';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Secure File Ready</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e0e0e0;font-family:'SF Mono',monospace;display:flex;
+  align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#161616;border:1px solid #2a2a2a;border-radius:12px;
+  max-width:440px;width:100%;padding:36px 32px}
+.logo{color:#5eead4;font-size:.75rem;letter-spacing:.15em;text-transform:uppercase;
+  margin-bottom:28px}
+h1{font-size:1.1rem;font-weight:600;margin-bottom:8px}
+.sub{color:#888;font-size:.82rem;margin-bottom:28px}
+.meta{background:#1e1e1e;border-radius:8px;padding:16px;margin-bottom:24px;
+  font-size:.82rem;display:grid;gap:8px}
+.meta-row{display:flex;justify-content:space-between;align-items:center}
+.meta-label{color:#666}
+.meta-val{color:#e0e0e0;text-align:right;max-width:60%;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.warn{color:#f59e0b;font-size:.78rem;margin-bottom:24px;
+  padding:10px 14px;background:#1c1700;border-radius:6px;border-left:3px solid #f59e0b}
+.btn{display:block;width:100%;padding:14px;background:#5eead4;color:#0d0d0d;
+  border:none;border-radius:8px;font-family:inherit;font-size:.9rem;font-weight:700;
+  cursor:pointer;text-align:center;text-decoration:none;letter-spacing:.03em;
+  transition:opacity .15s}
+.btn:hover{opacity:.88}
+.footer{margin-top:20px;font-size:.72rem;color:#444;text-align:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">PARAMANT · Post-Quantum Secure Transfer</div>
+  <h1>Secure file ready for download</h1>
+  <p class="sub">End-to-end encrypted · Burns after reading</p>
+  <div class="meta">
+    <div class="meta-row"><span class="meta-label">File</span><span class="meta-val">${name}</span></div>
+    <div class="meta-row"><span class="meta-label">Size</span><span class="meta-val">${sizeStr}</span></div>
+    <div class="meta-row"><span class="meta-label">Expires in</span><span class="meta-val">${ttlStr}</span></div>
+  </div>
+  <p class="warn">⚠ This file is deleted from the server immediately after download. You get one chance.</p>
+  <a class="btn" href="/v2/dl/${token}/get">Download &amp; Burn</a>
+  <p class="footer">ML-KEM-768 encrypted · Zero plaintext stored · PARAMANT</p>
+</div>
+</body></html>`;
+}
+
+function _dlBurnedPage(msg) {
+  const safe = msg.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — File Burned</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e0e0e0;font-family:'SF Mono',monospace;display:flex;
+  align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#161616;border:1px solid #2a2a2a;border-radius:12px;
+  max-width:440px;width:100%;padding:36px 32px;text-align:center}
+.icon{font-size:2.5rem;margin-bottom:16px}
+h1{font-size:1rem;font-weight:600;margin-bottom:8px;color:#f87171}
+p{color:#666;font-size:.82rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">🔥</div>
+  <h1>${safe}</h1>
+  <p>Burn-on-read: the file no longer exists on this server.</p>
+</div>
+</body></html>`;
+}
+
 // Cleanup expired tokens elke 60s
 setInterval(() => {
   const now = Date.now();
@@ -624,27 +707,67 @@ const server = http.createServer(async (req, res) => {
     return res.end(J(entry.doc));
   }
 
-  // ── GET /v2/dl/:token — publieke one-time download (geen API key) ───────
+  // ── GET /v2/dl/:token — two-step: HTML confirm page (safe for link preloaders)
   const dlm = path.match(/^\/v2\/dl\/([a-f0-9]{48})$/);
   if (dlm && req.method === 'GET') {
     const token = dlm[1];
-    const td = downloadTokens.get(token);
-    if (!td) {
-      res.writeHead(404); return res.end(J({ error: 'Link not found or already used' }));
+    const ua = req.headers['user-agent'] || '';
+    // Known preload bots get a safe placeholder — never trigger burn
+    if (PRELOAD_BOTS.test(ua)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>PARAMANT — Secure File</title>
+<meta name="description" content="A secure encrypted file is waiting for you.">
+<meta property="og:title" content="PARAMANT — Secure File Transfer">
+<meta property="og:description" content="End-to-end encrypted · Burns after reading · ML-KEM-768">
+</head><body>Open this link in your browser to download the secure file.</body></html>`);
     }
-    if (td.used) {
-      res.writeHead(410); return res.end(J({ error: 'This link has already been used' }));
+    const td = downloadTokens.get(token);
+    if (!td || td.used) {
+      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage(td?.used ? 'This file has already been downloaded and burned' : 'Link not found or already used'));
     }
     if (Date.now() > td.expires_ms) {
       downloadTokens.delete(token);
-      res.writeHead(410); return res.end(J({ error: 'Link expired' }));
+      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage('Link expired'));
+    }
+    const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
+    const ttlStr = ttl_left > 3600 ? `${Math.round(ttl_left/3600)}h` : ttl_left > 60 ? `${Math.round(ttl_left/60)}m` : `${ttl_left}s`;
+    const sizeStr = td.file_size ? (td.file_size > 1048576 ? `${(td.file_size/1048576).toFixed(1)} MB` : td.file_size > 1024 ? `${(td.file_size/1024).toFixed(1)} KB` : `${td.file_size} B`) : 'Unknown';
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(_dlConfirmPage(token, td.file_name, sizeStr, ttlStr));
+  }
+
+  // ── GET /v2/dl/:token/get — actual burn + download (human must click confirm)
+  const dlgm = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/get$/);
+  if (dlgm && req.method === 'GET') {
+    const token = dlgm[1];
+    const ua = req.headers['user-agent'] || '';
+    if (PRELOAD_BOTS.test(ua)) {
+      res.writeHead(403); return res.end(J({ error: 'Automated clients not permitted' }));
+    }
+    const td = downloadTokens.get(token);
+    if (!td) {
+      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage('Link not found or already used'));
+    }
+    if (td.used) {
+      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage('This file has already been downloaded and burned'));
+    }
+    if (Date.now() > td.expires_ms) {
+      downloadTokens.delete(token);
+      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage('Link expired'));
     }
     const entry = blobStore.get(td.hash);
     if (!entry) {
       downloadTokens.delete(token);
-      res.writeHead(404); return res.end(J({ error: 'File not found — already burned' }));
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage('File not found — already burned'));
     }
-    // Mark als gebruikt VOOR het sturen (burn-on-read)
+    // Mark as used BEFORE sending (burn-on-read)
     td.used = true;
     const data = Buffer.from(entry.blob);
     blobStore.delete(td.hash);
@@ -658,6 +781,7 @@ const server = http.createServer(async (req, res) => {
         const enc  = encodeURIComponent(td.file_name);
         return `attachment; filename="${safe}"; filename*=UTF-8''${enc}`;
       })(),
+      'Cache-Control': 'no-store',
       'X-Burned': 'true',
       'X-Hash': td.hash,
     });
