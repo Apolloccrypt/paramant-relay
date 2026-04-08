@@ -1,0 +1,43 @@
+name: Release ParaShare FileLink
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "thunderbird-filelink/**"
+
+permissions:
+  contents: write
+
+jobs:
+  package-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from manifest.json
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' thunderbird-filelink/manifest.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package .xpi
+        run: |
+          cd thunderbird-filelink
+          zip -r ../parashare-filelink.xpi . \
+            -x "README.md"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "filelink-v${{ steps.version.outputs.version }}"
+          name: "ParaShare FileLink v${{ steps.version.outputs.version }}"
+          body: |
+            Automated release of the ParaShare FileLink Thunderbird extension.
+
+            **Install:** Thunderbird → Add-ons and Themes → Gear → Install Add-on From File → select `parashare-filelink.xpi`
+          files: parashare-filelink.xpi
+          fail_on_unmatched_files: true

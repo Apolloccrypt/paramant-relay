@@ -1,0 +1,47 @@
+{
+  "name": "paramant-relay",
+  "image": "mcr.microsoft.com/devcontainers/base:debian-12",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.python"
+        }
+      }
+    }
+  },
+  "remoteUser": "vscode",
+  "forwardPorts": [
+    8080,
+    3000
+  ],
+  "portsAttributes": {
+    "8080": {
+      "label": "Relay (fly / local)",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Relay (dev)",
+      "onAutoForward": "notify"
+    }
+  }
+}
