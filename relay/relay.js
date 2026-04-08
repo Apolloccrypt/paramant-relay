@@ -676,7 +676,10 @@ const server = http.createServer(async (req, res) => {
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
       padding: '20MB fixed (DPI-masking)',
-      jurisdiction: 'EU/DE, GDPR, no US CLOUD Act' };
+      jurisdiction: 'EU/DE, GDPR, no US CLOUD Act',
+      edition: EDITION,
+      key_limit: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT,
+      active_keys: [...apiKeys.values()].filter(k => k.active !== false).length };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
   }
@@ -1317,10 +1320,11 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
-      key: k, plan: v.plan, label: v.label, active: v.active
+      key: k, plan: v.plan, label: v.label, active: v.active, over_limit: v.over_limit || false
     }));
+    const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT };
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, count: keys.length, keys }));
+    return res.end(J({ ok: true, count: keys.length, keys, license: licenseInfo }));
   }
 
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
