@@ -74,36 +74,19 @@ data  = gp.receive(hash_)</pre>
     return False
 
 # ── Config ────────────────────────────────────────────────────────────────────
-# Auto-detect: Docker volume mount or systemd install
-_default_dir = '/home/paramant'
-if os.path.exists('./relay-health') or os.path.exists('./data'):
-    _default_dir = '.'
-SECTORS_DIR = os.environ.get('PARAMANT_SECTORS_DIR', _default_dir)
-def _sector_path(sector):
-    # Docker volume: ./data/relay-health-data/users.json
-    docker_path = os.path.join('.', 'data', f'relay-{sector}-data', 'users.json')
-    # Systemd install: /home/paramant/relay-health/users.json
-    systemd_path = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
-    # Docker named volume via host path
-    docker_named = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
-    for path in [docker_path, systemd_path]:
-        if os.path.exists(os.path.dirname(path)):
-            return path
-    return systemd_path
-
-SECTORS = {s: _sector_path(s) for s in ['health','legal','finance','iot']}
-_relay_base = os.environ.get('RELAY_BASE_URL', '')
-if _relay_base:
-    # Self-hosted: single URL with Host header routing
-    RELAY_URLS = {s: _relay_base for s in ['health','legal','finance','iot']}
-else:
-    # Hosted: sector subdomains
-    RELAY_URLS = {
-        'health':  'https://health.paramant.app',
-        'legal':   'https://legal.paramant.app',
-        'finance': 'https://finance.paramant.app',
-        'iot':     'https://iot.paramant.app',
-    }
+SECTORS_DIR = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
+SECTORS = {
+    'health':  os.path.join(SECTORS_DIR, 'relay-health',   'users.json'),
+    'legal':   os.path.join(SECTORS_DIR, 'relay-legal',    'users.json'),
+    'finance': os.path.join(SECTORS_DIR, 'relay-finance',  'users.json'),
+    'iot':     os.path.join(SECTORS_DIR, 'relay-iot',      'users.json'),
+}
+RELAY_URLS = {
+    'health':  'https://health.paramant.app',
+    'legal':   'https://legal.paramant.app',
+    'finance': 'https://finance.paramant.app',
+    'iot':     'https://iot.paramant.app',
+}
 VALID_PLANS = ('free', 'pro', 'enterprise')
 
 # ── Kleuren ───────────────────────────────────────────────────────────────────
@@ -215,38 +198,23 @@ def cmd_revoke(args):
         print(f'\n{Y}Voer "paramant-admin.py sync" uit om relays te herladen.{E}')
 
 def cmd_sync(args):
-    """Herlaad API keys in alle sector relays zonder downtime via /v2/reload-users."""
-    import urllib.request, urllib.error
-    admin_token = os.environ.get('ADMIN_TOKEN', '')
-    if not admin_token:
-        err('ADMIN_TOKEN niet ingesteld — export ADMIN_TOKEN=<token>')
-        sys.exit(1)
+    """Herlaad users.json via /v2/reload-users zonder restart (zero downtime)."""
+    ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '')
+    if not ADMIN_TOKEN:
+        warn('ADMIN_TOKEN niet gezet — kan niet herladen'); return
     sectors = [args.sector] if args.sector else list(SECTORS.keys())
     for sector in sectors:
         base = RELAY_URLS.get(sector, '')
-        if not base:
-            warn(f'Geen URL voor sector {sector}, overgeslagen')
-            continue
+        if not base: continue
         url = f'{base}/v2/reload-users'
-        # For self-hosted: add Host header for nginx sector routing
-        host = f'{sector}.localhost' if 'localhost' in url or '127.0.0.1' in url else None
-        headers = {'X-Api-Key': admin_token, 'Content-Type': 'application/json'}
-        if host:
-            headers['Host'] = host
-        req = urllib.request.Request(url, method='POST', data=b'{}', headers=headers)
-        # Skip SSL verification for self-signed certs (localhost / private IP)
-        import ssl as _ssl
-        _is_local = any(x in url for x in ('localhost', '127.0.0.1', '10.', '192.168.', '172.'))
-        _ctx = _ssl.create_default_context()
-        if _is_local:
-            _ctx.check_hostname = False
-            _ctx.verify_mode = _ssl.CERT_NONE
+        req = urllib.request.Request(url, data=b'{}', method='POST',
+            headers={'X-Admin-Token': ADMIN_TOKEN, 'Content-Type': 'application/json'})
         try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=10, context=_ctx).read())
-            ok(f'{sector}: {resp.get("loaded", "?")} keys geladen')
-        except urllib.error.HTTPError as e:
-            body = e.read().decode()
-            err(f'{sector}: HTTP {e.code} — {body}')
+            resp = json.loads(urllib.request.urlopen(req, timeout=6).read())
+            if resp.get('ok'):
+                ok(f'{sector}: {resp.get("keys_loaded", "?")} keys geladen (zero downtime)')
+            else:
+                err(f'{sector}: {resp}')
         except Exception as e:
             err(f'{sector}: {e}')
 
