@@ -234,8 +234,15 @@ def cmd_sync(args):
         if host:
             headers['Host'] = host
         req = urllib.request.Request(url, method='POST', data=b'{}', headers=headers)
+        # Skip SSL verification for self-signed certs (localhost / private IP)
+        import ssl as _ssl
+        _is_local = any(x in url for x in ('localhost', '127.0.0.1', '10.', '192.168.', '172.'))
+        _ctx = _ssl.create_default_context()
+        if _is_local:
+            _ctx.check_hostname = False
+            _ctx.verify_mode = _ssl.CERT_NONE
         try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=10).read())
+            resp = json.loads(urllib.request.urlopen(req, timeout=10, context=_ctx).read())
             ok(f'{sector}: {resp.get("loaded", "?")} keys geladen')
         except urllib.error.HTTPError as e:
             body = e.read().decode()
