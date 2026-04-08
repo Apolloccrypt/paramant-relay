@@ -312,9 +312,9 @@ def cmd_team_create(args):
         team_id = 'team_' + secrets.token_hex(8)
         entry['team_id'] = team_id
         save_users(path, data)
-        ok(f'{sector}: team aangemaakt → {team_id}')
-        info(f'  Beheerder: {args.label}')
-        info(f'  Voeg toe: paramant-admin.py team-add --team {team_id} --label <device> --sector {sector}')
+        ok(f'{sector}: team created → {team_id}')
+        info(f'  Admin: {args.label}')
+        info(f'  Add members: paramant-admin.py team-add --team {team_id} --label <device> --sector {sector}')
 
 def cmd_team_add(args):
     """Voeg een nieuw device toe aan een bestaand team."""
