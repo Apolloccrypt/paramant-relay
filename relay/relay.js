@@ -648,6 +648,16 @@ const server = http.createServer(async (req, res) => {
   const dsaSig  = req.headers['x-dsa-signature'] || '';
   const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
 
+  // Community Edition limit: block keys that exceed the 5-key cap
+  if (keyData?.over_limit) {
+    res.writeHead(402, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      error: 'Community Edition limit reached — maximum 5 active API keys.',
+      upgrade: 'https://paramant.app/pricing',
+      docs: 'https://github.com/Apolloccrypt/paramant-relay#license--pricing'
+    }));
+  }
+
   incMetric('requests_total');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
@@ -861,6 +871,7 @@ const server = http.createServer(async (req, res) => {
     apiKeys.clear();
     loadUsers();
 
+    applyKeyLimitEnforcement();
     log('info', 'reload_users', { prev: prevCount, now: apiKeys.size });
     res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size }));
   }
@@ -1611,7 +1622,6 @@ function checkLicense() {
 
   const LICENSE_KEY = process.env.PARAMANT_LICENSE || '';
   if (LICENSE_KEY) {
-    // License key present — validate format (full validation via API in Pro)
     if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 32) {
       EDITION = 'licensed';
       log('info', 'license_valid', { edition: 'licensed' });
@@ -1619,17 +1629,47 @@ function checkLicense() {
       log('warn', 'license_invalid', { hint: 'License key must start with plk_ and be 32+ chars' });
     }
   }
+  applyKeyLimitEnforcement();
+}
 
-  const activeKeys = [...apiKeys.values()].filter(k => k.active !== false).length;
-  if (EDITION === 'community' && activeKeys > COMMUNITY_KEY_LIMIT) {
-    log('warn', 'community_limit_exceeded', {
-      active_keys: activeKeys,
-      limit: COMMUNITY_KEY_LIMIT,
-      msg: 'Community Edition is limited to 5 active API keys. Upgrade at https://paramant.app/pricing'
-    });
-  } else {
-    log('info', 'edition', { edition: EDITION, active_keys: activeKeys, limit: COMMUNITY_KEY_LIMIT });
+// ── Community Edition key-limit enforcement ───────────────────────────────────
+// Free self-hosters: max 5 active API keys. Keys 6+ receive 402 on every request.
+// Licensed (plk_*): no limit. Set PARAMANT_LICENSE=plk_... in .env to unlock.
+// ─────────────────────────────────────────────────────────────────────────────
+function applyKeyLimitEnforcement() {
+  if (EDITION === 'licensed') {
+    // Clear any leftover flags from a previous community run
+    for (const v of apiKeys.values()) v.over_limit = false;
+    log('info', 'edition', { edition: 'licensed', active_keys: [...apiKeys.values()].filter(k => k.active !== false).length });
+    return;
   }
+
+  const entries = [...apiKeys.entries()];
+  const active  = entries.filter(([, v]) => v.active !== false);
+
+  if (active.length <= COMMUNITY_KEY_LIMIT) {
+    for (const [, v] of entries) v.over_limit = false;
+    log('info', 'edition', { edition: EDITION, active_keys: active.length, limit: COMMUNITY_KEY_LIMIT });
+    return;
+  }
+
+  // First COMMUNITY_KEY_LIMIT active keys keep working; the rest are blocked
+  let n = 0;
+  for (const [, v] of entries) {
+    if (v.active === false) continue;
+    n++;
+    v.over_limit = n > COMMUNITY_KEY_LIMIT;
+    if (v.over_limit) log('warn', 'key_over_limit', {
+      label: v.label,
+      hint: 'Community Edition allows 5 active API keys — upgrade at https://paramant.app/pricing'
+    });
+  }
+  log('warn', 'community_limit_exceeded', {
+    active_keys: active.length,
+    limit: COMMUNITY_KEY_LIMIT,
+    blocked: active.length - COMMUNITY_KEY_LIMIT,
+    upgrade: 'https://paramant.app/pricing'
+  });
 }
 
 
