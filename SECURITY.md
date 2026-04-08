@@ -79,6 +79,7 @@ We thank the following researchers for responsible disclosure:
 
 | Date       | Researcher           | Findings                                      |
 |------------|----------------------|-----------------------------------------------|
+| 2026-04-09 | Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) — independent security researcher, Australia | 6 findings: API key in receiver URL, async onmessage, SDK key zeroization, plaintext filename in relay metadata, chunk count leak, _zero() warning (see CHANGELOG) |
 | 2026-04-08 | Internal assessment  | Pentest: 5 MEDIUM, 2 LOW (see CHANGELOG v2.2.1) |
 
 ---
