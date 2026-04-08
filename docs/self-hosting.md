@@ -327,3 +327,123 @@ curl -sk https://localhost/health | python3 -m json.tool
 
 Community Edition support is community-only (GitHub Issues).  
 Pro license includes email support.
+
+---
+
+## Web Interfaces
+
+After deploying, the following interfaces are available at `https://your-domain`:
+
+| URL | Access | Description |
+|-----|--------|-------------|
+| `/` | Public | Homepage |
+| `/dashboard` | API key | User dashboard |
+| `/parashare` | API key | File transfer |
+| `/ct-log` | Public | Certificate transparency log |
+| `/docs` | Public | API documentation |
+| `/health` | Public | Relay health status |
+| `/r34ct0r` | IP + API key + TOTP | Admin panel |
+
+---
+
+### Dashboard — `/dashboard`
+
+**Access:** any valid API key (`pgp_...`)
+
+1. Go to `https://your-domain/dashboard`
+2. Enter your API key (`pgp_...`)
+3. Click **Connect**
+
+Shows relay status, blob stats, and lets you test send/receive flows.
+
+---
+
+### ParaShare — `/parashare`
+
+**Access:** any valid API key (`pgp_...`)
+
+Browser-based end-to-end encrypted file transfer using ML-KEM-768:
+
+1. Go to `https://your-domain/parashare`
+2. Enter your API key
+3. Select a file — a one-time link is generated
+4. Share the link with the receiver
+5. Receiver opens the link, file downloads once then burns
+
+---
+
+### CT Log — `/ct-log`
+
+**Access:** public, no login required
+
+Every transfer is recorded in a public Merkle tree — without storing content.
+Cryptographic proof of delivery, visible to anyone.
+
+---
+
+### Admin Panel — `/r34ct0r`
+
+**Access:** IP whitelist + enterprise API key + TOTP (6-digit authenticator)
+
+> ⚠ Only accessible from whitelisted IP addresses. Configure in nginx:
+> ```nginx
+> allow YOUR_ADMIN_IP;
+> deny all;
+> ```
+
+**Login flow:**
+1. Go to `https://your-domain/r34ct0r`
+2. Enter your enterprise API key (`pgp_...`)
+3. Enter 6-digit TOTP code from your authenticator app
+4. Access granted
+
+**What you can do:**
+- Create, revoke, and manage API keys
+- Send welcome emails to new users
+- Switch between sector relays (health / legal / finance / iot)
+- View key usage and relay stats
+
+**Set up TOTP:**
+```bash
+# Generate a TOTP secret
+python3 -c "import base64, os; print(base64.b32encode(os.urandom(20)).decode())"
+# Add to .env:
+TOTP_SECRET=YOUR_BASE32_SECRET
+# Scan the QR code or enter the secret in Google Authenticator / Aegis
+```
+
+---
+
+### API Key Types
+
+| Plan | Dashboard | ParaShare | Admin panel |
+|------|-----------|-----------|-------------|
+| `free` | ✓ | ✓ | ✗ |
+| `pro` | ✓ | ✓ | ✗ |
+| `enterprise` | ✓ | ✓ | ✓ |
+
+Only enterprise keys can access `/r34ct0r`.
+
+---
+
+### First User Setup
+
+After deploying, create your first API key:
+
+```bash
+export $(grep -v '^#' .env | xargs)
+
+# Create an enterprise key for yourself (admin)
+python3 scripts/paramant-admin.py add \
+  --label "admin" \
+  --plan enterprise \
+  --email you@example.com
+
+# Reload all relays
+python3 scripts/paramant-admin.py sync
+
+# Your key is shown in the output — save it immediately
+# pgp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Then go to `https://your-domain/dashboard` and enter your key.
