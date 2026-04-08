@@ -652,8 +652,8 @@ const server = http.createServer(async (req, res) => {
   if (keyData?.over_limit) {
     res.writeHead(402, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
-      error: 'Community Edition limit reached — maximum 5 active API keys.',
-      upgrade: 'https://paramant.app/pricing',
+      error: 'This relay has reached its user limit. Please contact the relay operator.',
+      operator_hint: 'Relay operators: add PARAMANT_LICENSE=plk_... to .env to unlock unlimited users. See https://paramant.app/pricing',
       docs: 'https://github.com/Apolloccrypt/paramant-relay#license--pricing'
     }));
   }
@@ -1665,14 +1665,14 @@ function applyKeyLimitEnforcement() {
     v.over_limit = n > COMMUNITY_KEY_LIMIT;
     if (v.over_limit) log('warn', 'key_over_limit', {
       label: v.label,
-      hint: 'Community Edition allows 5 active API keys — upgrade at https://paramant.app/pricing'
+      hint: 'Community Edition: relay operator can add PARAMANT_LICENSE=plk_... to .env to unlock unlimited users'
     });
   }
   log('warn', 'community_limit_exceeded', {
     active_keys: active.length,
     limit: COMMUNITY_KEY_LIMIT,
     blocked: active.length - COMMUNITY_KEY_LIMIT,
-    upgrade: 'https://paramant.app/pricing'
+    operator_upgrade: 'https://paramant.app/pricing'
   });
 }
 

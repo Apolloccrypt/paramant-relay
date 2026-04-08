@@ -495,21 +495,34 @@ paramant-master/
 
 BUSL-1.1 — see [LICENSE](LICENSE). Change Date: 2029-01-01 → Apache 2.0.
 
-| Plan | API Keys | Sectors | Price |
-|------|----------|---------|-------|
-| **Community** (self-hosted) | Up to 5 | 1 | Free |
-| **Pro** (managed cloud) | Unlimited | All 4 | [paramant.app/pricing](https://paramant.app/pricing) |
-| **Enterprise** (on-premise) | Unlimited | Custom | Contact |
+### For relay operators (self-hosting)
 
-**Community Edition** is free for self-hosted production use with up to 5 active API keys per
-relay instance. No time limit. Code stays on your server.
+| Edition | Users per relay | License key | Price |
+|---------|----------------|-------------|-------|
+| **Community** | Up to 5 | Not required | Free |
+| **Licensed** | Unlimited | `plk_` relay license | [paramant.app/pricing](https://paramant.app/pricing) |
+| **Enterprise** | Unlimited | `plk_` relay license | [Contact us](mailto:privacy@paramant.app) |
 
-**Pro** gives you the managed cloud relay at `*.paramant.app`, zero-ops, automatic TLS,
-all four sectors, and priority support.
+**Community Edition** is free for self-hosted production use. You can issue up to 5
+`pgp_` API keys to your users. No time limit. Code stays on your server.
 
-**Enterprise** includes HA clustering (NATS-backed), Prometheus/Grafana monitoring,
-SOC 2 audit support, custom data residency, SLA, and dedicated support.
-[Contact us](mailto:privacy@paramant.app) for a quote.
+**Licensed / Enterprise** operators add `PARAMANT_LICENSE=plk_...` to their `.env` and
+restart — the relay unlocks unlimited users. The `plk_` key is for the **operator**,
+not for end users.
+
+### For end users (managed cloud)
+
+Users who want to use the managed relay at `*.paramant.app` receive a `pgp_` API key.
+They never interact with `plk_` keys.
+
+| Plan | Features | Price |
+|------|----------|-------|
+| **Free** | 10 uploads/day, 1-hour TTL, 1 view per blob | Free |
+| **Pro** | Unlimited uploads, 24-hour TTL, webhooks, streaming | [paramant.app/pricing](https://paramant.app/pricing) |
+| **Enterprise** | 7-day TTL, SLA, compliance docs, dedicated support | [Contact us](mailto:privacy@paramant.app) |
+
+**Enterprise** (managed) includes HA clustering, Prometheus/Grafana monitoring,
+SOC 2 audit support, custom data residency, and dedicated support.
 
 ## Enterprise Roadmap
 

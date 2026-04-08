@@ -144,29 +144,31 @@ python3 scripts/paramant-admin.py sync
 
 ## Community Edition Limits
 
-The Community Edition is **free** and includes full post-quantum encryption. It is limited to **5 active API keys**.
+The Community Edition is **free** for relay operators with up to **5 users** (active
+API keys). This is a limit on the **operator** — how many `pgp_` API keys you can
+issue to your users. The users themselves are unaffected by which edition you run.
 
-Keys 6 and beyond are blocked at request time with HTTP 402. This is enforced in the
-relay's authentication middleware — not just a warning. See [docs/licensing.md](licensing.md)
-for the full enforcement logic.
+Keys 6 and beyond are blocked at request time with HTTP 402. Hard enforcement in the
+auth middleware. See [docs/licensing.md](licensing.md) for the full logic.
 
 ```bash
-# Check current edition and key usage
+# Check edition and current user count
 curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-domain/health \
   | python3 -c "import sys,json; d=json.load(sys.stdin); \
-    print('edition:', d.get('edition'), '| keys:', d.get('active_keys'), '/', d.get('key_limit'))"
-# edition: community | keys: 3 / 5
+    print('edition:', d.get('edition'), '| users:', d.get('active_keys'), '/', d.get('key_limit'))"
+# edition: community | users: 3 / 5
 ```
 
-To unlock unlimited keys, set a license key in `.env`:
+To unlock unlimited users, add a relay license key to `.env`:
 
 ```bash
-PARAMANT_LICENSE=plk_your_license_key_here
+PARAMANT_LICENSE=plk_your_relay_license_key
 ```
 
-After adding the key, restart the relay. The log will show `edition: licensed`.
+After adding, restart the relay — logs will show `edition: licensed`.
 
-Licenses available at **paramant.app/pricing**.
+> **Note:** `plk_` is a **relay operator license** — it unlocks more users on your
+> relay. It is not what your users receive. Your users always get `pgp_` API keys.
 
 ---
 
