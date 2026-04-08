@@ -1,0 +1,108 @@
+version: "3.9"
+
+# PARAMANT self-hosted relay stack
+# Docs: https://github.com/Apolloccrypt/paramant-relay#self-hosting
+#
+# Quick start:
+#   cp .env.example .env && nano .env
+#   docker compose up -d
+
+services:
+  relay-health:
+    build: ./relay
+    restart: unless-stopped
+    environment:
+      PORT: "3005"
+      SECTOR: "health"
+      RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN}"
+      USERS_FILE: "/data/users.json"
+      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
+      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      TOTP_SECRET: "${TOTP_SECRET:-}"
+    volumes:
+      - relay-health-data:/data
+    networks:
+      - relay-internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  relay-legal:
+    build: ./relay
+    restart: unless-stopped
+    environment:
+      PORT: "3002"
+      SECTOR: "legal"
+      RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN}"
+      USERS_FILE: "/data/users.json"
+      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
+      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
+    volumes:
+      - relay-legal-data:/data
+    networks:
+      - relay-internal
+
+  relay-finance:
+    build: ./relay
+    restart: unless-stopped
+    environment:
+      PORT: "3003"
+      SECTOR: "finance"
+      RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN}"
+      USERS_FILE: "/data/users.json"
+      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
+      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
+    volumes:
+      - relay-finance-data:/data
+    networks:
+      - relay-internal
+
+  relay-iot:
+    build: ./relay
+    restart: unless-stopped
+    environment:
+      PORT: "3004"
+      SECTOR: "iot"
+      RELAY_MODE: "${RELAY_MODE:-iot}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN}"
+      USERS_FILE: "/data/users.json"
+      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
+      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
+    volumes:
+      - relay-iot-data:/data
+    networks:
+      - relay-internal
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx-selfhost.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro        # bring your own TLS
+    networks:
+      - relay-internal
+    depends_on:
+      - relay-health
+      - relay-legal
+      - relay-finance
+      - relay-iot
+
+volumes:
+  relay-health-data:
+  relay-legal-data:
+  relay-finance-data:
+  relay-iot-data:
+
+networks:
+  relay-internal:
+    driver: bridge
+    internal: true   # relays only reachable via nginx

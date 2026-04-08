@@ -294,37 +294,93 @@ python3 paramant-receiver.py \
 
 ## Relay: running your own
 
-### Requirements
+PARAMANT relays are self-hostable. You can run a single relay or all four sector relays behind nginx using Docker Compose.
 
-- Node.js 20+
-- 1GB+ RAM (512MB reserved for relay, remainder for blobs)
-- Swap **disabled** (`swapoff -a`)
-- Optional: NATS server for multi-relay setups
+### Docker Compose (recommended)
 
-### Install
+```bash
+git clone https://github.com/Apolloccrypt/paramant-relay
+cd paramant-relay
+
+cp .env.example .env
+# Required: set ADMIN_TOKEN (openssl rand -hex 32)
+nano .env
+
+# Add your TLS certs (or use a self-signed cert for local testing)
+mkdir -p deploy/certs
+# copy cert.pem and key.pem to deploy/certs/
+
+docker compose up -d
+```
+
+All four sector relays start behind nginx. Test with:
+
+```bash
+curl https://health.localhost/health
+# {"ok":true,"version":"2.2.0","sector":"health",...}
+```
+
+Add API keys without restarting:
+
+```bash
+# On the host, edit the users.json inside the named volume, then:
+ADMIN_TOKEN=your-token python3 scripts/paramant-admin.py sync
+# ✓ health: 3 keys geladen
+# ✓ legal: 3 keys geladen
+```
+
+### Single relay (Node.js, no Docker)
 
 ```bash
 cd relay/
 npm install
-cp ../deploy/.env.example .env
-# Edit .env: ADMIN_TOKEN, TOTP_SECRET, RESEND_API_KEY
+cp ../.env.example .env
+# Edit .env: set ADMIN_TOKEN at minimum
 
 node relay.js
 # or with sector:
 SECTOR=legal PORT=3002 node relay.js
 ```
 
+### Requirements
+
+- Node.js 20+ (or Docker)
+- 1 GB+ RAM per relay (512 MB reserved, remainder for blobs)
+- Swap **disabled** (`swapoff -a`) — relay uses RAM-only blob storage
+- TLS termination via nginx (included in Compose stack)
+- Optional: NATS server for multi-relay federation
+
 ### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `ADMIN_TOKEN` | — | **Required.** Admin API token for `/v2/reload-users` and admin endpoints |
 | `PORT` | `3001` | Listen port |
-| `SECTOR` | `health` | Relay sector (`health`/`legal`/`finance`/`iot`) |
-| `ADMIN_TOKEN` | — | Admin API access token |
-| `TOTP_SECRET` | — | TOTP MFA seed (base32) |
-| `RAM_LIMIT_MB` | `512` | Max RAM for blob storage |
-| `RAM_RESERVE_MB` | `256` | Reserve before rejecting inbound |
-| `RESEND_API_KEY` | — | Email delivery (welcome keys) |
+| `SECTOR` | `health` | Relay sector (`health` / `legal` / `finance` / `iot`) |
+| `RELAY_MODE` | `ghost_pipe` | Enabled endpoint set (`ghost_pipe` or `iot`) |
+| `USERS_FILE` | `./users.json` | Path to API key store |
+| `USERS_JSON` | — | Inline JSON users (overrides `USERS_FILE`; useful for secret managers) |
+| `RAM_LIMIT_MB` | `512` | Max RAM for in-flight blob storage |
+| `RAM_RESERVE_MB` | `256` | Reserve before rejecting new inbound blobs |
+| `TOTP_SECRET` | — | TOTP MFA seed (base32) for admin UI |
+| `RESEND_API_KEY` | — | Email delivery for welcome mails |
+
+### Zero-downtime key reload
+
+After editing `users.json`, reload all relays without a restart:
+
+```bash
+POST /v2/reload-users
+X-Api-Key: <ADMIN_TOKEN>
+
+→ {"ok":true,"loaded":11}
+```
+
+Or via the admin CLI:
+
+```bash
+ADMIN_TOKEN=xxx python3 scripts/paramant-admin.py sync
+```
 
 ### users.json schema
 
