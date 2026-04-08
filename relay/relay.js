@@ -195,7 +195,7 @@ function renderPrometheus() {
     L.push(`# TYPE paramant_${k} counter`);
     L.push(`paramant_${k}{sector="${SECTOR}",v="${VERSION}"} ${v}`);
   }
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['did_registry',didRegistry.size],['ct_log',ctLog.length],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION],['did_registry',didRegistry.size],['ct_log',ctLog.length],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -566,7 +566,7 @@ const server = http.createServer(async (req, res) => {
     const ram = ramStatus();
     const base = { ok: true, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       uptime_s: Math.floor(process.uptime()), blobs: blobStore.size,
-      ram_ok: ram.ram_ok, available_slots: ram.available_slots };
+      ram_ok: ram.ram_ok, available_slots: ram.available_slots, edition: EDITION };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
@@ -727,6 +727,7 @@ const server = http.createServer(async (req, res) => {
     const prevCount = apiKeys.size;
     apiKeys.clear();
     loadUsers();
+
     log('info', 'reload_users', { prev: prevCount, now: apiKeys.size });
     res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size }));
   }
@@ -1457,8 +1458,54 @@ try {
   log('info', 'websocket_streaming_active', { endpoint: '/v2/stream' });
 } catch(e) { global.wsPush = () => {}; log('warn', 'ws_not_available', { hint: 'npm install ws' }); }
 
+// ── PARAMANT Community Edition License Check ─────────────────────────────────
+// This function and its call may NOT be removed or modified under BUSL-1.1.
+// Community Edition: free for up to 5 active API keys.
+// For unlimited keys, obtain a commercial license at https://paramant.app/pricing
+// Tampering with this check constitutes a license violation under BUSL-1.1.
+// ─────────────────────────────────────────────────────────────────────────────
+const COMMUNITY_KEY_LIMIT = parseInt(process.env.MAX_KEYS || '5');
+let EDITION = 'community';
+
+function checkLicense() {
+  const fs2 = require('fs');
+  const crypto2 = require('crypto');
+  try {
+    const checksum = crypto2.createHash('sha256')
+      .update(fs2.readFileSync(__filename))
+      .digest('hex');
+    log('info', 'relay_integrity', { checksum, file: __filename });
+  } catch(e) {
+    log('warn', 'relay_integrity_failed', { err: e.message });
+  }
+
+  const LICENSE_KEY = process.env.PARAMANT_LICENSE || '';
+  if (LICENSE_KEY) {
+    // License key present — validate format (full validation via API in Pro)
+    if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 32) {
+      EDITION = 'licensed';
+      log('info', 'license_valid', { edition: 'licensed' });
+    } else {
+      log('warn', 'license_invalid', { hint: 'License key must start with plk_ and be 32+ chars' });
+    }
+  }
+
+  const activeKeys = [...apiKeys.values()].filter(k => k.active !== false).length;
+  if (EDITION === 'community' && activeKeys > COMMUNITY_KEY_LIMIT) {
+    log('warn', 'community_limit_exceeded', {
+      active_keys: activeKeys,
+      limit: COMMUNITY_KEY_LIMIT,
+      msg: 'Community Edition is limited to 5 active API keys. Upgrade at https://paramant.app/pricing'
+    });
+  } else {
+    log('info', 'edition', { edition: EDITION, active_keys: activeKeys, limit: COMMUNITY_KEY_LIMIT });
+  }
+}
+
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
+checkLicense();
 server.listen(PORT, '127.0.0.1', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });
