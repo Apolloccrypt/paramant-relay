@@ -343,11 +343,19 @@ SECTOR=legal PORT=3002 node relay.js
 
 ### Requirements
 
-- Node.js 20+ (or Docker)
-- 1 GB+ RAM per relay (512 MB reserved, remainder for blobs)
-- Swap **disabled** (`swapoff -a`) — relay uses RAM-only blob storage
-- TLS termination via nginx (included in Compose stack)
-- Optional: NATS server for multi-relay federation
+| Resource | Minimum | Recommended |
+|----------|---------|-------------|
+| CPU | 1 vCPU | 2 vCPU |
+| RAM | 1 GB | 4 GB |
+| Disk | 5 GB (OS + logs) | 20 GB |
+| OS | Ubuntu 22.04 / Debian 12 | Ubuntu 24.04 |
+| Node.js | 20+ | 22 LTS |
+
+> **Important:** Swap must be **disabled** (`swapoff -a && sed -i '/swap/d' /etc/fstab`).  
+> Relay stores blobs only in RAM — swap would write plaintext to disk, defeating burn-on-read.
+
+**Tested providers:** Hetzner CX22 (2 vCPU / 4 GB / €4/mo), DigitalOcean Droplet Basic,
+Contabo VPS S. Any VPS with full root access and outbound TLS works.
 
 ### Environment variables
 
@@ -456,8 +464,40 @@ paramant-master/
 
 ---
 
-## License
+## License & Pricing
 
 BUSL-1.1 — see [LICENSE](LICENSE). Change Date: 2029-01-01 → Apache 2.0.
 
-Free for non-production use. Contact for commercial licensing.
+| Plan | API Keys | Sectors | Price |
+|------|----------|---------|-------|
+| **Community** (self-hosted) | Up to 5 | 1 | Free |
+| **Pro** (managed cloud) | Unlimited | All 4 | [paramant.app/pricing](https://paramant.app/pricing) |
+| **Enterprise** (on-premise) | Unlimited | Custom | Contact |
+
+**Community Edition** is free for self-hosted production use with up to 5 active API keys per
+relay instance. No time limit. Code stays on your server.
+
+**Pro** gives you the managed cloud relay at `*.paramant.app`, zero-ops, automatic TLS,
+all four sectors, and priority support.
+
+**Enterprise** includes HA clustering (NATS-backed), Prometheus/Grafana monitoring,
+SOC 2 audit support, custom data residency, SLA, and dedicated support.
+[Contact us](mailto:hello@paramant.app) for a quote.
+
+## Enterprise Roadmap
+
+Features currently in development for Enterprise:
+
+- **HA clustering** — NATS JetStream-backed multi-node relay federation with shared
+  blob routing and zero single point of failure
+- **Observability stack** — pre-built Grafana dashboards for burn rates, key usage,
+  latency percentiles; Prometheus metrics endpoint already live (`/metrics`)
+- **Key management UI** — web dashboard for API key lifecycle, usage analytics,
+  team management
+- **Audit export** — signed NDJSON audit log export for SIEM integration (Splunk, Elastic)
+- **Custom sectors** — define your own sector labels, rate limits, and retention policies
+- **FIPS-compatible build** — relay variant using FIPS-validated crypto primitives
+- **SSO / SAML** — enterprise IdP integration for admin access
+
+[Watch the repo](https://github.com/Apolloccrypt/paramant-relay) or
+[email us](mailto:hello@paramant.app) to join the Enterprise preview.
