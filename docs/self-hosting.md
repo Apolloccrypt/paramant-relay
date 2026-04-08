@@ -1,8 +1,9 @@
 # PARAMANT Self-Hosting Guide
 
-**Version:** v2.2.0  
-**License:** BUSL-1.1 — source available, free for non-production use and up to 5 API keys  
-**Change date:** 2029-01-01 → Apache 2.0
+**Version:** v2.2.1  
+**License:** BUSL-1.1 — source available, free for up to 5 active API keys in production  
+**Change date:** 2029-01-01 → Apache 2.0  
+**License enforcement details:** [docs/licensing.md](licensing.md)
 
 ---
 
@@ -145,19 +146,27 @@ python3 scripts/paramant-admin.py sync
 
 The Community Edition is **free** and includes full post-quantum encryption. It is limited to **5 active API keys**.
 
+Keys 6 and beyond are blocked at request time with HTTP 402. This is enforced in the
+relay's authentication middleware — not just a warning. See [docs/licensing.md](licensing.md)
+for the full enforcement logic.
+
 ```bash
-# Check current edition
-curl -sk https://your-domain/health | python3 -m json.tool | grep edition
-# "edition": "community"
+# Check current edition and key usage
+curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-domain/health \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); \
+    print('edition:', d.get('edition'), '| keys:', d.get('active_keys'), '/', d.get('key_limit'))"
+# edition: community | keys: 3 / 5
 ```
 
-To unlock unlimited keys, set a Pro license key in `.env`:
+To unlock unlimited keys, set a license key in `.env`:
 
 ```bash
 PARAMANT_LICENSE=plk_your_license_key_here
 ```
 
-Licenses available at **paramant.app/pricing** (coming soon).
+After adding the key, restart the relay. The log will show `edition: licensed`.
+
+Licenses available at **paramant.app/pricing**.
 
 ---
 
@@ -398,10 +407,12 @@ Cryptographic proof of delivery, visible to anyone.
 4. Access granted
 
 **What you can do:**
-- Create, revoke, and manage API keys
-- Send welcome emails to new users
-- Switch between sector relays (health / legal / finance / iot)
-- View key usage and relay stats
+
+| Tab | Actions |
+|-----|---------|
+| Relay Monitor | Version, edition, active keys vs limit, uptime, blobs in flight, CT log |
+| API Keys | Load all keys (with BLOCKED indicator for over-limit keys), create, revoke, resend mail |
+| Licenses | Generate `plk_` license key for a customer — shown once with install instructions |
 
 **Set up TOTP:**
 ```bash
