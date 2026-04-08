@@ -10,6 +10,8 @@ Post-quantum encrypted file transfer. Files are encrypted client-side, transit t
 
 PARAMANT relays are self-hostable. You can run a single relay or all four sector relays behind nginx using Docker Compose.
 
+**Docker Hub:** [`mtty001/relay`](https://hub.docker.com/r/mtty001/relay) — multi-arch (amd64 + arm64), updated automatically on every push to `main`.
+
 ## Raspberry Pi
 
 One-command install for Raspberry Pi OS Lite 64-bit:
@@ -25,7 +27,8 @@ The installer:
 - Installs Docker if not present
 - Disables swap (required — relay is RAM-only)
 - Disables WiFi power saving (prevents connection drops)
-- Clones this repo and configures `.env` with an auto-generated `ADMIN_TOKEN`
+- Pulls `mtty001/relay:latest` from Docker Hub and starts the stack
+- Configures `.env` with an auto-generated `ADMIN_TOKEN`
 - Enables Docker at boot and starts the relay stack
 - Prints access URLs and a QR code for your local dashboard
 
@@ -37,11 +40,14 @@ After install, add API keys by editing `/opt/paramant-relay/config/users.json`.
 git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 
-# Step 1 — interactive preflight: detects port conflicts, generates ADMIN_TOKEN
-bash scripts/preflight.sh
-
-# Step 2 — start the stack
+# Option A — pull image from Docker Hub (default, no build needed)
+cp deploy/.env.example .env && nano .env   # set ADMIN_TOKEN at minimum
 docker compose up -d
+
+# Option B — build locally instead
+# In docker-compose.yml, replace  image: mtty001/relay:latest  with  build: ./relay
+# then:
+docker compose up -d --build
 
 # Step 3 — verify all sectors are live + get next-steps guide
 bash scripts/post-install.sh
