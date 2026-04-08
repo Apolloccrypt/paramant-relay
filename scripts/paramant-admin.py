@@ -74,19 +74,36 @@ data  = gp.receive(hash_)</pre>
     return False
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SECTORS_DIR = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
-SECTORS = {
-    'health':  os.path.join(SECTORS_DIR, 'relay-health',   'users.json'),
-    'legal':   os.path.join(SECTORS_DIR, 'relay-legal',    'users.json'),
-    'finance': os.path.join(SECTORS_DIR, 'relay-finance',  'users.json'),
-    'iot':     os.path.join(SECTORS_DIR, 'relay-iot',      'users.json'),
-}
-RELAY_URLS = {
-    'health':  'https://health.paramant.app',
-    'legal':   'https://legal.paramant.app',
-    'finance': 'https://finance.paramant.app',
-    'iot':     'https://iot.paramant.app',
-}
+# Auto-detect: Docker volume mount or systemd install
+_default_dir = '/home/paramant'
+if os.path.exists('./relay-health') or os.path.exists('./data'):
+    _default_dir = '.'
+SECTORS_DIR = os.environ.get('PARAMANT_SECTORS_DIR', _default_dir)
+def _sector_path(sector):
+    # Docker volume: ./data/relay-health-data/users.json
+    docker_path = os.path.join('.', 'data', f'relay-{sector}-data', 'users.json')
+    # Systemd install: /home/paramant/relay-health/users.json
+    systemd_path = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
+    # Docker named volume via host path
+    docker_named = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
+    for path in [docker_path, systemd_path]:
+        if os.path.exists(os.path.dirname(path)):
+            return path
+    return systemd_path
+
+SECTORS = {s: _sector_path(s) for s in ['health','legal','finance','iot']}
+_relay_base = os.environ.get('RELAY_BASE_URL', '')
+if _relay_base:
+    # Self-hosted: single URL with Host header routing
+    RELAY_URLS = {s: _relay_base for s in ['health','legal','finance','iot']}
+else:
+    # Hosted: sector subdomains
+    RELAY_URLS = {
+        'health':  'https://health.paramant.app',
+        'legal':   'https://legal.paramant.app',
+        'finance': 'https://finance.paramant.app',
+        'iot':     'https://iot.paramant.app',
+    }
 VALID_PLANS = ('free', 'pro', 'enterprise')
 
 # ── Kleuren ───────────────────────────────────────────────────────────────────
@@ -211,10 +228,12 @@ def cmd_sync(args):
             warn(f'Geen URL voor sector {sector}, overgeslagen')
             continue
         url = f'{base}/v2/reload-users'
-        req = urllib.request.Request(url, method='POST',
-                                     data=b'{}',
-                                     headers={'X-Api-Key': admin_token,
-                                              'Content-Type': 'application/json'})
+        # For self-hosted: add Host header for nginx sector routing
+        host = f'{sector}.localhost' if 'localhost' in url or '127.0.0.1' in url else None
+        headers = {'X-Api-Key': admin_token, 'Content-Type': 'application/json'}
+        if host:
+            headers['Host'] = host
+        req = urllib.request.Request(url, method='POST', data=b'{}', headers=headers)
         try:
             resp = json.loads(urllib.request.urlopen(req, timeout=10).read())
             ok(f'{sector}: {resp.get("loaded", "?")} keys geladen')
