@@ -89,7 +89,7 @@ for sector in "${SECTORS[@]}"; do
     version=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null)
     edition=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('edition','?'))" 2>/dev/null)
     if [ "$sector_val" = "$sector" ] || [ -n "$version" ]; then
-        ok "${sector:<8} v${version}  edition=${edition}"
+        ok "$(printf '%-8s' "$sector") v${version}  edition=${edition}"
     else
         err "${sector}: no response or wrong sector (got: ${sector_val:-empty})"
         ALL_OK=false
