@@ -418,12 +418,17 @@ Cryptographic proof of delivery, visible to anyone.
 
 **Set up TOTP:**
 ```bash
-# Generate a TOTP secret
+# Generate a TOTP secret (20 bytes = 160 bits, base32 encoded)
 python3 -c "import base64, os; print(base64.b32encode(os.urandom(20)).decode())"
 # Add to .env:
 TOTP_SECRET=YOUR_BASE32_SECRET
-# Scan the QR code or enter the secret in Google Authenticator / Aegis
+# Scan the QR code or enter the secret in Aegis / Google Authenticator / Authy
 ```
+
+> **Note:** PARAMANT uses **TOTP-SHA256** (RFC 6238 with HMAC-SHA256). When
+> manually entering the secret in an authenticator app, select **SHA-256** as the
+> algorithm if the app exposes that option. Aegis supports this. Google
+> Authenticator defaults to SHA-1 and will generate incorrect codes.
 
 ---
 

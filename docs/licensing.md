@@ -172,17 +172,19 @@ A `plk_` key is a **relay operator license**. It goes in the relay's `.env`, not
 ### Current validation (format-only)
 
 ```js
-if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 32) {
+const PLK_RE = /^plk_[0-9a-f]{64}$/;
+if (PLK_RE.test(LICENSE_KEY)) {
   EDITION = 'licensed';
 }
 ```
 
-The relay checks prefix and length only. It does not contact a license server,
-verify a signature, or check an expiry date. Full cryptographic validation is
-planned for a future release.
+The relay checks prefix, exact length (68 chars), and lowercase hex characters.
+It does not contact a license server, verify a cryptographic signature, or check
+an expiry date. Full cryptographic validation is planned for a future release.
 
-**Implication for auditors:** any string `plk_` + 32+ characters will unlock the
-relay. Enforcement is currently legal (BUSL-1.1), not cryptographic.
+**Implication for auditors:** any string matching `plk_[0-9a-f]{64}` (68 chars)
+will unlock the relay. Enforcement is currently legal (BUSL-1.1), not
+cryptographic.
 
 ### How to generate (r34ct0r — Licenses tab)
 
@@ -233,11 +235,11 @@ curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-relay/health \
 
 | # | Limitation | Impact |
 |---|-----------|--------|
-| 1 | License validation is format-only (no signature, no expiry, no server check) | Self-hosters can generate their own `plk_` keys — BUSL-1.1 is the enforcement mechanism |
+| 1 | License validation is format-only (regex `plk_[0-9a-f]{64}`, no signature or expiry) | Self-hosters can generate their own `plk_` keys — BUSL-1.1 is the enforcement mechanism |
 | 2 | `MAX_KEYS` env var overrides the 5-key limit | Operator can raise limit without a license |
 | 3 | `plk_` keys not tracked server-side | No revocation mechanism — if a license needs to be revoked, a relay update is required |
 | 4 | `over_limit` is position-based (insertion order in users.json) | An enterprise `pgp_` key added at position 6 is blocked until a `plk_` license is present |
-| 5 | `ADMIN_TOKEN` and `TOTP_SECRET` in environment | Any process with Docker exec or host root can read them |
+| 5 | `ADMIN_TOKEN` and `TOTP_SECRET` in environment | Any process with Docker exec or host root can read them — use Docker secrets in production |
 
 ---
 
