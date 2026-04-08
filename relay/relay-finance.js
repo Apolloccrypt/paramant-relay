@@ -950,7 +950,7 @@ python3 paramant-receiver.py \\
         <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> · <a href="https://paramant.app/ct-log" style="color:#555">CT log</a></p>
         <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 · Burn-on-read · EU/DE · BUSL-1.1</p>
       </div>`;
-      const body = JSON.stringify({ from: 'PARAMANT <hello@paramant.app>', to: [d.email], subject: 'Your PARAMANT API key', html });
+      const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [d.email], subject: 'Your PARAMANT API key', html });
       const resp = await new Promise((resolve, reject) => {
         const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
