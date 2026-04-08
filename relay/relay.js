@@ -1506,7 +1506,7 @@ function checkLicense() {
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
 checkLicense();
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });
 });
