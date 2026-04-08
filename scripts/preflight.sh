@@ -162,8 +162,12 @@ if [ "$ISSUES" -gt 0 ]; then
     echo -e "${YELLOW}⚠  Pre-flight complete with ${ISSUES} warning(s)${NC}"
     echo -e "   Proceeding may cause issues."
     echo ""
-    read -p "   Continue anyway? [y/N]: " cont
-    [[ "$cont" =~ ^[Yy]$ ]] || exit 1
+    if [ -t 0 ]; then
+        read -p "   Continue anyway? [y/N]: " cont
+        [[ "$cont" =~ ^[Yy]$ ]] || exit 1
+    else
+        echo -e "${YELLOW}   (non-interactive: continuing with warnings)${NC}"
+    fi
 else
     echo -e "${GREEN}╔═══════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║  ✓  All checks passed                 ║${NC}"
