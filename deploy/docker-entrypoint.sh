@@ -3,7 +3,6 @@
 CERT=/etc/nginx/certs/cert.pem
 KEY=/etc/nginx/certs/key.pem
 DOMAIN=${DOMAIN:-localhost}
-
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
     echo "[paramant] No TLS cert found — generating self-signed for $DOMAIN"
     apk add --no-cache openssl > /dev/null 2>&1
