@@ -124,7 +124,9 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <div class="proto-cell"><div class="label">AES-256-GCM</div><div class="pdesc">Symmetric</div></div>
   <div class="proto-cell"><div class="label">HKDF-SHA256</div><div class="pdesc">Key derivation</div></div>
   <div class="proto-cell"><div class="label">Burn-on-read</div><div class="pdesc">RAM-only</div></div>
-  <div class="proto-cell"><div class="label">5MB padding</div><div class="pdesc">DPI masking</div></div>
+  <div class=proto-cell><div class=label>5MB padding</div><div class=pdesc>DPI masking</div></div>
+  <div class=proto-cell><div class=label>Argon2id</div><div class=pdesc>RFC 9106</div></div>
+  <div class=proto-cell><div class=label>Two-step burn</div><div class=pdesc>Preload-proof</div></div>
   <div class="proto-cell"><div class="label">Hetzner DE</div><div class="pdesc">EU jurisdiction</div></div>
 </div>
 
@@ -400,7 +402,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># receiver → PACS</span><br>
         python3 paramant-receiver.py --forward https://pacs.hospital/api
       </div>
-      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
+      <a href="https://health.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on health.paramant.app →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Legal &amp; Notary</div>
@@ -414,7 +416,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># counterparty receives once — then gone</span><br>
         python3 paramant-receiver.py --key pgp_xxx --device counterparty-01
       </div>
-      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
+      <a href="https://legal.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on legal.paramant.app →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Industrial IoT / OT</div>
@@ -428,7 +430,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># forward to SCADA</span><br>
         python3 paramant-receiver.py --forward https://scada.intern/api
       </div>
-      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
+      <a href="https://iot.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on iot.paramant.app →</a>
     </div>
     <div class="cell">
       <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Finance &amp; Compliance</div>
@@ -442,14 +444,14 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="color:var(--quiet)"># forward to compliance system</span><br>
         python3 paramant-receiver.py --forward https://compliance.bank.nl/api
       </div>
-      <span style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;opacity:0.5;cursor:not-allowed">Coming soon</span>
+      <a href="https://finance.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on finance.paramant.app →</a>
     </div>
   </div>
 
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
       <div style="background:var(--bg);padding:20px 24px">
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">9</div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">5</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">relay nodes live</div>
       </div>
       <div style="background:var(--bg);padding:20px 24px">
@@ -462,7 +464,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       </div>
       <div style="background:var(--bg);padding:20px 24px">
         <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">&lt;100ms</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">delivery via NATS</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">delivery via WebSocket</div>
       </div>
     </div>
   </div>
