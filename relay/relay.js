@@ -101,7 +101,7 @@ initNats();
 const didRegistry = new Map();
 
 function generateDid(deviceId, pubKeyHex) {
-  const hash = crypto.createHash('sha256').update(deviceId + pubKeyHex).digest('hex').slice(0,32);
+  const hash = crypto.createHash('sha3-256').update(deviceId + pubKeyHex).digest('hex').slice(0,32);
   return `did:paramant:${hash}`;
 }
 
@@ -148,7 +148,7 @@ if (CT_FILE) {
 }
 
 function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
-  return crypto.createHash('sha256').update(deviceIdHash + pubKeyHex + ts).digest('hex');
+  return crypto.createHash('sha3-256').update(deviceIdHash + pubKeyHex + ts).digest('hex');
 }
 
 function ctTreeHash(entries) {
@@ -158,7 +158,7 @@ function ctTreeHash(entries) {
   while (hashes.length > 1) {
     const next = [];
     for (let i = 0; i < hashes.length; i += 2) {
-      next.push(crypto.createHash('sha256').update(hashes[i] + (hashes[i+1] || hashes[i])).digest('hex'));
+      next.push(crypto.createHash('sha3-256').update(hashes[i] + (hashes[i+1] || hashes[i])).digest('hex'));
     }
     hashes.splice(0, hashes.length, ...next);
   }
@@ -167,7 +167,7 @@ function ctTreeHash(entries) {
 
 function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
-  const deviceIdHash = crypto.createHash('sha256').update(deviceId + apiKey.slice(0,8)).digest('hex');
+  const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex.slice(0,64), ts);
   const index = ctLog.length;
   const tree_hash = ctTreeHash([...ctLog, { leaf_hash }]);
@@ -199,7 +199,7 @@ function verifyAttestation(pubKeyHex, deviceId, attestationObj) {
   } else {
     result = { valid: false, reason: 'unknown_method' };
   }
-  const deviceHash = crypto.createHash('sha256').update(deviceId).digest('hex');
+  const deviceHash = crypto.createHash('sha3-256').update(deviceId).digest('hex');
   attestations.set(deviceHash, { ...result, attested: result.valid, verified_ts: new Date().toISOString() });
   log(result.valid ? 'info' : 'warn', 'attestation_result', { device: deviceId.slice(0,8), method, valid: result.valid });
   return result;
@@ -483,7 +483,7 @@ function mnemonicToLookupHash(phrase) {
   if (!bip39Lib.validateMnemonic(phrase)) throw new Error('Ongeldige BIP39 mnemonic (checksum fout)');
   const entropy = Buffer.from(bip39Lib.mnemonicToEntropy(phrase), 'hex');
   const idBytes = hkdf(entropy, 'paramant-drop-v1', 'lookup-id', 32);
-  const hash    = crypto.createHash('sha256').update(idBytes).digest('hex');
+  const hash    = crypto.createHash('sha3-256').update(idBytes).digest('hex');
   zeroBuffer(entropy);
   return hash;
 }
@@ -497,7 +497,7 @@ function auditAppend(key, event, data = {}) {
   const prevHash = chain.length > 0 ? chain[chain.length - 1].chain_hash : '0'.repeat(64);
   const entry    = { ts: new Date().toISOString(), event, prev_hash: prevHash, ...data };
   const entryStr = JSON.stringify({ ts: entry.ts, event, hash: data.hash||'', bytes: data.bytes||0, prev_hash: prevHash });
-  entry.chain_hash = crypto.createHash('sha256').update(entryStr).digest('hex');
+  entry.chain_hash = crypto.createHash('sha3-256').update(entryStr).digest('hex');
   chain.push(entry);
   if (chain.length > MAX_AUDIT) chain.shift();
 }
@@ -830,7 +830,7 @@ const server = http.createServer(async (req, res) => {
       if (sess.joined)              { res.writeHead(409); return res.end(J({ error: 'Session already joined — first join wins' })); }
 
       // Verifieer PSS commitment: SHA-256(pss) moet overeenkomen
-      const pssHash = crypto.createHash('sha256').update(d.pss).digest('hex');
+      const pssHash = crypto.createHash('sha3-256').update(d.pss).digest('hex');
       if (pssHash !== sess.commitment) {
         log('warn', 'session_join_bad_pss', { sid: d.session_id.slice(0, 12) });
         res.writeHead(403); return res.end(J({ error: 'Pre-shared secret does not match commitment' }));
@@ -1237,7 +1237,7 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/attest/:device ───────────────────────────────────────────────────
   const attm = path.match(/^\/v2\/attest\/([^/]+)$/);
   if (attm && req.method === 'GET') {
-    const deviceHash = crypto.createHash('sha256').update(decodeURIComponent(attm[1])).digest('hex');
+    const deviceHash = crypto.createHash('sha3-256').update(decodeURIComponent(attm[1])).digest('hex');
     const att = attestations.get(deviceHash);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, device_hash: deviceHash, attestation: att || { attested: false, reason: 'never_attested' } }));
@@ -1601,7 +1601,7 @@ function checkLicense() {
   const fs2 = require('fs');
   const crypto2 = require('crypto');
   try {
-    const checksum = crypto2.createHash('sha256')
+    const checksum = crypto2.createHash('sha3-256')
       .update(fs2.readFileSync(__filename))
       .digest('hex');
     log('info', 'relay_integrity', { checksum, file: __filename });
