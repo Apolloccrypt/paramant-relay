@@ -69,7 +69,12 @@ jobs:
         run: npm install -g web-ext
 
       - name: Sign Thunderbird extension
-        run: web-ext sign --amo-base-url=https://addons.thunderbird.net/api/v5/ --api-key=${{ secrets.THUNDERBIRD_AMO_ISSUER }} --api-secret=${{ secrets.THUNDERBIRD_AMO_SECRET }} --artifacts-dir=./web-ext-artifacts
+        run: web-ext sign \
+          --amo-base-url=https://addons.thunderbird.net/api/v5/ \
+          --api-key=${{ secrets.THUNDERBIRD_AMO_ISSUER }} \
+          --api-secret=${{ secrets.THUNDERBIRD_AMO_SECRET }} \
+          --source-dir=./thunderbird-filelink \
+          --artifacts-dir=./
         env:
           NODE_ENV: production
 
