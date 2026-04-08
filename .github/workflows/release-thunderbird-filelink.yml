@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "thunderbird-filelink/**"
+      - ".github/workflows/release-thunderbird-filelink.yml"
 
 permissions:
   contents: write
@@ -17,18 +18,60 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # required to read all tags
 
-      - name: Read version from manifest.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compute next version
         id: version
         run: |
-          VERSION=$(jq -r '.version' thunderbird-filelink/manifest.json)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          git fetch --tags
+          LATEST=$(git tag --list 'filelink-v*' --sort=-version:refname | head -1)
+          if [[ -z "$LATEST" ]]; then
+            # No prior release tag — read major.minor from manifest and start patch at 0
+            BASE=$(jq -r '.version' thunderbird-filelink/manifest.json)
+            MAJOR=$(echo "$BASE" | cut -d. -f1)
+            MINOR=$(echo "$BASE" | cut -d. -f2)
+            PATCH=-1
+          else
+            VER="${LATEST#filelink-v}"
+            MAJOR=$(echo "$VER" | cut -d. -f1)
+            MINOR=$(echo "$VER" | cut -d. -f2)
+            PATCH=$(echo "$VER" | cut -d. -f3)
+          fi
+          NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version in manifest.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' \
+            thunderbird-filelink/manifest.json > _tmp.json
+          mv _tmp.json thunderbird-filelink/manifest.json
+
+      - name: Commit bumped manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add thunderbird-filelink/manifest.json
+          git commit -m "chore: bump filelink to ${{ steps.version.outputs.version }} [skip ci]"
+          git push
 
       - name: Package .xpi
         run: |
           cd thunderbird-filelink
           zip -r ../parashare-filelink.xpi . \
             -x "README.md"
+
+      - name: Install web-ext
+        run: npm install -g web-ext
+
+      - name: Sign Thunderbird extension
+        run: web-ext sign --amo-base-url=https://addons.thunderbird.net/api/v5/ --api-key=${{ secrets.THUNDERBIRD_AMO_ISSUER }} --api-secret=${{ secrets.THUNDERBIRD_AMO_SECRET }} --artifacts-dir=./web-ext-artifacts
+        env:
+          NODE_ENV: production
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
