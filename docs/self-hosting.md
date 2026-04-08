@@ -447,3 +447,39 @@ python3 scripts/paramant-admin.py sync
 ```
 
 Then go to `https://your-domain/dashboard` and enter your key.
+
+---
+
+## Security Notes
+
+### ADMIN_TOKEN visibility
+Anyone with `docker exec` access (i.e. root on the host) can read environment variables including `ADMIN_TOKEN`:
+```bash
+docker exec paramant-relay-relay-health-1 env | grep ADMIN_TOKEN
+```
+This is inherent to Docker. Mitigation:
+- Restrict host root access
+- Use Docker secrets for production deployments
+- Rotate ADMIN_TOKEN regularly: update `.env` → `docker compose up -d`
+
+### Swap
+Only **disk swap** is a security risk for RAM-only blob storage. Ubuntu's default **zram** (RAM-based compression) is acceptable.
+
+To disable disk swap only:
+```bash
+swapon --show=TYPE,NAME          # check what type is active
+sudo swapoff /dev/sdX            # disable disk swap only
+sudo sed -i '/\/dev\/sd/d' /etc/fstab
+```
+
+### Rate limiting
+The nginx config includes rate limiting out of the box:
+- `/v2/inbound`: 10 uploads/minute per IP (burst: 5)
+- All other endpoints: 60 requests/minute per IP (burst: 30)
+- Max 20 concurrent connections per IP
+
+### Relay isolation
+Relay containers are on an internal Docker network — not reachable directly from outside. All traffic goes through nginx.
+
+### Non-root containers
+All relay containers run as user `relay` (non-root). Files in `/app` are owned by root and not writable by the relay process.
