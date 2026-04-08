@@ -6,12 +6,12 @@
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
 
 /index.html
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src wss://relay.paramant.app https://relay.paramant.app wss://*.onion https://raw.githubusercontent.com; img-src 'self' data: blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://health.paramant.app https://legal.paramant.app https://finance.paramant.app https://iot.paramant.app wss://*.onion; img-src 'self' data: blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
   Cache-Control: no-store, no-cache, must-revalidate
   Pragma: no-cache
 
 /relay-feed.html
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://relay.paramant.app; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://health.paramant.app https://legal.paramant.app https://finance.paramant.app https://iot.paramant.app; frame-ancestors 'none'
   Cache-Control: no-store
 
 /privacy.html

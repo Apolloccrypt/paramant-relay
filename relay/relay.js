@@ -1,5 +1,5 @@
 /**
- * PARAMANT Ghost Pipe Relay v2.0.0
+ * PARAMANT Ghost Pipe Relay v2.2.1
  * 
  * Post-Quantum Transport Protocol
  * "New HTTPS — decentralized, zero-plaintext, quantum-safe"
@@ -36,7 +36,11 @@ const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
 const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
-const RELAY_MODE = process.env.RELAY_MODE          || 'full';
+const _RAW_MODE  = process.env.RELAY_MODE          || 'full';
+const RELAY_MODE = ['ghost_pipe', 'iot', 'full'].includes(_RAW_MODE) ? _RAW_MODE : (() => {
+  console.error(`[paramant] Invalid RELAY_MODE="${_RAW_MODE}". Must be ghost_pipe|iot|full. Defaulting to ghost_pipe.`);
+  return 'ghost_pipe';
+})();
 const SECTOR     = process.env.SECTOR              || 'relay';
 
 // Probeer @noble/post-quantum te laden voor ML-DSA
@@ -246,7 +250,7 @@ function totpCode(secret, counter) {
   const key = base32Decode(secret);
   const buf = Buffer.alloc(8);
   buf.writeBigUInt64BE(BigInt(counter));
-  const mac = crypto.createHmac('sha1', key).update(buf).digest();
+  const mac = crypto.createHmac('sha256', key).update(buf).digest();
   const offset = mac[mac.length - 1] & 0xf;
   const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
   zeroBuffer(key); zeroBuffer(mac);
@@ -634,9 +638,12 @@ const server = http.createServer(async (req, res) => {
   const parsed  = url_.parse(req.url, true);
   const path    = parsed.pathname;
   const query   = parsed.query;
-  const apiKey  = (req.headers['x-api-key'] || query.k || '').trim();
+  const apiKey  = (req.headers['x-api-key'] || '').trim();
+  // Reject any request that passes the API key as a query-string parameter.
+  // Query strings appear in server logs, browser history, and proxy access logs.
   if (query.k) {
-    log('warn', 'key_in_querystring', { path: path.slice(0,40), ip: (req.socket?.remoteAddress||'').slice(0,15) });
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'API key must be sent in the X-Api-Key header, not as a query parameter.' }));
   }
   const didHeader = req.headers['x-did'] || '';
   const didSig    = req.headers['x-did-signature'] || '';
@@ -1115,15 +1122,20 @@ const server = http.createServer(async (req, res) => {
       let pwOk = false;
       try {
         pwOk = await argon2Lib.verify(entry.pw_hash, reqPw);
-      } finally {
-        entry._verifying = false; // always reset — prevents permanent lock if verify() throws
+        // Keep _verifying = true through views decrement so a second concurrent
+        // request cannot slip in after verify() resolves but before burn/decrement.
+        // Reset only after the decision is made (below).
+      } catch(e) {
+        entry._verifying = false;
+        res.writeHead(500); return res.end(J({ error: 'Password verification failed' }));
       }
-      if (!pwOk) { res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
+      if (!pwOk) { entry._verifying = false; res.writeHead(403); return res.end(J({ error: 'Onjuist wachtwoord' })); }
     }
     // Access policies: max_views — decrement, burn wanneer 0
     entry.views_remaining = (entry.views_remaining ?? 1) - 1;
     const burned = entry.views_remaining <= 0;
     const data   = Buffer.from(entry.blob);
+    if (entry.pw_hash) entry._verifying = false; // release lock now that decision is finalized
     if (burned) {
       blobStore.delete(outm[1]);
       zeroBuffer(entry.blob);
@@ -1297,7 +1309,7 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
-      const newKey = 'pgp_' + crypto.randomBytes(16).toString('hex');
+      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
       const plan = d.plan || 'pro';
       const label = d.label || '';
       const email = d.email || '';
@@ -1630,11 +1642,17 @@ function checkLicense() {
 
   const LICENSE_KEY = process.env.PARAMANT_LICENSE || '';
   if (LICENSE_KEY) {
-    if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 32) {
+    // Format: plk_ + exactly 64 lowercase hex chars = 68 chars total
+    const PLK_RE = /^plk_[0-9a-f]{64}$/;
+    if (PLK_RE.test(LICENSE_KEY)) {
       EDITION = 'licensed';
-      log('info', 'license_valid', { edition: 'licensed' });
+      log('info', 'license_valid', { edition: 'licensed', key_prefix: LICENSE_KEY.slice(0, 12) + '...' });
     } else {
-      log('warn', 'license_invalid', { hint: 'License key must start with plk_ and be 32+ chars' });
+      log('warn', 'license_invalid', {
+        hint: 'License key must be plk_ followed by exactly 64 lowercase hex characters (68 chars total)',
+        length_provided: LICENSE_KEY.length,
+        expected_length: 68
+      });
     }
   }
   applyKeyLimitEnforcement();
