@@ -40,3 +40,16 @@ Thanks for your interest in contributing.
 ## Questions?
 
 Open an issue or reach out at privacy@paramant.app
+
+## Hall of Fame
+
+Security researchers and contributors who have helped make PARAMANT better:
+
+| Researcher | Handle | Contribution | Date |
+|------------|--------|--------------|------|
+| Ryan Williams | [@scs-labrat](https://github.com/scs-labrat) | Independent security review — 4 critical + 2 high findings | April 2026 |
+| Hendrik Bruinsma | [@readefries](https://github.com/readefries) | Thunderbird FileLink extension, QR bug, fingerprint mismatch, preload burn bug | April 2026 |
+
+Want to be on this list? Find something wrong. Report it. We fix it publicly.
+
+See [SECURITY.md](SECURITY.md) for responsible disclosure policy.
