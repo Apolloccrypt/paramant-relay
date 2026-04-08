@@ -1,7 +1,7 @@
 # PARAMANT Self-Hosting Guide
 
 **Version:** v2.2.1  
-**License:** BUSL-1.1 — source available, free for up to 5 active API keys in production  
+**License:** BUSL-1.1 — source available, free for up to 5 users per relay in production  
 **Change date:** 2029-01-01 → Apache 2.0  
 **License enforcement details:** [docs/licensing.md](licensing.md)
 
@@ -64,7 +64,7 @@ nano .env
 | `RAM_RESERVE_MB` | No | `256` | RAM reserve before rejecting uploads |
 | `RELAY_MODE` | No | `ghost_pipe` | Endpoint set: `ghost_pipe` or `iot` |
 | `USERS_FILE` | No | `./users.json` | Path to API key store |
-| `PARAMANT_LICENSE` | No | — | Pro license key (`plk_...`) for unlimited API keys |
+| `PARAMANT_LICENSE` | No | — | Relay license key (`plk_...`) — unlocks unlimited users |
 | `RESEND_API_KEY` | No | — | For welcome emails when adding users |
 | `HTTP_PORT` | No | `80` | Override if port 80 is in use |
 | `HTTPS_PORT` | No | `443` | Override if port 443 is in use |
