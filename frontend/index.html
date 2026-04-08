@@ -601,6 +601,50 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       <div style="margin-top:24px"><a href="mailto:privacy@paramant.app" style="font-size:12px;font-family:var(--mono);color:#2d8a5c;border:1px solid #1a3d28;padding:8px 18px;border-radius:4px;text-decoration:none">Get notified &rarr;</a></div>
     </div>
   </div>
+  <!-- Install method cards -->
+  <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
+
+    <!-- Raspberry Pi -->
+    <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:24px;display:flex;flex-direction:column">
+      <div style="font-size:20px;margin-bottom:10px">&#127822;</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
+      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Pi 3B+ / 4 / 5</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">One command. Detects your Pi, installs Docker, disables swap, shows QR code with your relay URL.</div>
+      <div style="background:#060e09;border:1px solid #1a3d28;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#2d8a5c;word-break:break-all;margin-bottom:16px">curl -fsSL https://paramant.app/install-pi.sh | bash</div>
+      <div style="font-size:10px;font-family:var(--mono);color:#6e6e6e">ARM64 &middot; 512 MB RAM min &middot; Raspberry Pi OS Lite</div>
+    </div>
+
+    <!-- Docker Hub -->
+    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
+      <div style="font-size:20px;margin-bottom:10px">&#128229;</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">DOCKER HUB</div>
+      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Linux &middot; amd64 + arm64</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Pull the pre-built multi-arch image. No build step, no Node.js required. Works on any Docker host.</div>
+      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
+        docker pull mtty001/relay:latest<br>
+        <span style="color:#6e6e6e"># or: docker compose up -d</span>
+      </div>
+      <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">View on Docker Hub &rarr;</a>
+    </div>
+
+    <!-- Linux VPS -->
+    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
+      <div style="font-size:20px;margin-bottom:10px">&#128196;</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">LINUX / VPS</div>
+      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Ubuntu &middot; Debian &middot; Hetzner</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 4-sector stack with nginx and auto-TLS.</div>
+      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
+        git clone github.com/Apolloccrypt/paramant-relay<br>
+        cp .env.example .env &amp;&amp; nano .env<br>
+        docker compose up -d
+      </div>
+      <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">&#9733; View on GitHub &rarr;</a>
+    </div>
+
+  </div>
+
+  <!-- Quick start detail -->
   <div style="background:#181818;border:1px solid #242424;border-radius:8px;overflow:hidden;margin-bottom:32px">
     <div style="padding:11px 20px;border-bottom:1px solid #242424;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">Quick start &mdash; Ubuntu / Debian</span>
@@ -616,7 +660,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       docker compose up -d<br><br>
       <span style="color:#6e6e6e"># 4. Verify</span><br>
       curl http://localhost/health<br>
-      <span style="color:#2d8a5c"># {"ok":true,"version":"2.2.0","edition":"community"}</span>
+      <span style="color:#2d8a5c"># {"ok":true,"version":"2.2.1","edition":"community"}</span>
     </div>
   </div>
   <div style="display:flex;gap:32px;flex-wrap:wrap">
