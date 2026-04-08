@@ -543,7 +543,10 @@ function loadUsers() {
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     (d.api_keys || []).forEach(k => {
-      if (k.active) apiKeys.set(k.key, { plan: k.plan, label: k.label||'', active: true, dsa_pub: k.dsa_pub||'' });
+      if (k.active) apiKeys.set(k.key, {
+        plan: k.plan, label: k.label||'', active: true, dsa_pub: k.dsa_pub||'',
+        daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
+      });
     });
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
   } catch(e) { log('warn', 'no_users_file'); }
@@ -998,9 +1001,17 @@ const server = http.createServer(async (req, res) => {
       }));
     }
     try {
-      if (keyData?.plan === 'free' && !checkFreeRateLimit(apiKey)) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
-        return res.end(JSON.stringify({ error: 'Free tier limit reached (10 uploads/day)', retry_after_s: 86400 }));
+      if (keyData?.plan === 'free') {
+        // Per-key daily upload counter (pentest #4 — survives IP rotation)
+        if (Date.now() > keyData.daily_reset_ts) {
+          keyData.daily_uploads   = 0;
+          keyData.daily_reset_ts  = Date.now() + 86_400_000;
+        }
+        if (keyData.daily_uploads >= 10) {
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+          return res.end(J({ error: 'Daily upload limit reached (10/day). Upgrade at paramant.app/pricing', retry_after_s: 86400 }));
+        }
+        keyData.daily_uploads++;
       }
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
