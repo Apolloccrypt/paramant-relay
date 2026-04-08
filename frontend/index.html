@@ -490,64 +490,63 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <p class="sub">You pay for access to the relay network — no fees per blob, no storage costs, no egress charges. <span style="color:var(--quiet)">Pay with money, not with your data. Or your customers'.</span></p>
   
         <div class="pricing-grid">
+
           <div class="pc">
-            <div class="price-name">DEV</div>
-            <div class="price-amount">€9.99 <span class="per-month">/ month</span></div>
-            <div class="price-note">Cancel anytime</div>
-            <div class="price-tagline">Send files. They vanish after opening.</div>
+            <div class="price-name">SELF-HOST</div>
+            <div class="price-amount">Free</div>
+            <div class="price-note">Community Edition &mdash; BUSL-1.1</div>
+            <div class="price-tagline">Full control. Your server, your data, zero lock-in.</div>
             <ul class="pf">
-              <li>+ Up to 500MB per transfer via ParaShare</li>
-              <li>+ Post-quantum encrypted transport</li>
-              <li>+ 1 device</li>
-              <li>+ One-time download links — burn on read</li>
-              <li>+ Certificate Transparency log — proof of delivery</li>
-              <li>+ No storage. No logs. No trace.</li>
+              <li>+ Full source code &mdash; audit everything</li>
+              <li>+ ML-KEM-768 + AES-256-GCM</li>
+              <li>+ RAM-only, burn-on-read</li>
+              <li>+ 4 sector relays via Docker Compose</li>
+              <li>+ Auto TLS via Let's Encrypt</li>
+              <li>+ Up to 5 API keys</li>
+              <li>+ Zero-downtime key reload</li>
+              <li>&ndash; No commercial support</li>
             </ul>
-            <span class="price-btn s" style="opacity:0.45;cursor:not-allowed;pointer-events:none">Coming soon</span>
+            <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.2.0" target="_blank" class="price-btn s">Download v2.2.0 &rarr;</a>
           </div>
 
           <div class="pc featured">
-            <div class="price-name">PRO</div>
-            <div class="price-amount">€49 <span class="per-month">/ month</span></div>
+            <div class="price-name">HOSTED</div>
+            <div class="price-amount">€12 <span class="per-month">/ mo per device</span></div>
             <div class="price-note">Cancel anytime</div>
-            <div class="price-tagline">For teams handling data that must never be seen twice.</div>
+            <div class="price-tagline">We run the relay. You get the security.</div>
             <ul class="pf">
-              <li>+ Everything in Dev</li>
-              <li>+ 3 devices included</li>
-              <li>+ Extra device: €12/mo per device</li>
-              <li>+ Team management — één factuur</li>
-              <li>+ Unlimited devices + unique device identities</li>
-              <li>+ Automatic webhook — notify your system on delivery</li>
-              <li>+ Password-protected transfers</li>
+              <li>+ Everything in Self-host</li>
+              <li>+ Unlimited API keys</li>
+              <li>+ Managed relay on Hetzner DE</li>
+              <li>+ WebSocket streaming &mdash; sub-100ms</li>
+              <li>+ Automatic webhook on delivery</li>
               <li>+ Compliance audit export (JSON + CSV)</li>
               <li>+ Live monitor dashboard</li>
-              <li>+ WebSocket streaming — sub-100ms delivery</li>
+              <li>+ Password-protected transfers</li>
               <li>+ Priority relay access</li>
+              <li>+ E-mail support</li>
             </ul>
             <span class="price-btn p" style="opacity:0.45;cursor:not-allowed;pointer-events:none">Coming soon</span>
-            <div style="margin-top:12px;padding:10px 12px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:4px;font-size:11px;color:#565656;line-height:1.7;">
-              Extra device: <span style="color:#aaa;">€12/mo</span>
-              <span style="color:#555;margin-left:8px;cursor:not-allowed">Coming soon</span>
-            </div>
-
           </div>
 
           <div class="pc">
             <div class="price-name">ENTERPRISE</div>
             <div class="price-amount">Custom</div>
             <div class="price-note">Volume and SLA pricing</div>
-            <div class="price-tagline">For regulated industries — healthcare, legal, finance.</div>
+            <div class="price-tagline">For regulated industries &mdash; healthcare, legal, finance.</div>
             <ul class="pf">
-              <li>+ Everything in Pro</li>
-              <li>+ Dedicated relay — your data never shared with others</li>
-              <li>+ DICOM / FHIR integration for medical systems</li>
-              <li>+ NEN 7510 / IEC 62443 compliance documentation</li>
-              <li>+ SLA 99.9% + priority support</li>
+              <li>+ Everything in Hosted</li>
+              <li>+ Dedicated relay &mdash; your data never shared</li>
               <li>+ On-premise relay option</li>
+              <li>+ DICOM / FHIR integration</li>
+              <li>+ NEN 7510 / IEC 62443 compliance docs</li>
+              <li>+ SLA 99.9% + priority support</li>
+              <li>+ SAML / SSO</li>
               <li>+ Kubernetes operator</li>
             </ul>
             <a href="mailto:hello@paramant.app" class="price-btn s">Contact us</a>
           </div>
+
         </div>
 
 </section>
