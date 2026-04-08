@@ -566,7 +566,7 @@ select {
             Waiting for receiver
           </div>
           <div class="qr-wrap">
-            <canvas id="qr-canvas"></canvas>
+            <div id="qr-canvas"></div>
             <div class="qr-hint">Receiver scans this QR code<br>with their camera or ParaDrop app</div>
             <div class="qr-link" id="qr-link-text" onclick="copySessionLink()">Tap to copy link</div>
           </div>
@@ -883,9 +883,12 @@ async function createSession() {
   document.getElementById('send-step-file').style.display = 'none';
   document.getElementById('send-step-qr').style.display = '';
 
-  // Generate QR
-  const qrCanvas = document.getElementById('qr-canvas');
-  QRCode.toCanvas(qrCanvas, recvUrl, { width: 200, margin: 1, color: { dark: '#000', light: '#fff' } });
+  // Generate QR (qrcodejs API: new QRCode(divEl, opts))
+  const qrWrap = document.getElementById('qr-canvas');
+  qrWrap.innerHTML = '';  // clear previous if re-generated
+  new QRCode(qrWrap, { text: recvUrl, width: 200, height: 200,
+    colorDark: '#000000', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M });
   document.getElementById('qr-link-text').textContent = recvUrl;
 
   connectWebSocket();
