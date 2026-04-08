@@ -23,10 +23,6 @@ primary_region = "ams"
     path = "/health"
     protocol = "http"
 
-[[mounts]]
-  source = "paramant_users"
-  destination = "/data"
-
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
