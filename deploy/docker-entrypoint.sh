@@ -5,7 +5,6 @@ KEY=/etc/nginx/certs/key.pem
 DOMAIN=${DOMAIN:-localhost}
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
     echo "[paramant] No TLS cert found — generating self-signed for $DOMAIN"
-    apk add --no-cache openssl > /dev/null 2>&1
     mkdir -p /etc/nginx/certs
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout "$KEY" \
