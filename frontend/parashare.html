@@ -391,13 +391,14 @@ function toB64(u8) {
 async function copyLink() {
   const url = $('session-link').textContent;
   await navigator.clipboard.writeText(url).catch(()=>{});
-  $('session-link').textContent = '✓ Copied! — ' + url;
+  $('session-link').textContent = '✓ Copied!';
   setTimeout(() => { $('session-link').textContent = url; }, 2000);
 }
 
 // ── Key validation ──
 async function onKeyInput() {
   apiKey = $('api-key').value.trim();
+  if (apiKey) localStorage.setItem('paramant_api_key', apiKey);
   if (apiKey.length < 10 || !apiKey.startsWith('pgp_')) {
     setStatus('key-status', 'Invalid format');
     keyValid = false; updateBtn(); return;
@@ -675,8 +676,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && globeOpen) toggleGlobe();
 });
 
-// Auto-init globe as background on load
+// Auto-init globe as background on load, restore saved API key
 document.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('paramant_api_key');
+  if (saved) { $('api-key').value = saved; onKeyInput(); }
   // Small delay so DOM is fully painted before Globe.gl reads dimensions
   setTimeout(() => initGlobe(), 400);
 });
