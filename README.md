@@ -482,7 +482,7 @@ all four sectors, and priority support.
 
 **Enterprise** includes HA clustering (NATS-backed), Prometheus/Grafana monitoring,
 SOC 2 audit support, custom data residency, SLA, and dedicated support.
-[Contact us](mailto:hello@paramant.app) for a quote.
+[Contact us](mailto:privacy@paramant.app) for a quote.
 
 ## Enterprise Roadmap
 
@@ -500,4 +500,4 @@ Features currently in development for Enterprise:
 - **SSO / SAML** — enterprise IdP integration for admin access
 
 [Watch the repo](https://github.com/Apolloccrypt/paramant-relay) or
-[email us](mailto:hello@paramant.app) to join the Enterprise preview.
+[email us](mailto:privacy@paramant.app) to join the Enterprise preview.
