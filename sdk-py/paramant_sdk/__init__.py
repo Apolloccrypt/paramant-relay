@@ -18,6 +18,9 @@ Gebruik:
   # Ontvanger
   data = gp.receive(result['hash'])
 
+Changelog v1.1.1:
+  - Security: key zeroization (ctypes _zero) added to _encrypt and _decrypt
+  - Security: runtime RuntimeWarning if _zero() CPython check fails or ctypes errors
 Changelog v1.1.0:
   - Wire format: PQHB v1 (aligned with JS SDK — nu interoperabel)
       [4 magic 'PQHB'][2 ver 0x01 0x00][16 salt][12 iv][16 tag][65 eph_pub][ciphertext]
@@ -27,11 +30,34 @@ Changelog v1.1.0:
   - detect_relay(): uses /v2/check-key for key validation before choosing relay
   - kyber: graceful optional (falls back to ECDH-only; document with mlkem package)
 """
-import base64, hashlib, json, os, struct, time
+import base64, ctypes, hashlib, json, os, struct, sys, time, warnings
 import urllib.request, urllib.error, urllib.parse
 from typing import Callable, Optional
 
-__version__ = '1.1.0'
+__version__ = '1.1.1'
+
+# ── Key zeroization ──────────────────────────────────────────────────────────
+_ZEROIZE_OK = (sys.implementation.name == 'cpython')
+if not _ZEROIZE_OK:
+    warnings.warn(
+        'paramant-sdk: key zeroization (ctypes) is not supported on '
+        f'{sys.implementation.name}. Secret key material may persist in RAM.',
+        RuntimeWarning, stacklevel=2,
+    )
+
+
+def _zero(b: bytes) -> None:
+    """Overwrite key material in memory with zeroes (CPython, best-effort)."""
+    if not b:
+        return
+    try:
+        offset = sys.getsizeof(b) - len(b) - 1
+        ctypes.memset(id(b) + offset, 0, len(b))
+    except Exception as _e:
+        warnings.warn(
+            f'paramant-sdk: _zero() failed — key material may persist in RAM: {_e}',
+            RuntimeWarning, stacklevel=2,
+        )
 
 SECTOR_RELAYS = {
     'health':  'https://health.paramant.app',
@@ -207,38 +233,43 @@ class GhostPipe:
     def _encrypt(self, plaintext: bytes, receiver_spki_hex: str) -> bytes:
         c = self._get_crypto(); K = self._try_mlkem(); be = c['be']()
         recv_pub = c['lpub'](bytes.fromhex(receiver_spki_hex), be)
+        ecdh_ss = kss = ikm = key = None
+        try:
+            # Ephemeral ECDH
+            eph     = c['gen'](c['curve'](), be)
+            ecdh_ss = eph.exchange(c['ECDH'](), recv_pub)
+            eph_raw = self._ecdh_raw_pub(
+                eph.public_key().public_bytes(c['Enc'].DER, c['Pub'].SubjectPublicKeyInfo))
 
-        # Ephemeral ECDH
-        eph     = c['gen'](c['curve'](), be)
-        ecdh_ss = eph.exchange(c['ECDH'](), recv_pub)
-        eph_raw = self._ecdh_raw_pub(
-            eph.public_key().public_bytes(c['Enc'].DER, c['Pub'].SubjectPublicKeyInfo))
+            # Optional ML-KEM (post-quantum)
+            kss = b''
+            if K:
+                try:
+                    recv_kyber = bytes.fromhex(
+                        self._load_keypair().get('kyber_pub', ''))
+                    if recv_kyber:
+                        _, kss = K.enc(recv_kyber)
+                except Exception:
+                    kss = b''
 
-        # Optional ML-KEM (post-quantum)
-        kss = b''
-        if K:
-            try:
-                recv_kyber = bytes.fromhex(
-                    self._load_keypair().get('kyber_pub', ''))
-                if recv_kyber:
-                    _, kss = K.enc(recv_kyber)
-            except Exception:
-                kss = b''
+            # HKDF
+            salt = os.urandom(16)
+            ikm  = ecdh_ss + kss
+            key  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
+                              salt=salt, info=b'paramant-ghost-pipe-v1',
+                              backend=be).derive(ikm)
+            # AES-256-GCM
+            iv = os.urandom(12)
+            ct = c['AES'](key).encrypt(iv, plaintext, None)
+            tag = ct[-16:]
+            enc = ct[:-16]  # AESGCM appends tag; separate for wire format
 
-        # HKDF
-        salt = os.urandom(16)
-        ikm  = ecdh_ss + kss
-        key  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
-                          salt=salt, info=b'paramant-ghost-pipe-v1',
-                          backend=be).derive(ikm)
-        # AES-256-GCM
-        iv = os.urandom(12)
-        ct = c['AES'](key).encrypt(iv, plaintext, None)
-        tag = ct[-16:]
-        enc = ct[:-16]  # AESGCM appends tag; separate for wire format
-
-        # PQHB v1: [magic][ver][salt][iv][tag][eph_pub_raw][ciphertext]
-        return MAGIC + VER + salt + iv + tag + eph_raw + enc
+            # PQHB v1: [magic][ver][salt][iv][tag][eph_pub_raw][ciphertext]
+            return MAGIC + VER + salt + iv + tag + eph_raw + enc
+        finally:
+            for _b in (ecdh_ss, kss, ikm, key):
+                if _b:
+                    _zero(_b)
 
     # ── Decrypt (PQHB v1) ────────────────────────────────────────────────────
     def _decrypt(self, blob: bytes) -> bytes:
@@ -255,28 +286,31 @@ class GhostPipe:
 
         c  = self._get_crypto(); be = c['be']()
         kp = self._load_keypair()
-        priv    = c['lpriv'](bytes.fromhex(kp['ecdh_priv']), None, be)
-        # Reconstruct sender ephemeral pub from raw 65 bytes (uncompressed)
-        # Node uses raw P-256 point; reconstruct as SubjectPublicKeyInfo
-        from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
-        from cryptography.hazmat.primitives.serialization import load_der_public_key
-        # Wrap raw 65-byte P-256 point in SPKI DER header
-        SPKI_PREFIX = bytes.fromhex(
-            '3059301306072a8648ce3d020106082a8648ce3d030107034200')
-        eph_spki = SPKI_PREFIX + eph_raw
-        eph_pub  = load_der_public_key(eph_spki, be)
-        ecdh_ss  = priv.exchange(c['ECDH'](), eph_pub)
-
-        key  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
-                          salt=salt, info=b'paramant-ghost-pipe-v1',
-                          backend=be).derive(ecdh_ss)
-        # Reattach tag for AESGCM decrypt
+        ecdh_ss = key = None
         try:
-            return c['AES'](key).decrypt(iv, enc + tag, None)
-        except Exception:
-            raise GhostPipeError(
-                'Ontsleuteling mislukt — verkeerde sleutel of beschadigde blob',
-                'DECRYPT_FAILED')
+            priv    = c['lpriv'](bytes.fromhex(kp['ecdh_priv']), None, be)
+            # Wrap raw 65-byte P-256 point in SPKI DER header
+            from cryptography.hazmat.primitives.serialization import load_der_public_key
+            SPKI_PREFIX = bytes.fromhex(
+                '3059301306072a8648ce3d020106082a8648ce3d030107034200')
+            eph_spki = SPKI_PREFIX + eph_raw
+            eph_pub  = load_der_public_key(eph_spki, be)
+            ecdh_ss  = priv.exchange(c['ECDH'](), eph_pub)
+
+            key  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
+                              salt=salt, info=b'paramant-ghost-pipe-v1',
+                              backend=be).derive(ecdh_ss)
+            # Reattach tag for AESGCM decrypt
+            try:
+                return c['AES'](key).decrypt(iv, enc + tag, None)
+            except Exception:
+                raise GhostPipeError(
+                    'Ontsleuteling mislukt — verkeerde sleutel of beschadigde blob',
+                    'DECRYPT_FAILED')
+        finally:
+            for _b in (ecdh_ss, key):
+                if _b:
+                    _zero(_b)
 
     # ── Publieke API ──────────────────────────────────────────────────────────
 

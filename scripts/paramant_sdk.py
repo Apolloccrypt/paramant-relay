@@ -16,7 +16,7 @@ Gebruik:
   gp = GhostPipe(api_key='pgp_xxx', device='mri-001')
   gp.listen(on_receive=lambda data, meta: save(data))
 """
-import base64, ctypes, hashlib, json, os, struct, sys, time
+import base64, ctypes, hashlib, json, os, struct, sys, time, warnings
 import urllib.request, urllib.error
 from typing import Callable, Optional
 
@@ -31,6 +31,15 @@ BLOCKS = {
 }
 
 # ── Sleutelzeroïsatie ─────────────────────────────────────────────────────────
+_ZEROIZE_OK = (sys.implementation.name == 'cpython')
+if not _ZEROIZE_OK:
+    warnings.warn(
+        'paramant-sdk: key zeroization (ctypes) is not supported on '
+        f'{sys.implementation.name}. Secret key material may persist in RAM.',
+        RuntimeWarning, stacklevel=2,
+    )
+
+
 def _zero(b: bytes) -> None:
     """Overschrijf sleutelmateriaal in geheugen met nullen (CPython, best-effort)."""
     if not b:
@@ -38,8 +47,11 @@ def _zero(b: bytes) -> None:
     try:
         offset = sys.getsizeof(b) - len(b) - 1
         ctypes.memset(id(b) + offset, 0, len(b))
-    except Exception:
-        pass
+    except Exception as _e:
+        warnings.warn(
+            f'paramant-sdk: _zero() failed — key material may persist in RAM: {_e}',
+            RuntimeWarning, stacklevel=2,
+        )
 
 # ── BIP39 helpers ─────────────────────────────────────────────────────────────
 def _bip39_encode(entropy: bytes) -> str:

@@ -161,7 +161,6 @@ async function genFingerprint(kyberPubHex, ecdhPubHex) {
 // ── Get session token from URL ──
 const params = new URLSearchParams(location.search);
 const sessionToken = params.get('s');
-const transferKey = params.get('k') || '';
 if (!sessionToken || !/^inv_[a-zA-Z0-9]{32}$/.test(sessionToken)) {
   window.addEventListener('mlkem-ready', () => showError('Invalid or missing session token'));
 }
@@ -241,7 +240,7 @@ async function init() {
       try {
         await fetch(`${RELAY_API}/v2/pubkey`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': transferKey },
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': sessionToken },
           body: JSON.stringify({
             device_id: sessionToken,
             ecdh_pub: ecdhPubHex,
@@ -285,7 +284,10 @@ async function init() {
     const pollTransfer = setInterval(async () => {
       if (_transferClaimed) return;
       try {
-        const r = await fetch(RELAY_API + '/v2/pubkey/' + encodeURIComponent(sessionToken + '_ready') + '?k=' + encodeURIComponent(transferKey), {signal: AbortSignal.timeout(3000)});
+        const r = await fetch(RELAY_API + '/v2/pubkey/' + encodeURIComponent(sessionToken + '_ready'), {
+          headers: { 'X-Api-Key': sessionToken },
+          signal: AbortSignal.timeout(3000)
+        });
         if (r.ok) {
           const d = await r.json();
           if (d.ecdh_pub && d.kyber_pub) {
@@ -293,14 +295,15 @@ async function init() {
             _transferClaimed = true;
             clearInterval(pollTransfer);
             const parts = d.kyber_pub.split('|');
-            const ttl_ms = parseInt(parts[2]) || 3600000;
             if (parts[0] === 'vault') {
               // Vault mode: meerdere bestanden
+              const ttl_ms = parseInt(parts[2]) || 3600000;
               const vaultFiles = JSON.parse(d.ecdh_pub);
               await receiveVault(vaultFiles, ttl_ms, myPrivateKey_MLKEM, myPrivateKey_ECDH);
             } else {
-              // Enkelvoudig bestand
-              await receiveFile({ tokens: d.ecdh_pub, file_name: parts[0], total_chunks: parseInt(parts[1]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH);
+              // Enkelvoudig bestand — formaat: total_chunks|ttl_ms (bestandsnaam zit alleen in encrypted payload)
+              const ttl_ms = parseInt(parts[1]) || 3600000;
+              await receiveFile({ tokens: d.ecdh_pub, file_name: 'download', total_chunks: parseInt(parts[0]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH);
             }
           }
         }
@@ -388,6 +391,12 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
       if (plainPadded[0] === META_MAGIC[0] && plainPadded[1] === META_MAGIC[1]) {
         doff = 4;
         const metaLen = new DataView(plainPadded.buffer).getUint32(doff, false);
+        if (i === 0) {
+          try {
+            const metaObj = JSON.parse(new TextDecoder().decode(plainPadded.slice(doff + 4, doff + 4 + metaLen)));
+            if (metaObj.file_name) fileName = metaObj.file_name;
+          } catch(_) {}
+        }
         doff += 4 + metaLen;
       }
       const decryptedChunk = plainPadded.slice(doff);
@@ -460,10 +469,10 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
   for (let fi = 0; fi < vaultFiles.length; fi++) {
     const vf = vaultFiles[fi];
     await receiveFile(
-      { tokens: vf.tokens.join(','), file_name: vf.name, total_chunks: vf.tokens.length, ttl_ms, _vaultIdx: fi, _vaultTotal: vaultFiles.length },
+      { tokens: vf.tokens.join(','), file_name: 'download', total_chunks: vf.tokens.length, ttl_ms, _vaultIdx: fi, _vaultTotal: vaultFiles.length },
       kyberSec, ecdhPriv, { silent: fi < vaultFiles.length - 1 }
     );
-    $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded — ' + vf.name;
+    $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded';
   }
 
   $('done-status').textContent = '✓ Vault opened — ' + vaultFiles.length + ' files decrypted and saved';
