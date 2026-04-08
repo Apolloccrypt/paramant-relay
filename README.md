@@ -10,6 +10,27 @@ Post-quantum encrypted file transfer. Files are encrypted client-side, transit t
 
 PARAMANT relays are self-hostable. You can run a single relay or all four sector relays behind nginx using Docker Compose.
 
+## Raspberry Pi
+
+One-command install for Raspberry Pi OS Lite 64-bit:
+
+```bash
+curl -fsSL https://paramant.app/install-pi.sh | bash
+```
+
+Works on Pi 3B+, Pi 4, Pi 5. 512MB RAM minimum (1GB+ recommended).
+
+The installer:
+- Detects your Pi model
+- Installs Docker if not present
+- Disables swap (required — relay is RAM-only)
+- Disables WiFi power saving (prevents connection drops)
+- Clones this repo and configures `.env` with an auto-generated `ADMIN_TOKEN`
+- Enables Docker at boot and starts the relay stack
+- Prints access URLs and a QR code for your local dashboard
+
+After install, add API keys by editing `/opt/paramant-relay/config/users.json`.
+
 ### Docker Compose (recommended)
 
 ```bash

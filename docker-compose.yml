@@ -8,7 +8,8 @@
 
 services:
   relay-health:
-    build: ./relay
+    image: paramant/relay:latest  # pull from Docker Hub; replace with: build: ./relay  to build locally
+    # build: ./relay
     restart: unless-stopped
     environment:
       PORT: "3005"
@@ -31,7 +32,8 @@ services:
       retries: 3
 
   relay-legal:
-    build: ./relay
+    image: paramant/relay:latest
+    # build: ./relay
     restart: unless-stopped
     environment:
       PORT: "3002"
@@ -47,7 +49,8 @@ services:
       - relay-internal
 
   relay-finance:
-    build: ./relay
+    image: paramant/relay:latest
+    # build: ./relay
     restart: unless-stopped
     environment:
       PORT: "3003"
@@ -63,7 +66,8 @@ services:
       - relay-internal
 
   relay-iot:
-    build: ./relay
+    image: paramant/relay:latest
+    # build: ./relay
     restart: unless-stopped
     environment:
       PORT: "3004"
