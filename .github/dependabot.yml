@@ -1,15 +1,6 @@
 version: 2
 
 updates:
-  # npm – fly-relay
-  - package-ecosystem: "npm"
-    directory: "/fly-relay"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "fly-relay"
-
   # npm – relay
   - package-ecosystem: "npm"
     directory: "/relay"
@@ -18,15 +9,6 @@ updates:
     labels:
       - "dependencies"
       - "relay"
-
-  # npm – sdk-js
-  - package-ecosystem: "npm"
-    directory: "/sdk-js"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "sdk-js"
 
   # pip – sdk-py (pyproject.toml)
   - package-ecosystem: "pip"
@@ -45,12 +27,3 @@ updates:
     labels:
       - "dependencies"
       - "docker"
-
-  # GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "github-actions"
