@@ -23,6 +23,13 @@ primary_region = "ams"
     path = "/health"
     protocol = "http"
 
+# Volume exists on existing machines — kept here to avoid deploy conflict.
+# Safe to delete after: flyctl volumes list -a paramant-ghost-pipe
+# then: flyctl volumes delete <vol-id> for each machine
+[[mounts]]
+  source = "paramant_users"
+  destination = "/data"
+
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
