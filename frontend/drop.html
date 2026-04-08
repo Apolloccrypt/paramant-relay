@@ -734,8 +734,8 @@ select {
 </div>
 
 <!-- QR code library -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/vendor/jsQR.min.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
 <!-- ML-KEM -->
 <script src="/noble-mlkem-bundle.js"></script>
 
@@ -883,13 +883,21 @@ async function createSession() {
   document.getElementById('send-step-file').style.display = 'none';
   document.getElementById('send-step-qr').style.display = '';
 
-  // Generate QR (qrcodejs API: new QRCode(divEl, opts))
+  // Generate QR — defer one tick so DOM layout settles after display change
   const qrWrap = document.getElementById('qr-canvas');
-  qrWrap.innerHTML = '';  // clear previous if re-generated
-  new QRCode(qrWrap, { text: recvUrl, width: 200, height: 200,
-    colorDark: '#000000', colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M });
+  qrWrap.innerHTML = '';
   document.getElementById('qr-link-text').textContent = recvUrl;
+  setTimeout(() => {
+    try {
+      new QRCode(qrWrap, { text: recvUrl, width: 200, height: 200,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M });
+    } catch(e) {
+      // Library not loaded or render failed — show URL as plain link fallback
+      qrWrap.innerHTML = `<div style="padding:8px;font-size:10px;word-break:break-all;color:#000">${recvUrl}</div>`;
+      console.error('QR render failed:', e);
+    }
+  }, 0);
 
   connectWebSocket();
 }

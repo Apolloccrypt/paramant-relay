@@ -1,17 +1,29 @@
 Business Source License 1.1
 
-Licensor: PARAMANT / Mick Beer
-Licensed Work: PARAMANT Ghost Pipe
-Change Date: 2029-01-01
+Licensor:       PARAMANT / Mick Beer
+Licensed Work:  PARAMANT Ghost Pipe
+Change Date:    2029-01-01
 Change License: Apache License 2.0
+
+Additional Use Grant
+
+You may make production use of the Licensed Work, provided such use does
+not exceed the following limits:
+
+  - Maximum 5 (five) active API keys per relay instance
+  - A single relay instance (one sector per self-hosted server)
+
+Use beyond these limits — including unlimited API keys, multiple sectors,
+high-availability clustering, or commercial redistribution — requires a
+commercial license. See https://paramant.app/pricing
 
 Terms
 
 The Licensor hereby grants you the right to copy, modify, create derivative
 works, redistribute, and make non-production use of the Licensed Work.
 
-The Licensor may make an Additional Use Grant, above, permitting limited
-production use.
+The production use rights granted in the Additional Use Grant above are
+limited to the conditions stated therein.
 
 Effective on the Change Date, or the fourth anniversary of the first publicly
 available distribution of a specific version of the Licensed Work under this
