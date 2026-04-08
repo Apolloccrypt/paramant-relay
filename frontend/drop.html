@@ -736,8 +736,8 @@ select {
 <!-- QR code library -->
 <script src="/vendor/jsQR.min.js"></script>
 <script src="/vendor/qrcode.min.js"></script>
-<!-- ML-KEM -->
-<script src="/noble-mlkem-bundle.js"></script>
+<!-- ML-KEM — loaded as module so export{} syntax works; sets window.ml_kem768 -->
+<script type="module" src="/noble-mlkem-loader.js"></script>
 
 <script>
 const RELAY_API = 'https://health.paramant.app';
