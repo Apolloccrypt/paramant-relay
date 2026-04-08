@@ -8,7 +8,7 @@
 
 services:
   relay-health:
-    image: paramant/relay:latest  # pull from Docker Hub; replace with: build: ./relay  to build locally
+    image: mtty001/relay:latest  # pull from Docker Hub; replace with: build: ./relay  to build locally
     # build: ./relay
     restart: unless-stopped
     environment:
@@ -32,7 +32,7 @@ services:
       retries: 3
 
   relay-legal:
-    image: paramant/relay:latest
+    image: mtty001/relay:latest
     # build: ./relay
     restart: unless-stopped
     environment:
@@ -49,7 +49,7 @@ services:
       - relay-internal
 
   relay-finance:
-    image: paramant/relay:latest
+    image: mtty001/relay:latest
     # build: ./relay
     restart: unless-stopped
     environment:
@@ -66,7 +66,7 @@ services:
       - relay-internal
 
   relay-iot:
-    image: paramant/relay:latest
+    image: mtty001/relay:latest
     # build: ./relay
     restart: unless-stopped
     environment:
