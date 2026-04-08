@@ -451,7 +451,7 @@ async function createSession() {
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
 
   // Build receiver URL
-  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&k=${encodeURIComponent(apiKey)}`;
+  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}`;
   $('session-link').textContent = recvUrl;
 
   showStep('step-waiting');
@@ -488,7 +488,7 @@ function connectWebSocket() {
     } catch(e) {}
   }, 2000);
 
-  ws.onmessage = (e) => {
+  ws.onmessage = async (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
 
@@ -613,7 +613,7 @@ async function confirmFingerprint() {
           headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
           body: JSON.stringify({
             hash, payload: toB64(padded), ttl_ms: ttlMs,
-            meta: { device_id: 'transfer-web', file_name: file.name, chunk_index: i, total_chunks: totalChunks, file_id: fileId }
+            meta: { device_id: 'transfer-web', chunk_index: i, file_id: fileId }
           }),
           signal: AbortSignal.timeout(120000)
         });
@@ -621,7 +621,7 @@ async function confirmFingerprint() {
         if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
         tokens.push(ud.download_token);
       }
-      return { name: file.name, size: file.size, tokens };
+      return { size: file.size, tokens };
     }
 
     // Upload alle bestanden
@@ -643,7 +643,7 @@ async function confirmFingerprint() {
         ecdh_pub: isVault ? JSON.stringify(vaultFiles) : vaultFiles[0].tokens.join(','),
         kyber_pub: isVault
           ? 'vault|' + files.length + '|' + ttlMs
-          : files[0].name + '|' + vaultFiles[0].tokens.length + '|' + ttlMs
+          : vaultFiles[0].tokens.length + '|' + ttlMs
       })
     });
 
