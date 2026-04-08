@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Post-Quantum Transport</title>
-<meta name="description" content="Encrypted file transport that destroys itself after delivery. ML-KEM-768. Burn-on-read. EU/DE jurisdiction.">
+<title>PARAMANT — Post-Quantum Encrypted File Transfer</title>
+<meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768. Burn-on-read. Self-hostable. EU/DE jurisdiction. Free to start.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
@@ -74,7 +74,7 @@ h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
 .price-btn{display:block;text-align:center;padding:10px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500}
 .price-btn.p{background:var(--text);color:var(--bg)}.price-btn.s{border:1px solid var(--border);color:var(--muted)}
 .price-btn:hover{opacity:.8}
-footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px}
+footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:32px}
 .footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
 .footer-links{display:flex;gap:24px}
 .footer-links a{font-size:12px;color:var(--quiet);text-decoration:none}
@@ -98,24 +98,26 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 <nav>
   <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
   <ul class="nav-links">
-    <li><a href="#selfhost" style="color:#2d8a5c">Self-host</a></li>
-
     <li><a href="#sectors">Use cases</a></li>
-    <li><a href="/docs">Docs</a></li>
     <li><a href="#pricing">Pricing</a></li>
-    <li><a href="/drop">ParaDrop</a></li><li><a href="/parashare">ParaShare</a></li>
-    <li><a href="/outlook">Outlook</a></li>
+    <li><a href="#selfhost">Self-host</a></li>
+    <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
   </ul>
-  <a href="/dashboard" class="nav-cta">Dashboard</a>
+  <a href="/parashare" class="nav-cta">Try free &rarr;</a>
 </nav>
 
 <div class="hero">
-  <div class="status"><span class="status-dot" id="sdot"></span><span id="stxt">Checking relay status...</span></div>
-  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:20px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">NOW SELF-HOSTABLE &mdash; docker compose up -d</span></div>
-<h1>Encrypted transport<br><em>that burns itself.</em></h1>
-  <p class="hero-sub">Post-quantum file transfer for healthcare, legal, and critical infrastructure. Data lives in RAM only &mdash; retrieved once, then gone forever.</p>
-  <div class="btns" style="margin-top:32px"><a href="/docs" class="btn-p">Get started</a><a href="#selfhost" class="btn-s">Self-host free &darr;</a><a href="https://github.com/Apolloccrypt/paramant-relay" class="btn-s" target="_blank">GitHub &nearr;</a></div>
-  
+  <div class="status"><span class="status-dot" id="sdot" style="background:#2d8a5c"></span><span id="stxt">Checking relay status...</span></div>
+  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.2.1 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
+  <h1>Encrypted transport<br><em>that burns itself.</em></h1>
+  <p class="hero-sub">Post-quantum file transfer. Encrypted client-side, stored in RAM only, destroyed after one download. For healthcare, legal, and critical infrastructure.</p>
+  <div class="btns" style="margin-top:36px">
+    <a href="/parashare" class="btn-p">Try ParaShare free &rarr;</a>
+    <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
+  </div>
+  <div style="margin-top:16px;font-size:12px;color:var(--quiet)">No account &nbsp;&middot;&nbsp; No credit card &nbsp;&middot;&nbsp; <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" style="color:var(--quiet);text-decoration:underline;text-decoration-color:#333">Request free API key &rarr;</a></div>
 </div>
 
 <div class="proto-bar">
@@ -293,60 +295,48 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 
   <div class="grid g2" style="margin-bottom:24px">
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Healthcare</div>
-      <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">MRI and CT scanners produce DICOM files that must reach the radiologist in milliseconds. SFTP leaves files on server. S3 is plaintext at rest. VPN breaks at firewalls. A breach costs €4.2M on average and triggers NEN 7510 liability.</p>
-      <h3>Solution</h3>
-      <p class="desc" style="margin-bottom:14px">DICOM → Ghost Pipe → PACS. The file exists only for the duration of the transfer, then burns. No NEN 7510 audit trail needed — there is nothing to audit.</p>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x2665; Healthcare</div>
+      <h3 style="margin-bottom:8px">DICOM files that vanish after delivery</h3>
+      <p class="desc" style="margin-bottom:14px">MRI / CT → Ghost Pipe → PACS. The file exists only for the duration of the transfer, then burns. Nothing to audit, nothing to breach. NEN 7510 compliant by design.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># DICOM gateway — runs today</span><br>
+        <span style="color:var(--quiet)"># DICOM gateway</span><br>
         python3 dicom-gateway.py --port 8090 --device mri-001<br>
-        <span style="color:var(--quiet)"># receiver → PACS</span><br>
         python3 paramant-receiver.py --forward https://pacs.hospital/api
       </div>
-      <a href="https://health.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on health.paramant.app →</a>
+      <a href="https://health.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on health.paramant.app &rarr;</a>
     </div>
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Legal &amp; Notary</div>
-      <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">Lawyers send contracts over email (unencrypted), WeTransfer (stored), or secure email (still stored somewhere). The moment a file lands on a server it can be subpoenaed, hacked, or leaked. Legal professional privilege does not survive a server breach.</p>
-      <h3>Solution</h3>
-      <p class="desc" style="margin-bottom:14px">Contract → Ghost Pipe → counterparty. After the notary retrieves the document it is cryptographically gone. The Merkle audit log proves delivery without storing what was delivered — admissible under eIDAS.</p>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x2696; Legal &amp; Notary</div>
+      <h3 style="margin-bottom:8px">Contracts that can't be subpoenaed</h3>
+      <p class="desc" style="margin-bottom:14px">Document → Ghost Pipe → counterparty. After retrieval it's cryptographically gone. The Merkle audit log proves delivery without storing what was delivered — admissible under eIDAS.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># send signed contract</span><br>
+        <span style="color:var(--quiet)"># send signed contract — once</span><br>
         python3 paramant-sender.py --key pgp_xxx --device notary-01 contract.pdf<br>
-        <span style="color:var(--quiet)"># counterparty receives once — then gone</span><br>
         python3 paramant-receiver.py --key pgp_xxx --device counterparty-01
       </div>
-      <a href="https://legal.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on legal.paramant.app →</a>
+      <a href="https://legal.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on legal.paramant.app &rarr;</a>
     </div>
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Industrial IoT / OT</div>
-      <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">PLCs and SCADA sensors send energy consumption, process temperatures, and production volumes. Plain MQTT leaks competitive intelligence. VPNs add latency and fail at scale. IEC 62443 requires encrypted transport with device identity. OT networks cannot have direct IT connections.</p>
-      <h3>Solution</h3>
-      <p class="desc" style="margin-bottom:14px">Sensor → Ghost Pipe → SCADA dashboard. Sub-100ms via NATS push. No VPN, no certificates, no IT overhead. Works on ESP32 and Raspberry Pi. Ghost Pipe acts as a quantum-safe data diode — OT never touches IT directly.</p>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x26a1; Industrial IoT / OT</div>
+      <h3 style="margin-bottom:8px">Sensor data without exposing your OT network</h3>
+      <p class="desc" style="margin-bottom:14px">PLC → Ghost Pipe → SCADA. Sub-100ms via NATS. No VPN, no certificates, no direct IT connection. IEC 62443-compliant quantum-safe data diode. Runs on ESP32 and Raspberry Pi.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
         <span style="color:var(--quiet)"># PLC heartbeat every 15s</span><br>
         python3 paramant-sender.py --heartbeat 15 --device plc-factory-01<br>
-        <span style="color:var(--quiet)"># forward to SCADA</span><br>
         python3 paramant-receiver.py --forward https://scada.intern/api
       </div>
-      <a href="https://iot.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on iot.paramant.app →</a>
+      <a href="https://iot.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on iot.paramant.app &rarr;</a>
     </div>
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Finance &amp; Compliance</div>
-      <h3>Problem</h3>
-      <p class="desc" style="margin-bottom:16px">Banks send KYC documents and signing keys over TLS — but the transport provider still sees metadata, timing, and payload size. US CLOUD Act means any US-hosted service can be compelled to hand over data. NIS2 and DORA require an auditable, tamper-proof delivery chain.</p>
-      <h3>Solution</h3>
-      <p class="desc" style="margin-bottom:14px">All traffic on finance.paramant.app runs exclusively on Hetzner Frankfurt. No US infrastructure. 20MB fixed padding means all transfers look identical. The Merkle audit chain gives per-transaction proof of delivery — verifiable without knowing the content.</p>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x1f3e6; Finance &amp; Compliance</div>
+      <h3 style="margin-bottom:8px">No US CLOUD Act. No metadata leakage.</h3>
+      <p class="desc" style="margin-bottom:14px">Hetzner Frankfurt only — no US infrastructure. Fixed 20 MB padding means all transfers look identical. Per-transaction Merkle proof for NIS2/DORA audits — verifiable without knowing the content.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># watch directory, auto-send new files</span><br>
+        <span style="color:var(--quiet)"># auto-send new ISO 20022 files</span><br>
         python3 paramant-sender.py --watch /export/iso20022/ --device bank-nl-01<br>
-        <span style="color:var(--quiet)"># forward to compliance system</span><br>
         python3 paramant-receiver.py --forward https://compliance.bank.nl/api
       </div>
-      <a href="https://finance.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on finance.paramant.app →</a>
+      <a href="https://finance.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on finance.paramant.app &rarr;</a>
     </div>
   </div>
 
@@ -437,29 +427,29 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <!-- OPERATOR pricing -->
   <div id="pane-op" class="pricing-grid">
 
-    <div class="pc">
-      <div class="price-name" style="color:#2d8a5c">SELF-HOST — START HERE</div>
+    <div class="pc featured">
+      <div class="price-name" style="color:#2d8a5c">COMMUNITY &mdash; START HERE</div>
       <div class="price-amount">Free</div>
-      <div class="price-note">Community Edition &mdash; BUSL-1.1</div>
-      <div class="price-tagline">Full control. Your server, your data, zero lock-in.</div>
+      <div class="price-note">Up to 5 users &middot; BUSL-1.1 &middot; no license key needed</div>
+      <div class="price-tagline">Your server, your data, zero lock-in. Free forever.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Full source code &mdash; audit everything</li>
-        <li><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM</li>
+        <li><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM + ML-DSA-65</li>
         <li><span class="check">&#10003;</span> RAM-only, burn-on-read</li>
         <li><span class="check">&#10003;</span> 4 sector relays via Docker Compose</li>
         <li><span class="check">&#10003;</span> Auto TLS via Let&rsquo;s Encrypt</li>
-        <li><span class="check">&#10003;</span> Up to 5 users</li>
         <li><span class="check">&#10003;</span> Zero-downtime user reload</li>
-        <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> No commercial support</li>
+        <li><span class="check">&#10003;</span> Admin panel (r34ct0r)</li>
+        <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> Community support only</li>
       </ul>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.2.1" target="_blank" class="price-btn s">Download v2.2.1 &rarr;</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.2.1" target="_blank" class="price-btn p">Download v2.2.1 &rarr;</a>
     </div>
 
-    <div class="pc featured">
+    <div class="pc">
       <div class="price-name">RELAY LICENSE</div>
-      <div class="price-amount" style="font-size:22px">Coming Q3 2026</div>
-      <div class="price-note">Unlimited users on your self-hosted relay</div>
-      <div class="price-tagline">Outgrown 5 users? Add a <code style="font-size:11px;background:#111;padding:2px 5px;border-radius:3px">plk_</code> key to your .env and restart.</div>
+      <div class="price-amount" style="font-size:28px">Notify me</div>
+      <div class="price-note">Unlimited users &middot; coming Q3 2026</div>
+      <div class="price-tagline">Outgrown 5 users? One <code style="font-size:11px;background:#111;padding:2px 5px;border-radius:3px">plk_</code> key in .env unlocks unlimited.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Everything in Community</li>
         <li><span class="check">&#10003;</span> Unlimited users on your relay</li>
@@ -468,20 +458,20 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <li><span class="check">&#10003;</span> Compliance documentation</li>
         <li><span class="check">&#10003;</span> SAML / SSO</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Relay+license+waitlist" class="price-btn p">Get notified &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Relay+license+waitlist" class="price-btn s">Join waitlist &rarr;</a>
     </div>
 
     <div class="pc">
       <div class="price-name">ENTERPRISE RELAY</div>
       <div class="price-amount">Custom</div>
-      <div class="price-note">Volume and SLA pricing</div>
-      <div class="price-tagline">For regulated industries &mdash; healthcare, legal, finance.</div>
+      <div class="price-note">Volume &middot; SLA &middot; regulated industries</div>
+      <div class="price-tagline">Dedicated relay, on-premise option, DICOM / FHIR, compliance docs.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Everything in Licensed</li>
-        <li><span class="check">&#10003;</span> Dedicated relay &mdash; your data never shared</li>
-        <li><span class="check">&#10003;</span> On-premise relay option</li>
+        <li><span class="check">&#10003;</span> Dedicated relay &mdash; data never shared</li>
+        <li><span class="check">&#10003;</span> On-premise option</li>
         <li><span class="check">&#10003;</span> DICOM / FHIR integration</li>
-        <li><span class="check">&#10003;</span> NEN 7510 / IEC 62443 compliance docs</li>
+        <li><span class="check">&#10003;</span> NEN 7510 / IEC 62443 docs</li>
         <li><span class="check">&#10003;</span> SLA 99.9% + priority support</li>
         <li><span class="check">&#10003;</span> Kubernetes operator</li>
       </ul>
@@ -493,11 +483,11 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
   <!-- END USER pricing -->
   <div id="pane-user" class="pricing-grid" style="display:none">
 
-    <div class="pc">
-      <div class="price-name" style="color:#2d8a5c">FREE</div>
+    <div class="pc featured">
+      <div class="price-name" style="color:#2d8a5c">FREE &mdash; START HERE</div>
       <div class="price-amount">€0</div>
-      <div class="price-note">pgp_ API key &mdash; no credit card</div>
-      <div class="price-tagline">Try it. Build on it. Ship on it.</div>
+      <div class="price-note">pgp_ API key &middot; no credit card &middot; no account</div>
+      <div class="price-tagline">Try ParaShare now, or request a key for the API.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> 10 uploads per day</li>
         <li><span class="check">&#10003;</span> 1-hour blob TTL</li>
@@ -508,13 +498,16 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> No webhooks</li>
         <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> No streaming</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" class="price-btn s">Request free key &rarr;</a>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="/parashare" class="price-btn p">Try ParaShare &rarr;</a>
+        <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" class="price-btn s">Request API key &rarr;</a>
+      </div>
     </div>
 
-    <div class="pc featured">
+    <div class="pc">
       <div class="price-name">PRO</div>
-      <div class="price-amount">Coming Q3 2026</div>
-      <div class="price-note">pgp_ API key &mdash; full relay access</div>
+      <div class="price-amount" style="font-size:28px">Notify me</div>
+      <div class="price-note">Unlimited &middot; coming Q3 2026</div>
       <div class="price-tagline">No limits. Webhooks. Streaming. 24-hour retention.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Unlimited uploads</li>
@@ -526,19 +519,19 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <li><span class="check">&#10003;</span> CSV audit export</li>
         <li><span class="check">&#10003;</span> DID registration</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Pro+waitlist" class="price-btn p">Join waitlist &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Pro+waitlist" class="price-btn s">Join waitlist &rarr;</a>
     </div>
 
     <div class="pc">
       <div class="price-name">ENTERPRISE USER</div>
       <div class="price-amount">Custom</div>
-      <div class="price-note">For teams &mdash; compliance &amp; SLA</div>
+      <div class="price-note">Teams &middot; compliance &middot; SLA</div>
       <div class="price-tagline">7-day retention, compliance docs, dedicated support.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Everything in Pro</li>
         <li><span class="check">&#10003;</span> 7-day blob TTL</li>
         <li><span class="check">&#10003;</span> Up to 100 views per blob</li>
-        <li><span class="check">&#10003;</span> Admin panel access (r34ct0r)</li>
+        <li><span class="check">&#10003;</span> Admin panel access</li>
         <li><span class="check">&#10003;</span> Unlimited file size</li>
         <li><span class="check">&#10003;</span> SLA + compliance docs</li>
         <li><span class="check">&#10003;</span> Dedicated support</li>
@@ -559,33 +552,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 <section id="selfhost" style="max-width:960px;margin:0 auto;padding:72px 48px">
   <div class="eyebrow">Self-hosting</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
-  <p class="sub" style="max-width:580px;margin-bottom:48px">PARAMANT is source-available under BUSL-1.1. Deploy your own post-quantum encrypted relay on any Linux server &mdash; full control, no lock-in, no data leaving your infrastructure.</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:48px">
-    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:28px">
-      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px">Community Edition &mdash; Free</div>
-      <ul style="list-style:none;font-size:13px;color:#aaa;line-height:2.4">
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Full source code &mdash; audit everything</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>ML-KEM-768 + AES-256-GCM</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>RAM-only, burn-on-read</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Docker Compose included</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Up to 5 users</li>
-        <li><span style="color:#6e6e6e;margin-right:10px">&ndash;</span>No commercial support</li>
-      </ul>
-      <div style="margin-top:24px"><a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.2.1" target="_blank" style="font-size:12px;font-family:var(--mono);color:#ededed;border:1px solid #242424;padding:8px 18px;border-radius:4px;text-decoration:none">Download v2.2.1 &rarr;</a></div>
-    </div>
-    <div style="background:#181818;border:1px solid #1a3d28;border-radius:8px;padding:28px">
-      <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px">Relay License &mdash; coming soon</div>
-      <ul style="list-style:none;font-size:13px;color:#aaa;line-height:2.4">
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Everything in Community</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Unlimited users on your relay</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Priority security updates</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>E-mail support + SLA</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>SAML / SSO</li>
-        <li><span style="color:#2d8a5c;margin-right:10px">&#10003;</span>Compliance documentation</li>
-      </ul>
-      <div style="margin-top:24px"><a href="mailto:privacy@paramant.app" style="font-size:12px;font-family:var(--mono);color:#2d8a5c;border:1px solid #1a3d28;padding:8px 18px;border-radius:4px;text-decoration:none">Get notified &rarr;</a></div>
-    </div>
-  </div>
+  <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
   <!-- Install method cards -->
   <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
@@ -657,15 +624,41 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 </section>
 
 <footer>
-  <a href="/" class="footer-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
-  <div class="footer-links">
-    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-    <a href="mailto:privacy@paramant.app">Contact</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/ct-log">CT log</a>
-    <a href="#api">Docs</a>
+  <div>
+    <a href="/" class="footer-logo" style="text-decoration:none;color:inherit;display:block;margin-bottom:8px">PARAMANT</a>
+    <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Post-quantum encrypted file relay</div>
   </div>
-  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204 &middot; Hetzner DE<br>BUSL-1.1 &middot; 2026 PARAMANT</div>
+  <div style="display:flex;gap:48px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Product</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/parashare">ParaShare</a>
+        <a href="/drop">ParaDrop</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/ct-log">CT Log</a>
+        <a href="/docs">Docs</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Self-host</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/self-hosting.md" target="_blank">Deploy guide</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Company</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="mailto:privacy@paramant.app">Contact</a>
+        <a href="mailto:privacy@paramant.app?subject=Free+API+key+request">Free API key</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank">Security</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank">License</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
 </footer>
 
 <script src="ct-stats.js" defer></script>
