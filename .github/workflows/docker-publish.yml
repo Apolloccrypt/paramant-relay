@@ -6,6 +6,10 @@ on:
       - main
     tags:
       - "v*.*.*"
+    paths:
+      - "relay/**"
+      - ".github/workflows/docker-publish.yml"
+
   workflow_dispatch:
 
 jobs:
