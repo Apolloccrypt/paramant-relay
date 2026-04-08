@@ -151,12 +151,11 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
         <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)" id="pipe-ts"></span>
       </div>
       <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)">
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Finance</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-finance">—</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">IoT</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-iot">—</div></div>
-        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Fly.io</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-fly">—</div></div>
+        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">IoT</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-iot">—</div></div>
       </div>
     </div>
 
@@ -261,7 +260,6 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
     {name:"legal",   url:"https://legal.paramant.app",   stat:"ps-legal"},
     {name:"finance", url:"https://finance.paramant.app", stat:"ps-finance"},
     {name:"iot",     url:"https://iot.paramant.app",     stat:"ps-iot"},
-    {name:"fly.io",  url:"https://paramant-ghost-pipe.fly.dev", stat:"ps-fly"},
   ];
 
   const pc = document.getElementById("pipeCanvas");
@@ -345,7 +343,7 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
       const d = await fetch(r.url+"/health",{signal:AbortSignal.timeout(4000)}).then(x=>x.json());
       relayStatus[r.name] = {...d, ok: d.ok || d.status === 'ok'};
       const el = document.getElementById(r.stat);
-      if(el) el.textContent = "v"+d.version+" · "+Math.floor(d.uptime_s/3600)+"h";
+      if(el) el.textContent = d.uptime_s != null ? "v"+d.version+" · "+Math.floor(d.uptime_s/3600)+"h" : "v"+d.version;
       spawnDot(i);
     }catch(e){
       relayStatus[r.name]={ok:false};
@@ -372,13 +370,31 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 </script>
 
 
-<section style="max-width:960px;margin:0 auto;padding:24px 48px 0">
-  <div style="border:1px solid var(--border);border-radius:8px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;background:var(--surface)">
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Certificate Transparency Log</div>
-      <div style="font-size:13px;color:var(--muted);max-width:480px;line-height:1.6">Every transfer is recorded in a public Merkle tree — without storing the content. Cryptographic proof of delivery, visible to anyone.</div>
+<section style="max-width:960px;margin:0 auto;padding:40px 48px 0">
+  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:6px;height:6px;border-radius:50%;background:#3aaa70;display:inline-block;box-shadow:0 0 6px #3aaa7066"></span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Certificate Transparency Log — live</span>
+      </div>
+      <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none">view all →</a>
     </div>
-    <a href="/ct-log" style="flex-shrink:0;margin-left:32px;font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:9px 20px;border-radius:5px;text-decoration:none;white-space:nowrap">View live CT log →</a>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:0">
+      <div style="padding:24px 32px;border-right:1px solid var(--border);min-width:180px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Total entries</div>
+        <div style="font-size:40px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-count">—</div>
+        <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">verified transfers</div>
+      </div>
+      <div style="padding:24px 28px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Current Merkle root</div>
+        <div style="font-size:12.5px;font-family:var(--mono);color:var(--muted);word-break:break-all;line-height:1.7" id="ct-root">—</div>
+        <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">SHA-256 · public · tamper-evident</div>
+      </div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Every transfer hashed into a Merkle tree — content never stored</div>
+      <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
+    </div>
   </div>
 </section>
 
@@ -624,6 +640,16 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;justify
 </footer>
 
 <script>
+// CT log live stats
+fetch('https://health.paramant.app/v2/ct/log?limit=1',{signal:AbortSignal.timeout(5000)})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    var ce=document.getElementById('ct-count');
+    var re=document.getElementById('ct-root');
+    if(ce && d.size!=null) ce.textContent=d.size.toLocaleString();
+    if(re && d.root && d.root!=='0'.repeat(64)) re.textContent=d.root.slice(0,16)+'...'+d.root.slice(-8);
+  }).catch(function(){});
+
 fetch('https://health.paramant.app/health',{signal:AbortSignal.timeout(5000)}).then(function(r){return r.json()}).then(function(d){
   if(d.ok){
     document.getElementById('sdot').style.background='#2d6a4f';
