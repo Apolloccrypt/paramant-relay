@@ -309,7 +309,7 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
       $('recv-progress').style.width = pct + '%';
       $('recv-status').textContent = `Downloading chunk ${i+1}/${tokens.length}...`;
 
-      const r = await fetch(`${RELAY_API}/v2/dl/${tokens[i]}`, {
+      const r = await fetch(`${RELAY_API}/v2/dl/${tokens[i]}/get`, {
         signal: AbortSignal.timeout(60000)
       });
       if (!r.ok) throw new Error('Download failed for chunk ' + (i+1) + ': ' + r.status + ' - blob expired or already burned');
