@@ -158,31 +158,69 @@ if (CT_FILE) {
   }
 }
 
+// RFC 6962-style Merkle tree — SHA3-256 with domain separation bytes:
+//   leaf node:  SHA3-256(0x00 || leaf_data_bytes)   — prevents second-preimage attacks
+//   inner node: SHA3-256(0x01 || left_bytes || right_bytes)
+// Odd leaf at end is promoted unchanged (no self-duplication).
+
 function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
-  return crypto.createHash('sha256').update(deviceIdHash + pubKeyHex + ts).digest('hex');
+  const data = Buffer.concat([
+    Buffer.from(deviceIdHash, 'hex'),
+    Buffer.from(pubKeyHex.slice(0, 64), 'hex'),
+    Buffer.from(ts, 'utf8')
+  ]);
+  return crypto.createHash('sha3-256').update(Buffer.from([0x00])).update(data).digest('hex');
+}
+
+function ctNodeHash(left, right) {
+  return crypto.createHash('sha3-256')
+    .update(Buffer.from([0x01]))
+    .update(Buffer.from(left, 'hex'))
+    .update(Buffer.from(right, 'hex'))
+    .digest('hex');
 }
 
 function ctTreeHash(entries) {
   if (entries.length === 0) return '0'.repeat(64);
-  if (entries.length === 1) return entries[0].leaf_hash;
-  const hashes = entries.map(e => e.leaf_hash);
+  let hashes = entries.map(e => e.leaf_hash);
   while (hashes.length > 1) {
     const next = [];
     for (let i = 0; i < hashes.length; i += 2) {
-      next.push(crypto.createHash('sha256').update(hashes[i] + (hashes[i+1] || hashes[i])).digest('hex'));
+      next.push(i + 1 < hashes.length ? ctNodeHash(hashes[i], hashes[i+1]) : hashes[i]);
     }
-    hashes.splice(0, hashes.length, ...next);
+    hashes = next;
   }
   return hashes[0];
 }
 
+function ctInclusionProof(entries, idx) {
+  if (entries.length <= 1) return [];
+  let hashes = entries.map(e => e.leaf_hash);
+  const path = [];
+  let i = idx;
+  while (hashes.length > 1) {
+    const sibling = i % 2 === 0 ? i + 1 : i - 1;
+    if (sibling < hashes.length) {
+      path.push({ hash: hashes[sibling], position: i % 2 === 0 ? 'right' : 'left' });
+    }
+    const next = [];
+    for (let j = 0; j < hashes.length; j += 2) {
+      next.push(j + 1 < hashes.length ? ctNodeHash(hashes[j], hashes[j+1]) : hashes[j]);
+    }
+    hashes = next;
+    i = Math.floor(i / 2);
+  }
+  return path;
+}
+
 function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
-  const deviceIdHash = crypto.createHash('sha256').update(deviceId + apiKey.slice(0,8)).digest('hex');
-  const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex.slice(0,64), ts);
+  const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
+  const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
   const index = ctLog.length;
-  const tree_hash = ctTreeHash([...ctLog, { leaf_hash }]);
-  const proof = ctLog.slice(-8).map(e => e.leaf_hash);
+  const allEntries = [...ctLog, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, index);
   const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
