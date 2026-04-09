@@ -45,8 +45,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.51.0
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # reach relay on host (native or Docker)
+    network_mode: host          # shares host network — can reach relay on 127.0.0.1
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -58,16 +57,6 @@ services:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./deploy/prometheus-token:/etc/prometheus/token:ro
       - prometheus-data:/prometheus
-    networks:
-      - relay-internal
-      - monitoring
-    ports:
-      - "127.0.0.1:9090:9090"   # localhost only — use SSH tunnel to access
-    depends_on:
-      - relay-health
-      - relay-legal
-      - relay-finance
-      - relay-iot
 
   # ── Metrics visualisation dashboard ─────────────────────────────────────────
   grafana:
@@ -86,6 +75,8 @@ services:
       - grafana-data:/var/lib/grafana
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach Prometheus on host network
     networks:
       - relay-internal
       - monitoring

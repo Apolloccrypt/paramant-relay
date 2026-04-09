@@ -13,7 +13,7 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['host.docker.internal:3005']
+      - targets: ['localhost:3005']
         labels:
           sector: 'health'
 
@@ -22,7 +22,7 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['host.docker.internal:3002']
+      - targets: ['localhost:3002']
         labels:
           sector: 'legal'
 
@@ -31,7 +31,7 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['host.docker.internal:3003']
+      - targets: ['localhost:3003']
         labels:
           sector: 'finance'
 
@@ -40,6 +40,6 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['host.docker.internal:3004']
+      - targets: ['localhost:3004']
         labels:
           sector: 'iot'
