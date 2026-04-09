@@ -85,6 +85,8 @@ services:
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - relay-internal
+    ports:
+      - "127.0.0.1:3000:3000"   # localhost only — proxied via system nginx at /grafana/
     depends_on:
       - prometheus
 
