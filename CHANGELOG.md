@@ -7,6 +7,40 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.0] — 2026-04-09
+
+### Added
+
+- **Admin panel** (`/admin/`) — Express-based SPA replacing static r34ct0r admin. Docker container on port 4200, accessible via nginx proxy. Full English UI.
+- **Cross-sector key management** — `GET/POST /api/keys/all` and `POST /api/keys/all/revoke` to manage keys across all 4 sectors simultaneously. Partial-failure response (HTTP 207) clearly lists which sectors failed.
+- **`LOG_LEVEL` env var** — relay accepts `debug | info | warn | error` (default: `info`). Reduces stdout noise on high-traffic deployments.
+- **Thunderbird FileLink add-on** — `thunderbird-filelink/` added to repo under AGPL-3.0; automated release workflow via GitHub Actions.
+
+### Security
+
+- **CSP + security headers on admin** — `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options: DENY` added to all admin responses.
+- **`/keys/all` partial-failure visibility** — endpoint now returns HTTP 207 with a `failed[]` array if any sector rejects key creation. Previously returned `ok: true` even when 3/4 sectors failed silently.
+
+### Fixed
+
+- **SHA3-256 correctly labelled** — CT log section on website and docs crypto table now show `SHA3-256` (Merkle chain, DID hashes, PSS commitments). Was incorrectly listed as SHA-256.
+- **Healthchecks** — added to `relay-legal`, `relay-finance`, `relay-iot` containers in `docker-compose.yml`. Only `relay-health` had one.
+- **Node image pinned** — `relay/Dockerfile` and `admin/Dockerfile` now use `node:20-alpine3.21` instead of floating `node:20-alpine`.
+- **Let's Encrypt renewal hook** — hook script now uses `$INSTALL_DIR` baked in at install time instead of hardcoded `/opt/paramant`. Fixes renewal for non-default install paths.
+- **nginx certs volume** — `paramant-certs` mounted as `:ro` on nginx container; was writable.
+- **JSON body limit** — admin server increased from `32kb` to `1mb`; previously silently dropped bulk key operation payloads.
+- **GitHub Actions** — `actions/checkout@v6` (non-existent) → `@v4`; Node.js 20 → 22 in filelink workflow; Docker `latest` tag now only published on `main` branch and version tags, not on every push.
+- **Duplicate relay stack cleanup** — Docker relay containers stopped and removed. Single relay stack now runs under systemd; admin container in Docker only.
+- **All `r34ct0r` references** — replaced with `/admin/` across nginx configs, docs, and frontend.
+- **Admin UI fully in English** — all Dutch strings translated (modals, error messages, status labels, placeholders).
+
+### Changed
+
+- **Icons in self-hosting section** — generic emoji (🍎 📥 📄) replaced with mono symbols: `π` (Raspberry Pi), `⬡` (Docker), `>_` (Linux/VPS).
+- **Relay cleanup logging** — download token GC now logs removed count at `debug` level instead of being silent.
+
+---
+
 ## [2.2.1] — 2026-04-08
 
 Security patch release. All findings from internal penetration test (2026-04-08).
