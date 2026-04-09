@@ -13,6 +13,5 @@ config/users.json
 frontend-live/
 config/
 frontend/r34ct0r.html
-frontend/admin.html
 deploy/nginx-paramant.conf
 .env.private
