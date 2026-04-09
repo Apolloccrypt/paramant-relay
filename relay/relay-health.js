@@ -230,7 +230,7 @@ function totpCode(secret, counter) {
   const key = base32Decode(secret);
   const buf = Buffer.alloc(8);
   buf.writeBigUInt64BE(BigInt(counter));
-  const mac = crypto.createHmac('sha1', key).update(buf).digest();
+  const mac = crypto.createHmac('sha256', key).update(buf).digest();
   const offset = mac[mac.length - 1] & 0xf;
   const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
   return code.toString().padStart(6, '0');
