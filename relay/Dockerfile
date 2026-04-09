@@ -14,7 +14,7 @@ RUN npm install --omit=dev && npm cache clean --force
 FROM node:20-alpine3.21
 
 LABEL org.opencontainers.image.title="paramant-relay" \
-      org.opencontainers.image.version="2.3.3" \
+      org.opencontainers.image.version="2.4.0" \
       org.opencontainers.image.description="Post-quantum encrypted file relay — RAM-only, burn-on-read" \
       org.opencontainers.image.source="https://github.com/Apolloccrypt/paramant-relay" \
       org.opencontainers.image.licenses="BUSL-1.1"
@@ -29,11 +29,11 @@ COPY relay.js ./
 RUN addgroup -S relay && adduser -S relay -G relay
 USER relay
 
-# Sector ports: health=3005 legal=3002 finance=3003 iot=3004
-EXPOSE 3001 3002 3003 3004 3005
+# All relay containers listen on 3000 internally; host port mapping is set per-service in docker-compose.yml
+EXPOSE 3000
 
 # wget is built into alpine; curl is not
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:${PORT:-3001}/health || exit 1
+  CMD wget -qO- http://127.0.0.1:${PORT:-3000}/health || exit 1
 
 CMD ["node", "relay.js"]

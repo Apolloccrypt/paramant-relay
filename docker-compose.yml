@@ -1,149 +1,176 @@
-# PARAMANT self-hosted relay stack
-# Docs: https://github.com/Apolloccrypt/paramant-relay#self-hosting
+# PARAMANT self-hosted relay stack — v2.4.0
+# One codebase (relay/), five sector containers, system nginx as TLS terminator.
 #
 # Quick start:
-#   cp .env.example .env && nano .env
-#   docker compose up -d
+#   cp deploy/.env.example .env && nano .env
+#   docker compose up -d --build
+#
+# Port mapping (host → container internal 3000):
+#   relay-main:    127.0.0.1:3000  (relay.paramant.app)
+#   relay-health:  127.0.0.1:3001  (health.paramant.app)
+#   relay-finance: 127.0.0.1:3002  (finance.paramant.app)
+#   relay-legal:   127.0.0.1:3003  (legal.paramant.app)
+#   relay-iot:     127.0.0.1:3004  (iot.paramant.app)
+#   admin:         127.0.0.1:4200  (/admin/ via nginx)
 
-# ── Image version pin ─────────────────────────────────────────────────────────
-# Pin to exact version — never use :latest in production.
-# Build locally:  build: ./relay  (comment out image:)
-x-relay-image: &relay-image mtty001/relay:2.3.3
-
-# ── Shared security baseline for all relay containers ─────────────────────────
+# ── Shared security baseline ──────────────────────────────────────────────────
 x-relay-hardening: &relay-hardening
   security_opt:
-    - no-new-privileges:true   # block privilege escalation via setuid/setgid
+    - no-new-privileges:true
   cap_drop:
-    - ALL                      # drop all Linux capabilities; relay needs none
-  read_only: true              # root filesystem is read-only
+    - ALL
+  read_only: true
   tmpfs:
-    - /tmp:size=64m,mode=1777  # writable /tmp only, max 64 MB, sticky bit
+    - /tmp:size=64m,mode=1777
 
 # ── Shared resource limits ────────────────────────────────────────────────────
 x-relay-resources: &relay-resources
   deploy:
     resources:
       limits:
-        memory: 1500m          # RAM_LIMIT_MB(1024) + OS + Node overhead
+        memory: 1500m
         cpus: '1.0'
       reservations:
         memory: 256m
 
+# ── Shared relay environment ──────────────────────────────────────────────────
+x-relay-env: &relay-env
+  PORT: "3000"
+  RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
+  ADMIN_TOKEN: "${ADMIN_TOKEN}"
+  TOTP_SECRET: "${TOTP_SECRET:-}"
+  USERS_FILE: "/data/users.json"
+  CT_LOG_FILE: "/data/ct-log.json"
+  RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
+  RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
+  LOG_LEVEL: "${LOG_LEVEL:-info}"
+  RESEND_API_KEY: "${RESEND_API_KEY:-}"
+
+# ── Shared logging ────────────────────────────────────────────────────────────
+x-relay-logging: &relay-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
 services:
-  relay-health:
-    image: *relay-image
-    # build: ./relay  # uncomment to build locally instead of pulling
+
+  # ── Main relay (relay.paramant.app) ─────────────────────────────────────────
+  relay-main:
+    build: ./relay
+    container_name: paramant-relay-main
     restart: unless-stopped
-    <<: [*relay-hardening, *relay-resources]
+    <<: [*relay-hardening, *relay-resources, *relay-logging]
     environment:
-      PORT: "3005"
-      SECTOR: "health"
-      RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
-      ADMIN_TOKEN: "${ADMIN_TOKEN}"
-      USERS_FILE: "/data/users.json"
-      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
-      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
-      LOG_LEVEL: "${LOG_LEVEL:-info}"
-      RESEND_API_KEY: "${RESEND_API_KEY:-}"
-      TOTP_SECRET: "${TOTP_SECRET:-}"
+      <<: *relay-env
+      SECTOR: "relay"
     ports:
-      - "127.0.0.1:3005:3005"  # localhost only — CLI + admin panel access
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - relay-main-data:/data
+    networks:
+      - relay-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Health relay (health.paramant.app) ──────────────────────────────────────
+  relay-health:
+    build: ./relay
+    container_name: paramant-relay-health
+    restart: unless-stopped
+    <<: [*relay-hardening, *relay-resources, *relay-logging]
+    environment:
+      <<: *relay-env
+      SECTOR: "health"
+    ports:
+      - "127.0.0.1:3001:3000"
     volumes:
       - relay-health-data:/data
     networks:
-      - relay-internal
+      - relay-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
 
-  relay-legal:
-    image: *relay-image
-    # build: ./relay
-    restart: unless-stopped
-    <<: [*relay-hardening, *relay-resources]
-    environment:
-      PORT: "3002"
-      SECTOR: "legal"
-      RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
-      ADMIN_TOKEN: "${ADMIN_TOKEN}"
-      USERS_FILE: "/data/users.json"
-      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
-      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
-      LOG_LEVEL: "${LOG_LEVEL:-info}"
-    ports:
-      - "127.0.0.1:3002:3002"
-    volumes:
-      - relay-legal-data:/data
-    networks:
-      - relay-internal
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
+  # ── Finance relay (finance.paramant.app) ────────────────────────────────────
   relay-finance:
-    image: *relay-image
-    # build: ./relay
+    build: ./relay
+    container_name: paramant-relay-finance
     restart: unless-stopped
-    <<: [*relay-hardening, *relay-resources]
+    <<: [*relay-hardening, *relay-resources, *relay-logging]
     environment:
-      PORT: "3003"
+      <<: *relay-env
       SECTOR: "finance"
-      RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
-      ADMIN_TOKEN: "${ADMIN_TOKEN}"
-      USERS_FILE: "/data/users.json"
-      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
-      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
-      LOG_LEVEL: "${LOG_LEVEL:-info}"
     ports:
-      - "127.0.0.1:3003:3003"
+      - "127.0.0.1:3002:3000"
     volumes:
       - relay-finance-data:/data
     networks:
-      - relay-internal
+      - relay-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
 
-  relay-iot:
-    image: *relay-image
-    # build: ./relay
+  # ── Legal relay (legal.paramant.app) ────────────────────────────────────────
+  relay-legal:
+    build: ./relay
+    container_name: paramant-relay-legal
     restart: unless-stopped
-    <<: [*relay-hardening, *relay-resources]
+    <<: [*relay-hardening, *relay-resources, *relay-logging]
     environment:
-      PORT: "3004"
-      SECTOR: "iot"
-      RELAY_MODE: "${RELAY_MODE:-iot}"
-      ADMIN_TOKEN: "${ADMIN_TOKEN}"
-      USERS_FILE: "/data/users.json"
-      RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
-      RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
-      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      <<: *relay-env
+      SECTOR: "legal"
     ports:
-      - "127.0.0.1:3004:3004"
+      - "127.0.0.1:3003:3000"
+    volumes:
+      - relay-legal-data:/data
+    networks:
+      - relay-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── IoT relay (iot.paramant.app) ─────────────────────────────────────────────
+  relay-iot:
+    build: ./relay
+    container_name: paramant-relay-iot
+    restart: unless-stopped
+    <<: [*relay-hardening, *relay-resources, *relay-logging]
+    environment:
+      <<: *relay-env
+      SECTOR: "iot"
+      RELAY_MODE: "${IOT_RELAY_MODE:-iot}"
+    ports:
+      - "127.0.0.1:3004:3000"
     volumes:
       - relay-iot-data:/data
     networks:
-      - relay-internal
+      - relay-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
 
+  # ── Admin panel ──────────────────────────────────────────────────────────────
   admin:
     build: ./admin
-    image: paramant-admin:latest
+    container_name: paramant-relay-admin
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -158,65 +185,36 @@ services:
       PORT: "4200"
       BASE_PATH: "/admin"
       ADMIN_TOKEN: "${ADMIN_TOKEN}"
-      RELAY_HEALTH:  "http://relay-health:3005"
-      RELAY_LEGAL:   "http://relay-legal:3002"
-      RELAY_FINANCE: "http://relay-finance:3003"
-      RELAY_IOT:     "http://relay-iot:3004"
-    networks:
-      - relay-internal
-    depends_on:
-      - relay-health
-      - relay-legal
-      - relay-finance
-      - relay-iot
-
-  nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE    # required to bind ports 80 and 443
-      - CHOWN               # nginx needs to chown temp files
-      - DAC_OVERRIDE        # nginx needs to read ssl certs
-      - SETUID              # nginx drops from root to worker user
-      - SETGID
-    deploy:
-      resources:
-        limits:
-          memory: 128m
-          cpus: '1.0'
+      RELAY_MAIN:    "http://relay-main:3000"
+      RELAY_HEALTH:  "http://relay-health:3000"
+      RELAY_FINANCE: "http://relay-finance:3000"
+      RELAY_LEGAL:   "http://relay-legal:3000"
+      RELAY_IOT:     "http://relay-iot:3000"
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-    environment:
-      - DOMAIN=${DOMAIN:-localhost}
-    volumes:
-      - ./deploy/nginx-selfhost.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./deploy/docker-entrypoint.sh:/docker-entrypoint.d/99-paramant.sh:ro
-      - paramant-certs:/etc/nginx/certs:ro
+      - "127.0.0.1:4200:4200"
     networks:
-      - relay-internal
-      - relay-external
+      - relay-net
     depends_on:
+      - relay-main
       - relay-health
-      - relay-legal
       - relay-finance
+      - relay-legal
       - relay-iot
-      - admin
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
 volumes:
-  paramant-certs:
+  relay-main-data:
   relay-health-data:
   relay-legal-data:
   relay-finance-data:
   relay-iot-data:
 
 networks:
-  relay-internal:
+  relay-net:
     driver: bridge
-    internal: true   # relay containers not reachable from internet — only via nginx
-  relay-external:
-    driver: bridge   # nginx uses this for certbot ACME challenges + upstream DNS
+    # internal: omitted — containers need outbound access for NATS, webhooks, etc.
+    # System nginx proxies inbound; no direct internet exposure via these ports.
