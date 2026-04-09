@@ -13,6 +13,7 @@ nav{height:52px;display:flex;align-items:center;padding:0 32px;border-bottom:1px
 main{max-width:640px;margin:0 auto;padding:64px 24px}
 h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .sub{font-size:13px;color:var(--muted);margin-bottom:40px;line-height:1.7}
+.hero-block{background:rgba(12,12,12,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:24px 28px;margin-bottom:40px}
 
 /* Steps */
 .step{display:none;animation:fadeIn .2s ease}
@@ -173,8 +174,10 @@ main { background: transparent !important }
 
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
-  <h1>Secure file transfer</h1>
-  <p class="sub">The receiver gets a unique link. Their browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees the key.</p>
+  <div class="hero-block">
+    <h1>Secure file transfer</h1>
+    <p class="sub" style="margin-bottom:0">The receiver gets a unique link. Their browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees the key.</p>
+  </div>
 
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>

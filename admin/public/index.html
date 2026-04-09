@@ -822,6 +822,7 @@ async function createKey() {
         method: 'POST', body: { email, key: firstKey, plan, label },
       });
     }
+    currentKeysSector = sectors.length > 1 ? 'all' : sectors[0];
     loadKeys(currentKeysSector);
   } catch (e) {
     showError(errEl, e.message);
@@ -876,7 +877,8 @@ async function sendWelcome() {
   const okEl  = document.getElementById('modal-welcome-success');
   errEl.style.display = 'none'; okEl.style.display = 'none';
   if (!email) { showError(errEl, 'Email address required'); return; }
-  const data = await apiFetch(`/sectors/${pendingWelcome.sector}/keys/welcome`, {
+  const welcomeSector = pendingWelcome.sector.split(',')[0].trim();
+  const data = await apiFetch(`/sectors/${welcomeSector}/keys/welcome`, {
     method: 'POST',
     body: { email, key: pendingWelcome.key, plan: pendingWelcome.plan, label: pendingWelcome.label },
   });
