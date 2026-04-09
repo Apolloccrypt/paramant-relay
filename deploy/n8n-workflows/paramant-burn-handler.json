@@ -1,0 +1,158 @@
+{
+  "name": "PARAMANT — Burn-on-Read Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "paramant-burn",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "webhook-trigger",
+      "name": "Relay Burn Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body?.event === 'burn' || $json.body?.burned === true }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-burn-event",
+      "name": "Is Burn Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract burn event data from relay webhook payload\nconst body = $input.item.json.body || $input.item.json;\n\nreturn [{\n  json: {\n    hash:       body.hash       || body.blob_hash  || 'unknown',\n    sector:     body.sector     || 'unknown',\n    device_id:  body.device_id  || body.device     || 'unknown',\n    bytes:      body.bytes      || body.size        || 0,\n    timestamp:  body.ts         || new Date().toISOString(),\n    api_key_prefix: (body.api_key || '').slice(0, 8) + '...',\n    event:      'burn',\n  }\n}];"
+      },
+      "id": "extract-burn-data",
+      "name": "Extract Burn Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "create",
+        "model": "claude-opus-4-6",
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=A PARAMANT Ghost Pipe secure file transfer just completed (burned after read).\n\nTransfer metadata:\n- Sector: {{ $json.sector }}\n- Hash prefix: {{ $json.hash.slice(0, 16) }}...\n- Bytes transferred: {{ $json.bytes }}\n- Device: {{ $json.device_id }}\n- Timestamp: {{ $json.timestamp }}\n\nWrite a 2-sentence security audit note confirming this transfer. Note any anomalies if: bytes=0, sector is unusual, or device_id looks non-standard. Be concise and professional. Format: plain text, no markdown."
+            }
+          ]
+        },
+        "options": {
+          "maxTokensToSample": 150
+        }
+      },
+      "id": "claude-audit-note",
+      "name": "Claude — Audit Note",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [900, 220],
+      "credentials": {
+        "anthropicApi": {
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Build structured audit log entry\nconst burn  = $('Extract Burn Data').item.json;\nconst audit = $input.item.json.text || $input.item.json.content || '';\n\nconst entry = {\n  timestamp:  burn.timestamp,\n  event:      'burn',\n  sector:     burn.sector,\n  hash:       burn.hash,\n  bytes:      burn.bytes,\n  device_id:  burn.device_id,\n  api_key:    burn.api_key_prefix,\n  audit_note: audit.trim(),\n  flagged:    burn.bytes === 0 || audit.toLowerCase().includes('anomal') || audit.toLowerCase().includes('unusual'),\n};\n\nconsole.log('[PARAMANT audit]', JSON.stringify(entry));\nreturn [{ json: entry }];"
+      },
+      "id": "build-audit-log",
+      "name": "Build Audit Log Entry",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.flagged }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-flagged",
+      "name": "Flagged?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "fromEmail": "privacy@paramant.app",
+        "toEmail": "={{ $env.ALERT_EMAIL || 'privacy@paramant.app' }}",
+        "subject": "=PARAMANT ALERT — Anomaly on {{ $json.sector }} sector",
+        "text": "=A PARAMANT transfer was flagged as anomalous.\n\nSector:    {{ $json.sector }}\nHash:      {{ $json.hash }}\nBytes:     {{ $json.bytes }}\nDevice:    {{ $json.device_id }}\nTime:      {{ $json.timestamp }}\n\nAudit note:\n{{ $json.audit_note }}\n\n---\nThis alert was generated automatically by n8n + Claude AI."
+      },
+      "id": "send-alert-email",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1560, 140]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normal burn — just log silently\nconst entry = $input.item.json;\nconsole.log('[PARAMANT] clean burn:', entry.hash.slice(0,16), entry.sector, entry.bytes + 'B');\nreturn [{ json: { ok: true, logged: entry.hash } }];"
+      },
+      "id": "log-clean-burn",
+      "name": "Log Clean Burn",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Relay Burn Webhook": {
+      "main": [[{ "node": "Is Burn Event?", "type": "main", "index": 0 }]]
+    },
+    "Is Burn Event?": {
+      "main": [
+        [{ "node": "Extract Burn Data", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Extract Burn Data": {
+      "main": [[{ "node": "Claude — Audit Note", "type": "main", "index": 0 }]]
+    },
+    "Claude — Audit Note": {
+      "main": [[{ "node": "Build Audit Log Entry", "type": "main", "index": 0 }]]
+    },
+    "Build Audit Log Entry": {
+      "main": [[{ "node": "Flagged?", "type": "main", "index": 0 }]]
+    },
+    "Flagged?": {
+      "main": [
+        [{ "node": "Send Alert Email", "type": "main", "index": 0 }],
+        [{ "node": "Log Clean Burn", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "paramant" }],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "paramant"
+  }
+}
