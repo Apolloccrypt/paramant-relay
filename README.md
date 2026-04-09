@@ -3,7 +3,7 @@
 **Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
 
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.3.1-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.2-brightgreen.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 [![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
 [![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
