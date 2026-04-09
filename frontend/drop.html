@@ -861,7 +861,7 @@ async function validateKey() {
   }
   st.textContent = 'Checking...'; st.className = 'status';
   try {
-    const r = await fetch(`${RELAY_API}/v2/check-key?k=${encodeURIComponent(apiKey)}`, {signal: AbortSignal.timeout(5000)});
+    const r = await fetch(`${RELAY_API}/v2/check-key`, {headers:{'X-Api-Key':apiKey},signal: AbortSignal.timeout(5000)});
     const d = await r.json();
     keyValid = d.valid;
     st.textContent = d.valid ? `✓ Valid — ${d.plan}` : 'Invalid key';
@@ -912,14 +912,20 @@ async function copySessionLink() {
 }
 
 // ── WebSocket ──
-function connectWebSocket() {
-  ws = new WebSocket(RELAY_WS);
+async function connectWebSocket() {
+  // Fetch a short-lived ticket so the API key never appears in the WS URL (finding #13)
+  let wsUrl = RELAY_WS + '/v2/stream';
+  try {
+    const tr = await fetch(`${RELAY_API}/v2/ws-ticket`, {method:'POST',headers:{'X-Api-Key':apiKey},signal:AbortSignal.timeout(5000)});
+    if (tr.ok) { const td = await tr.json(); if (td.ticket) wsUrl += '?ticket=' + encodeURIComponent(td.ticket); }
+  } catch {}
+  ws = new WebSocket(wsUrl);
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'sender' }));
     // Poll for receiver pubkey
     const poll = setInterval(async () => {
       try {
-        const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}?k=${encodeURIComponent(apiKey)}`, {signal: AbortSignal.timeout(3000)});
+        const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}`, {headers:{'X-Api-Key':apiKey}, signal: AbortSignal.timeout(3000)});
         if (r.ok) {
           const d = await r.json();
           if (d.kyber_pub && d.ecdh_pub) {
@@ -1025,7 +1031,8 @@ async function sendFile() {
       const ur = await fetch(`${RELAY_API}/v2/inbound`, {
         method: 'POST',
         headers: {'Content-Type':'application/json','X-Api-Key':apiKey},
-        body: JSON.stringify({hash, payload:toB64(padded), ttl_ms:ttl, meta:{device_id:'paradrop-web',file_name:selectedFile.name,chunk_index:i,total_chunks:totalChunks,file_id:fileId}}),
+        // file_name intentionally omitted — filename is only in the encrypted payload (finding #4)
+        body: JSON.stringify({hash, payload:toB64(padded), ttl_ms:ttl, meta:{device_id:'paradrop-web',chunk_index:i,total_chunks:totalChunks,file_id:fileId}}),
         signal: AbortSignal.timeout(120000)
       });
       const ud = await ur.json();

@@ -28,6 +28,12 @@ const VERSION    = '2.3.3';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
+// ── WS ticket store — avoids API key in WebSocket upgrade URL (finding #13) ──
+// Client calls POST /v2/ws-ticket → gets 30s one-time ticket → connects with ?ticket=xxx
+const wsTickets = new Map(); // ticket → { apiKey, expires }
+setInterval(() => { const now = Date.now(); for (const [k, v] of wsTickets) if (now > v.expires) wsTickets.delete(k); }, 10_000);
+
+
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;
 try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
@@ -570,6 +576,22 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
 // DER-SPKI prefix for P-256 uncompressed public key (65 bytes → 91 bytes total).
 // publicKeyHex stores raw ECDH P-256 point bytes; crypto.verify requires DER-SPKI.
 const P256_SPKI_PREFIX = Buffer.from('3059301306072a8648ce3d020106082a8648ce3d030107034200', 'hex');
+
+// ── Constant-time token comparison — prevents timing-side-channel on admin token (finding) ──
+function safeEqual(a, b) {
+  try {
+    const ba = Buffer.from(String(a || ''), 'utf8');
+    const bb = Buffer.from(String(b || ''), 'utf8');
+    if (ba.length !== bb.length) {
+      // Still do the compare to avoid length oracle, but result is always false
+      const pad = Buffer.alloc(Math.max(ba.length, bb.length));
+      crypto.timingSafeEqual(pad, pad);
+      return false;
+    }
+    return crypto.timingSafeEqual(ba, bb);
+  } catch { return false; }
+}
+
 function authByDid(didStr, signature, payload) {
   const entry = [...didRegistry.values()].find(e => e.doc.id === didStr);
   if (!entry) return null;
@@ -838,7 +860,7 @@ const server = http.createServer(async (req, res) => {
   const isAdminPath = path.startsWith('/v2/admin');
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
-    const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && adminHeader === process.env.ADMIN_TOKEN;
+    const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && safeEqual(adminHeader, process.env.ADMIN_TOKEN);
     if (!validAdmin) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
@@ -1458,7 +1480,16 @@ try {
   server.on('upgrade', (req, socket, head) => {
     const parsed = url_.parse(req.url, true);
     if (parsed.pathname !== '/v2/stream') return socket.destroy();
-    const apiKey = (req.headers['x-api-key'] || parsed.query.k || '').trim();
+    let wsApiKey = (req.headers['x-api-key'] || '').trim();
+    if (!wsApiKey && parsed.query.ticket) {
+      const td = wsTickets.get(parsed.query.ticket);
+      if (td && Date.now() < td.expires) { wsApiKey = td.apiKey; wsTickets.delete(parsed.query.ticket); }
+    }
+    if (!wsApiKey && parsed.query.k) {
+      wsApiKey = parsed.query.k;
+      log('warn', 'ws_legacy_key_in_url', { hint: 'Use POST /v2/ws-ticket — ?k= deprecated' });
+    }
+    const apiKey = wsApiKey;
     if (!apiKeys.get(apiKey)?.active) return socket.destroy();
     wss.handleUpgrade(req, socket, head, ws => {
       if (!wsClients.has(apiKey)) wsClients.set(apiKey, new Set());

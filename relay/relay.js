@@ -30,6 +30,12 @@ const VERSION    = '2.3.3';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
+// ── WS ticket store — avoids API key in WebSocket upgrade URL (finding #13) ──
+// Client calls POST /v2/ws-ticket → gets 30s one-time ticket → connects with ?ticket=xxx
+const wsTickets = new Map(); // ticket → { apiKey, expires }
+setInterval(() => { const now = Date.now(); for (const [k, v] of wsTickets) if (now > v.expires) wsTickets.delete(k); }, 10_000);
+
+
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;
 try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
@@ -289,7 +295,8 @@ const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
 
 function _dlConfirmPage(token, fileName, sizeStr, ttlStr) {
-  const name = fileName ? fileName.replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'Unnamed file';
+  // Filename not stored in relay (finding #4) — real name is in encrypted payload
+  const name = 'Encrypted file';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -675,6 +682,22 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
 // DER-SPKI prefix for P-256 uncompressed public key (65 bytes → 91 bytes total).
 // publicKeyHex stores raw ECDH P-256 point bytes; crypto.verify requires DER-SPKI.
 const P256_SPKI_PREFIX = Buffer.from('3059301306072a8648ce3d020106082a8648ce3d030107034200', 'hex');
+
+// ── Constant-time token comparison — prevents timing-side-channel on admin token (finding) ──
+function safeEqual(a, b) {
+  try {
+    const ba = Buffer.from(String(a || ''), 'utf8');
+    const bb = Buffer.from(String(b || ''), 'utf8');
+    if (ba.length !== bb.length) {
+      // Still do the compare to avoid length oracle, but result is always false
+      const pad = Buffer.alloc(Math.max(ba.length, bb.length));
+      crypto.timingSafeEqual(pad, pad);
+      return false;
+    }
+    return crypto.timingSafeEqual(ba, bb);
+  } catch { return false; }
+}
+
 function authByDid(didStr, signature, payload) {
   const entry = [...didRegistry.values()].find(e => e.doc.id === didStr);
   if (!entry) return null;
@@ -897,8 +920,9 @@ const server = http.createServer(async (req, res) => {
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
+      // Filename not stored in relay (finding #4) — receiver decrypts actual name from payload
       'Content-Disposition': (() => {
-        if (!td.file_name) return 'attachment';
+        if (!td.file_name) return 'attachment; filename="paramant-encrypted-file"';
         const safe = td.file_name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\/]/g, '_');
         const enc  = encodeURIComponent(td.file_name);
         return `attachment; filename="${safe}"; filename*=UTF-8''${enc}`;
@@ -1049,7 +1073,7 @@ const server = http.createServer(async (req, res) => {
   const isAdminPath = path.startsWith('/v2/admin');
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
-    const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && adminHeader === process.env.ADMIN_TOKEN;
+    const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && safeEqual(adminHeader, process.env.ADMIN_TOKEN);
     if (!validAdmin) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
@@ -1195,7 +1219,7 @@ const server = http.createServer(async (req, res) => {
         key: apiKey,
         expires_ms: Date.now() + ttl,
         used: false,
-        file_name: meta?.file_name || '',
+        file_name: '',  // filename intentionally not stored in relay (finding #4)
         file_size: blob.length,
       });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1300,6 +1324,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/ws-ticket — short-lived ticket for WS upgrade (finding #13) ───────
+  // Client fetches ticket via authenticated HTTP, then connects WS with ?ticket=xxx
+  // so the API key never appears in the WebSocket URL (which lands in nginx access logs).
+  if (path === '/v2/ws-ticket' && req.method === 'POST') {
+    const ticket = 'wst_' + crypto.randomBytes(24).toString('hex');
+    wsTickets.set(ticket, { apiKey, expires: Date.now() + 30_000 }); // 30s one-time use
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, ticket, expires_in: 30 }));
   }
 
   // ── GET /v2/stream-next ──────────────────────────────────────────────────────
@@ -1732,7 +1766,18 @@ try {
   server.on('upgrade', (req, socket, head) => {
     const parsed = url_.parse(req.url, true);
     if (parsed.pathname !== '/v2/stream') return socket.destroy();
-    const apiKey = (req.headers['x-api-key'] || parsed.query.k || '').trim();
+    // Prefer: X-Api-Key header (best) → ?ticket= one-time token → ?k= (legacy, deprecated)
+    let wsApiKey = (req.headers['x-api-key'] || '').trim();
+    if (!wsApiKey && parsed.query.ticket) {
+      const td = wsTickets.get(parsed.query.ticket);
+      if (td && Date.now() < td.expires) { wsApiKey = td.apiKey; wsTickets.delete(parsed.query.ticket); }
+      else { log('warn', 'ws_ticket_invalid', { ticket: parsed.query.ticket?.slice(0, 12) }); }
+    }
+    if (!wsApiKey && parsed.query.k) {
+      wsApiKey = parsed.query.k; // legacy — key in URL, still logged in nginx access log
+      log('warn', 'ws_legacy_key_in_url', { hint: 'Use POST /v2/ws-ticket for a short-lived ticket — ?k= deprecated, removed in v2.4' });
+    }
+    const apiKey = wsApiKey;
     if (!apiKeys.get(apiKey)?.active) return socket.destroy();
     wss.handleUpgrade(req, socket, head, ws => {
       if (!wsClients.has(apiKey)) wsClients.set(apiKey, new Set());
