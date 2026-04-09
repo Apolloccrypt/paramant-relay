@@ -378,16 +378,16 @@ tr:hover td { background: var(--bg2); }
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo"><span>PARAMANT</span> · Admin</div>
-    <h2>Inloggen</h2>
+    <h2>Sign in</h2>
     <div class="form-group">
       <label>Admin Token</label>
-      <input type="password" id="login-token" placeholder="ADMIN_TOKEN of pgp_..." autocomplete="current-password">
+      <input type="password" id="login-token" placeholder="ADMIN_TOKEN or pgp_..." autocomplete="current-password">
     </div>
     <div class="form-group">
       <label>TOTP Code</label>
       <input type="text" id="login-totp" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
     </div>
-    <button class="btn btn-primary btn-full" onclick="doLogin()">Inloggen</button>
+    <button class="btn btn-primary btn-full" onclick="doLogin()">Sign in</button>
     <div class="error-msg" id="login-error"></div>
   </div>
 </div>
@@ -551,14 +551,14 @@ async function doLogin() {
       body: JSON.stringify({ token, totp }),
     });
     const d = await r.json();
-    if (!d.ok) { showError(errEl, d.error || 'Inloggen mislukt'); return; }
+    if (!d.ok) { showError(errEl, d.error || 'Sign-in failed'); return; }
     session = d.session;
     localStorage.setItem('paramant-admin-session', session);
     showApp();
   } catch (e) {
     showError(errEl, `Verbindingsfout: ${e.message}`);
   } finally {
-    btn.textContent = 'Inloggen';
+    btn.textContent = 'Sign in';
     btn.disabled = false;
   }
 }
