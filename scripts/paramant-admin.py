@@ -115,6 +115,12 @@ def save_users(path, data):
         import shutil
         shutil.copy2(path, path + '.bak')
     os.replace(tmp, path)
+    # Ensure relay (paramant user) can write the file — paramant-admin runs as root
+    try:
+        import subprocess
+        subprocess.run(['chown', 'paramant:paramant', path], check=True, capture_output=True)
+    except Exception:
+        pass  # best-effort; systemd ExecStartPre also ensures this on next restart
 
 def gen_key():
     return 'pgp_' + secrets.token_hex(16)
@@ -188,7 +194,7 @@ def cmd_revoke(args):
                     warn(f'{sector}: key was al ingetrokken')
                 else:
                     k['active'] = False
-                    k['revoked'] = now_iso()
+                    k['revoked_at'] = now_iso()
                     save_users(path, data)
                     ok(f'{sector}: key ingetrokken')
                 found = True

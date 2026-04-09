@@ -1,6 +1,6 @@
 # PARAMANT Self-Hosting Guide
 
-**Version:** v2.2.1  
+**Version:** v2.3.1  
 **License:** BUSL-1.1 — source available, free for up to 5 users per relay in production  
 **Change date:** 2029-01-01 → Apache 2.0  
 **License enforcement details:** [docs/licensing.md](licensing.md)
@@ -64,6 +64,7 @@ nano .env
 | `RAM_RESERVE_MB` | No | `256` | RAM reserve before rejecting uploads |
 | `RELAY_MODE` | No | `ghost_pipe` | Endpoint set: `ghost_pipe` or `iot` |
 | `USERS_FILE` | No | `./users.json` | Path to API key store |
+| `CT_LOG_FILE` | No | `/data/ct-log.json` | Path to CT log persistence file (health relay only) |
 | `PARAMANT_LICENSE` | No | — | Relay license key (`plk_...`) — unlocks unlimited users |
 | `RESEND_API_KEY` | No | — | For welcome emails when adding users |
 | `HTTP_PORT` | No | `80` | Override if port 80 is in use |
@@ -78,7 +79,7 @@ nano .env
 docker compose up -d
 ```
 
-Starts 5 containers:
+Starts 6 containers:
 
 | Container | Role | Internal Port |
 |-----------|------|---------------|
@@ -86,6 +87,7 @@ Starts 5 containers:
 | `relay-legal` | Legal sector relay | 3002 |
 | `relay-finance` | Finance sector relay | 3003 |
 | `relay-iot` | IoT sector relay | 3004 |
+| `admin` | Admin panel | 4200 (via nginx /admin/) |
 | `nginx` | TLS termination + routing | 80, 443 |
 
 **Networks:**
@@ -279,7 +281,7 @@ relay-internal network (isolated)
 ```
 
 **Security properties:**
-- All blobs stored in RAM only — never written to disk
+- All blobs (encrypted payload) stored in RAM only — never written to disk
 - Burn-on-read — deleted from RAM after first download
 - Swap disabled — RAM cannot be paged to disk
 - Relay never sees plaintext (with proper E2E SDK usage)
@@ -394,24 +396,29 @@ Browser-based end-to-end encrypted file transfer using ML-KEM-768:
 
 **Access:** public, no login required
 
-Every transfer is recorded in a public Merkle tree — without storing content.
-Cryptographic proof of delivery, visible to anyone.
+Every key registration is recorded in a tamper-evident Merkle tree — without storing payload content.
+Entries are persisted to `CT_LOG_FILE` (default: `/data/ct-log.json`) on each registration and reloaded on startup.
+The log resets only if the file is deleted.
 
 ---
 
 ### Admin Panel — `/admin/`
 
-**Access:** IP whitelist + enterprise API key + TOTP (6-digit authenticator)
+**Access:** ADMIN_TOKEN (or enterprise `pgp_` key) + TOTP (6-digit authenticator)
 
-> ⚠ Only accessible from whitelisted IP addresses. Configure in nginx:
+> ⚠ Restrict access to your IP in nginx for extra security:
 > ```nginx
-> allow YOUR_ADMIN_IP;
-> deny all;
+> location /admin/ {
+>     allow YOUR_ADMIN_IP;
+>     deny all;
+>     proxy_pass http://admin:4200/admin/;
+>     ...
+> }
 > ```
 
 **Login flow:**
 1. Go to `https://your-domain/admin/`
-2. Enter your enterprise API key (`pgp_...`)
+2. Enter your `ADMIN_TOKEN` (from `.env`) or an enterprise `pgp_` key
 3. Enter 6-digit TOTP code from your authenticator app
 4. Access granted
 

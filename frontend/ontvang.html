@@ -240,7 +240,7 @@ async function init() {
       try {
         await fetch(`${RELAY_API}/v2/pubkey`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': sessionToken },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             device_id: sessionToken,
             ecdh_pub: ecdhPubHex,
@@ -285,7 +285,6 @@ async function init() {
       if (_transferClaimed) return;
       try {
         const r = await fetch(RELAY_API + '/v2/pubkey/' + encodeURIComponent(sessionToken + '_ready'), {
-          headers: { 'X-Api-Key': sessionToken },
           signal: AbortSignal.timeout(3000)
         });
         if (r.ok) {

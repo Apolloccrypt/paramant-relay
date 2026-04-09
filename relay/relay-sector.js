@@ -21,6 +21,7 @@ const http   = require('http');
 const crypto = require('crypto');
 const https  = require('https');
 const fs     = require('fs');
+const path   = require('path');
 const url_   = require('url');
 
 const VERSION    = '2.1.0';
@@ -123,6 +124,19 @@ function createDidDocument(did, deviceId, ecdhPubHex, dsaPubHex) {
 // ── Certificate Transparency Log ─────────────────────────────────────────────
 const ctLog = [];
 const CT_MAX = 10000;
+const CT_FILE = process.env.USERS_FILE ? path.join(path.dirname(process.env.USERS_FILE), 'ct-log.json') : null;
+
+if (CT_FILE) {
+  try {
+    const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
+    for (const line of lines) {
+      try { ctLog.push(JSON.parse(line)); } catch {}
+    }
+    if (ctLog.length) log('info', 'ct_log_loaded', { entries: ctLog.length, file: CT_FILE });
+  } catch(e) {
+    if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
+  }
+}
 
 function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
   return crypto.createHash('sha256').update(deviceIdHash + pubKeyHex + ts).digest('hex');
@@ -152,6 +166,9 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
+  if (CT_FILE) {
+    try { fs.appendFileSync(CT_FILE, JSON.stringify(entry) + '\n'); } catch {}
+  }
   return entry;
 }
 
@@ -836,7 +853,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const tok = req.headers['x-admin-token'] || '';
-      if (!tok || !apiKeys.has(tok)) {
+      if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
         res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
       }
       const valid = verifyTotp(d.totp_code || '');
@@ -849,7 +866,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
@@ -865,7 +882,7 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
@@ -878,7 +895,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
@@ -895,7 +912,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
   if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || !apiKeys.has(tok)) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }

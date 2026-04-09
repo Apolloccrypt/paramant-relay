@@ -79,8 +79,8 @@ We thank the following researchers for responsible disclosure:
 
 | Date       | Researcher           | Findings                                      |
 |------------|----------------------|-----------------------------------------------|
-| 2026-04-09 | Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) — independent security researcher, Australia | 6 findings: API key in receiver URL, async onmessage, SDK key zeroization, plaintext filename in relay metadata, chunk count leak, _zero() warning (see CHANGELOG) |
-| 2026-04-08 | Internal assessment  | Pentest: 5 MEDIUM, 2 LOW (see CHANGELOG v2.2.1) |
+| 2026-04-09 | Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) · Smart Cyber Solutions Pty Ltd (AU) | Independent, uncompensated review · 20 findings (4 critical, 5 high, 6 medium, 5 low) · [Full report](pentest-report-2026-04-08.txt) · [Patch status](docs/security-audit-2026-04.md) |
+| 2026-04-08 | Hendrik Bruinsma ([@readefries](https://github.com/readefries)) | Security review (5 findings: Argon2 race condition, `/health` info leak, `X-Paramant-Views-Left` header leak, `/v2/ct/proof` routing, stale CSP domain) + 4 bug reports (QR bug, fingerprint mismatch on refresh, receiver stuck at fingerprint, preload burn bug) + Thunderbird FileLink add-on · All patched in v2.2.1 / v2.3.0 |
 
 ---
 

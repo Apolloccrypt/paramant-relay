@@ -34,7 +34,7 @@ Thanks for your interest in contributing.
 - AES-256-GCM — symmetric encryption
 - Burn-on-read — destroyed after first download
 - Zero plaintext — relay never sees content
-- RAM-only — no disk writes
+- RAM-only blobs — encrypted payload data never written to disk (CT log hashes and API keys are persisted)
 - EU/DE jurisdiction — Hetzner Frankfurt only
 
 ## Questions?
@@ -47,8 +47,8 @@ Security researchers and contributors who have helped make PARAMANT better:
 
 | Researcher | Handle | Contribution | Date |
 |------------|--------|--------------|------|
-| Ryan Williams | [@scs-labrat](https://github.com/scs-labrat) | Independent security review — 4 critical + 2 high findings | April 2026 |
-| Hendrik Bruinsma | [@readefries](https://github.com/readefries) | Thunderbird FileLink extension, QR bug, fingerprint mismatch, preload burn bug | April 2026 |
+| Ryan Williams | [@scs-labrat](https://github.com/scs-labrat) | Independent security review — 4 critical · 5 high · 6 medium · 5 low (20 findings total) · [Smart Cyber Solutions](https://www.linkedin.com/in/ryan-williams-4068351b8/) | April 2026 |
+| Hendrik Bruinsma | [@readefries](https://github.com/readefries) | Thunderbird FileLink add-on (built & contributed); security review: Argon2 race condition (MEDIUM), `/health` info leak (MEDIUM), `X-Paramant-Views-Left` header leak (MEDIUM), `/v2/ct/proof` routing (LOW), stale CSP domain (LOW); bug reports: QR code display bug, ParaDrop fingerprint mismatch on refresh, receiver stuck at fingerprint verification, preload burn bug | April 2026 |
 
 Want to be on this list? Find something wrong. Report it. We fix it publicly.
 

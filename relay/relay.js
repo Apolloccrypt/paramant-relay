@@ -1311,7 +1311,7 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
-      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
+      const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
       const plan = d.plan || 'pro';
       const label = d.label || '';
       const email = d.email || '';

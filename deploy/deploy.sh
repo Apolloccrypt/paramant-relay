@@ -36,7 +36,9 @@ done
 
 # 2. Frontend
 echo "--- frontend"
-scp frontend/index.html   root@$SERVER:$APP_DIR/app/index.html
+for f in frontend/*.html; do
+  scp "$f" root@$SERVER:$APP_DIR/app/$(basename "$f")
+done
 
 # 3. Nginx config
 echo "--- nginx"

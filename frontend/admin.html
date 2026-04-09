@@ -116,10 +116,17 @@ async function resendMail(key,label,plan,email){
 
 async function revokeKey(key){
   if(!confirm("Revoke "+key.slice(0,20)+"...?"))return;
-  addLog("Revoking "+key.slice(0,16)+"...","warn");
-  const r=await apiCall(selectedRelay.u,"/v2/admin/keys/revoke","POST",{key});
-  if(r.ok){addLog("Key revoked","ok");await loadKeys();}
-  else addLog("Revoke failed: "+(r.data?.error||r.error),"error");
+  addLog("Revoking "+key.slice(0,16)+"... on all sectors","warn");
+  const localRelays=RELAYS.filter(r=>!r.u.includes("fly"));
+  const results=await Promise.all(localRelays.map(r=>apiCall(r.u,"/v2/admin/keys/revoke","POST",{key})));
+  const ok=results.filter(r=>r.ok).length;
+  const failed=results.length-ok;
+  if(ok>0){
+    addLog("Key revoked on "+ok+"/"+localRelays.length+" sectors"+(failed?" ("+failed+" failed":"")+(failed?")":""),"ok");
+    await loadKeys();
+  }else{
+    addLog("Revoke failed: "+(results[0]?.data?.error||results[0]?.error),"error");
+  }
 }
 
 async function loadKeys(){
