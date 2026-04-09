@@ -17,13 +17,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # required to read all tags
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Compute next version
         id: version
@@ -73,6 +73,7 @@ jobs:
         run: npm install -g web-ext
 
       - name: Sign Thunderbird extension
+        if: ${{ secrets.THUNDERBIRD_AMO_ISSUER != '' && secrets.THUNDERBIRD_AMO_SECRET != '' }}
         run: |
           web-ext sign \
           --api-key=${{ secrets.THUNDERBIRD_AMO_ISSUER }} \

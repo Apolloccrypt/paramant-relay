@@ -411,7 +411,7 @@ tr:hover td { background: var(--bg2); }
     <!-- DASHBOARD TAB -->
     <div class="tab-content active" id="tab-overview">
       <div class="overview-grid" id="overview-grid">
-        <div class="loading">Stats laden…</div>
+        <div class="loading">Loading stats…</div>
       </div>
     </div>
 
@@ -419,17 +419,17 @@ tr:hover td { background: var(--bg2); }
     <div class="tab-content" id="tab-keys">
       <div class="section-header">
         <div class="section-title">API Keys</div>
-        <button class="btn" onclick="openCreateKeyModal()">+ Nieuwe key</button>
+        <button class="btn" onclick="openCreateKeyModal()">+ New key</button>
       </div>
       <div class="sector-tabs" id="keys-sector-tabs">
-        <div class="sector-tab active" data-sector="all" onclick="selectKeysSector('all')">Alle</div>
+        <div class="sector-tab active" data-sector="all" onclick="selectKeysSector('all')">All</div>
         <div class="sector-tab" data-sector="health" onclick="selectKeysSector('health')">Health</div>
         <div class="sector-tab" data-sector="legal" onclick="selectKeysSector('legal')">Legal</div>
         <div class="sector-tab" data-sector="finance" onclick="selectKeysSector('finance')">Finance</div>
         <div class="sector-tab" data-sector="iot" onclick="selectKeysSector('iot')">IoT</div>
       </div>
       <div id="keys-table-container">
-        <div class="loading">Keys laden…</div>
+        <div class="loading">Loading keys…</div>
       </div>
     </div>
   </main>
@@ -438,11 +438,11 @@ tr:hover td { background: var(--bg2); }
 <!-- CREATE KEY MODAL -->
 <div class="modal-overlay" id="modal-create-key">
   <div class="modal">
-    <h3>Nieuwe API Key aanmaken</h3>
+    <h3>Create API Key</h3>
     <div class="form-group">
       <label>Sector</label>
       <select id="new-key-sector">
-        <option value="all">Alle sectoren</option>
+        <option value="all">All sectors</option>
         <option value="health">Health</option>
         <option value="legal">Legal</option>
         <option value="finance">Finance</option>
@@ -450,8 +450,8 @@ tr:hover td { background: var(--bg2); }
       </select>
     </div>
     <div class="form-group">
-      <label>Label (klant naam)</label>
-      <input type="text" id="new-key-label" placeholder="Bijv. Ziekenhuis Amsterdam">
+      <label>Label (customer name)</label>
+      <input type="text" id="new-key-label" placeholder="e.g. City Hospital">
     </div>
     <div class="form-group">
       <label>Plan</label>
@@ -462,15 +462,15 @@ tr:hover td { background: var(--bg2); }
       </select>
     </div>
     <div class="form-group">
-      <label>E-mail welkomstmail (optioneel)</label>
-      <input type="email" id="new-key-email" placeholder="klant@voorbeeld.nl">
+      <label>Welcome email (optional)</label>
+      <input type="email" id="new-key-email" placeholder="customer@example.com">
     </div>
     <div class="key-result" id="new-key-result"></div>
-    <div class="copy-hint" id="new-key-hint" style="display:none">Kopieer de key — dit is de enige keer dat je hem ziet.</div>
+    <div class="copy-hint" id="new-key-hint" style="display:none">Copy the key — this is the only time it will be shown.</div>
     <div class="error-msg" id="modal-key-error"></div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-create-key')">Annuleren</button>
-      <button class="btn btn-primary" id="btn-create-key" onclick="createKey()">Aanmaken</button>
+      <button class="btn" onclick="closeModal('modal-create-key')">Cancel</button>
+      <button class="btn btn-primary" id="btn-create-key" onclick="createKey()">Create</button>
     </div>
   </div>
 </div>
@@ -478,15 +478,15 @@ tr:hover td { background: var(--bg2); }
 <!-- REVOKE CONFIRM MODAL -->
 <div class="modal-overlay" id="modal-revoke">
   <div class="modal">
-    <h3>Key intrekken</h3>
+    <h3>Revoke key</h3>
     <p style="color:var(--muted);font-size:12px;margin-bottom:16px">
-      Weet je zeker dat je deze key wilt intrekken? Dit kan niet ongedaan worden.
+      Are you sure you want to revoke this key? This cannot be undone.
     </p>
     <div id="revoke-key-preview" style="font-size:11px;color:var(--red);word-break:break-all;"></div>
     <div class="error-msg" id="modal-revoke-error"></div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-revoke')">Annuleren</button>
-      <button class="btn btn-danger" onclick="confirmRevoke()">Intrekken</button>
+      <button class="btn" onclick="closeModal('modal-revoke')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmRevoke()">Revoke</button>
     </div>
   </div>
 </div>
@@ -494,17 +494,17 @@ tr:hover td { background: var(--bg2); }
 <!-- WELCOME MAIL MODAL -->
 <div class="modal-overlay" id="modal-welcome">
   <div class="modal">
-    <h3>Welkomstmail versturen</h3>
+    <h3>Send welcome email</h3>
     <div class="form-group">
-      <label>E-mailadres</label>
-      <input type="email" id="welcome-email" placeholder="klant@voorbeeld.nl">
+      <label>Email address</label>
+      <input type="email" id="welcome-email" placeholder="customer@example.com">
     </div>
     <div id="welcome-key-info" style="font-size:11px;color:var(--muted);margin-bottom:8px;"></div>
     <div class="error-msg" id="modal-welcome-error"></div>
     <div class="success-msg" id="modal-welcome-success"></div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-welcome')">Sluiten</button>
-      <button class="btn btn-primary" onclick="sendWelcome()">Versturen</button>
+      <button class="btn" onclick="closeModal('modal-welcome')">Close</button>
+      <button class="btn btn-primary" onclick="sendWelcome()">Send</button>
     </div>
   </div>
 </div>
@@ -540,9 +540,9 @@ async function doLogin() {
   const totp  = document.getElementById('login-totp').value.trim();
   const errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
-  if (!token || !totp) { showError(errEl, 'Vul beide velden in'); return; }
+  if (!token || !totp) { showError(errEl, 'Please fill in both fields'); return; }
   const btn = document.querySelector('#login-screen .btn-primary');
-  btn.textContent = 'Bezig…';
+  btn.textContent = 'Signing in…';
   btn.disabled = true;
   try {
     const r = await fetch(`${API}/auth/login`, {
@@ -656,7 +656,7 @@ async function loadOverview() {
   const dot  = document.getElementById('relay-status-dot');
   const txt  = document.getElementById('relay-status-text');
   dot.className  = `status-dot${anyDown ? ' red' : ''}`;
-  txt.textContent = anyDown ? 'Sector offline' : 'Alle sectoren online';
+  txt.textContent = anyDown ? 'Sector offline' : 'All sectors online';
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -680,7 +680,7 @@ function renderKeysTable(rows, container) {
           <th>Label</th>
           <th>Plan</th>
           <th>Status</th>
-          <th>Acties</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -690,10 +690,10 @@ function renderKeysTable(rows, container) {
             <td><div class="key-value" title="${esc(k.key)}">${esc(k.key.slice(0,20))}…</div></td>
             <td style="color:var(--muted2);font-size:12px">${esc(k.label || '—')}</td>
             <td><span class="badge badge-${esc(k.plan)}">${esc(k.plan)}</span></td>
-            <td><span class="badge ${k.active ? 'badge-active' : 'badge-revoked'}">${k.active ? 'actief' : 'ingetrokken'}</span></td>
+            <td><span class="badge ${k.active ? 'badge-active' : 'badge-revoked'}">${k.active ? 'active' : 'revoked'}</span></td>
             <td>
               <div class="actions">
-                ${k.active ? `<button class="btn btn-sm btn-danger" data-action="revoke" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}">Intrekken</button>` : ''}
+                ${k.active ? `<button class="btn btn-sm btn-danger" data-action="revoke" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}">Revoke</button>` : ''}
                 <button class="btn btn-sm" data-action="welcome" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}" data-label="${esc(k.label||'')}" data-plan="${esc(k.plan)}">Mail</button>
               </div>
             </td>
@@ -711,11 +711,11 @@ function renderKeysTable(rows, container) {
 
 async function loadKeys(sector) {
   const container = document.getElementById('keys-table-container');
-  container.innerHTML = '<div class="loading">Laden…</div>';
+  container.innerHTML = '<div class="loading">Loading…</div>';
 
   if (sector === 'all') {
     const data = await apiFetch('/keys/all');
-    if (!data || !data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">Laden mislukt</div>`; return; }
+    if (!data || !data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">Failed to load</div>`; return; }
     // Dedupliceer: één rij per unieke key+label+plan combinatie, maar toon welke sectoren
     const keyMap = new Map();
     for (const [sec, keys] of Object.entries(data.sectors || {})) {
@@ -731,16 +731,16 @@ async function loadKeys(sector) {
       ...k,
       sector: k.sectors.join(', '),
     }));
-    if (!rows.length) { container.innerHTML = '<div class="empty-state">Geen keys gevonden</div>'; return; }
+    if (!rows.length) { container.innerHTML = '<div class="empty-state">No keys found</div>'; return; }
     renderKeysTable(rows, container);
     return;
   }
 
   const data = await apiFetch(`/sectors/${sector}/keys`);
   if (!data) return;
-  if (!data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">${esc(data.error||'Fout')}</div>`; return; }
+  if (!data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">${esc(data.error||'Error')}</div>`; return; }
   const keys = (data.keys || []).map(k => ({ ...k, sector }));
-  if (!keys.length) { container.innerHTML = '<div class="empty-state">Geen keys voor deze sector</div>'; return; }
+  if (!keys.length) { container.innerHTML = '<div class="empty-state">No keys for this sector</div>'; return; }
   renderKeysTable(keys, container);
 }
 
@@ -766,7 +766,7 @@ async function createKey() {
   errEl.style.display = 'none';
 
   const btn = document.getElementById('btn-create-key');
-  btn.textContent = 'Aanmaken…'; btn.disabled = true;
+  btn.textContent = 'Creating…'; btn.disabled = true;
   try {
     let resultKey = null;
     if (sector === 'all') {
@@ -775,17 +775,17 @@ async function createKey() {
         method: 'POST', body: { label, plan, email: email || undefined },
       });
       if (!data || !data.ok || !data.created?.length) {
-        showError(errEl, 'Aanmaken op sectoren mislukt'); return;
+        showError(errEl, 'Failed to create on sectors'); return;
       }
       resultKey = data.created[0]?.key;
       const resultEl = document.getElementById('new-key-result');
-      resultEl.textContent = `${resultKey}\n(aangemaakt op: ${data.created.map(c=>c.sector).join(', ')})`;
+      resultEl.textContent = `${resultKey}\n(created on: ${data.created.map(c=>c.sector).join(', ')})`;
       resultEl.style.display = 'block';
     } else {
       const data = await apiFetch(`/sectors/${sector}/keys`, {
         method: 'POST', body: { label, plan, email: email || undefined },
       });
-      if (!data || !data.ok) { showError(errEl, data?.error || 'Mislukt'); return; }
+      if (!data || !data.ok) { showError(errEl, data?.error || 'Failed'); return; }
       resultKey = data.key;
       const resultEl = document.getElementById('new-key-result');
       resultEl.textContent = resultKey;
@@ -805,7 +805,7 @@ async function createKey() {
   } catch (e) {
     showError(errEl, e.message);
   } finally {
-    btn.textContent = 'Aanmaken'; btn.disabled = false;
+    btn.textContent = 'Create'; btn.disabled = false;
   }
 }
 
@@ -831,7 +831,7 @@ async function confirmRevoke() {
   } else {
     data = await apiFetch(`/sectors/${sectorStr}/keys/revoke`, { method: 'POST', body: { key: pendingRevoke.key } });
   }
-  if (!data || !data.ok) { showError(errEl, data?.error || 'Mislukt'); return; }
+  if (!data || !data.ok) { showError(errEl, data?.error || 'Failed'); return; }
   closeModal('modal-revoke');
   loadKeys(currentKeysSector);
   pendingRevoke = null;
@@ -842,7 +842,7 @@ async function confirmRevoke() {
 function openWelcomeModal(sector, key, label, plan) {
   pendingWelcome = { sector, key, label, plan };
   document.getElementById('welcome-email').value = '';
-  document.getElementById('welcome-key-info').textContent = `Key: ${key.slice(0,20)}… (${label || 'geen label'})`;
+  document.getElementById('welcome-key-info').textContent = `Key: ${key.slice(0,20)}… (${label || 'no label'})`;
   document.getElementById('modal-welcome-error').style.display = 'none';
   document.getElementById('modal-welcome-success').style.display = 'none';
   openModal('modal-welcome');
@@ -854,13 +854,13 @@ async function sendWelcome() {
   const errEl = document.getElementById('modal-welcome-error');
   const okEl  = document.getElementById('modal-welcome-success');
   errEl.style.display = 'none'; okEl.style.display = 'none';
-  if (!email) { showError(errEl, 'E-mailadres verplicht'); return; }
+  if (!email) { showError(errEl, 'Email address required'); return; }
   const data = await apiFetch(`/sectors/${pendingWelcome.sector}/keys/welcome`, {
     method: 'POST',
     body: { email, key: pendingWelcome.key, plan: pendingWelcome.plan, label: pendingWelcome.label },
   });
-  if (!data || !data.ok) { showError(errEl, data?.error || 'Versturen mislukt'); return; }
-  okEl.textContent = `Mail verstuurd naar ${email}`;
+  if (!data || !data.ok) { showError(errEl, data?.error || 'Failed to send'); return; }
+  okEl.textContent = `Email sent to ${email}`;
   okEl.style.display = 'block';
 }
 
