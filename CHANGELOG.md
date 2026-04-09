@@ -21,6 +21,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **P3 — Pubkeys Map unbounded — no TTL, no per-key device cap** (reported by Raymond Zwarts)  
   `POST /v2/pubkey` stored entries without expiry. A free user could register unlimited device IDs, growing the in-memory Map indefinitely. Fixed with per-plan device limits (free: 5, pro: 50, enterprise: unlimited) and TTL-based expiry (free: 7 days, pro: 30 days, enterprise: 1 year). Invite-session pubkeys expire after 1 hour. Expired entries are evicted lazily on `GET /v2/pubkey` and swept hourly by the TTL flush interval.
 
+- **P4 — SSRF via webhook URL registration** (reported by Raymond Zwarts)  
+  `POST /v2/webhook` accepted any URL without validation. The relay fires outbound HTTP POSTs to stored webhook URLs when blobs are uploaded — a paid user could register an internal URL (e.g. `http://169.254.169.254/`, `http://10.x.x.x/`) to probe internal services from the relay's network. Fixed with `isSsrfSafeUrl()` guard applied at both registration (HTTP 400 on private URLs) and fire time (skip + log). Only public `https:` URLs are accepted. Blocked: loopback, link-local, RFC1918, IPv6 ULA, cloud metadata, `.local`/`.internal`/`.localhost` TLDs.
+
 ---
 
 ## [2.3.1] — 2026-04-09

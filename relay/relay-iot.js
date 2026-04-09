@@ -416,16 +416,36 @@ setInterval(() => {
   }
 }, 30_000);
 
+// ── SSRF guard — only allow public HTTPS webhook URLs ─────────────────────────
+function isSsrfSafeUrl(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    if (u.protocol !== 'https:') return false;
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (h === 'localhost' || h === '0.0.0.0' || h === '0') return false;
+    if (/^127\./.test(h)) return false;
+    if (/^::1$|^0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:0*1$/.test(h)) return false;
+    if (/^169\.254\./.test(h)) return false;
+    if (/^fe80/i.test(h)) return false;
+    if (/^10\./.test(h)) return false;
+    if (/^192\.168\./.test(h)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+    if (/^f[cd]/i.test(h)) return false;
+    if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return false;
+    if (h === 'metadata.google.internal' || h === 'metadata.aws.internal') return false;
+    return true;
+  } catch { return false; }
+}
+
 // ── Webhook push ──────────────────────────────────────────────────────────────
 function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = webhooks.get(`${deviceId}:${apiKey}`) || [];
   for (const hook of hooks) {
+    if (!isSsrfSafeUrl(hook.url)) { log('warn', 'webhook_ssrf_blocked', { url: (hook.url||'').slice(0,60) }); continue; }
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
     try {
-      const u   = new URL(hook.url);
-      const lib = u.protocol === 'https:' ? https : http;
       const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
-      const req = lib.request(hook.url, {
+      const req = https.request(hook.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
                    'X-Paramant-Event': event, 'X-Paramant-Sig': sig, 'User-Agent': `paramant-relay/${VERSION}` }
@@ -823,6 +843,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
+      if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
       const k = `${d.device_id}:${apiKey}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
       webhooks.get(k).push({ url: d.url, secret: d.secret || '' });

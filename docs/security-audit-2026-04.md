@@ -78,6 +78,7 @@ Two post-report security findings were submitted independently and patched on 20
 | P1 | **RAM admission TOCTOU on `/v2/inbound` and `/v2/drop/create`** — `ramOk()` was checked before `readBody()`, allowing concurrent requests to all pass the RAM gate then all allocate large buffers simultaneously | ✓ | Fixed: `inFlightInbound` counter incremented atomically (Node.js single-threaded) immediately after `ramOk()` passes and before `await readBody()`. `ramOk()` and `ramStatus()` now account for in-flight allocations. Affects paid accounts only. |
 | P2 | **Download handlers duplicate blobs in RAM** — `Buffer.from(entry.blob)` in all download/outbound/pickup paths created a full in-memory copy before sending, doubling peak RAM per download | ✓ | Fixed: all handlers now use the buffer reference directly (`const blob = entry.blob`) and zero it in the `res.end()` callback (`res.end(blob, () => { blob.fill(0) })`) — eliminating the copy entirely. Applies to `/v2/dl/:token/get`, `/v2/outbound/:hash`, and `/v2/drop/pickup` across all relay files. |
 | P3 | **`pubkeys` Map has no TTL and no per-key device cap** — a free user could call `POST /v2/pubkey` with unlimited distinct device IDs, growing the Map indefinitely | ✓ | Fixed: all entries now carry an `expires` field. Limits: free=5 devices / 7-day TTL, pro=50 / 30-day, enterprise=unlimited / 1-year. Invite-session pubkeys expire after 1 hour. Hourly cleanup sweeps expired entries. `GET /v2/pubkey` evicts expired entries on access. |
+| P4 | **SSRF via webhook URL registration** — `POST /v2/webhook` accepted any URL; relay fires outbound HTTP POSTs to stored URLs when blobs are uploaded, allowing a paid user to probe internal services (RFC1918, loopback, cloud metadata endpoints) | ✓ | Fixed: `isSsrfSafeUrl()` guard applied at registration (HTTP 400 rejected) and at fire time (skipped + logged). Only public `https:` URLs accepted. Blocked ranges: loopback, link-local, RFC1918, IPv6 ULA, cloud metadata, private TLDs. |
 
 ---
 
@@ -87,7 +88,7 @@ Two post-report security findings were submitted independently and patched on 20
 |------|-------|
 | 2026-04-08 | Ryan Williams submits full report |
 | 2026-04-09 | Report reviewed, findings triaged, this tracking page published |
-| 2026-04-09 | Additional findings P1 + P2 + P3 submitted by Raymond Zwarts and patched same day |
+| 2026-04-09 | Additional findings P1–P4 submitted by Raymond Zwarts ([@rzwarts74](https://github.com/rzwarts74)) and patched same day |
 | TBD | Critical patches shipped (findings #1–4) |
 
 ---
