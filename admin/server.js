@@ -254,6 +254,31 @@ api.post('/keys/all', authMiddleware, async (req, res) => {
   res.status(allOk ? 200 : 207).json({ ok: allOk, created, failed, results });
 });
 
+// POST /api/keys/sectors — create key on a specific subset of sectors
+api.post('/keys/sectors', authMiddleware, async (req, res) => {
+  const { sectors, ...body } = req.body || {};
+  if (!Array.isArray(sectors) || !sectors.length) return res.status(400).json({ error: 'sectors array required' });
+  const invalid = sectors.filter(s => !SECTORS[s]);
+  if (invalid.length) return res.status(400).json({ error: `Unknown sectors: ${invalid.join(', ')}` });
+  const results = {};
+  await Promise.allSettled(
+    sectors.map(async sector => {
+      try {
+        const r = await relayFetch(sector, '/v2/admin/keys', 'POST', body, false, req.sessionToken);
+        results[sector] = { status: r.status, data: r.body };
+      } catch (e) { results[sector] = { status: 502, data: { error: e.message } }; }
+    })
+  );
+  const created = Object.entries(results)
+    .filter(([, v]) => v.status === 200 || v.status === 201)
+    .map(([sector, v]) => ({ sector, key: v.data?.key }));
+  const failed = Object.entries(results)
+    .filter(([, v]) => v.status !== 200 && v.status !== 201)
+    .map(([sector, v]) => ({ sector, error: v.data?.error || `HTTP ${v.status}` }));
+  const allOk = failed.length === 0;
+  res.status(allOk ? 200 : 207).json({ ok: allOk, created, failed, results });
+});
+
 // POST /api/keys/all/revoke — revoke key op ALLE sectoren
 api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
   const { key } = req.body || {};
