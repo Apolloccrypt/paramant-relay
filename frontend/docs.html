@@ -43,33 +43,8 @@ td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#aaaaaa;white-s
 .badge{display:inline-block;padding:2px 8px;border:1px solid #1a1a1a;border-radius:3px;font-size:11px;color:#606060;margin-right:4px;font-family:'SF Mono','Fira Code',monospace}
 @media(max-width:768px){.sidebar{display:none}.content{padding:32px 24px}}
 
-#gate{position:fixed;inset:0;background:#0c0c0c;z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column}
-#gate .box{width:100%;max-width:420px;padding:0 24px}
-#gate .logo{font-family:'SF Mono','Fira Code',monospace;font-size:13px;font-weight:700;letter-spacing:.08em;margin-bottom:40px;color:#ededed}
-#gate h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px;color:#ededed}
-#gate p{font-size:13px;color:#606060;line-height:1.7;margin-bottom:28px}
-#gate input{width:100%;background:#0f0f0f;border:1px solid #222;border-radius:6px;padding:11px 14px;font-size:13px;color:#ededed;font-family:'SF Mono','Fira Code',monospace;outline:none;margin-bottom:10px;box-sizing:border-box}
-#gate input:focus{border-color:#444}
-#gate input::placeholder{color:#333}
-#gate button{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;padding:11px;font-size:13px;color:#ededed;cursor:pointer;transition:background .15s}
-#gate button:hover{background:#222}
-#gate .err{font-size:12px;color:#c0392b;font-family:'SF Mono','Fira Code',monospace;margin-top:8px;min-height:16px}
-#gate .sub{margin-top:28px;font-size:12px;color:#404040;text-align:center}
-#gate .sub a{color:#606060;text-decoration:underline}
 </style>
 </head>
-
-<div id="gate">
-  <div class="box">
-    <div class="logo">PARAMANT</div>
-    <h2>Developer documentation</h2>
-    <p>Access requires a paid API key.<br>Get one at <a href="/#pricing" style="color:#8a8a8a;text-decoration:underline">paramant.app/#pricing</a>.</p>
-    <input id="gate-key" type="text" placeholder="pgp_your_api_key_here" autocomplete="off" spellcheck="false">
-    <button id="gate-btn" onclick="gateSubmit()">Unlock docs</button>
-    <div class="err" id="gate-err"></div>
-    <div class="sub"><a href="/">← Back to paramant.app</a></div>
-  </div>
-</div>
 
 <nav>
   <a class="logo" href="/">PARAMANT</a>
@@ -80,7 +55,7 @@ td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#aaaaaa;white-s
   <a class="back" href="/">back</a>
 </nav>
 
-<div class="layout" id="main-content" style="display:none">
+<div class="layout" id="main-content">
   <div class="sidebar">
     <h3>Getting started</h3>
     <a href="#quickstart">Quick start</a>
@@ -299,45 +274,6 @@ window.addEventListener('scroll', () => {
   headings.forEach(h => { if (window.scrollY >= h.offsetTop - 80) cur = h.id; });
   links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
 }, { passive: true });
-</script>
-
-<script>
-(function(){
-  const STORE = 'pm_docs_key';
-  const saved = localStorage.getItem(STORE);
-  if (saved) validate(saved);
-  document.getElementById('gate-key').addEventListener('keydown', e => { if (e.key === 'Enter') gateSubmit(); });
-
-  async function validate(key) {
-    try {
-      const r = await fetch('/api/check-key?k=' + encodeURIComponent(key));
-      const d = await r.json();
-      if (d.valid && (d.plan === 'pro' || d.plan === 'enterprise')) {
-        localStorage.setItem(STORE, key);
-        document.getElementById('gate').style.display = 'none';
-        document.getElementById('main-content').style.display = '';
-      } else if (d.valid && d.plan === 'free') {
-        showErr('Free tier does not have docs access. Upgrade to Pro.');
-      } else {
-        showErr('Invalid API key.');
-        localStorage.removeItem(STORE);
-      }
-    } catch(e) { showErr('Connection error. Try again.'); }
-  }
-
-  window.gateSubmit = function() {
-    const key = document.getElementById('gate-key').value.trim();
-    if (!key) return;
-    document.getElementById('gate-btn').textContent = 'Checking…';
-    document.getElementById('gate-err').textContent = '';
-    validate(key).finally(() => { document.getElementById('gate-btn').textContent = 'Unlock docs'; });
-  };
-
-  function showErr(msg) {
-    document.getElementById('gate-err').textContent = msg;
-    document.getElementById('gate-key').value = '';
-  }
-})();
 </script>
 
 </body>
