@@ -26,7 +26,7 @@ const fs     = require('fs');
 const path   = require('path');
 const url_   = require('url');
 
-const VERSION    = '2.2.1';
+const VERSION    = '2.3.1';
 
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;

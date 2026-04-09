@@ -23,7 +23,7 @@ const https  = require('https');
 const fs     = require('fs');
 const url_   = require('url');
 
-const VERSION    = '2.1.0';
+const VERSION    = '2.3.1';
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
