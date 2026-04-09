@@ -76,6 +76,54 @@ We will not take legal action against researchers who follow this policy.
 
 ## Recent Security Patches
 
+### v2.3.3 — 2026-04-09 (security hardening release)
+
+Deep security review and self-hosting hardening. No external researcher report; internal findings.
+
+#### DNS Rebinding bypass on webhook fire · Severity: Medium
+
+**What:** `isSsrfSafeUrl()` was only checked at webhook registration time. An attacker registers a webhook URL pointing to a legitimate public IP (passes the check), lets the DNS TTL expire, then switches their DNS record to a private address (RFC1918, `169.254.169.254`, `::1`). On the next blob upload the relay fires the webhook to the now-private IP — bypassing the SSRF guard.
+
+**Fix (v2.3.3):** `pushWebhooks()` now resolves the webhook hostname via `dns.promises.lookup()` immediately before every outbound request and re-verifies the resolved IP through `isSsrfSafeUrl()`. Redirected-to-private requests are blocked and logged as `webhook_dns_rebinding_blocked`. Applied to all 7 relay files.
+
+#### Version disclosure via `X-Paramant-Version` response header · Severity: Low
+
+**What:** Every relay response included `X-Paramant-Version: 2.x.x`, giving attackers an exact version string to cross-reference against CVE databases or known weaknesses without probing.
+
+**Fix (v2.3.3):** Header removed from all `setHeaders()` calls. Version remains in `/health` JSON response body (needed by SDKs) and admin-only Prometheus metrics.
+
+#### Google Fonts CDN in ParaDrop · Severity: Low
+
+**What:** `drop.html` fetched fonts from `fonts.googleapis.com` and `fonts.gstatic.com` on every page load, leaking user IP addresses and timing to Google — contrary to the product's privacy promises.
+
+**Fix (v2.3.3):** External font import removed. System font stack used instead.
+
+#### Docker container runs with full Linux capabilities · Severity: Medium
+
+**What:** Relay containers ran without capability restrictions. A container escape would give an attacker all Linux capabilities inside the container, including `CAP_NET_RAW`, `CAP_SYS_PTRACE`, etc.
+
+**Fix (v2.3.3):** All relay containers now use `no-new-privileges: true` and `cap_drop: ALL`. Root filesystem set to read-only with a 64 MB tmpfs for `/tmp`. Memory limits enforced (1500m per relay).
+
+#### Docker image uses floating `:latest` tag · Severity: Medium
+
+**What:** `mtty001/relay:latest` is resolved at pull time. A supply-chain compromise of the Docker Hub account would silently deliver malicious code.
+
+**Fix (v2.3.3):** Image pinned to `mtty001/relay:2.3.3`.
+
+#### Build tools present in production Docker image · Severity: Medium
+
+**What:** `python3`, `make`, `g++` (needed to compile argon2 native bindings) were present in the final runtime image, expanding the attack surface after a container escape.
+
+**Fix (v2.3.3):** Multi-stage Dockerfile: build stage compiles with tools; runtime stage is lean — only compiled `node_modules` + `relay.js`.
+
+#### nginx missing rate limits, security headers, session hardening · Severity: Medium
+
+**What:** `nginx-selfhost.conf` (self-hosting stack) lacked: per-endpoint rate limiting for key registration and admin paths, HSTS `preload` + `includeSubDomains`, OCSP stapling, `ssl_session_tickets off`, `proxy_hide_header Server`, slowloris timeouts, `client_max_body_size`, upstream health fail tracking.
+
+**Fix (v2.3.3):** Comprehensive hardening — see CHANGELOG v2.3.3 for full list.
+
+---
+
 ### v2.3.2 — 2026-04-09 (security release)
 
 Three vulnerabilities reported by Raymond Zwarts, independent security researcher. All patched and deployed same day.

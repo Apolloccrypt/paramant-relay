@@ -1,4 +1,3 @@
-
 # PARAMANT self-hosted relay stack
 # Docs: https://github.com/Apolloccrypt/paramant-relay#self-hosting
 #
@@ -6,11 +5,37 @@
 #   cp .env.example .env && nano .env
 #   docker compose up -d
 
+# ── Image version pin ─────────────────────────────────────────────────────────
+# Pin to exact version — never use :latest in production.
+# Build locally:  build: ./relay  (comment out image:)
+x-relay-image: &relay-image mtty001/relay:2.3.3
+
+# ── Shared security baseline for all relay containers ─────────────────────────
+x-relay-hardening: &relay-hardening
+  security_opt:
+    - no-new-privileges:true   # block privilege escalation via setuid/setgid
+  cap_drop:
+    - ALL                      # drop all Linux capabilities; relay needs none
+  read_only: true              # root filesystem is read-only
+  tmpfs:
+    - /tmp:size=64m,mode=1777  # writable /tmp only, max 64 MB, sticky bit
+
+# ── Shared resource limits ────────────────────────────────────────────────────
+x-relay-resources: &relay-resources
+  deploy:
+    resources:
+      limits:
+        memory: 1500m          # RAM_LIMIT_MB(1024) + OS + Node overhead
+        cpus: '1.0'
+      reservations:
+        memory: 256m
+
 services:
   relay-health:
-    image: mtty001/relay:latest  # pull from Docker Hub; replace with: build: ./relay  to build locally
-    # build: ./relay
+    image: *relay-image
+    # build: ./relay  # uncomment to build locally instead of pulling
     restart: unless-stopped
+    <<: [*relay-hardening, *relay-resources]
     environment:
       PORT: "3005"
       SECTOR: "health"
@@ -23,7 +48,7 @@ services:
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       TOTP_SECRET: "${TOTP_SECRET:-}"
     ports:
-      - "127.0.0.1:3005:3005"  # localhost only — for paramant CLI and admin panel
+      - "127.0.0.1:3005:3005"  # localhost only — CLI + admin panel access
     volumes:
       - relay-health-data:/data
     networks:
@@ -33,11 +58,13 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
   relay-legal:
-    image: mtty001/relay:latest
+    image: *relay-image
     # build: ./relay
     restart: unless-stopped
+    <<: [*relay-hardening, *relay-resources]
     environment:
       PORT: "3002"
       SECTOR: "legal"
@@ -58,11 +85,13 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
   relay-finance:
-    image: mtty001/relay:latest
+    image: *relay-image
     # build: ./relay
     restart: unless-stopped
+    <<: [*relay-hardening, *relay-resources]
     environment:
       PORT: "3003"
       SECTOR: "finance"
@@ -83,11 +112,13 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
   relay-iot:
-    image: mtty001/relay:latest
+    image: *relay-image
     # build: ./relay
     restart: unless-stopped
+    <<: [*relay-hardening, *relay-resources]
     environment:
       PORT: "3004"
       SECTOR: "iot"
@@ -108,11 +139,21 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
   admin:
     build: ./admin
     image: paramant-admin:latest
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
     environment:
       PORT: "4200"
       BASE_PATH: "/admin"
@@ -132,6 +173,21 @@ services:
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE    # required to bind ports 80 and 443
+      - CHOWN               # nginx needs to chown temp files
+      - DAC_OVERRIDE        # nginx needs to read ssl certs
+      - SETUID              # nginx drops from root to worker user
+      - SETGID
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: '1.0'
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -161,6 +217,6 @@ volumes:
 networks:
   relay-internal:
     driver: bridge
-    internal: true   # relays only reachable via nginx
+    internal: true   # relay containers not reachable from internet — only via nginx
   relay-external:
-    driver: bridge   # nginx uses this for certbot ACME + upstream DNS
+    driver: bridge   # nginx uses this for certbot ACME challenges + upstream DNS

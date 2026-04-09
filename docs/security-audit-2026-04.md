@@ -82,6 +82,23 @@ Two post-report security findings were submitted independently and patched on 20
 
 ---
 
+## Self-Hosting Hardening — April 2026 (v2.3.3)
+
+Internal security hardening pass concurrent with the audit. All findings identified in self-hosting stack, Docker deployment, and relay response behaviour. No external reporter.
+
+| # | Finding | Severity | Status | Notes |
+|---|---------|----------|--------|-------|
+| H1 | **DNS rebinding bypass on webhook fire** — `isSsrfSafeUrl()` only checked at registration. Attacker could switch DNS after registration to target private IP. | Medium | ✓ | Fixed: `dns.promises.lookup()` + IP re-verify before every webhook outbound request in all 7 relay files. Logged as `webhook_dns_rebinding_blocked`. |
+| H2 | **Version disclosure via `X-Paramant-Version` response header** — exact version in every response enables targeted exploitation. | Low | ✓ | Header removed from `setHeaders()`. Retained in `/health` JSON + admin metrics only. |
+| H3 | **Google Fonts CDN in ParaDrop** — `fonts.googleapis.com` and `fonts.gstatic.com` loaded on every page, leaking user IPs to Google. Violates product privacy promises. | Low | ✓ | External `@import` removed. System font stack used. |
+| H4 | **Docker containers run with full Linux capabilities** — no `cap_drop: ALL`, no `no-new-privileges`. Container escape gives full cap set. | Medium | ✓ | All relay containers: `no-new-privileges: true`, `cap_drop: ALL`, `read_only: true`, 64 MB `/tmp` tmpfs. Memory limits enforced. |
+| H5 | **Floating `:latest` Docker image tag** — supply chain risk; account compromise delivers malicious code silently. | Medium | ✓ | Pinned to `mtty001/relay:2.3.3`. |
+| H6 | **Build tools in production Docker image** — `python3`, `make`, `g++` in runtime image increases post-escape attack surface. | Medium | ✓ | Multi-stage build: build tools in stage 1 only; final image is lean runtime. |
+| H7 | **nginx-selfhost.conf missing hardening** — no rate limiting on `/v2/pubkey`, `/v2/did`, `/v2/admin`, `/v2/mfa`; HSTS incomplete; no OCSP stapling; no session ticket disabling; no `proxy_hide_header Server`; no slowloris timeouts; no `client_max_body_size`; access_log was off. | Medium | ✓ | Comprehensive hardening applied. See CHANGELOG v2.3.3. |
+| H8 | **`package.json` version mismatch** — reported `"version": "5.0.0"` vs actual `v2.3.2`. | Low | ✓ | Fixed to `2.3.3`. |
+
+---
+
 ## Disclosure timeline
 
 | Date | Event |
@@ -89,6 +106,7 @@ Two post-report security findings were submitted independently and patched on 20
 | 2026-04-08 | Ryan Williams submits full report |
 | 2026-04-09 | Report reviewed, findings triaged, this tracking page published |
 | 2026-04-09 | Additional findings P1–P4 submitted by Raymond Zwarts ([@rzwarts74](https://github.com/rzwarts74)) and patched same day |
+| 2026-04-09 | Internal hardening pass (H1–H8) — self-hosting stack, Docker, nginx, relay response headers |
 | TBD | Critical patches shipped (findings #1–4) |
 
 ---

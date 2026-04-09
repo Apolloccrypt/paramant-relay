@@ -7,6 +7,46 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.3] — 2026-04-09
+
+### Security
+
+- **DNS rebinding defense in webhook fire** — `pushWebhooks()` only checked the webhook URL at registration time (`isSsrfSafeUrl()`). An attacker could register a domain pointing to a public IP (passes the SSRF check), wait for the DNS TTL to expire, then switch DNS to a private/RFC1918/cloud-metadata address. On the next blob upload the relay would fire a webhook to the now-private IP — bypassing the SSRF guard entirely. Fixed: `pushWebhooks()` is now `async` and resolves the hostname via `dns.lookup()` immediately before each outbound request, then re-verifies the resolved IP with `isSsrfSafeUrl()`. Requests that resolve to private addresses are blocked and logged as `webhook_dns_rebinding_blocked`. Applied to all 7 relay files.
+
+- **Version disclosure via response header removed** — Every relay response included `X-Paramant-Version: 2.x.x`. This gives attackers an exact version fingerprint to target known vulnerabilities without needing to probe. Header removed from all relay responses (`setHeaders()`). Version is still returned in the `/health` endpoint JSON body (required by SDK) and in Prometheus metrics (admin-only). Applied to all 7 relay files.
+
+- **Google Fonts CDN removed from ParaDrop** — `drop.html` loaded `fonts.googleapis.com` and `fonts.gstatic.com` on page load, leaking user IP addresses and timing to Google. Removed. Replaced with system font stack (`system-ui, -apple-system, 'Segoe UI', sans-serif` for sans; `'Courier New', 'Menlo', monospace` for mono).
+
+- **Docker container hardening** — All relay containers now run with `no-new-privileges: true` and `cap_drop: ALL`. No Linux capabilities are required by the relay process (ports are > 1024; no raw sockets; no filesystem privilege). Nginx retains only `NET_BIND_SERVICE`, `CHOWN`, `DAC_OVERRIDE`, `SETUID`, `SETGID`. Containers run with a `read_only: true` root filesystem with a 64 MB `tmpfs` mount for `/tmp`. Memory limits applied: 1500m per relay, 256m for admin, 128m for nginx.
+
+- **Docker image pinned from floating `:latest`** — `docker-compose.yml` used `mtty001/relay:latest`. A supply-chain compromise of the Docker Hub account would silently deliver malicious code on next `docker compose pull`. Image pinned to `mtty001/relay:2.3.3`.
+
+- **Multi-stage Dockerfile — build tools removed from production image** — `python3`, `make`, `g++` (required to compile `argon2` native bindings) were present in the final runtime image. A container escape could leverage these to compile and execute arbitrary native code. Fixed with a two-stage build: stage 1 compiles with build tools, stage 2 is the lean runtime image with only compiled `node_modules` and `relay.js` — no compilers.
+
+- **nginx hardening (self-hosting)** — `nginx-selfhost.conf` updated:
+  - `server_tokens off` — hides nginx version from error pages and `Server:` header
+  - `ssl_session_tickets off` — forward secrecy: disables TLS session ticket resumption
+  - `ssl_stapling on` + `ssl_stapling_verify on` — OCSP stapling reduces revocation check latency
+  - HSTS upgraded: `max-age=63072000; includeSubDomains; preload` (was 1-year, no subdomains, no preload)
+  - `ssl_ciphers` tightened to ECDHE + AES-GCM + ChaCha20 only; removed weak `HIGH:!aNULL:!MD5`
+  - `proxy_hide_header Server; proxy_hide_header X-Powered-By` — removes upstream version strings
+  - `X-Permitted-Cross-Domain-Policies: none` added
+  - `Referrer-Policy: no-referrer` + `Permissions-Policy` added
+  - `client_max_body_size 35M` — prevents nginx from accepting oversized requests upstream
+  - `client_header_timeout 10s` / `client_body_timeout 60s` / `send_timeout 30s` — slowloris mitigation
+  - Rate limiting added to: `/v2/pubkey` (20/min), `/v2/did` (20/min), `/v2/admin` (10/min), `/v2/mfa` (10/min, brute-force guard)
+  - Dedicated `pubkey` and `auth` rate limit zones added
+  - Access logging re-enabled with minimal format (IP, timestamp, method+host+path, status, size, response time — **no query string to prevent API key logging**)
+  - `max_fails=3 fail_timeout=10s` on upstream servers — relay is marked unhealthy after 3 failures
+
+- **package.json version mismatch fixed** — `relay/package.json` reported `"version": "5.0.0"` while the actual release is v2.3.3. Fixed.
+
+### Changed
+
+- **Relay version** — all relay files updated from `2.3.2` → `2.3.3`.
+
+---
+
 ## [2.3.2] — 2026-04-09
 
 ### Security

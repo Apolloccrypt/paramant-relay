@@ -26,7 +26,7 @@ const fs     = require('fs');
 const path   = require('path');
 const url_   = require('url');
 
-const VERSION    = '2.3.2';
+const VERSION    = '2.3.3';
 
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;
@@ -615,10 +615,24 @@ function isSsrfSafeUrl(urlStr) {
 }
 
 // ── Webhook push ──────────────────────────────────────────────────────────────
-function pushWebhooks(apiKey, deviceId, event, data) {
+async function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = webhooks.get(`${deviceId}:${apiKey}`) || [];
   for (const hook of hooks) {
     if (!isSsrfSafeUrl(hook.url)) { log('warn', 'webhook_ssrf_blocked', { url: (hook.url||'').slice(0,60) }); continue; }
+    // DNS rebinding defense: resolve the hostname and verify the resulting IP
+    // Prevents attack where domain resolves to public IP at registration, then DNS
+    // TTL expires and is switched to a private/RFC1918 address before firing.
+    try {
+      const _wu = new URL(hook.url);
+      const _resolved = await require('dns').promises.lookup(_wu.hostname);
+      if (!isSsrfSafeUrl('https://' + _resolved.address + '/')) {
+        log('warn', 'webhook_dns_rebinding_blocked', { url: hook.url.slice(0,60), resolved: _resolved.address });
+        continue;
+      }
+    } catch(e) {
+      log('warn', 'webhook_dns_resolve_fail', { url: (hook.url||'').slice(0,60), err: e.message });
+      continue;
+    }
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
     try {
       const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
@@ -630,7 +644,7 @@ function pushWebhooks(apiKey, deviceId, event, data) {
       req.on('error', () => {});
       req.write(payload); req.end();
       stats.webhooks_sent++;
-    } catch(e) { log('warn', 'webhook_fail', { url: hook.url }); }
+    } catch(e) { log('warn', 'webhook_fail', { url: (hook.url||'').slice(0,60) }); }
   }
 }
 
@@ -666,7 +680,7 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
-  res.setHeader('X-Paramant-Version',           VERSION);
+  // X-Paramant-Version intentionally omitted — version disclosure via response header removed (security hardening v2.3.3)
   res.setHeader('X-Paramant-Sector',            SECTOR);
 }
 
