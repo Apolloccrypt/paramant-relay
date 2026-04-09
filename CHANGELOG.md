@@ -7,6 +7,30 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.5] — 2026-04-09
+
+### Security
+
+- **CT log Merkle tree standardised (finding #14)** — All 7 relay files. Previous implementation used SHA-256 with raw hex string concatenation — no domain separation between leaf and inner nodes, enabling second-preimage attacks. Fixed with RFC 6962-style domain separation using SHA3-256: leaf nodes use `SHA3-256(0x00 || leaf_data_bytes)`, inner nodes use `SHA3-256(0x01 || left_bytes || right_bytes)`. Binary Buffer operations replace hex string concatenation. Odd leaves are promoted unchanged (no self-duplication). `ctInclusionProof()` replaces `slice(-8)`: generates a proper Merkle audit path with `{ hash, position: 'left'|'right' }` per step, enabling O(log n) verifiable inclusion proofs.
+
+---
+
+## [2.3.4] — 2026-04-09
+
+### Security
+
+- **WebSocket API key no longer in URL (finding #13)** — All 7 relay files now expose `POST /v2/ws-ticket` which returns a 30-second one-time `wst_` token. WS upgrade handler prefers `?ticket=` over legacy `?k=` (still accepted with deprecation warning). `drop.html` and `parashare.html` fetch ticket asynchronously before connecting — API key is now only sent in the `X-Api-Key` header, never in the WebSocket URL.
+
+- **Plaintext filename removed from relay metadata (finding #4)** — `file_name` is no longer stored in relay inbound metadata (`file_name: ''`). The confirm download page now shows "Encrypted file". The real filename remains in the encrypted payload and is recovered by the receiver after decryption. `drop.html` and `parashare.html` no longer include `file_name` in inbound meta.
+
+- **Constant-time admin token comparison** — All 7 relay files. Admin token check replaced `===` with `crypto.timingSafeEqual()` via `safeEqual()` helper, preventing timing side-channel attacks on the admin token.
+
+- **Remaining `?k=` query param usage removed from `drop.html`** — `check-key` and `pubkey` fetches migrated from `?k=${apiKey}` query param to `X-Api-Key` header.
+
+- **`connectWebSocket()` made async in `drop.html` and `parashare.html` (finding #2)** — Functions now properly `await` the ticket fetch before constructing the WebSocket URL.
+
+---
+
 ## [2.3.3] — 2026-04-09
 
 ### Security

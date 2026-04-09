@@ -136,11 +136,11 @@ GET /v2/check-key?k=pgp_your_key_here</pre>
     <pre>gp = GhostPipe(
     api_key=<span class="st">"pgp_xxx"</span>,
     device=<span class="st">"device-001"</span>,
-    sector=<span class="st">"health"</span>,          <span class="cm"># health / legal / finance / iot</span>
+    sector=<span class="st">"health"</span>,          <span class="cm"># routing hint — picks health.paramant.app</span>
     use_edge=False            <span class="cm"># True = via Fly.io edge (geo-routed)</span>
-)
-
-hash = gp.send(data, ttl_ms=86400000, webhook=<span class="st">"https://you.com/cb"</span>)
+)</pre>
+    <p>All sectors expose the same API — <code>sector</code> selects the routing domain only.</p>
+    <pre>hash = gp.send(data, ttl_ms=86400000, webhook=<span class="st">"https://you.com/cb"</span>)
 data = gp.receive(hash)</pre>
 
     <h2 id="endpoints">All endpoints</h2>
@@ -152,7 +152,8 @@ data = gp.receive(hash)</pre>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live delivery stats, ACK rate</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket — blob_ready push events</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Get 30s one-time WebSocket ticket (avoids key in URL)</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket — blob_ready push events</td><td>Ticket or Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/webhook</td><td>Register delivery webhook URL</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/pubkey</td><td>Register ML-KEM + ECDH keypair</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/check-key</td><td>Verify key validity and plan</td><td>—</td></tr>
@@ -202,7 +203,14 @@ X-Api-Key: pgp_xxx
 { "event": "blob_retrieved", "hash": "...", "ts": "2026-04-02T..." }</span></pre>
 
     <h2 id="stream">GET /v2/stream</h2>
-    <pre>const ws = new WebSocket(<span class="st">'wss://health.paramant.app/v2/stream?k=pgp_xxx'</span>)
+    <p>Preferred: fetch a 30-second one-time ticket first to avoid putting the API key in the URL.</p>
+    <pre><span class="cm">// Step 1 — get a one-time WebSocket ticket (30s TTL)</span>
+const { ticket } = await fetch(<span class="st">'https://health.paramant.app/v2/ws-ticket'</span>, {
+  method: <span class="st">'POST'</span>, headers: { <span class="st">'X-Api-Key'</span>: <span class="st">'pgp_xxx'</span> }
+}).then(r => r.json());
+
+<span class="cm">// Step 2 — connect with ticket (key never appears in URL)</span>
+const ws = new WebSocket(<span class="st">`wss://health.paramant.app/v2/stream?ticket=${ticket}`</span>)
 ws.onmessage = e => {
   const msg = JSON.parse(e.data)
   <span class="cm">// { type: "blob_ready", hash: "...", size: 5242880 }</span>
@@ -256,14 +264,16 @@ python3 paramant-admin.py team-list</pre>
       <tr><td>enterprise</td><td>5 min</td><td>7 days</td></tr>
     </table>
 
-    <h2 id="sectors">Relay sectors</h2>
+    <h2 id="sectors">Relay routing domains</h2>
+    <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Separate subdomains exist for traffic routing, isolation, and sector-specific compliance documentation — not for different relay configurations.</p>
     <table>
-      <tr><th>Sector</th><th>URL</th><th>Use case</th><th>Compliance</th></tr>
+      <tr><th>Domain</th><th>URL</th><th>Primary use case</th><th>Compliance reference</th></tr>
       <tr><td>health</td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td>NEN 7510, GDPR</td></tr>
       <tr><td>legal</td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>AVG, eIDAS</td></tr>
-      <tr><td>finance</td><td>finance.paramant.app</td><td>Compliance data, signing keys</td><td>No CLOUD Act</td></tr>
+      <tr><td>finance</td><td>finance.paramant.app</td><td>Compliance data, signing keys</td><td>No CLOUD Act, NIS2/DORA</td></tr>
       <tr><td>iot</td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td>IEC 62443</td></tr>
     </table>
+    <p>The <code>sector</code> parameter in the SDK is a routing hint — it selects which subdomain to connect to. The crypto stack, API surface, and burn-on-read behaviour are identical across all domains.</p>
   </div>
 </div>
 
