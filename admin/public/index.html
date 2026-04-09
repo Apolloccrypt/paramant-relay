@@ -588,6 +588,9 @@ function logout() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  // Reset any buttons that may have been left in a broken state (e.g. after session expiry)
+  const btnReload = document.getElementById('btn-reload-all');
+  if (btnReload) { btnReload.textContent = '⟳ Sync keys'; btnReload.disabled = false; }
   loadOverview();
   loadKeys(currentKeysSector);
   startAutoRefresh();
@@ -901,11 +904,21 @@ async function reloadAllRelays() {
   btn.textContent = '⟳ Syncing…'; btn.disabled = true;
   try {
     const data = await apiFetch('/reload-all', { method: 'POST', body: {} });
-    if (!data) { btn.textContent = '✗ Failed'; return; }
+    if (!data) {
+      // 401 — session expired, logout() already called by apiFetch. Reset button so it
+      // works correctly after the user logs back in.
+      btn.textContent = '⟳ Sync keys'; btn.disabled = false; return;
+    }
+    const anyFailed = Object.values(data.results || {}).some(r => !r.ok);
     const counts = Object.entries(data.results || {})
-      .map(([s, r]) => `${s}:${r.loaded ?? '?'}`).join(' ');
-    btn.textContent = `✓ Synced (${counts})`;
-    setTimeout(() => { btn.textContent = '⟳ Sync keys'; btn.disabled = false; }, 3000);
+      .map(([s, r]) => `${s}:${r.ok ? (r.loaded ?? '✓') : '✗'}`).join(' ');
+    if (anyFailed) {
+      btn.textContent = `✗ Partial (${counts})`;
+      setTimeout(() => { btn.textContent = '⟳ Sync keys'; btn.disabled = false; }, 4000);
+    } else {
+      btn.textContent = `✓ Synced (${counts})`;
+      setTimeout(() => { btn.textContent = '⟳ Sync keys'; btn.disabled = false; }, 3000);
+    }
     loadOverview();
   } catch(e) {
     btn.textContent = '✗ Error'; btn.disabled = false;
