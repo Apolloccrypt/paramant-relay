@@ -7,6 +7,25 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.2] — 2026-04-09
+
+### Security
+
+- **P1 — RAM admission TOCTOU on `/v2/inbound` and `/v2/drop/create`** (reported by Raymond Zwarts)  
+  `ramOk()` was evaluated before `readBody()`. Under concurrent load, all requests could pass the RAM gate simultaneously, then all allocate large buffers — bypassing the capacity guard. Fixed by incrementing `inFlightInbound` atomically (Node.js single-threaded guarantee) immediately after `ramOk()` passes and before `await readBody()`, with `finally { inFlightInbound-- }`. `ramOk()` and `ramStatus()` now account for in-flight allocations in both blob count and RSS projection.
+
+- **P2 — Download handlers duplicated blobs in RAM** (reported by Raymond Zwarts)  
+  All download, outbound, and drop/pickup handlers called `Buffer.from(entry.blob)`, creating a full copy of the blob before sending — doubling peak RAM per download. Fixed across all relay files: handlers now use the buffer reference directly and zero it in the `res.end()` callback after the TCP stack has flushed the data. No second allocation, zero-on-flush guaranteed.  
+  Affected paths: `/v2/dl/:token/get`, `/v2/outbound/:hash`, `/v2/drop/pickup` in `relay-health.js`, `relay-legal.js`, `relay-finance.js`, `relay-iot.js`, `ghost-pipe-relay.js`, `relay.js`.
+
+- **P3 — Pubkeys Map unbounded — no TTL, no per-key device cap** (reported by Raymond Zwarts)  
+  `POST /v2/pubkey` stored entries without expiry. A free user could register unlimited device IDs, growing the in-memory Map indefinitely. Fixed with per-plan device limits (free: 5, pro: 50, enterprise: unlimited) and TTL-based expiry (free: 7 days, pro: 30 days, enterprise: 1 year). Invite-session pubkeys expire after 1 hour. Expired entries are evicted lazily on `GET /v2/pubkey` and swept hourly by the TTL flush interval.
+
+- **P4 — SSRF via webhook URL registration** (reported by Raymond Zwarts)  
+  `POST /v2/webhook` accepted any URL without validation. The relay fires outbound HTTP POSTs to stored webhook URLs when blobs are uploaded — a paid user could register an internal URL (e.g. `http://169.254.169.254/`, `http://10.x.x.x/`) to probe internal services from the relay's network. Fixed with `isSsrfSafeUrl()` guard applied at both registration (HTTP 400 on private URLs) and fire time (skip + log). Only public `https:` URLs are accepted. Blocked: loopback, link-local, RFC1918, IPv6 ULA, cloud metadata, `.local`/`.internal`/`.localhost` TLDs.
+
+---
+
 ## [2.3.1] — 2026-04-09
 
 ### Fixed

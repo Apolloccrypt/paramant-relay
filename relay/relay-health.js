@@ -400,8 +400,8 @@ function loadUsers() {
 }
 
 // Pubkey plan limits and TTL
-const _pubkeyTtl = { pro: 30 * 86_400_000, enterprise: 365 * 86_400_000 };
-const _pubkeyMax = { pro: 50, enterprise: Infinity };
+const _pubkeyTtl = { free: 7 * 86_400_000, pro: 30 * 86_400_000, enterprise: 365 * 86_400_000 };
+const _pubkeyMax = { free: 5, pro: 50, enterprise: Infinity };
 const INVITE_PUBKEY_TTL = 3_600_000; // 1 hour
 
 // TTL flush
@@ -697,7 +697,7 @@ const server = http.createServer(async (req, res) => {
       if (!keyData?.active) { res.writeHead(401); return res.end(J({ error: 'Invalid API key' })); }
       // Per-plan device registration limit
       const plan = keyData.plan || 'pro';
-      const maxDevices = _pubkeyMax[plan] ?? _pubkeyMax.pro;
+      const maxDevices = _pubkeyMax[plan] ?? _pubkeyMax.free;
       if (maxDevices !== Infinity) {
         const keyPrefix = `:${apiKey}`;
         let deviceCount = 0;
@@ -706,7 +706,7 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(429); return res.end(J({ error: `Device limit reached. Max ${maxDevices} devices on ${plan} plan.`, limit: maxDevices, plan }));
         }
       }
-      const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.pro;
+      const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
       pubkeys.set(`${d.device_id}:${apiKey}`, {
@@ -918,7 +918,7 @@ const server = http.createServer(async (req, res) => {
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
       didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
       const _didPlan = keyData?.plan || 'pro';
-      pubkeys.set(`${d.device_id}:${apiKey}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.pro) });
+      pubkeys.set(`${d.device_id}:${apiKey}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
       auditAppend(apiKey, 'did_registered', { did, device: d.device_id });
