@@ -201,7 +201,7 @@ function ctInclusionProof(entries, idx) {
   return path;
 }
 
-function ctAppend(deviceId, pubKeyHex, apiKey) {
+function ctAppend(deviceId, pubKeyHex, apiKey, event = 'pubkey') {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
@@ -209,7 +209,7 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const allEntries = [...ctLog, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, index);
-  const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
+  const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, event, proof };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
   return entry;
@@ -683,7 +683,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v2/ct/log') {
     const limit = Math.min(parseInt(query.limit || '100'), 1000);
     const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
+    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts, event: e.event || 'pubkey' }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
   }
@@ -900,6 +900,7 @@ const server = http.createServer(async (req, res) => {
       incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
       stats.inbound++; stats.bytes_in += blob.length;
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
+      ctAppend(deviceId || apiKey.slice(0, 16), hash, apiKey, 'transfer');
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
 
       if (deviceId) pushWebhooks(apiKey, deviceId, 'blob_ready', { hash, size: blob.length, ttl_ms: ttl, sig_valid: sigResult.valid });
@@ -1044,7 +1045,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v2/ct/log') {
     const limit = Math.min(parseInt(query.limit || '100'), 1000);
     const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
+    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts, event: e.event || 'pubkey' }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
   }
