@@ -58,6 +58,7 @@ services:
       - prometheus-data:/prometheus
     networks:
       - relay-internal
+      - monitoring
     ports:
       - "127.0.0.1:9090:9090"   # localhost only — use SSH tunnel to access
     depends_on:
@@ -85,6 +86,7 @@ services:
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - relay-internal
+      - monitoring
     ports:
       - "127.0.0.1:3000:3000"   # localhost only — proxied via system nginx at /grafana/
     depends_on:
@@ -94,3 +96,7 @@ volumes:
   n8n-data:
   prometheus-data:
   grafana-data:
+
+networks:
+  monitoring:
+    driver: bridge   # non-internal — allows port binding to host
