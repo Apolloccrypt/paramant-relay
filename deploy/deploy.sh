@@ -27,11 +27,11 @@ done
 
 echo "==> Deploying to $SERVER"
 
-# 1. Relay JS
-echo "--- relay.js naar alle sectors"
+# 1. Relay JS — relay-core.js is the shared implementation, sector files are thin wrappers
+echo "--- relay-core.js + sector wrappers"
 for sector in relay-health relay-legal relay-finance relay-iot; do
-  scp relay/relay.js root@$SERVER:$APP_DIR/$sector/relay.js
-  scp relay/relay.js root@$SERVER:$APP_DIR/$sector/ghost-pipe-relay.js
+  scp relay/relay-core.js root@$SERVER:$APP_DIR/$sector/relay-core.js
+  scp relay/relay-${sector#relay-}.js root@$SERVER:$APP_DIR/$sector/relay.js
 done
 
 # 2. Frontend
