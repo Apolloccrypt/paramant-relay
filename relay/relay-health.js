@@ -492,11 +492,7 @@ const server = http.createServer(async (req, res) => {
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
-  // ADMIN_TOKEN via X-Admin-Token or Authorization: Bearer grants enterprise access
-  const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
-  const isAdminToken = !!adminHeader && !!process.env.ADMIN_TOKEN && adminHeader === process.env.ADMIN_TOKEN;
   const keyData = apiKeys.get(apiKey)
-    || (isAdminToken ? { plan: 'enterprise', active: true, label: 'admin' } : null)
     || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
 
   incMetric('requests_total');
@@ -677,7 +673,19 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub || '', ts: entry.ts }));
   }
 
-  if (!keyData?.active) {
+  // Admin paths accept ADMIN_TOKEN via X-Admin-Token or Authorization: Bearer
+  // All other paths require a valid X-Api-Key (pgp_ key in users.json)
+  const isAdminPath = path.startsWith('/v2/admin');
+  if (isAdminPath) {
+    const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
+    const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && adminHeader === process.env.ADMIN_TOKEN;
+    const validEnterprise = apiKeys.get(adminHeader)?.plan === 'enterprise';
+    if (!validAdmin && !validEnterprise) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'ADMIN_TOKEN or enterprise key required' }));
+    }
+    // Fall through to admin endpoint handlers below
+  } else if (!keyData?.active) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
