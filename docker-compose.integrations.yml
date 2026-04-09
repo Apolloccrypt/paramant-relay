@@ -45,6 +45,8 @@ services:
   prometheus:
     image: prom/prometheus:v2.51.0
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach relay on host (native or Docker)
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
