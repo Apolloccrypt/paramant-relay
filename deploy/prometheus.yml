@@ -6,12 +6,14 @@ global:
 
 scrape_configs:
 
+  # Relay sectors — target host.docker.internal (resolves to host gateway)
+  # Works whether relay runs native (systemd) or Docker with host port binding
   - job_name: 'paramant-health'
     metrics_path: '/metrics'
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['relay-health:3005']
+      - targets: ['host.docker.internal:3005']
         labels:
           sector: 'health'
 
@@ -20,7 +22,7 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['relay-legal:3002']
+      - targets: ['host.docker.internal:3002']
         labels:
           sector: 'legal'
 
@@ -29,7 +31,7 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['relay-finance:3003']
+      - targets: ['host.docker.internal:3003']
         labels:
           sector: 'finance'
 
@@ -38,6 +40,6 @@ scrape_configs:
     authorization:
       credentials_file: /etc/prometheus/token
     static_configs:
-      - targets: ['relay-iot:3004']
+      - targets: ['host.docker.internal:3004']
         labels:
           sector: 'iot'
