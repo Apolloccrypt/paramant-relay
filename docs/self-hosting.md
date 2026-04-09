@@ -141,7 +141,7 @@ Set when you create a key with `--plan`.
 
 | Plan | Uploads/day | Max file size | TTL | Views/blob | Priority |
 |------|-------------|---------------|-----|------------|----------|
-| `free` | 10 | 20 MB | 1 hour | 1 | Low |
+| `free` | 10 | 5 MB | 1 hour | 1 | Low |
 | `pro` | Unlimited | 500 MB | 24 hours | 10 | High |
 | `enterprise` | Unlimited | Unlimited | 7 days | 100 | Highest |
 

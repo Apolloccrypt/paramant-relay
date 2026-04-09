@@ -11,7 +11,7 @@ You may make production use of the Licensed Work, provided such use does
 not exceed the following limits:
 
   - Maximum 5 (five) active API keys per relay instance
-  - A single relay instance (one sector per self-hosted server)
+  - A single self-hosted deployment (one relay stack per organization)
 
 Use beyond these limits — including unlimited API keys, multiple sectors,
 high-availability clustering, or commercial redistribution — requires a

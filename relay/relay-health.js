@@ -664,7 +664,7 @@ const server = http.createServer(async (req, res) => {
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
-      padding: '20MB fixed (DPI-masking)',
+      padding: '5MB fixed (DPI-masking)',
       jurisdiction: 'EU/DE, GDPR, no US CLOUD Act' };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));

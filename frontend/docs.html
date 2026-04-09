@@ -71,7 +71,7 @@ td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#aaaaaa;white-s
     <h3>Protocol</h3>
     <a href="#crypto">Crypto stack</a>
     <a href="#burn">Burn-on-read</a>
-    <a href="#padding">20MB padding</a>
+    <a href="#padding">5MB padding</a>
     <h3>Identity</h3>
     <a href="#did">W3C DID</a>
     <a href="#ct-log">CT log</a>
@@ -230,8 +230,8 @@ ws.onmessage = e => {
     <h2 id="burn">Burn-on-read</h2>
     <p>After <code>GET /v2/outbound/:hash</code> the relay overwrites the blob buffer with random bytes and removes it from memory. Encrypted payload data is never written to disk. No backup, no recovery. (The CT log persists cryptographic hashes to disk, but never payload content.)</p>
 
-    <h2 id="padding">20MB fixed padding</h2>
-    <p>All blobs are padded to exactly 20MB with cryptographically random bytes before upload. An observer on the network cannot determine the size or type of the transferred file.</p>
+    <h2 id="padding">5MB fixed padding</h2>
+    <p>All blobs are padded to exactly 5MB with cryptographically random bytes before upload. An observer on the network cannot determine the size or type of the transferred file.</p>
 
     <h2 id="did">W3C Decentralized Identity</h2>
     <pre>POST /v2/did/register

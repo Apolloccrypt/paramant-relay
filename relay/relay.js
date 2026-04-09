@@ -840,7 +840,7 @@ const server = http.createServer(async (req, res) => {
       signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
-      padding: '20MB fixed (DPI-masking)',
+      padding: '5MB fixed (DPI-masking)',
       jurisdiction: 'EU/DE, GDPR, no US CLOUD Act',
       edition: EDITION,
       key_limit: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT,
@@ -1815,8 +1815,8 @@ try {
       else { log('warn', 'ws_ticket_invalid', { ticket: parsed.query.ticket?.slice(0, 12) }); }
     }
     if (!wsApiKey && parsed.query.k) {
-      wsApiKey = parsed.query.k; // legacy — key in URL, still logged in nginx access log
-      log('warn', 'ws_legacy_key_in_url', { hint: 'Use POST /v2/ws-ticket for a short-lived ticket — ?k= deprecated, removed in v2.4' });
+      log('warn', 'ws_key_in_querystring_rejected', { ip: (socket.remoteAddress||'').slice(0,15) });
+      return socket.destroy();
     }
     const apiKey = wsApiKey;
     if (!apiKeys.get(apiKey)?.active) return socket.destroy();
