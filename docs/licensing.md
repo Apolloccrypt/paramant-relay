@@ -59,7 +59,7 @@ A relay operator who needs more than 5 users on their own relay.
 Customer pays / signs up
         │
         ▼
-Paramant operator creates a pgp_ key in r34ct0r
+Paramant operator creates a pgp_ key in the admin panel
   (API Keys tab → New key → label, plan, email)
         │
         ▼
@@ -119,7 +119,7 @@ Plans control what a `pgp_` key holder can do. Set in `users.json`.
 | Streaming | ✗ 403 | ✗ 403 | ✓ | ✓ |
 | CSV audit export | ✗ 403 | ✗ 403 | ✓ | ✓ |
 | DID registration | ✗ 403 | ✗ 403 | ✓ | ✓ |
-| Admin panel (r34ct0r) | ✗ | ✗ | ✗ | ✓ |
+| Admin panel (/admin/) | ✗ | ✗ | ✗ | ✓ |
 
 ---
 
@@ -186,9 +186,9 @@ an expiry date. Full cryptographic validation is planned for a future release.
 will unlock the relay. Enforcement is currently legal (BUSL-1.1), not
 cryptographic.
 
-### How to generate (r34ct0r — Licenses tab)
+### How to generate (Admin panel — Licenses tab)
 
-1. Open r34ct0r → **Licenses** tab
+1. Open `/admin/` → **Licenses** tab
 2. Enter operator/customer label and optional note
 3. Click **Generate** → key created in browser via `crypto.getRandomValues`
 4. Copy overlay → key shown once with install instructions for the operator
@@ -216,7 +216,7 @@ curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-relay/health \
 
 ---
 
-## r34ct0r admin panel — key management
+## Admin panel — key management
 
 **API Keys tab** — manages `pgp_` keys (end users):
 - Load all keys → shows plan, status, BLOCKED badge if over_limit
