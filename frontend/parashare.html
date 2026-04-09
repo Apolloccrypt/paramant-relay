@@ -338,7 +338,13 @@ main { background: transparent !important }
 <script type="module" src="/noble-mlkem-loader.js"></script>
 <script>
 const RELAY_WS  = 'wss://relay.paramant.app';
-const RELAY_API = 'https://health.paramant.app';
+const RELAY_SECTORS = {
+  health:  'https://health.paramant.app',
+  legal:   'https://legal.paramant.app',
+  finance: 'https://finance.paramant.app',
+  iot:     'https://iot.paramant.app',
+};
+let RELAY_API = RELAY_SECTORS.health; // updated after key validation
 
 let apiKey = '', keyValid = false, selectedFile = null, selectedFiles = [];
 let sessionToken = '', ws = null;
@@ -398,6 +404,25 @@ async function copyLink() {
   setTimeout(() => { $('session-link').textContent = url; }, 2000);
 }
 
+// ── Relay discovery: try all sectors in parallel, pick first valid ──
+async function discoverRelay(key) {
+  const results = await Promise.allSettled(
+    Object.entries(RELAY_SECTORS).map(async ([sector, url]) => {
+      const r = await fetch(`${url}/v2/check-key`, {
+        headers: { 'X-Api-Key': key },
+        signal: AbortSignal.timeout(5000)
+      });
+      const d = await r.json();
+      if (!d.valid) throw new Error('invalid');
+      return { sector, url, plan: d.plan };
+    })
+  );
+  const valid = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (!valid.length) return null;
+  // Prefer health; otherwise first sector that responded
+  return valid.find(v => v.sector === 'health') || valid[0];
+}
+
 // ── Key validation ──
 async function onKeyInput() {
   apiKey = $('api-key').value.trim();
@@ -408,10 +433,11 @@ async function onKeyInput() {
   }
   setStatus('key-status', 'Checking...');
   try {
-    const r = await fetch(`${RELAY_API}/v2/check-key`, { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(5000) });
-    const d = await r.json();
-    if (d.valid) {
-      setStatus('key-status', `✓ Valid — plan: ${d.plan}`, 'ok');
+    const found = await discoverRelay(apiKey);
+    if (found) {
+      RELAY_API = found.url;
+      const sectorLabel = found.sector !== 'health' ? ` · ${found.sector}` : '';
+      setStatus('key-status', `✓ Valid — plan: ${found.plan}${sectorLabel}`, 'ok');
       keyValid = true;
     } else {
       setStatus('key-status', 'Invalid or revoked key', 'err');
@@ -454,7 +480,8 @@ async function createSession() {
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
 
   // Build receiver URL
-  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}`;
+  const activeSector = Object.entries(RELAY_SECTORS).find(([, u]) => u === RELAY_API)?.[0] || 'health';
+  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&r=${activeSector}`;
   $('session-link').textContent = recvUrl;
 
   showStep('step-waiting');

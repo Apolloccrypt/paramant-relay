@@ -123,7 +123,12 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/noble-mlkem-loader.js"></script>
 <script>
 const RELAY_WS  = 'wss://relay.paramant.app';
-const RELAY_API = 'https://health.paramant.app';
+const RELAY_SECTORS = {
+  health:  'https://health.paramant.app',
+  legal:   'https://legal.paramant.app',
+  finance: 'https://finance.paramant.app',
+  iot:     'https://iot.paramant.app',
+};
 
 function $(id) { return document.getElementById(id); }
 function showStep(id) {
@@ -158,9 +163,10 @@ async function genFingerprint(kyberPubHex, ecdhPubHex) {
   return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}`;
 }
 
-// ── Get session token from URL ──
+// ── Get session token + relay sector from URL ──
 const params = new URLSearchParams(location.search);
 const sessionToken = params.get('s');
+const RELAY_API = RELAY_SECTORS[params.get('r')] || RELAY_SECTORS.health;
 if (!sessionToken || !/^inv_[a-zA-Z0-9]{32}$/.test(sessionToken)) {
   window.addEventListener('mlkem-ready', () => showError('Invalid or missing session token'));
 }
