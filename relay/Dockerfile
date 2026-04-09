@@ -26,7 +26,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY relay.js ./
 
 # Non-root user — relay never needs root after install
-RUN addgroup -S relay && adduser -S relay -G relay
+RUN addgroup -S relay && adduser -S relay -G relay \
+    && mkdir -p /data && chown relay:relay /data
+
 USER relay
 
 # All relay containers listen on 3000 internally; host port mapping is set per-service in docker-compose.yml
