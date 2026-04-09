@@ -798,7 +798,7 @@ async function createKey() {
       const data = await apiFetch('/keys/all', { method: 'POST', body: { label, plan, email: email || undefined } });
       if (!data || !data.created?.length) { showError(errEl, 'Failed to create on sectors'); return; }
       firstKey = data.created[0]?.key;
-      resultEl.textContent = data.created.map(c => `${c.sector}: ${c.key}`).join('\n');
+      resultEl.textContent = firstKey;
       if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
     } else if (sectors.length === 1) {
       const data = await apiFetch(`/sectors/${sectors[0]}/keys`, { method: 'POST', body: { label, plan, email: email || undefined } });
@@ -809,7 +809,7 @@ async function createKey() {
       const data = await apiFetch('/keys/sectors', { method: 'POST', body: { sectors, label, plan, email: email || undefined } });
       if (!data || !data.created?.length) { showError(errEl, 'Failed to create on selected sectors'); return; }
       firstKey = data.created[0]?.key;
-      resultEl.textContent = data.created.map(c => `${c.sector}: ${c.key}`).join('\n');
+      resultEl.textContent = firstKey;
       if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
     }
 
