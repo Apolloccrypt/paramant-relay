@@ -52,7 +52,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 
 <h2>How Ghost Pipe &amp; ParaShare work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). There is zero persistent storage. Nothing is written to disk.</p>
+<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. The only data persisted to disk is cryptographic hashes in the public Certificate Transparency log — no file content, no keys, no plaintext.</p>
 <p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
 <h2>What we process</h2>
@@ -63,6 +63,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
 <tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
+<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; <code>/data/ct-log.json</code> &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
 <tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
 </tbody>
 </table>

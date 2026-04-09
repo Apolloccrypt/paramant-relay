@@ -125,6 +125,14 @@ function createDidDocument(did, deviceId, ecdhPubHex, dsaPubHex) {
 // ── Certificate Transparency Log ─────────────────────────────────────────────
 const ctLog = [];
 const CT_MAX = 10000;
+const CT_LOG_FILE = process.env.CT_LOG_FILE || '/data/ct-log.json';
+
+function loadCtLog() {
+  try {
+    const d = JSON.parse(fs.readFileSync(CT_LOG_FILE, 'utf8'));
+    if (Array.isArray(d)) { ctLog.push(...d); log('info', 'ct_log_loaded', { count: ctLog.length }); }
+  } catch(e) { if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message }); }
+}
 
 function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
   return crypto.createHash('sha256').update(deviceIdHash + pubKeyHex + ts).digest('hex');
@@ -154,6 +162,7 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
+  try { fs.writeFileSync(CT_LOG_FILE, JSON.stringify(ctLog)); } catch(we) { log('warn', 'ct_log_persist_failed', { err: we.message }); }
   return entry;
 }
 
@@ -554,8 +563,8 @@ const server = http.createServer(async (req, res) => {
     return res.end(J(entry.doc));
   }
 
-  // ── GET /v2/dl/:token — publieke one-time download (geen API key) ───────
-  const dlm = path.match(/^\/v2\/dl\/([a-f0-9]{48})$/);
+  // ── GET /v2/dl/:token[/get] — publieke one-time download (geen API key) ───
+  const dlm = path.match(/^\/v2\/dl\/([a-f0-9]{48})(\/get)?$/);
   if (dlm && req.method === 'GET') {
     const token = dlm[1];
     const td = downloadTokens.get(token);
@@ -619,21 +628,29 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size }));
   }
 
-  if (!keyData?.active) {
-    res.writeHead(401, { 'Content-Type': 'application/json' });
-    return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
-  }
+  // ── Ghost Pipe invite rendezvous — pubkey exchange without API key ───────────
+  // inv_ session tokens bypass API key auth for pubkey endpoints only.
+  // Public keys are not sensitive; security comes from fingerprint verification.
+  const INVITE_RE = /^inv_[a-zA-Z0-9]{32}(_ready)?$/;
 
-  // ── POST /v2/pubkey — Registreer pubkeys (ML-KEM + ECDH + ML-DSA optioneel) ─
   if (path === '/v2/pubkey' && req.method === 'POST') {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      if (INVITE_RE.test(d.device_id)) {
+        // Store without API key suffix — readable by any party who knows the session token
+        pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', ts: new Date().toISOString() });
+        log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12) });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true }));
+      }
+      // Non-invite: require valid API key
+      if (!keyData?.active) { res.writeHead(401); return res.end(J({ error: 'Invalid API key' })); }
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
       pubkeys.set(`${d.device_id}:${apiKey}`, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
-        dsa_pub:  d.dsa_pub  || '',  // ML-DSA public key voor handtekening verificatie
+        dsa_pub:  d.dsa_pub  || '',
         ts: new Date().toISOString()
       });
       log('info', 'pubkey_registered', { device: d.device_id, kyber: !!d.kyber_pub, dsa: !!d.dsa_pub });
@@ -645,10 +662,19 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/pubkey/:device ───────────────────────────────────────────────────
   const pkm = path.match(/^\/v2\/pubkey\/([^/]+)$/);
   if (pkm && req.method === 'GET') {
-    const entry = pubkeys.get(`${decodeURIComponent(pkm[1])}:${query.k || apiKey}`);
+    const deviceId = decodeURIComponent(pkm[1]);
+    // Invite sessions: stored and retrieved without API key
+    const entry = INVITE_RE.test(deviceId)
+      ? pubkeys.get(deviceId)
+      : pubkeys.get(`${deviceId}:${query.k || apiKey}`);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device. Start receiver first.' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub, ts: entry.ts }));
+    return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub || '', ts: entry.ts }));
+  }
+
+  if (!keyData?.active) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
 
   // ── POST /v2/inbound — Upload versleuteld blok + optioneel ML-DSA handtekening
@@ -834,25 +860,6 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, count: dids.length, dids }));
   }
 
-  // ── GET /v2/ct/log ───────────────────────────────────────────────────────────
-  if (path === '/v2/ct/log') {
-    const limit = Math.min(parseInt(query.limit || '100'), 1000);
-    const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
-  }
-
-  // ── GET /v2/ct/proof/:index ──────────────────────────────────────────────────
-  const ctpm = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
-  if (ctpm) {
-    const idx = parseInt(ctpm[1]);
-    const entry = ctLog[idx];
-    if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: entry.ts }));
-  }
-
   // ── POST /v2/attest ──────────────────────────────────────────────────────────
   if (path === '/v2/attest' && req.method === 'POST') {
     try {
@@ -912,7 +919,7 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
-      const newKey = 'pgp_' + crypto.randomBytes(16).toString('hex');
+      const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(16).toString('hex');
       apiKeys.set(newKey, { plan: d.plan || 'pro', label: d.label || '', active: true });
       log('info', 'key_created_via_admin', { label: d.label, plan: d.plan });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -941,12 +948,17 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
-      if (apiKeys.has(d.key)) {
-        apiKeys.get(d.key).active = false;
-        log('info', 'key_revoked_via_admin', { key: d.key.slice(0,16) });
-        res.writeHead(200); return res.end(J({ ok: true }));
-      }
-      res.writeHead(404); return res.end(J({ error: 'Key not found' }));
+      if (!apiKeys.has(d.key)) { res.writeHead(404); return res.end(J({ error: 'Key not found' })); }
+      apiKeys.get(d.key).active = false;
+      try {
+        const usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+        const entry = usersData.api_keys.find(k => k.key === d.key);
+        if (entry) { entry.active = false; entry.revoked_at = new Date().toISOString(); }
+        usersData.updated = new Date().toISOString();
+        fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2));
+        log('info', 'key_revoked_via_admin', { key: d.key.slice(0,16), persisted: true });
+      } catch(we) { log('warn', 'key_revoke_persist_failed', { err: we.message }); }
+      res.writeHead(200); return res.end(J({ ok: true }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -1104,6 +1116,7 @@ try {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
+loadCtLog();
 server.listen(PORT, '127.0.0.1', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });

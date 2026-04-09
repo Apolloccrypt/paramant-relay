@@ -3,14 +3,14 @@
 **Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
 
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.2.1-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.1-brightgreen.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 [![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
-[![Pentest](https://img.shields.io/badge/pentest-2026--04--08-success.svg)](pentest-report-2026-04-08.txt)
+[![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
 
 - **Zero plaintext** — ML-KEM-768 + AES-256-GCM encryption happens in the browser, before upload
 - **Burn-on-read** — blob is zeroed from RAM after the first download
-- **RAM only** — no disk writes, no logs, no database
+- **RAM-only blobs** — encrypted payload data is never written to disk; only cryptographic hashes (CT log) and API key config are persisted
 - **Self-hostable** — Community Edition free forever, up to 5 users, one `docker compose up`
 
 ---
@@ -55,6 +55,21 @@ git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 cp .env.example .env && echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
+```
+
+Starts 6 containers: 4 sector relays (health / legal / finance / iot), an admin panel, and nginx with TLS.
+
+**First user (after deploy):**
+
+```bash
+export $(grep -v '^#' .env | xargs)
+
+# Create your admin key
+python3 scripts/paramant-admin.py add --label "admin" --plan enterprise --email you@example.com
+python3 scripts/paramant-admin.py sync
+
+# Admin panel → https://your-domain/admin/
+# Login: ADMIN_TOKEN + 6-digit TOTP code
 ```
 
 Community Edition is **free forever** for up to 5 users. No license key required.
@@ -108,7 +123,10 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Password blobs | Argon2id · RFC 9106 |
 | Jurisdiction | Hetzner DE · EU/GDPR · no US CLOUD Act |
 
-**Independent pentest:** [pentest-report-2026-04-08.txt](pentest-report-2026-04-08.txt) — no CRITICAL or HIGH findings.
+**Independent security audit (April 2026):** [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU) · uncompensated, voluntary review
+Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
+
+![PARAMANT Ghost Pipe — Crypto Stack](docs/assets/crypto-stack.jpg)
 
 ---
 

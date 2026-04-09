@@ -1,5 +1,9 @@
-# PARAMANT integrations — Admin panel
-# Usage:
+# PARAMANT integrations — Admin panel (systemd deployment override)
+# Only needed when running relays as systemd services (not Docker compose).
+# For Docker compose deployments, the admin service is already included
+# in docker-compose.yml and this file is not needed.
+#
+# Usage (systemd server):
 #   docker compose -f docker-compose.yml -f docker-compose.server.yml -f docker-compose.integrations.yml up -d
 #
 # Access:

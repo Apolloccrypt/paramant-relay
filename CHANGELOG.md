@@ -7,6 +7,26 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.1] — 2026-04-09
+
+### Fixed
+
+- **CT log persistence** — `ctLog` was RAM-only; survives relay restarts now. Loaded from `CT_LOG_FILE` (default `/data/ct-log.json`) on startup, written on every registration. For systemd deployments set `CT_LOG_FILE` in the service env file.
+- **Key revoke persistence on health relay** — `relay-health.js` revoke only set `active = false` in memory; did not write to `users.json`. After restart, revoked keys would come back active. Now persisted identically to other sector relays.
+- **Admin auth on sector relays** — `relay-legal`, `relay-finance`, `relay-iot` only accepted API keys from the `apiKeys` map on admin endpoints (keys, revoke, create, send-welcome). `ADMIN_TOKEN` was rejected with 401. Fixed to accept `ADMIN_TOKEN` or enterprise key, matching `relay-health` behaviour.
+- **`/keys/all/revoke` silent success** — always returned `ok: true` even when all sector revokes failed. Now returns `ok: false` (HTTP 502) if no sector successfully revoked the key.
+- **Duplicate CT log route** — dead `/v2/ct/log` and `/v2/ct/proof/:index` handlers in authenticated section of `relay-health.js` removed (unreachable; public handlers above returned early).
+- **CT log persistence in `ghost-pipe-relay.js` and `relay-sector.js`** — `ctAppend()` was RAM-only in both files. Now uses NDJSON append + startup load, identical to canonical `relay.js`.
+- **Admin auth in `relay-sector.js`** — same `!apiKeys.has(tok)` bug as legal/finance/iot; fixed to accept `ADMIN_TOKEN` or enterprise key.
+- **Systemd service templates missing env vars** — `paramant-relay-{health,legal,finance,iot}.service` lacked `PORT`, `SECTOR`, `ADMIN_TOKEN`, `USERS_FILE`. Without these, relays all started on port 4000, admin auth was broken, and CT log was not persisted. Fixed with correct values per sector.
+- **Admin panel absent from Docker self-hosting stack** — `docker-compose.yml` had no `admin` service; nginx proxied `/admin/` to an unresolvable hostname (`admin:4200`), causing nginx to fail. Admin service added with Docker-native relay URLs.
+- **Relay ports not accessible to `paramant` CLI** — relay containers were in an `internal: true` network with no host port binding. `paramant status` and `paramant reload` silently returned empty responses. Added `127.0.0.1:PORT:PORT` bindings (localhost only, not publicly exposed).
+- **`paramant-admin.py` used `revoked` key instead of `revoked_at`** — inconsistent with relay schema; fixed to `revoked_at`.
+- **`install.sh` cloned `v2.2.0`** — pinned version updated to `v2.3.1`.
+- **Self-hosting docs** — version updated to v2.3.1; container count corrected (5→6); admin login docs updated (enterprise key → ADMIN_TOKEN or enterprise key); IP restriction moved to inline nginx example.
+
+---
+
 ## [2.3.0] — 2026-04-09
 
 ### Added

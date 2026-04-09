@@ -800,18 +800,21 @@ async function createKey() {
 
     if (sectors.length === 4) {
       const data = await apiFetch('/keys/all', { method: 'POST', body: { label, plan, email: email || undefined } });
-      if (!data || !data.created?.length) { showError(errEl, 'Failed to create on sectors'); return; }
+      if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
+      if (!data.created?.length) { showError(errEl, 'Failed to create on sectors'); return; }
       firstKey = data.created[0]?.key;
       resultEl.textContent = firstKey;
       if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
     } else if (sectors.length === 1) {
       const data = await apiFetch(`/sectors/${sectors[0]}/keys`, { method: 'POST', body: { label, plan, email: email || undefined } });
-      if (!data || !data.ok) { showError(errEl, data?.error || 'Failed'); return; }
+      if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
+      if (!data.ok) { showError(errEl, data?.error || 'Failed'); return; }
       firstKey = data.key;
       resultEl.textContent = data.key;
     } else {
       const data = await apiFetch('/keys/sectors', { method: 'POST', body: { sectors, label, plan, email: email || undefined } });
-      if (!data || !data.created?.length) { showError(errEl, 'Failed to create on selected sectors'); return; }
+      if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
+      if (!data.created?.length) { showError(errEl, 'Failed to create on selected sectors'); return; }
       firstKey = data.created[0]?.key;
       resultEl.textContent = firstKey;
       if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;

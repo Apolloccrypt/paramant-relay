@@ -220,7 +220,7 @@ ws.onmessage = e => {
     </table>
 
     <h2 id="burn">Burn-on-read</h2>
-    <p>After <code>GET /v2/outbound/:hash</code> the relay overwrites the blob buffer with random bytes and removes it from memory. The relay never writes to disk. No backup, no recovery.</p>
+    <p>After <code>GET /v2/outbound/:hash</code> the relay overwrites the blob buffer with random bytes and removes it from memory. Encrypted payload data is never written to disk. No backup, no recovery. (The CT log persists cryptographic hashes to disk, but never payload content.)</p>
 
     <h2 id="padding">20MB fixed padding</h2>
     <p>All blobs are padded to exactly 20MB with cryptographically random bytes before upload. An observer on the network cannot determine the size or type of the transferred file.</p>

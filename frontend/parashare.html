@@ -454,7 +454,7 @@ async function createSession() {
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
 
   // Build receiver URL
-  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&k=${encodeURIComponent(apiKey)}`;
+  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}`;
   $('session-link').textContent = recvUrl;
 
   showStep('step-waiting');

@@ -3,8 +3,13 @@ Description=PARAMANT Relay - finance
 After=network.target
 
 [Service]
+Environment=PORT=3003
+Environment=SECTOR=finance
+Environment=ADMIN_TOKEN=REPLACE_ADMIN_TOKEN
+Environment=USERS_FILE=/home/paramant/relay-finance/users.json
 Environment=TOTP_SECRET=REPLACE_TOTP_SECRET
 Environment=RESEND_API_KEY=REPLACE_RESEND_KEY
+Environment=LOG_LEVEL=info
 Type=simple
 User=paramant
 WorkingDirectory=/home/paramant/relay-finance

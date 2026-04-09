@@ -117,11 +117,11 @@ nav a.back:hover { color:#aaa; }
 </div>
 
 <div class="notice" id="persistence-notice">
-  <div class="icon">⚡</div>
   <div class="body">
     <strong>Persistent log — survives relay restarts</strong>
-    <span>Entries are written to disk (<code>/data/ct-log.json</code>) on each registration
-    and reloaded on startup. The log resets only when the relay volume is deleted.</span>
+    <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
+    and reloaded on startup. No payload content is ever stored — only cryptographic hashes.
+    The log resets only when the relay volume is deleted.</span>
   </div>
 </div>
 
