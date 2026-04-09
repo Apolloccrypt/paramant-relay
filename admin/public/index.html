@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARAMANT Admin</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0a0a0a;
+  --bg1:      #111111;
+  --bg2:      #181818;
+  --bg3:      #222222;
+  --border:   #2a2a2a;
+  --border2:  #333333;
+  --text:     #e8e8e8;
+  --muted:    #666;
+  --muted2:   #444;
+  --accent:   #e8e8c0;
+  --green:    #4caf6f;
+  --red:      #e05252;
+  --yellow:   #d4a842;
+  --blue:     #5a8abf;
+  --font:     'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── Login ── */
+#login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg);
+}
+.login-box {
+  width: 380px;
+  padding: 40px;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.login-logo {
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+.login-logo span { color: var(--accent); }
+.login-box h2 {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+input[type=text], input[type=password], input[type=email], select, textarea {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: var(--bg2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  text-decoration: none;
+}
+.btn:hover { background: var(--bg3); border-color: var(--border2); }
+.btn-primary {
+  background: var(--accent);
+  color: #0a0a0a;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover { background: #d4d4a0; }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: rgba(224,82,82,.1); }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-full { width: 100%; justify-content: center; }
+.error-msg {
+  background: rgba(224,82,82,.1);
+  border: 1px solid rgba(224,82,82,.3);
+  border-radius: 4px;
+  color: var(--red);
+  padding: 8px 12px;
+  font-size: 12px;
+  margin-top: 12px;
+  display: none;
+}
+.success-msg {
+  background: rgba(76,175,111,.1);
+  border: 1px solid rgba(76,175,111,.3);
+  border-radius: 4px;
+  color: var(--green);
+  padding: 8px 12px;
+  font-size: 12px;
+  margin-top: 12px;
+  display: none;
+}
+
+/* ── App shell ── */
+#app { display: none; flex-direction: column; min-height: 100vh; }
+header {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 24px;
+  height: 48px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.header-logo {
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 32px;
+  white-space: nowrap;
+}
+.header-logo span { color: var(--accent); }
+nav { display: flex; gap: 0; flex: 1; }
+.nav-tab {
+  padding: 0 16px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.status-dot.red { background: var(--red); }
+
+main { flex: 1; padding: 24px; overflow-y: auto; }
+
+/* ── Tabs ── */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Overview ── */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.sector-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.sector-card:hover { border-color: var(--border2); }
+.sector-card.active-sector { border-color: var(--accent); }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card-status {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(76,175,111,.15);
+  color: var(--green);
+  border: 1px solid rgba(76,175,111,.3);
+}
+.card-status.down {
+  background: rgba(224,82,82,.15);
+  color: var(--red);
+  border-color: rgba(224,82,82,.3);
+}
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.metric-item { }
+.metric-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 2px;
+  letter-spacing: .04em;
+}
+.metric-value {
+  font-size: 18px;
+  color: var(--text);
+  font-weight: 500;
+}
+.metric-value.highlight { color: var(--accent); }
+.metric-value.red { color: var(--red); }
+
+/* ── Keys table ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.section-title {
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sector-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px;
+  margin-bottom: 20px;
+}
+.sector-tab {
+  padding: 4px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background .12s, color .12s;
+}
+.sector-tab.active {
+  background: var(--bg3);
+  color: var(--text);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg2); }
+.key-value {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .02em;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.key-value:hover { color: var(--text); cursor: default; }
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+.badge-pro { background: rgba(90,138,191,.2); color: var(--blue); border: 1px solid rgba(90,138,191,.3); }
+.badge-enterprise { background: rgba(232,232,192,.15); color: var(--accent); border: 1px solid rgba(232,232,192,.3); }
+.badge-community { background: var(--bg3); color: var(--muted); border: 1px solid var(--border2); }
+.badge-active { background: rgba(76,175,111,.15); color: var(--green); border: 1px solid rgba(76,175,111,.3); }
+.badge-revoked { background: rgba(224,82,82,.1); color: var(--red); border: 1px solid rgba(224,82,82,.2); }
+.actions { display: flex; gap: 6px; }
+.loading { color: var(--muted); font-size: 12px; padding: 24px; text-align: center; }
+.empty-state { color: var(--muted); text-align: center; padding: 40px; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  display: none;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg1);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 32px;
+  width: 420px;
+  max-width: 95vw;
+}
+.modal h3 {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+.key-result {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 12px;
+  word-break: break-all;
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 12px;
+  display: none;
+}
+.copy-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo"><span>PARAMANT</span> · Admin</div>
+    <h2>Inloggen</h2>
+    <div class="form-group">
+      <label>Admin Token</label>
+      <input type="password" id="login-token" placeholder="ADMIN_TOKEN of pgp_..." autocomplete="current-password">
+    </div>
+    <div class="form-group">
+      <label>TOTP Code</label>
+      <input type="text" id="login-totp" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()">Inloggen</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="header-logo"><span>PARAMANT</span> · Admin</div>
+    <nav>
+      <div class="nav-tab active" data-tab="overview" onclick="switchTab('overview')">Dashboard</div>
+      <div class="nav-tab" data-tab="keys" onclick="switchTab('keys')">API Keys</div>
+    </nav>
+    <div class="header-actions">
+      <div class="status-dot" id="relay-status-dot"></div>
+      <span id="relay-status-text" style="font-size:11px;color:var(--muted)">—</span>
+      <button class="btn btn-sm" onclick="doLogout()">Uitloggen</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- DASHBOARD TAB -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="overview-grid" id="overview-grid">
+        <div class="loading">Stats laden…</div>
+      </div>
+    </div>
+
+    <!-- KEYS TAB -->
+    <div class="tab-content" id="tab-keys">
+      <div class="section-header">
+        <div class="section-title">API Keys</div>
+        <button class="btn" onclick="openCreateKeyModal()">+ Nieuwe key</button>
+      </div>
+      <div class="sector-tabs" id="keys-sector-tabs">
+        <div class="sector-tab active" data-sector="all" onclick="selectKeysSector('all')">Alle</div>
+        <div class="sector-tab" data-sector="health" onclick="selectKeysSector('health')">Health</div>
+        <div class="sector-tab" data-sector="legal" onclick="selectKeysSector('legal')">Legal</div>
+        <div class="sector-tab" data-sector="finance" onclick="selectKeysSector('finance')">Finance</div>
+        <div class="sector-tab" data-sector="iot" onclick="selectKeysSector('iot')">IoT</div>
+      </div>
+      <div id="keys-table-container">
+        <div class="loading">Keys laden…</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- CREATE KEY MODAL -->
+<div class="modal-overlay" id="modal-create-key">
+  <div class="modal">
+    <h3>Nieuwe API Key aanmaken</h3>
+    <div class="form-group">
+      <label>Sector</label>
+      <select id="new-key-sector">
+        <option value="all">Alle sectoren</option>
+        <option value="health">Health</option>
+        <option value="legal">Legal</option>
+        <option value="finance">Finance</option>
+        <option value="iot">IoT</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Label (klant naam)</label>
+      <input type="text" id="new-key-label" placeholder="Bijv. Ziekenhuis Amsterdam">
+    </div>
+    <div class="form-group">
+      <label>Plan</label>
+      <select id="new-key-plan">
+        <option value="pro">Pro</option>
+        <option value="enterprise">Enterprise</option>
+        <option value="community">Community</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>E-mail welkomstmail (optioneel)</label>
+      <input type="email" id="new-key-email" placeholder="klant@voorbeeld.nl">
+    </div>
+    <div class="key-result" id="new-key-result"></div>
+    <div class="copy-hint" id="new-key-hint" style="display:none">Kopieer de key — dit is de enige keer dat je hem ziet.</div>
+    <div class="error-msg" id="modal-key-error"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-create-key')">Annuleren</button>
+      <button class="btn btn-primary" id="btn-create-key" onclick="createKey()">Aanmaken</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVOKE CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-revoke">
+  <div class="modal">
+    <h3>Key intrekken</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:16px">
+      Weet je zeker dat je deze key wilt intrekken? Dit kan niet ongedaan worden.
+    </p>
+    <div id="revoke-key-preview" style="font-size:11px;color:var(--red);word-break:break-all;"></div>
+    <div class="error-msg" id="modal-revoke-error"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-revoke')">Annuleren</button>
+      <button class="btn btn-danger" onclick="confirmRevoke()">Intrekken</button>
+    </div>
+  </div>
+</div>
+
+<!-- WELCOME MAIL MODAL -->
+<div class="modal-overlay" id="modal-welcome">
+  <div class="modal">
+    <h3>Welkomstmail versturen</h3>
+    <div class="form-group">
+      <label>E-mailadres</label>
+      <input type="email" id="welcome-email" placeholder="klant@voorbeeld.nl">
+    </div>
+    <div id="welcome-key-info" style="font-size:11px;color:var(--muted);margin-bottom:8px;"></div>
+    <div class="error-msg" id="modal-welcome-error"></div>
+    <div class="success-msg" id="modal-welcome-success"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-welcome')">Sluiten</button>
+      <button class="btn btn-primary" onclick="sendWelcome()">Versturen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Derive base from current path — works at /admin/ and /admin/index.html
+const BASE = window.location.pathname.split('/').slice(0, -1).join('/');
+const API  = `${BASE}/api`;
+
+let session    = localStorage.getItem('paramant-admin-session') || '';
+let currentKeysSector = 'all';
+let pendingRevoke = null;  // { sector, key }
+let pendingWelcome = null; // { sector, key, label, plan }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+async function apiFetch(path, opts = {}) {
+  opts.headers = Object.assign({ 'Content-Type': 'application/json', 'X-Session': session }, opts.headers || {});
+  if (opts.body && typeof opts.body === 'object') opts.body = JSON.stringify(opts.body);
+  const r = await fetch(`${API}${path}`, opts);
+  if (r.status === 401) { logout(); return null; }
+  return r.json();
+}
+
+async function checkSession() {
+  if (!session) return false;
+  const r = await fetch(`${API}/auth/check`, { headers: { 'X-Session': session } });
+  return r.ok;
+}
+
+async function doLogin() {
+  const token = document.getElementById('login-token').value.trim();
+  const totp  = document.getElementById('login-totp').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!token || !totp) { showError(errEl, 'Vul beide velden in'); return; }
+  const btn = document.querySelector('#login-screen .btn-primary');
+  btn.textContent = 'Bezig…';
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, totp }),
+    });
+    const d = await r.json();
+    if (!d.ok) { showError(errEl, d.error || 'Inloggen mislukt'); return; }
+    session = d.session;
+    localStorage.setItem('paramant-admin-session', session);
+    showApp();
+  } catch (e) {
+    showError(errEl, `Verbindingsfout: ${e.message}`);
+  } finally {
+    btn.textContent = 'Inloggen';
+    btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  await fetch(`${API}/auth/logout`, { method: 'POST', headers: { 'X-Session': session } }).catch(() => {});
+  logout();
+}
+
+function logout() {
+  session = '';
+  localStorage.removeItem('paramant-admin-session');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-totp').value = '';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  loadOverview();
+  loadKeys(currentKeysSector);
+  startAutoRefresh();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === `tab-${tab}`));
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+
+async function loadOverview() {
+  const data = await apiFetch('/overview');
+  if (!data) return;
+  const grid = document.getElementById('overview-grid');
+  grid.innerHTML = '';
+
+  let anyDown = false;
+  for (const [sector, info] of Object.entries(data.sectors || {})) {
+    const m = info.metrics || {};
+    const up = info.ok;
+    if (!up) anyDown = true;
+
+    const uptime = m.paramant_uptime_s != null ? fmtUptime(m.paramant_uptime_s) : '—';
+    const requests = m.paramant_requests_total != null ? fmtNum(m.paramant_requests_total) : '—';
+    const burned   = m.paramant_blobs_burned_total != null ? fmtNum(m.paramant_blobs_burned_total) : '—';
+    const inFlight = m.paramant_blobs_in_flight != null ? fmtNum(m.paramant_blobs_in_flight) : '—';
+    const errors   = m.paramant_errors_total != null ? fmtNum(m.paramant_errors_total) : '—';
+    const heap     = m.paramant_heap_bytes != null ? fmtBytes(m.paramant_heap_bytes) : '—';
+    const keys     = m.paramant_pubkeys != null ? fmtNum(m.paramant_pubkeys) : '—';
+
+    const card = document.createElement('div');
+    card.className = 'sector-card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-title">${sector}</div>
+        <div class="card-status ${up ? '' : 'down'}">${up ? 'online' : 'offline'}</div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-item">
+          <div class="metric-label">Requests</div>
+          <div class="metric-value">${requests}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Burns</div>
+          <div class="metric-value highlight">${burned}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">In flight</div>
+          <div class="metric-value">${inFlight}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Pubkeys</div>
+          <div class="metric-value">${keys}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Errors</div>
+          <div class="metric-value ${errors !== '0' && errors !== '—' ? 'red' : ''}">${errors}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Heap</div>
+          <div class="metric-value">${heap}</div>
+        </div>
+        <div class="metric-item" style="grid-column:span 2">
+          <div class="metric-label">Uptime</div>
+          <div class="metric-value" style="font-size:13px">${uptime}</div>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  }
+
+  const dot  = document.getElementById('relay-status-dot');
+  const txt  = document.getElementById('relay-status-text');
+  dot.className  = `status-dot${anyDown ? ' red' : ''}`;
+  txt.textContent = anyDown ? 'Sector offline' : 'Alle sectoren online';
+}
+
+// ── Keys ──────────────────────────────────────────────────────────────────────
+
+function selectKeysSector(sector) {
+  currentKeysSector = sector;
+  document.querySelectorAll('.sector-tab').forEach(el => el.classList.toggle('active', el.dataset.sector === sector));
+  document.getElementById('new-key-sector').value = sector;
+  loadKeys(sector);
+}
+
+function renderKeysTable(rows, container) {
+  // rows: [{sector, key, label, plan, active, email}]
+  const showSector = rows.some(r => r.sector);
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          ${showSector ? '<th>Sector</th>' : ''}
+          <th>Key</th>
+          <th>Label</th>
+          <th>Plan</th>
+          <th>Status</th>
+          <th>Acties</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(k => `
+          <tr>
+            ${showSector ? `<td style="color:var(--muted2);font-size:11px">${esc(k.sector||'')}</td>` : ''}
+            <td><div class="key-value" title="${esc(k.key)}">${esc(k.key.slice(0,20))}…</div></td>
+            <td style="color:var(--muted2);font-size:12px">${esc(k.label || '—')}</td>
+            <td><span class="badge badge-${esc(k.plan)}">${esc(k.plan)}</span></td>
+            <td><span class="badge ${k.active ? 'badge-active' : 'badge-revoked'}">${k.active ? 'actief' : 'ingetrokken'}</span></td>
+            <td>
+              <div class="actions">
+                ${k.active ? `<button class="btn btn-sm btn-danger" data-action="revoke" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}">Intrekken</button>` : ''}
+                <button class="btn btn-sm" data-action="welcome" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}" data-label="${esc(k.label||'')}" data-plan="${esc(k.plan)}">Mail</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+  container.onclick = function(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const {action, sector, key, label, plan} = btn.dataset;
+    if (action === 'revoke') revokeKey(sector, key);
+    else if (action === 'welcome') openWelcomeModal(sector, key, label, plan);
+  };
+}
+
+async function loadKeys(sector) {
+  const container = document.getElementById('keys-table-container');
+  container.innerHTML = '<div class="loading">Laden…</div>';
+
+  if (sector === 'all') {
+    const data = await apiFetch('/keys/all');
+    if (!data || !data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">Laden mislukt</div>`; return; }
+    // Dedupliceer: één rij per unieke key+label+plan combinatie, maar toon welke sectoren
+    const keyMap = new Map();
+    for (const [sec, keys] of Object.entries(data.sectors || {})) {
+      for (const k of (keys || [])) {
+        if (keyMap.has(k.key)) {
+          keyMap.get(k.key).sectors.push(sec);
+        } else {
+          keyMap.set(k.key, { ...k, sector: 'all', sectors: [sec] });
+        }
+      }
+    }
+    const rows = [...keyMap.values()].map(k => ({
+      ...k,
+      sector: k.sectors.join(', '),
+    }));
+    if (!rows.length) { container.innerHTML = '<div class="empty-state">Geen keys gevonden</div>'; return; }
+    renderKeysTable(rows, container);
+    return;
+  }
+
+  const data = await apiFetch(`/sectors/${sector}/keys`);
+  if (!data) return;
+  if (!data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">${esc(data.error||'Fout')}</div>`; return; }
+  const keys = (data.keys || []).map(k => ({ ...k, sector }));
+  if (!keys.length) { container.innerHTML = '<div class="empty-state">Geen keys voor deze sector</div>'; return; }
+  renderKeysTable(keys, container);
+}
+
+// ── Create key ────────────────────────────────────────────────────────────────
+
+function openCreateKeyModal() {
+  document.getElementById('new-key-label').value = '';
+  document.getElementById('new-key-email').value = '';
+  document.getElementById('new-key-sector').value = currentKeysSector;
+  document.getElementById('new-key-result').style.display = 'none';
+  document.getElementById('new-key-hint').style.display = 'none';
+  document.getElementById('modal-key-error').style.display = 'none';
+  document.getElementById('btn-create-key').style.display = 'inline-flex';
+  openModal('modal-create-key');
+}
+
+async function createKey() {
+  const sector = document.getElementById('new-key-sector').value;
+  const label  = document.getElementById('new-key-label').value.trim();
+  const plan   = document.getElementById('new-key-plan').value;
+  const email  = document.getElementById('new-key-email').value.trim();
+  const errEl  = document.getElementById('modal-key-error');
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('btn-create-key');
+  btn.textContent = 'Aanmaken…'; btn.disabled = true;
+  try {
+    let resultKey = null;
+    if (sector === 'all') {
+      // Maak key op alle sectoren tegelijk
+      const data = await apiFetch('/keys/all', {
+        method: 'POST', body: { label, plan, email: email || undefined },
+      });
+      if (!data || !data.ok || !data.created?.length) {
+        showError(errEl, 'Aanmaken op sectoren mislukt'); return;
+      }
+      resultKey = data.created[0]?.key;
+      const resultEl = document.getElementById('new-key-result');
+      resultEl.textContent = `${resultKey}\n(aangemaakt op: ${data.created.map(c=>c.sector).join(', ')})`;
+      resultEl.style.display = 'block';
+    } else {
+      const data = await apiFetch(`/sectors/${sector}/keys`, {
+        method: 'POST', body: { label, plan, email: email || undefined },
+      });
+      if (!data || !data.ok) { showError(errEl, data?.error || 'Mislukt'); return; }
+      resultKey = data.key;
+      const resultEl = document.getElementById('new-key-result');
+      resultEl.textContent = resultKey;
+      resultEl.style.display = 'block';
+    }
+
+    document.getElementById('new-key-hint').style.display = 'block';
+    btn.style.display = 'none';
+
+    if (email && resultKey) {
+      const welcomeSector = sector === 'all' ? 'health' : sector;
+      await apiFetch(`/sectors/${welcomeSector}/keys/welcome`, {
+        method: 'POST', body: { email, key: resultKey, plan, label },
+      });
+    }
+    loadKeys(sector);
+  } catch (e) {
+    showError(errEl, e.message);
+  } finally {
+    btn.textContent = 'Aanmaken'; btn.disabled = false;
+  }
+}
+
+// ── Revoke key ────────────────────────────────────────────────────────────────
+
+function revokeKey(sector, key) {
+  pendingRevoke = { sector, key };
+  document.getElementById('revoke-key-preview').textContent = key;
+  document.getElementById('modal-revoke-error').style.display = 'none';
+  openModal('modal-revoke');
+}
+
+async function confirmRevoke() {
+  if (!pendingRevoke) return;
+  const errEl = document.getElementById('modal-revoke-error');
+  errEl.style.display = 'none';
+  // sector bevat bijv. "health, legal, finance, iot" bij all-view — revoke op alle
+  const sectorStr = pendingRevoke.sector || 'health';
+  const isMulti = sectorStr.includes(',') || sectorStr === 'all';
+  let data;
+  if (isMulti) {
+    data = await apiFetch('/keys/all/revoke', { method: 'POST', body: { key: pendingRevoke.key } });
+  } else {
+    data = await apiFetch(`/sectors/${sectorStr}/keys/revoke`, { method: 'POST', body: { key: pendingRevoke.key } });
+  }
+  if (!data || !data.ok) { showError(errEl, data?.error || 'Mislukt'); return; }
+  closeModal('modal-revoke');
+  loadKeys(currentKeysSector);
+  pendingRevoke = null;
+}
+
+// ── Welcome mail ──────────────────────────────────────────────────────────────
+
+function openWelcomeModal(sector, key, label, plan) {
+  pendingWelcome = { sector, key, label, plan };
+  document.getElementById('welcome-email').value = '';
+  document.getElementById('welcome-key-info').textContent = `Key: ${key.slice(0,20)}… (${label || 'geen label'})`;
+  document.getElementById('modal-welcome-error').style.display = 'none';
+  document.getElementById('modal-welcome-success').style.display = 'none';
+  openModal('modal-welcome');
+}
+
+async function sendWelcome() {
+  if (!pendingWelcome) return;
+  const email = document.getElementById('welcome-email').value.trim();
+  const errEl = document.getElementById('modal-welcome-error');
+  const okEl  = document.getElementById('modal-welcome-success');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  if (!email) { showError(errEl, 'E-mailadres verplicht'); return; }
+  const data = await apiFetch(`/sectors/${pendingWelcome.sector}/keys/welcome`, {
+    method: 'POST',
+    body: { email, key: pendingWelcome.key, plan: pendingWelcome.plan, label: pendingWelcome.label },
+  });
+  if (!data || !data.ok) { showError(errEl, data?.error || 'Versturen mislukt'); return; }
+  okEl.textContent = `Mail verstuurd naar ${email}`;
+  okEl.style.display = 'block';
+}
+
+// ── Auto refresh ──────────────────────────────────────────────────────────────
+
+let refreshTimer = null;
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    if (document.getElementById('tab-overview').classList.contains('active')) {
+      loadOverview();
+    }
+  }, 30_000);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showError(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function fmtNum(n) {
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n/1_000).toFixed(1) + 'K';
+  return String(Math.round(n));
+}
+function fmtBytes(b) {
+  if (b >= 1073741824) return (b/1073741824).toFixed(1) + 'GB';
+  if (b >= 1048576)    return (b/1048576).toFixed(1) + 'MB';
+  if (b >= 1024)       return (b/1024).toFixed(0) + 'KB';
+  return b + 'B';
+}
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}u`;
+  if (h > 0) return `${h}u ${m}m`;
+  return `${m}m`;
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeModal(overlay.id);
+  });
+});
+
+// Enter key on login fields
+document.getElementById('login-totp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  if (session && await checkSession()) {
+    showApp();
+  } else {
+    session = '';
+    localStorage.removeItem('paramant-admin-session');
+  }
+})();
+</script>
+</body>
+</html>
