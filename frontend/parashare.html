@@ -335,7 +335,11 @@ main { background: transparent !important }
   </div>
 </div>
 
-<script type="module" src="/noble-mlkem-loader.js"></script>
+<script type="module">
+import { initCrypto, encryptBlob as _eb } from './crypto-bridge.js';
+window._cryptoBridge = { encryptBlob: _eb };
+initCrypto().catch(e => console.error('WASM init failed:', e));
+</script>
 <script>
 const RELAY_WS  = 'wss://relay.paramant.app';
 const RELAY_SECTORS = {
@@ -402,6 +406,17 @@ async function copyLink() {
   await navigator.clipboard.writeText(url).catch(()=>{});
   $('session-link').textContent = '✓ Copied!';
   setTimeout(() => { $('session-link').textContent = url; }, 2000);
+}
+
+// ── Helpers ──
+async function showReceiverConnected(kyberPub, ecdhPub) {
+  receiverPubs = { kyber_pub: kyberPub, ecdh_pub: ecdhPub };
+  const fp = await genFingerprint(kyberPub, ecdhPub);
+  $('fp-card').style.display = '';
+  $('fp-display').textContent = fp;
+  $('waiting-title').textContent = 'Receiver connected';
+  $('waiting-dot').className = 'dot';
+  setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
 }
 
 // ── Relay discovery: try all sectors in parallel, pick first valid ──
@@ -511,13 +526,7 @@ async function connectWebSocket() {
         const d = await r.json();
         if (d.kyber_pub && d.ecdh_pub) {
           clearInterval(pubkeyPollInterval);
-          receiverPubs = { kyber_pub: d.kyber_pub, ecdh_pub: d.ecdh_pub };
-          const fp = await genFingerprint(d.kyber_pub, d.ecdh_pub);
-          $('fp-card').style.display = '';
-          $('fp-display').textContent = fp;
-          $('waiting-title').textContent = 'Receiver connected';
-          $('waiting-dot').className = 'dot';
-          setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+          await showReceiverConnected(d.kyber_pub, d.ecdh_pub);
         }
       }
     } catch(e) {}
@@ -527,17 +536,8 @@ async function connectWebSocket() {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
 
-    // Receiver joined and sent pubkey
     if (msg.type === 'pubkey_offer' && msg.kyber_pub && msg.ecdh_pub) {
-      receiverPubs = { kyber_pub: msg.kyber_pub, ecdh_pub: msg.ecdh_pub };
-      const fp = await genFingerprint(msg.kyber_pub, msg.ecdh_pub);
-
-      // Show fingerprint card
-      $('fp-card').style.display = '';
-      $('fp-display').textContent = fp;
-      $('waiting-title').textContent = 'Receiver connected';
-      $('waiting-dot').className = 'dot';
-      setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+      await showReceiverConnected(msg.kyber_pub, msg.ecdh_pub);
     }
 
     if (msg.type === 'peer_left') {
@@ -554,9 +554,9 @@ async function confirmFingerprint() {
   if (!receiverPubs) return;
   if (!document.getElementById('fp-confirm-check')?.checked) return;
 
-  // Guard: abort if ML-KEM library failed to load
-  if (typeof ml_kem768 === 'undefined' || !ml_kem768?.encapsulate) {
-    setStatus('waiting-status', 'ERROR: ML-KEM-768 library not loaded — cannot encrypt safely. Refresh and try again.', 'err');
+  // Guard: abort if WASM crypto bridge failed to load
+  if (!window._cryptoBridge?.encryptBlob) {
+    setStatus('waiting-status', 'ERROR: WASM crypto module not loaded — cannot encrypt safely. Refresh and try again.', 'err');
     return;
   }
 
@@ -566,7 +566,6 @@ async function confirmFingerprint() {
   showStep('step-encrypting');
 
   try {
-    const BLOCK = 5 * 1024 * 1024;
     const CHUNK_PLAIN = 4.5 * 1024 * 1024;
     const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
     const ttlMs = parseInt($('ttl-select').value);
@@ -606,36 +605,12 @@ async function confirmFingerprint() {
         const metaBytes = new TextEncoder().encode(metaJson);
         const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
 
-        const kyberPub = hexToU8(receiverPubs.kyber_pub);
-        const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
-
-        const ecdhPubRaw = hexToU8(receiverPubs.ecdh_pub);
-        const recvECDH = await crypto.subtle.importKey('raw', ecdhPubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
-        const senderECDH = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']);
-        const senderPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', senderECDH.publicKey));
-        const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: recvECDH }, senderECDH.privateKey, 256));
-
-        const combined = concat(sharedSecret, ecdhSecret);
-        const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
-        const aesKey = await crypto.subtle.deriveKey(
-          { name: 'HKDF', hash: 'SHA-256', salt: cipherText.slice(0, 32), info: new TextEncoder().encode('paramant-v2') },
-          hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+        // ML-KEM-768 + ECDH P-256 + AES-256-GCM via Rust/WASM (crypto-bridge.js)
+        const padded = await window._cryptoBridge.encryptBlob(
+          payload,
+          hexToU8(receiverPubs.kyber_pub),
+          hexToU8(receiverPubs.ecdh_pub)
         );
-
-        const nonce = crypto.getRandomValues(new Uint8Array(12));
-        const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, payload));
-
-        const packet = concat(
-          new Uint8Array([0x02]),
-          u32be(cipherText.length), cipherText,
-          u32be(senderPubRaw.length), senderPubRaw,
-          nonce, u32be(ct.length), ct
-        );
-
-        const padded = new Uint8Array(BLOCK);
-        padded.set(packet.slice(0, Math.min(packet.length, BLOCK)));
-        for (let p = packet.length; p < BLOCK; p += 65536)
-          crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, BLOCK)));
 
         const mbUp = Math.round((i * CHUNK_PLAIN) / 1024 / 1024);
         $('enc-status').textContent = (totalFiles > 1 ? 'File ' + (fileIndex+1) + '/' + totalFiles + ' — ' : '') +

@@ -773,6 +773,10 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
+  res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
+  res.setHeader('Strict-Transport-Security',    'max-age=63072000; includeSubDomains; preload');
+  res.setHeader('Referrer-Policy',              'no-referrer');
+  res.setHeader('Permissions-Policy',           'interest-cohort=()');
   // X-Paramant-Version intentionally omitted — version disclosure via response header removed (security hardening v2.3.3)
   res.setHeader('X-Paramant-Sector',            SECTOR);
 }
@@ -1439,15 +1443,6 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
-  // ── GET /v2/did/:did ─────────────────────────────────────────────────────────
-  const didm = path.match(/^\/v2\/did\/([^/]+)$/);
-  if (didm && req.method === 'GET') {
-    const entry = [...didRegistry.values()].find(e => e.doc.id === decodeURIComponent(didm[1]));
-    if (!entry) { res.writeHead(404); return res.end(J({ error: 'DID not found' })); }
-    res.writeHead(200, { 'Content-Type': 'application/did+json' });
-    return res.end(J(entry.doc));
-  }
-
   // ── GET /v2/did ──────────────────────────────────────────────────────────────
   if (path === '/v2/did' && req.method === 'GET') {
     const dids = [...didRegistry.values()].filter(e => e.key === apiKey).map(e => ({ did: e.doc.id, device: e.device_id, ts: e.ts }));
@@ -1495,10 +1490,6 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v2/admin/verify-mfa' && req.method === 'POST') {
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
-      const tok = req.headers['x-admin-token'] || '';
-      if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
-        res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
-      }
       const valid = verifyTotp(d.totp_code || '');
       log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: req.socket?.remoteAddress });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1508,10 +1499,6 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
-    const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
-      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
-    }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
@@ -1536,10 +1523,6 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
-    const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
-      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
-    }
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
       key: k, plan: v.plan, label: v.label, active: v.active, over_limit: v.over_limit || false
     }));
@@ -1550,10 +1533,6 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
-    const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
-      res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
-    }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       if (!apiKeys.has(d.key)) { res.writeHead(404); return res.end(J({ error: 'Key not found' })); }
@@ -1575,8 +1554,6 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
   if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
-    const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }

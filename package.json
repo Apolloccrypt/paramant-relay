@@ -1,0 +1,12 @@
+{
+  "name": "paramant",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bash build.sh"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.1",
+    "terser": "^5.31.0"
+  }
+}

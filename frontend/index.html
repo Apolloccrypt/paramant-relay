@@ -134,7 +134,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <hr class="divider">
 
-<!-- Two-path banner: relay operator vs end user -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
   <a href="#selfhost" style="display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:var(--bg);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#111'" onmouseout="this.style.background='var(--bg)'">
     <div>
@@ -161,7 +160,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
-    <!-- Pipeline -->
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:8px">
@@ -179,7 +177,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       </div>
     </div>
 
-    <!-- Europa kaart -->
     <div id="node-map" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column;">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:8px">
@@ -189,74 +186,72 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">EU/DE &middot; Anycast</span>
       </div>
       <svg viewBox="0 0 500 310" style="width:100%;height:240px;flex:1;" xmlns="http://www.w3.org/2000/svg">
-        <!-- Scandinavia -->
+        
         <path d="M230,10 L245,8 L258,12 L265,25 L268,45 L262,65 L255,85 L248,105 L245,125 L240,125 L235,105 L228,85 L222,65 L218,45 L220,25 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Finland -->
+        
         <path d="M268,12 L285,10 L298,18 L305,35 L300,55 L290,75 L278,90 L268,80 L262,65 L265,45 L268,25 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Denmark -->
+        
         <path d="M225,128 L232,122 L238,128 L235,138 L228,140 L224,133 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- UK -->
+        
         <path d="M170,95 L182,88 L192,92 L195,108 L188,122 L178,128 L168,122 L162,108 L168,98 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Ireland -->
+        
         <path d="M148,108 L158,104 L162,114 L156,124 L146,120 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- NL + BE -->
+        
         <path d="M205,138 L218,132 L228,138 L225,150 L215,155 L205,150 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- France -->
+        
         <path d="M175,148 L205,138 L215,155 L218,175 L208,195 L192,205 L175,200 L162,185 L160,168 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Spain + Portugal -->
+        
         <path d="M158,205 L175,200 L192,205 L195,225 L188,248 L170,262 L148,258 L132,245 L128,225 L138,210 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Germany -->
+        
         <path d="M225,138 L248,132 L265,140 L268,160 L258,178 L238,182 L218,175 L215,155 Z" fill="#222" stroke="#333" stroke-width="1.5"/>
-        <!-- Poland -->
+        
         <path d="M268,138 L295,132 L315,140 L318,160 L305,175 L278,178 L265,165 L265,140 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Czech + Austria -->
+        
         <path d="M248,182 L278,178 L292,188 L288,202 L265,208 L245,202 L238,192 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Italy -->
+        
         <path d="M222,202 L238,195 L248,208 L252,228 L245,252 L235,268 L225,278 L218,265 L215,245 L218,225 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Switzerland -->
+        
         <path d="M208,195 L222,192 L228,202 L218,210 L205,205 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Balkans -->
+        
         <path d="M278,182 L310,178 L325,195 L322,218 L308,232 L288,235 L272,222 L268,205 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        <!-- Greece -->
+        
         <path d="M290,235 L308,228 L318,242 L312,258 L298,262 L285,252 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
 
-        <!-- Connection lines — green tinted, visible -->
         <line x1="220" y1="142" x2="252" y2="158" stroke="#2a4a2a" stroke-width="1.5"/>
         <line x1="220" y1="142" x2="242" y2="92"  stroke="#2a4a2a" stroke-width="1.5"/>
         <line x1="220" y1="142" x2="185" y2="168" stroke="#2a4a2a" stroke-width="1.5"/>
         <line x1="252" y1="158" x2="242" y2="92"  stroke="#2a4a2a" stroke-width="1.5"/>
         <line x1="252" y1="158" x2="185" y2="168" stroke="#2a4a2a" stroke-width="1.5"/>
-        <!-- ORD dashed -->
+        
         <line x1="55" y1="180" x2="185" y2="168" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="4,4"/>
-        <!-- Fly.io dashed -->
+        
         <line x1="220" y1="142" x2="310" y2="262" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="3,4"/>
 
-        <!-- AMS — planned -->
         <circle cx="220" cy="142" r="9" fill="#161616" stroke="#2a4a2a" stroke-width="1.5" stroke-dasharray="3,2"/>
         <circle cx="220" cy="142" r="4" fill="#2a5a3a"/>
         <text x="233" y="139" fill="#666" font-size="10" font-family="monospace" font-weight="500" letter-spacing=".04em">AMS</text>
         <text x="233" y="149" fill="#444" font-size="7" font-family="monospace">planned</text>
-        <!-- FRA — highlighted as main, live -->
+        
         <circle cx="252" cy="158" r="9" fill="#161616" stroke="#3d7a50" stroke-width="2"/>
         <circle cx="252" cy="158" r="4.5" fill="#3aaa70"/>
         <text x="265" y="155" fill="#ddd" font-size="10" font-family="monospace" font-weight="600" letter-spacing=".04em">FRA</text>
         <text x="265" y="167" fill="#777" font-size="8" font-family="monospace">Hetzner DE</text>
-        <!-- ARN — planned -->
+        
         <circle cx="242" cy="92" r="9" fill="#161616" stroke="#2a4a2a" stroke-width="1.5" stroke-dasharray="3,2"/>
         <circle cx="242" cy="92" r="4" fill="#2a5a3a"/>
         <text x="255" y="89" fill="#666" font-size="10" font-family="monospace" font-weight="500" letter-spacing=".04em">ARN</text>
         <text x="255" y="100" fill="#444" font-size="7" font-family="monospace">planned</text>
-        <!-- CDG — planned -->
+        
         <circle cx="185" cy="168" r="9" fill="#161616" stroke="#2a4a2a" stroke-width="1.5" stroke-dasharray="3,2"/>
         <circle cx="185" cy="168" r="4" fill="#2a5a3a"/>
         <text x="130" y="163" fill="#666" font-size="10" font-family="monospace" font-weight="500" letter-spacing=".04em">CDG</text>
         <text x="130" y="175" fill="#444" font-size="7" font-family="monospace">planned</text>
-        <!-- ORD dimmed/eval -->
+        
         <circle cx="48" cy="180" r="6" fill="#161616" stroke="#333" stroke-width="1" stroke-dasharray="3,2"/>
         <circle cx="48" cy="180" r="2.5" fill="#444"/>
         <text x="15" y="196" fill="#555" font-size="8" font-family="monospace">ORD</text>
         <text x="12" y="205" fill="#444" font-size="7" font-family="monospace">eval</text>
-        <!-- Fly.io edge — planned -->
+        
         <circle cx="310" cy="262" r="6" fill="#161616" stroke="#333" stroke-width="1" stroke-dasharray="3,2"/>
         <circle cx="310" cy="262" r="2.5" fill="#444"/>
         <text x="320" y="259" fill="#555" font-size="9" font-family="monospace">Fly.io</text>
@@ -274,8 +269,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </div>
 </section>
 
-<script src="relay-status.js" defer></script>
-
+<script src="relay-status.js" integrity="sha384-l7wGw141lesNkIiipOwsDmvsvgYorQh4eAQE9fe5VHG2fMg9PRzJoOwOMymGKerN" crossorigin="anonymous" defer></script>
 
 <section style="max-width:960px;margin:0 auto;padding:40px 48px 0">
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
@@ -393,12 +387,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </div>
 </section>
 
-
-
-
-
-
-
 <hr class="divider">
 
 <section id="pricing">
@@ -406,11 +394,9 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <h2>Simple. Free to start.</h2>
   <p class="sub">Two ways to use PARAMANT &mdash; pick the one that fits.</p>
 
-  <!-- WHO ARE YOU visual -->
   <div style="margin:40px auto 0;max-width:760px">
     <div style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:start;gap:0">
 
-      <!-- Left: Relay operator -->
       <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:28px 24px">
         <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Relay operator</div>
         <div style="font-size:15px;font-weight:600;color:#ededed;margin-bottom:8px">You run the relay</div>
@@ -422,10 +408,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <div style="margin-top:14px;font-size:11px;color:#555">Community: free forever up to 5 users</div>
       </div>
 
-      <!-- Arrow -->
       <div style="display:flex;align-items:center;justify-content:center;padding-top:60px;color:#333;font-size:20px">&#8942;</div>
 
-      <!-- Right: End user -->
       <div style="background:#161616;border:1px solid #242424;border-radius:8px;padding:28px 24px">
         <div style="font-size:11px;font-family:var(--mono);color:#888;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">End user</div>
         <div style="font-size:15px;font-weight:600;color:#ededed;margin-bottom:8px">You use a relay</div>
@@ -441,13 +425,11 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <div style="text-align:center;font-size:11px;font-family:var(--mono);color:#444;margin-top:14px;letter-spacing:.04em">plk_ keys are for operators &nbsp;&#183;&nbsp; pgp_ keys are for end users &nbsp;&#183;&nbsp; they are never the same person</div>
   </div>
 
-  <!-- Tab toggle -->
   <div style="display:flex;justify-content:center;gap:0;margin:48px auto 0;max-width:340px;background:#111;border:1px solid #242424;border-radius:6px;padding:3px">
     <button id="tab-op" onclick="showTab('op')" style="flex:1;padding:8px 0;border:none;background:#ededed;color:#111;border-radius:4px;font-size:12px;font-family:var(--mono);font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .15s">For operators</button>
     <button id="tab-user" onclick="showTab('user')" style="flex:1;padding:8px 0;border:none;background:transparent;color:#888;border-radius:4px;font-size:12px;font-family:var(--mono);font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .15s">For end users</button>
   </div>
 
-  <!-- OPERATOR pricing -->
   <div id="pane-op" class="pricing-grid">
 
     <div class="pc featured">
@@ -503,7 +485,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
   </div>
 
-  <!-- END USER pricing -->
   <div id="pane-user" class="pricing-grid" style="display:none">
 
     <div class="pc featured">
@@ -576,11 +557,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="eyebrow">Self-hosting</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
   <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
-  <!-- Install method cards -->
+  
   <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
 
-    <!-- Raspberry Pi -->
     <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:24px;display:flex;flex-direction:column">
       <div style="font-size:20px;font-family:var(--mono);color:#2d8a5c;margin-bottom:10px">π</div>
       <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
@@ -590,7 +570,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div style="font-size:10px;font-family:var(--mono);color:#6e6e6e">ARM64 &middot; 512 MB RAM min &middot; Raspberry Pi OS Lite</div>
     </div>
 
-    <!-- Docker Hub -->
     <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
       <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">⬡</div>
       <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">DOCKER HUB</div>
@@ -603,7 +582,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">View on Docker Hub &rarr;</a>
     </div>
 
-    <!-- Linux VPS -->
     <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
       <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">&gt;_</div>
       <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">LINUX / VPS</div>
@@ -619,7 +597,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
   </div>
 
-  <!-- Quick start detail -->
   <div style="background:#181818;border:1px solid #242424;border-radius:8px;overflow:hidden;margin-bottom:32px">
     <div style="padding:11px 20px;border-bottom:1px solid #242424;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">Quick start &mdash; Ubuntu / Debian</span>
@@ -684,6 +661,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
 </footer>
 
-<script src="ct-stats.js" defer></script>
+<script src="ct-stats.js" integrity="sha384-0NlvfyZijptzAowlE4UC1eXShyCCPektTQazq5/MF57wKaTHOtyrGIv3q/fNgEwI" crossorigin="anonymous" defer></script>
 </body>
 </html>
