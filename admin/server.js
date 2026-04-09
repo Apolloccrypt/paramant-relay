@@ -86,22 +86,22 @@ const api = express.Router();
 
 api.post('/auth/login', async (req, res) => {
   const { token, totp } = req.body || {};
-  if (!token) return res.status(401).json({ error: 'Token verplicht' });
+  if (!token) return res.status(401).json({ error: 'Token required' });
   if (!totp || !/^\d{6}$/.test(totp)) {
-    return res.status(400).json({ error: 'TOTP code verplicht (6 cijfers)' });
+    return res.status(400).json({ error: 'TOTP code required (6 digits)' });
   }
 
   // Accept: master ADMIN_TOKEN  OR  enterprise pgp_ key (relay verifies both)
   const isMaster    = token === ADMIN_TOKEN;
   const isEnterprise = token.startsWith('pgp_');
   if (!isMaster && !isEnterprise) {
-    return res.status(401).json({ error: 'Ongeldig token — gebruik ADMIN_TOKEN of een enterprise pgp_ key' });
+    return res.status(401).json({ error: 'Invalid token — use your ADMIN_TOKEN or an enterprise pgp_ key' });
   }
 
   try {
     // Pass the provided token — relay accepts both master token and enterprise keys
     const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, token);
-    if (!r.body?.ok) return res.status(401).json({ error: 'Ongeldige TOTP code' });
+    if (!r.body?.ok) return res.status(401).json({ error: 'Invalid TOTP code' });
     const sid = crypto.randomBytes(32).toString('hex');
     // Store which token to use for relay calls in this session
     sessions.set(sid, { expires: Date.now() + 3_600_000, token });
