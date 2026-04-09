@@ -919,9 +919,11 @@ async function copySessionLink() {
 // ── WebSocket ──
 async function connectWebSocket() {
   // Fetch a short-lived ticket so the API key never appears in the WS URL (finding #13)
+  // Ticket must come from the same relay host the WS connects to (relay-main)
   let wsUrl = RELAY_WS + '/v2/stream';
   try {
-    const tr = await fetch(`${RELAY_API}/v2/ws-ticket`, {method:'POST',headers:{'X-Api-Key':apiKey},signal:AbortSignal.timeout(5000)});
+    const wsHttpBase = RELAY_WS.replace('wss://', 'https://').replace('ws://', 'http://');
+    const tr = await fetch(`${wsHttpBase}/v2/ws-ticket`, {method:'POST',headers:{'X-Api-Key':apiKey},signal:AbortSignal.timeout(5000)});
     if (tr.ok) { const td = await tr.json(); if (td.ticket) wsUrl += '?ticket=' + encodeURIComponent(td.ticket); }
   } catch {}
   ws = new WebSocket(wsUrl);
