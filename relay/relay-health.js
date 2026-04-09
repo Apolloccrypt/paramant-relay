@@ -673,16 +673,15 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub || '', ts: entry.ts }));
   }
 
-  // Admin paths accept ADMIN_TOKEN via X-Admin-Token or Authorization: Bearer
-  // All other paths require a valid X-Api-Key (pgp_ key in users.json)
+  // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
+  // All other paths: require a valid X-Api-Key (pgp_ key in users.json)
   const isAdminPath = path.startsWith('/v2/admin');
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
     const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && adminHeader === process.env.ADMIN_TOKEN;
-    const validEnterprise = apiKeys.get(adminHeader)?.plan === 'enterprise';
-    if (!validAdmin && !validEnterprise) {
+    if (!validAdmin) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'ADMIN_TOKEN or enterprise key required' }));
+      return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
   } else if (!keyData?.active) {
