@@ -1,0 +1,15 @@
+{
+  "name": "paramant-crypto",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "paramant_crypto_bg.wasm",
+    "paramant_crypto.js",
+    "paramant_crypto.d.ts"
+  ],
+  "main": "paramant_crypto.js",
+  "types": "paramant_crypto.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -8,9 +8,8 @@ __pycache__/
 # Build & dist
 dist/
 frontend/dist/
-frontend/pkg/
 crypto-wasm/target/
-*.wasm
+crypto-wasm/target/**/*.wasm
 
 # Environment & secrets
 .env

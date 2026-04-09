@@ -3,7 +3,7 @@
 **Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
 
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.3.6-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.0-brightgreen.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 [![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
 [![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
@@ -57,7 +57,16 @@ cp .env.example .env && echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
 ```
 
-Starts 6 containers: 4 sector relays (health / legal / finance / iot), an admin panel, and nginx with TLS.
+Starts 6 containers: 5 sector relays (main / health / legal / finance / iot), an admin panel. System nginx handles TLS termination.
+
+| Container | Internal port | Host port | Domain |
+|-----------|--------------|-----------|--------|
+| relay-main | 3000 | 127.0.0.1:3000 | relay.paramant.app |
+| relay-health | 3000 | 127.0.0.1:3001 | health.paramant.app |
+| relay-finance | 3000 | 127.0.0.1:3002 | finance.paramant.app |
+| relay-legal | 3000 | 127.0.0.1:3003 | legal.paramant.app |
+| relay-iot | 3000 | 127.0.0.1:3004 | iot.paramant.app |
+| admin | 4200 | 127.0.0.1:4200 | /admin/ |
 
 **First user (after deploy):**
 
@@ -126,6 +135,14 @@ The relay is **untrusted by design** — it never holds a decryption key.
 
 **Independent security audit (April 2026):** [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU) · uncompensated, voluntary review
 Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
+
+**v2.4.0 (April 2026):**
+- **Docker architecture**: one shared relay codebase → 5 sector containers (compartmentalisation)
+- All browser crypto (parashare, drop, ontvang) migrated to **Rust/WASM** via `crypto-bridge.js`
+- WASM self-integrity: SHA-256 of `paramant_crypto_bg.wasm` verified at runtime before first use
+- WASM binary committed to git (`frontend/pkg/`) — no Rust toolchain needed to self-host
+- `noble-mlkem-loader.js` retained only for keypair generation (keygen not in WASM)
+- `scripts/deploy.sh` added for one-command server deploy
 
 **v2.3.6 hardening (April 2026):**
 - CSP: `unsafe-inline` removed from `script-src`/`style-src`; `wasm-unsafe-eval` added for WASM

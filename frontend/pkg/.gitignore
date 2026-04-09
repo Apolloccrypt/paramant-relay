@@ -1,0 +1,4 @@
+# wasm-pack generates "* " (ignore all) by default.
+# Paramant intentionally commits this pkg/ so self-hosted deployments
+# work without a Rust toolchain. No secrets are in these files.
+!*

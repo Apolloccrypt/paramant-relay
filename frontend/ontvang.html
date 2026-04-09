@@ -121,6 +121,12 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </main>
 
 <script type="module" src="/noble-mlkem-loader.js"></script>
+<script type="module">
+import { initCrypto, encryptBlob, decryptBlob } from '/crypto-bridge.js';
+window._cryptoBridge = { initCrypto, encryptBlob, decryptBlob };
+// Pre-warm WASM (integrity check + init) so it's ready when a transfer arrives
+initCrypto().catch(e => console.error('WASM init failed:', e));
+</script>
 <script>
 const RELAY_WS  = 'wss://relay.paramant.app';
 const RELAY_SECTORS = {
@@ -154,6 +160,10 @@ function concat(...arrays) {
   for (const a of arrays) { out.set(a, off); off += a.length; }
   return out;
 }
+function b64urlToU8(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(b64url.length / 4) * 4, '=');
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
 
 // Must match parashare.html: SHA-256(kyber_pub || ecdh_pub) → first 10 bytes → 5×4 hex
 async function genFingerprint(kyberPubHex, ecdhPubHex) {
@@ -172,7 +182,8 @@ if (!sessionToken || !/^inv_[a-zA-Z0-9]{32}$/.test(sessionToken)) {
 }
 
 // ── State ──
-let myPrivateKey_ECDH = null;
+let myPrivateKey_ECDH = null;      // CryptoKey (for ECDH deriveBits — kept for legacy)
+let myPrivateKey_ECDH_RAW = null;  // Uint8Array 32-byte scalar (for WASM decryptBlob)
 let myPrivateKey_MLKEM = null;
 let ws = null;
 
@@ -201,6 +212,8 @@ async function init() {
         { name: 'ECDH', namedCurve: 'P-256' },
         false, ['deriveBits']
       );
+      // Extract raw 32-byte scalar from JWK d field (base64url → Uint8Array)
+      myPrivateKey_ECDH_RAW = b64urlToU8(kp.ecdhSecJwk.d);
     } else {
       // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
       $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
@@ -220,6 +233,8 @@ async function init() {
 
       // Save to sessionStorage so refresh restores the same keypair
       const ecdhSecJwk = await crypto.subtle.exportKey('jwk', ecdhPair.privateKey);
+      // Extract raw 32-byte scalar from JWK d field (base64url → Uint8Array)
+      myPrivateKey_ECDH_RAW = b64urlToU8(ecdhSecJwk.d);
       sessionStorage.setItem(storageKey, JSON.stringify({
         kyberPubHex, ecdhPubHex,
         kyberSec: Array.from(kyberSec),
@@ -304,11 +319,11 @@ async function init() {
               // Vault mode: meerdere bestanden
               const ttl_ms = parseInt(parts[2]) || 3600000;
               const vaultFiles = JSON.parse(d.ecdh_pub);
-              await receiveVault(vaultFiles, ttl_ms, myPrivateKey_MLKEM, myPrivateKey_ECDH);
+              await receiveVault(vaultFiles, ttl_ms, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
             } else {
               // Enkelvoudig bestand — formaat: total_chunks|ttl_ms (bestandsnaam zit alleen in encrypted payload)
               const ttl_ms = parseInt(parts[1]) || 3600000;
-              await receiveFile({ tokens: d.ecdh_pub, file_name: 'download', total_chunks: parseInt(parts[0]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH);
+              await receiveFile({ tokens: d.ecdh_pub, file_name: 'download', total_chunks: parseInt(parts[0]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
             }
           }
         }
@@ -320,7 +335,7 @@ async function init() {
   }
 }
 
-async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
+async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
   showStep('step-receiving');
   const tokens = msg.tokens.split(',');
   const totalChunks = parseInt(msg.total_chunks) || 1;
@@ -355,41 +370,8 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
 
       $('recv-status').textContent = `Decrypting chunk ${i+1}/${tokens.length} with ML-KEM-768...`;
 
-      // Decrypt 0x02 packet
-      const magic = raw[0];
-      if (magic !== 0x02) throw new Error('Unexpected packet format: 0x' + magic.toString(16));
-
-      const view = new DataView(raw.buffer);
-      let off = 1;
-
-      const ctKyberLen = view.getUint32(off, false); off += 4;
-      const ctKyber = raw.slice(off, off + ctKyberLen); off += ctKyberLen;
-
-      const senderPubLen = view.getUint32(off, false); off += 4;
-      const senderPubRaw = raw.slice(off, off + senderPubLen); off += senderPubLen;
-
-      const nonce = raw.slice(off, off + 12); off += 12;
-      const ctLen = view.getUint32(off, false); off += 4;
-      const ct = raw.slice(off, off + ctLen);
-
-      // ML-KEM decapsulate
-      const sharedSecret = ml_kem768.decapsulate(ctKyber, kyberSec);
-
-      // ECDH derive
-      const senderPub = await crypto.subtle.importKey('raw', senderPubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
-      const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: senderPub }, ecdhPriv, 256));
-
-      // HKDF combine
-      const combined = concat(sharedSecret, ecdhSecret);
-      const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
-      const aesKey = await crypto.subtle.deriveKey(
-        { name: 'HKDF', hash: 'SHA-256', salt: ctKyber.slice(0, 32), info: new TextEncoder().encode('paramant-v2') },
-        hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
-      );
-
-      // Decrypt — AAD must match encrypt side: [version(1)][chunk_index_u32be(4)]
-      const aad = new Uint8Array(5); aad[0] = 0x02; new DataView(aad.buffer).setUint32(1, i, false);
-      const plainPadded = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad }, aesKey, ct));
+      if (!window._cryptoBridge) throw new Error('WASM crypto bridge not ready');
+      const plainPadded = await window._cryptoBridge.decryptBlob(raw, kyberSec, ecdhPrivRaw);
 
       // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
       const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);

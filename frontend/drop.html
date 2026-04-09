@@ -736,8 +736,13 @@ select {
 <!-- QR code library -->
 <script src="/vendor/jsQR.min.js" integrity="sha384-9Q0jWoineiIq95JeIyBsNV90KKLfDsbkj29k/YFxf76a2JwkHDYkMuSbNGN6XJfV" crossorigin="anonymous"></script>
 <script src="/vendor/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
-<!-- ML-KEM — loaded as module so export{} syntax works; sets window.ml_kem768 -->
-<script type="module" src="/noble-mlkem-loader.js"></script>
+<!-- WASM crypto bridge (ML-KEM-768 + ECDH P-256 + AES-256-GCM) -->
+<script type="module">
+import { initCrypto, encryptBlob, decryptBlob } from '/crypto-bridge.js';
+window._cryptoBridge = { initCrypto, encryptBlob, decryptBlob };
+// Pre-warm WASM so it's ready by the time sendFile() runs
+initCrypto().catch(e => console.error('WASM init failed:', e));
+</script>
 
 <script>
 const RELAY_API = 'https://health.paramant.app';
@@ -972,11 +977,10 @@ async function sendFile() {
   };
 
   try {
-    if (typeof ml_kem768 === 'undefined') throw new Error('ML-KEM library not loaded');
+    if (!window._cryptoBridge) throw new Error('WASM crypto bridge not ready');
 
     setMsg('Reading file...', 10);
     const CHUNK = 4.5 * 1024 * 1024;
-    const BLOCK = 5 * 1024 * 1024;
     const META_MAGIC = new Uint8Array([0x50,0x52,0x53,0x48]);
     const totalChunks = Math.ceil(selectedFile.size / CHUNK) || 1;
     const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
@@ -990,40 +994,19 @@ async function sendFile() {
       const start = Math.round(i * CHUNK);
       const chunkData = new Uint8Array(await selectedFile.slice(start, start + CHUNK).arrayBuffer());
 
-      // ML-KEM-768 encapsulate
-      const kyberPub = hexToU8(receiverPubs.kyber_pub);
-      const { cipherText, sharedSecret } = ml_kem768.encapsulate(kyberPub);
-
-      // ECDH P-256
-      const ecdhPubRaw = hexToU8(receiverPubs.ecdh_pub);
-      const recvECDH = await crypto.subtle.importKey('raw', ecdhPubRaw, {name:'ECDH',namedCurve:'P-256'}, false, []);
-      const senderECDH = await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'}, true, ['deriveBits']);
-      const senderPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', senderECDH.publicKey));
-      const ecdhBits = new Uint8Array(await crypto.subtle.deriveBits({name:'ECDH',public:recvECDH}, senderECDH.privateKey, 256));
-
-      // HKDF
-      const combined = concat(sharedSecret, ecdhBits);
-      const hkdfKey = await crypto.subtle.importKey('raw', combined, 'HKDF', false, ['deriveKey']);
-      const aesKey = await crypto.subtle.deriveKey(
-        {name:'HKDF',hash:'SHA-256',salt:cipherText.slice(0,32),info:new TextEncoder().encode('paramant-v2')},
-        hkdfKey, {name:'AES-GCM',length:256}, false, ['encrypt']
-      );
-
-      // Build metadata + encrypt
+      // Build plaintext payload (metadata header + chunk data)
       const metaBytes = new TextEncoder().encode(JSON.stringify({
         file_id: fileId, file_name: selectedFile.name, file_size: selectedFile.size,
         chunk_index: i, total_chunks: totalChunks, chunk_size: chunkData.length
       }));
       const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
-      const nonce = crypto.getRandomValues(new Uint8Array(12));
-      // AAD = [version_byte(1)] + [chunk_index_u32be(4)] — binds version+order to ciphertext (finding #8)
-      const aad = new Uint8Array(5); aad[0] = 0x02; new DataView(aad.buffer).setUint32(1, i, false);
-      const ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce,additionalData:aad}, aesKey, payload));
 
-      const packet = concat(new Uint8Array([0x02]), u32be(cipherText.length), cipherText, u32be(senderPubRaw.length), senderPubRaw, nonce, u32be(ct.length), ct);
-      const padded = new Uint8Array(BLOCK);
-      padded.set(packet.slice(0, Math.min(packet.length, BLOCK)));
-      for (let p = packet.length; p < BLOCK; p += 65536) crypto.getRandomValues(padded.subarray(p, Math.min(p+65536, BLOCK)));
+      // Hybrid KEM encrypt (ML-KEM-768 + ECDH P-256 + AES-256-GCM) via WASM
+      const padded = await window._cryptoBridge.encryptBlob(
+        payload,
+        hexToU8(receiverPubs.kyber_pub),
+        hexToU8(receiverPubs.ecdh_pub)
+      );
 
       setMsg(`Uploading chunk ${i+1}/${totalChunks}...`, pct + 5);
       const hashBuf = await crypto.subtle.digest('SHA-256', padded);
