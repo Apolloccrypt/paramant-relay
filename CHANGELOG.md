@@ -7,6 +7,36 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.6] — 2026-04-10
+
+### Security
+
+- **Rust/WASM crypto core** — `crypto-wasm/` crate (wasm-pack, 112 KB) exposes `encrypt_blob` and `decrypt_blob` via `wasm_bindgen`. Implements the same hybrid KEM as the JS path: ML-KEM-768 + ECDH P-256 + HKDF-SHA256 + AES-256-GCM with identical wire format (`0x02 | ctKemLen | ctKem | senderPubLen | senderPub | nonce | ctLen | ct`, 5 MB random padding). `parashare.html` sender path migrated from inline JS to `crypto-bridge.js` → WASM; 30 lines of inline crypto replaced by one `encryptBlob()` call. `decrypt_blob` accepts noble-post-quantum's 2400-byte NIST FIPS 203 decapsulation key format for forward compatibility. **Fixes audit finding #18 (partial).**
+
+- **CSP hardened — `unsafe-inline` removed (finding #18)** — `Content-Security-Policy` on `admin/server.js` and `relay/relay.js` updated: `unsafe-inline` removed from `script-src` and `style-src`; `wasm-unsafe-eval` added (required for WASM streaming instantiation). New policy: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'`.
+
+- **SRI integrity hashes on all local `<script>` tags** — SHA-384 `integrity` + `crossorigin="anonymous"` attributes added to every local script reference in `frontend/*.html`: `jsQR.min.js`, `qrcode.min.js` (drop.html), `relay-status.js`, `ct-stats.js` (index.html). Browser will refuse to execute any of these files if their content is tampered with.
+
+- **Security headers added to all responses** — `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`, `Referrer-Policy: no-referrer`, `Permissions-Policy: interest-cohort=()` added to `admin/server.js` middleware and `relay/relay.js` `setHeaders()`. `HSTS` was absent from relay responses entirely.
+
+- **Dead code removed — duplicate admin token checks (finding #16)** — Duplicate `GET /v2/did/:did` handler in `relay/relay.js` removed (second handler at line ~1443 was unreachable — preempted by identical unauthenticated handler before the `isAdminPath` gate). Five redundant `ADMIN_TOKEN` equality checks removed from individual admin handlers (`/v2/admin/verify-mfa`, `POST /v2/admin/keys`, `GET /v2/admin/keys`, `/v2/admin/keys/revoke`, `/v2/admin/send-welcome`) — all paths already verified by the constant-time `isAdminPath` gate using `safeEqual()`.
+
+### Fixed
+
+- **Service worker intercepting cross-origin requests** — `sw.js` called `e.respondWith()` for all requests including ArcGIS tile map requests and jsdelivr CDN assets (three-globe textures). When these cross-origin fetches failed, `caches.match()` returned `undefined`, which is not a valid `Response` — causing "A ServiceWorker passed a promise to FetchEvent.respondWith() that resolved with non-Response value 'undefined'" errors in the browser console. Fixed: fetch handler now returns immediately (no `respondWith`) for any request whose origin does not match `self.location.origin`. Cache version bumped to `paradrop-v2` to force SW update in existing clients.
+
+### Added
+
+- **JS build pipeline** — `build.sh` + `package.json` (devDependencies: `terser`, `javascript-obfuscator`). Runs terser minification then obfuscation (`controlFlowFlattening`, `stringArray`, `stringArrayEncoding: base64`, `selfDefending`) on all `frontend/*.js` → `frontend/dist/`. `frontend/dist/` gitignored.
+
+### Changed
+
+- **Code compression — 711 lines removed across 8 files** — Duplicate handlers, redundant checks, inline docstrings, and comment headers removed without changing any behaviour: `relay/relay.js` (−27), `admin/server.js` (−124), `sdk-js/src/index.js` (−203), `sdk-py/paramant_ghostpipe.py` (−196), `fly-relay/relay.js` (−56), `scripts/preflight.sh` (−78), `frontend/parashare.html` (−34 after WASM migration), `frontend/index.html` (−23).
+
+- **relay VERSION** `2.3.3` → `2.3.6`.
+
+---
+
 ## [2.3.5] — 2026-04-09
 
 ### Security

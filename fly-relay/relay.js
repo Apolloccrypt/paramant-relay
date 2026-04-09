@@ -41,7 +41,7 @@ async function getHealth() {
   if (cache.data && Date.now() - cache.ts < 30000) return cache.data;
   const relays = await Promise.all(Object.entries(RELAYS).map(([n, u]) => fetchOne(n, u)));
   cache = { ts: Date.now(), data: {
-    status: 'ok', version: '1.1.0', role: 'edge-gateway',
+    status: 'ok', version: '1.2.0', role: 'edge-gateway',
     region: process.env.FLY_REGION || 'local', uptime_s: Math.floor(process.uptime()),
     origin: 'hetzner', relays,
     online: relays.filter(r => r.ok).length, total: relays.length, all_ok: relays.every(r => r.ok),
@@ -106,5 +106,5 @@ server.on('upgrade', (req, socket, head) => {
   proxyWs(pickRelay(req) + stripSector(url.pathname) + url.search, req, socket, head);
 });
 
-server.listen(PORT, () => console.log(`PARAMANT edge-gateway v1.1.0 — port ${PORT} — ${process.env.FLY_REGION || 'local'} → hetzner`));
+server.listen(PORT, () => console.log(`PARAMANT edge-gateway v1.2.0 — port ${PORT} — ${process.env.FLY_REGION || 'local'} → hetzner`));
 process.on('SIGTERM', () => process.exit(0));

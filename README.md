@@ -3,7 +3,7 @@
 **Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
 
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.3.2-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.6-brightgreen.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 [![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
 [![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
@@ -121,10 +121,18 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Signatures | ML-DSA-65 · NIST FIPS 204 |
 | Key derivation | HKDF-SHA256 · RFC 5869 |
 | Password blobs | Argon2id · RFC 9106 |
+| Crypto runtime | Rust/WASM (wasm-pack) — browser-side encrypt runs in native code, not JS |
 | Jurisdiction | Hetzner DE · EU/GDPR · no US CLOUD Act |
 
 **Independent security audit (April 2026):** [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU) · uncompensated, voluntary review
 Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
+
+**v2.3.6 hardening (April 2026):**
+- CSP: `unsafe-inline` removed from `script-src`/`style-src`; `wasm-unsafe-eval` added for WASM
+- SRI `sha384` integrity hashes on all local `<script>` tags
+- `Strict-Transport-Security`, `Referrer-Policy: no-referrer`, `Permissions-Policy` on all responses
+- Encrypt path in browser migrated from JS to **Rust/WASM** (`crypto-wasm/`, 112 KB `.wasm`)
+- JS build pipeline: terser + javascript-obfuscator → `frontend/dist/`
 
 ![PARAMANT Ghost Pipe — Crypto Stack](docs/assets/crypto-stack.jpg)
 

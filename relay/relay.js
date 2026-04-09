@@ -26,7 +26,7 @@ const fs     = require('fs');
 const path   = require('path');
 const url_   = require('url');
 
-const VERSION    = '2.3.3';
+const VERSION    = '2.3.6';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 

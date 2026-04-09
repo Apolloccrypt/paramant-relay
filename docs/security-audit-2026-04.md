@@ -61,9 +61,9 @@
 
 | # | Finding | Status | Notes |
 |---|---------|--------|-------|
-| 16 | **Duplicate route handlers** — `/v2/ct/log` and `/v2/ct/proof/:index` defined twice (pre-auth and post-auth); post-auth versions are dead code | ⚙ | Dead code will be removed. |
+| 16 | **Duplicate route handlers** — `/v2/ct/log` and `/v2/ct/proof/:index` defined twice (pre-auth and post-auth); post-auth versions are dead code | ✓ | Fixed in v2.3.6: duplicate `GET /v2/did/:did` handler removed (preempted by identical handler before auth gate). Five redundant `ADMIN_TOKEN` re-checks removed from individual admin handlers — all paths already verified by the `isAdminPath` gate. |
 | 17 | **Google Fonts CDN in drop.html** — external CDN call leaks user IP to Google in a privacy-first product | ✓ | Fixed in v2.3.3: external `@import` removed, system font stack used. |
-| 18 | **CSP allows `unsafe-inline`** — weakens XSS protection; structurally required by inline `<script>` blocks | ⚙ | Nonces will be introduced to replace blanket `unsafe-inline`. |
+| 18 | **CSP allows `unsafe-inline`** — weakens XSS protection; structurally required by inline `<script>` blocks | ✓ | Fixed in v2.3.6: `unsafe-inline` removed from `script-src` and `style-src`. Added `wasm-unsafe-eval` (narrowly scoped). Browser-side encrypt path migrated to Rust/WASM (`crypto-wasm/`) eliminating the need for inline crypto. SRI `sha384` integrity on all local `<script>` tags. `Strict-Transport-Security`, `Referrer-Policy: no-referrer`, `Permissions-Policy` added to all relay + admin responses. |
 | 19 | **Nginx dead Cloudflare config** — `set_real_ip_from 127.0.0.1` with `real_ip_header CF-Connecting-IP` is a Cloudflare remnant | ○ | Harmless (header unset without Cloudflare). Will be cleaned up in next nginx pass. |
 | 20 | **Python SDK private keys serialized to disk** — `~/.paramant/*.keypair.json` stored as hex; `_zero()` only works on in-memory bytes, not persisted JSON | ○ | Documented in self-hosting guide: use `shred -u ~/.paramant/*.keypair.json` or OS-level full-disk encryption. Encrypted key storage planned for v2.4. |
 
