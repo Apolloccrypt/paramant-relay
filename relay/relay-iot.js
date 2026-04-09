@@ -532,7 +532,7 @@ const server = http.createServer(async (req, res) => {
   const parsed  = url_.parse(req.url, true);
   const path    = parsed.pathname;
   const query   = parsed.query;
-  const apiKey  = (req.headers['x-api-key'] || query.k || '').trim();
+  const apiKey  = (req.headers['x-api-key'] || '').trim();
   if (query.k) {
     log('warn', 'key_in_querystring', { path: path.slice(0,40), ip: (req.socket?.remoteAddress||'').slice(0,15) });
   }
@@ -577,7 +577,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
   if (path === '/v2/check-key') {
-    const kd = apiKeys.get(query.k || apiKey);
+    const kd = apiKeys.get(apiKey);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ valid: !!(kd?.active), plan: kd?.plan || null }));
   }
@@ -732,7 +732,7 @@ const server = http.createServer(async (req, res) => {
   if (pkm && req.method === 'GET') {
     const deviceId = decodeURIComponent(pkm[1]);
     // Invite sessions: stored and retrieved without API key
-    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${query.k || apiKey}`;
+    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
     const entry = pubkeys.get(_pkKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device. Start receiver first.' })); }
     if (entry.expires && Date.now() > entry.expires) {

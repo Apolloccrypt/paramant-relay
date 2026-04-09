@@ -878,7 +878,9 @@ function updateCreateBtn() {
 async function createSession() {
   const tokenBytes = crypto.getRandomValues(new Uint8Array(16));
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
-  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&k=${encodeURIComponent(apiKey)}`;
+  // API key intentionally NOT included in receiver URL — ontvang.html uses the session token only.
+  // Relay accepts inv_* session tokens without an API key (INVITE_RE path).
+  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}`;
 
   // Show QR step
   document.getElementById('send-step-file').style.display = 'none';

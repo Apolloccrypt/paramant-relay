@@ -44,7 +44,7 @@ async function fetchMonitor(){
   if(!apiKey)return;
   loading=true;softRender();
   try{
-    const r=await fetch(relay.u+"/v2/monitor?k="+apiKey,{signal:AbortSignal.timeout(8000)});
+    const r=await fetch(relay.u+"/v2/monitor",{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(8000)});
     if(r.ok){data=await r.json();lastPoll=new Date()}
     else data=null;
     // Haal CT log op voor audit sectie
@@ -106,7 +106,7 @@ async function runE2ETest(){
 
     // Stap 2 — API key
     addTestLog("2/6 — API key valideren","info");
-    const kd=await fetch(relay.u+"/v2/check-key?k="+apiKey,{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
+    const kd=await fetch(relay.u+"/v2/check-key",{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)}).then(r=>r.json());
     if(!kd.valid)throw new Error("API key ongeldig");
     addTestLog("Key geldig | plan: "+kd.plan,"ok");
 
