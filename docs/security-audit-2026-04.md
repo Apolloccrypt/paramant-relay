@@ -38,7 +38,7 @@
 |---|---------|--------|-------|
 | 5 | **Metadata size leakage** — `total_chunks` visible to relay, allowing order-of-magnitude file size inference despite 5 MB block padding | ○ | Accepted tradeoff. Padding blocks exact size; chunk count unavoidable for streaming assembly. Documented in threat model. |
 | 6 | **`_zero()` CPython-only** — `ctypes.memset` approach fails silently on PyPy / GraalPy / future CPython without warning | ⚙ | Add runtime warning when zeroization is not available. |
-| 7 | **HKDF salt inconsistency** — browser uses `cipherText.slice(0,32)` as salt (correct); Python SDK uses static string `paramant-gp-v1` as salt (weakens domain separation on CLI-to-CLI path) | ⚙ | Python SDK HKDF salt will be derived from KEM ciphertext to match browser behavior. |
+| 7 | **HKDF salt inconsistency** — browser uses `cipherText.slice(0,32)` as salt (correct); Python SDK uses static string `paramant-gp-v1` as salt (weakens domain separation on CLI-to-CLI path) | ✓ | Fixed in `scripts/paramant_sdk.py`: salt now derived from `kct[:32]` (KEM ciphertext) when ML-KEM is available, falls back to `ecdh_ss[:32]` for classical-only paths. Matches browser behavior. **Breaking change**: blobs encrypted before this fix will fail to decrypt — regenerate. |
 | 8 | **No GCM AAD** — version byte and chunk metadata not integrity-bound to ciphertext in browser or Python SDK | ⚙ | AAD will be added: version byte + chunk index bound to each GCM seal. |
 | 9 | **stream-next hash uses full API key as HMAC secret** — sequence hashes are precomputable from any key holder | ⚙ | Noted as `// FIX` comment in relay. Session-scoped nonce will be introduced. |
 
@@ -53,7 +53,7 @@
 | 12 | **No rate limiting on `/v2/outbound`** — valid key holder can burn other users' blobs via download token if intercepted | ⚙ | Rate limit on outbound per-key will be added. Download token path intentionally keyless for link sharing. |
 | 13 | **WebSocket API key in query string** — upgrade requests carry `?k=pgp_xxx` in URL, visible in access logs | ⚙ | Will move to a pre-upgrade HTTP handshake or short-lived ticket. |
 | 14 | **CT log Merkle tree non-standard** — odd-leaf duplication differs from RFC standard; tree rebuilt from scratch on each append; "proofs" are just last 8 leaf hashes | ⚙ | Incremental tree and proper inclusion proofs are planned. |
-| 15 | **DID auth uses raw hex as SPKI** — `crypto.verify` receives raw key bytes where DER-SPKI is expected; DID auth likely non-functional | ⚙ | DID auth path to be fixed or disabled pending rewrite. |
+| 15 | **DID auth uses raw hex as SPKI** — `crypto.verify` receives raw key bytes where DER-SPKI is expected; DID auth likely non-functional | ✓ | Fixed in all 7 relay files: `authByDid()` now wraps raw P-256 key bytes in DER-SPKI format before passing to `crypto.verify`. `P256_SPKI_PREFIX` constant added; falls through to already-encoded keys (`rawKey[0] === 0x30`). Verify errors now logged as `did_auth_verify_error`. |
 
 ---
 
@@ -62,7 +62,7 @@
 | # | Finding | Status | Notes |
 |---|---------|--------|-------|
 | 16 | **Duplicate route handlers** — `/v2/ct/log` and `/v2/ct/proof/:index` defined twice (pre-auth and post-auth); post-auth versions are dead code | ⚙ | Dead code will be removed. |
-| 17 | **Google Fonts CDN in drop.html** — external CDN call leaks user IP to Google in a privacy-first product | ⚙ | Fonts will be self-hosted or removed. |
+| 17 | **Google Fonts CDN in drop.html** — external CDN call leaks user IP to Google in a privacy-first product | ✓ | Fixed in v2.3.3: external `@import` removed, system font stack used. |
 | 18 | **CSP allows `unsafe-inline`** — weakens XSS protection; structurally required by inline `<script>` blocks | ⚙ | Nonces will be introduced to replace blanket `unsafe-inline`. |
 | 19 | **Nginx dead Cloudflare config** — `set_real_ip_from 127.0.0.1` with `real_ip_header CF-Connecting-IP` is a Cloudflare remnant | ○ | Harmless (header unset without Cloudflare). Will be cleaned up in next nginx pass. |
 | 20 | **Python SDK private keys serialized to disk** — `~/.paramant/*.keypair.json` stored as hex; `_zero()` only works on in-memory bytes, not persisted JSON | ⚙ | Key files will use encrypted storage or documented secure-deletion guidance. |

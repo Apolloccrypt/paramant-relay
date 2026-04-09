@@ -485,20 +485,28 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
 
 // ── DID-only authenticatie ────────────────────────────────────────────────────
 // Apparaat stuurt x-did + x-did-signature — geen centrale users.json nodig
+// DER-SPKI prefix for P-256 uncompressed public key (65 bytes → 91 bytes total).
+// publicKeyHex stores raw ECDH P-256 point bytes; crypto.verify requires DER-SPKI.
+const P256_SPKI_PREFIX = Buffer.from('3059301306072a8648ce3d020106082a8648ce3d030107034200', 'hex');
 function authByDid(didStr, signature, payload) {
   const entry = [...didRegistry.values()].find(e => e.doc.id === didStr);
   if (!entry) return null;
   const vm = entry.doc.verificationMethod?.[0];
   if (!vm || !vm.publicKeyHex) return null;
   try {
-    const valid = require('crypto').verify(
+    const rawKey = Buffer.from(vm.publicKeyHex, 'hex');
+    // Wrap raw uncompressed P-256 point in DER-SPKI if not already encoded (0x30 = SEQUENCE tag)
+    const spkiKey = rawKey[0] === 0x30 ? rawKey : Buffer.concat([P256_SPKI_PREFIX, rawKey]);
+    const valid = crypto.verify(
       'SHA256',
       Buffer.from(payload),
-      { key: Buffer.from(vm.publicKeyHex, 'hex'), format: 'der', type: 'spki' },
+      { key: spkiKey, format: 'der', type: 'spki' },
       Buffer.from(signature, 'hex')
     );
     if (valid) return entry;
-  } catch(e) {}
+  } catch(e) {
+    log('warn', 'did_auth_verify_error', { err: e.message, did: didStr.slice(0,30) });
+  }
   return null;
 }
 

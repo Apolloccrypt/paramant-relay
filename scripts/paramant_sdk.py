@@ -265,10 +265,13 @@ class GhostPipe:
             if K and kyber_pub:
                 try: kct, kss = K.enc(kyber_pub)
                 except Exception: pass
-            # HKDF
-            ikm = ecdh_ss + kss
-            ss  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
-                            salt=b'paramant-gp-v1', info=b'aes-key', backend=be).derive(ikm)
+            # HKDF — salt derived from KEM ciphertext (matches browser: cipherText.slice(0,32))
+            # When ML-KEM is unavailable, fall back to ECDH shared secret slice as domain separator.
+            # Static salt 'paramant-gp-v1' removed (security finding #7).
+            ikm  = ecdh_ss + kss
+            salt = kct[:32] if kct else ecdh_ss[:32]
+            ss   = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
+                             salt=salt, info=b'aes-key', backend=be).derive(ikm)
             # AES-256-GCM
             nonce  = os.urandom(12)
             ct     = c['AES'](ss).encrypt(nonce, data, None)
@@ -306,9 +309,10 @@ class GhostPipe:
             if K and kct and kp.get('kyber_priv'):
                 try: kss = K.dec(bytes.fromhex(kp['kyber_priv']), kct)
                 except Exception: pass
-            ikm = ecdh_ss + kss
-            ss  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
-                            salt=b'paramant-gp-v1', info=b'aes-key', backend=be).derive(ikm)
+            ikm  = ecdh_ss + kss
+            salt = kct[:32] if kct else ecdh_ss[:32]
+            ss   = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
+                             salt=salt, info=b'aes-key', backend=be).derive(ikm)
             return c['AES'](ss).decrypt(nonce, ct, None)
         finally:
             for b in (ecdh_ss, kss, ikm, ss):
