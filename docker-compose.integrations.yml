@@ -1,0 +1,94 @@
+# PARAMANT integrations stack — n8n + Prometheus + Grafana
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.integrations.yml up -d
+#
+# Prerequisites:
+#   bash deploy/setup-integrations.sh   (generates prometheus-token file)
+#
+# Access:
+#   Grafana   → https://<DOMAIN>/grafana/   (admin / $GRAFANA_PASSWORD)
+#   n8n       → SSH tunnel: ssh -L 5678:127.0.0.1:5678 root@<server>  then  http://localhost:5678
+#   Prometheus→ SSH tunnel: ssh -L 9090:127.0.0.1:9090 root@<server>  then  http://localhost:9090
+
+services:
+
+  # ── Automation engine + AI via Claude API ────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: "${N8N_USER:-admin}"
+      N8N_BASIC_AUTH_PASSWORD: "${N8N_PASSWORD}"
+      N8N_HOST: "localhost"
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: "http"
+      WEBHOOK_URL: "http://localhost:5678/"
+      EXECUTIONS_DATA_MAX_AGE: "168"       # keep 7 days of execution logs
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: "all"
+      N8N_LOG_LEVEL: "warn"
+      N8N_SECURE_COOKIE: "false"           # SSH-tunnel only, no public HTTPS needed
+      # AI — Anthropic Claude (set in .env)
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      # Notifications (optional)
+      PARAMANT_ADMIN_TOKEN: "${ADMIN_TOKEN}"
+      PARAMANT_RELAY_URL: "http://relay-health:3005"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - relay-internal
+      - relay-external          # needs outbound internet for Claude API + notifications
+    ports:
+      - "127.0.0.1:5678:5678"   # localhost only — use SSH tunnel to access
+
+  # ── Time-series metrics scraper ───────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus-token:/etc/prometheus/token:ro
+      - prometheus-data:/prometheus
+    networks:
+      - relay-internal
+    ports:
+      - "127.0.0.1:9090:9090"   # localhost only — use SSH tunnel to access
+    depends_on:
+      - relay-health
+      - relay-legal
+      - relay-finance
+      - relay-iot
+
+  # ── Metrics visualisation dashboard ─────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD}"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_LOG_LEVEL: "warn"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - relay-internal
+    depends_on:
+      - prometheus
+
+volumes:
+  n8n-data:
+  prometheus-data:
+  grafana-data:

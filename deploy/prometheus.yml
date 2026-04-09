@@ -1,0 +1,43 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    relay: 'paramant'
+
+scrape_configs:
+
+  - job_name: 'paramant-health'
+    metrics_path: '/metrics'
+    authorization:
+      credentials_file: /etc/prometheus/token
+    static_configs:
+      - targets: ['relay-health:3005']
+        labels:
+          sector: 'health'
+
+  - job_name: 'paramant-legal'
+    metrics_path: '/metrics'
+    authorization:
+      credentials_file: /etc/prometheus/token
+    static_configs:
+      - targets: ['relay-legal:3002']
+        labels:
+          sector: 'legal'
+
+  - job_name: 'paramant-finance'
+    metrics_path: '/metrics'
+    authorization:
+      credentials_file: /etc/prometheus/token
+    static_configs:
+      - targets: ['relay-finance:3003']
+        labels:
+          sector: 'finance'
+
+  - job_name: 'paramant-iot'
+    metrics_path: '/metrics'
+    authorization:
+      credentials_file: /etc/prometheus/token
+    static_configs:
+      - targets: ['relay-iot:3004']
+        labels:
+          sector: 'iot'
