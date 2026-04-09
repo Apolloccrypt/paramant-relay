@@ -360,7 +360,7 @@ After deploying, the following interfaces are available at `https://your-domain`
 | `/ct-log` | Public | Certificate transparency log |
 | `/docs` | Public | API documentation |
 | `/health` | Public | Relay health status |
-| `/r34ct0r` | IP + API key + TOTP | Admin panel |
+| `/admin/` | IP + API key + TOTP | Admin panel |
 
 ---
 
@@ -399,7 +399,7 @@ Cryptographic proof of delivery, visible to anyone.
 
 ---
 
-### Admin Panel — `/r34ct0r`
+### Admin Panel — `/admin/`
 
 **Access:** IP whitelist + enterprise API key + TOTP (6-digit authenticator)
 
@@ -410,7 +410,7 @@ Cryptographic proof of delivery, visible to anyone.
 > ```
 
 **Login flow:**
-1. Go to `https://your-domain/r34ct0r`
+1. Go to `https://your-domain/admin/`
 2. Enter your enterprise API key (`pgp_...`)
 3. Enter 6-digit TOTP code from your authenticator app
 4. Access granted
@@ -447,7 +447,7 @@ TOTP_SECRET=YOUR_BASE32_SECRET
 | `pro` | ✓ | ✓ | ✗ |
 | `enterprise` | ✓ | ✓ | ✓ |
 
-Only enterprise keys can access `/r34ct0r`.
+Only enterprise keys can access `/admin/`.
 
 ---
 
