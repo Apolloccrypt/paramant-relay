@@ -64,6 +64,11 @@ body {
   margin-bottom: 24px;
 }
 .form-group { margin-bottom: 16px; }
+.sector-checks { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.sector-check { display: flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; padding: 6px 10px; cursor: pointer; transition: border-color .15s; user-select: none; }
+.sector-check:hover { border-color: var(--accent); }
+.sector-check input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; margin: 0; }
+.sector-check span { font-size: 12px; font-family: var(--font); color: var(--text); }
 .form-group label {
   display: block;
   font-size: 11px;
@@ -440,14 +445,14 @@ tr:hover td { background: var(--bg2); }
   <div class="modal">
     <h3>Create API Key</h3>
     <div class="form-group">
-      <label>Sector</label>
-      <select id="new-key-sector">
-        <option value="all">All sectors</option>
-        <option value="health">Health</option>
-        <option value="legal">Legal</option>
-        <option value="finance">Finance</option>
-        <option value="iot">IoT</option>
-      </select>
+      <label>Sectors</label>
+      <div class="sector-checks">
+        <label class="sector-check"><input type="checkbox" id="ck-all" onchange="toggleAllSectors(this)"><span>All</span></label>
+        <label class="sector-check"><input type="checkbox" class="ck-sector" value="health" checked><span>Health</span></label>
+        <label class="sector-check"><input type="checkbox" class="ck-sector" value="legal" checked><span>Legal</span></label>
+        <label class="sector-check"><input type="checkbox" class="ck-sector" value="finance" checked><span>Finance</span></label>
+        <label class="sector-check"><input type="checkbox" class="ck-sector" value="iot" checked><span>IoT</span></label>
+      </div>
     </div>
     <div class="form-group">
       <label>Label (customer name)</label>
@@ -664,7 +669,6 @@ async function loadOverview() {
 function selectKeysSector(sector) {
   currentKeysSector = sector;
   document.querySelectorAll('.sector-tab').forEach(el => el.classList.toggle('active', el.dataset.sector === sector));
-  document.getElementById('new-key-sector').value = sector;
   loadKeys(sector);
 }
 
@@ -746,62 +750,79 @@ async function loadKeys(sector) {
 
 // ── Create key ────────────────────────────────────────────────────────────────
 
+function getSelectedSectors() {
+  return [...document.querySelectorAll('.ck-sector:checked')].map(el => el.value);
+}
+
+function toggleAllSectors(cb) {
+  document.querySelectorAll('.ck-sector').forEach(el => el.checked = cb.checked);
+}
+
+function syncAllCheckbox() {
+  const all = document.querySelectorAll('.ck-sector');
+  const checked = document.querySelectorAll('.ck-sector:checked');
+  document.getElementById('ck-all').checked = all.length === checked.length;
+}
+
 function openCreateKeyModal() {
   document.getElementById('new-key-label').value = '';
   document.getElementById('new-key-email').value = '';
-  document.getElementById('new-key-sector').value = currentKeysSector;
   document.getElementById('new-key-result').style.display = 'none';
   document.getElementById('new-key-hint').style.display = 'none';
   document.getElementById('modal-key-error').style.display = 'none';
   document.getElementById('btn-create-key').style.display = 'inline-flex';
+  const preselect = currentKeysSector === 'all' ? ['health','legal','finance','iot'] : [currentKeysSector];
+  document.querySelectorAll('.ck-sector').forEach(el => el.checked = preselect.includes(el.value));
+  document.getElementById('ck-all').checked = preselect.length === 4;
+  document.querySelectorAll('.ck-sector').forEach(el => el.addEventListener('change', syncAllCheckbox));
   openModal('modal-create-key');
 }
 
 async function createKey() {
-  const sector = document.getElementById('new-key-sector').value;
-  const label  = document.getElementById('new-key-label').value.trim();
-  const plan   = document.getElementById('new-key-plan').value;
-  const email  = document.getElementById('new-key-email').value.trim();
-  const errEl  = document.getElementById('modal-key-error');
+  const sectors = getSelectedSectors();
+  const label   = document.getElementById('new-key-label').value.trim();
+  const plan    = document.getElementById('new-key-plan').value;
+  const email   = document.getElementById('new-key-email').value.trim();
+  const errEl   = document.getElementById('modal-key-error');
   errEl.style.display = 'none';
+
+  if (!sectors.length) { showError(errEl, 'Select at least one sector'); return; }
 
   const btn = document.getElementById('btn-create-key');
   btn.textContent = 'Creating…'; btn.disabled = true;
   try {
-    let resultKey = null;
-    if (sector === 'all') {
-      // Maak key op alle sectoren tegelijk
-      const data = await apiFetch('/keys/all', {
-        method: 'POST', body: { label, plan, email: email || undefined },
-      });
-      if (!data || !data.ok || !data.created?.length) {
-        showError(errEl, 'Failed to create on sectors'); return;
-      }
-      resultKey = data.created[0]?.key;
-      const resultEl = document.getElementById('new-key-result');
-      resultEl.textContent = `${resultKey}\n(created on: ${data.created.map(c=>c.sector).join(', ')})`;
-      resultEl.style.display = 'block';
-    } else {
-      const data = await apiFetch(`/sectors/${sector}/keys`, {
-        method: 'POST', body: { label, plan, email: email || undefined },
-      });
+    const resultEl = document.getElementById('new-key-result');
+    let firstKey = null;
+
+    if (sectors.length === 4) {
+      const data = await apiFetch('/keys/all', { method: 'POST', body: { label, plan, email: email || undefined } });
+      if (!data || !data.created?.length) { showError(errEl, 'Failed to create on sectors'); return; }
+      firstKey = data.created[0]?.key;
+      resultEl.textContent = data.created.map(c => `${c.sector}: ${c.key}`).join('\n');
+      if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
+    } else if (sectors.length === 1) {
+      const data = await apiFetch(`/sectors/${sectors[0]}/keys`, { method: 'POST', body: { label, plan, email: email || undefined } });
       if (!data || !data.ok) { showError(errEl, data?.error || 'Failed'); return; }
-      resultKey = data.key;
-      const resultEl = document.getElementById('new-key-result');
-      resultEl.textContent = resultKey;
-      resultEl.style.display = 'block';
+      firstKey = data.key;
+      resultEl.textContent = data.key;
+    } else {
+      const data = await apiFetch('/keys/sectors', { method: 'POST', body: { sectors, label, plan, email: email || undefined } });
+      if (!data || !data.created?.length) { showError(errEl, 'Failed to create on selected sectors'); return; }
+      firstKey = data.created[0]?.key;
+      resultEl.textContent = data.created.map(c => `${c.sector}: ${c.key}`).join('\n');
+      if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
     }
 
+    resultEl.style.display = 'block';
     document.getElementById('new-key-hint').style.display = 'block';
     btn.style.display = 'none';
 
-    if (email && resultKey) {
-      const welcomeSector = sector === 'all' ? 'health' : sector;
-      await apiFetch(`/sectors/${welcomeSector}/keys/welcome`, {
-        method: 'POST', body: { email, key: resultKey, plan, label },
+    if (email && firstKey) {
+      await apiFetch(`/sectors/${sectors[0]}/keys/welcome`, {
+        method: 'POST', body: { email, key: firstKey, plan, label },
       });
     }
-    loadKeys(sector);
+    loadKeys(currentKeysSector);
   } catch (e) {
     showError(errEl, e.message);
   } finally {
