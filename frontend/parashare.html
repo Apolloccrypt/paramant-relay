@@ -405,7 +405,7 @@ async function onKeyInput() {
   }
   setStatus('key-status', 'Checking...');
   try {
-    const r = await fetch(`${RELAY_API}/v2/check-key?k=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(`${RELAY_API}/v2/check-key`, { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(5000) });
     const d = await r.json();
     if (d.valid) {
       setStatus('key-status', `✓ Valid — plan: ${d.plan}`, 'ok');
@@ -471,7 +471,7 @@ function connectWebSocket() {
   // Poll voor receiver pubkey via ghost pipe relay
   let pubkeyPollInterval = setInterval(async () => {
     try {
-      const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}?k=${encodeURIComponent(apiKey)}`, {signal: AbortSignal.timeout(3000)});
+      const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}`, { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(3000) });
       if (r.ok) {
         const d = await r.json();
         if (d.kyber_pub && d.ecdh_pub) {
@@ -728,22 +728,10 @@ async function initGlobe() {
     return;
   }
 
-  // Gebruikerslocatie ophalen (IP-based, privacy-friendly)
-  let userLat = RELAY_LOC.lat + 0.5, userLng = RELAY_LOC.lng - 2; // fallback
+  // Gebruikerslocatie: gebruik relay-locatie als fallback (privacy — geen externe IP lookup)
+  let userLat = RELAY_LOC.lat + 0.5, userLng = RELAY_LOC.lng - 2;
   _gUserLat = userLat; _gUserLng = userLng;
-  let cityLabel = 'Unknown';
-  try {
-    const geo = await Promise.race([
-      fetch('https://ipapi.co/json/').then(r => r.json()),
-      new Promise((_, rej) => setTimeout(() => rej(), 3000))
-    ]);
-    if (geo && geo.latitude) {
-      userLat = geo.latitude; userLng = geo.longitude;
-      _gUserLat = userLat; _gUserLng = userLng;
-      cityLabel = (geo.city || '') + (geo.country_code ? ' · ' + geo.country_code : '');
-    }
-  } catch(e) {}
-  document.getElementById('hud-loc').textContent = cityLabel || 'Unknown';
+  document.getElementById('hud-loc').textContent = 'EU · DE';
 
   const wrap = document.getElementById('globe-canvas-wrap');
 
