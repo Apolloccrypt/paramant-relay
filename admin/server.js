@@ -235,11 +235,14 @@ api.get('/keys/all', authMiddleware, async (req, res) => {
 
 // POST /api/keys/all — create key on ALL sectors with same label/plan
 api.post('/keys/all', authMiddleware, async (req, res) => {
+  // Generate ONE key here and pass it to every relay — prevents each relay generating its own
+  const sharedKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
+  const body = { ...req.body, key: sharedKey };
   const results = {};
   await Promise.allSettled(
     Object.keys(SECTORS).map(async sector => {
       try {
-        const r = await relayFetch(sector, '/v2/admin/keys', 'POST', req.body, false, req.sessionToken);
+        const r = await relayFetch(sector, '/v2/admin/keys', 'POST', body, false, req.sessionToken);
         results[sector] = { status: r.status, data: r.body };
       } catch (e) { results[sector] = { status: 502, data: { error: e.message } }; }
     })
@@ -260,11 +263,13 @@ api.post('/keys/sectors', authMiddleware, async (req, res) => {
   if (!Array.isArray(sectors) || !sectors.length) return res.status(400).json({ error: 'sectors array required' });
   const invalid = sectors.filter(s => !SECTORS[s]);
   if (invalid.length) return res.status(400).json({ error: `Unknown sectors: ${invalid.join(', ')}` });
+  // Generate ONE key and pass it to all selected sectors
+  const sectorBody = { ...body, key: 'pgp_' + crypto.randomBytes(32).toString('hex') };
   const results = {};
   await Promise.allSettled(
     sectors.map(async sector => {
       try {
-        const r = await relayFetch(sector, '/v2/admin/keys', 'POST', body, false, req.sessionToken);
+        const r = await relayFetch(sector, '/v2/admin/keys', 'POST', sectorBody, false, req.sessionToken);
         results[sector] = { status: r.status, data: r.body };
       } catch (e) { results[sector] = { status: 502, data: { error: e.message } }; }
     })
@@ -292,7 +297,23 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
       } catch (e) { results[sector] = { status: 502, ok: false }; }
     })
   );
-  res.json({ ok: true, results });
+  const anyRevoked = Object.values(results).some(r => r.ok);
+  res.status(anyRevoked ? 200 : 502).json({ ok: anyRevoked, results });
+});
+
+// POST /api/reload-all — zero-downtime key reload on all relays (no restart needed)
+api.post('/reload-all', authMiddleware, async (req, res) => {
+  const results = {};
+  await Promise.allSettled(
+    Object.keys(SECTORS).map(async sector => {
+      try {
+        const r = await relayFetch(sector, '/v2/reload-users', 'POST', {}, false, req.sessionToken);
+        results[sector] = r.body;
+      } catch (e) { results[sector] = { error: e.message }; }
+    })
+  );
+  const ok = Object.values(results).every(r => r.ok);
+  res.json({ ok, results });
 });
 
 app.use(`${BASE_PATH}/api`, api);

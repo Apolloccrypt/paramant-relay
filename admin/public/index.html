@@ -415,6 +415,10 @@ tr:hover td { background: var(--bg2); }
   <main>
     <!-- DASHBOARD TAB -->
     <div class="tab-content active" id="tab-overview">
+      <div class="section-header" style="margin-bottom:16px">
+        <div class="section-title">Relay overview</div>
+        <button class="btn btn-sm" id="btn-reload-all" onclick="reloadAllRelays()" title="Reload users.json on all relays without restart">⟳ Sync keys</button>
+      </div>
       <div class="overview-grid" id="overview-grid">
         <div class="loading">Loading stats…</div>
       </div>
@@ -885,6 +889,24 @@ async function sendWelcome() {
   if (!data || !data.ok) { showError(errEl, data?.error || 'Failed to send'); return; }
   okEl.textContent = `Email sent to ${email}`;
   okEl.style.display = 'block';
+}
+
+// ── Reload all relays (zero-downtime key sync) ────────────────────────────────
+
+async function reloadAllRelays() {
+  const btn = document.getElementById('btn-reload-all');
+  btn.textContent = '⟳ Syncing…'; btn.disabled = true;
+  try {
+    const data = await apiFetch('/reload-all', { method: 'POST', body: {} });
+    if (!data) { btn.textContent = '✗ Failed'; return; }
+    const counts = Object.entries(data.results || {})
+      .map(([s, r]) => `${s}:${r.loaded ?? '?'}`).join(' ');
+    btn.textContent = `✓ Synced (${counts})`;
+    setTimeout(() => { btn.textContent = '⟳ Sync keys'; btn.disabled = false; }, 3000);
+    loadOverview();
+  } catch(e) {
+    btn.textContent = '✗ Error'; btn.disabled = false;
+  }
 }
 
 // ── Auto refresh ──────────────────────────────────────────────────────────────
