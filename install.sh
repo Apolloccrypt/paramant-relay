@@ -276,13 +276,13 @@ if [[ -f "${CERT_PATH}/fullchain.pem" ]]; then
   ln -sf "${CERT_PATH}/privkey.pem"   "${INSTALL_DIR}/deploy/certs/key.pem"
   ok "Certificate obtained and linked"
 
-  # Auto-renewal hook
-  cat > /etc/letsencrypt/renewal-hooks/deploy/paramant-reload.sh <<'HOOK'
+  # Auto-renewal hook — uses INSTALL_DIR baked in at install time
+  cat > /etc/letsencrypt/renewal-hooks/deploy/paramant-reload.sh <<HOOK
 #!/bin/bash
-DOMAIN=$(basename $RENEWED_LINEAGE)
-ln -sf "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" /opt/paramant/deploy/certs/cert.pem
-ln -sf "/etc/letsencrypt/live/${DOMAIN}/privkey.pem"   /opt/paramant/deploy/certs/key.pem
-docker compose -f /opt/paramant/docker-compose.yml exec nginx nginx -s reload 2>/dev/null || true
+DOMAIN=\$(basename \$RENEWED_LINEAGE)
+ln -sf "/etc/letsencrypt/live/\${DOMAIN}/fullchain.pem" "${INSTALL_DIR}/deploy/certs/cert.pem"
+ln -sf "/etc/letsencrypt/live/\${DOMAIN}/privkey.pem"   "${INSTALL_DIR}/deploy/certs/key.pem"
+docker compose -f "${INSTALL_DIR}/docker-compose.yml" exec nginx nginx -s reload 2>/dev/null || true
 HOOK
   chmod +x /etc/letsencrypt/renewal-hooks/deploy/paramant-reload.sh
   ok "Auto-renewal hook installed"

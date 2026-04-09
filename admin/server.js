@@ -75,7 +75,15 @@ function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 const app = express();
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '1mb' }));
+
+// Security headers for all responses
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
 
 // Serve static files at BASE_PATH
 app.use(BASE_PATH || '/', express.static(path.join(__dirname, 'public')));
@@ -223,7 +231,7 @@ api.get('/keys/all', authMiddleware, async (req, res) => {
   res.json({ ok: true, sectors: results });
 });
 
-// POST /api/keys/all — maak key op ALLE sectoren aan met zelfde label/plan
+// POST /api/keys/all — create key on ALL sectors with same label/plan
 api.post('/keys/all', authMiddleware, async (req, res) => {
   const results = {};
   await Promise.allSettled(
@@ -234,11 +242,14 @@ api.post('/keys/all', authMiddleware, async (req, res) => {
       } catch (e) { results[sector] = { status: 502, data: { error: e.message } }; }
     })
   );
-  // Succesvolle keys samenvoegen voor de response
   const created = Object.entries(results)
     .filter(([, v]) => v.status === 200 || v.status === 201)
     .map(([sector, v]) => ({ sector, key: v.data?.key }));
-  res.json({ ok: created.length > 0, created, results });
+  const failed = Object.entries(results)
+    .filter(([, v]) => v.status !== 200 && v.status !== 201)
+    .map(([sector, v]) => ({ sector, error: v.data?.error || `HTTP ${v.status}` }));
+  const allOk = failed.length === 0;
+  res.status(allOk ? 200 : 207).json({ ok: allOk, created, failed, results });
 });
 
 // POST /api/keys/all/revoke — revoke key op ALLE sectoren

@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up QEMU (for ARM64 cross-build)
         uses: docker/setup-qemu-action@v4
@@ -41,10 +41,14 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
+            IS_RELEASE=true
           else
-            VERSION="latest"
+            VERSION="$(git rev-parse --short HEAD)"
+            IS_RELEASE=false
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "push_latest=$([[ "$GITHUB_REF" == refs/heads/main || "$IS_RELEASE" == true ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -54,13 +58,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            mtty001/relay:latest
-            ${{ steps.meta.outputs.version != 'latest' && format('mtty001/relay:{0}', steps.meta.outputs.version) || '' }}
+            ${{ steps.meta.outputs.push_latest == 'true' && 'mtty001/relay:latest' || '' }}
+            ${{ steps.meta.outputs.is_release == 'true' && format('mtty001/relay:{0}', steps.meta.outputs.version) || format('mtty001/relay:sha-{0}', steps.meta.outputs.version) }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp || github.run_id }}
 
       - name: Image digest
         run: echo "Pushed ${{ steps.meta.outputs.version }} — digest available in job summary"

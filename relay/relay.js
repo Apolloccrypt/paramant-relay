@@ -1,6 +1,8 @@
 /**
  * PARAMANT Ghost Pipe Relay v2.2.1
- * 
+ * NOTE: This is the canonical relay used by the Docker image (CMD ["node", "relay.js"]).
+ * ghost-pipe-relay.js is the development/experimental variant — do not confuse the two.
+ *
  * Post-Quantum Transport Protocol
  * "New HTTPS — decentralized, zero-plaintext, quantum-safe"
  * 
