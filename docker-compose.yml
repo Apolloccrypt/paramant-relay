@@ -45,6 +45,8 @@ x-relay-env: &relay-env
   RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
   LOG_LEVEL: "${LOG_LEVEL:-info}"
   RESEND_API_KEY: "${RESEND_API_KEY:-}"
+  MAX_KEYS: "${MAX_KEYS:-50}"
+  PARAMANT_LICENSE: "${PARAMANT_LICENSE:-}"
 
 # ── Shared logging ────────────────────────────────────────────────────────────
 x-relay-logging: &relay-logging
