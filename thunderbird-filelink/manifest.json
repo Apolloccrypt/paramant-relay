@@ -26,5 +26,6 @@
     "https://iot.paramant.app/*",
     "https://paramant-ghost-pipe.fly.dev/*",
     "https://paramant.app/rp/*"
-  ]
+  ],
+  "license": "AGPL-3.0-only"
 }
