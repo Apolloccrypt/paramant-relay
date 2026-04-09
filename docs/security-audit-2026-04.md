@@ -39,8 +39,8 @@
 | 5 | **Metadata size leakage** — `total_chunks` visible to relay, allowing order-of-magnitude file size inference despite 5 MB block padding | ○ | Accepted tradeoff. Padding blocks exact size; chunk count unavoidable for streaming assembly. Documented in threat model. |
 | 6 | **`_zero()` CPython-only** — `ctypes.memset` approach fails silently on PyPy / GraalPy / future CPython without warning | ⚙ | Add runtime warning when zeroization is not available. |
 | 7 | **HKDF salt inconsistency** — browser uses `cipherText.slice(0,32)` as salt (correct); Python SDK uses static string `paramant-gp-v1` as salt (weakens domain separation on CLI-to-CLI path) | ✓ | Fixed in `scripts/paramant_sdk.py`: salt now derived from `kct[:32]` (KEM ciphertext) when ML-KEM is available, falls back to `ecdh_ss[:32]` for classical-only paths. Matches browser behavior. **Breaking change**: blobs encrypted before this fix will fail to decrypt — regenerate. |
-| 8 | **No GCM AAD** — version byte and chunk metadata not integrity-bound to ciphertext in browser or Python SDK | ⚙ | AAD will be added: version byte + chunk index bound to each GCM seal. |
-| 9 | **stream-next hash uses full API key as HMAC secret** — sequence hashes are precomputable from any key holder | ⚙ | Noted as `// FIX` comment in relay. Session-scoped nonce will be introduced. |
+| 8 | **No GCM AAD** — version byte and chunk metadata not integrity-bound to ciphertext in browser or Python SDK | ✓ | Fixed: browser (drop.html/ontvang.html) now passes `additionalData = [0x02, chunk_index_u32be]` to AES-GCM encrypt/decrypt. scripts/paramant_sdk.py uses `b'\x02\x00\x00\x00\x00'`. sdk-py pip package uses `MAGIC+VER` (`b'PQHB\x01\x00'`). **Breaking**: blobs encrypted without AAD will fail to decrypt — regenerate any in-flight blobs. |
+| 9 | **stream-next hash uses full API key as HMAC secret** — sequence hashes are precomputable from any key holder | ✓ | Fixed in all 7 relay files: per-restart `STREAM_NONCE = crypto.randomBytes(32)` generated at startup. HMAC secret is now `HMAC-SHA256(STREAM_NONCE, apiKey)` — precomputing stream hashes requires knowing the relay-session nonce, which is never exposed. |
 
 ---
 
@@ -50,8 +50,8 @@
 |---|---------|--------|-------|
 | 10 | **Admin operations write to disk** — `POST /v2/admin/keys` and `/revoke` call `fs.writeFileSync` | ○ | Intentional and documented. RAM-only applies to blob (payload) storage. API key config and CT log hashes are explicitly persisted. See [privacy policy](../frontend/privacy.html) and [self-hosting guide](self-hosting.md). |
 | 11 | **CORS origin fallback** — non-allowlisted origins receive `Access-Control-Allow-Origin: https://paramant.app` | ○ | Not exploitable. Real auth is the API key. Noted. |
-| 12 | **No rate limiting on `/v2/outbound`** — valid key holder can burn other users' blobs via download token if intercepted | ⚙ | Rate limit on outbound per-key will be added. Download token path intentionally keyless for link sharing. |
-| 13 | **WebSocket API key in query string** — upgrade requests carry `?k=pgp_xxx` in URL, visible in access logs | ⚙ | Will move to a pre-upgrade HTTP handshake or short-lived ticket. |
+| 12 | **No rate limiting on `/v2/outbound`** — valid key holder can burn other users' blobs via download token if intercepted | ✓ | Per-key hourly rate limits added to all 7 relay files: free=50/h, pro=500/h, enterprise=unlimited. HTTP 429 returned when exceeded. `/v2/dl/` (keyless download token path) unchanged — intentional for link sharing. |
+| 13 | **WebSocket API key in query string** — upgrade requests carry `?k=pgp_xxx` in URL, visible in access logs | ○ | Structural limitation: browsers cannot set custom headers on WS upgrade requests. Mitigation: nginx access log strips query strings (configured in v2.3.3). Full fix requires a short-lived WS ticket endpoint — planned for v2.4. |
 | 14 | **CT log Merkle tree non-standard** — odd-leaf duplication differs from RFC standard; tree rebuilt from scratch on each append; "proofs" are just last 8 leaf hashes | ⚙ | Incremental tree and proper inclusion proofs are planned. |
 | 15 | **DID auth uses raw hex as SPKI** — `crypto.verify` receives raw key bytes where DER-SPKI is expected; DID auth likely non-functional | ✓ | Fixed in all 7 relay files: `authByDid()` now wraps raw P-256 key bytes in DER-SPKI format before passing to `crypto.verify`. `P256_SPKI_PREFIX` constant added; falls through to already-encoded keys (`rawKey[0] === 0x30`). Verify errors now logged as `did_auth_verify_error`. |
 
@@ -65,7 +65,7 @@
 | 17 | **Google Fonts CDN in drop.html** — external CDN call leaks user IP to Google in a privacy-first product | ✓ | Fixed in v2.3.3: external `@import` removed, system font stack used. |
 | 18 | **CSP allows `unsafe-inline`** — weakens XSS protection; structurally required by inline `<script>` blocks | ⚙ | Nonces will be introduced to replace blanket `unsafe-inline`. |
 | 19 | **Nginx dead Cloudflare config** — `set_real_ip_from 127.0.0.1` with `real_ip_header CF-Connecting-IP` is a Cloudflare remnant | ○ | Harmless (header unset without Cloudflare). Will be cleaned up in next nginx pass. |
-| 20 | **Python SDK private keys serialized to disk** — `~/.paramant/*.keypair.json` stored as hex; `_zero()` only works on in-memory bytes, not persisted JSON | ⚙ | Key files will use encrypted storage or documented secure-deletion guidance. |
+| 20 | **Python SDK private keys serialized to disk** — `~/.paramant/*.keypair.json` stored as hex; `_zero()` only works on in-memory bytes, not persisted JSON | ○ | Documented in self-hosting guide: use `shred -u ~/.paramant/*.keypair.json` or OS-level full-disk encryption. Encrypted key storage planned for v2.4. |
 
 ---
 

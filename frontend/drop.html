@@ -1010,7 +1010,9 @@ async function sendFile() {
       }));
       const payload = concat(META_MAGIC, u32be(metaBytes.length), metaBytes, chunkData);
       const nonce = crypto.getRandomValues(new Uint8Array(12));
-      const ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce}, aesKey, payload));
+      // AAD = [version_byte(1)] + [chunk_index_u32be(4)] — binds version+order to ciphertext (finding #8)
+      const aad = new Uint8Array(5); aad[0] = 0x02; new DataView(aad.buffer).setUint32(1, i, false);
+      const ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce,additionalData:aad}, aesKey, payload));
 
       const packet = concat(new Uint8Array([0x02]), u32be(cipherText.length), cipherText, u32be(senderPubRaw.length), senderPubRaw, nonce, u32be(ct.length), ct);
       const padded = new Uint8Array(BLOCK);

@@ -25,6 +25,8 @@ const path   = require('path');
 const url_   = require('url');
 
 const VERSION    = '2.3.3';
+// Per-restart nonce: stream-next hashes non-precomputable even if API key is known
+const STREAM_NONCE = crypto.randomBytes(32);
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
@@ -93,7 +95,8 @@ async function natsPush(apiKey, deviceId, hash, size) {
     const { StringCodec } = require('nats');
     const sc = StringCodec();
     await natsJs.publish(
-      `paramant.${apiKey.slice(0,12)}.${deviceId}`,
+      // Hash key+device to avoid partial API key exposure in NATS subjects (finding)
+      `paramant.${crypto.createHash('sha256').update(apiKey).digest('hex').slice(0,16)}.${crypto.createHash('sha256').update(deviceId).digest('hex').slice(0,16)}`,
       sc.encode(JSON.stringify({ hash, size, ts: new Date().toISOString() }))
     );
   } catch(e) {}
@@ -376,6 +379,22 @@ function verifyDsaSignature(payload, signature, pubKeyHex) {
 // ── Relay stats ───────────────────────────────────────────────────────────────
 let stats = { inbound: 0, outbound: 0, burned: 0, webhooks_sent: 0, bytes_in: 0, bytes_out: 0 };
 let inFlightInbound = 0;
+
+// ── Per-key outbound rate limiting (finding #12) ──────────────────────────────
+const OUTBOUND_RATE = { free: 50, pro: 500, enterprise: Infinity };
+const OUTBOUND_RATE_WINDOW_MS = 60 * 60 * 1000;
+const outboundRateMap = new Map();
+function outboundRateOk(apiKey, plan) {
+  const max = OUTBOUND_RATE[plan] ?? OUTBOUND_RATE.free;
+  if (max === Infinity) return true;
+  const now = Date.now();
+  let c = outboundRateMap.get(apiKey);
+  if (!c || now > c.resetAt) { c = { count: 0, resetAt: now + OUTBOUND_RATE_WINDOW_MS }; }
+  if (c.count >= max) return false;
+  c.count++; outboundRateMap.set(apiKey, c);
+  return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
@@ -822,6 +841,10 @@ const server = http.createServer(async (req, res) => {
     const entry = blobStore.get(outm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
+    if (!outboundRateOk(apiKey, keyData?.plan)) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Outbound rate limit exceeded. Retry after the hourly window resets.' }));
+    }
     const data = Buffer.from(entry.blob);
     blobStore.delete(outm[1]);
     try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
@@ -863,8 +886,10 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/stream-next ──────────────────────────────────────────────────────
   if (path === '/v2/stream-next') {
     const device = query.device || ''; const seq = parseInt(query.seq || '0');
-    const secret = apiKey; const next = seq + 1; // FIX: volledige key als HMAC secret
-    const h = crypto.createHmac('sha256', Buffer.from(secret)).update(`${device}|${next}`).digest('hex');
+    const next = seq + 1;
+    // HMAC secret = STREAM_NONCE+apiKey — non-precomputable without relay-session nonce (finding #9)
+    const streamSecret = crypto.createHmac('sha256', STREAM_NONCE).update(apiKey).digest();
+    const h = crypto.createHmac('sha256', streamSecret).update(`${device}|${next}`).digest('hex');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, device, seq: next, hash: h, available: blobStore.has(h) }));
   }

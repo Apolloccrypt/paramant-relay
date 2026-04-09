@@ -272,9 +272,10 @@ class GhostPipe:
             salt = kct[:32] if kct else ecdh_ss[:32]
             ss   = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
                              salt=salt, info=b'aes-key', backend=be).derive(ikm)
-            # AES-256-GCM
+            # AES-256-GCM — AAD binds version+chunk to ciphertext (finding #8)
             nonce  = os.urandom(12)
-            ct     = c['AES'](ss).encrypt(nonce, data, None)
+            aad    = b'\x02\x00\x00\x00\x00'  # version 0x02 + chunk_index 0 (single-chunk)
+            ct     = c['AES'](ss).encrypt(nonce, data, aad)
             bundle = struct.pack('>I', len(eph_b)) + eph_b + struct.pack('>I', len(kct)) + kct
             packet = struct.pack('>I', len(bundle)) + bundle + nonce + struct.pack('>I', len(ct)) + ct
             target = pad_block or BLOCK
@@ -313,7 +314,8 @@ class GhostPipe:
             salt = kct[:32] if kct else ecdh_ss[:32]
             ss   = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
                              salt=salt, info=b'aes-key', backend=be).derive(ikm)
-            return c['AES'](ss).decrypt(nonce, ct, None)
+            aad  = b'\x02\x00\x00\x00\x00'  # version 0x02 + chunk_index 0
+            return c['AES'](ss).decrypt(nonce, ct, aad)
         finally:
             for b in (ecdh_ss, kss, ikm, ss):
                 if b: _zero(b)

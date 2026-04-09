@@ -258,9 +258,10 @@ class GhostPipe:
             key  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
                               salt=salt, info=b'paramant-ghost-pipe-v1',
                               backend=be).derive(ikm)
-            # AES-256-GCM
-            iv = os.urandom(12)
-            ct = c['AES'](key).encrypt(iv, plaintext, None)
+            # AES-256-GCM — AAD = MAGIC+VER binds ciphertext to protocol/version (finding #8)
+            iv  = os.urandom(12)
+            aad = MAGIC + VER  # b'PQHB\x01\x00' — public but authenticated
+            ct  = c['AES'](key).encrypt(iv, plaintext, aad)
             tag = ct[-16:]
             enc = ct[:-16]  # AESGCM appends tag; separate for wire format
 
@@ -300,9 +301,10 @@ class GhostPipe:
             key  = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
                               salt=salt, info=b'paramant-ghost-pipe-v1',
                               backend=be).derive(ecdh_ss)
-            # Reattach tag for AESGCM decrypt
+            # Reattach tag for AESGCM decrypt — AAD must match encrypt side
+            aad = MAGIC + VER
             try:
-                return c['AES'](key).decrypt(iv, enc + tag, None)
+                return c['AES'](key).decrypt(iv, enc + tag, aad)
             except Exception:
                 raise GhostPipeError(
                     'Ontsleuteling mislukt — verkeerde sleutel of beschadigde blob',

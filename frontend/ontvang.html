@@ -387,8 +387,9 @@ async function receiveFile(msg, kyberSec, ecdhPriv, opts = {}) {
         hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
       );
 
-      // Decrypt
-      const plainPadded = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, aesKey, ct));
+      // Decrypt — AAD must match encrypt side: [version(1)][chunk_index_u32be(4)]
+      const aad = new Uint8Array(5); aad[0] = 0x02; new DataView(aad.buffer).setUint32(1, i, false);
+      const plainPadded = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad }, aesKey, ct));
 
       // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
       const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
