@@ -23,7 +23,7 @@ const https  = require('https');
 const fs     = require('fs');
 const url_   = require('url');
 
-const VERSION    = '2.3.1';
+const VERSION    = '2.3.2';
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
@@ -275,8 +275,10 @@ function ramStats() {
 
 function ramOk() {
   const { rssMB, blobCount } = ramStats();
-  if (blobCount >= MAX_BLOBS) return false;
-  if (rssMB + BLOB_SIZE_MB > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  // Account for in-flight uploads: each one will allocate up to BLOB_SIZE_MB
+  const effective = blobCount + inFlightInbound;
+  if (effective >= MAX_BLOBS) return false;
+  if (rssMB + BLOB_SIZE_MB * (inFlightInbound + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
   return true;
 }
 
@@ -284,13 +286,14 @@ function ramStatus() {
   const s = ramStats();
   return {
     blobs_in_flight:  s.blobCount,
+    blobs_uploading:  inFlightInbound,
     blobs_max:        MAX_BLOBS,
     blob_ram_mb:      s.blobMB,
     heap_mb:          s.heapMB,
     rss_mb:           s.rssMB,
     ram_limit_mb:     RAM_LIMIT_MB,
     ram_ok:           ramOk(),
-    available_slots:  Math.max(0, MAX_BLOBS - s.blobCount),
+    available_slots:  Math.max(0, MAX_BLOBS - s.blobCount - inFlightInbound),
   };
 }
 
@@ -376,6 +379,10 @@ function verifyDsaSignature(payload, signature, pubKeyHex) {
 
 // ── Relay stats ───────────────────────────────────────────────────────────────
 let stats = { inbound: 0, outbound: 0, burned: 0, webhooks_sent: 0, bytes_in: 0, bytes_out: 0 };
+// In-flight inbound counter: incremented BEFORE readBody(), decremented after blob stored.
+// This closes the TOCTOU window where many concurrent requests all pass ramOk() before
+// any body allocation, allowing RSS to exceed the configured limit.
+let inFlightInbound = 0;
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
@@ -390,12 +397,22 @@ function loadUsers() {
   } catch(e) { log('warn', 'no_users_file'); }
 }
 
+// Pubkey plan limits and TTL
+const _pubkeyTtl = { free: 7 * 86_400_000, pro: 30 * 86_400_000, enterprise: 365 * 86_400_000 };
+const _pubkeyMax = { free: 5, pro: 50, enterprise: Infinity };
+const INVITE_PUBKEY_TTL = 3_600_000; // 1 hour
+
 // TTL flush
 setInterval(() => {
   // Clean freeRateLimits entries older than yesterday
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
   for (const [k, v] of freeRateLimits.entries()) {
     if (v.date < yesterday) freeRateLimits.delete(k);
+  }
+  // Clean expired pubkeys
+  const now = Date.now();
+  for (const [k, v] of pubkeys.entries()) {
+    if (v.expires && now > v.expires) pubkeys.delete(k);
   }
 }, 3600000);
 
@@ -497,6 +514,11 @@ const server = http.createServer(async (req, res) => {
 
   incMetric('requests_total');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  // Root path: return minimal public relay info (used by website "Live on X" links)
+  if (path === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, relay: SECTOR, version: VERSION, status: 'operational', protocol: 'ghost-pipe-v2', docs: 'https://paramant.app/docs' }));
+  }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
 
   // ── GET /health ─────────────────────────────────────────────────────────────
@@ -586,10 +608,8 @@ const server = http.createServer(async (req, res) => {
     }
     // Mark als gebruikt VOOR het sturen (burn-on-read)
     td.used = true;
-    const data = Buffer.from(entry.blob);
+    const blob = entry.blob;
     blobStore.delete(td.hash);
-    try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
-    try { entry.blob.fill(0); } catch {}
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
@@ -597,7 +617,7 @@ const server = http.createServer(async (req, res) => {
       'X-Burned': 'true',
       'X-Hash': td.hash,
     });
-    return res.end(data);
+    return res.end(blob, () => { try { blob.fill(0); } catch {} });
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
@@ -616,7 +636,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/reload-users — Zero-downtime API key reload ─────────────────
   if (path === '/v2/reload-users' && req.method === 'POST') {
     const tok = (req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ','')||'').trim();
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     if (process.env.USERS_JSON) {
@@ -640,21 +660,34 @@ const server = http.createServer(async (req, res) => {
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
       if (INVITE_RE.test(d.device_id)) {
         // Store without API key suffix — readable by any party who knows the session token
-        pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', ts: new Date().toISOString() });
+        pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', ts: new Date().toISOString(), expires: Date.now() + INVITE_PUBKEY_TTL });
         log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12) });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(J({ ok: true }));
       }
       // Non-invite: require valid API key
       if (!keyData?.active) { res.writeHead(401); return res.end(J({ error: 'Invalid API key' })); }
+      // Per-plan device registration limit
+      const plan = keyData.plan || 'free';
+      const maxDevices = _pubkeyMax[plan] ?? _pubkeyMax.free;
+      if (maxDevices !== Infinity) {
+        const keyPrefix = `:${apiKey}`;
+        let deviceCount = 0;
+        for (const k of pubkeys.keys()) { if (k.endsWith(keyPrefix)) deviceCount++; }
+        if (deviceCount >= maxDevices) {
+          res.writeHead(429); return res.end(J({ error: `Device limit reached. Max ${maxDevices} devices on ${plan} plan.`, limit: maxDevices, plan }));
+        }
+      }
+      const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
       pubkeys.set(`${d.device_id}:${apiKey}`, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
         dsa_pub:  d.dsa_pub  || '',
-        ts: new Date().toISOString()
+        ts: new Date().toISOString(),
+        expires: Date.now() + ttl,
       });
-      log('info', 'pubkey_registered', { device: d.device_id, kyber: !!d.kyber_pub, dsa: !!d.dsa_pub });
+      log('info', 'pubkey_registered', { device: d.device_id, kyber: !!d.kyber_pub, dsa: !!d.dsa_pub, plan, ttl_days: Math.round(ttl/86400000) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, dsa_supported: !!mlDsa, ct_index: ctEntry.index, ct_tree_hash: ctEntry.tree_hash, attested: attestResult.valid, attestation_method: attestResult.method || null }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -665,10 +698,13 @@ const server = http.createServer(async (req, res) => {
   if (pkm && req.method === 'GET') {
     const deviceId = decodeURIComponent(pkm[1]);
     // Invite sessions: stored and retrieved without API key
-    const entry = INVITE_RE.test(deviceId)
-      ? pubkeys.get(deviceId)
-      : pubkeys.get(`${deviceId}:${query.k || apiKey}`);
+    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${query.k || apiKey}`;
+    const entry = pubkeys.get(_pkKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device. Start receiver first.' })); }
+    if (entry.expires && Date.now() > entry.expires) {
+      pubkeys.delete(_pkKey);
+      res.writeHead(404); return res.end(J({ error: 'Pubkey registration expired. Re-register the device.' }));
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub || '', ts: entry.ts }));
   }
@@ -691,6 +727,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/inbound — Upload versleuteld blok + optioneel ML-DSA handtekening
   if (path === '/v2/inbound' && req.method === 'POST') {
+    // ramOk() now accounts for inFlightInbound so the check is admission-safe
     if (!ramOk()) {
       const r = ramStatus();
       res.writeHead(503, {
@@ -707,11 +744,15 @@ const server = http.createServer(async (req, res) => {
         blobs_in_flight: r.blobs_in_flight,
       }));
     }
+    if (keyData?.plan === 'free' && !checkFreeRateLimit(apiKey)) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+      return res.end(JSON.stringify({ error: 'Free tier limit reached (5 uploads/day)', retry_after_s: 86400 }));
+    }
+    // Reserve slot BEFORE awaiting body — closes TOCTOU window under concurrency.
+    // Node.js is single-threaded so check + increment is atomic; no request can
+    // interleave between these two lines.
+    inFlightInbound++;
     try {
-      if (keyData?.plan === 'free' && !checkFreeRateLimit(apiKey)) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
-        return res.end(JSON.stringify({ error: 'Free tier limit reached (5 uploads/day)', retry_after_s: 86400 }));
-      }
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
       const { hash, payload, ttl_ms, meta, dsa_signature } = d;
@@ -763,6 +804,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid, download_token: dlToken }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    finally { inFlightInbound--; }
   }
 
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
@@ -771,17 +813,15 @@ const server = http.createServer(async (req, res) => {
     const entry = blobStore.get(outm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
-    const data = Buffer.from(entry.blob);
+    const blob = entry.blob;
     blobStore.delete(outm[1]);
-    try { entry.blob.fill(crypto.randomFillSync(Buffer.alloc(4))[0]); } catch {}
-    try { entry.blob.fill(0); } catch {}
-    incMetric('blobs_burned'); incMetric('bytes_out_total', data.length);
-    stats.outbound++; stats.burned++; stats.bytes_out += data.length;
-    auditAppend(apiKey, 'outbound_burn', { hash: outm[1].slice(0,16)+'...', bytes: data.length });
+    incMetric('blobs_burned'); incMetric('bytes_out_total', blob.length);
+    stats.outbound++; stats.burned++; stats.bytes_out += blob.length;
+    auditAppend(apiKey, 'outbound_burn', { hash: outm[1].slice(0,16)+'...', bytes: blob.length });
     log('info', 'blob_burned', { hash: outm[1].slice(0,16) });
-    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': data.length,
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': blob.length,
                           'X-Paramant-Burned': 'true', 'X-Paramant-Hash': outm[1] });
-    return res.end(data);
+    return res.end(blob, () => { try { blob.fill(0); } catch {} });
   }
 
   // ── GET /v2/status/:hash ─────────────────────────────────────────────────────
@@ -847,7 +887,8 @@ const server = http.createServer(async (req, res) => {
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
       didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
-      pubkeys.set(`${d.device_id}:${apiKey}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString() });
+      const _didPlan = keyData?.plan || 'free';
+      pubkeys.set(`${d.device_id}:${apiKey}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
       auditAppend(apiKey, 'did_registered', { did, device: d.device_id });
@@ -913,7 +954,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const tok = req.headers['x-admin-token'] || '';
-      if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
+      if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
         res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
       }
       const valid = verifyTotp(d.totp_code || '');
@@ -926,7 +967,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
@@ -942,7 +983,7 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
@@ -955,7 +996,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) {
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     try {
@@ -977,7 +1018,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
   if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
     const tok = req.headers['x-admin-token'] || '';
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || '') && apiKeys.get(tok)?.plan !== 'enterprise')) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
