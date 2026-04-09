@@ -492,7 +492,12 @@ const server = http.createServer(async (req, res) => {
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
-  const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
+  // ADMIN_TOKEN via X-Admin-Token or Authorization: Bearer grants enterprise access
+  const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
+  const isAdminToken = !!adminHeader && !!process.env.ADMIN_TOKEN && adminHeader === process.env.ADMIN_TOKEN;
+  const keyData = apiKeys.get(apiKey)
+    || (isAdminToken ? { plan: 'enterprise', active: true, label: 'admin' } : null)
+    || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
 
   incMetric('requests_total');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
