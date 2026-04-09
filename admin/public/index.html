@@ -607,7 +607,7 @@ async function loadOverview() {
 
     const uptime = m.paramant_uptime_s != null ? fmtUptime(m.paramant_uptime_s) : '—';
     const requests = m.paramant_requests_total != null ? fmtNum(m.paramant_requests_total) : '—';
-    const burned   = m.paramant_blobs_burned_total != null ? fmtNum(m.paramant_blobs_burned_total) : '—';
+    const burned   = m.paramant_blobs_burned != null ? fmtNum(m.paramant_blobs_burned) : '—';
     const inFlight = m.paramant_blobs_in_flight != null ? fmtNum(m.paramant_blobs_in_flight) : '—';
     const errors   = m.paramant_errors_total != null ? fmtNum(m.paramant_errors_total) : '—';
     const heap     = m.paramant_heap_bytes != null ? fmtBytes(m.paramant_heap_bytes) : '—';
