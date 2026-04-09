@@ -47,6 +47,7 @@ Security researchers and contributors who have helped make PARAMANT better:
 
 | Researcher | Handle | Contribution | Date |
 |------------|--------|--------------|------|
+| Raymond Zwarts | [@rzwarts74](https://github.com/rzwarts74) | Independent security research — RAM admission TOCTOU (P1/High), download handlers duplicate blobs in RAM (P2/Medium), pubkeys Map unbounded — no TTL/device cap (P3/Medium), SSRF via webhook URL registration (P4/High) · All 4 patched in v2.3.2 | April 2026 |
 | Ryan Williams | [@scs-labrat](https://github.com/scs-labrat) | Independent security review — 4 critical · 5 high · 6 medium · 5 low (20 findings total) · [Smart Cyber Solutions](https://www.linkedin.com/in/ryan-williams-4068351b8/) | April 2026 |
 | Hendrik Bruinsma | [@readefries](https://github.com/readefries) | Thunderbird FileLink add-on (built & contributed); security review: Argon2 race condition (MEDIUM), `/health` info leak (MEDIUM), `X-Paramant-Views-Left` header leak (MEDIUM), `/v2/ct/proof` routing (LOW), stale CSP domain (LOW); bug reports: QR code display bug, ParaDrop fingerprint mismatch on refresh, receiver stuck at fingerprint verification, preload burn bug | April 2026 |
 
