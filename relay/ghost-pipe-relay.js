@@ -246,12 +246,14 @@ function verifyTotp(token) {
 // ── Download tokens — one-time public download links
 const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 
-// Cleanup expired tokens elke 60s
+// Cleanup expired download tokens every 60s
 setInterval(() => {
   const now = Date.now();
+  let cleaned = 0;
   for (const [t, d] of downloadTokens.entries()) {
-    if (d.used || now > d.expires_ms) downloadTokens.delete(t);
+    if (d.used || now > d.expires_ms) { downloadTokens.delete(t); cleaned++; }
   }
+  if (cleaned > 0) log('debug', 'gc_tokens', { removed: cleaned, remaining: downloadTokens.size });
 }, 60000);
 
 
@@ -338,8 +340,11 @@ const pubkeys    = new Map();  // device:key → {ecdh_pub, kyber_pub, dsa_pub, 
 const webhooks   = new Map();  // device:key → [{url, secret}]
 const auditChain = new Map();  // key → Merkle chain [{ts,event,hash,bytes,device,prev_hash,chain_hash}]
 
+const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
+const LOG_LEVEL  = LOG_LEVELS[process.env.LOG_LEVEL?.toLowerCase()] ?? LOG_LEVELS.info;
+
 function log(level, msg, data = {}) {
-  if (typeof msg === 'string')
+  if (typeof msg === 'string' && (LOG_LEVELS[level] ?? 1) >= LOG_LEVEL)
     console.log(JSON.stringify({ ts: new Date().toISOString(), level, msg, v: VERSION, ...data }));
 }
 

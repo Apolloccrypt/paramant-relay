@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-alpine3.21
 
 LABEL org.opencontainers.image.title="paramant-relay" \
       org.opencontainers.image.version="2.2.1" \
