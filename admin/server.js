@@ -172,7 +172,9 @@ function parseMetrics(text) {
     if (!line || line.startsWith('#')) continue;
     const sp = line.lastIndexOf(' ');
     if (sp < 0) continue;
-    const name = line.slice(0, sp).trim();
+    // Strip Prometheus labels: "metric_name{label="val"} 42" → "metric_name"
+    const rawName = line.slice(0, sp).trim();
+    const name = rawName.replace(/\{[^}]*\}/, '');
     const val  = parseFloat(line.slice(sp + 1));
     if (!isNaN(val)) m[name] = val;
   }
