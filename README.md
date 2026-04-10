@@ -3,7 +3,7 @@
 **Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
 
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.4.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.1-brightgreen.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 [![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
 [![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
@@ -135,6 +135,14 @@ The relay is **untrusted by design** — it never holds a decryption key.
 
 **Independent security audit (April 2026):** [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU) · uncompensated, voluntary review
 Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
+
+**v2.4.1 (April 2026):** ParaShare end-to-end flow restored:
+- `ghost_pipe` mode: `/v2/ws-ticket` added to ALLOWED paths
+- WS ticket URL fixed — fetched from relay-main (same host as WS connection)
+- Receiver keypair generation unblocked — `mlkem-ready` event dispatched on `window` not `document`
+- Receiver pubkey registration decoupled from WS — HTTP POST now happens before WS attempt
+- Admin panel CSP: `'unsafe-inline'` restored for JS-rendered UI
+- nginx: `'wasm-unsafe-eval'` added to CSP, `no-store` cache-control for JS/WASM files
 
 **v2.4.0 (April 2026):**
 - **Docker architecture**: one shared relay codebase → 5 sector containers (compartmentalisation)
