@@ -99,6 +99,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
   <ul class="nav-links">
     <li><a href="#sectors">Use cases</a></li>
+    <li><a href="#security">Security</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#selfhost">Self-host</a></li>
     <li><a href="/parashare">ParaShare</a></li>
@@ -110,7 +111,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <div class="hero">
   <div class="status"><span class="status-dot" id="sdot" style="background:#2d8a5c"></span><span id="stxt">Checking relay status...</span></div>
-  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.3.6 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
+  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.4.1 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum file transfer. Encrypted client-side, stored in RAM only, destroyed after one download. For healthcare, legal, and critical infrastructure.</p>
   <div class="btns" style="margin-top:36px">
@@ -389,6 +390,68 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <hr class="divider">
 
+<section id="security" style="max-width:960px;margin:0 auto;padding:72px 48px">
+  <div class="eyebrow">Security</div>
+  <h2>Independently audited. April 2026.</h2>
+  <p class="sub" style="max-width:560px">An uncompensated, voluntary security review by Ryan Williams (Smart Cyber Solutions Pty Ltd, AU). All critical and high findings patched before public release.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:32px">
+    <div style="background:var(--bg);padding:24px 20px;text-align:center">
+      <div style="font-size:32px;font-weight:600;letter-spacing:-.03em;color:#c0392b;margin-bottom:4px">4</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Critical &mdash; patched</div>
+    </div>
+    <div style="background:var(--bg);padding:24px 20px;text-align:center">
+      <div style="font-size:32px;font-weight:600;letter-spacing:-.03em;color:#e67e22;margin-bottom:4px">5</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">High &mdash; patched</div>
+    </div>
+    <div style="background:var(--bg);padding:24px 20px;text-align:center">
+      <div style="font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--muted);margin-bottom:4px">6</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Medium &mdash; patched</div>
+    </div>
+    <div style="background:var(--bg);padding:24px 20px;text-align:center">
+      <div style="font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--quiet);margin-bottom:4px">5</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Low &mdash; patched</div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:32px">
+    <div class="cell">
+      <h3>Crypto stack</h3>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border-soft)"><span style="font-family:var(--mono);color:var(--muted)">ML-KEM-768</span><span style="color:var(--quiet)">NIST FIPS 203 &mdash; key encapsulation</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border-soft)"><span style="font-family:var(--mono);color:var(--muted)">AES-256-GCM</span><span style="color:var(--quiet)">NIST SP 800-38D &mdash; symmetric</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border-soft)"><span style="font-family:var(--mono);color:var(--muted)">ML-DSA-65</span><span style="color:var(--quiet)">NIST FIPS 204 &mdash; signatures</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border-soft)"><span style="font-family:var(--mono);color:var(--muted)">HKDF-SHA256</span><span style="color:var(--quiet)">RFC 5869 &mdash; key derivation</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border-soft)"><span style="font-family:var(--mono);color:var(--muted)">Argon2id</span><span style="color:var(--quiet)">RFC 9106 &mdash; password blobs</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0"><span style="font-family:var(--mono);color:var(--muted)">Rust/WASM</span><span style="color:var(--quiet)">Browser-side encrypt in native code</span></div>
+      </div>
+    </div>
+    <div class="cell">
+      <h3>What a compromised relay cannot do</h3>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:12px;color:var(--muted);padding:7px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px"><span style="color:#2d8a5c;flex-shrink:0">&#10003;</span>Read file contents</div>
+        <div style="font-size:12px;color:var(--muted);padding:7px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px"><span style="color:#2d8a5c;flex-shrink:0">&#10003;</span>Substitute a registered public key</div>
+        <div style="font-size:12px;color:var(--muted);padding:7px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px"><span style="color:#2d8a5c;flex-shrink:0">&#10003;</span>Decrypt any stored ciphertext</div>
+        <div style="font-size:12px;color:var(--muted);padding:7px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px"><span style="color:#2d8a5c;flex-shrink:0">&#10003;</span>Identify file size (fixed 5 MB padding)</div>
+        <div style="font-size:12px;color:var(--muted);padding:7px 0;display:flex;gap:10px"><span style="color:#2d8a5c;flex-shrink:0">&#10003;</span>Recover burned blobs &mdash; memory zeroed on download</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px">Independent security audit &mdash; April 2026</div>
+      <div style="font-size:12px;color:var(--quiet);font-family:var(--mono)">Ryan Williams &middot; Smart Cyber Solutions Pty Ltd (AU) &middot; uncompensated, voluntary</div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a href="/pentest-report-2026-04-08.txt" style="font-size:12px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:7px 16px;border-radius:4px;text-decoration:none">Full report &rarr;</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/security-audit-2026-04.md" target="_blank" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:7px 16px;border-radius:4px;text-decoration:none">Patch status &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
 <section id="pricing">
   <div class="eyebrow">Pricing</div>
   <h2>Simple. Free to start.</h2>
@@ -441,13 +504,13 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> Full source code &mdash; audit everything</li>
         <li><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM + ML-DSA-65</li>
         <li><span class="check">&#10003;</span> RAM-only, burn-on-read</li>
-        <li><span class="check">&#10003;</span> 4 sector relays via Docker Compose</li>
+        <li><span class="check">&#10003;</span> 5 sector relays via Docker Compose</li>
         <li><span class="check">&#10003;</span> Auto TLS via Let&rsquo;s Encrypt</li>
         <li><span class="check">&#10003;</span> Zero-downtime user reload</li>
         <li><span class="check">&#10003;</span> Admin panel (/admin/)</li>
         <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> Community support only</li>
       </ul>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.3.6" target="_blank" class="price-btn p">Download v2.3.6 &rarr;</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.4.1" target="_blank" class="price-btn p">Download v2.4.1 &rarr;</a>
     </div>
 
     <div class="pc">
@@ -586,7 +649,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">&gt;_</div>
       <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">LINUX / VPS</div>
       <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Ubuntu &middot; Debian &middot; Hetzner</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 4-sector stack with nginx and auto-TLS.</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 5-sector stack with nginx and auto-TLS.</div>
       <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
         git clone github.com/Apolloccrypt/paramant-relay<br>
         cp .env.example .env &amp;&amp; nano .env<br>
@@ -612,7 +675,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       docker compose up -d<br><br>
       <span style="color:#6e6e6e"># 4. Verify</span><br>
       curl http://localhost/health<br>
-      <span style="color:#2d8a5c"># {"ok":true,"version":"2.3.6","edition":"community"}</span>
+      <span style="color:#2d8a5c"># {"ok":true,"version":"2.4.1","sector":"main"}</span>
     </div>
   </div>
   <div style="display:flex;gap:32px;flex-wrap:wrap">
