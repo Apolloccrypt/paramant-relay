@@ -153,9 +153,15 @@ api.get('/keys/all', authMiddleware, async (req, res) => {
 });
 
 function keyResults(results) {
-  const created = Object.entries(results).filter(([,v]) => v.status === 200 || v.status === 201).map(([s,v]) => ({ sector: s, key: v.data?.key }));
-  const failed  = Object.entries(results).filter(([,v]) => v.status !== 200 && v.status !== 201).map(([s,v]) => ({ sector: s, error: v.data?.error || `HTTP ${v.status}` }));
-  return { created, failed, allOk: failed.length === 0 };
+  const created  = Object.entries(results).filter(([,v]) => v.status === 200 || v.status === 201).map(([s,v]) => ({ sector: s, key: v.data?.key }));
+  const failed   = Object.entries(results).filter(([,v]) => v.status !== 200 && v.status !== 201).map(([s,v]) => ({
+    sector: s,
+    status: v.status,
+    error: v.data?.error || `HTTP ${v.status}`,
+    ...(v.status === 402 && v.data?.upgrade_url ? { upgrade_url: v.data.upgrade_url } : {})
+  }));
+  const upgradeRequired = failed.some(f => f.status === 402);
+  return { created, failed, allOk: failed.length === 0, upgradeRequired };
 }
 
 api.post('/keys/all', authMiddleware, async (req, res) => {
@@ -164,8 +170,10 @@ api.post('/keys/all', authMiddleware, async (req, res) => {
     const r = await relayFetch(s, '/v2/admin/keys', 'POST', body, false, req.sessionToken);
     return { status: r.status, data: r.body };
   });
-  const { created, failed, allOk } = keyResults(results);
-  res.status(allOk ? 200 : 207).json({ ok: allOk, created, failed, results });
+  const { created, failed, allOk, upgradeRequired } = keyResults(results);
+  const statusCode = upgradeRequired ? 402 : (allOk ? 200 : 207);
+  res.status(statusCode).json({ ok: allOk, created, failed, results,
+    ...(upgradeRequired ? { upgrade_url: 'https://paramant.app/pricing' } : {}) });
 });
 
 api.post('/keys/sectors', authMiddleware, async (req, res) => {
@@ -178,8 +186,10 @@ api.post('/keys/sectors', authMiddleware, async (req, res) => {
     const r = await relayFetch(s, '/v2/admin/keys', 'POST', sectorBody, false, req.sessionToken);
     return { status: r.status, data: r.body };
   });
-  const { created, failed, allOk } = keyResults(results);
-  res.status(allOk ? 200 : 207).json({ ok: allOk, created, failed, results });
+  const { created, failed, allOk, upgradeRequired } = keyResults(results);
+  const statusCode = upgradeRequired ? 402 : (allOk ? 200 : 207);
+  res.status(statusCode).json({ ok: allOk, created, failed, results,
+    ...(upgradeRequired ? { upgrade_url: 'https://paramant.app/pricing' } : {}) });
 });
 
 api.post('/keys/all/revoke', authMiddleware, async (req, res) => {

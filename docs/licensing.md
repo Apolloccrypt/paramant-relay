@@ -47,7 +47,7 @@ Someone who self-hosts a relay for their own use or for up to 5 users.
 A relay operator who needs more than 5 users on their own relay.
 
 - Receives a `plk_` license key from Paramant
-- Adds `PARAMANT_LICENSE=plk_...` to their `.env` and restarts
+- Adds `PLK_KEY=plk_...` to their `.env` and restarts
 - Can now add unlimited `pgp_` keys to `users.json`
 - Still manages their own users — the `plk_` only removes the cap
 
@@ -85,21 +85,18 @@ Self-hoster running Community Edition
 Has 5 pgp_ keys in users.json — all working fine
         │
         ▼
-Tries to add a 6th pgp_ key and reload
+Tries to create a 6th key (via admin panel or POST /v2/admin/keys)
         │
         ▼
-Key 6 is flagged over_limit = true by applyKeyLimitEnforcement()
-        │
-        ▼
-Any request from key 6 → HTTP 402:
-  { "error": "This relay has reached its user limit.
-              Contact the relay operator.",
-    "operator_hint": "Add PARAMANT_LICENSE=plk_... to .env" }
+Relay returns HTTP 402 immediately:
+  { "error": "Community Edition limit reached (5 keys).
+              Add a plk_ license key to unlock unlimited users.",
+    "upgrade_url": "https://paramant.app/pricing" }
         │
         ▼
 Operator goes to paramant.app/pricing
 Gets a plk_ license key
-Adds PARAMANT_LICENSE=plk_xxx to .env
+Adds PLK_KEY=plk_xxx to .env
 Restarts relay → edition: licensed → no limit
 ```
 
@@ -127,31 +124,45 @@ Plans control what a `pgp_` key holder can do. Set in `users.json`.
 
 ### What gets blocked
 
-The first 5 active keys in `users.json` always work. Keys at position 6 and beyond
-are flagged `over_limit = true` when users are loaded. Every request from those
-keys returns HTTP 402.
+Creating a 6th active key is blocked at the API level — the relay returns HTTP 402
+before the key is stored. Existing over-limit keys in `users.json` (loaded from a
+previous community run) are additionally flagged `over_limit = true` at startup,
+blocking their requests with HTTP 402.
 
 ### Code path
 
 ```
+POST /v2/admin/keys (create key)
+  └── if EDITION = 'community' AND active keys >= 5:
+        → HTTP 402 { error: 'Community Edition limit reached (5 keys)...', upgrade_url }
+        (key never created)
+
 loadUsers() + checkLicense()
   └── applyKeyLimitEnforcement()
         EDITION = 'community' AND active keys > 5:
           keys 1-5 → over_limit = false  (work normally)
-          keys 6+  → over_limit = true   (blocked)
+          keys 6+  → over_limit = true   (blocked at request time)
 
-every request
-  └── keyData = apiKeys.get(apiKey)
-  └── if keyData.over_limit → HTTP 402, request terminated
+/health (public, no auth)
+  └── { edition: 'community', max_keys: 5, ... }
+      { edition: 'licensed',  max_keys: null, ... }
+```
+
+### Startup log
+
+```
+[PARAMANT] Edition: community (max 5 users)
+[PARAMANT] Edition: licensed (unlimited users)
+[PARAMANT] Edition: community (max 5 users) — license key invalid
 ```
 
 ### Relevant lines in relay.js
 
 | Lines | What |
 |-------|------|
-| 1597 | `COMMUNITY_KEY_LIMIT = parseInt(process.env.MAX_KEYS \|\| '5')` |
-| 1613 | `let EDITION = 'community'` |
-| 1615 | `checkLicense()` — reads env, sets EDITION |
+| `COMMUNITY_KEY_LIMIT` | `parseInt(process.env.MAX_KEYS \|\| '5')` |
+| `let EDITION` | `'community'` (default) |
+| `checkLicense()` | reads `PLK_KEY` (or `PARAMANT_LICENSE` for compat), sets EDITION |
 | 1639 | `applyKeyLimitEnforcement()` — marks over_limit keys |
 | 649–659 | Auth middleware — checks `over_limit`, returns 402 |
 | 851–865 | `POST /v2/reload-users` — calls `applyKeyLimitEnforcement()` after reload |
@@ -172,17 +183,16 @@ A `plk_` key is a **relay operator license**. It goes in the relay's `.env`, not
 ### Current validation (format-only)
 
 ```js
-const PLK_RE = /^plk_[0-9a-f]{64}$/;
-if (PLK_RE.test(LICENSE_KEY)) {
+if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 68) {
   EDITION = 'licensed';
 }
 ```
 
-The relay checks prefix, exact length (68 chars), and lowercase hex characters.
+The relay checks prefix (`plk_`) and minimum length (68 chars total).
 It does not contact a license server, verify a cryptographic signature, or check
 an expiry date. Full cryptographic validation is planned for a future release.
 
-**Implication for auditors:** any string matching `plk_[0-9a-f]{64}` (68 chars)
+**Implication for auditors:** any string starting with `plk_` and at least 68 chars
 will unlock the relay. Enforcement is currently legal (BUSL-1.1), not
 cryptographic.
 
@@ -198,17 +208,17 @@ Keys are **not stored server-side**. Record them in a password manager or CRM.
 ### Install on self-hosted relay
 
 ```bash
-# 1. Add to .env
-echo "PARAMANT_LICENSE=plk_xxxx..." >> .env
+# 1. Add to .env  (PLK_KEY is the canonical var; PARAMANT_LICENSE also accepted)
+echo "PLK_KEY=plk_xxxx..." >> .env
 
 # 2. Restart all containers to pick up the new env var
 cd /path/to/paramant-relay
 docker compose up -d
 
-# 3. Verify — edition is now in the public /health response (no admin token needed)
+# 3. Verify — edition and max_keys are in the public /health response
 curl -s https://your-relay/health \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['edition'])"
-# licensed
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['edition'], 'max_keys:', d['max_keys'])"
+# licensed max_keys: None
 
 # Full detail with admin token:
 curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-relay/health \
@@ -238,7 +248,7 @@ curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-relay/health \
 
 | # | Limitation | Impact |
 |---|-----------|--------|
-| 1 | License validation is format-only (regex `plk_[0-9a-f]{64}`, no signature or expiry) | Self-hosters can generate their own `plk_` keys — BUSL-1.1 is the enforcement mechanism |
+| 1 | License validation is format-only (`plk_` prefix + length >= 68, no signature or expiry) | Self-hosters can generate their own `plk_` keys — BUSL-1.1 is the enforcement mechanism |
 | 2 | `MAX_KEYS` env var overrides the 5-key limit | Operator can raise limit without a license |
 | 3 | `plk_` keys not tracked server-side | No revocation mechanism — if a license needs to be revoked, a relay update is required |
 | 4 | `over_limit` is position-based (insertion order in users.json) | An enterprise `pgp_` key added at position 6 is blocked until a `plk_` license is present |

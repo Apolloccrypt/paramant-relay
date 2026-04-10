@@ -837,7 +837,7 @@ const server = http.createServer(async (req, res) => {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     const adminOk  = adminTok && adminTok === (process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
-    const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION };
+    const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION, max_keys: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
@@ -1500,6 +1500,17 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
+    // Community Edition: block key creation once the limit is reached
+    if (EDITION === 'community') {
+      const activeCount = [...apiKeys.values()].filter(v => v.active !== false).length;
+      if (activeCount >= COMMUNITY_KEY_LIMIT) {
+        res.writeHead(402, { 'Content-Type': 'application/json' });
+        return res.end(J({
+          error: `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`,
+          upgrade_url: 'https://paramant.app/pricing'
+        }));
+      }
+    }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
@@ -1835,20 +1846,24 @@ function checkLicense() {
     log('warn', 'relay_integrity_failed', { err: e.message });
   }
 
-  const LICENSE_KEY = process.env.PARAMANT_LICENSE || '';
+  // PLK_KEY is the canonical env var; PARAMANT_LICENSE accepted for backward compat
+  const LICENSE_KEY = process.env.PLK_KEY || process.env.PARAMANT_LICENSE || '';
   if (LICENSE_KEY) {
-    // Format: plk_ + exactly 64 lowercase hex chars = 68 chars total
-    const PLK_RE = /^plk_[0-9a-f]{64}$/;
-    if (PLK_RE.test(LICENSE_KEY)) {
+    // Format: plk_ prefix + at least 64 chars (total >= 68)
+    if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 68) {
       EDITION = 'licensed';
       log('info', 'license_valid', { edition: 'licensed', key_prefix: LICENSE_KEY.slice(0, 12) + '...' });
+      console.log('[PARAMANT] Edition: licensed (unlimited users)');
     } else {
       log('warn', 'license_invalid', {
-        hint: 'License key must be plk_ followed by exactly 64 lowercase hex characters (68 chars total)',
+        hint: 'License key must start with plk_ and be at least 68 characters total',
         length_provided: LICENSE_KEY.length,
-        expected_length: 68
+        min_length: 68
       });
+      console.log(`[PARAMANT] Edition: community (max ${COMMUNITY_KEY_LIMIT} users) — license key invalid`);
     }
+  } else {
+    console.log(`[PARAMANT] Edition: community (max ${COMMUNITY_KEY_LIMIT} users)`);
   }
   applyKeyLimitEnforcement();
 }
