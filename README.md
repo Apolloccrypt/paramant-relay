@@ -114,11 +114,15 @@ python3 scripts/paramant-admin.py sync
 Community Edition is **free forever** for up to 5 users. No license key required.
 For unlimited users, add a `plk_` relay license to `.env`. → [docs/licensing.md](docs/licensing.md)
 
-| Edition | Users | Price |
-|---------|-------|-------|
-| Community | Up to 5 | Free |
-| Licensed | Unlimited | [paramant.app/pricing](https://paramant.app/pricing) |
-| Enterprise | Unlimited + SLA | [Contact us](mailto:privacy@paramant.app) |
+| Edition | Users | Enforcement | Price |
+|---------|-------|-------------|-------|
+| Community | Up to 5 | Hard cap — 6th key returns HTTP 402 | Free |
+| Licensed | Unlimited | Ed25519-signed key, verified in-process | [paramant.app/pricing](https://paramant.app/pricing) |
+| Enterprise | Unlimited + SLA | Ed25519-signed key | [Contact us](mailto:privacy@paramant.app) |
+
+**Security note:** `plk_` license keys are Ed25519-signed with a private key held offline
+by Paramant. They cannot be forged, modified, or replicated. An invalid or expired key
+falls back to Community Edition gracefully — the relay never crashes on a bad key.
 
 Full deploy guide: [docs/self-hosting.md](docs/self-hosting.md)
 

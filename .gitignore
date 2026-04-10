@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 **/node_modules/
+
+# License key generator — contains logic to issue keys; NEVER commit
+scripts/generate-license.js
 __pycache__/
 *.pyc
 *.egg-info/

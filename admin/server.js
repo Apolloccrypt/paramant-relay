@@ -203,6 +203,17 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
   res.status(anyRevoked ? 200 : 502).json({ ok: anyRevoked, results });
 });
 
+api.get('/license-status', authMiddleware, async (req, res) => {
+  const sectors = await eachSector(Object.keys(SECTORS), async s => {
+    const r = await relayFetch(s, '/health', 'GET', null, false, ADMIN_TOKEN);
+    if (r.status !== 200) return { ok: false, error: `HTTP ${r.status}` };
+    const { edition, max_keys, license_expires, license_issued_to } = r.body || {};
+    return { ok: true, edition: edition || 'community', max_keys: max_keys ?? null, license_expires: license_expires || null, license_issued_to: license_issued_to || null };
+  });
+  const anyLicensed = Object.values(sectors).some(s => s.edition === 'licensed');
+  res.json({ ok: true, anyLicensed, sectors });
+});
+
 api.post('/reload-all', authMiddleware, async (req, res) => {
   const results = await eachSector(Object.keys(SECTORS), async s => {
     const r = await relayFetch(s, '/v2/reload-users', 'POST', {}, false, req.sessionToken);

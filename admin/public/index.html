@@ -406,11 +406,18 @@ tr:hover td { background: var(--bg2); }
       <div class="nav-tab" data-tab="keys" onclick="switchTab('keys')">API Keys</div>
     </nav>
     <div class="header-actions">
+      <div id="license-badge" style="display:none;font-size:11px;font-family:monospace;padding:3px 10px;border-radius:12px;border:1px solid"></div>
       <div class="status-dot" id="relay-status-dot"></div>
       <span id="relay-status-text" style="font-size:11px;color:var(--muted)">—</span>
       <button class="btn btn-sm" onclick="doLogout()">Uitloggen</button>
     </div>
   </header>
+  <!-- Upgrade banner (hidden by default, shown on 402) -->
+  <div id="upgrade-banner" style="display:none;background:#1a0d00;border-bottom:1px solid #8b4513;padding:10px 24px;font-size:13px;color:#f4a460;display:flex;align-items:center;gap:12px">
+    <span>Community Edition limit reached (5 keys). Add a <code style="background:#2a1a00;padding:1px 5px;border-radius:3px">PLK_KEY=plk_...</code> to your <code style="background:#2a1a00;padding:1px 5px;border-radius:3px">.env</code> to unlock unlimited users.</span>
+    <a href="https://paramant.app/pricing" target="_blank" rel="noopener" style="color:#f4a460;font-weight:600;white-space:nowrap">Get a license →</a>
+    <button onclick="document.getElementById('upgrade-banner').style.display='none'" style="margin-left:auto;background:none;border:none;color:#f4a460;cursor:pointer;font-size:16px">&times;</button>
+  </div>
 
   <main>
     <!-- DASHBOARD TAB -->
@@ -588,12 +595,40 @@ function logout() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  // Reset any buttons that may have been left in a broken state (e.g. after session expiry)
   const btnReload = document.getElementById('btn-reload-all');
   if (btnReload) { btnReload.textContent = '⟳ Sync keys'; btnReload.disabled = false; }
   loadOverview();
   loadKeys(currentKeysSector);
+  loadLicenseStatus();
   startAutoRefresh();
+}
+
+async function loadLicenseStatus() {
+  const data = await apiFetch('/license-status');
+  if (!data) return;
+  const badge = document.getElementById('license-badge');
+  // Use health sector as representative
+  const rep = Object.values(data.sectors || {}).find(s => s.ok);
+  if (!rep) return;
+  badge.style.display = 'inline-block';
+  if (rep.edition === 'licensed') {
+    badge.style.background = '#0d1f17';
+    badge.style.borderColor = '#2d8a5c';
+    badge.style.color = '#2d8a5c';
+    const exp = rep.license_expires ? ` · expires ${rep.license_expires}` : '';
+    badge.textContent = `Licensed${exp}`;
+  } else {
+    badge.style.background = '#1a1000';
+    badge.style.borderColor = '#8b6914';
+    badge.style.color = '#c8a520';
+    const used = rep.max_keys != null ? `${rep.max_keys}/5 key limit` : 'Community';
+    badge.textContent = `Community · ${used}`;
+  }
+}
+
+function showUpgradeBanner() {
+  const el = document.getElementById('upgrade-banner');
+  if (el) el.style.display = 'flex';
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -804,6 +839,7 @@ async function createKey() {
     if (sectors.length === 4) {
       const data = await apiFetch('/keys/all', { method: 'POST', body: { label, plan, email: email || undefined } });
       if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
+      if (data.upgradeRequired) { showError(errEl, data.failed?.[0]?.error || 'License limit reached'); showUpgradeBanner(); return; }
       if (!data.created?.length) { showError(errEl, 'Failed to create on sectors'); return; }
       firstKey = data.created[0]?.key;
       resultEl.textContent = firstKey;
@@ -811,12 +847,14 @@ async function createKey() {
     } else if (sectors.length === 1) {
       const data = await apiFetch(`/sectors/${sectors[0]}/keys`, { method: 'POST', body: { label, plan, email: email || undefined } });
       if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
+      if (!data.ok && data.upgrade_url) { showError(errEl, data.error || 'License limit reached'); showUpgradeBanner(); return; }
       if (!data.ok) { showError(errEl, data?.error || 'Failed'); return; }
       firstKey = data.key;
       resultEl.textContent = data.key;
     } else {
       const data = await apiFetch('/keys/sectors', { method: 'POST', body: { sectors, label, plan, email: email || undefined } });
       if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
+      if (data.upgradeRequired) { showError(errEl, data.failed?.[0]?.error || 'License limit reached'); showUpgradeBanner(); return; }
       if (!data.created?.length) { showError(errEl, 'Failed to create on selected sectors'); return; }
       firstKey = data.created[0]?.key;
       resultEl.textContent = firstKey;

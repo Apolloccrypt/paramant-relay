@@ -837,7 +837,9 @@ const server = http.createServer(async (req, res) => {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     const adminOk  = adminTok && adminTok === (process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
-    const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION, max_keys: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT };
+    const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION,
+      max_keys: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS,
+      ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at, license_issued_to: LICENSE_PAYLOAD.issued_to } : {}) };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
@@ -848,7 +850,7 @@ const server = http.createServer(async (req, res) => {
       padding: '5MB fixed (DPI-masking)',
       jurisdiction: 'EU/DE, GDPR, no US CLOUD Act',
       edition: EDITION,
-      key_limit: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT,
+      key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS,
       active_keys: [...apiKeys.values()].filter(k => k.active !== false).length };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
@@ -1500,13 +1502,17 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
-    // Community Edition: block key creation once the limit is reached
-    if (EDITION === 'community') {
+    // Enforce key limit (community = 5 hard cap; licensed = LICENSE_MAX_KEYS or Infinity)
+    if (LICENSE_MAX_KEYS !== Infinity) {
       const activeCount = [...apiKeys.values()].filter(v => v.active !== false).length;
-      if (activeCount >= COMMUNITY_KEY_LIMIT) {
+      if (activeCount >= LICENSE_MAX_KEYS) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
         return res.end(J({
-          error: `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`,
+          error: EDITION === 'community'
+            ? `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`
+            : `License limit reached (${LICENSE_MAX_KEYS} keys). Contact Paramant to upgrade your license.`,
+          current_keys: activeCount,
+          max_keys: LICENSE_MAX_KEYS,
           upgrade_url: 'https://paramant.app/pricing'
         }));
       }
@@ -1538,7 +1544,7 @@ const server = http.createServer(async (req, res) => {
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
       key: k, plan: v.plan, label: v.label, active: v.active, over_limit: v.over_limit || false
     }));
-    const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: EDITION === 'licensed' ? null : COMMUNITY_KEY_LIMIT };
+    const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: keys.length, keys, license: licenseInfo }));
   }
@@ -1831,39 +1837,78 @@ try {
 // For unlimited keys, obtain a commercial license at https://paramant.app/pricing
 // Tampering with this check constitutes a license violation under BUSL-1.1.
 // ─────────────────────────────────────────────────────────────────────────────
-const COMMUNITY_KEY_LIMIT = parseInt(process.env.MAX_KEYS || '5');
-let EDITION = 'community';
+const COMMUNITY_KEY_LIMIT = 5; // Fixed; never overridable via env (BUSL-1.1 § 4)
+// Ed25519 public key — matches private key in ~/.paramant/license-signing-key.pem
+// To rotate: run scripts/generate-license.js --init and paste new key here.
+const ED25519_PUBLIC_KEY = 'ed8a6201c86f013b16718b3e6d9ded62362ca82ef7ae334308c12d71d18ae4e6';
+// Ed25519 SPKI DER prefix for key reconstruction
+const _ED25519_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+
+let EDITION          = 'community';
+let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by checkLicense()
+let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
+
+// ── Ed25519 base64url decoder ─────────────────────────────────────────────────
+function _b64urlDecode(s) {
+  const p = s.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(p + '='.repeat((4 - p.length % 4) % 4), 'base64');
+}
 
 function checkLicense() {
-  const fs2 = require('fs');
-  const crypto2 = require('crypto');
+  // File integrity checksum (tamper detection)
   try {
-    const checksum = crypto2.createHash('sha3-256')
-      .update(fs2.readFileSync(__filename))
-      .digest('hex');
+    const checksum = crypto.createHash('sha3-256').update(fs.readFileSync(__filename)).digest('hex');
     log('info', 'relay_integrity', { checksum, file: __filename });
   } catch(e) {
     log('warn', 'relay_integrity_failed', { err: e.message });
   }
 
   // PLK_KEY is the canonical env var; PARAMANT_LICENSE accepted for backward compat
-  const LICENSE_KEY = process.env.PLK_KEY || process.env.PARAMANT_LICENSE || '';
-  if (LICENSE_KEY) {
-    // Format: plk_ prefix + at least 64 chars (total >= 68)
-    if (LICENSE_KEY.startsWith('plk_') && LICENSE_KEY.length >= 68) {
-      EDITION = 'licensed';
-      log('info', 'license_valid', { edition: 'licensed', key_prefix: LICENSE_KEY.slice(0, 12) + '...' });
-      console.log('[PARAMANT] Edition: licensed (unlimited users)');
-    } else {
-      log('warn', 'license_invalid', {
-        hint: 'License key must start with plk_ and be at least 68 characters total',
-        length_provided: LICENSE_KEY.length,
-        min_length: 68
-      });
-      console.log(`[PARAMANT] Edition: community (max ${COMMUNITY_KEY_LIMIT} users) — license key invalid`);
+  const rawKey = process.env.PLK_KEY || process.env.PARAMANT_LICENSE || '';
+  if (!rawKey) {
+    console.log(`[PARAMANT] Edition: community | max keys: ${COMMUNITY_KEY_LIMIT}`);
+    applyKeyLimitEnforcement();
+    return;
+  }
+
+  try {
+    if (!rawKey.startsWith('plk_')) throw new Error('must start with plk_');
+
+    // Decode: last 64 bytes = Ed25519 signature, rest = payload JSON
+    const combined    = _b64urlDecode(rawKey.slice(4));
+    if (combined.length < 65) throw new Error('token too short');
+    const sig         = combined.subarray(combined.length - 64);
+    const payloadBuf  = combined.subarray(0, combined.length - 64);
+
+    // Reconstruct public key from hardcoded hex (SPKI DER = prefix + 32 raw bytes)
+    const pubDer = Buffer.concat([_ED25519_DER_PREFIX, Buffer.from(ED25519_PUBLIC_KEY, 'hex')]);
+    const pubKey = crypto.createPublicKey({ key: pubDer, format: 'der', type: 'spki' });
+
+    if (!crypto.verify(null, payloadBuf, pubKey, sig)) throw new Error('signature invalid — key not issued by Paramant');
+
+    const payload = JSON.parse(payloadBuf.toString('utf8'));
+    if (!payload.expires_at || !payload.max_keys || !payload.issued_to) throw new Error('payload missing required fields');
+
+    // Expiry check — fall back gracefully, do NOT crash
+    const expiresAt = new Date(payload.expires_at);
+    if (isNaN(expiresAt.getTime())) throw new Error('expires_at is not a valid date');
+    if (expiresAt < new Date()) {
+      log('warn', 'license_expired', { expires_at: payload.expires_at, issued_to: payload.issued_to });
+      console.log(`[PARAMANT] Edition: community (license expired ${payload.expires_at}) | max keys: ${COMMUNITY_KEY_LIMIT}`);
+      applyKeyLimitEnforcement();
+      return;
     }
-  } else {
-    console.log(`[PARAMANT] Edition: community (max ${COMMUNITY_KEY_LIMIT} users)`);
+
+    // Valid license
+    LICENSE_PAYLOAD  = payload;
+    EDITION          = 'licensed';
+    LICENSE_MAX_KEYS = payload.max_keys === 'unlimited' ? Infinity : parseInt(payload.max_keys, 10);
+    log('info', 'license_valid', { edition: 'licensed', issued_to: payload.issued_to, expires_at: payload.expires_at, max_keys: payload.max_keys });
+    console.log(`[PARAMANT] Edition: licensed | issued to: ${payload.issued_to} | expires: ${payload.expires_at} | max keys: ${payload.max_keys}`);
+
+  } catch(e) {
+    log('warn', 'license_invalid', { err: e.message, hint: 'PLK_KEY failed Ed25519 verification — falling back to community' });
+    console.log(`[PARAMANT] Edition: community (invalid key: ${e.message}) | max keys: ${COMMUNITY_KEY_LIMIT}`);
   }
   applyKeyLimitEnforcement();
 }
@@ -1874,36 +1919,35 @@ function checkLicense() {
 // ─────────────────────────────────────────────────────────────────────────────
 function applyKeyLimitEnforcement() {
   if (EDITION === 'licensed') {
-    // Clear any leftover flags from a previous community run
     for (const v of apiKeys.values()) v.over_limit = false;
-    log('info', 'edition', { edition: 'licensed', active_keys: [...apiKeys.values()].filter(k => k.active !== false).length });
+    log('info', 'edition', { edition: 'licensed', active_keys: [...apiKeys.values()].filter(k => k.active !== false).length, max_keys: LICENSE_MAX_KEYS === Infinity ? 'unlimited' : LICENSE_MAX_KEYS });
     return;
   }
 
   const entries = [...apiKeys.entries()];
   const active  = entries.filter(([, v]) => v.active !== false);
 
-  if (active.length <= COMMUNITY_KEY_LIMIT) {
+  if (active.length <= LICENSE_MAX_KEYS) {
     for (const [, v] of entries) v.over_limit = false;
-    log('info', 'edition', { edition: EDITION, active_keys: active.length, limit: COMMUNITY_KEY_LIMIT });
+    log('info', 'edition', { edition: EDITION, active_keys: active.length, limit: LICENSE_MAX_KEYS });
     return;
   }
 
-  // First COMMUNITY_KEY_LIMIT active keys keep working; the rest are blocked
+  // Keys beyond LICENSE_MAX_KEYS are flagged over_limit
   let n = 0;
   for (const [, v] of entries) {
     if (v.active === false) continue;
     n++;
-    v.over_limit = n > COMMUNITY_KEY_LIMIT;
+    v.over_limit = n > LICENSE_MAX_KEYS;
     if (v.over_limit) log('warn', 'key_over_limit', {
       label: v.label,
-      hint: 'Community Edition: relay operator can add PARAMANT_LICENSE=plk_... to .env to unlock unlimited users'
+      hint: 'Add PLK_KEY=plk_... to .env to unlock unlimited users — https://paramant.app/pricing'
     });
   }
   log('warn', 'community_limit_exceeded', {
     active_keys: active.length,
-    limit: COMMUNITY_KEY_LIMIT,
-    blocked: active.length - COMMUNITY_KEY_LIMIT,
+    limit: LICENSE_MAX_KEYS,
+    blocked: active.length - LICENSE_MAX_KEYS,
     operator_upgrade: 'https://paramant.app/pricing'
   });
 }
