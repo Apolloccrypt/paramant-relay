@@ -8,4 +8,4 @@
  */
 import { ml_kem768 } from './noble-mlkem-bundle.js';
 window.ml_kem768 = ml_kem768;
-document.dispatchEvent(new Event('mlkem-ready'));
+window.dispatchEvent(new Event('mlkem-ready'));
