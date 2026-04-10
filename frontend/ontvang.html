@@ -251,27 +251,28 @@ async function init() {
     $('fp-display').textContent = fp;
     showStep('step-fingerprint');
 
-    // Connect WebSocket
-    ws = new WebSocket(RELAY_WS);
+    // Registreer pubkey via HTTP — onafhankelijk van WS (ontvanger heeft geen API key)
+    try {
+      await fetch(`${RELAY_API}/v2/pubkey`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_id: sessionToken,
+          ecdh_pub: ecdhPubHex,
+          kyber_pub: kyberPubHex
+        }),
+        signal: AbortSignal.timeout(8000)
+      });
+      $('fp-status').textContent = 'Ready - waiting for sender to verify fingerprint';
+    } catch(e) { console.warn('pubkey register failed', e); }
 
-    ws.onopen = async () => {
-      ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'receiver' }));
-      // Registreer pubkey via ghost pipe relay HTTP endpoint
-      // Device ID = sessie token zodat verzender hem kan ophalen
-      try {
-        await fetch(`${RELAY_API}/v2/pubkey`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            device_id: sessionToken,
-            ecdh_pub: ecdhPubHex,
-            kyber_pub: kyberPubHex
-          }),
-          signal: AbortSignal.timeout(8000)
-        });
-      } catch(e) { console.warn('pubkey register failed', e); }
-      $('fp-status').textContent = 'Connected - waiting for sender to verify fingerprint';
-    };
+    // Connect WebSocket (best-effort — ontvanger heeft geen API key, kan falen)
+    try {
+      ws = new WebSocket(RELAY_WS + '/v2/stream');
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'receiver' }));
+      };
+    } catch(e) { ws = { send: () => {}, close: () => {} }; }
 
     ws.onmessage = async (e) => {
       let msg;
@@ -297,7 +298,7 @@ async function init() {
       }
     };
 
-    ws.onerror = () => showError('WebSocket connection failed');
+    ws.onerror = (e) => console.warn('WS optional for receiver — file transfer via HTTP polling', e);
     ws.onclose = () => {};
 
     // Poll voor transfer_ready via HTTP
