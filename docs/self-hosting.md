@@ -1,6 +1,6 @@
 # PARAMANT Self-Hosting Guide
 
-**Version:** v2.3.1  
+**Version:** v2.4.1  
 **License:** BUSL-1.1 — source available, free for up to 5 users per relay in production  
 **Change date:** 2029-01-01 → Apache 2.0  
 **License enforcement details:** [docs/licensing.md](licensing.md)
@@ -58,9 +58,9 @@ nano .env
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `ADMIN_TOKEN` | **Yes** | — | Admin API token. Generate: `openssl rand -hex 32` |
-| `PORT` | No | `3001` | Relay listen port (set per sector in docker-compose) |
-| `SECTOR` | No | `health` | Relay sector: `health` / `legal` / `finance` / `iot` |
-| `RAM_LIMIT_MB` | No | `512` | Max RAM for blob storage per relay |
+| `PORT` | No | `3000` | Relay listen port (all containers use 3000 internally; host port is set in docker-compose) |
+| `SECTOR` | Set by Compose | — | Sector identifier (`relay` / `health` / `finance` / `legal` / `iot`). Injected per-container by docker-compose — do not set manually in `.env`. |
+| `RAM_LIMIT_MB` | No | `1024` | Max RAM for blob storage per relay |
 | `RAM_RESERVE_MB` | No | `256` | RAM reserve before rejecting uploads |
 | `RELAY_MODE` | No | `ghost_pipe` | Endpoint set: `ghost_pipe` or `iot` |
 | `USERS_FILE` | No | `./users.json` | Path to API key store |
@@ -76,28 +76,32 @@ nano .env
 ## What Gets Deployed
 
 ```
-docker compose up -d
+docker compose up -d --build
 ```
 
 Starts 6 containers:
 
-| Container | Role | Internal Port |
-|-----------|------|---------------|
-| `relay-health` | Health sector relay | 3005 |
-| `relay-legal` | Legal sector relay | 3002 |
-| `relay-finance` | Finance sector relay | 3003 |
-| `relay-iot` | IoT sector relay | 3004 |
-| `admin` | Admin panel | 4200 (via nginx /admin/) |
-| `nginx` | TLS termination + routing | 80, 443 |
+| Container | Role | Host port |
+|-----------|------|-----------|
+| `relay-main` | Main relay | 127.0.0.1:3000 |
+| `relay-health` | Health sector relay | 127.0.0.1:3001 |
+| `relay-finance` | Finance sector relay | 127.0.0.1:3002 |
+| `relay-legal` | Legal sector relay | 127.0.0.1:3003 |
+| `relay-iot` | IoT sector relay | 127.0.0.1:3004 |
+| `admin` | Admin panel | 127.0.0.1:4200 |
+
+All five relay containers run the **same image** (`build: ./relay`). The `SECTOR` environment variable — injected per-service in `docker-compose.yml` — is the only difference between them. No separate codebases.
 
 **Networks:**
-- `relay-internal` — relays only reachable via nginx (internal: true)
-- `relay-external` — nginx uses this for Let's Encrypt ACME challenges
+- `relay-net` — single bridge network; all containers communicate over it. All host-side ports are bound to `127.0.0.1` — not publicly reachable. System nginx proxies inbound traffic.
 
 **TLS:**
-- If no cert is found in the `paramant-certs` volume, a self-signed cert is auto-generated
-- For production: use `install.sh` which runs Certbot automatically
-- To bring your own cert: mount to `/etc/nginx/certs/cert.pem` and `/etc/nginx/certs/key.pem`
+- Handled by **system nginx** (not a Docker container). Install via Certbot / Let's Encrypt or bring your own cert.
+- See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
+
+**Dockerfile — two-stage build:**
+- Stage 1 (`build`): `node:20-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
+- Stage 2 (`runtime`): lean `node:20-alpine` → copies only compiled `node_modules` + `relay.js`. No compilers, no build tools in the production image.
 
 ---
 
@@ -269,15 +273,26 @@ done
 Internet
     │
     ▼
-nginx (TLS termination)
+system nginx (TLS termination, ports 80/443)
     │
-    ├── health.your-domain → relay-health:3005
-    ├── legal.your-domain  → relay-legal:3002
-    ├── finance.your-domain → relay-finance:3003
-    └── iot.your-domain    → relay-iot:3004
+    ├── relay.your-domain    → 127.0.0.1:3000  (relay-main)
+    ├── health.your-domain   → 127.0.0.1:3001  (relay-health)
+    ├── finance.your-domain  → 127.0.0.1:3002  (relay-finance)
+    ├── legal.your-domain    → 127.0.0.1:3003  (relay-legal)
+    ├── iot.your-domain      → 127.0.0.1:3004  (relay-iot)
+    └── your-domain/admin/   → 127.0.0.1:4200  (admin)
 
-relay-internal network (isolated)
-    └── relays never directly reachable from outside
+relay-net (Docker bridge, not public)
+    └── containers communicate internally; only 127.0.0.1 ports exposed to host
+```
+
+**One codebase, five containers:**
+```
+relay/relay.js ──(build: ./relay)──► relay-main    (SECTOR=relay)
+                                  ► relay-health  (SECTOR=health)
+                                  ► relay-finance (SECTOR=finance)
+                                  ► relay-legal   (SECTOR=legal)
+                                  ► relay-iot     (SECTOR=iot)
 ```
 
 **Security properties:**
@@ -292,12 +307,11 @@ relay-internal network (isolated)
 ## Upgrade
 
 ```bash
-paramant upgrade
-# or manually:
-cd /opt/paramant
+cd /path/to/paramant-relay   # wherever you cloned the repo
 git pull
-docker compose build --no-cache
-docker compose up -d
+docker compose up -d --build
+# --build rebuilds the relay image with the updated relay.js
+# Named volumes (users.json, CT log) are preserved across rebuilds
 ```
 
 ---
@@ -320,7 +334,7 @@ docker compose up -d
 ```bash
 paramant logs health
 # or:
-docker logs paramant-relay-relay-health-1 --tail 20
+docker logs paramant-relay-health --tail 20
 ```
 
 ### Reset everything

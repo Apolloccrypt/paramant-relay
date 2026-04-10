@@ -25,6 +25,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **Stale JS caching** — Browsers cached `noble-mlkem-loader.js` and `crypto-bridge.js`. Added `Cache-Control: no-store` nginx location for `*.js` and `*.wasm` files. Added `?v=4` cache-bust suffix on all module imports.
 
+### Changed
+
+- **`VERSION` constant** — bumped from `2.3.6` to `2.4.1` in `relay/relay.js`. The version in code now matches the CHANGELOG and git tags.
+- **`/health` endpoint** — `edition` field now included in the public (unauthenticated) base response. Previously `edition` was only visible with `X-Admin-Token`. Self-hosters can now verify their license status without admin credentials: `curl https://your-relay/health | grep edition`.
+- **Relay directory cleaned up** — Legacy sector shim files removed from `relay/`: `relay-core.js`, `relay-sector.js`, `ghost-pipe-relay.js`, `relay-health.js`, `relay-legal.js`, `relay-finance.js`, `relay-iot.js`. These were superseded by the unified `relay/relay.js` in v2.4.0. The `relay/` directory now contains only: `relay.js`, `Dockerfile`, `package.json`, `LICENSE`, `README.md`.
+
 ---
 
 ## [2.3.6] — 2026-04-10

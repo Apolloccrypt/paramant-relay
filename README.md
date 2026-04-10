@@ -68,6 +68,36 @@ Starts 6 containers: 5 sector relays (main / health / legal / finance / iot), an
 | relay-iot | 3000 | 127.0.0.1:3004 | iot.paramant.app |
 | admin | 4200 | 127.0.0.1:4200 | /admin/ |
 
+**Architecture:** One shared codebase (`relay/relay.js`) builds into all five relay containers. The `SECTOR` environment variable tells each container which sector it is — no separate codebases, one file to maintain:
+
+```
+relay/relay.js ──(build: ./relay)──► relay-main    (SECTOR=relay)    :3000
+                                  ► relay-health  (SECTOR=health)   :3001
+                                  ► relay-finance (SECTOR=finance)  :3002
+                                  ► relay-legal   (SECTOR=legal)    :3003
+                                  ► relay-iot     (SECTOR=iot)      :3004
+```
+
+System nginx handles TLS termination and routes each subdomain to the matching container port:
+
+```
+Internet → nginx (443)
+  relay.your-domain    → 127.0.0.1:3000
+  health.your-domain   → 127.0.0.1:3001
+  finance.your-domain  → 127.0.0.1:3002
+  legal.your-domain    → 127.0.0.1:3003
+  iot.your-domain      → 127.0.0.1:3004
+  your-domain/admin/   → 127.0.0.1:4200
+```
+
+**Dockerfile** uses a two-stage build: stage 1 compiles `argon2` native bindings (needs `python3`/`make`/`g++`), stage 2 is a lean runtime image with only `node_modules` + `relay.js` — no build tools in production.
+
+**To upgrade** after a code change:
+```bash
+git pull
+docker compose up -d --build   # --build rebuilds the image; volumes (users, CT log) are preserved
+```
+
 **First user (after deploy):**
 
 ```bash

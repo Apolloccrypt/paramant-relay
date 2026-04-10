@@ -1,8 +1,8 @@
 # PARAMANT — License & Key System
 
-**Version:** relay v2.2.1  
+**Version:** relay v2.4.1  
 **License:** BUSL-1.1 — see [LICENSE](../LICENSE)  
-**Last updated:** 2026-04-08
+**Last updated:** 2026-04-10
 
 ---
 
@@ -201,13 +201,16 @@ Keys are **not stored server-side**. Record them in a password manager or CRM.
 # 1. Add to .env
 echo "PARAMANT_LICENSE=plk_xxxx..." >> .env
 
-# 2. Restart (repeat per sector)
-systemctl restart paramant-relay-health paramant-relay-legal \
-                  paramant-relay-finance paramant-relay-iot
-# or Docker:
-docker compose restart
+# 2. Restart all containers to pick up the new env var
+cd /path/to/paramant-relay
+docker compose up -d
 
-# 3. Verify
+# 3. Verify — edition is now in the public /health response (no admin token needed)
+curl -s https://your-relay/health \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['edition'])"
+# licensed
+
+# Full detail with admin token:
 curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-relay/health \
   | python3 -c "import sys,json; d=json.load(sys.stdin); \
     print(d['edition'], d['active_keys'], 'keys, limit:', d['key_limit'])"

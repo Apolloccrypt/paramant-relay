@@ -26,7 +26,7 @@ const fs     = require('fs');
 const path   = require('path');
 const url_   = require('url');
 
-const VERSION    = '2.3.6';
+const VERSION    = '2.4.1';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
@@ -837,7 +837,7 @@ const server = http.createServer(async (req, res) => {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     const adminOk  = adminTok && adminTok === (process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
-    const base = { ok: true, version: VERSION, sector: SECTOR };
+    const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION };
     const full = { ...base, ...ram, pubkeys: pubkeys.size,
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
