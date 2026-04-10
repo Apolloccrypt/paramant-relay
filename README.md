@@ -48,7 +48,29 @@ Subject: Free API key request
 
 ## Self-host
 
-**Raspberry Pi / Linux VPS / Docker** (~2 minutes):
+Two options — pick one:
+
+### Option A — ParamantOS (bootable ISO, easiest)
+
+**[→ Download ParamantOS ISO](https://github.com/Apolloccrypt/ParamantOS/releases/latest)**
+
+Flash to USB, plug in, boot. The relay starts automatically — no Linux, no Docker, no package manager needed. Purpose-built NixOS image with the relay baked in, SSH hardened, firewall pre-configured.
+
+```bash
+# Flash to USB (replace /dev/sdX with your drive)
+sudo dd if=ParamantOS.iso of=/dev/sdX bs=4M status=progress && sync
+# Boot → relay is live on port 3000
+curl http://YOUR_IP:3000/health
+```
+
+> Best for: bare-metal servers, dedicated hardware, edge deployments, air-gapped setups.  
+> Source & build instructions: [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS)
+
+---
+
+### Option B — Docker (Linux VPS / Raspberry Pi)
+
+**Raspberry Pi / Linux VPS** (~2 minutes):
 
 ```bash
 git clone https://github.com/Apolloccrypt/paramant-relay
@@ -124,7 +146,8 @@ For unlimited users, add a `plk_` relay license to `.env`. → [docs/licensing.m
 by Paramant. They cannot be forged, modified, or replicated. An invalid or expired key
 falls back to Community Edition gracefully — the relay never crashes on a bad key.
 
-Full deploy guide: [docs/self-hosting.md](docs/self-hosting.md)
+Full Docker deploy guide: [docs/self-hosting.md](docs/self-hosting.md)  
+Bootable ISO (no Docker): [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS)
 
 ---
 
@@ -201,8 +224,9 @@ Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest
 
 | | |
 |--|--|
-| [docs/self-hosting.md](docs/self-hosting.md) | Deploy, env vars, nginx, TLS, upgrade |
-| [docs/licensing.md](docs/licensing.md) | Key types, edition limits, known limitations |
+| [docs/self-hosting.md](docs/self-hosting.md) | Docker deploy, env vars, nginx, TLS, upgrade |
+| [docs/licensing.md](docs/licensing.md) | Key types, edition limits, Ed25519 enforcement |
+| [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS) | Bootable NixOS ISO — plug in, boot, relay is live |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
 
