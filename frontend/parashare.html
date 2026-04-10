@@ -336,7 +336,7 @@ main { background: transparent !important }
 </div>
 
 <script type="module">
-import { initCrypto, encryptBlob as _eb } from './crypto-bridge.js';
+import { initCrypto, encryptBlob as _eb } from './crypto-bridge.js?v=4';
 window._cryptoBridge = { encryptBlob: _eb };
 initCrypto().catch(e => console.error('WASM init failed:', e));
 </script>
@@ -562,8 +562,8 @@ async function confirmFingerprint() {
     return;
   }
 
-  // Tell receiver we confirmed
-  ws.send(JSON.stringify({ type: 'packet', chatHash: sessionToken, seq: 0, payload: JSON.stringify({ type: 'fingerprint_ok' }) }));
+  // Tell receiver we confirmed (best-effort via WS — file transfer uses HTTP anyway)
+  try { ws.send(JSON.stringify({ type: 'packet', chatHash: sessionToken, seq: 0, payload: JSON.stringify({ type: 'fingerprint_ok' }) })); } catch(e) { console.warn('WS send failed (non-fatal):', e.message); }
 
   showStep('step-encrypting');
 

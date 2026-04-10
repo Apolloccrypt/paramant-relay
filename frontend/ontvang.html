@@ -120,9 +120,9 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 </main>
 
-<script type="module" src="/noble-mlkem-loader.js"></script>
+<script type="module" src="/noble-mlkem-loader.js?v=4"></script>
 <script type="module">
-import { initCrypto, encryptBlob, decryptBlob } from '/crypto-bridge.js';
+import { initCrypto, encryptBlob, decryptBlob } from '/crypto-bridge.js?v=4';
 window._cryptoBridge = { initCrypto, encryptBlob, decryptBlob };
 // Pre-warm WASM (integrity check + init) so it's ready when a transfer arrives
 initCrypto().catch(e => console.error('WASM init failed:', e));
