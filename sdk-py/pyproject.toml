@@ -7,13 +7,12 @@ name = "paramant-sdk"
 version = "2.4.1"
 description = "Python SDK for PARAMANT Ghost Pipe — zero-plaintext post-quantum file transport"
 readme = "README.md"
-license = { text = "BUSL-1.1" }
+license = "BUSL-1.1"
 requires-python = ">=3.9"
 keywords = ["paramant", "ghost-pipe", "encryption", "post-quantum", "file-transfer", "zero-knowledge"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
