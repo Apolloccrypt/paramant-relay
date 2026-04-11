@@ -279,22 +279,26 @@ async function init() {
       try { msg = JSON.parse(e.data); } catch { return; }
       console.log('WS msg:', msg.type, msg.payload ? msg.payload.slice?.(0,50) : '');
 
-      let payload = null;
-      if (msg.type === 'packet' && msg.payload) {
-        try { payload = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch {}
-      }
-
-      if (payload?.type === 'fingerprint_ok') {
-        $('fp-title').textContent = 'Fingerprint confirmed - receiving file...';
-        $('fp-status').textContent = 'Sender confirmed fingerprint - file is being encrypted for you';
-      }
-
-      // ook via HTTP polling afgehandeld hieronder
-
-      if (msg.type === 'peer_left') {
-        if (!$('step-done').classList.contains('active')) {
-          showError('Sender disconnected');
+      try {
+        let payload = null;
+        if (msg.type === 'packet' && msg.payload) {
+          try { payload = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload; } catch {}
         }
+
+        if (payload?.type === 'fingerprint_ok') {
+          $('fp-title').textContent = 'Fingerprint confirmed - receiving file...';
+          $('fp-status').textContent = 'Sender confirmed fingerprint - file is being encrypted for you';
+        }
+
+        // ook via HTTP polling afgehandeld hieronder
+
+        if (msg.type === 'peer_left') {
+          if (!$('step-done').classList.contains('active')) {
+            showError('Sender disconnected');
+          }
+        }
+      } catch(err) {
+        console.error('ws.onmessage handler error:', err);
       }
     };
 

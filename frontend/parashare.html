@@ -576,12 +576,17 @@ async function connectWebSocket() {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
 
-    if (msg.type === 'pubkey_offer' && msg.kyber_pub && msg.ecdh_pub) {
-      await showReceiverConnected(msg.kyber_pub, msg.ecdh_pub);
-    }
+    try {
+      if (msg.type === 'pubkey_offer' && msg.kyber_pub && msg.ecdh_pub) {
+        await showReceiverConnected(msg.kyber_pub, msg.ecdh_pub);
+      }
 
-    if (msg.type === 'peer_left') {
-      setStatus('waiting-status', 'Receiver disconnected', 'err');
+      if (msg.type === 'peer_left') {
+        setStatus('waiting-status', 'Receiver disconnected', 'err');
+      }
+    } catch(err) {
+      console.error('ws.onmessage handler error:', err);
+      setStatus('waiting-status', 'Error processing receiver message — ' + err.message, 'err');
     }
   };
 

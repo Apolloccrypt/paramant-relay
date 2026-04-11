@@ -25,8 +25,8 @@
 
 | # | Finding | Status | Notes |
 |---|---------|--------|-------|
-| 1 | **API key leaked in receiver URL** — sender's `pgp_` key embedded in `/ontvang?k=pgp_xxx` share link | ⚙ | Fix: scope to a session token derived from the PSS/inv_ mechanism. Relay already logs `key_in_querystring` warning. |
-| 2 | **`await` in non-async `ws.onmessage`** — fingerprint path silently broken in parashare.html | ⚙ | HTTP polling fallback masks it in practice. Async handler fix pending. |
+| 1 | **API key leaked in receiver URL** — sender's `pgp_` key embedded in `/ontvang?k=pgp_xxx` share link | ✓ | Share URL now uses `inv_` session token (`/ontvang?s=inv_xxx&r=sector`). Relay rejects `?k=` on all HTTP paths (HTTP 400) and logs + drops WebSocket upgrades with `?k=`. API key never appears in any URL. |
+| 2 | **`await` in non-async `ws.onmessage`** — fingerprint path silently broken in parashare.html | ✓ | Both `ws.onmessage` handlers (parashare.html, ontvang.html) now wrap all async logic in `try/catch`. Errors surface via `setStatus()` instead of silently failing as unhandled rejections. |
 | 3 | **Python SDK — no key zeroization** — `sdk-py/paramant_sdk/__init__.py` (pip package) has no `_zero()` calls unlike `scripts/paramant_sdk.py` | ⚙ | Zeroization will be added to the pip package to match the scripts version. |
 | 4 | **Plaintext filename in relay metadata** — `files[0].name` stored in cleartext in `pubkeys` Map and `downloadTokens` Map on relay | ⚙ | Filename should be encrypted client-side before being passed through the token metadata channel. |
 
