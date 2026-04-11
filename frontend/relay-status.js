@@ -79,6 +79,23 @@
     const online = RELAYS.filter(r => relayStatus[r.name]?.ok).length;
     const el = document.getElementById("stat-relay-count");
     if(el) el.textContent = online || RELAYS.length;
+
+    const stxt = document.getElementById("stxt");
+    const sdot = document.getElementById("sdot");
+    if(stxt){
+      const checked = Object.keys(relayStatus).length;
+      if(checked === 0) return;
+      if(online === RELAYS.length){
+        stxt.textContent = "All relays operational \u00b7 v2.4.2";
+        if(sdot) sdot.style.background = "#3aaa70";
+      } else if(online > 0){
+        stxt.textContent = online + " of " + RELAYS.length + " relays online";
+        if(sdot) sdot.style.background = "#e67e22";
+      } else {
+        stxt.textContent = "Relay status unknown";
+        if(sdot) sdot.style.background = "#555";
+      }
+    }
   }
 
   async function pollRelay(r,i){
