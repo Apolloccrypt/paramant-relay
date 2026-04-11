@@ -99,7 +99,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
   <ul class="nav-links">
     <li><a href="#sectors">Use cases</a></li>
-    <li><a href="#security">Security</a></li>
+    <li><a href="/security">Security</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#selfhost">Self-host</a></li>
     <li><a href="/parashare">ParaShare</a></li>
@@ -111,7 +111,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <div class="hero">
   <div class="status"><span class="status-dot" id="sdot" style="background:#2d8a5c"></span><span id="stxt">Checking relay status...</span></div>
-  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.4.1 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
+  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.4.2 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum file transfer. Encrypted client-side, stored in RAM only, destroyed after one download. For healthcare, legal, and critical infrastructure.</p>
   <div class="btns" style="margin-top:36px">
@@ -171,6 +171,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       </div>
       <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)">
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Relay</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-main">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Finance</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-finance">—</div></div>
@@ -361,8 +362,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
       <div style="background:var(--bg);padding:20px 24px">
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">1</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">relay node live</div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px" id="stat-relay-count">5</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">relay sectors live</div>
       </div>
       <div style="background:var(--bg);padding:20px 24px">
         <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">5MB</div>
@@ -444,8 +445,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div style="font-size:12px;color:var(--quiet);font-family:var(--mono)">Ryan Williams &middot; Smart Cyber Solutions Pty Ltd (AU) &middot; uncompensated, voluntary</div>
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <a href="/pentest-report-2026-04-08.txt" style="font-size:12px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:7px 16px;border-radius:4px;text-decoration:none">Full report &rarr;</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/security-audit-2026-04.md" target="_blank" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:7px 16px;border-radius:4px;text-decoration:none">Patch status &rarr;</a>
+      <a href="/security" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:7px 16px;border-radius:4px;text-decoration:none">Security page &rarr;</a>
     </div>
   </div>
 </section>
@@ -510,7 +510,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> Admin panel (/admin/)</li>
         <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> Community support only</li>
       </ul>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.4.1" target="_blank" class="price-btn p">Download v2.4.1 &rarr;</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.4.2" target="_blank" class="price-btn p">Download v2.4.2 &rarr;</a>
     </div>
 
     <div class="pc">
@@ -716,7 +716,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div class="footer-links" style="flex-direction:column;gap:10px">
         <a href="mailto:privacy@paramant.app">Contact</a>
         <a href="mailto:privacy@paramant.app?subject=Free+API+key+request">Free API key</a>
-        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank">Security</a>
+        <a href="/security">Security</a>
         <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank">License</a>
       </div>
     </div>

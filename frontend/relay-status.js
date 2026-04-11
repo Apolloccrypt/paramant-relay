@@ -1,5 +1,6 @@
 (function(){
   const RELAYS = [
+    {name:"relay",   url:"https://relay.paramant.app",   stat:"ps-main"},
     {name:"health",  url:"https://health.paramant.app",  stat:"ps-health"},
     {name:"legal",   url:"https://legal.paramant.app",   stat:"ps-legal"},
     {name:"finance", url:"https://finance.paramant.app", stat:"ps-finance"},
@@ -74,6 +75,12 @@
 
   function spawnDot(i){ pdots.push({x:100,relay:i,speed:1.5+Math.random()*1.5}); }
 
+  function updateLiveCount(){
+    const online = RELAYS.filter(r => relayStatus[r.name]?.ok).length;
+    const el = document.getElementById("stat-relay-count");
+    if(el) el.textContent = online || RELAYS.length;
+  }
+
   async function pollRelay(r,i){
     try{
       const d = await fetch(r.url+"/health",{signal:AbortSignal.timeout(4000)}).then(x=>x.json());
@@ -86,6 +93,7 @@
       const el=document.getElementById(r.stat);
       if(el) el.textContent="offline";
     }
+    updateLiveCount();
   }
 
   RELAYS.forEach((r,i)=>{ pollRelay(r,i); setInterval(()=>pollRelay(r,i),20000); });
