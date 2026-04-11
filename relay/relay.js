@@ -1035,9 +1035,10 @@ const server = http.createServer(async (req, res) => {
       return res.end(J({ error: 'Invalid base64 in public_key or signature' }));
     }
     // Verify ML-DSA-65 signature over: url|sector|version|timestamp
+    // API in @noble/post-quantum: verify(signature, message, publicKey)
     const msg = Buffer.from(rUrl + '|' + rSector + '|' + rVersion + '|' + timestamp, 'utf8');
     let verified = false;
-    try { verified = mlDsa.verify(pkBytes, msg, sigBytes); } catch {}
+    try { verified = mlDsa.verify(sigBytes, msg, pkBytes); } catch {}
     if (!verified) {
       log('warn', 'relay_register_bad_sig', { url: rUrl, sector: rSector });
       res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -2178,8 +2179,9 @@ async function registerSelf() {
   const target = RELAY_PRIMARY_URL || `http://localhost:${PORT}`;
   const timestamp = new Date().toISOString();
   const msg = Buffer.from(RELAY_SELF_URL + '|' + SECTOR + '|' + VERSION + '|' + timestamp, 'utf8');
+  // API in @noble/post-quantum: sign(message, secretKey)
   let sig;
-  try { sig = Buffer.from(mlDsa.sign(relayIdentity.sk, msg)); } catch (e) {
+  try { sig = Buffer.from(mlDsa.sign(msg, relayIdentity.sk)); } catch (e) {
     log('warn', 'relay_self_register_sign_failed', { err: e.message }); return;
   }
   const body = JSON.stringify({
