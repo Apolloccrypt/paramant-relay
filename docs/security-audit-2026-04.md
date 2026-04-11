@@ -27,7 +27,7 @@
 |---|---------|--------|-------|
 | 1 | **API key leaked in receiver URL** — sender's `pgp_` key embedded in `/ontvang?k=pgp_xxx` share link | ✓ | Share URL now uses `inv_` session token (`/ontvang?s=inv_xxx&r=sector`). Relay rejects `?k=` on all HTTP paths (HTTP 400) and logs + drops WebSocket upgrades with `?k=`. API key never appears in any URL. |
 | 2 | **`await` in non-async `ws.onmessage`** — fingerprint path silently broken in parashare.html | ✓ | Both `ws.onmessage` handlers (parashare.html, ontvang.html) now wrap all async logic in `try/catch`. Errors surface via `setStatus()` instead of silently failing as unhandled rejections. |
-| 3 | **Python SDK — no key zeroization** — `sdk-py/paramant_sdk/__init__.py` (pip package) has no `_zero()` calls unlike `scripts/paramant_sdk.py` | ⚙ | Zeroization will be added to the pip package to match the scripts version. |
+| 3 | **Python SDK — no key zeroization** — `sdk-py/paramant_sdk/__init__.py` (pip package) has no `_zero()` calls unlike `scripts/paramant_sdk.py` | ✓ | Fixed in v2.4.4: `sdk-py/paramant_sdk.py` overwritten with `scripts/paramant_sdk.py` (v2.4.1) which includes full `_zero()` zeroization, HKDF salt fix (finding #7), GCM AAD fix (finding #8), and complete API surface. |
 | 4 | **Plaintext filename in relay metadata** — `files[0].name` stored in cleartext in `pubkeys` Map and `downloadTokens` Map on relay | ⚙ | Filename should be encrypted client-side before being passed through the token metadata channel. |
 
 ---
@@ -107,8 +107,9 @@ Internal security hardening pass concurrent with the audit. All findings identif
 | 2026-04-09 | Report reviewed, findings triaged, this tracking page published |
 | 2026-04-09 | Additional findings P1–P4 submitted by Raymond Zwarts ([@rzwarts74](https://github.com/rzwarts74)) and patched same day |
 | 2026-04-09 | Internal hardening pass (H1–H8) — self-hosting stack, Docker, nginx, relay response headers |
-| 2026-04-10 | Critical patches shipped — C1 (already fixed, confirmed), C2 (try/catch in ws.onmessage), C3 (Python SDK zeroization, in progress), C4 (plaintext filename, in progress) |
+| 2026-04-10 | Critical patches shipped — C1 (already fixed, confirmed), C2 (try/catch in ws.onmessage), C3 (Python SDK zeroization, in progress → patched 2026-04-11), C4 (plaintext filename, in progress) |
 | 2026-04-11 | Relay registry launched — ML-DSA-65 signed relay identity, `GET /v2/relays`, `POST /v2/relays/register`, CT log relay_reg entries. All 5 production relays registered. |
+| 2026-04-11 | RAPTOR internal review — relay findings patched in v2.4.4: H1 (admin container read-only FS), M1 (timingSafeEqual for ADMIN_TOKEN), M2 (MFA rate limiting 5/min), M3 (device_id length cap 256), M4 (sdk-py sync + finding #3 closed), M5 (XSS admin overview esc()), L4 (email validation). |
 
 ---
 

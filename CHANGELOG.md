@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.4.4] — 2026-04-11
+
+### Security — RAPTOR audit (relay findings)
+
+- **H1 — Admin container read-only FS**: `docker-compose.yml` admin container now has `read_only: true` and `tmpfs: /tmp:size=32m,mode=1777` — matching the `relay-hardening` baseline applied to all relay containers since v2.3.3.
+- **M1 — Timing-safe admin token**: `admin/server.js` replaced `token === ADMIN_TOKEN` with `crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ADMIN_TOKEN))` — prevents timing-oracle attacks on the admin login endpoint.
+- **M2 — MFA rate limiting**: `relay.js` now enforces a per-IP rate limit on `POST /v2/admin/verify-mfa`: max 5 attempts per minute. Excess requests receive `HTTP 429` with `Retry-After: 60`. Defends against brute-force TOTP attacks.
+- **M3 — device_id length cap**: `POST /v2/pubkey` rejects `device_id` longer than 256 characters with HTTP 400. Prevents memory exhaustion via oversized Map keys.
+- **M4 — sdk-py sync**: `sdk-py/paramant_sdk.py` (pip package) overwritten with `scripts/paramant_sdk.py` (v2.4.1). Brings the pip package up to date with the HKDF salt fix (finding #7), GCM AAD fix (finding #8), and full API surface. **Closes audit finding #3 (Python SDK missing zeroization).**
+- **M5 — XSS in admin overview**: `admin/public/index.html` sector card now escapes the server-supplied sector name via `esc()` before inserting into `innerHTML`.
+- **L4 — Email validation**: `relay.js` `POST /v2/admin/keys` validates the supplied email address (max 254 chars, basic format regex) and caps the label field at 128 chars.
+
+---
+
 ## [2.4.2] — 2026-04-11
 
 ### Added
