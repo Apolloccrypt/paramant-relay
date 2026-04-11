@@ -1,0 +1,50 @@
+{
+  "name": "paramant-sdk",
+  "version": "2.4.1",
+  "description": "JavaScript SDK for PARAMANT Ghost Pipe — zero-plaintext post-quantum file transport",
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "keywords": [
+    "paramant",
+    "ghost-pipe",
+    "encryption",
+    "post-quantum",
+    "file-transfer",
+    "zero-knowledge",
+    "ml-kem",
+    "kyber"
+  ],
+  "license": "MIT",
+  "homepage": "https://paramant.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paramant/paramant-master.git",
+    "directory": "sdk-js"
+  },
+  "bugs": {
+    "url": "https://github.com/paramant/paramant-master/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.4"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
