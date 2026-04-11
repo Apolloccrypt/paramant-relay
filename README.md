@@ -3,7 +3,7 @@
 **Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
 
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.4.1-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.2-brightgreen.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 [![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
 [![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
@@ -117,7 +117,16 @@ Internet → nginx (443)
 **To upgrade** after a code change:
 ```bash
 git pull
-docker compose up -d --build   # --build rebuilds the image; volumes (users, CT log) are preserved
+# Copy updated relay.js into the Docker build context, then rebuild
+cp relay/relay.js /opt/paramant-relay/relay/relay.js   # or wherever docker-compose.yml lives
+docker compose build relay-main relay-health relay-finance relay-legal relay-iot
+docker compose up -d
+# Named volumes (users.json, CT log, relay identity) are preserved across rebuilds
+```
+
+Or add a shell alias for one-command deploy:
+```bash
+alias paramant-deploy='rsync relay/relay.js root@YOUR_SERVER:/opt/paramant-relay/relay/relay.js && ssh root@YOUR_SERVER "cd /opt/paramant-relay && docker compose build relay-main relay-health relay-finance relay-legal relay-iot && docker compose up -d"'
 ```
 
 **First user (after deploy):**
@@ -193,6 +202,13 @@ The relay is **untrusted by design** — it never holds a decryption key.
 **Independent security audit (April 2026):** [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU) · uncompensated, voluntary review
 Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
 
+**v2.4.2 (April 2026):** Relay registry:
+- Each relay generates an ML-DSA-65 identity keypair on first boot (`/data/relay-identity.json`)
+- `POST /v2/relays/register` — signed self-registration appended to CT log (public, no API key)
+- `GET /v2/relays` — public relay discovery: url, sector, version, edition, `verified_since`, `pk_hash`
+- ct-log.html: "Registered Relays" tab; paramant-scan queries registry before nmap
+- SDK-JS 2.4.2: CJS+ESM dual exports (`require()` + `import`)
+
 **v2.4.1 (April 2026):** ParaShare end-to-end flow restored:
 - `ghost_pipe` mode: `/v2/ws-ticket` added to ALLOWED paths
 - WS ticket URL fixed — fetched from relay-main (same host as WS connection)
@@ -226,6 +242,7 @@ Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest
 |--|--|
 | [docs/self-hosting.md](docs/self-hosting.md) | Docker deploy, env vars, nginx, TLS, upgrade |
 | [docs/licensing.md](docs/licensing.md) | Key types, edition limits, Ed25519 enforcement |
+| [docs/security.md](docs/security.md) | Security model — threat model, crypto stack, audit |
 | [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS) | Bootable NixOS ISO — plug in, boot, relay is live |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |

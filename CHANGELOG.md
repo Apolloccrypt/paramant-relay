@@ -7,6 +7,36 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.4.2] — 2026-04-11
+
+### Added
+
+- **Relay registry via CT log** — Every relay announces itself at startup. New public endpoints (no API key required):
+  - `POST /v2/relays/register` — ML-DSA-65 signed self-registration. Validates signature over `url|sector|version|timestamp`, rejects timestamps older than 5 minutes (replay prevention). Registration is appended to the CT log as a `relay_reg` entry, creating a tamper-evident audit trail.
+  - `GET /v2/relays` — Returns all verified relays: `url`, `sector`, `version`, `edition`, `pk_hash`, `verified_since`, `last_seen`, `ct_index`.
+  - Three new env vars: `RELAY_SELF_URL` (this relay's public URL), `RELAY_PRIMARY_URL` (where to POST registration, default: self), `RELAY_IDENTITY_FILE` (keypair path, default: `/data/relay-identity.json`).
+  - On first boot each relay generates an ML-DSA-65 identity keypair and persists it to `/data/relay-identity.json`. On subsequent restarts the same keypair is reused — `verified_since` therefore proves how long a relay has been continuously running the same identity.
+
+- **CT log `relay_reg` entries** — CT log now contains two entry types: `key_reg` (existing pubkey registrations) and `relay_reg` (relay self-registrations). Both share the same Merkle tree — every relay registration is provably included in the same tamper-evident audit chain as key registrations.
+
+- **ct-log.html — "Registered Relays" tab** — Second tab on the CT log viewer shows all registered relays in a table: URL, sector, version, edition, verified_since, last_seen.
+
+- **paramant-scan — registry-first discovery** — Queries `PARAMANT_PRIMARY/v2/relays` (default: `health.paramant.app`) before running nmap scan. Displays `verified_since`, `pk_hash`, and `ct_index` for each registered relay. Falls back to local network nmap scan when registry is empty or unreachable.
+
+- **SDK-JS CJS+ESM dual exports** — `sdk-js/package.json` now includes `"require": "./index.js"` in the exports map alongside `"import"`. Works with both `require()` (Node.js 22+ CJS interop) and `import`.
+
+### Fixed
+
+- **ML-DSA-65 sign/verify argument order** — In the installed version of `@noble/post-quantum` the API is `sign(message, secretKey)` and `verify(signature, message, publicKey)` — reversed from the documented order. Fixed in relay registry sign and verify calls.
+
+- **Relay deploy workflow** — Docker images are built from `/opt/paramant-relay/relay/relay.js`, not from `/home/paramant/relay/relay.js`. Correct deploy sequence: copy relay.js to the build context → `docker compose build` → `docker compose up -d`. Alias: `paramant-deploy`.
+
+### Changed
+
+- **SDK-JS version** — `2.4.1` → `2.4.2`
+
+---
+
 ## [2.4.1] — 2026-04-10
 
 ### Fixed

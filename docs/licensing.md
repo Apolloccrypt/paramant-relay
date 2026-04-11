@@ -1,8 +1,8 @@
 # PARAMANT — License & Key System
 
-**Version:** relay v2.4.1  
+**Version:** relay v2.4.2  
 **License:** BUSL-1.1 — see [LICENSE](../LICENSE)  
-**Last updated:** 2026-04-10
+**Last updated:** 2026-04-11
 
 ---
 

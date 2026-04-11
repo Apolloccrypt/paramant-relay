@@ -8,5 +8,8 @@
   "devDependencies": {
     "javascript-obfuscator": "^4.1.1",
     "terser": "^5.31.0"
+  },
+  "dependencies": {
+    "paramant-sdk": "^2.4.1"
   }
 }

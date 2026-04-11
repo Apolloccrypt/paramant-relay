@@ -1,6 +1,6 @@
 # PARAMANT Self-Hosting Guide
 
-**Version:** v2.4.1  
+**Version:** v2.4.2  
 **License:** BUSL-1.1 — source available, free for up to 5 users per relay in production  
 **Change date:** 2029-01-01 → Apache 2.0  
 **License enforcement details:** [docs/licensing.md](licensing.md)
@@ -67,6 +67,9 @@ nano .env
 | `CT_LOG_FILE` | No | `/data/ct-log.json` | Path to CT log persistence file (health relay only) |
 | `PARAMANT_LICENSE` | No | — | Relay license key (`plk_...`) — unlocks unlimited users |
 | `RESEND_API_KEY` | No | — | For welcome emails when adding users |
+| `RELAY_SELF_URL` | No | — | This relay's public URL (e.g. `https://relay.yourdomain.com`). Required for relay registry self-registration. |
+| `RELAY_PRIMARY_URL` | No | self | URL of the registry relay to POST registrations to (e.g. `https://health.yourdomain.com`). Defaults to posting to self. |
+| `RELAY_IDENTITY_FILE` | No | `/data/relay-identity.json` | Path for ML-DSA-65 relay identity keypair. Generated on first boot, reused on subsequent starts. |
 | `HTTP_PORT` | No | `80` | Override if port 80 is in use |
 | `HTTPS_PORT` | No | `443` | Override if port 443 is in use |
 | `DOMAIN` | No | `localhost` | Your domain — used for self-signed cert CN |
@@ -306,13 +309,32 @@ relay/relay.js ──(build: ./relay)──► relay-main    (SECTOR=relay)
 
 ## Upgrade
 
+The Docker image is built from the `relay/` subdirectory in your clone. After pulling new code you must rebuild the images before restarting:
+
 ```bash
 cd /path/to/paramant-relay   # wherever you cloned the repo
 git pull
-docker compose up -d --build
-# --build rebuilds the relay image with the updated relay.js
-# Named volumes (users.json, CT log) are preserved across rebuilds
+
+# Build new images (node_modules cached; only relay.js layer is rebuilt)
+docker compose build relay-main relay-health relay-finance relay-legal relay-iot
+
+# Recreate containers with new images
+docker compose up -d
+
+# Named volumes (users.json, CT log, relay-identity.json) are preserved across rebuilds
 ```
+
+**One-command alias** (add to `~/.bashrc`):
+```bash
+alias paramant-deploy='
+  rsync relay/relay.js root@YOUR_SERVER:/opt/paramant-relay/relay/relay.js &&
+  ssh root@YOUR_SERVER "cd /opt/paramant-relay &&
+    docker compose build relay-main relay-health relay-finance relay-legal relay-iot &&
+    docker compose up -d"
+'
+```
+
+> **Note:** `docker compose up -d --build` works too but rebuilds all services including admin. Using explicit service names (`relay-main relay-health ...`) skips rebuilding the admin container.
 
 ---
 
@@ -410,9 +432,62 @@ Browser-based end-to-end encrypted file transfer using ML-KEM-768:
 
 **Access:** public, no login required
 
-Every key registration is recorded in a tamper-evident Merkle tree — without storing payload content.
-Entries are persisted to `CT_LOG_FILE` (default: `/data/ct-log.json`) on each registration and reloaded on startup.
-The log resets only if the file is deleted.
+Every key registration and relay registration is recorded in a tamper-evident Merkle tree — without storing payload content. Two entry types:
+
+- `key_reg` — pubkey registration (existing behaviour)
+- `relay_reg` — relay self-registration (see Relay Registry below)
+
+Entries are persisted to `CT_LOG_FILE` (default: `/data/ct-log.json`) on each registration and reloaded on startup. The log resets only if the file is deleted.
+
+The CT log viewer has two tabs: **Key Registrations** (all pubkey entries) and **Registered Relays** (relay identity entries with `verified_since` per relay).
+
+---
+
+### Relay Registry — `/v2/relays`
+
+**Access:** public, no login required  
+**Endpoints:** `GET /v2/relays`, `POST /v2/relays/register`
+
+On first boot each relay generates an ML-DSA-65 keypair and stores it in `/data/relay-identity.json`. After the server starts it signs a registration payload and POSTs it to `RELAY_PRIMARY_URL`. The registration is verified (ML-DSA-65 signature + timestamp freshness check) and appended to the CT log.
+
+**To enable for your relay stack**, add to each service's environment in `docker-compose.yml`:
+
+```yaml
+# Per-service (different URL per sector):
+RELAY_SELF_URL: "https://relay.yourdomain.com"       # relay-main
+RELAY_SELF_URL: "https://health.yourdomain.com"      # relay-health
+# ... etc.
+
+# Same for all services — where to POST registrations:
+RELAY_PRIMARY_URL: "https://health.yourdomain.com"
+```
+
+After restarting, verify registration:
+```bash
+curl -s https://health.yourdomain.com/v2/relays | python3 -m json.tool
+```
+
+Expected output (one entry per registered relay):
+```json
+{
+  "ok": true,
+  "relays": [
+    {
+      "url": "https://relay.yourdomain.com",
+      "sector": "relay",
+      "version": "2.4.2",
+      "edition": "community",
+      "pk_hash": "3d9b960c...",
+      "verified_since": "2026-04-11T02:14:13Z",
+      "last_seen": "2026-04-11T02:14:13Z",
+      "ct_index": 0
+    }
+  ],
+  "count": 1
+}
+```
+
+`verified_since` is the timestamp of the first CT log entry for this relay's public key — it proves how long the relay has been running the same identity. `pk_hash` is SHA3-256 of the ML-DSA-65 public key — stable across relay restarts as long as `/data/relay-identity.json` is preserved.
 
 ---
 

@@ -1,6 +1,6 @@
 # PARAMANT Ghost Pipe — Security Model
 
-**Version:** 2.4.1  
+**Version:** 2.4.2  
 **Last updated:** 2026-04-11
 
 ---
@@ -243,6 +243,47 @@ Registration now returns fingerprint + CT info:
   "ct_tree_hash": "...",
   "dsa_supported": true
 }
+```
+
+---
+
+## Relay Identity — ML-DSA-65 signed registry
+
+Each relay node generates an ML-DSA-65 keypair on first boot and persists it to `/data/relay-identity.json`. On every subsequent start the relay signs a registration payload and POSTs it to the registry relay. The signature is verified before the relay is added to the registry.
+
+**Registration message (signed):**
+```
+message = url | sector | version | timestamp
+signature = ML-DSA-65.sign(message, secretKey)
+```
+
+**Timestamp freshness check:** registrations with timestamps older than 5 minutes are rejected — prevents replay attacks from old registration payloads.
+
+**CT log entry (relay_reg):**
+```json
+{
+  "index": 4,
+  "type": "relay_reg",
+  "leaf_hash": "sha3-256(0x00 || sha3-256(url|sector) || pk_hash || timestamp)",
+  "relay_url": "https://relay.paramant.app",
+  "relay_sector": "relay",
+  "relay_version": "2.4.2",
+  "relay_edition": "licensed",
+  "relay_pk_hash": "3d9b960c...",
+  "ts": "2026-04-11T02:14:13.555Z"
+}
+```
+
+**`verified_since`** is the timestamp of the first CT log entry for a given `pk_hash`. It proves how long a relay has been continuously running the same identity — cannot be backdated because CT entries are append-only Merkle leaves.
+
+**Registry endpoint (public, no auth):**
+```bash
+GET /v2/relays
+→ { ok: true, relays: [...], count: 5 }
+
+POST /v2/relays/register
+Body: { url, sector, version, edition, public_key (base64), signature (base64), timestamp (ISO) }
+→ { ok: true, pk_hash, ct_index, verified_since }
 ```
 
 ---

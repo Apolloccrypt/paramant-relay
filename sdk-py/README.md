@@ -4,6 +4,8 @@ Python SDK for **PARAMANT Ghost Pipe** — zero-plaintext, burn-on-read file tra
 
 **Version:** 2.4.1 · [Security model](../docs/security.md) · [Relay API](../docs/api.md)
 
+> **Note (pending — C3):** Key zeroization (`_zero()`) is implemented in `scripts/paramant_sdk.py` but not yet in this pip package. The pip package will be updated in the next patch.
+
 ---
 
 ## Install
