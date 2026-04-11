@@ -828,7 +828,9 @@ const server = http.createServer(async (req, res) => {
   const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
 
   // Community Edition limit: block keys that exceed the 5-key cap
-  if (keyData?.over_limit) {
+  // /v2/check-key is exempt — it must always return the real key status so
+  // clients can discover which relay accepts their key without being gated.
+  if (keyData?.over_limit && path !== '/v2/check-key') {
     res.writeHead(402, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       error: 'This relay has reached its user limit. Please contact the relay operator.',

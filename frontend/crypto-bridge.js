@@ -37,7 +37,8 @@ async function _verifyAndInit() {
   }
 
   // Pass the already-fetched bytes to init() to avoid a second HTTP request
-  return init(wasmBytes);
+  // wasm-bindgen ≥ 0.2.91 requires object form { module_or_path: ... }
+  return init({ module_or_path: wasmBytes });
 }
 
 /** Ensure WASM is initialised exactly once (with integrity check). */

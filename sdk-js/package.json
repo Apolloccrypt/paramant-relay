@@ -27,7 +27,7 @@
     "ml-kem",
     "kyber"
   ],
-  "license": "MIT",
+  "license": "BUSL-1.1",
   "homepage": "https://paramant.app",
   "repository": {
     "type": "git",

@@ -316,4 +316,4 @@ except RelayError as e:
 
 ## License
 
-MIT — see [LICENSE](../LICENSE)
+BUSL-1.1 — see [LICENSE](../LICENSE)
