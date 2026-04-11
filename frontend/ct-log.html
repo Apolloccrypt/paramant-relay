@@ -93,6 +93,27 @@ nav a.back:hover { color:#aaa; }
 .empty-state h3 { font-size:14px; color:#aaa; margin-bottom:10px; }
 .empty-state p { font-size:12px; color:#666; max-width:480px; margin:0 auto; line-height:1.8; }
 
+/* Tabs */
+.tabs { display:flex; gap:0; margin:0 40px 32px; border-bottom:1px solid #1a1a1a; }
+.tab { background:transparent; border:none; border-bottom:2px solid transparent; color:#666;
+  padding:10px 20px; font-family:inherit; font-size:12px; letter-spacing:.08em; cursor:pointer;
+  margin-bottom:-1px; transition:color .15s, border-color .15s; }
+.tab.active { color:#e0e0e0; border-bottom-color:#3aaa70; }
+.tab:hover:not(.active) { color:#aaa; }
+
+/* Relay registry table */
+.relay-table-wrap { margin:0 40px 40px; border:1px solid #1a1a1a; border-radius:6px; overflow:hidden; }
+.relay-table-head { display:grid; grid-template-columns:1fr 90px 70px 90px 160px 160px; gap:0; background:#111; padding:10px 16px; }
+.relay-table-head span { font-size:10px; color:#666; letter-spacing:.1em; text-transform:uppercase; }
+.relay-row { display:grid; grid-template-columns:1fr 90px 70px 90px 160px 160px; gap:0; padding:14px 16px;
+  border-top:1px solid #131313; transition:background .1s; }
+.relay-row:hover { background:#111; }
+.relay-row .url { font-size:11px; color:#c0c0c0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.relay-row .cell { font-size:11px; color:#999; }
+.relay-row .cell.green { color:#3aaa70; }
+.relay-row .cell.dim { color:#666; font-size:10px; }
+.relay-verified { font-size:10px; color:#3aaa70; padding:2px 6px; background:#0a1f1a; border:1px solid #1a3f30; border-radius:3px; display:inline-block; }
+
 @media(max-width:700px) {
   nav, .hero, .search-bar, .pagination, .notice, .verify-section { padding-left:20px; padding-right:20px; }
   .stats { flex-direction:column; gap:1px; margin:0 20px 32px; }
@@ -116,6 +137,12 @@ nav a.back:hover { color:#aaa; }
   <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered — without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
 </div>
 
+<div class="tabs">
+  <button class="tab active" id="tab-log"    onclick="switchTab('log')">Key Registrations</button>
+  <button class="tab"        id="tab-relays" onclick="switchTab('relays')">Registered Relays</button>
+</div>
+
+<div id="pane-log">
 <div class="notice" id="persistence-notice">
   <div class="body">
     <strong>Persistent log — survives relay restarts</strong>
@@ -175,6 +202,23 @@ nav a.back:hover { color:#aaa; }
   <span id="page-info">—</span>
   <button id="next-btn" onclick="changePage(1)" disabled>Next &#8594;</button>
 </div>
+
+</div><!-- /pane-log -->
+
+<div id="pane-relays" style="display:none">
+  <div class="stats" id="relay-stats">
+    <div class="stat"><div class="val" id="rstat-count">—</div><div class="lbl">Registered Relays</div></div>
+    <div class="stat"><div class="val green" id="rstat-sectors">—</div><div class="lbl">Sectors</div></div>
+    <div class="stat"><div class="val dim" id="rstat-last">—</div><div class="lbl">Last Registration</div></div>
+  </div>
+  <div class="relay-table-wrap">
+    <div class="relay-table-head">
+      <span>URL</span><span>Sector</span><span>Version</span><span>Edition</span>
+      <span>Verified Since</span><span>Last Seen</span>
+    </div>
+    <div id="relay-entries"><div class="loading">Loading relay registry…</div></div>
+  </div>
+</div><!-- /pane-relays -->
 
 <script>
 const RELAY = 'https://health.paramant.app';
@@ -342,6 +386,65 @@ function verifyHash() {
     + 'Timestamp     : ' + (match.ts ? new Date(match.ts).toISOString() : '—') + '\n'
     + (match.proof && match.proof.length ? 'Merkle proof  : ' + match.proof.join(' → ') : '')
     + '</pre>';
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('pane-log').style.display    = tab === 'log'    ? '' : 'none';
+  document.getElementById('pane-relays').style.display = tab === 'relays' ? '' : 'none';
+  document.getElementById('tab-log').classList.toggle('active',    tab === 'log');
+  document.getElementById('tab-relays').classList.toggle('active', tab === 'relays');
+  if (tab === 'relays') loadRelays();
+}
+
+// ── Relay registry ────────────────────────────────────────────────────────────
+let relaysLoaded = false;
+
+async function loadRelays() {
+  if (relaysLoaded) return;
+  relaysLoaded = true;
+  var el = document.getElementById('relay-entries');
+  try {
+    var r = await fetch(RELAY + '/v2/relays');
+    var d = await r.json();
+    var relays = d.relays || [];
+
+    document.getElementById('rstat-count').textContent = relays.length || '0';
+    var sectors = [...new Set(relays.map(function(r){return r.sector;}))];
+    document.getElementById('rstat-sectors').textContent = sectors.join(', ') || '—';
+    var latest = relays.reduce(function(a,b){ return (b.last_seen > a) ? b.last_seen : a; }, '');
+    document.getElementById('rstat-last').textContent = latest
+      ? new Date(latest).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})
+      : '—';
+
+    if (relays.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="big">📡</div>'
+        + '<h3>No relays registered yet</h3>'
+        + '<p>Relays register themselves at startup via <code>POST /v2/relays/register</code> using an ML-DSA-65 signed payload. '
+        + 'Set <code>RELAY_SELF_URL</code> and <code>RELAY_PRIMARY_URL</code> in the relay environment to enable auto-registration.</p></div>';
+      return;
+    }
+
+    el.innerHTML = relays.map(function(relay) {
+      var since = relay.verified_since
+        ? new Date(relay.verified_since).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
+        : '—';
+      var last = relay.last_seen
+        ? new Date(relay.last_seen).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
+        : '—';
+      var urlShort = relay.url.replace(/^https?:\/\//, '');
+      return '<div class="relay-row">'
+        + '<div class="url" title="' + relay.url + '">' + urlShort + '</div>'
+        + '<div class="cell green">' + (relay.sector || '—') + '</div>'
+        + '<div class="cell">v' + (relay.version || '?') + '</div>'
+        + '<div class="cell">' + (relay.edition || 'community') + '</div>'
+        + '<div class="cell dim" title="CT log index ' + relay.ct_index + '">' + since + '</div>'
+        + '<div class="cell dim">' + last + '</div>'
+        + '</div>';
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="loading">Error loading relay registry: ' + e.message + '</div>';
+  }
 }
 
 load();

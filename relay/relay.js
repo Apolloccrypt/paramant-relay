@@ -51,7 +51,10 @@ const RELAY_MODE = ['ghost_pipe', 'iot', 'full'].includes(_RAW_MODE) ? _RAW_MODE
   console.error(`[paramant] Invalid RELAY_MODE="${_RAW_MODE}". Must be ghost_pipe|iot|full. Defaulting to ghost_pipe.`);
   return 'ghost_pipe';
 })();
-const SECTOR     = process.env.SECTOR              || 'relay';
+const SECTOR              = process.env.SECTOR              || 'relay';
+const RELAY_SELF_URL      = process.env.RELAY_SELF_URL      || null; // e.g. https://relay.paramant.app — this relay's public URL
+const RELAY_PRIMARY_URL   = process.env.RELAY_PRIMARY_URL   || null; // e.g. https://health.paramant.app — where to register
+const RELAY_IDENTITY_FILE = process.env.RELAY_IDENTITY_FILE || '/data/relay-identity.json';
 
 // Probeer @noble/post-quantum te laden voor ML-DSA
 let mlDsa = null;
@@ -67,12 +70,13 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint'],
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session'],
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
+               '/v2/relays'],
   full:       null,
 };
 
@@ -174,6 +178,72 @@ if (CT_FILE) {
   }
 }
 
+// ── Relay identity — ML-DSA-65 keypair for relay authentication ───────────────
+let relayIdentity = null; // { sk: Buffer, pk: Buffer, pk_hash: string }
+
+function loadOrCreateRelayIdentity() {
+  if (!mlDsa) {
+    log('warn', 'relay_identity_skipped', { reason: 'ML-DSA-65 not available — relay registry disabled' });
+    return;
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(RELAY_IDENTITY_FILE, 'utf8'));
+    const sk = Buffer.from(raw.sk, 'base64');
+    const pk = Buffer.from(raw.pk, 'base64');
+    const pk_hash = crypto.createHash('sha3-256').update(pk).digest('hex');
+    relayIdentity = { sk, pk, pk_hash };
+    log('info', 'relay_identity_loaded', { pk_hash: pk_hash.slice(0, 16) + '…', file: RELAY_IDENTITY_FILE });
+  } catch (e) {
+    if (e.code !== 'ENOENT') log('warn', 'relay_identity_load_failed', { err: e.message, file: RELAY_IDENTITY_FILE });
+    // Generate new keypair
+    try {
+      const kp = mlDsa.keygen();
+      const sk = Buffer.from(kp.secretKey);
+      const pk = Buffer.from(kp.publicKey);
+      const pk_hash = crypto.createHash('sha3-256').update(pk).digest('hex');
+      relayIdentity = { sk, pk, pk_hash };
+      try {
+        fs.mkdirSync(path.dirname(RELAY_IDENTITY_FILE), { recursive: true });
+        fs.writeFileSync(RELAY_IDENTITY_FILE,
+          JSON.stringify({ sk: sk.toString('base64'), pk: pk.toString('base64'), created_at: new Date().toISOString() }),
+          { mode: 0o600 });
+        log('info', 'relay_identity_created', { pk_hash: pk_hash.slice(0, 16) + '…', file: RELAY_IDENTITY_FILE });
+      } catch (we) {
+        log('warn', 'relay_identity_not_persisted', { err: we.message, hint: 'Key regenerated on restart — set RELAY_IDENTITY_FILE to a writable path' });
+      }
+    } catch (ge) {
+      log('error', 'relay_identity_keygen_failed', { err: ge.message });
+    }
+  }
+}
+
+// ── Relay registry — in-memory, populated from CT log on startup ──────────────
+// key: pk_hash (hex) → { url, sector, version, edition, pk_hash, verified_since, last_seen, ct_index, last_ct_index }
+const relayRegistry = new Map();
+
+function relayRegistryFromCTLog() {
+  for (const entry of ctLog) {
+    if (entry.type !== 'relay_reg') continue;
+    const key = entry.relay_pk_hash;
+    if (!key) continue;
+    const existing = relayRegistry.get(key);
+    if (!existing) {
+      relayRegistry.set(key, {
+        url: entry.relay_url, sector: entry.relay_sector,
+        version: entry.relay_version, edition: entry.relay_edition || 'community',
+        pk_hash: key, verified_since: entry.ts, last_seen: entry.ts,
+        ct_index: entry.index, last_ct_index: entry.index
+      });
+    } else {
+      existing.last_seen    = entry.ts;
+      existing.last_ct_index = entry.index;
+      existing.version      = entry.relay_version;
+      existing.edition      = entry.relay_edition || existing.edition;
+    }
+  }
+  if (relayRegistry.size > 0) log('info', 'relay_registry_loaded', { relays: relayRegistry.size });
+}
+
 // RFC 6962-style Merkle tree — SHA3-256 with domain separation bytes:
 //   leaf node:  SHA3-256(0x00 || leaf_data_bytes)   — prevents second-preimage attacks
 //   inner node: SHA3-256(0x01 || left_bytes || right_bytes)
@@ -244,6 +314,34 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
   // Persist to disk (NDJSON append — survives relay restarts)
+  if (CT_FILE) {
+    try { fs.appendFileSync(CT_FILE, JSON.stringify(entry) + '\n'); } catch {}
+  }
+  return entry;
+}
+
+// Appends a relay registration entry to the CT log.
+// Leaf hash: SHA3-256(0x00 || SHA3-256(url|sector) || pk_hash_bytes || ts)
+// — commits to relay identity (URL+sector) and public key, auditable without revealing keys.
+function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
+  const ts = new Date().toISOString();
+  const urlSectorHash = crypto.createHash('sha3-256').update(relayUrl + '|' + sector).digest('hex');
+  // ctLeafHash(deviceIdHash, pubKeyHex, ts) — reuse with urlSectorHash as identity, pkHash as key
+  const leaf_hash = ctLeafHash(urlSectorHash, pkHash, ts);
+  const index = ctLog.length;
+  const allEntries = [...ctLog, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, index);
+  const entry = {
+    index, type: 'relay_reg', leaf_hash, tree_hash,
+    device_hash: pkHash,          // reused field — relay public key hash
+    relay_url: relayUrl, relay_sector: sector,
+    relay_version: version, relay_edition: edition,
+    relay_pk_hash: pkHash,
+    ts, proof
+  };
+  ctLog.push(entry);
+  if (ctLog.length > CT_MAX) ctLog.shift();
   if (CT_FILE) {
     try { fs.appendFileSync(CT_FILE, JSON.stringify(entry) + '\n'); } catch {}
   }
@@ -905,6 +1003,71 @@ const server = http.createServer(async (req, res) => {
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: entry.ts }));
+  }
+
+  // ── POST /v2/relays/register — relay self-registration, ML-DSA-65 verified ───
+  // Public endpoint — no API key required. Requires valid ML-DSA-65 signature.
+  if (path === '/v2/relays/register' && req.method === 'POST') {
+    if (!mlDsa) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'ML-DSA-65 not available on this relay — relay registry disabled' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 65536)).toString()); } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid JSON body' }));
+    }
+    const { url: rUrl, sector: rSector, version: rVersion, edition: rEdition,
+            public_key, signature, timestamp } = body;
+    if (!rUrl || !rSector || !rVersion || !public_key || !signature || !timestamp) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Missing required fields: url, sector, version, public_key, signature, timestamp' }));
+    }
+    // Timestamp freshness check — reject if older than 5 minutes (replay prevention)
+    const ageSec = (Date.now() - new Date(timestamp).getTime()) / 1000;
+    if (Math.abs(ageSec) > 300) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Timestamp out of range — must be within 5 minutes of server time', age_sec: Math.round(ageSec) }));
+    }
+    let pkBytes, sigBytes;
+    try { pkBytes = Buffer.from(public_key, 'base64'); sigBytes = Buffer.from(signature, 'base64'); } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid base64 in public_key or signature' }));
+    }
+    // Verify ML-DSA-65 signature over: url|sector|version|timestamp
+    const msg = Buffer.from(rUrl + '|' + rSector + '|' + rVersion + '|' + timestamp, 'utf8');
+    let verified = false;
+    try { verified = mlDsa.verify(pkBytes, msg, sigBytes); } catch {}
+    if (!verified) {
+      log('warn', 'relay_register_bad_sig', { url: rUrl, sector: rSector });
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Signature verification failed' }));
+    }
+    const pkHash = crypto.createHash('sha3-256').update(pkBytes).digest('hex');
+    const existing = relayRegistry.get(pkHash);
+    const verified_since = existing?.verified_since || new Date().toISOString();
+    const ctEntry = ctAppendRelayReg(rUrl, rSector, rVersion, rEdition || 'community', pkHash);
+    relayRegistry.set(pkHash, {
+      url: rUrl, sector: rSector, version: rVersion, edition: rEdition || 'community',
+      pk_hash: pkHash, verified_since,
+      last_seen: ctEntry.ts,
+      ct_index: existing?.ct_index ?? ctEntry.index,
+      last_ct_index: ctEntry.index
+    });
+    log('info', 'relay_registered', { url: rUrl, sector: rSector, pk_hash: pkHash.slice(0,16)+'…', ct_index: ctEntry.index });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, pk_hash: pkHash, ct_index: ctEntry.index, verified_since }));
+  }
+
+  // ── GET /v2/relays — public registry of verified relay nodes ─────────────────
+  if (path === '/v2/relays' && req.method === 'GET') {
+    const relays = [...relayRegistry.values()].map(r => ({
+      url: r.url, sector: r.sector, version: r.version, edition: r.edition,
+      pk_hash: r.pk_hash, verified_since: r.verified_since, last_seen: r.last_seen,
+      ct_index: r.ct_index, last_ct_index: r.last_ct_index
+    }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, relays, count: relays.length }));
   }
 
   // ── GET /v2/did/:did — publiek DID document resolven ─────────────────────────
@@ -2009,12 +2172,67 @@ function applyKeyLimitEnforcement() {
 }
 
 
+// ── Self-registration — announce this relay to the registry ───────────────────
+async function registerSelf() {
+  if (!relayIdentity || !RELAY_SELF_URL) return;
+  const target = RELAY_PRIMARY_URL || `http://localhost:${PORT}`;
+  const timestamp = new Date().toISOString();
+  const msg = Buffer.from(RELAY_SELF_URL + '|' + SECTOR + '|' + VERSION + '|' + timestamp, 'utf8');
+  let sig;
+  try { sig = Buffer.from(mlDsa.sign(relayIdentity.sk, msg)); } catch (e) {
+    log('warn', 'relay_self_register_sign_failed', { err: e.message }); return;
+  }
+  const body = JSON.stringify({
+    url:        RELAY_SELF_URL,
+    sector:     SECTOR,
+    version:    VERSION,
+    edition:    EDITION,
+    public_key: relayIdentity.pk.toString('base64'),
+    signature:  sig.toString('base64'),
+    timestamp
+  });
+  try {
+    const u = new URL('/v2/relays/register', target);
+    const mod = target.startsWith('https://') ? https : http;
+    await new Promise((resolve, reject) => {
+      const req = mod.request({
+        hostname: u.hostname,
+        port:     u.port || (target.startsWith('https://') ? 443 : 80),
+        path:     u.pathname,
+        method:   'POST',
+        headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+      }, res2 => {
+        let data = '';
+        res2.on('data', d => { data += d; });
+        res2.on('end', () => {
+          try {
+            const d = JSON.parse(data);
+            if (d.ok) log('info', 'relay_self_registered', { url: RELAY_SELF_URL, target, ct_index: d.ct_index });
+            else log('warn', 'relay_self_register_rejected', { error: d.error, target });
+          } catch {}
+          resolve();
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+  } catch (e) {
+    log('warn', 'relay_self_register_failed', { err: e.message, target });
+  }
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
 checkLicense();
+loadOrCreateRelayIdentity();
+relayRegistryFromCTLog();
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
-      dsa: !!mlDsa, protocol: 'ghost-pipe-v2' });
+      dsa: !!mlDsa, protocol: 'ghost-pipe-v2',
+      relay_identity: relayIdentity ? relayIdentity.pk_hash.slice(0,16)+'…' : 'none' });
+  // Register to the relay registry after a short delay to let the server fully bind
+  if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
 });
 function emergencyZeroAndExit(reason, code = 0) {
   // Zeroize all in-memory blobs before exit
