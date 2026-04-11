@@ -613,6 +613,17 @@ function checkTeamRateLimit(teamId, limit) {
   if (b.count >= limit) return false;
   b.count++; teamRateLimits.set(teamId, b); return true;
 }
+
+// M2: Per-IP rate limit for /v2/admin/verify-mfa (max 5 attempts per minute)
+const mfaRateLimits = new Map(); // ip → { count, resetAt }
+function checkMfaRateLimit(ip) {
+  const now = Date.now();
+  const b = mfaRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
+  if (b.count >= 5) return false;
+  b.count++; mfaRateLimits.set(ip, b); return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) if (now > v.resetAt + 60000) mfaRateLimits.delete(k); }, 120_000);
 const pubkeys    = new Map();  // device:key → {ecdh_pub, kyber_pub, dsa_pub, ts}
 const webhooks   = new Map();  // device:key → [{url, secret}]
 const auditChain = new Map();  // key → Merkle chain [{ts,event,hash,bytes,device,prev_hash,chain_hash}]
@@ -1240,6 +1251,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
+      if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
         // Store without API key suffix — readable by any party who knows the session token
         const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
@@ -1711,10 +1724,17 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/admin/verify-mfa ─────────────────────────────────────────────
   if (path === '/v2/admin/verify-mfa' && req.method === 'POST') {
+    // M2: rate limit — max 5 attempts per IP per minute
+    const clientIp = req.socket?.remoteAddress || 'unknown';
+    if (!checkMfaRateLimit(clientIp)) {
+      log('warn', 'mfa_rate_limited', { ip: clientIp });
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Too many MFA attempts — try again in 60 seconds' }));
+    }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const valid = verifyTotp(d.totp_code || '');
-      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: req.socket?.remoteAddress });
+      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: clientIp });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: valid, error: valid ? null : 'Invalid TOTP code' }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -1741,8 +1761,14 @@ const server = http.createServer(async (req, res) => {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
       const plan = d.plan || 'pro';
-      const label = d.label || '';
-      const email = d.email || '';
+      const label = typeof d.label === 'string' ? d.label.slice(0, 128) : '';
+      // L4: validate email format and length before storing/sending
+      const rawEmail = (d.email || '').toString().trim();
+      if (rawEmail && (rawEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail))) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Invalid email address' }));
+      }
+      const email = rawEmail;
       apiKeys.set(newKey, { plan, label, active: true });
       // Persist to users.json so key survives relay restarts
       try {

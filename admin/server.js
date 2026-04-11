@@ -81,7 +81,10 @@ api.post('/auth/login', async (req, res) => {
   const { token, totp } = req.body || {};
   if (!token) return res.status(401).json({ error: 'Token required' });
   if (!totp || !/^\d{6}$/.test(totp)) return res.status(400).json({ error: 'TOTP code required (6 digits)' });
-  const isMaster = token === ADMIN_TOKEN;
+  // M1: timing-safe comparison prevents timing-oracle attacks on the token
+  const isMaster = ADMIN_TOKEN.length > 0
+    && token.length === ADMIN_TOKEN.length
+    && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ADMIN_TOKEN));
   const isEnterprise = token.startsWith('pgp_');
   if (!isMaster && !isEnterprise) return res.status(401).json({ error: 'Invalid token — use your ADMIN_TOKEN or an enterprise pgp_ key' });
   try {

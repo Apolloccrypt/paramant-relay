@@ -178,6 +178,10 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # H1: read-only root FS + explicit tmpfs — matches relay-hardening baseline
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
     deploy:
       resources:
         limits:

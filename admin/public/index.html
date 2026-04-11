@@ -664,7 +664,7 @@ async function loadOverview() {
     card.className = 'sector-card';
     card.innerHTML = `
       <div class="card-header">
-        <div class="card-title">${sector}</div>
+        <div class="card-title">${esc(sector)}</div>
         <div class="card-status ${up ? '' : 'down'}">${up ? 'online' : 'offline'}</div>
       </div>
       <div class="metrics-grid">
