@@ -2,7 +2,6 @@
 
 **Version:** v2.4.2  
 **License:** BUSL-1.1 — source available, free for up to 5 users per relay in production  
-**Change date:** 2029-01-01 → Apache 2.0  
 **License enforcement details:** [docs/licensing.md](licensing.md)
 
 ---

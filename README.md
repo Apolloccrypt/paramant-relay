@@ -251,4 +251,4 @@ Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest
 
 **Requirements:** 1 GB RAM · Ubuntu 22.04+ / Debian 12+ · Docker 24+ · swap disabled
 
-**License:** BUSL-1.1 — source available, free for ≤ 5 users. Change Date 2029-01-01 → Apache 2.0.
+**License:** BUSL-1.1 — source available, free for ≤ 5 users.
