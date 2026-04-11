@@ -235,6 +235,12 @@ main { background: transparent !important }
       <p class="status-line" style="margin-bottom:6px">Call or message the receiver via a <strong>separate channel</strong> (phone, Signal, etc.) and ask: <em>"What is your fingerprint?"</em></p>
       <p class="status-line" style="margin-bottom:8px;color:rgba(245,158,11,.85);font-size:10px">⚠ A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
       <div class="fingerprint" id="fp-display">—</div>
+      <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--green);margin:-4px 0 10px;text-align:center">✓ Matches stored fingerprint from a previous session</div>
+      <div id="fp-new-device" style="display:none;font-size:10px;color:rgba(245,158,11,.85);margin:-4px 0 10px;text-align:center">◈ First contact with this receiver — verify carefully</div>
+      <div style="display:flex;justify-content:center;margin:12px 0 4px">
+        <canvas id="fp-qr" style="display:none;border:4px solid #fff;border-radius:4px"></canvas>
+      </div>
+      <p style="font-size:10px;color:var(--quiet);text-align:center;margin-bottom:10px" id="fp-qr-label" style="display:none">QR — receiver can scan to compare</p>
       <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:11px;cursor:pointer;user-select:none">
         <input type="checkbox" id="fp-confirm-check" onchange="$('fp-confirm-btn').disabled=!this.checked" style="width:14px;height:14px;accent-color:#3aaa70">
         I have verified this fingerprint with the receiver via a separate channel
@@ -335,6 +341,7 @@ main { background: transparent !important }
   </div>
 </div>
 
+<script src="./vendor/qrcode.min.js"></script>
 <script type="module">
 import { initCrypto, encryptBlob as _eb } from './crypto-bridge.js?v=4';
 window._cryptoBridge = { encryptBlob: _eb };
@@ -408,6 +415,27 @@ async function copyLink() {
   setTimeout(() => { $('session-link').textContent = url; }, 2000);
 }
 
+// ── Fingerprint localStorage (TOFU) ──
+function fpStorageKey(fp) { return 'paramant_fp_' + fp.replace(/-/g,''); }
+function storeFingerprintConfirmed(fp) {
+  try { localStorage.setItem(fpStorageKey(fp), JSON.stringify({ fp, ts: new Date().toISOString() })); } catch {}
+}
+function isFingerprintKnown(fp) {
+  try { return !!localStorage.getItem(fpStorageKey(fp)); } catch { return false; }
+}
+
+// ── QR code for fingerprint ──
+function renderFingerprintQR(fp) {
+  const canvas = $('fp-qr');
+  if (!canvas || typeof QRCode === 'undefined') return;
+  try {
+    QRCode.toCanvas(canvas, fp, { width: 140, margin: 1, color: { dark: '#000', light: '#fff' } });
+    canvas.style.display = '';
+    const lbl = $('fp-qr-label');
+    if (lbl) lbl.style.display = '';
+  } catch(e) { console.warn('QR render failed:', e); }
+}
+
 // ── Helpers ──
 async function showReceiverConnected(kyberPub, ecdhPub) {
   receiverPubs = { kyber_pub: kyberPub, ecdh_pub: ecdhPub };
@@ -417,6 +445,16 @@ async function showReceiverConnected(kyberPub, ecdhPub) {
   $('waiting-title').textContent = 'Receiver connected';
   $('waiting-dot').className = 'dot';
   setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+  // TOFU: check if we've verified this fingerprint before
+  if (isFingerprintKnown(fp)) {
+    $('fp-seen-before').style.display = '';
+    $('fp-new-device').style.display = 'none';
+  } else {
+    $('fp-new-device').style.display = '';
+    $('fp-seen-before').style.display = 'none';
+  }
+  // Render QR code for easy scanning
+  renderFingerprintQR(fp);
 }
 
 // ── Relay discovery: try all sectors in parallel, pick first valid ──
@@ -561,6 +599,10 @@ async function confirmFingerprint() {
     setStatus('waiting-status', 'ERROR: WASM crypto module not loaded — cannot encrypt safely. Refresh and try again.', 'err');
     return;
   }
+
+  // Store confirmed fingerprint in localStorage (TOFU)
+  const confirmedFp = $('fp-display').textContent;
+  if (confirmedFp && confirmedFp !== '—') storeFingerprintConfirmed(confirmedFp);
 
   // Tell receiver we confirmed (best-effort via WS — file transfer uses HTTP anyway)
   try { ws.send(JSON.stringify({ type: 'packet', chatHash: sessionToken, seq: 0, payload: JSON.stringify({ type: 'fingerprint_ok' }) })); } catch(e) { console.warn('WS send failed (non-fatal):', e.message); }

@@ -116,6 +116,23 @@ UA    = f'paramant-sdk/{__version__}'
 class GhostPipeError(Exception):
     pass
 
+class FingerprintMismatchError(GhostPipeError):
+    """Raised when a device's pubkey fingerprint differs from the stored (TOFU) value.
+    This indicates either a key rotation or a relay MITM attack.
+    """
+    def __init__(self, device_id: str, stored: str, received: str):
+        self.device_id = device_id
+        self.stored    = stored
+        self.received  = received
+        super().__init__(
+            f'\n\n  ⚠  FINGERPRINT MISMATCH — device: {device_id}\n'
+            f'  Stored:   {stored}\n'
+            f'  Received: {received}\n\n'
+            f'  This may indicate a compromised relay or legitimate key rotation.\n'
+            f'  If the device owner rotated their key, run:\n'
+            f'    gp.trust("{device_id}")  — after verifying the new fingerprint out-of-band\n'
+        )
+
 
 class GhostPipe:
     """
@@ -141,6 +158,81 @@ class GhostPipe:
         if not self.relay:
             raise GhostPipeError('Geen relay bereikbaar. Controleer API key.')
         self._keypair = None
+
+    # ── TOFU / known-keys ─────────────────────────────────────────────────────
+    @staticmethod
+    def _known_keys_path() -> str:
+        return os.path.join(os.path.expanduser('~/.paramant'), 'known_keys')
+
+    def _load_known_keys(self) -> dict:
+        """Load ~/.paramant/known_keys → {device_id: {fingerprint, registered_at}}"""
+        p = self._known_keys_path()
+        if not os.path.exists(p):
+            return {}
+        result = {}
+        with open(p) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split()
+                if len(parts) >= 2:
+                    result[parts[0]] = {'fingerprint': parts[1], 'registered_at': parts[2] if len(parts) > 2 else ''}
+        return result
+
+    def _save_known_key(self, device_id: str, fingerprint: str, registered_at: str = ''):
+        """Append or update a device in known_keys."""
+        os.makedirs(os.path.dirname(self._known_keys_path()), exist_ok=True)
+        keys = self._load_known_keys()
+        keys[device_id] = {'fingerprint': fingerprint, 'registered_at': registered_at or ''}
+        tmp = self._known_keys_path() + '.tmp'
+        with open(tmp, 'w') as f:
+            f.write('# PARAMANT known-keys — Trust On First Use (TOFU)\n')
+            f.write('# Format: device_id fingerprint registered_at\n')
+            for did, v in keys.items():
+                f.write(f'{did} {v["fingerprint"]} {v["registered_at"]}\n')
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, self._known_keys_path())
+
+    def _remove_known_key(self, device_id: str):
+        keys = self._load_known_keys()
+        if device_id in keys:
+            del keys[device_id]
+            tmp = self._known_keys_path() + '.tmp'
+            with open(tmp, 'w') as f:
+                f.write('# PARAMANT known-keys — Trust On First Use (TOFU)\n')
+                f.write('# Format: device_id fingerprint registered_at\n')
+                for did, v in keys.items():
+                    f.write(f'{did} {v["fingerprint"]} {v["registered_at"]}\n')
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, self._known_keys_path())
+
+    @staticmethod
+    def _compute_fingerprint(kyber_pub_hex: str, ecdh_pub_hex: str) -> str:
+        """SHA-256(kyber_pub_bytes || ecdh_pub_bytes) → first 10 bytes → XXXX-XXXX-XXXX-XXXX-XXXX
+        Matches parashare.html and ontvang.html exactly for cross-surface consistency.
+        """
+        buf = bytes.fromhex(kyber_pub_hex or '') + bytes.fromhex(ecdh_pub_hex or '')
+        h = hashlib.sha256(buf).hexdigest()[:20].upper()
+        return f'{h[0:4]}-{h[4:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}'
+
+    def _tofu_check(self, device_id: str, kyber_pub_hex: str, ecdh_pub_hex: str,
+                    registered_at: str = '') -> str:
+        """Check TOFU for device. Returns fingerprint. Stores on first use.
+        Raises FingerprintMismatchError if stored fingerprint differs."""
+        fp = self._compute_fingerprint(kyber_pub_hex, ecdh_pub_hex)
+        keys = self._load_known_keys()
+        if device_id in keys:
+            stored = keys[device_id]['fingerprint']
+            if stored.replace('-','').upper() != fp.replace('-','').upper():
+                raise FingerprintMismatchError(device_id, stored, fp)
+        else:
+            # First contact — store fingerprint (TOFU)
+            self._save_known_key(device_id, fp, registered_at)
+            print(f'[paramant] New device: {device_id}')
+            print(f'           Fingerprint: {fp}')
+            print(f'           Verify this out-of-band before trusting.')
+        return fp
 
     # ── Relay detectie ────────────────────────────────────────────────────────
     def _detect_relay(self) -> Optional[str]:
@@ -238,9 +330,10 @@ class GhostPipe:
         if status != 200:
             raise GhostPipeError(f'Pubkey registratie mislukt: {resp.decode()[:100]}')
 
-    def _fetch_receiver_pubkeys(self):
-        """Haal pubkeys op van relay (voor encryptie)."""
-        status, body = self._get(f'/v2/pubkey/{self.device}')
+    def _fetch_receiver_pubkeys(self, recipient: str = None):
+        """Haal pubkeys op van relay (voor encryptie). Returns (ecdh_pub, kyber_pub, raw_ecdh_hex, raw_kyber_hex, registered_at)."""
+        target = recipient or self.device
+        status, body = self._get(f'/v2/pubkey/{target}')
         if status == 404:
             raise GhostPipeError('Geen pubkeys voor dit device. Start ontvanger eerst met receive_setup().')
         if status != 200:
@@ -249,12 +342,15 @@ class GhostPipe:
         c  = self._get_crypto(); be = c['be']()
         ecdh_pub  = c['lpub'](bytes.fromhex(d['ecdh_pub']), be)
         kyber_pub = bytes.fromhex(d['kyber_pub']) if d.get('kyber_pub') else None
-        return ecdh_pub, kyber_pub
+        return ecdh_pub, kyber_pub, d['ecdh_pub'], d.get('kyber_pub',''), d.get('registered_at', '')
 
-    def _encrypt(self, data: bytes, ecdh_pub, kyber_pub, pad_block: int = None) -> tuple:
-        """ML-KEM-768 + ECDH + AES-256-GCM + padding (configureerbare blokgrootte)."""
+    def _encrypt(self, data: bytes, ecdh_pub, kyber_pub, pad_block: int = None,
+                 pre_shared_secret: str = '') -> tuple:
+        """ML-KEM-768 + ECDH + AES-256-GCM + optional PSS + padding.
+        PSS: K = HKDF(ecdh_ss || kem_ss || SHA3-256(pss)) — even a relay MITM can't decrypt.
+        """
         c  = self._get_crypto(); K = self._try_kyber(); be = c['be']()
-        ecdh_ss = kss = ikm = ss = None
+        ecdh_ss = kss = ikm = ss = pss_hash = None
         try:
             # ECDH
             eph     = c['gen'](c['curve'](), be)
@@ -268,7 +364,8 @@ class GhostPipe:
             # HKDF — salt derived from KEM ciphertext (matches browser: cipherText.slice(0,32))
             # When ML-KEM is unavailable, fall back to ECDH shared secret slice as domain separator.
             # Static salt 'paramant-gp-v1' removed (security finding #7).
-            ikm  = ecdh_ss + kss
+            pss_hash = hashlib.sha3_256(pre_shared_secret.encode('utf-8')).digest() if pre_shared_secret else b''
+            ikm  = ecdh_ss + kss + pss_hash
             salt = kct[:32] if kct else ecdh_ss[:32]
             ss   = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
                              salt=salt, info=b'aes-key', backend=be).derive(ikm)
@@ -284,11 +381,11 @@ class GhostPipe:
             blob = packet + os.urandom(target - len(packet))
             return blob, hashlib.sha256(blob).hexdigest(), bool(kct)
         finally:
-            for b in (ecdh_ss, kss, ikm, ss):
+            for b in (ecdh_ss, kss, ikm, ss, pss_hash):
                 if b: _zero(b)
 
-    def _decrypt(self, blob: bytes) -> bytes:
-        """Ontsleutel Ghost Pipe blob."""
+    def _decrypt(self, blob: bytes, pre_shared_secret: str = '') -> bytes:
+        """Ontsleutel Ghost Pipe blob. PSS must match what sender used."""
         c  = self._get_crypto(); K = self._try_kyber(); be = c['be']()
         kp = self._load_keypair()
         o  = 0
@@ -302,7 +399,7 @@ class GhostPipe:
         nonce = blob[o:o+12]; o += 12
         ctlen = struct.unpack('>I', blob[o:o+4])[0]; o += 4
         ct    = blob[o:o+ctlen]
-        ecdh_ss = kss = ikm = ss = None
+        ecdh_ss = kss = ikm = ss = pss_hash = None
         try:
             priv    = c['lpriv'](bytes.fromhex(kp['ecdh_priv']), None, be)
             ecdh_ss = priv.exchange(c['ECDH'](), c['lpub'](epb, be))
@@ -310,34 +407,44 @@ class GhostPipe:
             if K and kct and kp.get('kyber_priv'):
                 try: kss = K.dec(bytes.fromhex(kp['kyber_priv']), kct)
                 except Exception: pass
-            ikm  = ecdh_ss + kss
+            pss_hash = hashlib.sha3_256(pre_shared_secret.encode('utf-8')).digest() if pre_shared_secret else b''
+            ikm  = ecdh_ss + kss + pss_hash
             salt = kct[:32] if kct else ecdh_ss[:32]
             ss   = c['HKDF'](algorithm=c['hsh'].SHA256(), length=32,
                              salt=salt, info=b'aes-key', backend=be).derive(ikm)
             aad  = b'\x02\x00\x00\x00\x00'  # version 0x02 + chunk_index 0
             return c['AES'](ss).decrypt(nonce, ct, aad)
         finally:
-            for b in (ecdh_ss, kss, ikm, ss):
+            for b in (ecdh_ss, kss, ikm, ss, pss_hash):
                 if b: _zero(b)
 
     # ── Publieke API ──────────────────────────────────────────────────────────
 
     def send(self, data: bytes, ttl: int = 300, max_views: int = 1,
-             pad_block: int = None) -> str:
+             pad_block: int = None, recipient: str = None,
+             pre_shared_secret: str = '') -> str:
         """
         Verstuur data via Ghost Pipe.
 
         Args:
-            data:      Bytes om te versturen
-            ttl:       Seconden beschikbaar op relay (default 300)
-            max_views: Max ophaalverzoeken voor burn (default 1)
-            pad_block: Blokgrootte voor padding in bytes (default 5MB)
+            data:               Bytes om te versturen
+            ttl:                Seconden beschikbaar op relay (default 300)
+            max_views:          Max ophaalverzoeken voor burn (default 1)
+            pad_block:          Blokgrootte voor padding in bytes (default 5MB)
+            recipient:          Device-ID van ontvanger (default: self.device)
+            pre_shared_secret:  Optioneel geheim — toevoeging aan HKDF-IKM.
+                                Beide kanten moeten hetzelfde PSS gebruiken.
+                                Beschermt ook als relay een verkeerde pubkey serveert.
 
         Returns:
             hash: SHA-256 hash — geef dit aan de ontvanger
         """
-        ecdh_pub, kyber_pub = self._fetch_receiver_pubkeys()
-        blob, h, used_kyber = self._encrypt(data, ecdh_pub, kyber_pub, pad_block=pad_block)
+        ecdh_pub, kyber_pub, ecdh_hex, kyber_hex, registered_at = self._fetch_receiver_pubkeys(recipient)
+        target_device = recipient or self.device
+        # TOFU check — raises FingerprintMismatchError on mismatch
+        self._tofu_check(target_device, kyber_hex, ecdh_hex, registered_at)
+        blob, h, used_kyber = self._encrypt(data, ecdh_pub, kyber_pub, pad_block=pad_block,
+                                            pre_shared_secret=pre_shared_secret)
         body = json.dumps({
             'hash': h,
             'payload': base64.b64encode(blob).decode(),
@@ -417,17 +524,18 @@ class GhostPipe:
         finally:
             _zero(aes_key); _zero(entropy)
 
-    def receive(self, hash_: str) -> bytes:
+    def receive(self, hash_: str, pre_shared_secret: str = '') -> bytes:
         """
         Ontvang data van relay via hash.
         Relay vernietigt het blok direct na dit verzoek (burn-on-read).
-        
+
         Args:
-            hash_: SHA-256 hash van het blok
-        
+            hash_:              SHA-256 hash van het blok
+            pre_shared_secret:  Moet overeenkomen met waarde die zender gebruikte.
+
         Returns:
             Ontsleutelde data
-        
+
         Raises:
             GhostPipeError: Blok niet gevonden, verlopen of al opgehaald
         """
@@ -436,8 +544,7 @@ class GhostPipe:
             raise GhostPipeError('Blok niet gevonden. Verlopen, al opgehaald, of nooit opgeslagen.')
         if status != 200:
             raise GhostPipeError(f'Download mislukt: HTTP {status}')
-        blob = raw
-        return self._decrypt(blob)
+        return self._decrypt(raw, pre_shared_secret=pre_shared_secret)
 
     def status(self, hash_: str) -> dict:
         """
@@ -448,6 +555,67 @@ class GhostPipe:
         """
         _, body = self._get(f'/v2/status/{hash_}')
         return json.loads(body)
+
+    def fingerprint(self, device_id: str = None) -> str:
+        """
+        Haal fingerprint op van een device (voor out-of-band verificatie).
+        Vraagt relay, berekent fingerprint lokaal, toont resultaat.
+
+        Args:
+            device_id: Device ID (default: self.device)
+
+        Returns:
+            Fingerprint string in XXXX-XXXX-XXXX-XXXX-XXXX formaat
+        """
+        target = device_id or self.device
+        status, body = self._get(f'/v2/pubkey/{target}')
+        if status == 404:
+            raise GhostPipeError(f'Geen pubkeys voor device {target}')
+        if status != 200:
+            raise GhostPipeError(f'Pubkeys ophalen mislukt: HTTP {status}')
+        d = json.loads(body)
+        fp = self._compute_fingerprint(d.get('kyber_pub',''), d['ecdh_pub'])
+        print(f'Device:      {target}')
+        print(f'Fingerprint: {fp}')
+        if d.get('registered_at'):
+            print(f'Registered:  {d["registered_at"]}')
+        if d.get('ct_index') is not None:
+            print(f'CT log index: {d["ct_index"]}')
+        return fp
+
+    def trust(self, device_id: str, fingerprint: str = None) -> str:
+        """
+        Markeer device als vertrouwd in known_keys.
+        Als fingerprint weggelaten: haalt huidige fingerprint op van relay.
+
+        Returns:
+            Opgeslagen fingerprint
+        """
+        if fingerprint:
+            self._save_known_key(device_id, fingerprint)
+            print(f'[paramant] Trusted: {device_id} ({fingerprint})')
+            return fingerprint
+        fp = self.fingerprint(device_id)
+        self._save_known_key(device_id, fp)
+        print(f'[paramant] Trusted: {device_id} ({fp})')
+        return fp
+
+    def untrust(self, device_id: str):
+        """Verwijder device uit known_keys."""
+        self._remove_known_key(device_id)
+        print(f'[paramant] Removed: {device_id}')
+
+    def known_devices(self) -> list:
+        """Geef lijst van alle trusted devices met fingerprints."""
+        keys = self._load_known_keys()
+        if not keys:
+            print('[paramant] No trusted devices yet.')
+            return []
+        print(f'{"Device":<36} {"Fingerprint":<26} {"Registered":<24}')
+        print('-' * 88)
+        for did, v in keys.items():
+            print(f'{did:<36} {v["fingerprint"]:<26} {v["registered_at"]:<24}')
+        return [{'device_id': k, **v} for k, v in keys.items()]
 
     def receive_setup(self):
         """

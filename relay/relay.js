@@ -67,7 +67,7 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/ws-ticket'],
+               '/v2/ws-ticket','/v2/fingerprint'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
@@ -248,6 +248,19 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
     try { fs.appendFileSync(CT_FILE, JSON.stringify(entry) + '\n'); } catch {}
   }
   return entry;
+}
+
+// ── Fingerprint — out-of-band key verification ────────────────────────────────
+// SHA-256(kyber_pub_bytes || ecdh_pub_bytes) → first 10 bytes → 5×4 hex groups
+// Matches browser genFingerprint() in parashare.html and ontvang.html exactly.
+// Both parties compute independently; mismatch = relay MITM detected.
+function computeFingerprint(kyberPubHex, ecdhPubHex) {
+  const buf = Buffer.concat([
+    Buffer.from(kyberPubHex || '', 'hex'),
+    Buffer.from(ecdhPubHex  || '', 'hex'),
+  ]);
+  const h = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 20).toUpperCase();
+  return `${h.slice(0,4)}-${h.slice(4,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}`;
 }
 
 // ── Hardware Attestation — TPM / Secure Enclave ───────────────────────────────
@@ -1063,10 +1076,11 @@ const server = http.createServer(async (req, res) => {
       if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
       if (INVITE_RE.test(d.device_id)) {
         // Store without API key suffix — readable by any party who knows the session token
-        pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', ts: new Date().toISOString(), expires: Date.now() + INVITE_PUBKEY_TTL });
-        log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12) });
+        const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
+        pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', fingerprint: invFp, ts: new Date().toISOString(), registered_at: new Date().toISOString(), expires: Date.now() + INVITE_PUBKEY_TTL });
+        log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12), fp: invFp });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true }));
+        return res.end(J({ ok: true, fingerprint: invFp }));
       }
       // Non-invite: require valid API key
       if (!keyData?.active) { res.writeHead(401); return res.end(J({ error: 'Invalid API key' })); }
@@ -1088,15 +1102,18 @@ const server = http.createServer(async (req, res) => {
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
         res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' }));
       }
+      const fp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
+      const regAt = new Date().toISOString();
       pubkeys.set(`${d.device_id}:${apiKey}`, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
         dsa_pub:  d.dsa_pub  || '',
-        ts: new Date().toISOString(),
+        fingerprint: fp, ct_index: ctEntry.index,
+        ts: regAt, registered_at: regAt,
         expires: Date.now() + ttl,
       });
-      log('info', 'pubkey_registered', { device: d.device_id, kyber: !!d.kyber_pub, dsa: !!d.dsa_pub, plan, ttl_days: Math.round(ttl/86400000) });
+      log('info', 'pubkey_registered', { device: d.device_id, kyber: !!d.kyber_pub, dsa: !!d.dsa_pub, plan, ttl_days: Math.round(ttl/86400000), fp });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, dsa_supported: !!mlDsa, ct_index: ctEntry.index, ct_tree_hash: ctEntry.tree_hash, attested: attestResult.valid, attestation_method: attestResult.method || null }));
+      return res.end(J({ ok: true, fingerprint: fp, dsa_supported: !!mlDsa, ct_index: ctEntry.index, ct_tree_hash: ctEntry.tree_hash, attested: attestResult.valid, attestation_method: attestResult.method || null }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -1112,8 +1129,45 @@ const server = http.createServer(async (req, res) => {
       pubkeys.delete(_pkKey);
       res.writeHead(404); return res.end(J({ error: 'Pubkey registration expired. Re-register the device.' }));
     }
+    // Compute fingerprint on the fly if not stored (backcompat with pre-fingerprint entries)
+    const fp = entry.fingerprint || computeFingerprint(entry.kyber_pub || '', entry.ecdh_pub);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub || '', ts: entry.ts }));
+    return res.end(J({ ok: true, ecdh_pub: entry.ecdh_pub, kyber_pub: entry.kyber_pub, dsa_pub: entry.dsa_pub || '', ts: entry.ts, fingerprint: fp, registered_at: entry.registered_at || entry.ts, ct_index: entry.ct_index ?? null }));
+  }
+
+  // ── GET /v2/fingerprint/:device — Return just the fingerprint for out-of-band verification
+  const fpm = path.match(/^\/v2\/fingerprint\/([^/]+)$/);
+  if (fpm && req.method === 'GET') {
+    const deviceId = decodeURIComponent(fpm[1]);
+    const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
+    const entry = pubkeys.get(_fKey);
+    if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
+    if (entry.expires && Date.now() > entry.expires) {
+      pubkeys.delete(_fKey);
+      res.writeHead(404); return res.end(J({ error: 'Pubkey registration expired.' }));
+    }
+    const fp = entry.fingerprint || computeFingerprint(entry.kyber_pub || '', entry.ecdh_pub);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, device_id: deviceId, fingerprint: fp, registered_at: entry.registered_at || entry.ts, ct_index: entry.ct_index ?? null }));
+  }
+
+  // ── POST /v2/pubkey/verify — Verify a fingerprint matches stored pubkey ───────
+  if (path === '/v2/pubkey/verify' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      if (!d.device_id || !d.fingerprint) { res.writeHead(400); return res.end(J({ error: 'device_id and fingerprint required' })); }
+      const _vKey = INVITE_RE.test(d.device_id) ? d.device_id : `${d.device_id}:${apiKey}`;
+      const entry = pubkeys.get(_vKey);
+      if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
+      const storedFp = entry.fingerprint || computeFingerprint(entry.kyber_pub || '', entry.ecdh_pub);
+      const match = storedFp.toUpperCase() === d.fingerprint.toUpperCase().replace(/[^A-F0-9]/g,'').replace(/(.{4})/g,'$1-').slice(0,-1);
+      // Normalised comparison: strip dashes, uppercase
+      const normStored  = storedFp.replace(/-/g,'').toUpperCase();
+      const normProvided = d.fingerprint.replace(/-/g,'').toUpperCase();
+      const verified = normStored === normProvided;
+      res.writeHead(verified ? 200 : 409, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: verified, match: verified, stored: storedFp, provided: d.fingerprint, registered_at: entry.registered_at || entry.ts }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
