@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — PARAMANT</title>
+<meta name="description" content="PARAMANT pricing. Community free up to 5 keys. Licensed €149/month unlimited. Enterprise custom.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0c;--surface:#111;--surface2:#161616;
+  --border:#1e1e1e;--border-soft:#161616;
+  --text:#ededed;--muted:#888;--quiet:#444;
+  --green:#2d6a4f;--green-dim:#1a3d2e;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'SF Mono','Fira Code','Cascadia Code',monospace
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+
+/* ── Nav ── */
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.92);backdrop-filter:blur(8px);z-index:100}
+.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text)}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{font-size:13px;color:var(--muted);transition:color .15s}
+.nav-links a:hover,.nav-links a.active{color:var(--text)}
+.nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px}
+.nav-cta:hover{opacity:.85}
+
+/* ── Hero ── */
+.hero{max-width:640px;margin:0 auto;padding:88px 48px 64px;text-align:center}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--quiet);margin-bottom:18px;font-family:var(--mono)}
+h1{font-size:42px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin-bottom:18px}
+.hero-sub{font-size:16px;color:var(--muted);line-height:1.75;max-width:480px;margin:0 auto}
+
+/* ── Pricing grid ── */
+.pricing-wrap{max-width:1000px;margin:0 auto;padding:16px 48px 80px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.plan{background:var(--surface);padding:36px 32px;display:flex;flex-direction:column;position:relative}
+.plan.highlighted{background:var(--surface2)}
+.plan-badge{display:inline-block;font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:3px;margin-bottom:20px;width:fit-content}
+.badge-community{color:var(--muted);background:var(--border);border:1px solid var(--border)}
+.badge-licensed{color:var(--green);background:var(--green-dim);border:1px solid var(--green)}
+.badge-enterprise{color:#888;background:#1a1a1a;border:1px solid #2a2a2a}
+.plan-name{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
+.plan-price{font-size:38px;font-weight:700;letter-spacing:-.04em;margin-bottom:4px;line-height:1}
+.plan-price span{font-size:16px;font-weight:400;color:var(--muted);letter-spacing:0}
+.plan-price .period{font-size:14px;font-weight:400;color:var(--muted)}
+.plan-desc{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.6;min-height:52px}
+.plan-cta{display:block;text-align:center;padding:10px 20px;border-radius:5px;font-size:13px;font-weight:500;margin-bottom:28px;transition:opacity .15s}
+.cta-primary{background:var(--text);color:var(--bg)}
+.cta-primary:hover{opacity:.85}
+.cta-secondary{border:1px solid var(--border);color:var(--muted)}
+.cta-secondary:hover{border-color:var(--muted);color:var(--text)}
+.cta-contact{background:var(--green);color:#e8f4ee}
+.cta-contact:hover{opacity:.88}
+.plan-features{list-style:none;display:flex;flex-direction:column;gap:11px;flex:1}
+.plan-features li{font-size:13px;color:var(--muted);display:flex;align-items:flex-start;gap:9px;line-height:1.5}
+.plan-features li::before{content:'✓';color:var(--green);font-size:11px;flex-shrink:0;margin-top:2px}
+.plan-features li.faded{color:var(--quiet)}
+.plan-features li.faded::before{color:var(--quiet);content:'—'}
+.divider-line{border:none;border-top:1px solid var(--border);margin:24px 0}
+
+/* ── FAQ / notes ── */
+.notes{max-width:800px;margin:0 auto;padding:0 48px 80px}
+.notes h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
+.faq{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.faq-item{padding:20px 24px;border-bottom:1px solid var(--border)}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
+.faq-a{font-size:13px;color:var(--muted);line-height:1.65}
+.faq-a code{font-family:var(--mono);font-size:12px;color:var(--text);background:var(--surface);padding:1px 5px;border-radius:3px}
+
+/* ── Comparison table ── */
+.compare-wrap{max-width:800px;margin:0 auto;padding:0 48px 64px}
+.compare-wrap h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:10px 16px;font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--quiet);font-family:var(--mono);border-bottom:1px solid var(--border)}
+thead th:not(:first-child){text-align:center}
+tbody td{padding:12px 16px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody td:not(:first-child){text-align:center}
+.feat{color:var(--muted)}
+.yes{color:var(--green);font-size:15px}
+.no{color:var(--quiet);font-size:15px}
+.num{font-family:var(--mono);font-size:12px;color:var(--text)}
+
+/* ── Footer ── */
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.footer-copy{font-size:12px;color:var(--quiet)}
+.footer-links{display:flex;gap:20px}
+.footer-links a{font-size:12px;color:var(--quiet);transition:color .15s}
+.footer-links a:hover{color:var(--muted)}
+
+@media(max-width:780px){
+  nav{padding:0 20px}
+  .hero{padding:64px 20px 48px}
+  .pricing-wrap{grid-template-columns:1fr;padding:16px 20px 64px;background:none;border:none;gap:12px}
+  .plan{border:1px solid var(--border);border-radius:8px}
+  .notes,.compare-wrap{padding:0 20px 48px}
+  footer{padding:24px 20px}
+  .footer-links{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/docs.html">Docs</a></li>
+    <li><a href="/pricing.html" class="active">Pricing</a></li>
+  </ul>
+  <a href="/parashare" class="nav-cta">Try free</a>
+</nav>
+
+<div class="hero">
+  <div class="eyebrow">Pricing</div>
+  <h1>Simple, honest pricing</h1>
+  <p class="hero-sub">Free for individuals and small teams. Unlimited keys for growing organizations. Full source code available — self-host if you prefer.</p>
+</div>
+
+<div class="pricing-wrap">
+
+  <!-- Community -->
+  <div class="plan">
+    <span class="plan-badge badge-community">Community</span>
+    <div class="plan-name">Free</div>
+    <div class="plan-price">€0 <span class="period">/ forever</span></div>
+    <p class="plan-desc">For developers, researchers, and small teams. Self-host with up to 5 API keys.</p>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" class="plan-cta cta-secondary" target="_blank">Self-host on GitHub →</a>
+    <ul class="plan-features">
+      <li>Up to 5 API keys per relay</li>
+      <li>All transfer features (send, receive, drop)</li>
+      <li>Post-quantum encryption (ML-KEM-768)</li>
+      <li>ParaShare web UI included</li>
+      <li>Docker Compose install</li>
+      <li>ParamantOS ISO (NixOS)</li>
+      <li>Python + JS SDK</li>
+      <li class="faded">No support SLA</li>
+      <li class="faded">No license key required</li>
+    </ul>
+  </div>
+
+  <!-- Licensed -->
+  <div class="plan highlighted">
+    <span class="plan-badge badge-licensed">Licensed</span>
+    <div class="plan-name">Pro</div>
+    <div class="plan-price">€149 <span class="period">/ month</span></div>
+    <p class="plan-desc">Unlimited API keys. For organizations running their own relay with multiple users or teams.</p>
+    <a href="mailto:hello@paramant.app?subject=Pro%20license%20request" class="plan-cta cta-primary">Get a license key →</a>
+    <ul class="plan-features">
+      <li>Unlimited API keys</li>
+      <li>All Community features</li>
+      <li>Sector relays (health / legal / finance / iot)</li>
+      <li>TOFU key fingerprinting</li>
+      <li>Pre-shared secret (PSS) transfers</li>
+      <li>CT transparency log</li>
+      <li>Admin panel</li>
+      <li>Email support within 2 business days</li>
+      <li>License key (<code>plk_</code>) for self-hosted relay</li>
+    </ul>
+  </div>
+
+  <!-- Enterprise -->
+  <div class="plan">
+    <span class="plan-badge badge-enterprise">Enterprise</span>
+    <div class="plan-name">Custom</div>
+    <div class="plan-price" style="font-size:26px;padding-top:6px">On request</div>
+    <p class="plan-desc">For healthcare, legal, finance, and government. On-prem, air-gap, compliance documentation, SLA.</p>
+    <a href="mailto:hello@paramant.app?subject=Enterprise%20inquiry" class="plan-cta cta-contact">Contact us →</a>
+    <ul class="plan-features">
+      <li>Everything in Pro</li>
+      <li>On-premise deployment support</li>
+      <li>NEN 7510 / ISO 27001 alignment docs</li>
+      <li>NIS2 / DORA compliance materials</li>
+      <li>HECVAT questionnaire support</li>
+      <li>Custom sector configuration</li>
+      <li>Gateway agent (on-prem → relay)</li>
+      <li>Priority support + dedicated contact</li>
+      <li>Custom MSA / DPA</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- Comparison table -->
+<div class="compare-wrap">
+  <h2>Feature comparison</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Community</th>
+        <th>Pro</th>
+        <th>Enterprise</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="feat">API keys per relay</td><td class="num">5</td><td class="num">Unlimited</td><td class="num">Unlimited</td></tr>
+      <tr><td class="feat">ParaShare web UI</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">ML-KEM-768 + ECDH P-256</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Burn-on-read, RAM-only</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Anonymous drop (BIP39)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Pre-shared secret (PSS)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">TOFU fingerprint verification</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">CT transparency log</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Sector relays (health/legal/...)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Python + JS SDK</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">ParamantOS ISO</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Admin panel</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Email support</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Compliance docs (ISO 27001, NEN 7510)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Gateway agent (on-prem)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td class="feat">Custom DPA / MSA</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- FAQ -->
+<div class="notes">
+  <h2>Frequently asked questions</h2>
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q">What is a relay? Do I need to run my own?</div>
+      <div class="faq-a">A relay is the server that temporarily holds encrypted blobs. You can use the hosted relay at <code>relay.paramant.app</code> (free, 5 keys), or self-host the relay on your own infrastructure using the Docker Compose stack and a <code>plk_</code> license key.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What is a license key (<code>plk_</code>)?</div>
+      <div class="faq-a">A <code>plk_</code> license key is an Ed25519-signed JWT you add to your self-hosted relay's <code>.env</code> file. It lifts the 5-key community limit and enables unlimited API keys. The relay verifies the signature on startup and on each hourly reload — no phone-home, no internet required.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can I use the hosted relay for free?</div>
+      <div class="faq-a">Yes. The hosted relay at <code>relay.paramant.app</code> and sector relays (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>) are free to use. Free accounts are limited to 5 active API keys and standard rate limits. The relay operator never sees your plaintext — all encryption happens in your browser or SDK.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is the source code available?</div>
+      <div class="faq-a">Yes. The relay, frontend, SDKs, and ParamantOS ISO are all open source on GitHub under BUSL-1.1. You can read every line of code that handles your data. Commercial use of the relay beyond the community limit requires a <code>plk_</code> license.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What jurisdictions apply?</div>
+      <div class="faq-a">The hosted relay runs on servers in Germany (EU). It is subject to GDPR and German data protection law (BDSG). It is NOT subject to US CLOUD Act. Zero plaintext is stored — the relay only sees encrypted blobs which are deleted on first download or after TTL expiry.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Do you offer invoicing or bank transfer?</div>
+      <div class="faq-a">Yes. Email <a href="mailto:hello@paramant.app" style="color:var(--green)">hello@paramant.app</a> for an invoice. We support SEPA bank transfer for EU customers and bank wire for international orders.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span class="footer-copy">© 2026 PARAMANT · BUSL-1.1 · EU/DE</span>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/parashare">ParaShare</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="mailto:hello@paramant.app">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>
