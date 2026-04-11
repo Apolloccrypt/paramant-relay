@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ParaShare Settings</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 1.2em;
+      max-width: 420px;
+      color: #1a1a1a;
+    }
+    h2 { margin-top: 0; font-size: 1.1em; }
+    label { display: block; margin-top: 1em; font-weight: bold; font-size: 0.9em; }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4em 0.5em;
+      margin-top: 0.3em;
+      border: 1px solid #bbb;
+      border-radius: 3px;
+      font-size: 0.95em;
+    }
+    button {
+      margin-top: 1.2em;
+      padding: 0.5em 1.2em;
+      background: #0060df;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.95em;
+    }
+    button:hover { background: #0050c0; }
+    .hint { font-size: 0.8em; color: #666; margin-top: 0.2em; }
+    .status { margin-top: 0.7em; font-size: 0.85em; }
+    .ok  { color: green; }
+    .err { color: red; }
+  </style>
+</head>
+<body>
+  <h2>ParaShare — PARAMANT FileLink</h2>
+
+  <label>API Key
+    <input type="password" id="apiKey" placeholder="pgp_...">
+  </label>
+  <p class="hint">Get a key at <a href="https://paramant.app" target="_blank">paramant.app</a></p>
+
+  <label>Relay URL <span style="font-weight:normal">(optional — leave blank for auto)</span>
+    <input type="text" id="relayUrl" placeholder="https://relay.paramant.app">
+  </label>
+  <p class="hint">Leave blank to auto-detect the best relay for your key.</p>
+
+  <button id="save">Save</button>
+  <div class="status" id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

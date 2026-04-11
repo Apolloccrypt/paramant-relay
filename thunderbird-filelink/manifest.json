@@ -1,0 +1,30 @@
+{
+  "manifest_version": 2,
+  "name": "ParaShare FileLink",
+  "version": "1.0.1",
+  "description": "Send large attachments as burn-on-read links via PARAMANT Ghost Pipe.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "parashare-filelink@paramant.app",
+      "strict_min_version": "78.0"
+    }
+  },
+  "cloud_file": {
+    "name": "ParaShare",
+    "management_url": "/options/options.html"
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "permissions": [
+    "storage",
+    "https://relay.paramant.app/*",
+    "https://health.paramant.app/*",
+    "https://legal.paramant.app/*",
+    "https://finance.paramant.app/*",
+    "https://iot.paramant.app/*"
+  ],
+  "license": "AGPL-3.0-only"
+}
