@@ -1,7 +1,7 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
 # Build tools (python3, make, g++) are required only to compile argon2 native
 # bindings. They are NOT present in the final runtime image.
-FROM node:20-alpine3.21 AS build
+FROM node:22-alpine3.21 AS build
 
 RUN apk add --no-cache python3 make g++
 
@@ -11,10 +11,10 @@ RUN npm install --omit=dev && npm cache clean --force
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 # Lean image: no build tools, no npm, no compilers — only the relay and its deps.
-FROM node:20-alpine3.21
+FROM node:22-alpine3.21
 
 LABEL org.opencontainers.image.title="paramant-relay" \
-      org.opencontainers.image.version="2.4.0" \
+      org.opencontainers.image.version="2.4.4" \
       org.opencontainers.image.description="Post-quantum encrypted file relay — RAM-only, burn-on-read" \
       org.opencontainers.image.source="https://github.com/Apolloccrypt/paramant-relay" \
       org.opencontainers.image.licenses="BUSL-1.1"

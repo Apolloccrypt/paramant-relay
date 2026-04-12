@@ -6,7 +6,7 @@
     "build": "bash build.sh"
   },
   "devDependencies": {
-    "javascript-obfuscator": "^4.1.1",
+    "javascript-obfuscator": "^5.4.1",
     "terser": "^5.31.0"
   },
   "dependencies": {

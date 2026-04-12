@@ -250,6 +250,7 @@ api.post('/reload-all', authMiddleware, async (req, res) => {
 });
 
 app.use(`${BASE_PATH}/api`, api);
-app.get(`${BASE_PATH}/*`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
+app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`[PARAMANT-ADMIN] listening on :${PORT}${BASE_PATH || '/'}`));

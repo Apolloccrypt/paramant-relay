@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # PARAMANT post-install verification
 # Run after: docker compose up -d
 # Usage: bash scripts/post-install.sh

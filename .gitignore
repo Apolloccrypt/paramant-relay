@@ -14,12 +14,16 @@ frontend/dist/
 crypto-wasm/target/
 crypto-wasm/target/**/*.wasm
 
-# Environment & secrets
+# Environment & secrets (.example files are templates — intentionally tracked)
 .env
 .env.local
 .env.*.local
 .env.private
 deploy/.env
+relay-identity.json
+**/relay-identity.json
+data/
+**/data/*.json
 
 # Runtime data (server-side — never commit)
 users.json
