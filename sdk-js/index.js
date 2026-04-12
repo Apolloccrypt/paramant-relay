@@ -232,9 +232,10 @@ export class GhostPipe {
   async _detectRelay() {
     for (const [, url] of Object.entries(SECTOR_RELAYS)) {
       try {
+        // Fix D: send API key in X-Api-Key header — never in query string
         const { status, body } = await httpRequest({
-          url: `${url}/v2/check-key?k=${this.apiKey}`,
-          headers: { 'User-Agent': UA },
+          url: `${url}/v2/check-key`,
+          headers: { 'User-Agent': UA, 'X-Api-Key': this.apiKey },
           timeout: 4000,
           retries: 1,
         });
@@ -250,7 +251,8 @@ export class GhostPipe {
   async _ensureRelay() {
     if (!this.relay) {
       this.relay = await this._detectRelay();
-      if (!this.relay) throw new RelayError(0, 'No reachable relay. Set relay: option explicitly.');
+      // Fix D: fail explicitly — no silent fallback to arbitrary relay
+      if (!this.relay) throw new RelayError(0, 'No reachable relay found for this API key. Set relay: option explicitly.');
     }
   }
 

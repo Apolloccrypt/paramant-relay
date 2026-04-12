@@ -128,6 +128,18 @@ async function natsPush(apiKey, deviceId, hash, size) {
 }
 initNats();
 
+// Fix B: per-device delivery queue — stream-next returns real blob hashes
+// deviceQueues[apiKey:deviceId] = [sha256_hash, ...]
+const deviceQueues = new Map(); // `${apiKey}:${deviceId}` → string[]
+
+function deviceQueuePush(apiKey, deviceId, hash) {
+  if (!deviceId) return;
+  const k = `${apiKey}:${deviceId}`;
+  if (!deviceQueues.has(k)) deviceQueues.set(k, []);
+  const q = deviceQueues.get(k);
+  if (!q.includes(hash)) q.push(hash); // dedup
+}
+
 // ── DID — Decentralized Identity (W3C) ───────────────────────────────────────
 const didRegistry = new Map();
 
@@ -163,9 +175,60 @@ function createDidDocument(did, deviceId, ecdhPubHex, dsaPubHex) {
 // ── Certificate Transparency Log ─────────────────────────────────────────────
 const ctLog = [];
 const CT_MAX = 10000;
-const CT_FILE = process.env.CT_FILE || null; // opt-in only — auto-derive disabled to preserve RAM-only default
+const CT_FILE     = process.env.CT_FILE     || null; // opt-in only — auto-derive disabled to preserve RAM-only default
+const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
 
-// Load persisted CT log on startup
+// Fix 8: async CT write stream with queued writes and log rotation
+let _ctStream    = null;
+let _ctWriteQueue = [];
+let _ctDraining  = false;
+
+function _ctOpenStream() {
+  if (!CT_FILE) return;
+  _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
+  _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+}
+
+async function _ctRotate() {
+  if (!CT_FILE) return;
+  try {
+    const stat = await fs.promises.stat(CT_FILE).catch(() => null);
+    if (!stat || stat.size < CT_MAX_SIZE) return;
+    if (_ctStream) { await new Promise(r => _ctStream.end(r)); _ctStream = null; }
+    await fs.promises.rename(CT_FILE, CT_FILE + '.1').catch(() => {});
+    _ctOpenStream();
+    log('info', 'ct_log_rotated', { file: CT_FILE });
+  } catch(e) { log('warn', 'ct_rotate_error', { err: e.message }); }
+}
+
+async function _ctDrain() {
+  if (_ctDraining || !_ctStream) return;
+  _ctDraining = true;
+  while (_ctWriteQueue.length > 0) {
+    const line = _ctWriteQueue.shift();
+    await new Promise((resolve, reject) => {
+      _ctStream.write(line, err => err ? reject(err) : resolve());
+    }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
+  }
+  _ctDraining = false;
+  // Check rotation after draining
+  _ctRotate().catch(() => {});
+}
+
+function ctWrite(entry) {
+  if (!CT_FILE || !_ctStream) return;
+  _ctWriteQueue.push(JSON.stringify(entry) + '\n');
+  setImmediate(_ctDrain);
+}
+
+// Flush CT queue on graceful shutdown
+function _flushCtOnExit() {
+  if (!_ctStream || _ctWriteQueue.length === 0) return;
+  for (const line of _ctWriteQueue) { try { _ctStream.write(line); } catch {} }
+  _ctWriteQueue = [];
+}
+
+// Load persisted CT log on startup (sync read only at startup, not on hot path)
 if (CT_FILE) {
   try {
     const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
@@ -176,6 +239,7 @@ if (CT_FILE) {
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
   }
+  _ctOpenStream();
 }
 
 // ── Relay identity — ML-DSA-65 keypair for relay authentication ───────────────
@@ -220,6 +284,7 @@ function loadOrCreateRelayIdentity() {
 // ── Relay registry — in-memory, populated from CT log on startup ──────────────
 // key: pk_hash (hex) → { url, sector, version, edition, pk_hash, verified_since, last_seen, ct_index, last_ct_index }
 const relayRegistry = new Map();
+const MAX_RELAY_REGISTRY = parseInt(process.env.MAX_RELAY_REGISTRY || '10000');
 
 function relayRegistryFromCTLog() {
   for (const entry of ctLog) {
@@ -313,10 +378,8 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
-  // Persist to disk (NDJSON append — survives relay restarts)
-  if (CT_FILE) {
-    try { fs.appendFileSync(CT_FILE, JSON.stringify(entry) + '\n'); } catch {}
-  }
+  // Fix 8: async write via stream queue instead of appendFileSync
+  ctWrite(entry);
   return entry;
 }
 
@@ -342,9 +405,8 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
-  if (CT_FILE) {
-    try { fs.appendFileSync(CT_FILE, JSON.stringify(entry) + '\n'); } catch {}
-  }
+  // Fix 8: async write via stream queue
+  ctWrite(entry);
   return entry;
 }
 
@@ -408,13 +470,21 @@ function renderPrometheus() {
 // ── TOTP verificatie (RFC 6238) ───────────────────────────────────────────────
 const TOTP_SECRET = process.env.TOTP_SECRET || '';
 const TOTP_WINDOW = 1;
+// Fix 14: validate TOTP_SECRET at startup so misconfiguration is caught early
+if (TOTP_SECRET) {
+  try { base32Decode(TOTP_SECRET); }
+  catch(e) { log('error', 'totp_secret_invalid', { err: e.message, hint: 'TOTP_SECRET must be valid Base32 (A-Z, 2-7)' }); process.exit(1); }
+}
 
 function base32Decode(s) {
   const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = 0, value = 0, output = [];
   s = s.toUpperCase().replace(/=+$/, '');
   for (const c of s) {
-    value = (value << 5) | alpha.indexOf(c);
+    const idx = alpha.indexOf(c);
+    // Fix 14: throw on invalid Base32 character instead of silently using -1
+    if (idx === -1) throw new Error(`Invalid Base32 character: '${c}'`);
+    value = (value << 5) | idx;
     bits += 5;
     if (bits >= 8) { output.push((value >>> (bits - 8)) & 0xFF); bits -= 8; }
   }
@@ -432,13 +502,32 @@ function totpCode(secret, counter) {
   return code.toString().padStart(6, '0');
 }
 
+// Fix 5: used-code tracking — window = 30s each side → 3 windows × 30s = 90s expiry
+const _usedTotpCodes = new Map(); // code+counter → expiry ms
+setInterval(() => { const now = Date.now(); for (const [k, exp] of _usedTotpCodes) if (now > exp) _usedTotpCodes.delete(k); }, 30_000);
+
 function verifyTotp(token) {
   if (!TOTP_SECRET) return false;
+  const tokenBuf = Buffer.from(String(token || ''), 'utf8');
+  if (tokenBuf.length !== 6) return false;
   const counter = Math.floor(Date.now() / 1000 / 30);
+  // Fix 5a: evaluate ALL windows — never short-circuit (constant-time scan)
+  let matched = false;
   for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
-    if (totpCode(TOTP_SECRET, counter + i) === token) return true;
+    const c = counter + i;
+    const expected = totpCode(TOTP_SECRET, c);
+    const expectedBuf = Buffer.from(expected, 'utf8');
+    // Fix 5b: timingSafeEqual (lengths guaranteed equal — both are 6-char strings)
+    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
+    if (eq) {
+      // Fix 5c: reject reused codes — key = token + counter slot
+      const useKey = `${token}:${c}`;
+      if (_usedTotpCodes.has(useKey)) { matched = false; continue; }
+      _usedTotpCodes.set(useKey, (c + 2) * 30 * 1000); // expire after 2 windows past use
+      matched = true;
+    }
   }
-  return false;
+  return matched;
 }
 
 // ── Download tokens — one-time public download links
@@ -730,6 +819,15 @@ function outboundRateOk(apiKey, plan) {
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
 
+// Fix 6: serialized async write queue for users.json — prevents lost-update race
+let _usersWriteQueue = Promise.resolve();
+function _writeUsersJson(data) {
+  _usersWriteQueue = _usersWriteQueue.then(() =>
+    fs.promises.writeFile(USERS_FILE, JSON.stringify(data, null, 2))
+  ).catch(e => log('warn', 'users_write_error', { err: e.message }));
+  return _usersWriteQueue;
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
     try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",active:true}); }); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
@@ -802,6 +900,9 @@ function isSsrfSafeUrl(urlStr) {
     if (/^f[cd]/i.test(h)) return false;                  // IPv6 ULA (fc00::/7)
     if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return false;
     if (h === 'metadata.google.internal' || h === 'metadata.aws.internal') return false;
+    // Fix 11: restrict to standard HTTPS ports only
+    const ALLOWED_PORTS = new Set(['', '443']);
+    if (!ALLOWED_PORTS.has(u.port)) return false;
     return true;
   } catch { return false; }
 }
@@ -863,7 +964,7 @@ function safeEqual(a, b) {
 }
 
 function authByDid(didStr, signature, payload) {
-  const entry = [...didRegistry.values()].find(e => e.doc.id === didStr);
+  const entry = didRegistry.get(didStr);
   if (!entry) return null;
   const vm = entry.doc.verificationMethod?.[0];
   if (!vm || !vm.publicKeyHex) return null;
@@ -959,7 +1060,7 @@ const server = http.createServer(async (req, res) => {
   // ── GET /health ─────────────────────────────────────────────────────────────
   if (path === '/health') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
-    const adminOk  = adminTok && adminTok === (process.env.ADMIN_TOKEN || '');
+    const adminOk  = adminTok && safeEqual(adminTok, process.env.ADMIN_TOKEN || '');
     const ram = ramStatus();
     const base = { ok: true, version: VERSION, sector: SECTOR, edition: EDITION,
       max_keys: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS,
@@ -991,7 +1092,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/metrics') {
     const adminToken = process.env.ADMIN_TOKEN || '';
     const reqToken = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-    if (adminToken && reqToken !== adminToken) {
+    if (adminToken && !safeEqual(reqToken, adminToken)) {
       res.writeHead(401, { 'Content-Type': 'text/plain' }); return res.end('Unauthorized');
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
@@ -1059,6 +1160,12 @@ const server = http.createServer(async (req, res) => {
     const existing = relayRegistry.get(pkHash);
     const verified_since = existing?.verified_since || new Date().toISOString();
     const ctEntry = ctAppendRelayReg(rUrl, rSector, rVersion, rEdition || 'community', pkHash);
+    // Fix 7: evict oldest entry when registry is at capacity
+    if (!existing && relayRegistry.size >= MAX_RELAY_REGISTRY) {
+      const oldestKey = relayRegistry.keys().next().value;
+      relayRegistry.delete(oldestKey);
+      log('warn', 'relay_registry_evict', { evicted: oldestKey?.slice(0,16), size: relayRegistry.size });
+    }
     relayRegistry.set(pkHash, {
       url: rUrl, sector: rSector, version: rVersion, edition: rEdition || 'community',
       pk_hash: pkHash, verified_since,
@@ -1073,19 +1180,23 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/relays — public registry of verified relay nodes ─────────────────
   if (path === '/v2/relays' && req.method === 'GET') {
-    const relays = [...relayRegistry.values()].map(r => ({
+    // Fix 7: paginate response to bound response size
+    const limit  = Math.min(parseInt(query.limit  || '50')  || 50,  200);
+    const offset = Math.max(parseInt(query.offset || '0')   || 0,   0);
+    const all = [...relayRegistry.values()];
+    const page = all.slice(offset, offset + limit).map(r => ({
       url: r.url, sector: r.sector, version: r.version, edition: r.edition,
       pk_hash: r.pk_hash, verified_since: r.verified_since, last_seen: r.last_seen,
       ct_index: r.ct_index, last_ct_index: r.last_ct_index
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, relays, count: relays.length }));
+    return res.end(J({ ok: true, relays: page, total: relayRegistry.size, limit, offset }));
   }
 
   // ── GET /v2/did/:did — publiek DID document resolven ─────────────────────────
   const didm0 = path.match(/^\/v2\/did\/([^/]+)$/);
   if (didm0 && req.method === 'GET') {
-    const entry = [...didRegistry.values()].find(e => e.doc.id === decodeURIComponent(didm0[1]));
+    const entry = didRegistry.get(decodeURIComponent(didm0[1]));
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'DID not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/did+json' });
     return res.end(J(entry.doc));
@@ -1151,11 +1262,15 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(_dlBurnedPage('File not found — already burned'));
     }
-    // Mark as used BEFORE sending (burn-on-read)
-    td.used = true;
+    // Fix 4: block concurrent downloads before transfer starts
+    if (td.in_progress) {
+      res.writeHead(409, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(_dlBurnedPage('Download already in progress'));
+    }
+    td.in_progress = true;
+    const blobHash = td.hash;
     const blob = entry.blob;
-    blobStore.delete(td.hash);
-    log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16) });
+    log('info', 'dl_token_used', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       // Filename not stored in relay (finding #4) — receiver decrypts actual name from payload
@@ -1167,9 +1282,22 @@ const server = http.createServer(async (req, res) => {
       })(),
       'Cache-Control': 'no-store',
       'X-Burned': 'true',
-      'X-Hash': td.hash,
+      'X-Hash': blobHash,
     });
-    return res.end(blob, () => { try { blob.fill(0); } catch {} });
+    // Fix 4: only burn blob after response has fully flushed to the client
+    res.on('finish', () => {
+      td.used = true;
+      blobStore.delete(blobHash);
+      try { blob.fill(0); } catch {}
+    });
+    // Fix 4: on socket error before finish, allow retry
+    res.on('close', () => {
+      if (!td.used) {
+        td.in_progress = false;
+        log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
+      }
+    });
+    return res.end(blob);
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
@@ -1226,7 +1354,7 @@ const server = http.createServer(async (req, res) => {
   // ── POST /v2/reload-users — Zero-downtime API key reload ─────────────────
   if (path === '/v2/reload-users' && req.method === 'POST') {
     const tok = (req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ','')||'').trim();
-    if (!tok || (tok !== (process.env.ADMIN_TOKEN || ''))) {
+    if (!tok || !safeEqual(tok, process.env.ADMIN_TOKEN || '')) {
       res.writeHead(401); return res.end(J({ error: 'unauthorized' }));
     }
     if (process.env.USERS_JSON) {
@@ -1489,7 +1617,11 @@ const server = http.createServer(async (req, res) => {
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
 
-      if (deviceId) pushWebhooks(apiKey, deviceId, 'blob_ready', { hash, size: blob.length, ttl_ms: ttl, sig_valid: sigResult.valid });
+      if (deviceId) {
+        pushWebhooks(apiKey, deviceId, 'blob_ready', { hash, size: blob.length, ttl_ms: ttl, sig_valid: sigResult.valid });
+        // Fix B: push real hash to recipient device queue for stream-next
+        deviceQueuePush(apiKey, deviceId, hash);
+      }
       if (global.wsPush) global.wsPush(apiKey, { hash, size: blob.length, device: deviceId, sig_valid: sigResult.valid });
       natsPush(apiKey, deviceId || 'unknown', hash, blob.length);
 
@@ -1619,13 +1751,19 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/stream-next ──────────────────────────────────────────────────────
   if (path === '/v2/stream-next') {
-    const device = query.device || ''; const seq = parseInt(query.seq || '0');
-    const next = seq + 1;
-    // HMAC secret = STREAM_NONCE+apiKey — non-precomputable without relay-session nonce (finding #9)
-    const streamSecret = crypto.createHmac('sha256', STREAM_NONCE).update(apiKey).digest();
-    const h = crypto.createHmac('sha256', streamSecret).update(`${device}|${next}`).digest('hex');
+    const device = query.device || '';
+    // Fix B: return next real blob hash from per-device delivery queue
+    const qKey = `${apiKey}:${device}`;
+    const queue = deviceQueues.get(qKey) || [];
+    // Pop only hashes whose blob is still in store (TTL may have expired)
+    let hash = null;
+    while (queue.length > 0) {
+      const candidate = queue[0];
+      if (blobStore.has(candidate)) { hash = candidate; break; }
+      queue.shift(); // discard expired/burned entries
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, device, seq: next, hash: h, available: blobStore.has(h) }));
+    return res.end(J({ ok: true, device, hash, available: hash !== null }));
   }
 
   // ── GET /v2/audit — Merkle chain audit log ───────────────────────────────────
@@ -1760,7 +1898,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
-      const plan = d.plan || 'pro';
+      // Fix 13: validate plan against allowlist
+      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'licensed', 'enterprise']);
+      const plan = VALID_PLANS.has(d.plan) ? d.plan : 'community';
       const label = typeof d.label === 'string' ? d.label.slice(0, 128) : '';
       // L4: validate email format and length before storing/sending
       const rawEmail = (d.email || '').toString().trim();
@@ -1770,16 +1910,17 @@ const server = http.createServer(async (req, res) => {
       }
       const email = rawEmail;
       apiKeys.set(newKey, { plan, label, active: true });
-      // Persist to users.json so key survives relay restarts
-      try {
-        const usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      // Fix 6: async serialized write — no sync I/O on hot path
+      fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
+        const usersData = JSON.parse(raw);
         usersData.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
         usersData.updated = new Date().toISOString();
-        fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2));
+        return _writeUsersJson(usersData);
+      }).then(() => {
         log('info', 'key_created_via_admin', { label, plan, persisted: true });
-      } catch(we) {
+      }).catch(we => {
         log('warn', 'key_persist_failed', { err: we.message, label });
-      }
+      });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, plan, label }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -1801,16 +1942,26 @@ const server = http.createServer(async (req, res) => {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       if (!apiKeys.has(d.key)) { res.writeHead(404); return res.end(J({ error: 'Key not found' })); }
       apiKeys.get(d.key).active = false;
-      // Persist revocation to users.json
-      try {
-        const usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-        const entry = usersData.api_keys.find(k => k.key === d.key);
-        if (entry) { entry.active = false; entry.revoked_at = new Date().toISOString(); }
+      const revokedKey = d.key;
+      // Fix 6: async serialized write — no sync I/O on hot path
+      fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
+        const usersData = JSON.parse(raw);
+        const ue = usersData.api_keys.find(k => k.key === revokedKey);
+        if (ue) { ue.active = false; ue.revoked_at = new Date().toISOString(); }
         usersData.updated = new Date().toISOString();
-        fs.writeFileSync(USERS_FILE, JSON.stringify(usersData, null, 2));
-        log('info', 'key_revoked_via_admin', { key: d.key.slice(0,16), persisted: true });
-      } catch(we) {
+        return _writeUsersJson(usersData);
+      }).then(() => {
+        log('info', 'key_revoked_via_admin', { key: revokedKey.slice(0,16), persisted: true });
+      }).catch(we => {
         log('warn', 'key_revoke_persist_failed', { err: we.message });
+      });
+      // Fix 12: close active WebSocket connections for the revoked key
+      const revokedWsClients = wsClients.get(revokedKey);
+      if (revokedWsClients) {
+        for (const ws of revokedWsClients) {
+          try { ws.close(4401, 'Key revoked'); } catch {}
+        }
+        wsClients.delete(revokedKey);
       }
       res.writeHead(200); return res.end(J({ ok: true }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -2263,6 +2414,8 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
 });
 function emergencyZeroAndExit(reason, code = 0) {
+  // Fix 8: flush CT write queue before exit
+  _flushCtOnExit();
   // Zeroize all in-memory blobs before exit
   try {
     for (const [, e] of blobStore.entries()) {

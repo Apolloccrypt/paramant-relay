@@ -20,6 +20,19 @@ if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — r
 const sessions = new Map();
 setInterval(() => { const now = Date.now(); for (const [k, v] of sessions) if (v.expires < now) sessions.delete(k); }, 60_000);
 
+// Fix 1: rate limiting on /auth/login — 5 attempts per 15 min per IP
+const loginAttempts = new Map(); // ip → { count, resetAt }
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const b = loginAttempts.get(ip) || { count: 0, resetAt: now + 15 * 60_000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 15 * 60_000; }
+  if (b.count >= 5) return false;
+  b.count++;
+  loginAttempts.set(ip, b);
+  return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of loginAttempts) if (now > v.resetAt + 60_000) loginAttempts.delete(k); }, 120_000);
+
 function authMiddleware(req, res, next) {
   const s = sessions.get((req.headers['x-session'] || '').trim());
   if (!s || s.expires < Date.now()) return res.status(401).json({ error: 'unauthorized' });
@@ -78,22 +91,33 @@ app.use(BASE_PATH || '/', express.static(path.join(__dirname, 'public')));
 const api = express.Router();
 
 api.post('/auth/login', async (req, res) => {
+  // Fix 1: rate limit by IP (proxy-aware — trust X-Forwarded-For behind nginx)
+  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  if (!checkLoginRateLimit(ip)) {
+    return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
+  }
   const { token, totp } = req.body || {};
   if (!token) return res.status(401).json({ error: 'Token required' });
   if (!totp || !/^\d{6}$/.test(totp)) return res.status(400).json({ error: 'TOTP code required (6 digits)' });
-  // M1: timing-safe comparison prevents timing-oracle attacks on the token
+  // Fix 1 + Fix 3: timing-safe ADMIN_TOKEN comparison only — pgp_ enterprise path removed
+  // (pgp_ keys are regular API keys managed per-sector; they don't grant admin access)
+  const tokenBuf = Buffer.from(token, 'utf8');
+  const adminBuf = Buffer.from(ADMIN_TOKEN, 'utf8');
   const isMaster = ADMIN_TOKEN.length > 0
-    && token.length === ADMIN_TOKEN.length
-    && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ADMIN_TOKEN));
-  const isEnterprise = token.startsWith('pgp_');
-  if (!isMaster && !isEnterprise) return res.status(401).json({ error: 'Invalid token — use your ADMIN_TOKEN or an enterprise pgp_ key' });
+    && tokenBuf.length === adminBuf.length
+    && crypto.timingSafeEqual(tokenBuf, adminBuf);
+  if (!isMaster) return res.status(401).json({ error: 'Invalid token' });
   try {
-    const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, token);
+    const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, ADMIN_TOKEN);
     if (!r.body?.ok) return res.status(401).json({ error: 'Invalid TOTP code' });
     const sid = crypto.randomBytes(32).toString('hex');
-    sessions.set(sid, { expires: Date.now() + 3_600_000, token });
+    sessions.set(sid, { expires: Date.now() + 3_600_000, token: ADMIN_TOKEN });
     return res.json({ ok: true, session: sid, expires_in: 3600 });
-  } catch (e) { return res.status(502).json({ error: `Relay unreachable: ${e.message}` }); }
+  } catch (e) {
+    // Fix 10: don't leak internal relay address in error response
+    console.error('[admin] relay unreachable:', e.message);
+    return res.status(502).json({ error: 'Relay unreachable' });
+  }
 });
 
 api.post('/auth/logout', (req, res) => { sessions.delete((req.headers['x-session'] || '').trim()); res.json({ ok: true }); });
