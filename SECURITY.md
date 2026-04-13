@@ -93,6 +93,26 @@ Applied directly to production server after internal review:
 | 9 | /download page served outdated v0.2.0 app | Returns 410 Gone |
 | 10 | /chat page unlinked/orphaned | Returns 410 Gone |
 
+### 2026-04-13 — CIS Ubuntu 24.04 Benchmark (Wazuh)
+
+114 checks applied via automated hardening. All 13 categories resolved:
+
+| # | Category | Details |
+|---|----------|---------|
+| 1 | Kernel module blacklist | 33 modules blocked: dccp, rds, sctp, tipc, cramfs, usb-storage, filesystem modules with known CVEs |
+| 2 | /tmp as tmpfs | nosuid, nodev, noexec, size=2G via fstab |
+| 3 | AppArmor | 119/121 profiles enforcing (was 4 in complain) |
+| 4 | SSH hardening | MACs, LogLevel VERBOSE, LoginGraceTime 60, MaxStartups 10:30:60, DisableForwarding, Banner |
+| 5 | Kernel network | ip_forward=0, send_redirects=0, log_martians=1, syncookies=1, ASLR=2, dmesg_restrict=1 |
+| 6 | PAM hardening | pwquality minlen=14, faillock deny=5 unlock=900s, pwhistory remember=24 |
+| 7 | auditd | 49 rules loaded: time, identity, network, DAC, login, sudo, modules |
+| 8 | AIDE | v0.18.6 installed, daily cron at 05:00 |
+| 9 | Cron permissions | /etc/crontab + cron.d 700/root, cron.allow=root only |
+| 10 | Password policy | MAX_DAYS=365, MIN_DAYS=1, SHA512, INACTIVE=30 |
+| 11 | sudo logging | logfile=/var/log/sudo.log, log_input, log_output, use_pty |
+| 12 | Firewall | UFW/nftables, default deny in+out, enabled at boot |
+| 13 | Login banners | /etc/issue, /etc/issue.net, /etc/motd, SSH Banner |
+
 ---
 
 ### v2.4.5 — 2026-04-11 — Code audit by R. Zwarts (verification review)
