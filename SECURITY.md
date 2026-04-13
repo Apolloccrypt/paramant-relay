@@ -76,6 +76,63 @@ We will not take legal action against researchers who follow this policy.
 
 ## Recent Security Patches
 
+### 2026-04-13 — Server hardening (paramant.app production)
+
+Applied directly to production server after internal review:
+
+| # | Finding | Fix |
+|---|---------|-----|
+| 1 | .env readable by other users | chmod 600 |
+| 2 | API key visible in ps aux (stale debug process) | Process killed |
+| 3 | SSH: root login not fully disabled | PermitRootLogin prohibit-password + MaxAuthTries 3 |
+| 4 | Spurious arm64 architecture in apt | Removed, apt upgraded |
+| 5 | HSTS header missing on HTTPS blocks | Added to all 6 server blocks |
+| 6 | Google Fonts in CSP (external dependency) | Removed from style-src + font-src |
+| 7 | atd scheduler running unnecessarily | Stopped and disabled |
+| 8 | NATS running as root | Dedicated system user, systemd hardening |
+| 9 | /download page served outdated v0.2.0 app | Returns 410 Gone |
+| 10 | /chat page unlinked/orphaned | Returns 410 Gone |
+
+---
+
+### v2.4.5 — 2026-04-11 — Code audit by R. Zwarts (verification review)
+
+Commit: e6f216d — All 14 findings resolved.
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| 1 | High | Admin login plain === + no rate limiting | timingSafeEqual + per-IP rate limiter |
+| 2 | Medium | safeEqual() bypassed on 3 relay paths | All paths use safeEqual() |
+| 3 | Medium | pgp_ enterprise admin path broken (repeat) | Removed pgp_ support |
+| 4 | Medium | Blob burned before transfer complete (repeat) | Deferred deletion on res.finish() |
+| 5 | Medium | TOTP timing-sensitive + code reuse in window | Full window scan + _usedTotpCodes |
+| 6 | Medium | Sync file I/O on key create/revoke | Serialized async write queue |
+| 7 | Medium | Relay registry unbounded + unpaginated | Cap + limit/offset pagination |
+| 8 | Medium | CT log appendFileSync + no rotation | Async write stream + size rotation |
+| 9 | Medium | Webhook SSRF port not restricted | Allowlist: 443 + 80 only |
+| 10 | Low | DID lookup O(n) scan | O(1) via didRegistry.get(did) |
+| 11 | Low | Admin login leaks internal address | Generic error, server-side log only |
+| 12 | Low | Revoked keys keep WebSocket open | ws.close(4401) on revoke |
+| 13 | Low | Arbitrary plan strings accepted | VALID_PLANS allowlist |
+| 14 | Low | Invalid Base32 in TOTP_SECRET silent | Startup validation + clear error |
+
+---
+
+### v2.4.5 — 2026-04-10 — Code audit by R. Zwarts (independent security researcher)
+
+Commit: 0db3ef0 — All 6 findings resolved.
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| 1 | High | WebSocket proxy uses plain TCP to HTTPS upstream | tls.connect() |
+| 2 | High | stream-next returns synthetic hash not real blob hash | Per-device queue with real sha256 |
+| 3 | High | Webhook SSRF — DNS not resolved before connecting | dns.resolve + private range reject |
+| 4 | Medium | SDK uses ?k= query param rejected by relay | X-Api-Key header |
+| 5 | Medium | pgp_ enterprise admin path broken end-to-end | Removed pgp_ support |
+| 6 | Medium | Blob burned before transfer complete | Deferred deletion on res.finish() |
+
+---
+
 ### v2.3.3 — 2026-04-09 (security hardening release)
 
 Deep security review and self-hosting hardening. No external researcher report; internal findings.
@@ -175,7 +232,9 @@ We thank the following researchers for responsible disclosure:
 
 | Date       | Researcher           | Findings                                      |
 |------------|----------------------|-----------------------------------------------|
-| 2026-04-09 | **Raymond Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | RAM admission TOCTOU `/v2/inbound` + `/v2/drop/create` (P1 · High) · Download handlers duplicate blobs in RAM (P2 · Medium) · pubkeys Map unbounded — no TTL, no device cap (P3 · Medium) · SSRF via webhook URL registration (P4 · High) · All 4 patched in v2.3.2 |
+| 2026-04-11 | **R. Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | Verification review: 14 findings (1 high, 8 medium, 5 low) · All resolved in commit e6f216d |
+| 2026-04-10 | **R. Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | First audit: 6 findings (3 high, 3 medium) · All resolved in commit 0db3ef0 |
+| 2026-04-09 | **R. Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | RAM admission TOCTOU `/v2/inbound` + `/v2/drop/create` (P1 · High) · Download handlers duplicate blobs in RAM (P2 · Medium) · pubkeys Map unbounded — no TTL, no device cap (P3 · Medium) · SSRF via webhook URL registration (P4 · High) · All 4 patched in v2.3.2 |
 | 2026-04-09 | Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) · Smart Cyber Solutions Pty Ltd (AU) | Independent, uncompensated review · 20 findings (4 critical, 5 high, 6 medium, 5 low) · [Full report](pentest-report-2026-04-08.txt) · [Patch status](docs/security-audit-2026-04.md) |
 | 2026-04-08 | Hendrik Bruinsma ([@readefries](https://github.com/readefries)) | Security review (5 findings: Argon2 race condition, `/health` info leak, `X-Paramant-Views-Left` header leak, `/v2/ct/proof` routing, stale CSP domain) + 4 bug reports (QR bug, fingerprint mismatch on refresh, receiver stuck at fingerprint, preload burn bug) + Thunderbird FileLink add-on · All patched in v2.2.1 / v2.3.0 |
 

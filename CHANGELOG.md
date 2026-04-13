@@ -7,6 +7,37 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.4.5] — 2026-04-13
+
+### Security
+- Applied all 20 findings from R. Zwarts audits (2026-04-10 + 2026-04-11)
+- Server hardening: SSH (`PermitRootLogin prohibit-password`, `MaxAuthTries 3`), HSTS on all 6 nginx blocks, CSP cleaned (Google Fonts removed), `.env` permissions fixed, `atd` disabled, NATS moved to dedicated non-root user
+- Docker containers confirmed running as non-root (admin + relay)
+- `/download` (outdated v0.2.0) and `/chat` (orphaned) return 410 Gone
+- `/security` and `/changelog` redirect to GitHub
+
+### Dependencies
+- `node:20-alpine` → `node:22-alpine` (Node 20 EOL April 2026)
+- `express` 4.x → 5.x
+- 0 npm audit vulnerabilities across all packages
+- New Ed25519 license token (stricter validation in v2.4.4+)
+
+### Fixed
+- Admin login: `timingSafeEqual` + per-IP rate limiter (max 5/min)
+- `safeEqual()` now enforced on all `ADMIN_TOKEN` paths (3 relay paths were bypassed)
+- TOTP: full window scan + `_usedTotpCodes` set for replay prevention
+- Blob deletion deferred until transfer complete (`res.finish()`)
+- Async write queue for `users.json` — no more blocking I/O on key create/revoke
+- Relay registry: cap enforced + `limit`/`offset` pagination added
+- CT log: switched to async write stream + size-based rotation
+- Webhook SSRF: DNS resolution before connect + port allowlist (443 + 80 only)
+- DID lookup: O(1) via `didRegistry.get(did)` (was O(n) scan)
+- WebSocket connections closed on key revocation (`ws.close(4401)`)
+- `VALID_PLANS` allowlist — arbitrary plan strings no longer accepted
+- `TOTP_SECRET` validated at startup with clear error on invalid Base32
+
+---
+
 ## [2.4.4] — 2026-04-11
 
 ### Security — RAPTOR audit (relay findings)

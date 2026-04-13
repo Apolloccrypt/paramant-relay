@@ -199,8 +199,12 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Crypto runtime | Rust/WASM (wasm-pack) — browser-side encrypt runs in native code, not JS |
 | Jurisdiction | Hetzner DE · EU/GDPR · no US CLOUD Act |
 
-**Independent security audit (April 2026):** [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU) · uncompensated, voluntary review
-Findings: **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
+**Security audits (April 2026):**
+- 2026-04-11 — R. Zwarts verification review: 14 findings (1 high · 8 medium · 5 low), all resolved — commit e6f216d
+- 2026-04-10 — R. Zwarts independent audit: 6 findings (3 high · 3 medium), all resolved — commit 0db3ef0
+- 2026-04-08 — [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU): **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
+
+All findings publicly documented in [SECURITY.md](SECURITY.md). To report: privacy@paramant.app
 
 **v2.4.2 (April 2026):** Relay registry:
 - Each relay generates an ML-DSA-65 identity keypair on first boot (`/data/relay-identity.json`)
