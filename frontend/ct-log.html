@@ -61,6 +61,12 @@ nav a.back:hover { color:#aaa; }
   font-family:inherit; font-size:11px; font-weight:700; letter-spacing:.1em; cursor:pointer; border-radius:0 4px 4px 0; }
 .search-bar button:hover { background:#fff; }
 
+.type-filter { display:flex; gap:6px; margin:0 40px 20px; flex-wrap:wrap; }
+.tf { background:transparent; border:1px solid #222; color:#666; padding:6px 14px;
+  font-family:inherit; font-size:11px; letter-spacing:.06em; border-radius:3px; cursor:pointer; transition:border-color .1s,color .1s; }
+.tf:hover:not(.active) { border-color:#444; color:#aaa; }
+.tf.active { background:#0a1f1a; border-color:#3aaa70; color:#3aaa70; }
+
 .table-wrap { margin:0 40px 40px; border:1px solid #1a1a1a; border-radius:6px; overflow:hidden; }
 .table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; background:#111; padding:10px 16px; }
 .table-head span { font-size:10px; color:#666; letter-spacing:.1em; text-transform:uppercase; }
@@ -155,7 +161,11 @@ nav a.back:hover { color:#aaa; }
 <div class="stats">
   <div class="stat">
     <div class="val" id="stat-count">—</div>
-    <div class="lbl">Registrations</div>
+    <div class="lbl">Relay registrations</div>
+  </div>
+  <div class="stat">
+    <div class="val" id="stat-transfers">—</div>
+    <div class="lbl">Transfer proofs</div>
   </div>
   <div class="stat">
     <div class="val dim" id="stat-root">—</div>
@@ -179,6 +189,12 @@ nav a.back:hover { color:#aaa; }
     <button onclick="verifyHash()">VERIFY</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
+</div>
+
+<div class="type-filter">
+  <button class="tf active" id="tf-all"      onclick="setTypeFilter('all')">All</button>
+  <button class="tf"        id="tf-relay_reg" onclick="setTypeFilter('relay_reg')">Relay registrations</button>
+  <button class="tf"        id="tf-transfer"  onclick="setTypeFilter('transfer')">Transfer proofs</button>
 </div>
 
 <div class="search-bar">
@@ -223,7 +239,7 @@ nav a.back:hover { color:#aaa; }
 <script>
 const RELAY = 'https://health.paramant.app';
 const PAGE_SIZE = 20;
-let allEntries = [], page = 0, filtered = [];
+let allEntries = [], page = 0, filtered = [], typeFilter = 'all';
 
 async function load() {
   try {
@@ -235,7 +251,10 @@ async function load() {
     allEntries = (d.entries || []).slice().reverse();
     filtered   = allEntries;
 
-    document.getElementById('stat-count').textContent = d.size || allEntries.length;
+    var relayRegCount = allEntries.filter(function(e){ return e.type === 'relay_reg'; }).length;
+    var transferCount = allEntries.filter(function(e){ return e.type === 'transfer' || e.type === 'pubkey'; }).length;
+    document.getElementById('stat-count').textContent = relayRegCount;
+    document.getElementById('stat-transfers').textContent = transferCount;
     const root = d.root || '';
     document.getElementById('stat-root').textContent =
       root && root !== '0'.repeat(64) ? root.slice(0,16)+'…' : '—';
@@ -317,6 +336,7 @@ function render() {
       + '<div class="ts">'+time+'</div>'
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
+      + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+e.type+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+(e.leaf_hash||'—')+'</span></div>'
       + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+(e.tree_hash||'—')+'</span></div>'
       + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+(e.device_hash||'—')+'</span></div>'
@@ -336,12 +356,26 @@ function toggle(i) {
 
 function filterEntries() {
   var q = document.getElementById('search').value.trim().toLowerCase();
-  filtered = q ? allEntries.filter(function(e) {
+  var base = typeFilter === 'relay_reg'
+    ? allEntries.filter(function(e){ return e.type === 'relay_reg'; })
+    : typeFilter === 'transfer'
+    ? allEntries.filter(function(e){ return e.type === 'transfer' || e.type === 'pubkey'; })
+    : allEntries;
+  filtered = q ? base.filter(function(e) {
     return (e.leaf_hash||'').includes(q) || (e.tree_hash||'').includes(q)
         || (e.device_hash||'').includes(q) || String(e.index||'').includes(q);
-  }) : allEntries;
+  }) : base;
   page = 0;
   render();
+}
+
+function setTypeFilter(type) {
+  typeFilter = type;
+  ['all','relay_reg','transfer'].forEach(function(t) {
+    var btn = document.getElementById('tf-'+t);
+    if (btn) btn.className = 'tf' + (t === type ? ' active' : '');
+  });
+  filterEntries();
 }
 
 function changePage(dir) {

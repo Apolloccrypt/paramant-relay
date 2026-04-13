@@ -1,9 +1,11 @@
-fetch('https://health.paramant.app/v2/ct/log?limit=1',{signal:AbortSignal.timeout(5000)})
+fetch('https://health.paramant.app/v2/ct/log?limit=1000',{signal:AbortSignal.timeout(5000)})
   .then(function(r){return r.json()})
   .then(function(d){
     var ce=document.getElementById('ct-count');
     var re=document.getElementById('ct-root');
-    if(ce && d.size!=null) ce.textContent=d.size.toLocaleString();
+    var entries=d.entries||[];
+    var relayCount=entries.filter(function(e){return e.type==='relay_reg';}).length;
+    if(ce) ce.textContent=relayCount.toLocaleString();
     if(re && d.root && d.root!=='0'.repeat(64)) re.textContent=d.root.slice(0,16)+'...'+d.root.slice(-8);
   }).catch(function(){});
 
