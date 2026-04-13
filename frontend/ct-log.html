@@ -122,11 +122,16 @@ nav a.back:hover { color:#aaa; }
 
 @media(max-width:700px) {
   nav, .hero, .search-bar, .pagination, .notice, .verify-section { padding-left:20px; padding-right:20px; }
+  .tabs { margin-left:20px; margin-right:20px; }
+  .type-filter { margin-left:20px; margin-right:20px; }
   .stats { flex-direction:column; gap:1px; margin:0 20px 32px; }
+  .relay-table-wrap { margin:0 20px 40px; }
   .table-wrap { margin:0 20px 40px; }
   .table-head, .entry { grid-template-columns:40px 1fr 130px; }
   .table-head span:nth-child(3), .table-head span:nth-child(4),
   .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
+  .relay-table-head, .relay-row { grid-template-columns:1fr 80px 70px; }
+  .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
 </style>
 </head>

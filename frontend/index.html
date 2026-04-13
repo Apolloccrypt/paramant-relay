@@ -81,17 +81,39 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 .footer-links a:hover{color:var(--muted)}
 .footer-meta{font-size:11px;color:var(--quiet);font-family:var(--mono);text-align:right;line-height:1.8}
 @media(max-width:768px){
-  nav{padding:0 20px}.nav-links{display:none}
-  .hero,.code-wrap{padding-left:24px;padding-right:24px}
-  h1{font-size:32px}
-  section{padding:64px 24px}
+  nav{padding:0 16px}
+  .nav-links{display:none}
+  .nav-burger{display:flex;align-items:center}
+  .nav-open .nav-links{display:flex!important;flex-direction:column;position:absolute;top:56px;left:0;right:0;background:rgba(12,12,12,.97);border-bottom:1px solid var(--border);padding:20px 16px;gap:20px;z-index:99}
+  .nav-open .nav-links a{font-size:14px}
+  .hero,.code-wrap{padding-left:20px;padding-right:20px}
+  .hero{padding-top:64px}
+  h1{font-size:30px}
+  section{padding:56px 20px}
+  .sec-pad{padding-left:20px!important;padding-right:20px!important}
   .g3,.g2,.pricing-grid{grid-template-columns:1fr}
   .proto-bar{flex-wrap:wrap}
   .proto-cell{flex:1 1 50%;border-bottom:1px solid var(--border)}
-  footer{flex-direction:column;align-items:flex-start;padding:32px 24px}
+  footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
   .footer-meta{text-align:left}
+  /* Inline-style grid overrides */
+  .role-banner{grid-template-columns:1fr!important}
+  .net-pair{grid-template-columns:1fr!important}
+  .pipe-stats{grid-template-columns:repeat(2,1fr)!important}
+  .nodemap-stats{grid-template-columns:repeat(3,1fr)!important}
+  .ct-pair{grid-template-columns:1fr!important}
+  .ct-foot{flex-wrap:wrap!important;gap:10px!important}
+  .stat-quad{grid-template-columns:repeat(2,1fr)!important}
+  .install-three{grid-template-columns:1fr!important}
+  .price-split{grid-template-columns:1fr!important}
+  .price-split>*:nth-child(2){display:none}
+  /* Canvas/SVG media */
+  canvas,svg{max-width:100%}
 }
 .price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
+/* Hamburger */
+.nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
+.nav-burger:hover{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -107,6 +129,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
   </ul>
   <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-burger" onclick="this.closest('nav').classList.toggle('nav-open');this.textContent=this.closest('nav').classList.contains('nav-open')?'✕':'☰'" aria-label="Menu">☰</button>
 </nav>
 
 <div class="hero">
@@ -135,7 +158,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <hr class="divider">
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
+<div class="role-banner" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
   <a href="#selfhost" style="display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:var(--bg);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#111'" onmouseout="this.style.background='var(--bg)'">
     <div>
       <div style="font-size:10px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Relay operator</div>
@@ -154,12 +177,12 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </a>
 </div>
 
-<section id="network" style="max-width:960px;margin:0 auto;padding:64px 48px 0">
+<section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:64px 48px 0">
   <div class="eyebrow">Relay network</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
   <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="net-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
@@ -170,7 +193,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)" id="pipe-ts"></span>
       </div>
       <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)">
+      <div class="pipe-stats" style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)">
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Relay</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-main">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">—</div></div>
@@ -259,7 +282,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <text x="320" y="259" fill="#555" font-size="9" font-family="monospace">Fly.io</text>
         <text x="320" y="269" fill="#444" font-size="8" font-family="monospace">planned</text>
       </svg>
-      <div style="display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)">
+      <div class="nodemap-stats" style="display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)">
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">AMS</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">FRA</div><div style="font-size:10px;font-family:var(--mono);color:#3aaa70">live</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ARN</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
@@ -273,7 +296,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <script src="relay-status.js" integrity="sha384-zwgp1dUWLvm8iCOTiriHKk1xEDJ602wRXeATIxsWqM4FRoi0GIETSn6kSMN19gPf" crossorigin="anonymous" defer></script>
 
-<section style="max-width:960px;margin:0 auto;padding:40px 48px 0">
+<section class="sec-pad" style="max-width:960px;margin:0 auto;padding:40px 48px 0">
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:8px">
@@ -282,7 +305,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       </div>
       <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none">view all →</a>
     </div>
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:0">
+    <div class="ct-pair" style="display:grid;grid-template-columns:auto 1fr;gap:0">
       <div style="padding:24px 32px;border-right:1px solid var(--border);min-width:180px">
         <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Relay registrations</div>
         <div style="font-size:40px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-count">—</div>
@@ -294,7 +317,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">SHA3-256 · public · tamper-evident</div>
       </div>
     </div>
-    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <div class="ct-foot" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Every transfer hashed into a Merkle tree — content never stored</div>
       <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
     </div>
@@ -360,7 +383,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </div>
 
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
+    <div class="stat-quad" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
       <div style="background:var(--bg);padding:20px 24px">
         <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px" id="stat-relay-count">5</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">relay sectors live</div>
@@ -391,13 +414,13 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="selfhost" style="max-width:960px;margin:0 auto;padding:72px 48px">
+<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:72px 48px">
   <div class="eyebrow">Self-hosting</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
   <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
 
   <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
+  <div class="install-three" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
 
     <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:24px;display:flex;flex-direction:column">
       <div style="font-size:20px;font-family:var(--mono);color:#2d8a5c;margin-bottom:10px">π</div>
@@ -469,7 +492,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <p class="sub">Two ways to use PARAMANT &mdash; pick the one that fits.</p>
 
   <div style="margin:40px auto 0;max-width:760px">
-    <div style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:start;gap:0">
+    <div class="price-split" style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:start;gap:0">
 
       <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:28px 24px">
         <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Relay operator</div>
@@ -664,5 +687,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 </footer>
 
 <script src="ct-stats.js" integrity="sha384-ZJMCfhlRH6OCODBcLfm/vvO0QEw26FxvM84NIiRYbeF+ahESe9Axc8yox1hwg5dB" crossorigin="anonymous" defer></script>
+<script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='☰';}});});</script>
 </body>
 </html>
