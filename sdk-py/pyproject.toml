@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paramant-sdk"
-version = "2.4.1"
+version = "2.4.5"
 description = "Python SDK for PARAMANT Ghost Pipe — zero-plaintext post-quantum file transport"
 readme = "README.md"
 license = "BUSL-1.1"
@@ -38,9 +38,9 @@ dev = [
 [project.urls]
 Homepage = "https://paramant.app"
 Documentation = "https://docs.paramant.app"
-Repository = "https://github.com/paramant/paramant-master"
-Changelog = "https://github.com/paramant/paramant-master/releases"
-"Bug Tracker" = "https://github.com/paramant/paramant-master/issues"
+Repository = "https://github.com/Apolloccrypt/paramant-relay"
+Changelog = "https://github.com/Apolloccrypt/paramant-relay/releases"
+"Bug Tracker" = "https://github.com/Apolloccrypt/paramant-relay/issues"
 
 [project.scripts]
 paramant-sdk = "paramant_sdk:_cli_main"

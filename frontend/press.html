@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT Press Kit</title>
+<link rel="stylesheet" href="_design.css">
+<style>
+  body { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; font-family: system-ui,sans-serif; color:#e0e0e0; background:#0a0a0a; }
+  h1 { color: #00cc55; font-size: 2rem; margin-bottom: .25rem; }
+  h2 { color: #00cc55; border-bottom: 1px solid #1a3a2a; padding-bottom: .5rem; margin-top: 2.5rem; }
+  h3 { color: #aaa; margin-bottom: .5rem; }
+  .subtitle { color: #aaa; font-size: 1.1rem; margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .card { background: #111; border: 1px solid #222; border-radius: 8px; padding: 1.25rem; }
+  .card h3 { margin-top: 0; color: #00cc55; }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1.5rem; }
+  .facts dt { color: #888; white-space: nowrap; }
+  .facts dd { margin: 0; color: #e0e0e0; }
+  .blurb { background: #0f1f17; border-left: 3px solid #00cc55; padding: 1rem 1.25rem; border-radius: 0 6px 6px 0; margin: 1rem 0; line-height: 1.7; }
+  .download-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: .75rem; }
+  .dl-btn { background: #0f2a1a; border: 1px solid #00cc55; color: #00cc55; padding: .5rem 1rem; border-radius: 6px; text-decoration: none; font-size: .9rem; transition: background .15s; }
+  .dl-btn:hover { background: #00cc55; color: #000; }
+  .bullet-list { list-style: none; padding: 0; }
+  .bullet-list li { padding: .4rem 0; padding-left: 1.5rem; position: relative; }
+  .bullet-list li::before { content: "▸"; color: #00cc55; position: absolute; left: 0; }
+  .contact { background: #111; border: 1px solid #333; border-radius: 8px; padding: 1.25rem; margin-top: 1rem; }
+  .contact a { color: #00cc55; }
+  table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
+  td, th { border: 1px solid #222; padding: .6rem .85rem; text-align: left; font-size: .9rem; }
+  th { background: #111; color: #aaa; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>PARAMANT</h1>
+<p class="subtitle">Post-Quantum Ghost Pipe · Press Kit</p>
+
+<h2>About</h2>
+
+<div class="blurb">
+  <strong>50 words:</strong> PARAMANT is a post-quantum encrypted file relay built for regulated industries. Files are encrypted client-side with ML-KEM-768 before upload, stored in RAM only, and destroyed after one download. Nothing is written to disk. EU/DE jurisdiction. Self-hostable. NIS2, NEN7510, and IEC 62443 ready.
+</div>
+
+<div class="blurb">
+  <strong>150 words:</strong> PARAMANT Ghost Pipe is a post-quantum encrypted relay that makes secure file transfer genuinely simple. Data is encrypted in the browser or SDK using ML-KEM-768 + AES-256-GCM — before it leaves the device. The relay only ever sees fixed-size (5 MB) ciphertext blobs, never the original file, never a decryption key. Blobs are held in RAM and destroyed immediately after the recipient downloads them. There is no storage, no inbox, no user account. Every transfer is recorded in a public SHA3-256 Merkle tree — proving delivery without storing content. Five live sector relays cover healthcare (NEN 7510), legal (eIDAS), finance (DORA), industrial IoT (IEC 62443), and general use. Community Edition is free forever for up to 5 API keys. The relay runs on a Raspberry Pi, a VPS, or as a bootable USB — no cloud dependency required.
+</div>
+
+<div class="blurb">
+  <strong>300 words:</strong> PARAMANT Ghost Pipe is a post-quantum secure file relay designed for healthcare providers, legal professionals, industrial operators, and financial institutions operating under strict data sovereignty requirements. It solves a specific problem: sending sensitive files between parties where neither party trusts the relay — and where the jurisdiction of storage matters.<br><br>
+  The system is built around three hard guarantees. First, encryption is purely client-side: files are encrypted using ML-KEM-768 key encapsulation and AES-256-GCM symmetric encryption inside a Rust/WASM module that runs in the browser, before any data leaves the device. Second, the relay is RAM-only: encrypted blobs are never written to disk, making forensic recovery impossible. Third, burn-on-read: each blob is destroyed immediately after the first successful download. The relay cannot be compelled to hand over content it no longer holds.<br><br>
+  PARAMANT runs five sector relays, each tuned to its compliance domain: health (NEN 7510, HL7 FHIR, DICOM), legal (eIDAS, KNB), finance (NIS2, DORA, ISO 20022), industrial IoT (IEC 62443, EU CRA), and general. Each sector is a separate container — a breach in one does not expose another.<br><br>
+  Deployment takes two minutes: one docker compose command on any Ubuntu 22.04+ server. A Raspberry Pi installer and a bootable NixOS image (paramantOS) are available for dedicated hardware. The community edition is permanently free for up to 5 API keys per relay instance.<br><br>
+  PARAMANT was independently security-audited in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. Twenty findings across two audits — including 4 critical — were fully resolved before public release. All findings are publicly documented.<br><br>
+  Incorporated in the Netherlands. Infrastructure on Hetzner Frankfurt, DE. EU/GDPR jurisdiction only, no US CLOUD Act exposure.
+</div>
+
+<h2>Key facts</h2>
+
+<div class="card">
+  <dl class="facts">
+    <dt>Founded</dt>        <dd>2025</dd>
+    <dt>HQ</dt>            <dd>Netherlands / EU</dd>
+    <dt>Infrastructure</dt><dd>Hetzner Frankfurt, DE — EU only</dd>
+    <dt>Jurisdiction</dt>  <dd>EU/DE · GDPR · no US CLOUD Act</dd>
+    <dt>Version</dt>       <dd>v2.4.5 (April 2026)</dd>
+    <dt>Live relays</dt>   <dd>5 (relay · health · finance · legal · iot)</dd>
+    <dt>Encryption</dt>    <dd>ML-KEM-768 + AES-256-GCM (NIST FIPS 203 / SP 800-38D)</dd>
+    <dt>Audit</dt>         <dd>April 2026 — 40 findings, all resolved</dd>
+    <dt>License</dt>       <dd>BUSL-1.1 — source available, free ≤ 5 keys</dd>
+    <dt>Contact</dt>       <dd><a href="mailto:privacy@paramant.app" style="color:#00cc55">privacy@paramant.app</a></dd>
+  </dl>
+</div>
+
+<h2>What makes PARAMANT different</h2>
+
+<ul class="bullet-list">
+  <li><strong>No plaintext, ever.</strong> Encryption happens client-side in Rust/WASM before upload. The relay cannot read your file — even under court order, because it never had it.</li>
+  <li><strong>Burn-on-read, not expiry.</strong> Blobs are destroyed on download, not on a timer. You cannot re-download a file, and neither can an attacker who compromises the relay after delivery.</li>
+  <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner Frankfurt DE. No US entity in the chain. No CLOUD Act exposure. GDPR-compliant by architecture, not by policy.</li>
+  <li><strong>Sector compartmentalisation.</strong> Five separate relay containers — healthcare, legal, finance, IoT, general. A breach or subpoena targeting the finance relay cannot reach health data.</li>
+  <li><strong>Post-quantum now, not later.</strong> ML-KEM-768 (NIST FIPS 203) protects against store-now-decrypt-later attacks. Healthcare data sent today cannot be decrypted by a quantum computer in 2030.</li>
+</ul>
+
+<h2>Logo &amp; brand assets</h2>
+
+<p>Use PARAMANT brand assets only in editorial/press contexts. Do not modify the logo or use it to imply endorsement without written permission.</p>
+
+<div class="download-row">
+  <a href="/icon-512.png" download class="dl-btn">Logo PNG (512×512)</a>
+  <a href="/icon-192.png" download class="dl-btn">Logo PNG (192×192)</a>
+</div>
+
+<p style="color:#888;font-size:.85rem;margin-top:.75rem">SVG version available on request: <a href="mailto:privacy@paramant.app" style="color:#00cc55">privacy@paramant.app</a></p>
+
+<h2>Screenshots &amp; product images</h2>
+
+<div class="grid">
+  <div class="card">
+    <h3>ParaShare — file transfer UI</h3>
+    <p style="color:#888;font-size:.9rem">Browser-based send/receive. No account. No install.</p>
+    <a href="/parashare" class="dl-btn">Live demo →</a>
+  </div>
+  <div class="card">
+    <h3>CT log — public Merkle audit trail</h3>
+    <p style="color:#888;font-size:.9rem">Every transfer recorded. Tamper-evident. Public.</p>
+    <a href="/ct-log.html" class="dl-btn">Live CT log →</a>
+  </div>
+  <div class="card">
+    <h3>Relay status dashboard</h3>
+    <p style="color:#888;font-size:.9rem">Five live sectors with real-time health indicators.</p>
+    <a href="/status.html" class="dl-btn">Status page →</a>
+  </div>
+  <div class="card">
+    <h3>Compliance pages</h3>
+    <p style="color:#888;font-size:.9rem">NIS2, NEN7510, IEC 62443 — detailed mapping.</p>
+    <a href="/compliance/nis2.html" class="dl-btn">NIS2 →</a>
+    <a href="/compliance/nen7510.html" class="dl-btn" style="margin-left:.5rem">NEN7510 →</a>
+  </div>
+</div>
+
+<h2>Press contact</h2>
+
+<div class="contact">
+  <p><strong>Email:</strong> <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+  <p><strong>Response time:</strong> 24 hours (EU business hours)</p>
+  <p><strong>Available for:</strong> product demos, technical briefings, compliance review calls, researcher access</p>
+  <p><strong>GitHub:</strong> <a href="https://github.com/Apolloccrypt/paramant-relay">github.com/Apolloccrypt/paramant-relay</a></p>
+</div>
+
+</body>
+</html>
