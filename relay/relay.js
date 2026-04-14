@@ -2445,7 +2445,8 @@ process.on('SIGINT',  () => emergencyZeroAndExit('SIGINT'));
 
 // Catch unhandled promise rejections — log and exit cleanly so blobs are zeroized
 process.on('unhandledRejection', (reason) => {
-  log('error', 'unhandled_rejection', { reason: String(reason).slice(0, 200) });
+  const stack = (reason instanceof Error) ? reason.stack : String(reason);
+  log('error', 'unhandled_rejection', { reason: String(reason).slice(0, 200), stack: stack?.slice(0, 1000) });
   emergencyZeroAndExit('unhandledRejection', 1);
 });
 
