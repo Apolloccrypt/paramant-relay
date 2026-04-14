@@ -487,7 +487,7 @@ Expected output (one entry per registered relay):
     {
       "url": "https://relay.yourdomain.com",
       "sector": "relay",
-      "version": "2.4.2",
+      "version": "2.4.5",
       "edition": "community",
       "pk_hash": "3d9b960c...",
       "verified_since": "2026-04-11T02:14:13Z",

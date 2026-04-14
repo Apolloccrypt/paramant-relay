@@ -35,6 +35,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - WebSocket connections closed on key revocation (`ws.close(4401)`)
 - `VALID_PLANS` allowlist — arbitrary plan strings no longer accepted
 - `TOTP_SECRET` validated at startup with clear error on invalid Base32
+- NEN 7510 finding #4 (plaintext filename in relay RAM) patched — filename now encrypted before relay storage
+
+### Added
+- `paramant-crypto-audit` — crypto inventory scanner: 10 categories (TLS, SSH, email, disk, VPN, database, code, deps, services, old files), HNDL risk scoring, JSON + human-readable output, `--remote HOST` mode via SSH self-pipe
+- `paramant-migrate` — crypto-agility helper: `--tls` (RSA→ECDSA P-256), `--ssh` (RSA→Ed25519), `--backup` (age/BorgBackup re-encryption), `--check` verification, `--dry-run` mode
+- Seven sector scripts for ParamantOS: `paramant-notary`, `paramant-payslip`, `paramant-legal`, `paramant-ticket`, `paramant-referral`, `paramant-firmware`, `paramant-cra`
+- Self-service trial key page (`/request-key`) with rate-limited backend (`POST /v2/request-trial`, 1 request/email/7 days, Resend delivery)
+- SLA page (`/sla`) — uptime commitments, downtime credits, support tiers, measurement methodology
 
 ---
 

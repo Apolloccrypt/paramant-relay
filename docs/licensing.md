@@ -1,6 +1,6 @@
 # PARAMANT — License & Key System
 
-**Version:** relay v2.4.2  
+**Version:** relay v2.4.5  
 **License:** BUSL-1.1 — see [LICENSE](../LICENSE)  
 **Last updated:** 2026-04-11
 
@@ -169,10 +169,10 @@ Payload fields:
 
 ```json
 // Community Edition
-{ "ok": true, "version": "2.4.1", "edition": "community", "max_keys": 5, "sector": "relay" }
+{ "ok": true, "version": "2.4.5", "edition": "community", "max_keys": 5, "sector": "relay" }
 
 // Licensed Edition
-{ "ok": true, "version": "2.4.1", "edition": "licensed", "max_keys": null,
+{ "ok": true, "version": "2.4.5", "edition": "licensed", "max_keys": null,
   "license_expires": "2027-01-01", "license_issued_to": "Acme Corp", "sector": "relay" }
 ```
 

@@ -372,7 +372,7 @@ All findings publicly documented in [SECURITY.md](SECURITY.md).
 | EU CRA 2027 | Designed for | paramant-cra tool + CT log |
 | GDPR Art. 28 | Ready | [Verwerkersovereenkomst](https://paramant.app/verwerkersovereenkomst) |
 
-*NEN 7510: finding #4 (filename in transit RAM) remediation in progress.
+*NEN 7510: finding #4 (filename in transit RAM) patched in v2.4.5 — filename encrypted in relay RAM and never written to disk.
 
 ---
 

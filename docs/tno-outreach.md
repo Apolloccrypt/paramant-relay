@@ -10,63 +10,63 @@
 
 **To:** acqa@tno.nl  
 **CC:** *(optional: info@tno.nl)*  
-**Subject:** Paramant — operationele post-quantum relay als referentie-implementatie voor NEN 7510 / NIS2
+**Subject:** Paramant — operational post-quantum relay as reference implementation for NEN 7510 / NIS2
 
 ---
 
-Beste ACQuA-team,
+Dear ACQuA team,
 
-Ik schrijf jullie omdat Paramant iets is wat in de PQC-migratiediscussie nog vrijwel ontbreekt: een operationele, open-source bestandsrelay die vandaag draait op ML-KEM-768 (NIST FIPS 203) en ML-DSA-65 (FIPS 204), volledig binnen EU-jurisdictie.
+I am writing because Paramant addresses something that is almost entirely absent from current PQC migration discussions: an operational, open-source file relay running today on ML-KEM-768 (NIST FIPS 203) and ML-DSA-65 (FIPS 204), fully within EU jurisdiction.
 
-**Wat Paramant is**
+**What Paramant is**
 
-Paramant is een post-quantum versleutelde bestandsrelay gebouwd op het Ghost Pipe-protocol. Bestanden worden volledig client-side versleuteld met ML-KEM-768 + ECDH P-256 (hybride), via AES-256-GCM versleuteld verstuurd, en vernietigd na de eerste geautoriseerde download — burn-on-read. Er is geen persistente opslag. Een Merkle-gebaseerd CT-log legt elke overdracht vast zonder de inhoud te bewaren.
+Paramant is a post-quantum encrypted file relay built on the Ghost Pipe protocol. Files are encrypted fully client-side using ML-KEM-768 + ECDH P-256 (hybrid), transmitted over AES-256-GCM, and destroyed after the first authorised download — burn-on-read. There is no persistent storage. A Merkle-based CT log records every transfer without retaining the content.
 
-Vijf live relay-sectoren (zorg, juridisch, financieel, industrieel IoT, algemeen) draaien op Hetzner Frankfurt. Broncode: https://github.com/Apolloccrypt/paramant-relay
+Five live relay sectors (healthcare, legal, finance, industrial IoT, general) run on Hetzner Frankfurt. Source code: https://github.com/Apolloccrypt/paramant-relay
 
-**Waarom relevant voor ACQuA**
+**Why this is relevant to ACQuA**
 
-ACQuA richt zich op de praktische inzetbaarheid van post-quantum cryptografie — precies waar Paramant zit. De meeste PQC-implementaties die publiek beschikbaar zijn, zijn libraries of proof-of-concepts. Paramant is een productiesysteem dat:
+ACQuA focuses on the practical deployability of post-quantum cryptography — exactly where Paramant sits. Most publicly available PQC implementations are libraries or proof-of-concepts. Paramant is a production system that:
 
-- ML-KEM-768 toepast op een realistisch use-case (bestandsoverdracht in zorgsector en kritieke infrastructuur)
-- Volledig binnen NIS2 Annex I/II en NEN 7510-2 valt
-- Verifieerbaar is via een publieke CT-log en open broncode
-- Vandaag in gebruik is, niet over twee jaar
+- Applies ML-KEM-768 to a realistic use case (file transfer in healthcare and critical infrastructure)
+- Falls fully within NIS2 Annex I/II and NEN 7510-2
+- Is verifiable via a public CT log and open source code
+- Is in use today, not in two years
 
-**Wat we voorstellen**
+**What we propose**
 
-We zouden graag verkennen of er basis is voor samenwerking op één van de volgende punten:
+We would like to explore whether there is a basis for collaboration on one or more of the following:
 
-1. **Gezamenlijke whitepaper** — "PQC in de praktijk: referentie-implementatie voor NEN 7510 en NIS2" — geschreven voor zorginstellingen en overheidsorganisaties die nu de afweging maken welke PQC-stack ze adopteren
-2. **Vermelding als referentie-implementatie** in ACQuA's migratie-guidelines of de NCSC PQC-factsheets, als concreet voorbeeld van ML-KEM-768 in productie
-3. **Technische review** — we stellen onze codebase, protocolspecificaties en auditrapport (2026-04) open voor review door ACQuA, zodat jullie een onafhankelijk oordeel kunnen geven
+1. **Joint whitepaper** — "PQC in practice: reference implementation for NEN 7510 and NIS2" — written for healthcare institutions and government organisations currently deciding which PQC stack to adopt
+2. **Listing as a reference implementation** in ACQuA's migration guidelines or the NCSC PQC factsheets, as a concrete example of ML-KEM-768 in production
+3. **Technical review** — we make our codebase, protocol specifications, and audit report (April 2026) available for review by ACQuA, so you can form an independent assessment
 
-We vragen geen commerciële endorsement — alleen de technische discussie.
+We are not asking for commercial endorsement — only the technical conversation.
 
-**Onze credentials**
+**Our credentials**
 
-- ML-KEM-768 + ECDH P-256 hybride sleutelwisseling (conform FIPS 203 draft + NIST SP 800-227)
-- ML-DSA-65 relay-identiteitscertificaat
-- Onafhankelijk security-audit afgerond april 2026 (rapport beschikbaar)
-- 5 live relay-sectoren, operationeel
-- BUSL-1.1 licentie — broncode volledig inzichtelijk
+- ML-KEM-768 + ECDH P-256 hybrid key exchange (conforming to FIPS 203 + NIST SP 800-227)
+- ML-DSA-65 relay identity certificate
+- Independent security audit completed April 2026 (report available)
+- 5 live relay sectors, operational
+- BUSL-1.1 licence — source code fully transparent
 
-**Vraag**
+**Request**
 
-Zouden jullie open staan voor een gesprek van 30 minuten om te verkennen of er overlap is met lopend ACQuA-onderzoek? We passen ons aan aan jullie agenda.
+Would you be open to a 30-minute conversation to explore whether there is overlap with ongoing ACQuA research? We are happy to work around your schedule.
 
-Met vriendelijke groet,
+Kind regards,
 
-*(naam)*  
+*(name)*  
 Paramant  
 privacy@paramant.app  
 https://paramant.app
 
 ---
 
-## Notes voor verzending
+## Sending notes
 
-- Alternatief contactadres: via LinkedIn (TNO Cyber Security & Resilience groep)
-- NCSC equivalent: ncsc@ncsc.nl — vergelijkbare email, focus op NCSC PQC-factsheet vermelding
-- RvIG / DigiD-aansluiting: apart traject — eerst ACQuA-contact leggen
-- Timing: verstuur na publieke vermelding van het security-audit rapport
+- Alternative contact: via LinkedIn (TNO Cyber Security & Resilience group)
+- NCSC equivalent: ncsc@ncsc.nl — similar email, focus on NCSC PQC factsheet listing
+- RvIG / DigiD integration: separate track — establish ACQuA contact first
+- Timing: send after public release of the security audit report

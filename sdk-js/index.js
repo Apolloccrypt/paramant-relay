@@ -1,5 +1,5 @@
 /**
- * PARAMANT Ghost Pipe SDK v2.4.1
+ * PARAMANT Ghost Pipe SDK v2.4.5
  * ==================================
  * JavaScript/TypeScript SDK for Paramant Ghost Pipe — post-quantum encrypted file relay.
  *
@@ -11,7 +11,7 @@
 
 'use strict';
 
-const VERSION = '2.4.1';
+const VERSION = '2.4.5';
 
 const SECTOR_RELAYS = {
   health:  'https://health.paramant.app',

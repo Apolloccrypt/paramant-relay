@@ -37,7 +37,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://paramant.app"
-Documentation = "https://docs.paramant.app"
+Documentation = "https://paramant.app/docs"
 Repository = "https://github.com/Apolloccrypt/paramant-relay"
 Changelog = "https://github.com/Apolloccrypt/paramant-relay/releases"
 "Bug Tracker" = "https://github.com/Apolloccrypt/paramant-relay/issues"

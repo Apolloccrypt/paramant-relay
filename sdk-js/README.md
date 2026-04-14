@@ -2,7 +2,7 @@
 
 JavaScript SDK for **PARAMANT Ghost Pipe** — zero-plaintext, burn-on-read file transport with post-quantum encryption (ML-KEM-768 + ECDH P-256) and optional pre-shared secret (PSS) for relay-MITM protection.
 
-**Version:** 2.4.2 · [Security model](../docs/security.md) · [Relay API](../docs/api.md)
+**Version:** 2.4.5 · [Security model](../docs/security.md) · [Relay API](../docs/api.md)
 
 Works in **Node.js 18+** (ESM `import` and CJS `require`) and modern **browsers** (via bundler or CDN).
 
@@ -314,7 +314,7 @@ try {
 
 ```html
 <script type="module">
-  import { GhostPipe } from 'https://cdn.paramant.app/sdk/2.4.1/index.js';
+  import { GhostPipe } from 'https://cdn.paramant.app/sdk/2.4.5/index.js';
   const gp = new GhostPipe({ apiKey: 'pgp_xxx', device: 'browser' });
 </script>
 ```

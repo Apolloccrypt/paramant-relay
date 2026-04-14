@@ -1,6 +1,6 @@
 # PARAMANT Ghost Pipe — Security Model
 
-**Version:** 2.4.2  
+**Version:** 2.4.5  
 **Last updated:** 2026-04-11
 
 ---
@@ -267,7 +267,7 @@ signature = ML-DSA-65.sign(message, secretKey)
   "leaf_hash": "sha3-256(0x00 || sha3-256(url|sector) || pk_hash || timestamp)",
   "relay_url": "https://relay.paramant.app",
   "relay_sector": "relay",
-  "relay_version": "2.4.2",
+  "relay_version": "2.4.5",
   "relay_edition": "licensed",
   "relay_pk_hash": "3d9b960c...",
   "ts": "2026-04-11T02:14:13.555Z"
@@ -374,4 +374,4 @@ Pentest by Ryan Williams · Smart Cyber Solutions Pty Ltd (AU) · April 2026
 Report: [pentest-report-2026-04-08.txt](../pentest-report-2026-04-08.txt)  
 Full writeup: [security-audit-2026-04.md](./security-audit-2026-04.md)
 
-All critical/high/medium findings addressed in v2.4.1.
+All critical/high/medium findings addressed in v2.4.5.

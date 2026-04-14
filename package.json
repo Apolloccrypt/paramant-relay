@@ -10,6 +10,6 @@
     "terser": "^5.31.0"
   },
   "dependencies": {
-    "paramant-sdk": "^2.4.1"
+    "paramant-sdk": "^2.4.5"
   }
 }
