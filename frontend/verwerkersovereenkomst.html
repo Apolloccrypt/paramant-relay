@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verwerkersovereenkomst — PARAMANT</title>
+<meta name="description" content="PARAMANT verwerkersovereenkomst (GDPR artikel 28). Modelovereenkomst voor Enterprise-klanten.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.95);backdrop-filter:blur(8px);z-index:100}
+.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
+.nav-back{font-size:12px;color:var(--muted);text-decoration:none}
+.nav-back:hover{color:var(--text)}
+main{max-width:720px;margin:0 auto;padding:64px 48px 120px}
+.doc-header{margin-bottom:56px}
+.doc-eyebrow{font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:12px}
+h1{font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:8px}
+.doc-meta{font-size:12px;font-family:var(--mono);color:var(--quiet);line-height:2}
+.doc-meta span{color:var(--muted)}
+.notice{background:#0d1a12;border:1px solid #1a3d28;border-radius:6px;padding:16px 20px;margin:32px 0;font-size:13px;color:#a8d5b5;line-height:1.6}
+.notice strong{color:#2d8a5c}
+section{margin-bottom:40px}
+h2{font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;padding-top:8px;border-top:1px solid var(--border)}
+h3{font-size:13px;font-weight:500;color:var(--muted);margin:18px 0 8px;font-family:var(--mono);letter-spacing:.04em}
+p{font-size:14px;color:var(--muted);margin-bottom:12px;line-height:1.75}
+ul,ol{padding-left:20px;margin-bottom:12px}
+li{font-size:14px;color:var(--muted);margin-bottom:6px;line-height:1.65}
+.field{display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:16px;align-items:start}
+.field-label{font-size:12px;font-family:var(--mono);color:var(--quiet);padding-top:2px}
+.field-value{font-size:13px;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:6px}
+.field-blank{font-size:13px;color:#333;border-bottom:1px solid #2a2a2a;padding-bottom:6px;font-style:italic}
+.sig-block{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:40px}
+.sig-col{border-top:1px solid var(--border);padding-top:20px}
+.sig-role{font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);margin-bottom:14px}
+.sig-line{border-bottom:1px solid #2a2a2a;height:36px;margin-bottom:8px}
+.sig-caption{font-size:11px;color:#333;font-family:var(--mono)}
+.article-num{font-size:11px;font-family:var(--mono);color:#333;margin-right:8px}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}
+th{text-align:left;padding:8px 12px;font-size:11px;font-family:var(--mono);font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);border-bottom:1px solid var(--border);background:var(--surface)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.highlight{background:#0d1a12;border-left:3px solid #2d8a5c;padding:12px 16px;margin:16px 0;font-size:13px;color:#a8d5b5;font-family:var(--mono);line-height:1.6}
+footer{border-top:1px solid var(--border);padding:32px 48px;text-align:center;font-size:11px;color:var(--quiet);font-family:var(--mono)}
+footer a{color:var(--quiet);text-decoration:none}
+footer a:hover{color:var(--muted)}
+@media(max-width:640px){
+  nav{padding:0 16px}
+  main{padding:40px 20px 80px}
+  .field{grid-template-columns:1fr;gap:4px}
+  .sig-block{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <a href="/#pricing" class="nav-back">&#8592; Pricing</a>
+</nav>
+
+<main>
+
+  <div class="doc-header">
+    <div class="doc-eyebrow">Enterprise &mdash; GDPR artikel 28</div>
+    <h1>Verwerkersovereenkomst</h1>
+    <div class="doc-meta">
+      Modelversie <span>2026-04</span> &nbsp;&#183;&nbsp;
+      Verwerker: <span>PARAMANT / Mick Beer</span> &nbsp;&#183;&nbsp;
+      Jurisdictie: <span>EU/DE &mdash; Hetzner DE</span>
+    </div>
+  </div>
+
+  <div class="notice">
+    <strong>Kernprincipe:</strong> PARAMANT slaat geen persoonsgegevens op. Alle data wordt na ontvangst vernietigd (burn-on-read). De verwerker fungeert uitsluitend als versleuteld transportkanaal &mdash; de inhoud van bestanden is nooit leesbaar voor de verwerker.
+  </div>
+
+  <!-- Partijen -->
+  <section>
+    <h2><span class="article-num">Art. 1</span> Partijen</h2>
+
+    <h3>Verwerkingsverantwoordelijke</h3>
+    <div class="field"><span class="field-label">Naam organisatie</span><span class="field-blank">__________________________</span></div>
+    <div class="field"><span class="field-label">KVK-nummer</span><span class="field-blank">__________________________</span></div>
+    <div class="field"><span class="field-label">Adres</span><span class="field-blank">__________________________</span></div>
+    <div class="field"><span class="field-label">Contactpersoon</span><span class="field-blank">__________________________</span></div>
+    <div class="field"><span class="field-label">E-mailadres</span><span class="field-blank">__________________________</span></div>
+    <p>Hierna te noemen: <strong style="color:var(--text)">Verwerkingsverantwoordelijke</strong>.</p>
+
+    <h3>Verwerker</h3>
+    <div class="field"><span class="field-label">Naam</span><span class="field-value">PARAMANT / Mick Beer</span></div>
+    <div class="field"><span class="field-label">Handelsnaam</span><span class="field-value">PARAMANT</span></div>
+    <div class="field"><span class="field-label">E-mailadres</span><span class="field-value">privacy@paramant.app</span></div>
+    <div class="field"><span class="field-label">Website</span><span class="field-value">paramant.app</span></div>
+    <p>Hierna te noemen: <strong style="color:var(--text)">Verwerker</strong>.</p>
+
+    <p>Partijen zijn gezamenlijk overeengekomen als volgt:</p>
+  </section>
+
+  <!-- Onderwerp en duur -->
+  <section>
+    <h2><span class="article-num">Art. 2</span> Onderwerp en duur van de verwerking</h2>
+    <p>De Verwerker verleent de Verwerkingsverantwoordelijke toegang tot de PARAMANT Ghost Pipe dienst &mdash; een post-quantum versleuteld bestandstransportkanaal. De overeenkomst geldt voor de duur van de commerci&euml;le overeenkomst tussen partijen en eindigt van rechtswege bij be&euml;indiging van die overeenkomst.</p>
+    <p>De Verwerker bewaart na be&euml;indiging geen gegevens. Er vindt geen retentie van bestanden of metadata plaats; alles wordt direct na ontvangst vernietigd (burn-on-read).</p>
+  </section>
+
+  <!-- Aard en doel -->
+  <section>
+    <h2><span class="article-num">Art. 3</span> Aard en doel van de verwerking</h2>
+    <p><strong style="color:var(--text)">Aard:</strong> tijdelijk transport van eind-tot-eind versleutelde bestanden via een RAM-only relay-infrastructuur. Bestanden worden in het werkgeheugen van de relay opgeslagen en direct na de eerste download gewist (burn-on-read). Bestanden worden nooit naar schijf geschreven.</p>
+    <p><strong style="color:var(--text)">Doel:</strong> beveiligde bestandsoverdracht ten behoeve van de Verwerkingsverantwoordelijke en diens eindgebruikers. De Verwerker verwerkt uitsluitend versleutelde ciphertext &mdash; de inhoud is op geen enkel moment leesbaar voor de Verwerker.</p>
+    <p><strong style="color:var(--text)">Grondslagen:</strong> de verwerking vindt plaats op basis van de uitvoering van een overeenkomst (artikel 6 lid 1 sub b AVG), dan wel gerechtvaardigd belang van de Verwerkingsverantwoordelijke en haar cli&euml;nten (artikel 6 lid 1 sub f AVG).</p>
+  </section>
+
+  <!-- Soort persoonsgegevens -->
+  <section>
+    <h2><span class="article-num">Art. 4</span> Soort persoonsgegevens en categorie&euml;n betrokkenen</h2>
+
+    <div class="highlight">
+      De Verwerker slaat <strong>geen persoonsgegevens op</strong>. Alle versleutelde data wordt vernietigd na ontvangst (burn-on-read). De relay is een versleuteld transportkanaal &mdash; geen opslagdienst.
+    </div>
+
+    <p>Voor zover de dienst technisch gezien beperkte verkeersgegevens verwerkt, betreft dit uitsluitend:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Gegeven</th>
+          <th>Doel</th>
+          <th>Retentie</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>IP-adres (tijdelijk)</td>
+          <td>Rate-limiting, misbruikpreventie</td>
+          <td>In-memory, max. 60 minuten</td>
+        </tr>
+        <tr>
+          <td>API-sleutel hash</td>
+          <td>Authenticatie</td>
+          <td>Opgeslagen in users.json op relay-server; alleen hash, geen plaintext</td>
+        </tr>
+        <tr>
+          <td>Versleutelde bestandsinhoud</td>
+          <td>Transport (RAM-only)</td>
+          <td>Vernietigd na eerste download of TTL-verstrijking</td>
+        </tr>
+        <tr>
+          <td>CT-log entry (Merkle hash)</td>
+          <td>Tamper-evidence audit trail</td>
+          <td>Cryptografische hash; geen persoonsgegevens</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong style="color:var(--text)">Categorie&euml;n betrokkenen:</strong> medewerkers en/of cli&euml;nten van de Verwerkingsverantwoordelijke die gebruikmaken van de bestandsoverdrachtsoplossing.</p>
+    <p><strong style="color:var(--text)">Bijzondere categorie&euml;n:</strong> de Verwerker verwerkt in beginsel geen bijzondere categorie&euml;n persoonsgegevens (art. 9 AVG). Indien de Verwerkingsverantwoordelijke bestanden met bijzondere persoonsgegevens (zoals medische dossiers) verstuurt, geschiedt dit volledig versleuteld; de inhoud is voor de Verwerker niet toegankelijk.</p>
+  </section>
+
+  <!-- Verplichtingen verwerker -->
+  <section>
+    <h2><span class="article-num">Art. 5</span> Verplichtingen van de Verwerker</h2>
+    <p>De Verwerker verplicht zich:</p>
+    <ol>
+      <li>persoonsgegevens uitsluitend te verwerken op basis van gedocumenteerde instructies van de Verwerkingsverantwoordelijke, tenzij een wettelijke verplichting anders vereist;</li>
+      <li>te waarborgen dat personen die toegang hebben tot de persoonsgegevens zich hebben verbonden aan geheimhouding;</li>
+      <li>alle vereiste technische en organisatorische maatregelen te nemen overeenkomstig artikel 32 AVG (zie artikel 7);</li>
+      <li>de Verwerkingsverantwoordelijke onverwijld te informeren indien een instructie naar het oordeel van de Verwerker in strijd is met de AVG of andere Unierechtelijke of nationale wetgeving;</li>
+      <li>geen (sub)verwerkers in te schakelen zonder voorafgaande schriftelijke toestemming van de Verwerkingsverantwoordelijke, behoudens de in artikel 9 genoemde subverwerkers;</li>
+      <li>de Verwerkingsverantwoordelijke te assisteren bij de nakoming van haar verplichtingen inzake beveiliging, meldingen van datalekken, DPIA&rsquo;s en rechten van betrokkenen;</li>
+      <li>op keuze van de Verwerkingsverantwoordelijke na afloop van de dienstverlening alle gegevens terug te sturen of te vernietigen. Gezien het burn-on-read karakter is er bij PARAMANT standaard niets te vernietigen of terug te geven;</li>
+      <li>de Verwerkingsverantwoordelijke alle informatie te verstrekken die noodzakelijk is om te kunnen aantonen dat aan de verplichtingen van artikel 28 AVG wordt voldaan, en audits toe te staan.</li>
+    </ol>
+  </section>
+
+  <!-- Beveiligingsmaatregelen -->
+  <section>
+    <h2><span class="article-num">Art. 6</span> Technische en organisatorische beveiligingsmaatregelen</h2>
+    <p>De Verwerker heeft passende technische en organisatorische maatregelen getroffen als bedoeld in artikel 32 AVG:</p>
+
+    <h3>Cryptografie</h3>
+    <table>
+      <thead>
+        <tr><th>Laag</th><th>Algoritme / standaard</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Sleutelinkapseling (KEM)</td><td>ML-KEM-768 &mdash; NIST FIPS 203 (post-quantum)</td></tr>
+        <tr><td>Symmetrische versleuteling</td><td>AES-256-GCM &mdash; NIST SP 800-38D</td></tr>
+        <tr><td>Sleutelafleidingsfunctie</td><td>HKDF-SHA256 &mdash; RFC 5869</td></tr>
+        <tr><td>Digitale handtekeningen</td><td>ML-DSA-65 &mdash; NIST FIPS 204 (relay-identiteit)</td></tr>
+        <tr><td>Wachtwoordbeveiliging</td><td>Argon2id &mdash; RFC 9106</td></tr>
+        <tr><td>Audit trail</td><td>SHA3-256 Merkle-boom &mdash; RFC 6962 stijl</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Infrastructuur en toegangsbeveiliging</h3>
+    <ul>
+      <li><strong>RAM-only opslag:</strong> versleutelde bestanden worden nooit naar schijf geschreven; ze worden in RAM gehouden en onmiddellijk na de eerste download of TTL-verstrijking gewist (zeroization).</li>
+      <li><strong>Jurisdictie:</strong> servers uitsluitend bij Hetzner Online GmbH, Frankfurt am Main, Duitsland (EU). Geen US-infrastructuur, geen CLOUD Act exposure.</li>
+      <li><strong>Geen toegang inhoud:</strong> de relay ontvangt uitsluitend versleutelde ciphertext; de versleutelingssleutel wordt nooit naar de relay verstuurd.</li>
+      <li><strong>Toegangsbeheer:</strong> relay-containers draaien als niet-root gebruiker, read-only bestandssysteem, alle Linux capabilities verwijderd, <code>no-new-privileges: true</code>.</li>
+      <li><strong>Netwerk:</strong> TLS 1.3 verplicht voor alle inkomende verbindingen; HSTS preload; CSP strict.</li>
+      <li><strong>SSH:</strong> Ed25519-only, ML-KEM-768 KEX, wachtwoordauthenticatie uitgeschakeld.</li>
+      <li><strong>Monitoring:</strong> auditd, fail2ban, UFW default-deny, AIDE integriteitscontrole.</li>
+      <li><strong>Updates:</strong> automatische beveiligingsupdates actief; zero npm-kwetsbaarheden (npm audit clean).</li>
+    </ul>
+
+    <h3>Beveiligingsaudits</h3>
+    <ul>
+      <li>April 2026 &mdash; R. Zwarts, onafhankelijk beveiligingsonderzoeker: 20 bevindingen, alle opgelost.</li>
+      <li>April 2026 &mdash; Ryan Williams, Smart Cyber Solutions Pty Ltd (AU): penetratietest, alle kritieke en hoge bevindingen opgelost.</li>
+    </ul>
+  </section>
+
+  <!-- Datalek -->
+  <section>
+    <h2><span class="article-num">Art. 7</span> Melding van datalekken</h2>
+    <p>De Verwerker stelt de Verwerkingsverantwoordelijke onverwijld &mdash; en in elk geval binnen <strong style="color:var(--text)">24 uur</strong> na ontdekking &mdash; op de hoogte van een inbreuk in verband met de verwerkte persoonsgegevens, via <a href="mailto:privacy@paramant.app" style="color:var(--muted)">privacy@paramant.app</a>.</p>
+    <p>Gezien het burn-on-read karakter van de dienst en de volledige end-to-end versleuteling is de kans op een datalek waarbij persoonsgegevens in leesbare vorm worden blootgesteld structureel minimaal. Mocht er desondanks een incident plaatsvinden, dan bevat de melding tenminste:</p>
+    <ul>
+      <li>de aard van de inbreuk;</li>
+      <li>de categorie&euml;n en het (geschatte) aantal betrokkenen;</li>
+      <li>de maatregelen die zijn of worden genomen om de inbreuk aan te pakken.</li>
+    </ul>
+  </section>
+
+  <!-- Rechten betrokkenen -->
+  <section>
+    <h2><span class="article-num">Art. 8</span> Rechten van betrokkenen</h2>
+    <p>De Verwerker assisteert de Verwerkingsverantwoordelijke bij de uitvoering van verzoeken van betrokkenen (inzage, rectificatie, wissing, beperking, overdraagbaarheid en bezwaar) voor zover de verwerking dit toelaat.</p>
+    <p>Praktisch gevolg: omdat PARAMANT geen persoonsgegevens bewaart na burn-on-read, is er doorgaans niets in te zien, te rectificeren of te wissen. De Verwerker bevestigt dit desgewenst schriftelijk aan de Verwerkingsverantwoordelijke.</p>
+  </section>
+
+  <!-- Subverwerkers -->
+  <section>
+    <h2><span class="article-num">Art. 9</span> Subverwerkers</h2>
+    <p>De Verwerker maakt gebruik van de volgende subverwerkers. De Verwerkingsverantwoordelijke stemt in met het inschakelen van deze subverwerkers:</p>
+
+    <table>
+      <thead>
+        <tr><th>Subverwerker</th><th>Locatie</th><th>Rol</th><th>Overeenkomst</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Hetzner Online GmbH</td>
+          <td>Frankfurt am Main, DE (EU)</td>
+          <td>Hosting (bare-metal / VPS)</td>
+          <td><a href="https://www.hetzner.com/legal/privacy-policy" target="_blank" style="color:var(--muted)">Hetzner DPA</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>De Verwerker informeert de Verwerkingsverantwoordelijke tijdig over beoogde wijzigingen met betrekking tot de inschakeling of vervanging van subverwerkers, zodat de Verwerkingsverantwoordelijke de mogelijkheid heeft hiertegen bezwaar te maken.</p>
+    <p><strong style="color:var(--text)">Geen US-infrastructuur:</strong> de Verwerker maakt geen gebruik van servers, CDN&rsquo;s of cloudproviders die onderworpen zijn aan de Amerikaanse CLOUD Act of FISA Section 702.</p>
+  </section>
+
+  <!-- Doorgifte derde landen -->
+  <section>
+    <h2><span class="article-num">Art. 10</span> Doorgifte aan derde landen</h2>
+    <p>De Verwerker geeft geen persoonsgegevens door aan landen buiten de Europese Economische Ruimte (EER). Alle verwerkingen vinden plaats binnen de EU (Duitsland).</p>
+  </section>
+
+  <!-- Aansprakelijkheid -->
+  <section>
+    <h2><span class="article-num">Art. 11</span> Aansprakelijkheid</h2>
+    <p>De aansprakelijkheid van de Verwerker is beperkt tot het bedrag dat de Verwerkingsverantwoordelijke in de twaalf maanden voorafgaand aan het schadeveroorzakende incident aan de Verwerker heeft betaald, tenzij schade het gevolg is van opzet of grove nalatigheid aan de zijde van de Verwerker.</p>
+    <p>De Verwerker is niet aansprakelijk voor schade die het gevolg is van onjuist gebruik van de dienst door de Verwerkingsverantwoordelijke of haar gebruikers, of voor schade die voortvloeit uit inbreuken op de beveiliging die zich voordoen aan de zijde van de Verwerkingsverantwoordelijke.</p>
+  </section>
+
+  <!-- Duur en be&euml;indiging -->
+  <section>
+    <h2><span class="article-num">Art. 12</span> Duur en be&euml;indiging</h2>
+    <p>Deze verwerkersovereenkomst treedt in werking op de datum van ondertekening en eindigt van rechtswege op het moment dat de onderliggende dienstverleningsovereenkomst eindigt.</p>
+    <p>Bij be&euml;indiging is de Verwerker niet verplicht gegevens te retourneren of te vernietigen, aangezien er op grond van het burn-on-read beginsel geen gegevens worden bewaard.</p>
+  </section>
+
+  <!-- Toepasselijk recht -->
+  <section>
+    <h2><span class="article-num">Art. 13</span> Toepasselijk recht en geschillen</h2>
+    <p>Op deze overeenkomst is Nederlands recht van toepassing. Geschillen worden voorgelegd aan de bevoegde rechter in het arrondissement waar de Verwerker is gevestigd, tenzij partijen overeenkomen een andere geschillenbeslechting te hanteren.</p>
+  </section>
+
+  <!-- Ondertekening -->
+  <section>
+    <h2><span class="article-num">Art. 14</span> Ondertekening</h2>
+    <p>Aldus overeengekomen en in tweevoud ondertekend:</p>
+
+    <div class="sig-block">
+      <div class="sig-col">
+        <div class="sig-role">Verwerkingsverantwoordelijke</div>
+        <div class="field"><span class="field-label">Naam organisatie</span><span class="field-blank">__________________________</span></div>
+        <div class="field"><span class="field-label">Naam ondertekenaar</span><span class="field-blank">__________________________</span></div>
+        <div class="field"><span class="field-label">Functie</span><span class="field-blank">__________________________</span></div>
+        <div class="field"><span class="field-label">Datum</span><span class="field-blank">__________________________</span></div>
+        <div class="sig-line"></div>
+        <div class="sig-caption">Handtekening</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-role">Verwerker &mdash; PARAMANT</div>
+        <div class="field"><span class="field-label">Naam</span><span class="field-value">Mick Beer</span></div>
+        <div class="field"><span class="field-label">Functie</span><span class="field-value">Eigenaar / Data Protection Officer</span></div>
+        <div class="field"><span class="field-label">E-mail</span><span class="field-value">privacy@paramant.app</span></div>
+        <div class="field"><span class="field-label">Datum</span><span class="field-blank">__________________________</span></div>
+        <div class="sig-line"></div>
+        <div class="sig-caption">Handtekening</div>
+      </div>
+    </div>
+
+    <p style="margin-top:32px;font-size:13px;color:#555">
+      Aanvraag: stuur een e-mail naar <a href="mailto:privacy@paramant.app?subject=Verwerkersovereenkomst+aanvraag" style="color:var(--muted)">privacy@paramant.app</a> met als onderwerp &ldquo;Verwerkersovereenkomst aanvraag&rdquo;. U ontvangt een getekend exemplaar binnen 2 werkdagen.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div>PARAMANT &mdash; Post-quantum encrypted file relay &nbsp;&#183;&nbsp; EU/DE jurisdiction &nbsp;&#183;&nbsp; Hetzner Frankfurt</div>
+  <div style="margin-top:6px"><a href="/">Home</a> &nbsp;&#183;&nbsp; <a href="/#pricing">Pricing</a> &nbsp;&#183;&nbsp; <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank">Security</a> &nbsp;&#183;&nbsp; <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></div>
+</footer>
+
+</body>
+</html>
