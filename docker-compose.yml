@@ -68,7 +68,7 @@ services:
       <<: *relay-env
       SECTOR: "relay"
       RELAY_SELF_URL: "https://relay.paramant.app"
-      RELAY_PRIMARY_URL: "https://health.paramant.app"
+      RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -92,7 +92,7 @@ services:
       <<: *relay-env
       SECTOR: "health"
       RELAY_SELF_URL: "https://health.paramant.app"
-      RELAY_PRIMARY_URL: "https://health.paramant.app"
+      RELAY_PRIMARY_URL: "http://localhost:3000"
     ports:
       - "127.0.0.1:3001:3000"
     volumes:
@@ -116,7 +116,7 @@ services:
       <<: *relay-env
       SECTOR: "finance"
       RELAY_SELF_URL: "https://finance.paramant.app"
-      RELAY_PRIMARY_URL: "https://health.paramant.app"
+      RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3002:3000"
     volumes:
@@ -140,7 +140,7 @@ services:
       <<: *relay-env
       SECTOR: "legal"
       RELAY_SELF_URL: "https://legal.paramant.app"
-      RELAY_PRIMARY_URL: "https://health.paramant.app"
+      RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3003:3000"
     volumes:
@@ -165,7 +165,7 @@ services:
       SECTOR: "iot"
       RELAY_MODE: "${IOT_RELAY_MODE:-iot}"
       RELAY_SELF_URL: "https://iot.paramant.app"
-      RELAY_PRIMARY_URL: "https://health.paramant.app"
+      RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3004:3000"
     volumes:
