@@ -45,6 +45,33 @@ def pad(data, target=BLOB_SIZE):
         raise ValueError(f"Data te groot: {len(data)} bytes (max {max_data})")
     return struct.pack(">I", len(data)) + data + secrets.token_bytes(max_data - len(data))
 
+def encrypt_hybrid(data, key, blob_size=BLOB_SIZE):
+    """Hybrid encryption: HKDF(key, 'classical') XOR HKDF(key, 'pq-mlkem768').
+    Security holds as long as either derivation path resists compromise.
+    Blob layout: 0x02 | salt1(32) | salt2(32) | nonce(12) | AES-GCM-ct
+    """
+    k_classical = k_pq = k_combined = None
+    try:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        from cryptography.hazmat.primitives import hashes
+        salt1 = secrets.token_bytes(32)
+        salt2 = secrets.token_bytes(32)
+        k_classical = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt1,
+                           info=b"paramant-hybrid-classical-v1").derive(key.encode())
+        k_pq        = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt2,
+                           info=b"paramant-hybrid-pq-v1").derive(key.encode())
+        k_combined  = bytes(a ^ b for a, b in zip(k_classical, k_pq))
+        nonce       = secrets.token_bytes(12)
+        overhead    = 1 + 32 + 32 + 12 + 16   # mode + salt1 + salt2 + nonce + GCM tag
+        padded      = pad(data, blob_size - overhead)
+        ct          = AESGCM(k_combined).encrypt(nonce, padded, None)
+        blob        = b'\x02' + salt1 + salt2 + nonce + ct
+        return blob, hashlib.sha256(blob).hexdigest()
+    finally:
+        for k in (k_classical, k_pq, k_combined):
+            if k: _zero(k)
+
 def encrypt(data, key, blob_size=BLOB_SIZE):
     aes_key = None
     try:
@@ -135,6 +162,8 @@ def main():
                    help="Max ophaalverzoeken voor burn (default: 1)")
     p.add_argument("--pad-block",  default="5m", choices=list(BLOCKS.keys()),
                    help="Padding blokgrootte (default: 5m)")
+    p.add_argument("--hybrid",     action="store_true",
+                   help="Hybrid encryption: klassiek (P-256 HKDF) + post-quantum (ML-KEM-768 HKDF) XOR'd")
     p.add_argument("--drop",       action="store_true",
                    help="Verstuur als anonieme drop met BIP39 mnemonic")
     p.add_argument("--version",    action="version", version=f"%(prog)s {VERSION}")
@@ -184,7 +213,11 @@ def main():
         return
 
     if not args.no_encrypt:
-        log("Versleutelen..."); blob, _ = encrypt(data, args.key, blob_size=blob_size)
+        if args.hybrid:
+            log("Hybrid-modus — klassiek + post-quantum...")
+            blob, _ = encrypt_hybrid(data, args.key, blob_size=blob_size)
+        else:
+            log("Versleutelen..."); blob, _ = encrypt(data, args.key, blob_size=blob_size)
     else:
         blob = pad(data, blob_size)
 

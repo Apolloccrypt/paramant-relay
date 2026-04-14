@@ -207,6 +207,12 @@ services:
       RELAY_FINANCE: "http://relay-finance:3000"
       RELAY_LEGAL:   "http://relay-legal:3000"
       RELAY_IOT:     "http://relay-iot:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4200/admin/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     ports:
       - "127.0.0.1:4200:4200"
     networks:

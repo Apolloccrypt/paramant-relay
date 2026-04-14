@@ -1015,6 +1015,8 @@ function setHeaders(res, req) {
   res.setHeader('Permissions-Policy',           'interest-cohort=()');
   // X-Paramant-Version intentionally omitted — version disclosure via response header removed (security hardening v2.3.3)
   res.setHeader('X-Paramant-Sector',            SECTOR);
+  res.setHeader('X-Crypto-Version',             'ML-KEM-768+AES-256-GCM');
+  res.setHeader('X-Hybrid-Mode',                'available');
 }
 
 function readBody(req, max = MAX_BLOB * 2) {

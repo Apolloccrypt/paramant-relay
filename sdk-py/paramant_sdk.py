@@ -239,8 +239,8 @@ class GhostPipe:
         for relay in SECTOR_RELAYS.values():
             try:
                 r = urllib.request.urlopen(
-                    urllib.request.Request(f'{relay}/v2/check-key?k={self.api_key}',
-                                           headers={'User-Agent': UA}), timeout=4)
+                    urllib.request.Request(f'{relay}/v2/check-key',
+                                           headers={'User-Agent': UA, 'X-Api-Key': self.api_key}), timeout=4)
                 if json.loads(r.read()).get('valid'):
                     return relay
             except Exception:
