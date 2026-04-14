@@ -20,6 +20,40 @@ if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — r
 const sessions = new Map();
 setInterval(() => { const now = Date.now(); for (const [k, v] of sessions) if (v.expires < now) sessions.delete(k); }, 60_000);
 
+// ── Self-service trial key tracking ──────────────────────────────────────────
+const trialEmailTrack = new Map(); // email → { lastAt }
+const trialIpTrack    = new Map(); // ip → { count, resetAt }
+function checkTrialIpLimit(ip) {
+  const now = Date.now();
+  const b = trialIpTrack.get(ip) || { count: 0, resetAt: now + 60_000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
+  if (b.count >= 3) return false;
+  b.count++;
+  trialIpTrack.set(ip, b);
+  return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of trialIpTrack)    if (now > v.resetAt + 120_000) trialIpTrack.delete(k);
+  for (const [k, v] of trialEmailTrack) if (now - v.lastAt > 8 * 86_400_000) trialEmailTrack.delete(k);
+}, 3_600_000);
+async function sendTrialEmail(to, firstName, key) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) { console.warn('[trial] RESEND_API_KEY not set'); return false; }
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'PARAMANT <noreply@paramant.app>',
+      to: [to],
+      subject: 'Your PARAMANT trial API key',
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0c0c0c"><div style="max-width:580px;margin:40px auto;padding:40px;background:#0c0c0c;color:#ededed;font-family:monospace"><h2 style="color:#2d8a5c;margin:0 0 24px;font-size:18px;letter-spacing:.04em">PARAMANT TRIAL KEY</h2>${firstName ? `<p>Hi ${firstName},</p>` : ''}<p>Here's your 30-day trial API key:</p><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:13px;word-break:break-all;margin:16px 0">${key}</pre><h3 style="color:#2d8a5c;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Quick start</h3><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:12px;line-height:1.6"># Upload a file (burn-on-read)\ncurl -X POST https://health.paramant.app/v2/upload \\\n  -H "X-API-Key: ${key}" \\\n  -F "file=@document.pdf"\n\n# Returns a one-time URL\n# Recipient visits once — file is destroyed</pre><p style="color:#aaa;font-size:12px;margin-top:20px">Trial limits: 10 uploads/day &middot; 1h TTL &middot; 5 MB max &middot; ML-KEM-768</p><p style="font-size:12px;margin:8px 0"><a href="https://paramant.app/docs" style="color:#2d8a5c">paramant.app/docs</a></p><hr style="border:none;border-top:1px solid #242424;margin:24px 0"><p style="color:#6e6e6e;font-size:11px;margin:0">PARAMANT &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act</p></div></body></html>`,
+    }),
+  });
+  if (!resp.ok) { const t = await resp.text().catch(() => ''); console.error('[trial] Resend', resp.status, t); return false; }
+  return true;
+}
+
 // Fix 1: rate limiting on /auth/login — 5 attempts per 15 min per IP
 const loginAttempts = new Map(); // ip → { count, resetAt }
 function checkLoginRateLimit(ip) {
@@ -247,6 +281,43 @@ api.post('/reload-all', authMiddleware, async (req, res) => {
     return r.body;
   });
   res.json({ ok: Object.values(results).every(r => r.ok), results });
+});
+
+// ── Self-service trial key request (public, no auth) ──────────────────────
+api.post('/request-key', async (req, res) => {
+  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  if (!checkTrialIpLimit(ip)) return res.status(429).json({ error: 'Too many requests — try again in a minute' });
+
+  const { email, name, usecase } = req.body || {};
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email is required' });
+  const norm = email.toLowerCase().trim();
+  if (!/^[^@\s]{1,64}@[^@\s]{1,253}\.[^@\s]{2,}$/.test(norm)) return res.status(400).json({ error: 'Enter a valid email address' });
+
+  const now = Date.now();
+  const prev = trialEmailTrack.get(norm);
+  if (prev && now - prev.lastAt < 7 * 86_400_000) {
+    const nextOk = new Date(prev.lastAt + 7 * 86_400_000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    return res.status(429).json({ error: `A key was already sent to this address. Next request allowed after ${nextOk}.` });
+  }
+
+  const key = 'pgp_' + crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(now + 30 * 86_400_000).toISOString().slice(0, 10);
+  const keyBody = { key, plan: 'trial', label: `trial:${norm}${usecase ? ':' + usecase : ''}`, max_uploads: 10, expires_at: expiresAt, active: true };
+
+  try {
+    await eachSector(Object.keys(SECTORS), async s => {
+      const r = await relayFetch(s, '/v2/admin/keys', 'POST', keyBody, false, ADMIN_TOKEN);
+      if (r.status !== 200 && r.status !== 201) console.warn(`[trial] sector ${s} returned ${r.status}`);
+    });
+    const firstName = (typeof name === 'string' ? name.trim() : '').split(/\s+/)[0] || '';
+    const sent = await sendTrialEmail(norm, firstName, key);
+    if (!sent) return res.status(503).json({ error: 'Email delivery unavailable — contact privacy@paramant.app' });
+    trialEmailTrack.set(norm, { lastAt: now });
+    return res.json({ ok: true, message: `Key sent to ${norm}` });
+  } catch (e) {
+    console.error('[trial] error:', e.message);
+    return res.status(500).json({ error: 'Could not issue key — contact privacy@paramant.app' });
+  }
 });
 
 app.use(`${BASE_PATH}/api`, api);

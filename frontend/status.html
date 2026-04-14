@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>System Status — PARAMANT</title>
+<meta name="description" content="Real-time status of all PARAMANT relay sectors.">
+<link rel="icon" href="/icon-192.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d8a5c;--green-bg:#0d1f17;--green-dim:#1a3d28;--red:#a03030;--red-bg:#1f0d0d;--red-dim:#3d1a1a;--amber:#a07030;--amber-bg:#1f1a0d;--amber-dim:#3d340d;--mono:'Courier New',Courier,monospace}
+html{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;min-height:100vh}
+a{color:var(--text);text-decoration:none}
+a:hover{color:var(--green)}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
+.nav-logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.nav-links{display:flex;gap:28px;font-size:13px;color:var(--muted)}
+.page{max-width:760px;margin:0 auto;padding:56px 24px 120px}
+.header{margin-bottom:44px}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:10px}
+h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
+.overall{display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:6px;font-size:14px;border:1px solid var(--border);margin-bottom:8px;transition:background .3s,border-color .3s}
+.overall.ok{background:var(--green-bg);border-color:var(--green-dim)}
+.overall.degraded{background:var(--red-bg);border-color:var(--red-dim)}
+.overall.checking{background:var(--surface)}
+.dot-large{width:10px;height:10px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.dot-large.ok{background:var(--green)}
+.dot-large.degraded{background:var(--red)}
+.dot-large.checking{background:var(--quiet);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.last-checked{font-size:12px;color:var(--quiet);font-family:var(--mono);margin-bottom:36px}
+.sector-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.sector-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 22px;transition:border-color .3s}
+.sector-card.ok{border-color:var(--green-dim)}
+.sector-card.degraded{border-color:var(--red-dim)}
+.card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sector-name{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.dot.ok{background:var(--green)}
+.dot.degraded{background:var(--red)}
+.dot.checking{background:var(--quiet);animation:pulse 1.2s ease-in-out infinite}
+.card-status{font-size:13px;color:var(--muted);margin-bottom:10px}
+.card-status.ok{color:var(--green)}
+.card-status.degraded{color:#e88}
+.meta-row{display:flex;gap:24px;flex-wrap:wrap}
+.meta-item{font-family:var(--mono);font-size:11px;color:var(--quiet)}
+.meta-item span{color:var(--muted)}
+.sector-url{font-family:var(--mono);font-size:11px;color:var(--quiet);margin-top:10px}
+.sector-url a{color:var(--quiet)}
+.sector-url a:hover{color:var(--green)}
+.refresh-note{font-size:12px;color:var(--quiet);font-family:var(--mono);text-align:center;margin-top:32px}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--quiet);font-family:var(--mono)}
+footer a{color:var(--quiet)}
+footer a:hover{color:var(--green)}
+@media(max-width:600px){nav{padding:0 20px}.sector-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <div class="nav-links">
+    <a href="/docs">Docs</a>
+    <a href="/request-key">Free key</a>
+    <a href="/parashare">ParaShare</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="header">
+    <div class="eyebrow">System status</div>
+    <h1>Relay network</h1>
+  </div>
+
+  <div class="overall checking" id="overall">
+    <div class="dot-large checking" id="overallDot"></div>
+    <span id="overallText">Checking all sectors&hellip;</span>
+  </div>
+  <div class="last-checked" id="lastChecked">&nbsp;</div>
+
+  <div class="sector-grid" id="sectorGrid">
+    <!-- rendered by JS -->
+  </div>
+
+  <p class="refresh-note">Auto-refreshes every 30s &middot; uptime % calculated from last 24h of checks (stored locally)</p>
+</div>
+
+<footer>
+  PARAMANT relay network &middot; Hetzner DE &middot; GDPR &middot; <a href="/docs">docs</a> &middot; <a href="/request-key">free key</a>
+</footer>
+
+<script>
+(function () {
+  var SECTORS = [
+    { id: 'relay',   label: 'RELAY',   url: 'https://relay.paramant.app',   host: 'relay.paramant.app' },
+    { id: 'health',  label: 'HEALTH',  url: 'https://health.paramant.app',  host: 'health.paramant.app' },
+    { id: 'legal',   label: 'LEGAL',   url: 'https://legal.paramant.app',   host: 'legal.paramant.app' },
+    { id: 'finance', label: 'FINANCE', url: 'https://finance.paramant.app', host: 'finance.paramant.app' },
+    { id: 'iot',     label: 'IoT',     url: 'https://iot.paramant.app',     host: 'iot.paramant.app' },
+  ];
+
+  var STORAGE_KEY = 'paramant_status_v1';
+  var WINDOW_MS   = 24 * 60 * 60 * 1000;
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+  }
+  function saveHistory(h) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(h)); } catch {}
+  }
+  function pruneHistory(h) {
+    var cutoff = Date.now() - WINDOW_MS;
+    SECTORS.forEach(function (s) {
+      if (h[s.id]) h[s.id] = h[s.id].filter(function (r) { return r.ts > cutoff; });
+    });
+    return h;
+  }
+  function addResult(h, id, ok) {
+    if (!h[id]) h[id] = [];
+    h[id].push({ ts: Date.now(), ok: ok });
+    return h;
+  }
+  function uptimePct(h, id) {
+    var arr = h[id];
+    if (!arr || arr.length === 0) return null;
+    var good = arr.filter(function (r) { return r.ok; }).length;
+    return (good / arr.length * 100).toFixed(1);
+  }
+
+  // Build cards once
+  var grid = document.getElementById('sectorGrid');
+  SECTORS.forEach(function (s) {
+    var card = document.createElement('div');
+    card.className = 'sector-card';
+    card.id = 'card-' + s.id;
+    card.innerHTML =
+      '<div class="card-top">' +
+        '<div class="sector-name">' + s.label + '</div>' +
+        '<div class="dot checking" id="dot-' + s.id + '"></div>' +
+      '</div>' +
+      '<div class="card-status" id="status-' + s.id + '">Checking&hellip;</div>' +
+      '<div class="meta-row">' +
+        '<div class="meta-item">version <span id="ver-' + s.id + '">&mdash;</span></div>' +
+        '<div class="meta-item">latency <span id="ms-' + s.id + '">&mdash;</span></div>' +
+        '<div class="meta-item">uptime 24h <span id="up-' + s.id + '">&mdash;</span></div>' +
+      '</div>' +
+      '<div class="sector-url"><a href="' + s.url + '/health" target="_blank" rel="noopener">' + s.host + '/health</a></div>';
+    grid.appendChild(card);
+  });
+
+  function setCard(s, state, data, ms) {
+    var card    = document.getElementById('card-' + s.id);
+    var dot     = document.getElementById('dot-' + s.id);
+    var statusEl = document.getElementById('status-' + s.id);
+    var verEl   = document.getElementById('ver-' + s.id);
+    var msEl    = document.getElementById('ms-' + s.id);
+
+    card.className    = 'sector-card ' + (state === 'ok' ? 'ok' : state === 'checking' ? '' : 'degraded');
+    dot.className     = 'dot ' + state;
+    statusEl.className = 'card-status ' + (state === 'ok' ? 'ok' : state === 'checking' ? '' : 'degraded');
+    statusEl.textContent = state === 'ok' ? 'Operational' : state === 'checking' ? 'Checking\u2026' : 'Degraded';
+
+    if (data && data.version) verEl.textContent = 'v' + data.version;
+    if (ms !== undefined) msEl.textContent = ms + 'ms';
+  }
+
+  function setUptime(id, pct) {
+    var el = document.getElementById('up-' + id);
+    if (el && pct !== null) el.textContent = pct + '%';
+  }
+
+  function setOverall(allOk, anyChecked) {
+    var el   = document.getElementById('overall');
+    var dot  = document.getElementById('overallDot');
+    var text = document.getElementById('overallText');
+    if (!anyChecked) {
+      el.className = 'overall checking'; dot.className = 'dot-large checking';
+      text.textContent = 'Checking all sectors\u2026';
+    } else if (allOk) {
+      el.className = 'overall ok'; dot.className = 'dot-large ok';
+      text.textContent = 'All systems operational';
+    } else {
+      el.className = 'overall degraded'; dot.className = 'dot-large degraded';
+      text.textContent = 'One or more sectors degraded';
+    }
+  }
+
+  function checkAll() {
+    var h = pruneHistory(loadHistory());
+    var results = {};
+    var pending = SECTORS.length;
+
+    SECTORS.forEach(function (s) {
+      var t0 = Date.now();
+      fetch(s.url + '/health', { signal: AbortSignal.timeout(8000) })
+        .then(function (r) {
+          var ms = Date.now() - t0;
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json().then(function (body) {
+            results[s.id] = { ok: true, ms: ms, data: body };
+            setCard(s, 'ok', body, ms);
+            addResult(h, s.id, true);
+          });
+        })
+        .catch(function () {
+          results[s.id] = { ok: false };
+          setCard(s, 'degraded', null, undefined);
+          addResult(h, s.id, false);
+        })
+        .finally(function () {
+          setUptime(s.id, uptimePct(h, s.id));
+          pending--;
+          if (pending === 0) {
+            saveHistory(h);
+            var allOk = SECTORS.every(function (sec) { return results[sec.id] && results[sec.id].ok; });
+            setOverall(allOk, true);
+            var now = new Date();
+            document.getElementById('lastChecked').textContent =
+              'Last checked: ' + now.toLocaleTimeString() + ' \u2014 next check in 30s';
+          }
+        });
+    });
+  }
+
+  // Initial state
+  SECTORS.forEach(function (s) { setCard(s, 'checking'); });
+  setOverall(false, false);
+
+  // Run immediately, then every 30s
+  checkAll();
+  setInterval(checkAll, 30000);
+}());
+</script>
+</body>
+</html>
