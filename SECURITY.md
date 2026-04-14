@@ -1,269 +1,127 @@
 # Security Policy
 
-## Supported Versions
+## Reporting a vulnerability
 
-| Version | Supported |
-|---------|-----------|
-| **2.3.x** | ✓ **Active** |
-| 2.2.x   | ✓ Active (security fixes backported) |
-| 2.1.x   | ✗ End of life |
-| < 2.1   | ✗ End of life |
+Email: privacy@paramant.app
+Subject: Security vulnerability — paramant-relay
 
----
-
-## Reporting a Vulnerability
-
-**Email:** privacy@paramant.app  
-**Response time:** 48 hours for initial acknowledgement  
-**Resolution target:** 14 days for critical, 30 days for high, 90 days for medium/low
-
-Please include:
-- A clear description of the vulnerability
-- Steps to reproduce (curl commands, PoC code, screenshots)
-- Affected component (relay, frontend, SDK, nginx config)
-- Your assessment of severity and impact
-
-We do **not** have a bug bounty program at this time. We will credit researchers in the Hall of Fame below (with your consent).
+We aim to respond within 48 hours and patch within 7 days for critical issues.
+All reports are treated with responsible disclosure.
 
 ---
 
-## Scope
+## Security audits
 
-### In scope
+### 2026-04-13 — CIS Ubuntu 24.04 benchmark (production server)
 
-- `relay.paramant.app` and sector relays (`health`, `legal`, `finance`, `iot`)
-- `paramant.app` frontend (ParaDrop, ParaShare, ParaVault)
-- Relay source code at `github.com/Apolloccrypt/paramant-relay`
-- SDK packages: `paramant` (PyPI), `@paramant/sdk` (npm)
-- Authentication, authorisation, and key management logic
-- Cryptographic protocol implementation (ML-KEM-768, ECDH P-256, AES-256-GCM)
-- Burn-on-read and first-registration-wins enforcement
-- Rate limiting and abuse controls
+114 checks applied across 13 categories on paramant.app:
 
-### Out of scope
+| Category | Result |
+|----------|--------|
+| Kernel module blacklist (33 modules) | Enforced |
+| /tmp as tmpfs (nodev, nosuid, noexec) | Configured |
+| AppArmor | 119/121 profiles enforcing |
+| SSH hardening (MACs, LoginGraceTime, MaxStartups) | Applied |
+| Kernel network hardening | Applied |
+| PAM hardening (pwquality, faillock, pwhistory) | Applied |
+| auditd | 49 CIS L2 rules loaded |
+| AIDE | Installed, daily integrity check |
+| Cron permissions | Restricted to root |
+| Password policy | MAX_DAYS=365, SHA512 |
+| sudo logging | Enabled with full I/O logging |
+| Firewall | UFW/nftables, default deny |
+| Login banners | Configured |
 
-- Denial of service against production infrastructure
-- Social engineering of staff
-- Physical attacks
-- Issues in third-party dependencies with no exploit path in this codebase
-- Theoretical attacks without a practical reproduction
-- Self-hosted instances not operated by Paramant
-- Reports generated solely by automated scanners without manual validation
+### 2026-04-11 — R. Zwarts (verification review)
 
----
+14 findings, all resolved in commit `e6f216d`.
 
-## Disclosure Policy
+| # | Severity | Finding | Status |
+|---|----------|---------|--------|
+| 1 | High | Admin login plain === + no rate limiting | Fixed: timingSafeEqual + per-IP rate limiter |
+| 2 | Medium | safeEqual() bypassed on 3 relay paths | Fixed: all paths use safeEqual() |
+| 3 | Medium | pgp_ enterprise admin path broken | Fixed: removed pgp_ admin support |
+| 4 | Medium | Blob burned before transfer complete | Fixed: deferred deletion on res.finish() |
+| 5 | Medium | TOTP timing-sensitive + code reuse | Fixed: full window scan + _usedTotpCodes |
+| 6 | Medium | Sync file I/O on key create/revoke | Fixed: serialized async write queue |
+| 7 | Medium | Relay registry unbounded + unpaginated | Fixed: cap + limit/offset pagination |
+| 8 | Medium | CT log appendFileSync + no rotation | Fixed: async write stream + size rotation |
+| 9 | Medium | Webhook SSRF port not restricted | Fixed: allowlist 443 + 80 only |
+| 10 | Low | DID lookup O(n) scan | Fixed: O(1) via didRegistry.get(did) |
+| 11 | Low | Admin login leaks internal address | Fixed: generic error, server-side log only |
+| 12 | Low | Revoked keys keep WebSocket open | Fixed: ws.close(4401) on revoke |
+| 13 | Low | Arbitrary plan strings accepted | Fixed: VALID_PLANS allowlist |
+| 14 | Low | Invalid Base32 in TOTP_SECRET silent | Fixed: startup validation + clear error |
 
-We follow **coordinated (responsible) disclosure**:
+### 2026-04-10 — R. Zwarts (independent security researcher)
 
-1. Report the vulnerability privately to privacy@paramant.app
-2. We acknowledge within 48 hours
-3. We work with you to validate and fix the issue
-4. We aim to release a patch within 14–90 days depending on severity
-5. After the patch is released (or 90 days from your report, whichever comes first), you are free to publish
+6 findings, all resolved in commit `0db3ef0`.
 
-We will not take legal action against researchers who follow this policy.
+| # | Severity | Finding | Status |
+|---|----------|---------|--------|
+| 1 | High | WebSocket proxy uses plain TCP to HTTPS upstream | Fixed: tls.connect() |
+| 2 | High | stream-next returns synthetic hash not real blob hash | Fixed: per-device queue with real sha256 |
+| 3 | High | Webhook SSRF — DNS not resolved before connecting | Fixed: dns.resolve + private range reject |
+| 4 | Medium | SDK uses ?k= query param rejected by relay | Fixed: X-Api-Key header |
+| 5 | Medium | pgp_ enterprise admin path broken end-to-end | Fixed: removed pgp_ support |
+| 6 | Medium | Blob burned before transfer complete | Fixed: deferred deletion on res.finish() |
 
----
+### 2026-04 — Ryan Williams, Smart Cyber Solutions (independent)
 
-## What We Ask
+20 findings across 4 critical / 5 high / 6 medium / 5 low.
+Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
-- Do not access, modify, or delete data belonging to other users
-- Do not perform automated scanning at rates that degrade service for others
-- Do not disclose findings publicly before the 90-day window expires or a patch is released
-
----
-
-## Recent Security Patches
-
-### 2026-04-13 — Server hardening (paramant.app production)
-
-Applied directly to production server after internal review:
-
-| # | Finding | Fix |
-|---|---------|-----|
-| 1 | .env readable by other users | chmod 600 |
-| 2 | API key visible in ps aux (stale debug process) | Process killed |
-| 3 | SSH: root login not fully disabled | PermitRootLogin prohibit-password + MaxAuthTries 3 |
-| 4 | Spurious arm64 architecture in apt | Removed, apt upgraded |
-| 5 | HSTS header missing on HTTPS blocks | Added to all 6 server blocks |
-| 6 | Google Fonts in CSP (external dependency) | Removed from style-src + font-src |
-| 7 | atd scheduler running unnecessarily | Stopped and disabled |
-| 8 | NATS running as root | Dedicated system user, systemd hardening |
-| 9 | /download page served outdated v0.2.0 app | Returns 410 Gone |
-| 10 | /chat page unlinked/orphaned | Returns 410 Gone |
-
-### 2026-04-13 — CIS Ubuntu 24.04 Benchmark (Wazuh)
-
-114 checks applied via automated hardening. All 13 categories resolved:
-
-| # | Category | Details |
-|---|----------|---------|
-| 1 | Kernel module blacklist | 33 modules blocked: dccp, rds, sctp, tipc, cramfs, usb-storage, filesystem modules with known CVEs |
-| 2 | /tmp as tmpfs | nosuid, nodev, noexec, size=2G via fstab |
-| 3 | AppArmor | 119/121 profiles enforcing (was 4 in complain) |
-| 4 | SSH hardening | MACs, LogLevel VERBOSE, LoginGraceTime 60, MaxStartups 10:30:60, DisableForwarding, Banner |
-| 5 | Kernel network | ip_forward=0, send_redirects=0, log_martians=1, syncookies=1, ASLR=2, dmesg_restrict=1 |
-| 6 | PAM hardening | pwquality minlen=14, faillock deny=5 unlock=900s, pwhistory remember=24 |
-| 7 | auditd | 49 rules loaded: time, identity, network, DAC, login, sudo, modules |
-| 8 | AIDE | v0.18.6 installed, daily cron at 05:00 |
-| 9 | Cron permissions | /etc/crontab + cron.d 700/root, cron.allow=root only |
-| 10 | Password policy | MAX_DAYS=365, MIN_DAYS=1, SHA512, INACTIVE=30 |
-| 11 | sudo logging | logfile=/var/log/sudo.log, log_input, log_output, use_pty |
-| 12 | Firewall | UFW/nftables, default deny in+out, enabled at boot |
-| 13 | Login banners | /etc/issue, /etc/issue.net, /etc/motd, SSH Banner |
+| # | Severity | Status |
+|---|----------|--------|
+| 1–3 | Critical | Fixed |
+| 4 | Critical | In progress: plaintext filename in relay RAM |
+| 5–9 | High | Fixed |
+| 10–15 | Medium | Fixed (13: accepted — documented) |
+| 16–20 | Low | Fixed |
 
 ---
 
-### v2.4.5 — 2026-04-11 — Code audit by R. Zwarts (verification review)
+## Open findings
 
-Commit: e6f216d — All 14 findings resolved.
-
-| # | Severity | Finding | Fix |
+| # | Severity | Finding | ETA |
 |---|----------|---------|-----|
-| 1 | High | Admin login plain === + no rate limiting | timingSafeEqual + per-IP rate limiter |
-| 2 | Medium | safeEqual() bypassed on 3 relay paths | All paths use safeEqual() |
-| 3 | Medium | pgp_ enterprise admin path broken (repeat) | Removed pgp_ support |
-| 4 | Medium | Blob burned before transfer complete (repeat) | Deferred deletion on res.finish() |
-| 5 | Medium | TOTP timing-sensitive + code reuse in window | Full window scan + _usedTotpCodes |
-| 6 | Medium | Sync file I/O on key create/revoke | Serialized async write queue |
-| 7 | Medium | Relay registry unbounded + unpaginated | Cap + limit/offset pagination |
-| 8 | Medium | CT log appendFileSync + no rotation | Async write stream + size rotation |
-| 9 | Medium | Webhook SSRF port not restricted | Allowlist: 443 + 80 only |
-| 10 | Low | DID lookup O(n) scan | O(1) via didRegistry.get(did) |
-| 11 | Low | Admin login leaks internal address | Generic error, server-side log only |
-| 12 | Low | Revoked keys keep WebSocket open | ws.close(4401) on revoke |
-| 13 | Low | Arbitrary plan strings accepted | VALID_PLANS allowlist |
-| 14 | Low | Invalid Base32 in TOTP_SECRET silent | Startup validation + clear error |
+| 4 | Critical | Plaintext filename stored in relay RAM | v2.4.6 |
+| 14 | Medium | CT Merkle tree non-RFC-6962 compliant | v2.5.0 |
 
 ---
 
-### v2.4.5 — 2026-04-10 — Code audit by R. Zwarts (independent security researcher)
+## Server hardening (paramant.app)
 
-Commit: 0db3ef0 — All 6 findings resolved.
+Additional fixes applied 2026-04-13:
 
-| # | Severity | Finding | Fix |
-|---|----------|---------|-----|
-| 1 | High | WebSocket proxy uses plain TCP to HTTPS upstream | tls.connect() |
-| 2 | High | stream-next returns synthetic hash not real blob hash | Per-device queue with real sha256 |
-| 3 | High | Webhook SSRF — DNS not resolved before connecting | dns.resolve + private range reject |
-| 4 | Medium | SDK uses ?k= query param rejected by relay | X-Api-Key header |
-| 5 | Medium | pgp_ enterprise admin path broken end-to-end | Removed pgp_ support |
-| 6 | Medium | Blob burned before transfer complete | Deferred deletion on res.finish() |
-
----
-
-### v2.3.3 — 2026-04-09 (security hardening release)
-
-Deep security review and self-hosting hardening. No external researcher report; internal findings.
-
-#### DNS Rebinding bypass on webhook fire · Severity: Medium
-
-**What:** `isSsrfSafeUrl()` was only checked at webhook registration time. An attacker registers a webhook URL pointing to a legitimate public IP (passes the check), lets the DNS TTL expire, then switches their DNS record to a private address (RFC1918, `169.254.169.254`, `::1`). On the next blob upload the relay fires the webhook to the now-private IP — bypassing the SSRF guard.
-
-**Fix (v2.3.3):** `pushWebhooks()` now resolves the webhook hostname via `dns.promises.lookup()` immediately before every outbound request and re-verifies the resolved IP through `isSsrfSafeUrl()`. Redirected-to-private requests are blocked and logged as `webhook_dns_rebinding_blocked`. Applied to all 7 relay files.
-
-#### Version disclosure via `X-Paramant-Version` response header · Severity: Low
-
-**What:** Every relay response included `X-Paramant-Version: 2.x.x`, giving attackers an exact version string to cross-reference against CVE databases or known weaknesses without probing.
-
-**Fix (v2.3.3):** Header removed from all `setHeaders()` calls. Version remains in `/health` JSON response body (needed by SDKs) and admin-only Prometheus metrics.
-
-#### Google Fonts CDN in ParaDrop · Severity: Low
-
-**What:** `drop.html` fetched fonts from `fonts.googleapis.com` and `fonts.gstatic.com` on every page load, leaking user IP addresses and timing to Google — contrary to the product's privacy promises.
-
-**Fix (v2.3.3):** External font import removed. System font stack used instead.
-
-#### Docker container runs with full Linux capabilities · Severity: Medium
-
-**What:** Relay containers ran without capability restrictions. A container escape would give an attacker all Linux capabilities inside the container, including `CAP_NET_RAW`, `CAP_SYS_PTRACE`, etc.
-
-**Fix (v2.3.3):** All relay containers now use `no-new-privileges: true` and `cap_drop: ALL`. Root filesystem set to read-only with a 64 MB tmpfs for `/tmp`. Memory limits enforced (1500m per relay).
-
-#### Docker image uses floating `:latest` tag · Severity: Medium
-
-**What:** `mtty001/relay:latest` is resolved at pull time. A supply-chain compromise of the Docker Hub account would silently deliver malicious code.
-
-**Fix (v2.3.3):** Image pinned to `mtty001/relay:2.3.3`.
-
-#### Build tools present in production Docker image · Severity: Medium
-
-**What:** `python3`, `make`, `g++` (needed to compile argon2 native bindings) were present in the final runtime image, expanding the attack surface after a container escape.
-
-**Fix (v2.3.3):** Multi-stage Dockerfile: build stage compiles with tools; runtime stage is lean — only compiled `node_modules` + `relay.js`.
-
-#### nginx missing rate limits, security headers, session hardening · Severity: Medium
-
-**What:** `nginx-selfhost.conf` (self-hosting stack) lacked: per-endpoint rate limiting for key registration and admin paths, HSTS `preload` + `includeSubDomains`, OCSP stapling, `ssl_session_tickets off`, `proxy_hide_header Server`, slowloris timeouts, `client_max_body_size`, upstream health fail tracking.
-
-**Fix (v2.3.3):** Comprehensive hardening — see CHANGELOG v2.3.3 for full list.
+| Fix | Detail |
+|-----|--------|
+| .env permissions | chmod 600 |
+| Stale debug process | Killed (API key was visible in ps aux) |
+| SSH | PermitRootLogin prohibit-password, MaxAuthTries 3 |
+| Spurious arm64 arch | Removed from apt |
+| HSTS | max-age=63072000 on all HTTPS blocks |
+| Google Fonts | Removed from CSP |
+| atd | Stopped and disabled |
+| NATS | Dedicated system user, systemd hardening |
+| Docker | admin + relay containers non-root (since e6f216d) |
 
 ---
 
-### v2.3.2 — 2026-04-09 (security release)
+## Dependency audit (2026-04-13)
 
-Three vulnerabilities reported by Raymond Zwarts, independent security researcher. All patched and deployed same day.
-
-#### P1 — RAM admission TOCTOU · Severity: High · Affected: paid accounts only
-
-**What:** `ramOk()` checked relay capacity _before_ reading the request body. Under concurrent uploads, multiple requests could simultaneously pass the RAM gate, then each allocate a full blob-sized buffer — bypassing the limit entirely.
-
-**Where:** `POST /v2/inbound` and `POST /v2/drop/create` in all relay files.
-
-**Fix (v2.3.2):** `inFlightInbound` counter incremented atomically after `ramOk()` passes, before `await readBody()`, protected with `try/finally`. `ramOk()` now projects RSS including all in-flight allocations: `rssMB + BLOB_SIZE_MB * (inFlightInbound + 1)`.
-
-#### P2 — Download handlers duplicate blobs in RAM · Severity: Medium
-
-**What:** All download, outbound, and drop/pickup handlers called `Buffer.from(entry.blob)` — creating a full copy of the blob in RAM before sending. During download, every blob occupied 2× its size in memory.
-
-**Where:** `/v2/dl/:token/get`, `/v2/outbound/:hash`, `/v2/drop/pickup` in all six relay files (10 call sites total).
-
-**Fix (v2.3.2):** All handlers now use the buffer reference directly (`const blob = entry.blob`) and zero it in the `res.end()` flush callback (`res.end(blob, () => { blob.fill(0) })`). No copy created; zeroing deferred until TCP stack confirms delivery.
-
-#### P3 — Pubkeys Map unbounded — no TTL, no device cap · Severity: Medium
-
-**What:** `POST /v2/pubkey` stored entries without expiry or per-key limits. A free user could register an unlimited number of device IDs, growing the in-process Map indefinitely — a slow RAM exhaustion vector.
-
-**Where:** `/v2/pubkey` POST handler in all relay files.
-
-**Fix (v2.3.2):**
-- Per-plan device limits enforced at registration time: **free = 5 devices, pro = 50, enterprise = unlimited**
-- TTL on every entry: **free = 7 days, pro = 30 days, enterprise = 1 year**
-- Invite-session pubkeys expire after **1 hour**
-- `GET /v2/pubkey` evicts expired entries on access
-- Hourly cleanup sweep removes remaining expired entries
-
-#### P4 — SSRF via webhook URL registration · Severity: High · Affected: pro/enterprise accounts
-
-**What:** `POST /v2/webhook` accepted any URL and stored it. When a blob was uploaded, the relay fired an outbound HTTP POST to the stored URL — including private RFC1918 addresses, loopback (`127.x.x.x`, `::1`), link-local (`169.254.x.x`), cloud metadata endpoints (`169.254.169.254`), and `.internal` hostnames. A paid user could use this to probe internal network services from the relay's network perspective.
-
-**Where:** `pushWebhooks()` and `POST /v2/webhook` in all relay files.
-
-**Fix (v2.3.2):** `isSsrfSafeUrl()` guard added. Enforced at two layers:
-1. **Registration** (`POST /v2/webhook`): URL must be `https:` and hostname must not match any private/loopback/link-local range. Returns HTTP 400 with clear error if rejected.
-2. **Fire** (`pushWebhooks()`): Guard re-checked before every outbound request. Any stored URL that fails the check is skipped and logged as `webhook_ssrf_blocked`. Blocked ranges: loopback (`127.x.x.x`, `::1`), link-local (`169.254.x.x`, `fe80::/10`), RFC1918 (`10.x`, `172.16-31.x`, `192.168.x`), IPv6 ULA (`fc00::/7`), `.local`/`.internal`/`.localhost` TLDs.
+- 0 npm vulnerabilities across all 4 packages
+- Base image: node:22-alpine (node:20 was EOL)
+- express 4.x → 5.x
+- 0 GPL/AGPL/LGPL licenses
+- 0 hardcoded secrets
 
 ---
 
-## Hall of Fame
+## Hall of fame
 
-We thank the following researchers for responsible disclosure:
-
-| Date       | Researcher           | Findings                                      |
-|------------|----------------------|-----------------------------------------------|
-| 2026-04-11 | **R. Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | Verification review: 14 findings (1 high, 8 medium, 5 low) · All resolved in commit e6f216d |
-| 2026-04-10 | **R. Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | First audit: 6 findings (3 high, 3 medium) · All resolved in commit 0db3ef0 |
-| 2026-04-09 | **R. Zwarts** ([@rzwarts74](https://github.com/rzwarts74)) · Independent security researcher | RAM admission TOCTOU `/v2/inbound` + `/v2/drop/create` (P1 · High) · Download handlers duplicate blobs in RAM (P2 · Medium) · pubkeys Map unbounded — no TTL, no device cap (P3 · Medium) · SSRF via webhook URL registration (P4 · High) · All 4 patched in v2.3.2 |
-| 2026-04-09 | Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) · Smart Cyber Solutions Pty Ltd (AU) | Independent, uncompensated review · 20 findings (4 critical, 5 high, 6 medium, 5 low) · [Full report](pentest-report-2026-04-08.txt) · [Patch status](docs/security-audit-2026-04.md) |
-| 2026-04-08 | Hendrik Bruinsma ([@readefries](https://github.com/readefries)) | Security review (5 findings: Argon2 race condition, `/health` info leak, `X-Paramant-Views-Left` header leak, `/v2/ct/proof` routing, stale CSP domain) + 4 bug reports (QR bug, fingerprint mismatch on refresh, receiver stuck at fingerprint, preload burn bug) + Thunderbird FileLink add-on · All patched in v2.2.1 / v2.3.0 |
-
----
-
-## Security Contacts
-
-| Purpose             | Contact                  |
-|---------------------|--------------------------|
-| Vulnerability report | privacy@paramant.app     |
-| General security     | privacy@paramant.app     |
-| Legal / compliance   | privacy@paramant.app     |
+| Researcher | Contribution | Date |
+|------------|-------------|------|
+| Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) | Independent security review — 20 findings | April 2026 |
+| R. Zwarts ([@rzwarts74](https://github.com/rzwarts74)) | Code audit — 20 findings across two reports | April 2026 |
+| Hendrik Bruinsma ([@readefries](https://github.com/readefries)) | FileLink extension + bug reports | April 2026 |

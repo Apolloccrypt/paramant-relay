@@ -1,56 +1,36 @@
-# Contributing to PARAMANT Ghost Pipe
+# Contributing to PARAMANT
 
-Thanks for your interest in contributing.
+## Ways to contribute
 
-## How it works
+- Report security vulnerabilities: privacy@paramant.app
+- Report bugs: [GitHub Issues](https://github.com/Apolloccrypt/paramant-relay/issues)
+- Submit pull requests for fixes and improvements
+- Test self-hosting on different platforms
 
-1. Fork or branch from `main`
-2. Make your changes
-3. Open a Pull Request with a clear description
-4. I'll review and merge
+## Development setup
 
-## Branch naming
+```bash
+git clone https://github.com/Apolloccrypt/paramant-relay
+cd paramant-relay
+cp .env.example .env
+echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+docker compose up -d
+```
 
-- `feature/description` — new functionality
-- `fix/description` — bug fixes
-- `docs/description` — documentation only
+## Pull request guidelines
 
-## Areas where help is welcome
+- One fix per PR
+- Include test if applicable
+- Update CHANGELOG.md under Unreleased section
+- English only in code and comments
 
-- **Thunderbird FileLink integration** — `/outlook-addin/` as reference
-- **SDK improvements** — `sdk-js/` and `sdk-py/`
-- **Documentation** — API docs, examples, use cases
-- **Security review** — relay logic in `relay/`
+## Security
 
-## Ground rules
+Do not open a public issue for security vulnerabilities.
+Email privacy@paramant.app with responsible disclosure.
 
-- No secrets, tokens, or API keys in commits
-- No changes to `relay/ghost-pipe-relay.js` without discussion first — this is production code
-- Keep PRs focused — one thing per PR
+See [SECURITY.md](SECURITY.md) for full security policy.
 
-## Protocol constraints (never compromise)
+## Hall of fame
 
-- ML-KEM-768 — key encapsulation
-- AES-256-GCM — symmetric encryption
-- Burn-on-read — destroyed after first download
-- Zero plaintext — relay never sees content
-- RAM-only blobs — encrypted payload data never written to disk (CT log hashes and API keys are persisted)
-- EU/DE jurisdiction — Hetzner Frankfurt only
-
-## Questions?
-
-Open an issue or reach out at privacy@paramant.app
-
-## Hall of Fame
-
-Security researchers and contributors who have helped make PARAMANT better:
-
-| Researcher | Handle | Contribution | Date |
-|------------|--------|--------------|------|
-| Raymond Zwarts | [@rzwarts74](https://github.com/rzwarts74) | Independent security research — RAM admission TOCTOU (P1/High), download handlers duplicate blobs in RAM (P2/Medium), pubkeys Map unbounded — no TTL/device cap (P3/Medium), SSRF via webhook URL registration (P4/High) · All 4 patched in v2.3.2 | April 2026 |
-| Ryan Williams | [@scs-labrat](https://github.com/scs-labrat) | Independent security review — 4 critical · 5 high · 6 medium · 5 low (20 findings total) · [Smart Cyber Solutions](https://www.linkedin.com/in/ryan-williams-4068351b8/) | April 2026 |
-| Hendrik Bruinsma | [@readefries](https://github.com/readefries) | Thunderbird FileLink add-on (built & contributed); security review: Argon2 race condition (MEDIUM), `/health` info leak (MEDIUM), `X-Paramant-Views-Left` header leak (MEDIUM), `/v2/ct/proof` routing (LOW), stale CSP domain (LOW); bug reports: QR code display bug, ParaDrop fingerprint mismatch on refresh, receiver stuck at fingerprint verification, preload burn bug | April 2026 |
-
-Want to be on this list? Find something wrong. Report it. We fix it publicly.
-
-See [SECURITY.md](SECURITY.md) for responsible disclosure policy.
+Security researchers and contributors are listed in [SECURITY.md](SECURITY.md).
