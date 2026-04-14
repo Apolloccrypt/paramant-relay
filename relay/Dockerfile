@@ -14,7 +14,7 @@ RUN npm install --omit=dev && npm cache clean --force
 FROM node:22-alpine3.21
 
 LABEL org.opencontainers.image.title="paramant-relay" \
-      org.opencontainers.image.version="2.4.4" \
+      org.opencontainers.image.version="2.4.5" \
       org.opencontainers.image.description="Post-quantum encrypted file relay — RAM-only, burn-on-read" \
       org.opencontainers.image.source="https://github.com/Apolloccrypt/paramant-relay" \
       org.opencontainers.image.licenses="BUSL-1.1"
