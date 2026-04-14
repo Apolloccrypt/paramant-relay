@@ -115,6 +115,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 </style>
 </head>
 <body>
@@ -122,6 +123,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
   <ul class="nav-links">
     <li><a href="#sectors">Use cases</a></li>
+    <li><a href="/hndl" style="color:#c84040">HNDL threat</a></li>
     <li><a href="/security">Security</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#selfhost">Self-host</a></li>
@@ -143,6 +145,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
   <div style="margin-top:16px;font-size:12px;color:var(--quiet)">No account &nbsp;&middot;&nbsp; No credit card &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--quiet);text-decoration:underline;text-decoration-color:#333">Request free API key &rarr;</a></div>
+  <div style="margin-top:24px"><a href="/hndl" style="display:inline-flex;align-items:center;gap:8px;background:rgba(200,40,40,.12);border:1px solid rgba(200,40,40,.35);border-radius:4px;padding:7px 16px;font-size:11px;font-family:var(--mono);color:#c84040;text-decoration:none;letter-spacing:.04em;animation:pulse 2.5s ease-in-out infinite">&#9888; Your data is being harvested NOW &mdash; Q-Day est. 2029 &rarr;</a></div>
 </div>
 
 <div class="proto-bar">
