@@ -193,7 +193,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)" id="pipe-ts"></span>
       </div>
       <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
-      <div class="pipe-stats" style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)">
+      <div class="pipe-stats" style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)">
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Relay</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-main">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">—</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">—</div></div>
@@ -449,7 +449,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Ubuntu &middot; Debian &middot; Hetzner</div>
       <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 5-sector stack with nginx and auto-TLS.</div>
       <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
-        git clone github.com/Apolloccrypt/paramant-relay<br>
+        git clone https://github.com/Apolloccrypt/paramant-relay<br>
         cp .env.example .env &amp;&amp; nano .env<br>
         docker compose up -d
       </div>
@@ -686,7 +686,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
 </footer>
 
-<script src="ct-stats.js" integrity="sha384-ZJMCfhlRH6OCODBcLfm/vvO0QEw26FxvM84NIiRYbeF+ahESe9Axc8yox1hwg5dB" crossorigin="anonymous" defer></script>
+<script src="ct-stats.js" integrity="sha384-tLQJGKJhkcEUSgwLBWhho+ReVj1fuLC7gPX2kTbYbbQ1JcLljaXCN48UscZrBbmE" crossorigin="anonymous" defer></script>
 <script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='☰';}});});</script>
 </body>
 </html>
