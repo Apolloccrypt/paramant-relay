@@ -70,13 +70,13 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint','/v2/relays'],
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays'],
+               '/v2/relays','/v2/request-trial'],
   full:       null,
 };
 
@@ -701,6 +701,9 @@ setInterval(() => {
 const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub}
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
+// Trial key request rate limiting (1 per email per 24h, in-memory)
+const trialRequests = new Map(); // 'trial:email' → timestamp
+
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
 function checkTeamRateLimit(teamId, limit) {
@@ -1095,6 +1098,73 @@ const server = http.createServer(async (req, res) => {
     const kd = apiKeys.get(apiKey);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ valid: !!(kd?.active), plan: kd?.plan || null }));
+  }
+
+  // ── POST /v2/request-trial — Self-service trial key request (public, no auth) ──
+  if (path === '/v2/request-trial' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      const rawEmail = (d.email || '').toString().trim();
+      const name = (d.name || '').toString().trim().slice(0, 128);
+      const useCase = ((d.use_case || d.usecase) || '').toString().trim().slice(0, 512);
+      if (!name || !rawEmail || !useCase) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'name, email and use_case are required' }));
+      }
+      if (rawEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Invalid email address' }));
+      }
+      // Simple in-memory rate limit: 1 trial per email per 24h
+      const rlKey = 'trial:' + rawEmail.toLowerCase();
+      const now = Date.now();
+      if (trialRequests.has(rlKey) && now - trialRequests.get(rlKey) < 604800000) {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'A trial key was already requested for this email in the last 7 days. Check your inbox.' }));
+      }
+      trialRequests.set(rlKey, now);
+      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
+      const label = `trial:${name.replace(/\s+/g, '_').toLowerCase().slice(0, 40)}`;
+      apiKeys.set(newKey, { plan: 'community', label, active: true });
+      fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
+        const usersData = JSON.parse(raw);
+        usersData.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date().toISOString(), trial_metadata: { name, use_case: useCase } });
+        usersData.updated = new Date().toISOString();
+        return _writeUsersJson(usersData);
+      }).catch(we => log('warn', 'trial_key_persist_failed', { err: we.message }));
+      // Send welcome email via Resend if configured
+      const RESEND_KEY = process.env.RESEND_API_KEY || '';
+      if (RESEND_KEY) {
+        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
+          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
+          <p style="color:#888;margin-bottom:16px">Hi ${name},</p>
+          <p style="color:#888;margin-bottom:24px">Your free trial API key is ready. It gives you access to the community relay — burn-on-read, ML-KEM-768 encryption, EU/DE jurisdiction.</p>
+          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
+            <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
+            <div style="font-size:14px;color:#ededed;word-break:break-all">${newKey}</div>
+          </div>
+          <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
+            IMPORTANT: Save this key in your password manager immediately. It is generated once and cannot be recovered.
+          </div>
+          <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install paramant-sdk
+
+from paramant import ParamantClient
+client = ParamantClient(api_key='${newKey}')
+session = client.create_session('recipient@example.com')</pre>
+          <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> &nbsp;&middot;&nbsp; <a href="https://paramant.app" style="color:#888">Dashboard</a></p>
+          <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 &nbsp;&middot;&nbsp; Burn-on-read &nbsp;&middot;&nbsp; EU/DE &nbsp;&middot;&nbsp; BUSL-1.1</p>
+        </div>`;
+        const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [rawEmail], subject: 'Your PARAMANT trial API key', html });
+        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'trial_welcome_sent', { email: rawEmail, id: p.id }); } catch(e) {} }); });
+        req2.on('error', e => log('warn', 'trial_welcome_send_failed', { err: e.message }));
+        req2.write(body); req2.end();
+      }
+      log('info', 'trial_key_requested', { name, email: rawEmail, use_case: useCase.slice(0, 80) });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, message: 'Trial key sent to your email address.' }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /metrics — Prometheus metrics (voor auth gate, ADMIN_TOKEN vereist) ──
