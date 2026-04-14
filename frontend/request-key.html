@@ -90,9 +90,16 @@ footer a:hover{color:var(--green)}
   </form>
 
   <div class="msg success" id="successMsg">
-    <div style="margin-bottom:8px">&#10003; <strong>Key sent to <span class="key-name" id="sentEmail"></span></strong></div>
-    <div style="color:var(--muted);font-size:13px">Check your inbox (and spam folder). The key is valid for 30 days.</div>
-    <div style="margin-top:12px;font-size:13px">Next: read the <a href="/docs" style="color:var(--green)">quick start docs &rarr;</a></div>
+    <div style="margin-bottom:16px">&#10003; <strong>Your API key is ready</strong></div>
+    <div style="background:#0a1a12;border:1px solid var(--green-dim);border-radius:6px;padding:14px 16px;margin-bottom:16px">
+      <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--text);word-break:break-all;user-select:all" id="keyDisplay"></div>
+    </div>
+    <div style="background:#1c1700;border:1px solid #3a3000;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#cccc00;font-family:var(--mono)">
+      &#9888; Save this key now in your password manager. It is shown once and cannot be recovered.
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">A copy has also been sent to <span id="sentEmail" style="color:var(--text)"></span></div>
+    <div style="font-size:13px">Next: <a href="/docs" style="color:var(--green)">quick start &rarr;</a></div>
   </div>
 
   <div class="msg error" id="errorMsg"></div>
@@ -134,7 +141,8 @@ footer a:hover{color:var(--green)}
       var data = await r.json();
       if (r.ok && data.ok) {
         form.style.display = 'none';
-        sentEmail.textContent = email;
+        document.getElementById('keyDisplay').textContent = data.key || '';
+        sentEmail.textContent = data.email || email;
         successMsg.style.display = 'block';
       } else {
         errorMsg.textContent     = data.error || 'Something went wrong \u2014 please try again.';

@@ -70,13 +70,13 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial'],
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays','/v2/request-trial'],
+               '/v2/relays','/v2/request-trial','/v2/sign-dpa'],
   full:       null,
 };
 
@@ -545,8 +545,10 @@ const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
 
-function _dlConfirmPage(token, fileName, sizeStr, ttlStr) {
-  // Filename not stored in relay (finding #4) — real name is in encrypted payload
+function _dlConfirmPage(token, encMeta, sizeStr, ttlStr) {
+  // encMeta is ciphertext only — relay never sees plaintext filename (finding #4)
+  // If present, embed as data attribute for SDK to decrypt client-side
+  const encMetaAttr = encMeta ? ` data-enc-meta="${encMeta.replace(/"/g,'&quot;')}"` : '';
   const name = 'Encrypted file';
   return `<!DOCTYPE html>
 <html lang="en">
@@ -587,7 +589,7 @@ h1{font-size:1.1rem;font-weight:600;margin-bottom:8px}
   <h1>Secure file ready for download</h1>
   <p class="sub">End-to-end encrypted · Burns after reading</p>
   <div class="meta">
-    <div class="meta-row"><span class="meta-label">File</span><span class="meta-val">${name}</span></div>
+    <div class="meta-row"><span class="meta-label">File</span><span class="meta-val" id="fn"${encMetaAttr}>${name}</span></div>
     <div class="meta-row"><span class="meta-label">Size</span><span class="meta-val">${sizeStr}</span></div>
     <div class="meta-row"><span class="meta-label">Expires in</span><span class="meta-val">${ttlStr}</span></div>
   </div>
@@ -1165,7 +1167,77 @@ session = client.create_session('recipient@example.com')</pre>
       }
       log('info', 'trial_key_requested', { name, email: rawEmail, use_case: useCase.slice(0, 80) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, message: 'Trial key sent to your email address.' }));
+      return res.end(J({ ok: true, key: newKey, email: rawEmail,
+        message: 'Your API key is ready. Save it now — it cannot be recovered. A copy has also been sent to your email.' }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/sign-dpa — Electronic DPA signature (GDPR Art. 28) ──────────────
+  if (path === '/v2/sign-dpa' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 8192)).toString());
+      const name  = (d.name  || '').toString().trim().slice(0, 256);
+      const title = (d.title || '').toString().trim().slice(0, 256);
+      const org   = (d.org   || '').toString().trim().slice(0, 256);
+      const kvk   = (d.kvk   || '').toString().trim().slice(0, 64);
+      const email = (d.email || '').toString().trim();
+      const version = (d.version || '2025-01-01').toString().trim().slice(0, 20);
+
+      if (!name || !org || !email) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'name, org, and email are required' }));
+      }
+      if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Invalid email address' }));
+      }
+
+      const ref = 'DPA-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+      const signed_at = new Date().toISOString();
+
+      // Persist DPA signature record (append-only)
+      const DPA_FILE = process.env.DPA_FILE || '/etc/paramant/dpa-signatures.jsonl';
+      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: req.socket?.remoteAddress || 'unknown' });
+      fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
+
+      // Send countersigned DPA email
+      const RESEND_KEY = process.env.RESEND_API_KEY || '';
+      if (RESEND_KEY) {
+        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
+          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
+          <p style="color:#888;margin-bottom:16px">Dear ${name},</p>
+          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${org}</strong>.</p>
+          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px;font-size:13px">
+            <div style="color:#555;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Agreement details</div>
+            <table style="width:100%;border-collapse:collapse">
+              <tr><td style="color:#555;padding:4px 0;width:40%">Reference</td><td style="color:#ededed">${ref}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${org}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${name}${title ? ' — ' + title : ''}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${version}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner DE (FSN1)</td></tr>
+            </table>
+          </div>
+          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/verwerkersovereenkomst" style="color:#888">paramant.app/verwerkersovereenkomst</a>. Keep this email and the reference number for your records.</p>
+          <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
+        </div>`;
+        const emailBody = JSON.stringify({
+          from: 'PARAMANT <privacy@paramant.app>',
+          to: [email],
+          cc: ['privacy@paramant.app'],
+          subject: `DPA signed — ${org} (${ref})`,
+          html,
+        });
+        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(emailBody) }
+        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'dpa_email_sent', { ref, email, id: p.id }); } catch(e) {} }); });
+        req2.on('error', e => log('warn', 'dpa_email_failed', { err: e.message }));
+        req2.write(emailBody); req2.end();
+      }
+
+      log('info', 'dpa_signed', { ref, org, email, version });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, ref, signed_at }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -1312,7 +1384,7 @@ session = client.create_session('recipient@example.com')</pre>
     const ttlStr = ttl_left > 3600 ? `${Math.round(ttl_left/3600)}h` : ttl_left > 60 ? `${Math.round(ttl_left/60)}m` : `${ttl_left}s`;
     const sizeStr = td.file_size ? (td.file_size > 1048576 ? `${(td.file_size/1048576).toFixed(1)} MB` : td.file_size > 1024 ? `${(td.file_size/1024).toFixed(1)} KB` : `${td.file_size} B`) : 'Unknown';
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end(_dlConfirmPage(token, td.file_name, sizeStr, ttlStr));
+    return res.end(_dlConfirmPage(token, td.enc_meta || null, sizeStr, ttlStr));
   }
 
   // ── GET /v2/dl/:token/get — actual burn + download (human must click confirm)
@@ -1354,13 +1426,8 @@ session = client.create_session('recipient@example.com')</pre>
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
-      // Filename not stored in relay (finding #4) — receiver decrypts actual name from payload
-      'Content-Disposition': (() => {
-        if (!td.file_name) return 'attachment; filename="paramant-encrypted-file"';
-        const safe = td.file_name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\/]/g, '_');
-        const enc  = encodeURIComponent(td.file_name);
-        return `attachment; filename="${safe}"; filename*=UTF-8''${enc}`;
-      })(),
+      // Relay never stores plaintext filename (finding #4) — receiver SDK decrypts enc_meta to recover name
+      'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
       'Cache-Control': 'no-store',
       'X-Burned': 'true',
       'X-Hash': blobHash,
@@ -1391,7 +1458,7 @@ session = client.create_session('recipient@example.com')</pre>
     }
     const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, file_name: td.file_name, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
+    return res.end(J({ ok: true, enc_meta: td.enc_meta || null, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
   }
 
   // ── POST /v2/session/join — Receiver bewijst kennis van PSS + bindt pubkeys ─
@@ -1657,11 +1724,21 @@ session = client.create_session('recipient@example.com')</pre>
     try {
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
-      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password } = d;
+      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password, enc_meta } = d;
 
       if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
       if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
+
+      // enc_meta: sender-encrypted filename/metadata (relay stores ciphertext only — finding #4)
+      // Max 2048 bytes base64; relay never decrypts it.
+      let safeEncMeta = null;
+      if (enc_meta !== undefined && enc_meta !== null) {
+        const em = String(enc_meta);
+        if (em.length > 2048) { res.writeHead(400); return res.end(J({ error: 'enc_meta too large (max 2048 chars)' })); }
+        if (!/^[A-Za-z0-9+/=]+$/.test(em)) { res.writeHead(400); return res.end(J({ error: 'enc_meta must be base64' })); }
+        safeEncMeta = em;
+      }
 
       const blob = Buffer.from(payload, 'base64');
       const planMaxSize = MAX_BLOB;
@@ -1713,7 +1790,7 @@ session = client.create_session('recipient@example.com')</pre>
         key: apiKey,
         expires_ms: Date.now() + ttl,
         used: false,
-        file_name: '',  // filename intentionally not stored in relay (finding #4)
+        enc_meta: safeEncMeta,  // encrypted filename/metadata (ciphertext only) — finding #4 closed
         file_size: blob.length,
       });
       res.writeHead(200, { 'Content-Type': 'application/json' });
