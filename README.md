@@ -1,162 +1,302 @@
-# PARAMANT Ghost Pipe
+# PARAMANT — Post-Quantum Encrypted File Relay
 
-**Post-quantum encrypted file relay. Encrypted before it leaves your device. Destroyed after one download.**
-
-[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.4.5-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.4.5-brightgreen.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
+[![Security Audit](https://img.shields.io/badge/security-audited%20apr%202026-brightgreen.svg)](docs/security-audit-2026-04.md)
+[![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
+[![Jurisdiction](https://img.shields.io/badge/jurisdiction-EU%2FDE%20only-blue.svg)](https://paramant.app/compliance/nis2)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
-[![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/mtty001/relay)
-[![Security Audit](https://img.shields.io/badge/security%20audit-apr%202026-blue.svg)](docs/security-audit-2026-04.md)
 
-- **Zero plaintext** — ML-KEM-768 + AES-256-GCM encryption happens in the browser, before upload
-- **Burn-on-read** — blob is zeroed from RAM after the first download
-- **RAM-only blobs** — encrypted payload data is never written to disk; only cryptographic hashes (CT log) and API key config are persisted
-- **Self-hostable** — Community Edition free forever, up to 5 users, one `docker compose up`
+**Post-quantum encrypted file relay. Burn-on-read. EU jurisdiction. Self-hostable in 2 minutes.**
+
+Data is encrypted client-side with ML-KEM-768 + AES-256-GCM, relayed through RAM only, and destroyed after one download. Nothing is ever written to disk. Every transfer is recorded in a public Merkle tree — proving delivery without storing content.
 
 ---
 
-## Two ways to use PARAMANT
-
-| | **Managed relay** | **Self-hosted relay** |
-|---|---|---|
-| **Who** | End users — send/receive files | Teams / operators — run your own relay |
-| **Key type** | `pgp_` API key | `plk_` license key (only if > 5 users) |
-| **Free tier** | 10 uploads/day, 1-hour TTL | Community Edition — unlimited for ≤ 5 users |
-| **Get started** | [Request a free key →](mailto:privacy@paramant.app?subject=Free+API+key+request) | [Self-host ↓](#self-host) |
-
----
-
-## Managed relay — no install
-
-**[Try ParaShare →](https://paramant.app/parashare)** — browser-based, no account needed.
-
-Or request a `pgp_` API key to use with the SDK:
-
-```
-Email: privacy@paramant.app
-Subject: Free API key request
-→ Returns: pgp_<key>  — no account, no credit card
-```
-
-| Plan | Uploads/day | TTL | |
-|------|-------------|-----|---|
-| Free | 10 | 1 hour | [Request key](mailto:privacy@paramant.app?subject=Free+API+key+request) |
-| Pro | Unlimited | 24 hours | [paramant.app/pricing](https://paramant.app/pricing) |
-| Enterprise | Unlimited | 7 days | [Contact us](mailto:privacy@paramant.app) |
-
----
-
-## Self-host
-
-Two options — pick one:
-
-### Option A — ParamantOS (bootable ISO, easiest)
-
-**[→ Download ParamantOS ISO](https://github.com/Apolloccrypt/ParamantOS/releases/latest)**
-
-Flash to USB, plug in, boot. The relay starts automatically — no Linux, no Docker, no package manager needed. Purpose-built NixOS image with the relay baked in, SSH hardened, firewall pre-configured.
+## Quick start
 
 ```bash
-# Flash to USB (replace /dev/sdX with your drive)
-sudo dd if=ParamantOS.iso of=/dev/sdX bs=4M status=progress && sync
-# Boot → relay is live on port 3000
-curl http://YOUR_IP:3000/health
+# 1. Clone
+git clone https://github.com/Apolloccrypt/paramant-relay && cd paramant-relay
+
+# 2. Configure
+cp .env.example .env
+echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+
+# 3. Launch (6 containers: 5 sector relays + admin panel)
+docker compose up -d
+
+# 4. Verify
+curl http://localhost:3001/health
+# {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
 ```
 
-> Best for: bare-metal servers, dedicated hardware, edge deployments, air-gapped setups.  
-> Source & build instructions: [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS)
+Or on a Raspberry Pi / fresh VPS:
+
+```bash
+curl -fsSL https://paramant.app/install-pi.sh | bash
+```
+
+Or via the browser — no install:
+**[Try ParaShare →](https://paramant.app/parashare)** (no account, no key needed)
+
+**[Get a free API key →](https://paramant.app/request-key)** (email delivery, 30-second form)
 
 ---
 
-### Option B — Docker (Linux VPS / Raspberry Pi)
+## How it works
 
-**Raspberry Pi / Linux VPS** (~2 minutes):
+```
+Sender                     Ghost Pipe Relay               Receiver
+------                     ----------------               --------
+file.pdf                   RAM only — no disk writes      file.pdf
+  │                        burn-on-read                     ▲
+  ▼                        5 MB fixed padding               │
+encrypt(ML-KEM-768)  ───►  hash → Merkle CT log  ────►  decrypt(ML-KEM-768)
+X-Api-Key header           blob destroyed on read          X-Api-Key header
+```
+
+**What the relay never sees:** plaintext, encryption keys, filenames, or recipient identity.  
+**What it does see:** fixed-size (5 MB) ciphertext blobs, blob hashes, API key identifiers.
+
+---
+
+## Use cases
+
+### Healthcare — DICOM / HL7 FHIR (NEN 7510)
+
+```bash
+# Send MRI scan to specialist — burned after one download
+python3 paramant-sender.py \
+  --key pgp_xxx --device mri-001 --sector health scan.dcm
+
+# Receive and forward to PACS system
+python3 paramant-receiver.py \
+  --key pgp_xxx --stream --forward https://pacs.hospital.nl/api
+
+# Structured referral (HL7 FHIR R4)
+paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg
+```
+
+→ [NEN 7510 compliance](https://paramant.app/compliance/nen7510) · [DICOM setup guide](docs/dicom-guide.md)
+
+---
+
+### Legal & Notary — eIDAS compatible
+
+```bash
+# Send signed deed — cryptographically gone after receipt, CT log proof preserved
+paramant-notary deed.pdf --sign --receipt
+
+# Court documents with case reference
+paramant-legal summons.pdf --case ROT-2026-1234 --proof
+```
+
+→ [Legal compliance](https://paramant.app/compliance/nis2)
+
+---
+
+### Industrial IoT — IEC 62443
+
+```bash
+# PLC telemetry — no VPN, no direct OT exposure to internet
+python3 paramant-sender.py \
+  --heartbeat 15 --device plc-factory-01 --sector iot data.bin
+
+# Firmware update to body cams / IoT device fleet
+paramant-firmware update-v2.1.bin \
+  --sign --device-group bodycams.txt --version 2.1
+```
+
+→ [IEC 62443 compliance](https://paramant.app/compliance/iec62443)
+
+---
+
+### Finance — NIS2 / DORA
+
+```bash
+# ISO 20022 payment file relay with Merkle audit trail
+python3 paramant-sender.py \
+  --watch /export/iso20022/ --device bank-nl-01 --sector finance
+
+# Every transfer produces a CT log entry for DORA audit
+curl https://finance.paramant.app/v2/ct -H "X-Api-Key: pgp_xxx"
+```
+
+---
+
+### HR — GDPR-compliant payslip distribution
+
+```bash
+# Bulk payslip delivery — no email, no storage, no GDPR risk
+paramant-payslip \
+  --bulk employees.csv --dir ./payslips/april/
+```
+
+---
+
+### Software supply chain — EU CRA 2027
+
+```bash
+# CI/CD: sign + relay build artifacts with SBOM
+paramant-cra dist/app-v1.2.tar.gz \
+  --sbom sbom.json --sign --registry https://registry.company.nl/api
+```
+
+---
+
+## Sector relays
+
+Five live relays — each tuned for its compliance domain:
+
+| Subdomain | Sector | Port | Compliance |
+|-----------|--------|------|------------|
+| relay.paramant.app | General | 3000 | — |
+| health.paramant.app | Healthcare | 3001 | NEN 7510, DICOM, HL7 FHIR |
+| legal.paramant.app | Legal/Notary | 3003 | eIDAS, KNB |
+| finance.paramant.app | Finance | 3002 | NIS2, DORA, ISO 20022 |
+| iot.paramant.app | Industrial IoT | 3004 | IEC 62443, EU CRA |
+
+All five run the same codebase — the `SECTOR` env var determines which compliance mode activates.
+
+---
+
+## Self-hosting
+
+### Linux VPS (Ubuntu 22.04+ / Debian 12+)
 
 ```bash
 git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
-cp .env.example .env && echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+cp .env.example .env
+echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
 ```
 
-Starts 6 containers: 5 sector relays (main / health / legal / finance / iot), an admin panel. System nginx handles TLS termination.
+This starts 6 containers: 5 sector relays + admin panel. System nginx handles TLS.
 
-| Container | Internal port | Host port | Domain |
-|-----------|--------------|-----------|--------|
-| relay-main | 3000 | 127.0.0.1:3000 | relay.paramant.app |
-| relay-health | 3000 | 127.0.0.1:3001 | health.paramant.app |
-| relay-finance | 3000 | 127.0.0.1:3002 | finance.paramant.app |
-| relay-legal | 3000 | 127.0.0.1:3003 | legal.paramant.app |
-| relay-iot | 3000 | 127.0.0.1:3004 | iot.paramant.app |
-| admin | 4200 | 127.0.0.1:4200 | /admin/ |
+| Container | Host port | Public URL |
+|-----------|-----------|------------|
+| relay-main | 127.0.0.1:3000 | relay.your-domain |
+| relay-health | 127.0.0.1:3001 | health.your-domain |
+| relay-finance | 127.0.0.1:3002 | finance.your-domain |
+| relay-legal | 127.0.0.1:3003 | legal.your-domain |
+| relay-iot | 127.0.0.1:3004 | iot.your-domain |
+| admin | 127.0.0.1:4200 | your-domain/admin/ |
 
-**Architecture:** One shared codebase (`relay/relay.js`) builds into all five relay containers. The `SECTOR` environment variable tells each container which sector it is — no separate codebases, one file to maintain:
-
-```
-relay/relay.js ──(build: ./relay)──► relay-main    (SECTOR=relay)    :3000
-                                  ► relay-health  (SECTOR=health)   :3001
-                                  ► relay-finance (SECTOR=finance)  :3002
-                                  ► relay-legal   (SECTOR=legal)    :3003
-                                  ► relay-iot     (SECTOR=iot)      :3004
-```
-
-System nginx handles TLS termination and routes each subdomain to the matching container port:
-
-```
-Internet → nginx (443)
-  relay.your-domain    → 127.0.0.1:3000
-  health.your-domain   → 127.0.0.1:3001
-  finance.your-domain  → 127.0.0.1:3002
-  legal.your-domain    → 127.0.0.1:3003
-  iot.your-domain      → 127.0.0.1:3004
-  your-domain/admin/   → 127.0.0.1:4200
-```
-
-**Dockerfile** uses a two-stage build: stage 1 compiles `argon2` native bindings (needs `python3`/`make`/`g++`), stage 2 is a lean runtime image with only `node_modules` + `relay.js` — no build tools in production.
-
-**To upgrade** after a code change:
-```bash
-git pull
-# Copy updated relay.js into the Docker build context, then rebuild
-cp relay/relay.js /opt/paramant-relay/relay/relay.js   # or wherever docker-compose.yml lives
-docker compose build relay-main relay-health relay-finance relay-legal relay-iot
-docker compose up -d
-# Named volumes (users.json, CT log, relay identity) are preserved across rebuilds
-```
-
-Or add a shell alias for one-command deploy:
-```bash
-alias paramant-deploy='rsync relay/relay.js root@YOUR_SERVER:/opt/paramant-relay/relay/relay.js && ssh root@YOUR_SERVER "cd /opt/paramant-relay && docker compose build relay-main relay-health relay-finance relay-legal relay-iot && docker compose up -d"'
-```
-
-**First user (after deploy):**
+### Raspberry Pi (arm64)
 
 ```bash
-export $(grep -v '^#' .env | xargs)
-
-# Create your admin key
-python3 scripts/paramant-admin.py add --label "admin" --plan enterprise --email you@example.com
-python3 scripts/paramant-admin.py sync
-
-# Admin panel → https://your-domain/admin/
-# Login: ADMIN_TOKEN + 6-digit TOTP code
+curl -fsSL https://paramant.app/install-pi.sh | bash
+# Detects Pi model, installs Docker, disables swap, prints relay URL
 ```
 
-Community Edition is **free forever** for up to 5 users. No license key required.
-For unlimited users, add a `plk_` relay license to `.env`. → [docs/licensing.md](docs/licensing.md)
+### Automated full setup (domain + TLS + sectors)
 
-| Edition | Users | Enforcement | Price |
-|---------|-------|-------------|-------|
-| Community | Up to 5 | Hard cap — 6th key returns HTTP 402 | Free |
-| Licensed | Unlimited | Ed25519-signed key, verified in-process | [paramant.app/pricing](https://paramant.app/pricing) |
-| Enterprise | Unlimited + SLA | Ed25519-signed key | [Contact us](mailto:privacy@paramant.app) |
+```bash
+curl -fsSL https://paramant.app/install.sh | bash
+# Prompts: domain, email (Let's Encrypt), admin token, sectors, license key
+```
 
-**Security note:** `plk_` license keys are Ed25519-signed with a private key held offline
-by Paramant. They cannot be forged, modified, or replicated. An invalid or expired key
-falls back to Community Edition gracefully — the relay never crashes on a bad key.
+### Bootable OS (no Docker needed)
 
-Full Docker deploy guide: [docs/self-hosting.md](docs/self-hosting.md)  
-Bootable ISO (no Docker): [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS)
+Flash [paramantOS](https://github.com/Apolloccrypt/ParamantOS) to USB — relay starts on boot.
+
+---
+
+## API
+
+### Send a file
+
+```bash
+curl -X POST https://health.paramant.app/v2/inbound \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"sha256_of_payload","payload":"base64_5mb_blob","ttl_ms":3600000}'
+# Returns: {"blob_hash":"sha256...","ttl":3600}
+```
+
+### Receive a file (burn-on-read)
+
+```bash
+curl https://health.paramant.app/v2/outbound/abc123... \
+  -H "X-Api-Key: pgp_your_key" --output received-file.bin
+# Blob is destroyed immediately after this response
+```
+
+### Health check (public)
+
+```bash
+curl https://health.paramant.app/health
+# {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
+```
+
+### CT log (authenticated)
+
+```bash
+curl https://health.paramant.app/v2/ct -H "X-Api-Key: pgp_your_key"
+# {"size":58,"root":"deed04dd...","entries":[...]}
+```
+
+Full API reference: [docs/api.md](docs/api.md)
+
+---
+
+## CLI tools
+
+All 38 `paramant-*` tools are included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS) and installable via `.deb`:
+
+```bash
+curl -fsSL https://paramant.app/install-client.sh | bash
+```
+
+### Setup & diagnostics
+
+```
+paramant-help              # full command reference
+paramant-setup             # first-time wizard (key + relay URL)
+paramant-status            # relay health across all sectors
+paramant-doctor            # automated health check
+paramant-relay-setup       # clone + configure + start relay
+```
+
+### Sector tools (use-case specific)
+
+```
+paramant-referral          # healthcare referral (NEN 7510, HL7 FHIR, DICOM)
+paramant-notary            # legal document transport (eIDAS, KNB)
+paramant-legal             # court document relay (replaces Zivver)
+paramant-payslip           # HR payslip distribution (GDPR)
+paramant-firmware          # IoT/body cam firmware updates (IEC 62443)
+paramant-cra               # software supply chain relay (EU CRA 2027)
+paramant-ticket            # one-time transit ticket issuer/verifier
+```
+
+### Key management
+
+```
+paramant-keys              # list all API keys
+paramant-key-add           # add new API key
+paramant-key-revoke        # revoke an API key
+```
+
+### Security & network
+
+```
+security-status            # all security layers at a glance
+paramant-ports             # firewall rules + listening ports
+paramant-scan              # LAN relay discovery + registry
+paramant-verify            # TOFU fingerprint verification
+```
+
+### Data management
+
+```
+paramant-backup            # backup keys + CT log
+paramant-export            # export audit log to USB
+paramant-logs              # live log stream
+paramant-update            # check for updates
+```
 
 ---
 
@@ -169,11 +309,16 @@ pip install paramant-sdk
 ```python
 from paramant_sdk import GhostPipe
 
-gp    = GhostPipe(api_key="pgp_...", device="my-device")
-hash_ = gp.send(b"secret data", ttl=3600, max_views=1)
-data  = gp.receive(hash_)
+gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
 
-mnemonic = gp.drop(b"sensitive data", ttl=3600)   # 12-word anonymous drop
+# Send — returns blob hash
+hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
+
+# Receive — burn-on-read, returns plaintext bytes
+data = gp.receive(hash_)
+
+# Anonymous drop with 12-word mnemonic
+mnemonic = gp.drop(b"sensitive data", ttl=3600)
 data     = gp.pickup(mnemonic)
 ```
 
@@ -187,72 +332,59 @@ The relay is **untrusted by design** — it never holds a decryption key.
 |---------------------------------|-------------------|
 | Deny service | Read file contents |
 | Learn transfer timing | Substitute a registered public key |
-| See blob sizes (fixed 5 MB padding) | Decrypt any stored ciphertext |
+| See blob sizes (fixed 5 MB) | Decrypt any stored ciphertext |
 
-| Stack | Standard |
+**Crypto stack:**
+
+| Layer | Standard |
 |-------|----------|
 | Key encapsulation | ML-KEM-768 · NIST FIPS 203 |
 | Symmetric | AES-256-GCM · NIST SP 800-38D |
 | Signatures | ML-DSA-65 · NIST FIPS 204 |
 | Key derivation | HKDF-SHA256 · RFC 5869 |
 | Password blobs | Argon2id · RFC 9106 |
-| Crypto runtime | Rust/WASM (wasm-pack) — browser-side encrypt runs in native code, not JS |
-| Jurisdiction | Hetzner DE · EU/GDPR · no US CLOUD Act |
+| Crypto runtime | Rust/WASM — browser-side encryption runs in native code |
+| Storage | RAM only — never written to disk |
+| Padding | 5 MB fixed — all transfers look identical (DPI masking) |
+| Audit log | SHA3-256 Merkle tree — tamper-evident, public |
+| Infrastructure | Hetzner Frankfurt DE — EU jurisdiction only, no US CLOUD Act |
+| Docker | cap_drop ALL, no-new-privileges, read-only rootfs |
 
 **Security audits (April 2026):**
-- 2026-04-11 — R. Zwarts verification review: 14 findings (1 high · 8 medium · 5 low), all resolved — commit e6f216d
-- 2026-04-10 — R. Zwarts independent audit: 6 findings (3 high · 3 medium), all resolved — commit 0db3ef0
-- 2026-04-08 — [Ryan Williams](https://github.com/scs-labrat) · Smart Cyber Solutions Pty Ltd (AU): **4 critical · 5 high** · 6 medium · 5 low · [Full report](pentest-report-2026-04-08.txt) · [Patch status →](docs/security-audit-2026-04.md)
 
-All findings publicly documented in [SECURITY.md](SECURITY.md). To report: privacy@paramant.app
+- **2026-04-13 — R. Zwarts dependency review:** 0 npm vulnerabilities. Node 20 EOL → node:22-alpine. express 4.x → 5.x. Commit [e6f216d](https://github.com/Apolloccrypt/paramant-relay/commit/e6f216d)
+- **2026-04-11 — R. Zwarts verification review:** 14 findings (1 high · 8 medium · 5 low), all resolved. Commit [e6f216d](https://github.com/Apolloccrypt/paramant-relay/commit/e6f216d)
+- **2026-04-10 — R. Zwarts independent audit:** 6 findings (3 high · 3 medium), all resolved. Commit [0db3ef0](https://github.com/Apolloccrypt/paramant-relay/commit/0db3ef0)
+- **2026-04-08 — Ryan Williams, Smart Cyber Solutions (AU):** 4 critical · 5 high · 6 medium · 5 low. [Full report](docs/security-audit-2026-04.md)
 
-**v2.4.5 (April 2026):** Full security hardening — all 20 R. Zwarts audit findings:
-- Node.js 20 EOL → **node:22-alpine**; express 4.x → **5.x**; 0 npm vulnerabilities
-- `timingSafeEqual` + per-IP rate limiter on admin login (max 5/min)
-- TOTP: full window scan + `_usedTotpCodes` replay prevention
-- Async CT log write stream + size-based rotation
-- Webhook SSRF: DNS resolved immediately before connect + port allowlist (443/80)
-- Relay registry cap + `limit`/`offset` pagination; WebSocket close on key revoke (`4401`)
-- `VALID_PLANS` allowlist; `TOTP_SECRET` validated at startup
-- install.sh + install-pi.sh: pinned to v2.4.5; nginx exact-match location blocks for `.sh` install scripts
+All findings publicly documented in [SECURITY.md](SECURITY.md).
 
-**v2.4.4 (April 2026):** RAPTOR audit — relay findings:
-- Admin container now has `read_only: true` + `tmpfs: /tmp` (H1)
-- `timingSafeEqual` on `ADMIN_TOKEN` (M1); per-IP MFA rate limit (M2)
-- `device_id` length cap 256 chars (M3); sdk-py synced to v2.4.1 (M4)
-- XSS escape in admin overview sector names (M5); email + label validation on key create (L4)
+---
 
-**v2.4.2 (April 2026):** Relay registry:
-- Each relay generates an ML-DSA-65 identity keypair on first boot (`/data/relay-identity.json`)
-- `POST /v2/relays/register` — signed self-registration appended to CT log (public, no API key)
-- `GET /v2/relays` — public relay discovery: url, sector, version, edition, `verified_since`, `pk_hash`
-- ct-log.html: "Registered Relays" tab; paramant-scan queries registry before nmap
-- SDK-JS 2.4.2: CJS+ESM dual exports (`require()` + `import`)
+## Compliance
 
-**v2.4.1 (April 2026):** ParaShare end-to-end flow restored:
-- `ghost_pipe` mode: `/v2/ws-ticket` added to ALLOWED paths
-- WS ticket URL fixed — fetched from relay-main (same host as WS connection)
-- Receiver keypair generation unblocked — `mlkem-ready` event dispatched on `window` not `document`
-- Receiver pubkey registration decoupled from WS — HTTP POST now happens before WS attempt
-- Admin panel CSP: `'unsafe-inline'` restored for JS-rendered UI
-- nginx: `'wasm-unsafe-eval'` added to CSP, `no-store` cache-control for JS/WASM files
+| Regulation | Status | Details |
+|------------|--------|---------|
+| NIS2 (EU 2022/2555) | Ready | [Compliance page](https://paramant.app/compliance/nis2) |
+| NEN 7510 (Healthcare NL) | Ready* | [Compliance page](https://paramant.app/compliance/nen7510) |
+| IEC 62443 (Industrial IoT) | Ready | [Compliance page](https://paramant.app/compliance/iec62443) |
+| DORA (Finance EU) | Ready | NIS2 compliance covers DORA Art. 6 |
+| EU CRA 2027 | Designed for | paramant-cra tool + CT log |
+| GDPR Art. 28 | Ready | [Verwerkersovereenkomst](https://paramant.app/verwerkersovereenkomst) |
 
-**v2.4.0 (April 2026):**
-- **Docker architecture**: one shared relay codebase → 5 sector containers (compartmentalisation)
-- All browser crypto (parashare, drop, ontvang) migrated to **Rust/WASM** via `crypto-bridge.js`
-- WASM self-integrity: SHA-256 of `paramant_crypto_bg.wasm` verified at runtime before first use
-- WASM binary committed to git (`frontend/pkg/`) — no Rust toolchain needed to self-host
-- `noble-mlkem-loader.js` retained only for keypair generation (keygen not in WASM)
-- `scripts/deploy.sh` added for one-command server deploy
+*NEN 7510: finding #4 (filename in transit RAM) remediation in progress.
 
-**v2.3.6 hardening (April 2026):**
-- CSP: `unsafe-inline` removed from `script-src`/`style-src`; `wasm-unsafe-eval` added for WASM
-- SRI `sha384` integrity hashes on all local `<script>` tags
-- `Strict-Transport-Security`, `Referrer-Policy: no-referrer`, `Permissions-Policy` on all responses
-- Encrypt path in browser migrated from JS to **Rust/WASM** (`crypto-wasm/`, 112 KB `.wasm`)
-- JS build pipeline: terser + javascript-obfuscator → `frontend/dist/`
+---
 
-![PARAMANT Ghost Pipe — Crypto Stack](docs/assets/crypto-stack.jpg)
+## Pricing
+
+| Tier | Price | Users | Features |
+|------|-------|-------|---------|
+| Community | Free | Up to 5 | Full source, all sectors, self-hosted, no key required |
+| Professional | €149/mo | Up to 50 | Webhooks, 24h retention, email support, `plk_` license |
+| Enterprise | Custom | Unlimited | Dedicated relay, SLA 99.9%, compliance docs, TOTP MFA |
+
+[Full pricing →](https://paramant.app/#pricing) · [Get a free API key →](https://paramant.app/request-key)
 
 ---
 
@@ -260,9 +392,11 @@ All findings publicly documented in [SECURITY.md](SECURITY.md). To report: priva
 
 | | |
 |--|--|
-| [docs/self-hosting.md](docs/self-hosting.md) | Docker deploy, env vars, nginx, TLS, upgrade |
+| [docs/api.md](docs/api.md) | Full API reference — all endpoints, request/response formats |
+| [docs/self-hosting.md](docs/self-hosting.md) | Docker deploy, nginx, TLS, env vars, upgrade |
+| [docs/dicom-guide.md](docs/dicom-guide.md) | Healthcare sector — DICOM gateway, HL7 FHIR, NEN 7510 |
 | [docs/licensing.md](docs/licensing.md) | Key types, edition limits, Ed25519 enforcement |
-| [docs/security.md](docs/security.md) | Security model — threat model, crypto stack, audit |
+| [docs/security.md](docs/security.md) | Threat model, crypto stack, audit reports |
 | [Apolloccrypt/ParamantOS](https://github.com/Apolloccrypt/ParamantOS) | Bootable NixOS ISO — plug in, boot, relay is live |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
@@ -271,4 +405,6 @@ All findings publicly documented in [SECURITY.md](SECURITY.md). To report: priva
 
 **Requirements:** 1 GB RAM · Ubuntu 22.04+ / Debian 12+ · Docker 24+ · swap disabled
 
-**License:** BUSL-1.1 — source available, free for ≤ 5 users.
+**License:** BUSL-1.1 — source available, free for ≤ 5 active API keys per relay.
+
+Licensor: PARAMANT | Jurisdiction: EU/DE | Contact: privacy@paramant.app

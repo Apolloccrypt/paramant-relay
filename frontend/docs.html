@@ -74,6 +74,7 @@ tr:last-child td{border-bottom:none}
     <a href="/#pricing">Pricing</a>
     <a href="/parashare">ParaShare</a>
     <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
   </div>
   <a class="back" href="/">← back</a>
 </nav>
@@ -84,6 +85,7 @@ tr:last-child td{border-bottom:none}
     <a href="#quickstart">Quick start</a>
     <a href="#authentication">Authentication</a>
     <a href="#sdk">SDK &amp; scripts</a>
+    <a href="#usecases">Use cases</a>
     <h3>API Reference</h3>
     <a href="#endpoints">All endpoints</a>
     <a href="#inbound">POST /v2/inbound</a>
@@ -123,11 +125,11 @@ tr:last-child td{border-bottom:none}
 
   <div class="content">
     <h1>Documentation</h1>
-    <p class="subtitle">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.4. The relay is untrusted by design — it never holds a decryption key.</p>
+    <p class="subtitle">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v2.4.5. The relay is untrusted by design — it never holds a decryption key. <a href="/request-key" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">Get a free API key →</a></p>
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Quick start</h2>
-    <p>Send your first encrypted file in under 5 minutes. No account required — request a free <code>pgp_</code> key at <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">privacy@paramant.app</a>.</p>
+    <p>Send your first encrypted file in under 5 minutes. No account required — <a href="/request-key" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">get a free <code>pgp_</code> key here</a> (30-second form, key arrives by email).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:#666;font-size:13px">Install the Python SDK (requires Python 3.9+, cryptography library)</p></div></div>
     <pre>pip install cryptography</pre>
@@ -225,6 +227,48 @@ data = gp.receive(hash_)
 mnemonic = gp.drop(b"sensitive data", ttl=3600)
 data     = gp.pickup(mnemonic)</pre>
     </div>
+
+    <!-- ── Use cases ──────────────────────────────────────────── -->
+    <h2 id="usecases">Use cases</h2>
+    <p>PARAMANT has five sector relays — each tuned for its compliance domain. Pick the sector that matches your use case.</p>
+
+    <h3><span class="sector-badge">health</span>Healthcare — NEN 7510, DICOM, HL7 FHIR</h3>
+    <p>Send MRI scans, referral letters, and lab results between care providers. <code>health.paramant.app</code> is designed for NEN 7510 compliance — encrypted in transit, RAM-only, EU jurisdiction, per-access CT log proof.</p>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+    <pre><span class="cm"># Send DICOM scan to specialist</span>
+python3 paramant-sender.py --key pgp_xxx --device mri-001 --sector health scan.dcm
+
+<span class="cm"># HL7 FHIR referral</span>
+paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg</pre></div>
+    <p><a href="/compliance/nen7510" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">NEN 7510 compliance page →</a></p>
+
+    <h3><span class="sector-badge">legal</span>Legal &amp; Notary — eIDAS, KNB</h3>
+    <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log provides tamper-evident proof of delivery without storing content.</p>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+    <pre><span class="cm"># Signed deed — proof of delivery, zero storage</span>
+paramant-notary deed.pdf --sign --receipt
+
+<span class="cm"># Court document with case reference</span>
+paramant-legal summons.pdf --case ROT-2026-1234 --proof</pre></div>
+
+    <h3><span class="sector-badge">iot</span>Industrial IoT — IEC 62443</h3>
+    <p>PLC and sensor data relay without VPN or direct OT internet exposure. Acts as a post-quantum data diode — OT side pushes outbound only, IT side receives. Fixed 5 MB padding defeats traffic analysis.</p>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+    <pre><span class="cm"># PLC heartbeat every 15s</span>
+python3 paramant-sender.py --heartbeat 15 --device plc-factory-01 --sector iot
+
+<span class="cm"># Firmware update to IoT fleet</span>
+paramant-firmware update-v2.1.bin --sign --device-group bodycams.txt</pre></div>
+    <p><a href="/compliance/iec62443" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">IEC 62443 compliance page →</a></p>
+
+    <h3><span class="sector-badge">finance</span>Finance — NIS2, DORA, ISO 20022</h3>
+    <p>ISO 20022 payment file relay with per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code> — EU jurisdiction, no US Cloud Act, no metadata retention.</p>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+    <pre><span class="cm"># Watch directory for ISO 20022 files</span>
+python3 paramant-sender.py --watch /export/iso20022/ --device bank-nl-01 --sector finance
+
+<span class="cm"># CT log proof for DORA audit</span>
+curl https://finance.paramant.app/v2/ct -H "X-Api-Key: pgp_xxx"</pre></div>
 
     <!-- ── API Reference ──────────────────────────────────────── -->
     <h2 id="endpoints">All endpoints</h2>
@@ -648,7 +692,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How do I get a pgp_ API key?</div>
-      <div class="faq-a">Send an email to <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" style="color:#6a9a6a">privacy@paramant.app</a> with subject "Free API key request". Free keys allow 10 uploads/day, 1-hour TTL. No account, no credit card required.</div>
+      <div class="faq-a"><a href="/request-key" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">paramant.app/request-key</a> — 30-second form, key arrives by email. Trial keys allow 10 uploads/day, 1-hour TTL, 30-day expiry. No account, no credit card required.</div>
     </div>
 
   </div>

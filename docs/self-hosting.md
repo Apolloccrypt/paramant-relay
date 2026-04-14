@@ -1,28 +1,41 @@
-# PARAMANT Self-Hosting Guide
+# Self-Hosting Guide — PARAMANT Relay v2.4.5
 
-**Version:** v2.4.2  
-**License:** BUSL-1.1 — source available, free for up to 5 users per relay in production  
-**License enforcement details:** [docs/licensing.md](licensing.md)
+**License:** BUSL-1.1 — source available, free for up to 5 active API keys per relay.
 
 ---
 
-## Quick Start
+## Quick start
 
-One command installs everything — Docker, TLS, all 4 sector relays:
+**Option 1 — one-command automated install** (domain + TLS + all sectors):
 
 ```bash
 curl -fsSL https://paramant.app/install.sh | bash
+# Prompts: domain, Let's Encrypt email, admin token, sectors, license key
 ```
 
-Or manually in 4 steps:
+**Option 2 — manual Docker setup** (4 steps):
 
 ```bash
 git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
-cp .env.example .env        # edit: set ADMIN_TOKEN
+cp .env.example .env
+echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
-curl -sk https://localhost/health
+curl http://localhost:3001/health
+# {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
 ```
+
+**Option 3 — Raspberry Pi / arm64:**
+
+```bash
+curl -fsSL https://paramant.app/install-pi.sh | bash
+# Detects Pi model, installs Docker, disables swap, prints relay URL + QR code
+```
+
+**Option 4 — Bootable OS (no Docker needed):**
+
+Flash [paramantOS](https://github.com/Apolloccrypt/ParamantOS) to USB. Relay starts on boot.
+No Linux expertise required. BIOS and UEFI supported.
 
 ---
 
@@ -151,9 +164,7 @@ Set when you create a key with `--plan`.
 | `pro` | Unlimited | 500 MB | 24 hours | 10 | High |
 | `enterprise` | Unlimited | Unlimited | 7 days | 100 | Highest |
 
-> **Getting a free `pgp_` key on the managed relay:** email
-> [privacy@paramant.app](mailto:privacy@paramant.app?subject=Free+API+key+request)
-> with subject "Free API key request". No account or credit card needed.
+> **Get a free `pgp_` key:** [paramant.app/request-key](https://paramant.app/request-key) — form takes 30 seconds, key arrives by email. No account or credit card needed.
 
 ---
 
@@ -375,13 +386,15 @@ curl -sk https://localhost/health | python3 -m json.tool
 
 ## Support
 
-- **Docs:** paramant.app/docs
-- **GitHub:** github.com/Apolloccrypt/paramant-relay
-- **Issues:** github.com/Apolloccrypt/paramant-relay/issues
+- **API Reference:** [docs/api.md](api.md)
+- **Website docs:** [paramant.app/docs](https://paramant.app/docs)
+- **GitHub:** [Apolloccrypt/paramant-relay](https://github.com/Apolloccrypt/paramant-relay)
+- **Issues:** [github.com/Apolloccrypt/paramant-relay/issues](https://github.com/Apolloccrypt/paramant-relay/issues)
 - **Email:** privacy@paramant.app
+- **Status page:** [paramant.app/status](https://paramant.app/status)
 
 Community Edition support is community-only (GitHub Issues).  
-Pro license includes email support.
+Professional license includes email support. Enterprise includes SLA + dedicated support.
 
 ---
 
