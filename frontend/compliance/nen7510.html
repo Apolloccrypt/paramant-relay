@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARAMANT — NEN 7510 Compliance (Informatiebeveiliging in de zorg)</title>
+<meta name="description" content="Hoe paramant helpt voldoen aan NEN 7510 voor vertrouwelijkheid, beschikbaarheid en integriteit van medische gegevens. DICOM-transport, burn-on-read, EU/DE-jurisdictie.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0f0f0f;--dark:#1a1a1a;--mid:#444;--soft:#888;--light:#ccc;--pale:#f4f4f2;
+  --purple:#3a1a5c;--purple-light:#f0ebfb;--purple-border:#c8b2df;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'SF Mono','Fira Code','Cascadia Code',monospace
+}
+html{scroll-behavior:smooth}
+body{background:#fff;color:var(--black);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:52px;border-bottom:1px solid #e0e0e0;background:#fff}
+.nav-logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.08em;color:var(--black);text-decoration:none}
+.nav-back{font-size:12px;color:var(--soft);text-decoration:none}
+.nav-back:hover{color:var(--black)}
+.reg-band{background:var(--purple);color:#fff;padding:40px 48px 36px}
+.reg-tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:10px}
+.reg-band h1{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-bottom:10px}
+.reg-band .subtitle{font-size:15px;opacity:.85;max-width:620px;line-height:1.6}
+.reg-meta{display:flex;gap:24px;margin-top:20px;flex-wrap:wrap}
+.reg-meta span{font-size:12px;opacity:.75;font-family:var(--mono)}
+main{max-width:860px;margin:0 auto;padding:48px 48px 64px}
+.summary{background:var(--purple-light);border:1px solid var(--purple-border);border-radius:6px;padding:20px 24px;margin-bottom:40px}
+.summary p{font-size:14px;color:var(--dark);line-height:1.7}
+.summary strong{color:var(--purple)}
+.article-block{border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;margin-bottom:20px}
+.article-header{background:#f9f9f9;border-bottom:1px solid #e8e8e8;padding:14px 20px;display:flex;align-items:baseline;gap:14px}
+.article-ref{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--purple);letter-spacing:.04em;white-space:nowrap}
+.article-title{font-size:14px;font-weight:600;color:var(--dark)}
+.article-body{padding:18px 20px}
+.article-body p{font-size:14px;color:#333;line-height:1.65;margin-bottom:10px}
+.article-body p:last-child{margin-bottom:0}
+.requirement{font-size:13px;color:var(--mid);font-style:italic;margin-bottom:6px}
+.oneliner{background:#f5f0fc;border-left:3px solid var(--purple);padding:10px 14px;border-radius:0 4px 4px 0;margin-top:12px}
+.oneliner p{font-size:13px;color:var(--dark);line-height:1.5}
+.oneliner strong{color:var(--purple)}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pill{font-size:11px;font-family:var(--mono);background:#f5f0fc;color:var(--purple);padding:3px 10px;border-radius:3px;border:1px solid var(--purple-border)}
+.compliance-table{width:100%;border-collapse:collapse;margin:32px 0;font-size:13px}
+.compliance-table thead tr{background:#f9f9f9}
+.compliance-table th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--soft);border-bottom:2px solid #e0e0e0;font-family:var(--mono)}
+.compliance-table td{padding:11px 14px;border-bottom:1px solid #eee;vertical-align:top}
+.compliance-table td:first-child{font-family:var(--mono);font-size:12px;color:var(--purple);font-weight:600;white-space:nowrap}
+.compliance-table td:nth-child(2){color:var(--mid)}
+.compliance-table td:nth-child(3){color:var(--dark)}
+.compliance-table tr:last-child td{border-bottom:none}
+.check{color:var(--purple);font-size:14px;font-weight:700}
+.cta{background:#f9f9f9;border:1px solid #e8e8e8;border-radius:6px;padding:24px 28px;margin-top:40px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.cta h3{font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px}
+.cta p{font-size:13px;color:var(--soft)}
+.cta a{display:inline-block;margin-top:10px;font-size:13px;color:var(--purple);font-weight:500;text-decoration:none;border:1px solid var(--purple-border);padding:7px 16px;border-radius:4px}
+.cta a:hover{background:var(--purple-light)}
+@media print{
+  nav{display:none}
+  body{font-size:12px}
+  main{padding:24px}
+  .reg-band{padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .article-block{page-break-inside:avoid}
+}
+@media(max-width:640px){
+  nav,.reg-band,main{padding-left:20px;padding-right:20px}
+  .reg-band{padding-top:28px;padding-bottom:24px}
+  .reg-band h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <a href="/" class="nav-back">← paramant.app</a>
+</nav>
+
+<div class="reg-band">
+  <div class="reg-tag">Compliance · NEN 7510</div>
+  <h1>Hoe paramant helpt voldoen aan NEN 7510</h1>
+  <p class="subtitle">NEN 7510 beschrijft de eisen voor informatiebeveiliging in de Nederlandse gezondheidszorg. Dit document legt uit hoe paramant bijdraagt aan vertrouwelijkheid, integriteit en beschikbaarheid van patiëntgegevens tijdens transport.</p>
+  <div class="reg-meta">
+    <span>Norm: NEN 7510:2017+A1:2020</span>
+    <span>Toepassingsgebied: Nederlandse zorg</span>
+    <span>Gerelateerd: NEN 7512, NEN 7513, BIO</span>
+  </div>
+</div>
+
+<main>
+
+<div class="summary">
+  <p><strong>Samengevat:</strong> NEN 7510 vereist dat zorginstellingen persoonsgegevens — waaronder medische beelden, verslagen en patiëntcommunicatie — vertrouwelijk, integer en beschikbaar houden. Paramant is speciaal gebouwd voor dit soort transport: <strong>gegevens worden uitsluitend versleuteld verzonden, nooit opgeslagen op schijf, en vernietigd bij eerste ontvangst</strong>. De infrastructuur staat op Hetzner-servers in Duitsland. Geen US CLOUD Act, geen derde partij die meeleest, geen retentie.</p>
+</div>
+
+<!-- NEN 7510 §10.1 — Cryptografie -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">NEN 7510 §10.1</span>
+    <span class="article-title">Cryptografische beheersmaatregelen</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">NEN 7510 §10.1 (gebaseerd op ISO 27001 A.10.1) vereist een beleid voor het gebruik van cryptografische beheersmaatregelen ter bescherming van informatie. Versleuteling van gevoelige gegevens tijdens transport is een basisvereiste.</p>
+    <p><strong>Post-kwantumversleuteling:</strong> Paramant versleutelt alle gegevens aan de clientzijde met ML-KEM-768 (NIST FIPS 203, post-kwantum sleuteluitwisseling) gecombineerd met ECDH X25519. Zelfs als in de toekomst kwantumcomputers beschikbaar komen, zijn historisch onderschepte bestanden niet te ontcijferen.</p>
+    <p><strong>Sleutelbeheer:</strong> De versleuteling vindt uitsluitend plaats op het apparaat van de afzender. De relay ontvangt alleen versleutelde gegevens en beschikt nooit over de decoderingssleutel. De ontvanger genereert zelf een tijdelijk sleutelpaar — de privésleutel verlaat het apparaat van de ontvanger nooit.</p>
+    <p><strong>Geen opslagrisico:</strong> Er worden geen bestanden naar schijf geschreven. Na ontvangst worden de gegevens uit het geheugen gewist (burn-on-read). Er bestaat geen "data in rust" die versleuteld zou moeten worden, want er is geen opslag.</p>
+    <div class="pills">
+      <span class="pill">ML-KEM-768 (FIPS 203)</span>
+      <span class="pill">ECDH X25519</span>
+      <span class="pill">TLS 1.3</span>
+      <span class="pill">Geen schijfopslag</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>NEN 7510 §10.1 vereist</strong> cryptografische maatregelen voor gevoelige gegevens — <strong>paramant levert</strong> post-kwantumversleuteling op de client, zonder dat de relay ooit de decoderingssleutel bezit.</p>
+    </div>
+  </div>
+</div>
+
+<!-- NEN 7510 §8.2 / §12.4 — Vertrouwelijkheid & logging -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">NEN 7510 §8.2 / §12.4</span>
+    <span class="article-title">Classificatie van informatie &amp; registratie van gebeurtenissen</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">NEN 7510 §8.2 vereist dat informatie geclassificeerd en behandeld wordt overeenkomstig haar gevoeligheid. §12.4 (logbeheer) vereist dat beveiligingsrelevante gebeurtenissen worden geregistreerd en bewaard voor auditdoeleinden.</p>
+    <p><strong>Geen inhoudelijke opslag:</strong> Paramant slaat geen inhoud op — geen patiëntnamen, geen BSN, geen medische beelden. Alleen cryptografische hashes worden geregistreerd. Dit minimalisert het classificatierisico: er zijn geen persoonsgegevens aanwezig om te classificeren of te beveiligen op de relay-server.</p>
+    <p><strong>Certificate Transparency log:</strong> Elke sleutelregistratie wordt toegevoegd aan een Merkle-boom (Certificate Transparency-stijl). Elke invoer bevat een hash, tijdstempel en boomwortel — waardoor het logboek manipulatiebestendig is. Dit logboek is openbaar beschikbaar via <code>health.paramant.app/v2/ct/log</code> en kan worden gebruikt als bewijs bij audits.</p>
+    <p><strong>Operationeel logboek:</strong> De relay registreert alle acties met tijdstempels en sectoridentificatie. Logbestanden zijn exporteerbaar en kunnen worden gekoppeld aan een SIEM-systeem voor melding aan toezichthouders.</p>
+    <div class="pills">
+      <span class="pill">Geen persoonsgegevens op relay</span>
+      <span class="pill">CT Merkle-log (openbaar)</span>
+      <span class="pill">Tijdgestempelde audit trail</span>
+      <span class="pill">SIEM-integratie</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>NEN 7510 §8.2 / §12.4 vereist</strong> informatieclassificatie en auditlogboeken — <strong>paramant levert</strong> nul inhoudelijke opslag op de relay en een manipulatiebestendig Merkle-logboek voor audit.</p>
+    </div>
+  </div>
+</div>
+
+<!-- NEN 7510 §13.2 / NEN 7512 — Uitwisseling van informatie -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">NEN 7510 §13.2 / NEN 7512</span>
+    <span class="article-title">Veilige uitwisseling van (medische) gegevens</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">NEN 7510 §13.2 vereist beleid en procedures voor veilige informatieoverdracht. NEN 7512 specificeert eisen voor vertrouwde informatie-uitwisseling in de zorg, inclusief authenticatie van communicatiepartijen en bescherming van de transportlaag.</p>
+    <p><strong>DICOM-transportondersteuning:</strong> Paramant ondersteunt het transport van DICOM-bestanden (medische beelden) via de Ghost Pipe-architectuur. Een DICOM-bestand wordt client-side versleuteld, via de relay doorgestuurd en bij de ontvanger automatisch vernietigd na ontvangst. Het formaat van het bestand is voor de relay niet zichtbaar.</p>
+    <p><strong>Wederzijdse authenticatie:</strong> Elke zender authenticeert zich met een API-sleutel. Elke ontvanger genereert een tijdelijk ML-KEM-sleutelpaar voor de sessie. De identiteit van de relay wordt geverifieerd via ML-DSA-65-handtekeningen (NIST FIPS 204, post-kwantum digitale handtekening).</p>
+    <p><strong>Trust-on-first-use (TOFU):</strong> De Python SDK ondersteunt TOFU-vingerafdrukverificatie (<code>~/.paramant/known_keys</code>). Zodra een ontvanger voor het eerst wordt gezien, wordt de cryptografische vingerafdruk opgeslagen. Toekomstige sessies met een gewijzigde vingerafdruk worden geblokkeerd en gesignaleerd — vergelijkbaar met SSH-hostverificatie.</p>
+    <div class="pills">
+      <span class="pill">DICOM-transport ondersteund</span>
+      <span class="pill">ML-DSA-65 relay-authenticatie</span>
+      <span class="pill">TOFU-vingerafdruk (SDK)</span>
+      <span class="pill">API-sleutel per gebruiker</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>NEN 7510 §13.2 / NEN 7512 vereist</strong> veilige uitwisseling met authenticatie — <strong>paramant levert</strong> end-to-end versleuteld DICOM-transport met TOFU-verificatie en post-kwantum relay-authenticatie.</p>
+    </div>
+  </div>
+</div>
+
+<!-- NEN 7510 §18.1 — Jurisdictie & CLOUD Act -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">NEN 7510 §18.1 / GDPR Art. 28</span>
+    <span class="article-title">Naleving van wettelijke en contractuele vereisten — jurisdictie</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">NEN 7510 §18.1 vereist identificatie van relevante wetgeving en contractuele verplichtingen, inclusief privacywetgeving (AVG/GDPR). Zorginstellingen mogen patiëntgegevens niet overdragen aan partijen buiten de EER zonder passende waarborgen.</p>
+    <p><strong>EU/DE-jurisdictie:</strong> Alle paramant-infrastructuur draait op Hetzner-servers in Falkenstein, Duitsland. Er worden geen US-cloudproviders gebruikt (geen AWS, Azure, GCP). De US CLOUD Act — die Amerikaanse autoriteiten bevoegdheid geeft om data bij US-bedrijven op te vragen, ook als de data in Europa staat — is niet van toepassing op Hetzner.</p>
+    <p><strong>Geen dataverzameling op de relay:</strong> Zelfs als een justitieel bevel zou worden uitgevaardigd, bevat de relay geen persoonsgegevens om te overhandigen. Er is geen inhoud, geen metadata van patiënten, geen bestanden — alleen cryptografische hashes in een publiek auditlogboek.</p>
+    <p><strong>Verwerkersovereenkomst:</strong> Paramant treedt op als verwerker in de zin van AVG Art. 28. Een verwerkersovereenkomst (DPA) die voldoet aan AVG-vereisten en aansluit bij NEN 7510 §18.1 is beschikbaar op aanvraag. De verantwoordelijke blijft de zorginstelling.</p>
+    <div class="pills">
+      <span class="pill">Hetzner DE (niet-Amerikaans)</span>
+      <span class="pill">Geen US CLOUD Act</span>
+      <span class="pill">AVG Art. 28 DPA beschikbaar</span>
+      <span class="pill">Geen overdracht buiten EER</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>NEN 7510 §18.1 / AVG vereist</strong> dataverwerkingswaarborgen binnen de EER — <strong>paramant levert</strong> uitsluitend Hetzner DE-infrastructuur, geen US CLOUD Act-risico, en een AVG-conforme verwerkersovereenkomst.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Summary table -->
+<h2 style="font-size:17px;font-weight:600;margin:40px 0 4px;color:var(--dark)">Overzicht per norm-eis</h2>
+<p style="font-size:13px;color:var(--soft);margin-bottom:0">Beknopt overzicht voor de FG (functionaris gegevensbescherming) en informatiebeveiligers.</p>
+<table class="compliance-table">
+  <thead>
+    <tr>
+      <th>Norm-eis</th>
+      <th>Verplichting</th>
+      <th>Hoe paramant dit adresseert</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>NEN 7510 §10.1</td>
+      <td>Cryptografische maatregelen</td>
+      <td><span class="check">✓</span> ML-KEM-768 + ECDH; relay bezit nooit de decoderingssleutel</td>
+    </tr>
+    <tr>
+      <td>NEN 7510 §8.2</td>
+      <td>Informatieclassificatie</td>
+      <td><span class="check">✓</span> Geen persoonsgegevens op relay — alleen hashes</td>
+    </tr>
+    <tr>
+      <td>NEN 7510 §12.4</td>
+      <td>Logbeheer / audit trail</td>
+      <td><span class="check">✓</span> Manipulatiebestendig CT Merkle-logboek, openbaar</td>
+    </tr>
+    <tr>
+      <td>NEN 7512 / §13.2</td>
+      <td>Veilige gegevensuitwisseling</td>
+      <td><span class="check">✓</span> DICOM-transport; ML-DSA-65 relay-authenticatie; TOFU</td>
+    </tr>
+    <tr>
+      <td>NEN 7510 §18.1 / AVG</td>
+      <td>Juridische naleving / jurisdictie</td>
+      <td><span class="check">✓</span> Hetzner DE; geen US CLOUD Act; AVG Art. 28 DPA beschikbaar</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="cta">
+  <div>
+    <h3>Verwerkersovereenkomst &amp; documentatie</h3>
+    <p>Verwerkersovereenkomst beschikbaar op aanvraag — privacy@paramant.app<br>
+    Ook beschikbaar: architectuuroverzicht, beveiligingsauditrapport (RAPTOR 2026), SLA.</p>
+    <a href="mailto:privacy@paramant.app?subject=NEN%207510%20verwerkersovereenkomst%20aanvraag">privacy@paramant.app →</a>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:11px;color:var(--soft);font-family:var(--mono);line-height:1.8">
+      Hetzner DE · AVG/GDPR · geen US CLOUD Act<br>
+      ML-KEM-768 · NIST FIPS 203/204<br>
+      BUSL-1.1 · © 2026 PARAMANT
+    </div>
+    <a href="/compliance/nis2" style="font-size:12px;color:var(--soft);text-decoration:none;display:block;margin-top:8px">NIS2 (EU 2022/2555) →</a>
+    <a href="/compliance/iec62443" style="font-size:12px;color:var(--soft);text-decoration:none;display:block;margin-top:4px">IEC 62443 (Industrial IoT) →</a>
+  </div>
+</div>
+
+</main>
+</body>
+</html>

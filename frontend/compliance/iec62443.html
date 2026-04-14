@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARAMANT — IEC 62443 Compliance (Industrial IoT)</title>
+<meta name="description" content="How paramant supports IEC 62443 compliance for industrial control systems — quantum-safe communications, zone isolation, and data integrity for OT environments.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0f0f0f;--dark:#1a1a1a;--mid:#444;--soft:#888;--light:#ccc;--pale:#f4f4f2;
+  --blue:#1a3a5c;--blue-light:#e8f0f8;--blue-border:#b2c8df;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'SF Mono','Fira Code','Cascadia Code',monospace
+}
+html{scroll-behavior:smooth}
+body{background:#fff;color:var(--black);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:52px;border-bottom:1px solid #e0e0e0;background:#fff}
+.nav-logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.08em;color:var(--black);text-decoration:none}
+.nav-back{font-size:12px;color:var(--soft);text-decoration:none}
+.nav-back:hover{color:var(--black)}
+.reg-band{background:var(--blue);color:#fff;padding:40px 48px 36px}
+.reg-tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin-bottom:10px}
+.reg-band h1{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-bottom:10px}
+.reg-band .subtitle{font-size:15px;opacity:.85;max-width:620px;line-height:1.6}
+.reg-meta{display:flex;gap:24px;margin-top:20px;flex-wrap:wrap}
+.reg-meta span{font-size:12px;opacity:.75;font-family:var(--mono)}
+main{max-width:860px;margin:0 auto;padding:48px 48px 64px}
+.summary{background:var(--blue-light);border:1px solid var(--blue-border);border-radius:6px;padding:20px 24px;margin-bottom:40px}
+.summary p{font-size:14px;color:var(--dark);line-height:1.7}
+.summary strong{color:var(--blue)}
+.article-block{border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;margin-bottom:20px}
+.article-header{background:#f9f9f9;border-bottom:1px solid #e8e8e8;padding:14px 20px;display:flex;align-items:baseline;gap:14px}
+.article-ref{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--blue);letter-spacing:.04em;white-space:nowrap}
+.article-title{font-size:14px;font-weight:600;color:var(--dark)}
+.article-body{padding:18px 20px}
+.article-body p{font-size:14px;color:#333;line-height:1.65;margin-bottom:10px}
+.article-body p:last-child{margin-bottom:0}
+.requirement{font-size:13px;color:var(--mid);font-style:italic;margin-bottom:6px}
+.oneliner{background:#edf4fb;border-left:3px solid var(--blue);padding:10px 14px;border-radius:0 4px 4px 0;margin-top:12px}
+.oneliner p{font-size:13px;color:var(--dark);line-height:1.5}
+.oneliner strong{color:var(--blue)}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pill{font-size:11px;font-family:var(--mono);background:#edf4fb;color:var(--blue);padding:3px 10px;border-radius:3px;border:1px solid var(--blue-border)}
+.compliance-table{width:100%;border-collapse:collapse;margin:32px 0;font-size:13px}
+.compliance-table thead tr{background:#f9f9f9}
+.compliance-table th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--soft);border-bottom:2px solid #e0e0e0;font-family:var(--mono)}
+.compliance-table td{padding:11px 14px;border-bottom:1px solid #eee;vertical-align:top}
+.compliance-table td:first-child{font-family:var(--mono);font-size:12px;color:var(--blue);font-weight:600;white-space:nowrap}
+.compliance-table td:nth-child(2){color:var(--mid)}
+.compliance-table td:nth-child(3){color:var(--dark)}
+.compliance-table tr:last-child td{border-bottom:none}
+.check{color:var(--blue);font-size:14px;font-weight:700}
+.cta{background:#f9f9f9;border:1px solid #e8e8e8;border-radius:6px;padding:24px 28px;margin-top:40px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.cta h3{font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px}
+.cta p{font-size:13px;color:var(--soft)}
+.cta a{display:inline-block;margin-top:10px;font-size:13px;color:var(--blue);font-weight:500;text-decoration:none;border:1px solid var(--blue-border);padding:7px 16px;border-radius:4px}
+.cta a:hover{background:var(--blue-light)}
+@media print{
+  nav{display:none}
+  body{font-size:12px}
+  main{padding:24px}
+  .reg-band{padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .article-block{page-break-inside:avoid}
+}
+@media(max-width:640px){
+  nav,.reg-band,main{padding-left:20px;padding-right:20px}
+  .reg-band{padding-top:28px;padding-bottom:24px}
+  .reg-band h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <a href="/" class="nav-back">← paramant.app</a>
+</nav>
+
+<div class="reg-band">
+  <div class="reg-tag">Compliance · IEC 62443</div>
+  <h1>How paramant supports IEC 62443 compliance</h1>
+  <p class="subtitle">IEC 62443 defines security requirements for Industrial Automation and Control Systems (IACS). This document explains how paramant's IoT relay supports the zones-and-conduits model, secure communications requirements, and integrity verification for OT environments.</p>
+  <div class="reg-meta">
+    <span>Standard: IEC 62443 (series)</span>
+    <span>Scope: Industrial control systems, OT/ICS/SCADA</span>
+    <span>Paramant sector: iot.paramant.app</span>
+  </div>
+</div>
+
+<main>
+
+<div class="summary">
+  <p><strong>Bottom line:</strong> IEC 62443 requires organisations to secure communications between zones, prevent unauthorised data access, and maintain integrity of data crossing conduits. Paramant functions as a <strong>quantum-safe data diode</strong> for the inter-zone conduit: data passes through encrypted and is destroyed on receipt. Nothing accumulates. Nothing can be exfiltrated from the conduit itself. A dedicated IoT sector relay (<code>iot.paramant.app</code>) isolates industrial traffic from other sectors.</p>
+</div>
+
+<!-- IEC 62443-3-3 SR 4.1 -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">IEC 62443-3-3 SR 4.1</span>
+    <span class="article-title">Information confidentiality — protection of information at rest and in transit</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">SR 4.1 requires the IACS to protect the confidentiality of information at rest and in transit as required to meet the target Security Level (SL-T).</p>
+    <p><strong>Transit protection:</strong> All data transported via paramant is encrypted client-side before transmission using ML-KEM-768 (post-quantum key encapsulation per NIST FIPS 203) combined with ECDH X25519. Decryption requires the receiver's private key, which never leaves the receiver's device. The relay never holds a decryption key.</p>
+    <p><strong>No data at rest:</strong> Paramant stores no payload on disk. Files reside in RAM only and are deleted upon first download (burn-on-read). The concept of "data at rest" is structurally eliminated for transit events. An attacker who gains access to the relay server finds no stored data.</p>
+    <p><strong>Ciphertext padding:</strong> All transfers are padded to a fixed 5 MB block, preventing traffic analysis based on file size — relevant for SCADA environments where message patterns carry operational meaning.</p>
+    <div class="pills">
+      <span class="pill">ML-KEM-768 (FIPS 203)</span>
+      <span class="pill">ECDH X25519</span>
+      <span class="pill">RAM-only, no disk write</span>
+      <span class="pill">Fixed-size ciphertext</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>SR 4.1 requires</strong> confidentiality at rest and in transit — <strong>paramant delivers</strong> post-quantum encryption in transit with no "at rest" state to protect.</p>
+    </div>
+  </div>
+</div>
+
+<!-- IEC 62443-3-3 SR 5.1 / Zones & Conduits -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">IEC 62443-3-3 SR 5.1 / IEC 62443-3-2</span>
+    <span class="article-title">Network segmentation — zones and conduits</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">IEC 62443-3-2 requires assets to be grouped into security zones. Communication between zones must traverse defined conduits with security controls. SR 5.1 requires the system to separate networks and communications into different security zones.</p>
+    <p><strong>Dedicated IoT conduit:</strong> Paramant provides a dedicated relay sector at <code>iot.paramant.app</code> that is isolated at the application and network level from all other sectors (relay, health, legal, finance). Traffic from OT environments is never co-mingled with other sectors.</p>
+    <p><strong>Conduit as a service:</strong> The paramant relay acts as the conduit between your OT zone and a receiving IT zone or cloud system. Data enters the conduit encrypted and exits as ciphertext. The conduit itself cannot decrypt the payload. This mirrors the IEC 62443 principle of a managed, controlled communication path with no persistent data in the conduit.</p>
+    <p><strong>Self-hosted option:</strong> Operators with strict zone control requirements can deploy paramant relay entirely within their own infrastructure, maintaining full network topology control without any dependency on the managed cloud service.</p>
+    <div class="pills">
+      <span class="pill">iot.paramant.app isolated sector</span>
+      <span class="pill">No cross-sector data leakage</span>
+      <span class="pill">Relay cannot decrypt payload</span>
+      <span class="pill">Self-hostable</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>SR 5.1 / IEC 62443-3-2 requires</strong> zones and controlled conduits — <strong>paramant delivers</strong> a dedicated OT conduit service that is isolated, non-decryptable, and optionally self-hosted.</p>
+    </div>
+  </div>
+</div>
+
+<!-- IEC 62443-3-3 SR 3.1 / Data Integrity -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">IEC 62443-3-3 SR 3.1</span>
+    <span class="article-title">Communication integrity — protection of transmitted information</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">SR 3.1 requires the IACS to protect the integrity of transmitted information to detect and correct errors and detect and deter tampering.</p>
+    <p><strong>Cryptographic integrity:</strong> The paramant wire format includes an AEAD authentication tag (AES-256-GCM). Any modification of the ciphertext in transit — whether by a network attacker or a compromised relay — causes decryption to fail with an authentication error. Tampered transfers are rejected, not silently accepted.</p>
+    <p><strong>CT log integrity:</strong> Every key registration is appended to a Merkle tree. The tree root hash is published at <code>health.paramant.app/v2/ct/log</code>. Any retroactive modification of a log entry invalidates all subsequent tree hashes, making tampering immediately detectable by any verifier who holds the expected root.</p>
+    <p><strong>ML-DSA-65 relay identity:</strong> Each relay instance signs its registration with ML-DSA-65 (NIST FIPS 204, post-quantum digital signature). A relay claiming a known identity cannot be impersonated without the corresponding signing key.</p>
+    <div class="pills">
+      <span class="pill">AES-256-GCM AEAD</span>
+      <span class="pill">ML-DSA-65 (FIPS 204)</span>
+      <span class="pill">Merkle CT log</span>
+      <span class="pill">Tamper-evident</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>SR 3.1 requires</strong> integrity verification for transmitted data — <strong>paramant delivers</strong> AEAD authentication on every payload and a tamper-evident Merkle log for relay identity.</p>
+    </div>
+  </div>
+</div>
+
+<!-- IEC 62443-2-1 / Supply chain -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">IEC 62443-2-1 / IEC 62443-2-3</span>
+    <span class="article-title">Product security baseline &amp; supply chain management</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">IEC 62443-2-3 addresses patch management and the security of supplier relationships. IEC 62443-2-1 requires a documented security program for the IACS components in use.</p>
+    <p><strong>Minimal attack surface:</strong> The relay binary has 22 runtime dependencies, all present in the public npm registry with reproducible builds. The Docker image is built from Alpine Linux with a non-root relay process and a read-only filesystem. No shell access is exposed at runtime.</p>
+    <p><strong>Publicly audited:</strong> The relay software is open source under BUSL-1.1. An independent security audit (RAPTOR methodology, April 2026) is available and documents all findings and remediations. Operators can verify that findings have been addressed before deployment.</p>
+    <p><strong>Versioned releases:</strong> All relay releases are tagged, signed, and published on GitHub and Docker Hub (mtty001/relay). Patch history is publicly traceable. Operators receive upgrade paths without hidden changes.</p>
+    <div class="pills">
+      <span class="pill">22 dependencies</span>
+      <span class="pill">Reproducible builds</span>
+      <span class="pill">RAPTOR audit (2026)</span>
+      <span class="pill">Versioned Docker releases</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>IEC 62443-2-3 requires</strong> supply chain security and patch management — <strong>paramant delivers</strong> open-source code, a public audit, and versioned releases with traceable patch history.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Summary table -->
+<h2 style="font-size:17px;font-weight:600;margin:40px 0 4px;color:var(--dark)">Requirement reference overview</h2>
+<p style="font-size:13px;color:var(--soft);margin-bottom:0">For ICS security managers and system integrators.</p>
+<table class="compliance-table">
+  <thead>
+    <tr>
+      <th>Requirement</th>
+      <th>Obligation</th>
+      <th>How paramant addresses it</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>SR 4.1</td>
+      <td>Confidentiality at rest and in transit</td>
+      <td><span class="check">✓</span> ML-KEM-768 encryption; no disk writes — no "at rest"</td>
+    </tr>
+    <tr>
+      <td>SR 3.1</td>
+      <td>Communication integrity</td>
+      <td><span class="check">✓</span> AES-256-GCM AEAD; Merkle log for audit integrity</td>
+    </tr>
+    <tr>
+      <td>SR 5.1 / IEC 62443-3-2</td>
+      <td>Zones and conduits</td>
+      <td><span class="check">✓</span> Isolated IoT sector relay; relay cannot decrypt payload</td>
+    </tr>
+    <tr>
+      <td>IEC 62443-2-3</td>
+      <td>Supply chain / patch management</td>
+      <td><span class="check">✓</span> Open source, RAPTOR audit, versioned tagged releases</td>
+    </tr>
+    <tr>
+      <td>ML-DSA relay ID</td>
+      <td>Relay authentication</td>
+      <td><span class="check">✓</span> ML-DSA-65 (FIPS 204) relay identity signatures</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="cta">
+  <div>
+    <h3>Request documentation</h3>
+    <p>Architecture diagram, security audit report, DPA, and ICS deployment guide available on request. On-premise deployment for air-gapped environments supported.</p>
+    <a href="mailto:privacy@paramant.app?subject=IEC%2062443%20compliance%20documentation%20request">privacy@paramant.app →</a>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:11px;color:var(--soft);font-family:var(--mono);line-height:1.8">
+      Hetzner DE · GDPR · no US CLOUD Act<br>
+      ML-KEM-768 · NIST FIPS 203/204<br>
+      BUSL-1.1 · © 2026 PARAMANT
+    </div>
+    <a href="/compliance/nis2" style="font-size:12px;color:var(--soft);text-decoration:none;display:block;margin-top:8px">NIS2 (EU 2022/2555) →</a>
+    <a href="/compliance/nen7510" style="font-size:12px;color:var(--soft);text-decoration:none;display:block;margin-top:4px">NEN 7510 (Zorg) →</a>
+  </div>
+</div>
+
+</main>
+</body>
+</html>

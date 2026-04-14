@@ -111,6 +111,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   canvas,svg{max-width:100%}
 }
 .price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
+.popular-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:#2d8a5c;padding:2px 8px;border-radius:3px;margin-bottom:12px}
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
@@ -488,8 +489,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <section id="pricing">
   <div class="eyebrow">Pricing</div>
-  <h2>Simple. Free to start.</h2>
-  <p class="sub">Two ways to use PARAMANT &mdash; pick the one that fits.</p>
+  <h2>Simple pricing. Free to start.</h2>
+  <p class="sub">Two ways to use PARAMANT &mdash; pick the one that fits. Operators run the relay; end users connect to it.</p>
 
   <div style="margin:40px auto 0;max-width:760px">
     <div class="price-split" style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:start;gap:0">
@@ -529,10 +530,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
   <div id="pane-op" class="pricing-grid">
 
-    <div class="pc featured">
-      <div class="price-name" style="color:#2d8a5c">COMMUNITY &mdash; START HERE</div>
+    <div class="pc">
+      <div class="price-name" style="color:#2d8a5c">COMMUNITY</div>
       <div class="price-amount">Free</div>
-      <div class="price-note">Up to 5 users &middot; BUSL-1.1 &middot; no license key needed</div>
+      <div class="price-note">Up to 5 users &middot; no credit card &middot; BUSL-1.1</div>
       <div class="price-tagline">Your server, your data, zero lock-in. Free forever.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Full source code &mdash; audit everything</li>
@@ -540,44 +541,46 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> RAM-only, burn-on-read</li>
         <li><span class="check">&#10003;</span> 5 sector relays via Docker Compose</li>
         <li><span class="check">&#10003;</span> Auto TLS via Let&rsquo;s Encrypt</li>
-        <li><span class="check">&#10003;</span> Zero-downtime user reload</li>
         <li><span class="check">&#10003;</span> Admin panel (/admin/)</li>
         <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> Community support only</li>
       </ul>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases/tag/v2.4.5" target="_blank" class="price-btn p">Download v2.4.5 &rarr;</a>
     </div>
 
-    <div class="pc">
-      <div class="price-name">RELAY LICENSE</div>
-      <div class="price-amount" style="font-size:28px">Notify me</div>
-      <div class="price-note">Unlimited users &middot; coming Q3 2026</div>
-      <div class="price-tagline">Outgrown 5 users? One <code style="font-size:11px;background:#111;padding:2px 5px;border-radius:3px">plk_</code> key in .env unlocks unlimited.</div>
+    <div class="pc featured">
+      <div class="popular-badge">Most popular</div>
+      <div class="price-name">PROFESSIONAL</div>
+      <div class="price-amount">€149<sub>/mo</sub></div>
+      <div class="price-note">Up to 50 users &middot; <code style="font-size:11px;background:#111;padding:2px 5px;border-radius:3px">plk_</code> key in .env &middot; billed monthly</div>
+      <div class="price-tagline">Outgrown 5 users. Full features, email support, no waitlist.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Everything in Community</li>
-        <li><span class="check">&#10003;</span> Unlimited users on your relay</li>
+        <li><span class="check">&#10003;</span> Up to 50 active users</li>
+        <li><span class="check">&#10003;</span> Webhook delivery notifications</li>
+        <li><span class="check">&#10003;</span> 24-hour blob retention</li>
+        <li><span class="check">&#10003;</span> Email support &mdash; response &lt; 48h</li>
         <li><span class="check">&#10003;</span> Priority security updates</li>
-        <li><span class="check">&#10003;</span> E-mail support + SLA</li>
         <li><span class="check">&#10003;</span> Compliance documentation</li>
-        <li><span style="color:#555;flex-shrink:0;font-size:11px">○</span> SAML / SSO <span style="color:#555;font-size:10px">(coming soon)</span></li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Relay+license+waitlist" class="price-btn s">Join waitlist &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Professional+relay+license" class="price-btn p">Contact for invoice &rarr;</a>
     </div>
 
     <div class="pc">
       <div class="price-name">ENTERPRISE RELAY</div>
       <div class="price-amount">Custom</div>
-      <div class="price-note">Volume &middot; SLA &middot; regulated industries</div>
+      <div class="price-note">Unlimited &middot; SLA 99.9% &middot; regulated industries</div>
       <div class="price-tagline">Dedicated relay, on-premise option, DICOM / FHIR, compliance docs.</div>
       <ul class="pf">
-        <li><span class="check">&#10003;</span> Everything in Licensed</li>
+        <li><span class="check">&#10003;</span> Everything in Professional</li>
+        <li><span class="check">&#10003;</span> Unlimited users &mdash; no cap</li>
         <li><span class="check">&#10003;</span> Dedicated relay &mdash; data never shared</li>
+        <li><span class="check">&#10003;</span> SLA 99.9% + priority support</li>
         <li><span class="check">&#10003;</span> On-premise option</li>
         <li><span class="check">&#10003;</span> DICOM / FHIR integration</li>
-        <li><span class="check">&#10003;</span> NEN 7510 / IEC 62443 design documentation</li>
-        <li><span class="check">&#10003;</span> SLA 99.9% + priority support</li>
-        <li><span style="color:#555;flex-shrink:0;font-size:11px">○</span> Kubernetes operator <span style="color:#555;font-size:10px">(coming soon)</span></li>
+        <li><span class="check">&#10003;</span> <a href="/compliance/nen7510" style="color:inherit;text-decoration:underline;text-decoration-color:#333">NEN 7510</a> / <a href="/compliance/iec62443" style="color:inherit;text-decoration:underline;text-decoration-color:#333">IEC 62443</a> / <a href="/compliance/nis2" style="color:inherit;text-decoration:underline;text-decoration-color:#333">NIS2</a> compliance docs</li>
+        <li><span class="check">&#10003;</span> <a href="mailto:privacy@paramant.app?subject=Verwerkersovereenkomst" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Verwerkersovereenkomst</a> (GDPR Art. 28)</li>
       </ul>
-      <a href="mailto:privacy@paramant.app" class="price-btn s">Contact us</a>
+      <a href="mailto:privacy@paramant.app?subject=Enterprise+relay" class="price-btn s">Contact us &rarr;</a>
     </div>
 
   </div>
@@ -607,8 +610,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
     <div class="pc">
       <div class="price-name">PRO</div>
-      <div class="price-amount" style="font-size:28px">Notify me</div>
-      <div class="price-note">Unlimited &middot; coming Q3 2026</div>
+      <div class="price-amount" style="font-size:28px">Coming soon</div>
+      <div class="price-note">Unlimited &middot; webhooks &middot; 24h retention</div>
       <div class="price-tagline">No limits. Webhooks. Streaming. 24-hour retention.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Unlimited uploads</li>
@@ -620,7 +623,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> CSV audit export</li>
         <li><span class="check">&#10003;</span> DID registration</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Pro+waitlist" class="price-btn s">Join waitlist &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Pro+user+interest" class="price-btn s">Get notified &rarr;</a>
     </div>
 
     <div class="pc">
@@ -635,9 +638,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> Admin panel access</li>
         <li><span class="check">&#10003;</span> Unlimited file size</li>
         <li><span class="check">&#10003;</span> SLA + compliance docs</li>
+        <li><span class="check">&#10003;</span> <a href="/verwerkersovereenkomst" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Verwerkersovereenkomst</a> (GDPR Art. 28)</li>
         <li><span class="check">&#10003;</span> Dedicated support</li>
       </ul>
-      <a href="mailto:privacy@paramant.app" class="price-btn s">Contact us</a>
+      <a href="mailto:privacy@paramant.app?subject=Enterprise+user" class="price-btn s">Contact us &rarr;</a>
     </div>
 
   </div>
@@ -671,6 +675,15 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
         <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
         <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/self-hosting.md" target="_blank">Deploy guide</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Compliance</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+        <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+        <a href="/compliance/nen7510">NEN 7510 (Zorg)</a>
+        <a href="mailto:privacy@paramant.app?subject=Verwerkersovereenkomst">Verwerkersovereenkomst</a>
       </div>
     </div>
     <div>
