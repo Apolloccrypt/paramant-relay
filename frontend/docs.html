@@ -3,46 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Docs</title>
+<title>PARAMANT — Documentation</title>
+<meta name="description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0c0c0c;color:#ededed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+body{background:#0c0c0c;color:#ededed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-nav{display:flex;align-items:center;padding:0 40px;height:52px;border-bottom:1px solid #111;position:sticky;top:0;background:rgba(12,12,12,.96);z-index:100;gap:24px}
+nav{display:flex;align-items:center;padding:0 40px;height:52px;border-bottom:1px solid #1a1a1a;position:sticky;top:0;background:rgba(12,12,12,.97);backdrop-filter:blur(8px);z-index:100;gap:24px}
 nav .logo{font-family:'SF Mono','Fira Code',monospace;font-size:13px;font-weight:700;letter-spacing:.08em}
-.nav-links{display:flex;gap:20px;font-size:13px;color:#8a8a8a}
+.nav-links{display:flex;gap:20px;font-size:13px;color:#6a6a6a}
 .nav-links a:hover{color:#ededed}
-nav .back{margin-left:auto;font-size:12px;color:#565656;border:1px solid #1a1a1a;padding:5px 12px;border-radius:4px}
-nav .back:hover{color:#aaa;border-color:#424242}
+nav .back{margin-left:auto;font-size:12px;color:#505050;border:1px solid #1c1c1c;padding:5px 12px;border-radius:4px}
+nav .back:hover{color:#aaa;border-color:#383838}
 .layout{display:flex;min-height:calc(100vh - 52px)}
-.sidebar{width:220px;flex-shrink:0;padding:28px 20px;border-right:1px solid #111;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
-.sidebar h3{font-size:10px;color:#505050;letter-spacing:.1em;text-transform:uppercase;margin:20px 0 8px;font-family:'SF Mono','Fira Code',monospace}
+.sidebar{width:224px;flex-shrink:0;padding:28px 16px 40px;border-right:1px solid #141414;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
+.sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
+.sidebar h3{font-size:10px;color:#404040;letter-spacing:.1em;text-transform:uppercase;margin:22px 0 6px;padding-left:8px;font-family:'SF Mono','Fira Code',monospace}
 .sidebar h3:first-child{margin-top:0}
-.sidebar a{display:block;font-size:12px;color:#606060;padding:4px 0;line-height:1.7;transition:color .1s}
-.sidebar a:hover{color:#aaa}
-.sidebar a.active{color:#ededed}
-.content{flex:1;padding:52px 64px;max-width:820px}
-.content h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.subtitle{font-size:14px;color:#8a8a8a;margin-bottom:52px;line-height:1.7}
-.content h2{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#aaa;margin:52px 0 20px;padding-top:52px;border-top:1px solid #111}
+.sidebar a{display:block;font-size:12px;color:#565656;padding:3px 8px;line-height:1.8;border-radius:3px;transition:color .1s,background .1s}
+.sidebar a:hover{color:#bbb;background:#111}
+.sidebar a.active{color:#ededed;background:#141414}
+.content{flex:1;padding:52px 72px 80px;max-width:840px}
+.content h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.subtitle{font-size:14px;color:#666;margin-bottom:52px;line-height:1.8}
+.content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin:56px 0 18px;padding-top:56px;border-top:1px solid #141414}
 .content h2:first-of-type{border-top:none;padding-top:0;margin-top:0}
-.content p{font-size:13px;color:#8a8a8a;line-height:1.8;margin-bottom:14px}
-.content p strong{color:#aaa}
-code{background:#111;border:1px solid #1a1a1a;padding:2px 7px;border-radius:3px;font-size:12px;color:#aaaaaa;font-family:'SF Mono','Fira Code',monospace}
-pre{background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px 24px;margin:16px 0 24px;overflow-x:auto;font-size:12px;color:#9a9a9a;line-height:1.8;font-family:'SF Mono','Fira Code',monospace}
-pre .cm{color:#505050}
-pre .kw{color:#aaa}
-pre .st{color:#8a8a8a}
-table{width:100%;border-collapse:collapse;margin:16px 0 28px;font-size:12px}
-th{text-align:left;font-size:10px;color:#505050;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;border-bottom:1px solid #111;font-family:'SF Mono','Fira Code',monospace}
-td{padding:10px 14px;border-bottom:1px solid #0f0f0f;color:#8a8a8a;vertical-align:top;line-height:1.7}
-td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#aaaaaa;white-space:nowrap}
+.content h3{font-size:13px;font-weight:600;color:#ccc;margin:28px 0 10px}
+.content p{font-size:13px;color:#767676;line-height:1.85;margin-bottom:14px}
+.content p strong{color:#999}
+.content ul{margin:10px 0 18px 0;padding-left:0;list-style:none}
+.content ul li{font-size:13px;color:#767676;padding:3px 0 3px 16px;position:relative}
+.content ul li::before{content:'·';position:absolute;left:4px;color:#404040}
+code{background:#111;border:1px solid #1e1e1e;padding:2px 7px;border-radius:3px;font-size:12px;color:#aaa;font-family:'SF Mono','Fira Code',monospace}
+pre{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:6px;padding:20px 24px;margin:14px 0 22px;overflow-x:auto;font-size:12px;color:#8a8a8a;line-height:1.9;font-family:'SF Mono','Fira Code',monospace}
+pre .cm{color:#404040}.pre .kw{color:#aaa}.pre .st{color:#7a7a7a}
+.cb{background:#0e0e0e;border:1px solid #1c1c1c;border-radius:6px;overflow:hidden;margin:14px 0 22px}
+.cb-header{padding:8px 16px;border-bottom:1px solid #161616;display:flex;align-items:center;gap:6px}
+.cb-dots{display:flex;gap:5px}.cb-dot{width:7px;height:7px;border-radius:50%;background:#1e1e1e}
+.cb-lang{margin-left:auto;font-size:10px;color:#3a3a3a;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.06em}
+.cb pre{margin:0;border:none;border-radius:0;background:transparent;padding:18px 24px}
+table{width:100%;border-collapse:collapse;margin:14px 0 26px;font-size:12px}
+th{text-align:left;font-size:10px;color:#404040;letter-spacing:.1em;text-transform:uppercase;padding:9px 14px;border-bottom:1px solid #141414;font-family:'SF Mono','Fira Code',monospace}
+td{padding:9px 14px;border-bottom:1px solid #0e0e0e;color:#767676;vertical-align:top;line-height:1.75}
+td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#999;white-space:nowrap}
+tr:last-child td{border-bottom:none}
 .method{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.04em}
-.get{background:#0f1f0f;color:#3a8a3a;border:1px solid #1a3a1a}
-.post{background:#0f0f1f;color:#3a3a8a;border:1px solid #1a1a3a}
-.badge{display:inline-block;padding:2px 8px;border:1px solid #1a1a1a;border-radius:3px;font-size:11px;color:#606060;margin-right:4px;font-family:'SF Mono','Fira Code',monospace}
-@media(max-width:768px){nav{padding:0 20px}.sidebar{display:none}.content{padding:32px 20px}}
-
+.get{background:#0a1a0a;color:#3a7a3a;border:1px solid #183018}
+.post{background:#0a0a1a;color:#3a3a7a;border:1px solid #181830}
+.badge{display:inline-block;padding:2px 8px;border:1px solid #1c1c1c;border-radius:3px;font-size:11px;color:#545454;margin-right:4px;font-family:'SF Mono','Fira Code',monospace}
+.callout{border:1px solid #1e2a1e;background:#0c130c;border-radius:6px;padding:14px 18px;margin:16px 0 22px}
+.callout.warn{border-color:#2a1e0c;background:#13100a}
+.callout p{margin:0;color:#5a7a5a;font-size:12.5px;line-height:1.75}
+.callout.warn p{color:#7a6a3a}
+.step-row{display:flex;gap:16px;align-items:flex-start;margin:8px 0}
+.step-num{width:20px;height:20px;border-radius:50%;background:#141414;border:1px solid #1e1e1e;font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:#505050;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-body{flex:1}
+.step-body p{margin-bottom:8px}
+.faq-item{border-bottom:1px solid #111;padding:18px 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-size:13px;font-weight:500;color:#ccc;margin-bottom:8px}
+.faq-a{font-size:13px;color:#6a6a6a;line-height:1.8}
+.sector-badge{display:inline-block;font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:#3a7a3a;background:#0c160c;border:1px solid #1a2e1a;border-radius:3px;padding:2px 7px;margin-right:6px}
+@media(max-width:900px){nav{padding:0 20px}.sidebar{display:none}.content{padding:32px 24px 60px}}
 </style>
 </head>
 
@@ -51,143 +73,223 @@ td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#aaaaaa;white-s
   <div class="nav-links">
     <a href="/#pricing">Pricing</a>
     <a href="/parashare">ParaShare</a>
+    <a href="/ct-log">CT Log</a>
   </div>
-  <a class="back" href="/">back</a>
+  <a class="back" href="/">← back</a>
 </nav>
 
-<div class="layout" id="main-content">
+<div class="layout">
   <div class="sidebar">
     <h3>Getting started</h3>
     <a href="#quickstart">Quick start</a>
     <a href="#authentication">Authentication</a>
-    <a href="#sdk">SDK</a>
+    <a href="#sdk">SDK &amp; scripts</a>
     <h3>API Reference</h3>
     <a href="#endpoints">All endpoints</a>
     <a href="#inbound">POST /v2/inbound</a>
     <a href="#outbound">GET /v2/outbound</a>
+    <a href="#stream">GET /v2/stream</a>
     <a href="#monitor">GET /v2/monitor</a>
     <a href="#webhook">POST /v2/webhook</a>
-    <a href="#stream">GET /v2/stream</a>
+    <a href="#health">GET /health</a>
+    <h3>Self-hosting</h3>
+    <a href="#selfhost-docker">Docker Compose</a>
+    <a href="#selfhost-nginx">nginx &amp; TLS</a>
+    <a href="#selfhost-users">First user</a>
+    <a href="#selfhost-upgrade">Upgrade</a>
+    <h3>paramant-client</h3>
+    <a href="#client-deb">.deb install</a>
+    <a href="#client-cli">CLI reference</a>
     <h3>Protocol</h3>
     <a href="#crypto">Crypto stack</a>
     <a href="#burn">Burn-on-read</a>
     <a href="#padding">5MB padding</a>
-    <h3>Identity</h3>
-    <a href="#did">W3C DID</a>
     <a href="#ct-log">CT log</a>
-    <h3>Teams</h3>
+    <h3>Identity &amp; Teams</h3>
+    <a href="#did">W3C DID</a>
     <a href="#teams">Team management</a>
     <a href="#retention">Retention policy</a>
-    <h3>Sectors</h3>
-    <a href="#sectors">Health / Legal / Finance / IoT</a>
+    <a href="#sectors">Relay sectors</a>
+    <h3>Security</h3>
+    <a href="#threat-model">Threat model</a>
+    <a href="#audits">Security audits</a>
+    <h3>Compliance</h3>
+    <a href="#compliance-nis2">NIS2 / DORA</a>
+    <a href="#compliance-nen7510">NEN 7510</a>
+    <a href="#compliance-iec62443">IEC 62443</a>
+    <h3>FAQ</h3>
+    <a href="#faq">Frequently asked</a>
   </div>
 
   <div class="content">
     <h1>Documentation</h1>
-    <p class="subtitle">REST API, SDK, protocol reference, and team management for PARAMANT Ghost Pipe v2.</p>
+    <p class="subtitle">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.4. The relay is untrusted by design — it never holds a decryption key.</p>
 
+    <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Quick start</h2>
-    <p>Send your first encrypted blob in under 5 minutes.</p>
-    <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;overflow:hidden;margin:20px 0 8px;">
-      <div style="padding:8px 16px;border-bottom:1px solid #171717;display:flex;align-items:center;gap:6px;">
-        <span style="width:8px;height:8px;border-radius:50%;background:#222;"></span>
-        <span style="width:8px;height:8px;border-radius:50%;background:#222;"></span>
-        <span style="width:8px;height:8px;border-radius:50%;background:#222;"></span>
-        <span style="margin-left:auto;font-size:10px;color:#404040;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.06em">python</span>
-      </div>
-      <pre style="margin:0;padding:20px 24px;border:none;border-radius:0;background:transparent;font-size:12px;line-height:1.9;"><span style="color:#505050"># pip install paramant-sdk</span>
-<span style="color:#aaa">from</span> paramant_sdk <span style="color:#aaa">import</span> GhostPipe
+    <p>Send your first encrypted file in under 5 minutes. No account required — request a free <code>pgp_</code> key at <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">privacy@paramant.app</a>.</p>
 
-gp   = GhostPipe(<span style="color:#707070">"pgp_xxx"</span>, <span style="color:#707070">"mri-scanner-001"</span>)
-hash = gp.send(patient_record)  <span style="color:#505050"># ML-KEM-768 encrypted</span>
-data = gp.receive(hash)         <span style="color:#505050"># burn-on-read — then gone</span>
+    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:#666;font-size:13px">Install the Python SDK (requires Python 3.9+, cryptography library)</p></div></div>
+    <pre>pip install cryptography</pre>
 
-<span style="color:#606060"># delivered. destroyed. zero trace.</span></pre>
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:#666;font-size:13px">Download the sender and receiver scripts</p></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px">
+      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
+      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
     </div>
 
-    <pre><span class="cm"># Python SDK</span>
-pip install paramant-sdk
+    <div class="step-row"><div class="step-num">3</div><div class="step-body"><p style="color:#666;font-size:13px">Send a file — encrypted before it leaves your device</p></div></div>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre><span class="cm"># Terminal 1 — sender</span>
+python3 paramant-sender.py --key pgp_your_key --device laptop-01 document.pdf
+<span class="cm"># → HASH: abc123... (share this with the receiver)</span>
 
-from paramant_sdk import GhostPipe
+<span class="cm"># Terminal 2 — receiver (burn-on-read: one download only)</span>
+python3 paramant-receiver.py --key pgp_your_key --hash abc123...
+<span class="cm"># → document.pdf saved locally. Blob destroyed on relay.</span></pre>
+    </div>
 
-gp   = GhostPipe(<span class="st">"pgp_your_key"</span>, <span class="st">"device-001"</span>)
-hash = gp.send(open(<span class="st">"document.pdf"</span>, <span class="st">"rb"</span>).read())
-data = gp.receive(hash)   <span class="cm"># burn-on-read — then gone forever</span></pre>
-    <pre><span class="cm"># Direct HTTP — no SDK needed</span>
+    <p>Or use the direct HTTP API — no SDK needed:</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">curl</span></div>
+      <pre><span class="cm"># Upload encrypted blob</span>
 curl -X POST https://health.paramant.app/v2/inbound \
-  -H <span class="st">"X-Api-Key: pgp_your_key"</span> \
-  -H <span class="st">"Content-Type: application/json"</span> \
-  -d <span class="st">'{"hash":"sha256_of_payload","payload":"base64_blob","ttl_ms":300000}'</span></pre>
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"sha256_of_payload","payload":"base64_5mb_blob","ttl_ms":3600000}'
 
-    <h2 id="authentication">Authentication</h2>
-    <p>All endpoints require an API key as a header or query parameter.</p>
-    <pre>X-Api-Key: pgp_your_key_here
-<span class="cm"># or via query param</span>
-GET /v2/check-key?k=pgp_your_key_here</pre>
-    <p>Keys are plan-based: <span class="badge">dev</span><span class="badge">pro</span><span class="badge">enterprise</span></p>
-
-    <h2 id="sdk">SDK &amp; scripts</h2>
-    <p>The Python SDK and CLI scripts handle encryption, chunking, retries, and DID auth automatically. Download them below — your API key is required to use the relay.</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 24px">
-      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ededed;background:#111;border:1px solid #1a1a1a;border-radius:5px;padding:8px 16px;text-decoration:none">&#8595; paramant-sender.py</a>
-      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ededed;background:#111;border:1px solid #1a1a1a;border-radius:5px;padding:8px 16px;text-decoration:none">&#8595; paramant-receiver.py</a>
-      <a href="/dl/scripts/paramant_sdk.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ededed;background:#111;border:1px solid #1a1a1a;border-radius:5px;padding:8px 16px;text-decoration:none">&#8595; paramant_sdk.py</a>
+<span class="cm"># Retrieve (one-time — blob is burned after this)</span>
+curl https://health.paramant.app/v2/outbound/abc123... \
+  -H "X-Api-Key: pgp_your_key" -o received.bin</pre>
     </div>
-    <pre>gp = GhostPipe(
-    api_key=<span class="st">"pgp_xxx"</span>,
-    device=<span class="st">"device-001"</span>,
-    sector=<span class="st">"health"</span>,          <span class="cm"># routing hint — picks health.paramant.app</span>
-    use_edge=False            <span class="cm"># True = via Fly.io edge (geo-routed)</span>
-)</pre>
-    <p>All sectors expose the same API — <code>sector</code> selects the routing domain only.</p>
-    <pre>hash = gp.send(data, ttl_ms=86400000, webhook=<span class="st">"https://you.com/cb"</span>)
-data = gp.receive(hash)</pre>
 
+    <!-- ── Authentication ──────────────────────────────────────── -->
+    <h2 id="authentication">Authentication</h2>
+    <p>Two key types exist — they serve different roles and are never interchangeable.</p>
+    <table>
+      <tr><th>Key</th><th>Prefix</th><th>Who</th><th>Purpose</th></tr>
+      <tr><td>pgp_</td><td><code>pgp_</code></td><td>End users</td><td>Send/receive files via the API</td></tr>
+      <tr><td>plk_</td><td><code>plk_</code></td><td>Relay operators</td><td>License key — unlocks &gt;5 users on self-hosted relay</td></tr>
+    </table>
+    <p>Pass the <code>pgp_</code> key in the <code>X-Api-Key</code> header or <code>?k=</code> query parameter:</p>
+    <pre>X-Api-Key: pgp_your_key_here
+<span class="cm"># or:</span>
+GET /v2/check-key?k=pgp_your_key_here</pre>
+
+    <!-- ── SDK ──────────────────────────────────────────────────── -->
+    <h2 id="sdk">SDK &amp; scripts</h2>
+    <p>The Python scripts handle ML-KEM-768 encryption, 5MB padding, chunking, retries, and DID authentication. No SDK package required — just <code>pip install cryptography</code>.</p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px">
+      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
+      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
+      <a href="/dl/scripts/paramant_sdk.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant_sdk.py</a>
+    </div>
+
+    <h3>Sender — common options</h3>
+    <pre>python3 paramant-sender.py \
+  --key    pgp_xxx       <span class="cm"># required — your API key</span>
+  --device mri-001       <span class="cm"># required — identifies this device</span>
+  --sector health        <span class="cm"># optional — routes to health.paramant.app</span>
+  --ttl    3600          <span class="cm"># optional — TTL in seconds (default 3600)</span>
+  --watch  /data/out/    <span class="cm"># optional — watch directory and auto-send new files</span>
+  document.pdf</pre>
+
+    <h3>Receiver — common options</h3>
+    <pre>python3 paramant-receiver.py \
+  --key     pgp_xxx        <span class="cm"># required</span>
+  --hash    abc123...      <span class="cm"># receive specific blob by hash</span>
+  --stream                 <span class="cm"># listen for incoming blobs via WebSocket</span>
+  --forward https://you/cb <span class="cm"># forward decrypted payload to webhook</span>
+  --out     ./received/    <span class="cm"># output directory</span></pre>
+
+    <h3>Python SDK (class-based)</h3>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
+      <pre>from paramant_sdk import GhostPipe
+
+gp = GhostPipe(
+    api_key = "pgp_xxx",
+    device  = "device-001",
+    sector  = "health",     <span class="cm"># routes to health.paramant.app</span>
+)
+
+<span class="cm"># Send — returns blob hash</span>
+hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
+
+<span class="cm"># Receive — burn-on-read, returns plaintext bytes</span>
+data = gp.receive(hash_)
+
+<span class="cm"># Anonymous drop with 12-word mnemonic</span>
+mnemonic = gp.drop(b"sensitive data", ttl=3600)
+data     = gp.pickup(mnemonic)</pre>
+    </div>
+
+    <!-- ── API Reference ──────────────────────────────────────── -->
     <h2 id="endpoints">All endpoints</h2>
     <table>
       <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth</th></tr>
-      <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, slots</td><td>—</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>—</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob (RAM-only)</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn — one retrieval only</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check availability without consuming</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live delivery stats, ACK rate</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Get 30s one-time WebSocket ticket (avoids key in URL)</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket — blob_ready push events</td><td>Ticket or Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live stats: blobs in flight, ACK rate</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Get 30s one-time WebSocket ticket</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket push — blob_ready events</td><td>Ticket / Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/webhook</td><td>Register delivery webhook URL</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/pubkey</td><td>Register ML-KEM + ECDH keypair</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/check-key</td><td>Verify key validity and plan</td><td>—</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/did/register</td><td>Register W3C Decentralized Identity</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>Resolve DID document</td><td>—</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency log</td><td>—</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency log (public)</td><td>—</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Registered relay nodes and status</td><td>—</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain — JSON + CSV export</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/key-sector</td><td>Resolve sector for this key</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>List team devices</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add device to team (Pro+)</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/metrics</td><td>Prometheus scrape endpoint</td><td>Admin</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/metrics</td><td>Prometheus scrape endpoint</td><td>Admin token</td></tr>
     </table>
 
     <h2 id="inbound">POST /v2/inbound</h2>
-    <p>Upload an encrypted blob. Stored in RAM only. Returns hash and download token.</p>
-    <pre>{
-  <span class="st">"hash"</span>:    <span class="st">"sha256_of_padded_payload"</span>,
-  <span class="st">"payload"</span>: <span class="st">"base64_encoded_5mb_blob"</span>,
-  <span class="st">"ttl_ms"</span>:  300000
+    <p>Upload an encrypted, padded blob. Stored in RAM only — never written to disk. Returns a hash used for retrieval.</p>
+    <pre><span class="cm">Request body (JSON):</span>
+{
+  "hash":    "sha256_of_padded_payload",
+  "payload": "base64_encoded_5mb_blob",
+  "ttl_ms":  3600000
 }
 
-<span class="cm">200: { "ok": true, "hash": "...", "ttl_ms": 300000, "download_token": "..." }
+<span class="cm">200: { "ok": true, "hash": "...", "ttl_ms": 3600000 }
 409: hash already exists
-503: relay at capacity</span></pre>
-    <p>TTL is clamped to plan maximum: <strong>dev</strong> 1h · <strong>pro</strong> 24h · <strong>enterprise</strong> 7 days.</p>
+503: relay at capacity (memory limit)</span></pre>
+    <p>TTL is clamped to plan maximum. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>One retrieval only.</strong> Blob is overwritten with random bytes and removed from RAM after this call.</p>
+    <p><strong>One retrieval only.</strong> After this call the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
-<span class="cm">200: binary blob (5MB padded)
-404: burned or expired
-403: wrong API key</span></pre>
+<span class="cm">200: binary blob (always 5MB padded)
+404: burned, expired, or never existed
+403: API key mismatch</span></pre>
+
+    <h2 id="stream">GET /v2/stream</h2>
+    <p>WebSocket endpoint for real-time <code>blob_ready</code> push notifications. Use a one-time ticket to avoid exposing the key in the URL.</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">javascript</span></div>
+      <pre><span class="cm">// Step 1 — get a one-time WebSocket ticket (30s TTL)</span>
+const { ticket } = await fetch('https://health.paramant.app/v2/ws-ticket', {
+  method: 'POST', headers: { 'X-Api-Key': 'pgp_xxx' }
+}).then(r => r.json());
+
+<span class="cm">// Step 2 — connect with ticket (API key never appears in URL)</span>
+const ws = new WebSocket(`wss://health.paramant.app/v2/stream?ticket=${ticket}`);
+ws.onmessage = e => {
+  const msg = JSON.parse(e.data);
+  <span class="cm">// { type: "blob_ready", hash: "...", size: 5242880, ts: "..." }</span>
+};</pre>
+    </div>
 
     <h2 id="monitor">GET /v2/monitor</h2>
     <pre><span class="cm">{
@@ -197,83 +299,358 @@ X-Api-Key: pgp_xxx
 }</span></pre>
 
     <h2 id="webhook">POST /v2/webhook</h2>
-    <pre>{ <span class="st">"hash"</span>: <span class="st">"blob_hash"</span>, <span class="st">"callback_url"</span>: <span class="st">"https://you.com/hook"</span> }
+    <pre>{ "hash": "blob_hash", "callback_url": "https://you.com/hook" }
 
-<span class="cm">Payload on delivery:
-{ "event": "blob_retrieved", "hash": "...", "ts": "2026-04-02T..." }</span></pre>
+<span class="cm">Relay POSTs to your callback on delivery:
+{ "event": "blob_retrieved", "hash": "...", "ts": "2026-04-14T..." }</span></pre>
+    <p>Webhooks are signed with <code>X-Paramant-Sig</code> (HMAC-SHA256 of the body using your API key as the secret). Reject unsigned callbacks.</p>
 
-    <h2 id="stream">GET /v2/stream</h2>
-    <p>Preferred: fetch a 30-second one-time ticket first to avoid putting the API key in the URL.</p>
-    <pre><span class="cm">// Step 1 — get a one-time WebSocket ticket (30s TTL)</span>
-const { ticket } = await fetch(<span class="st">'https://health.paramant.app/v2/ws-ticket'</span>, {
-  method: <span class="st">'POST'</span>, headers: { <span class="st">'X-Api-Key'</span>: <span class="st">'pgp_xxx'</span> }
-}).then(r => r.json());
+    <h2 id="health">GET /health</h2>
+    <pre><span class="cm">{
+  "ok": true,
+  "version": "2.4.4",
+  "sector": "health",
+  "edition": "licensed",
+  "uptime_s": 3600,
+  "license_expires": "2027-01-01"
+}</span></pre>
 
-<span class="cm">// Step 2 — connect with ticket (key never appears in URL)</span>
-const ws = new WebSocket(<span class="st">`wss://health.paramant.app/v2/stream?ticket=${ticket}`</span>)
-ws.onmessage = e => {
-  const msg = JSON.parse(e.data)
-  <span class="cm">// { type: "blob_ready", hash: "...", size: 5242880 }</span>
-}</pre>
+    <!-- ── Self-hosting ─────────────────────────────────────────── -->
+    <h2 id="selfhost-docker">Self-hosting — Docker Compose</h2>
+    <p>Community Edition is free forever for up to 5 users. One <code>docker compose up</code> starts 6 containers: five sector relays and an admin panel.</p>
 
+    <div class="callout">
+      <p><strong style="color:#7a9a7a">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
+    </div>
+
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre><span class="cm"># 1. Clone</span>
+git clone https://github.com/Apolloccrypt/paramant-relay
+cd paramant-relay
+
+<span class="cm"># 2. Configure</span>
+cp .env.example .env
+echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+nano .env   <span class="cm"># set TOTP_SECRET and RESEND_API_KEY if desired</span>
+
+<span class="cm"># 3. Launch</span>
+docker compose up -d
+
+<span class="cm"># 4. Verify</span>
+curl http://localhost:3000/health
+<span class="cm"># → {"ok":true,"version":"2.4.4","sector":"relay"}</span></pre>
+    </div>
+
+    <h3>Container port map</h3>
+    <table>
+      <tr><th>Container</th><th>Host port</th><th>Sector</th><th>Recommended domain</th></tr>
+      <tr><td>relay-main</td><td>127.0.0.1:3000</td><td>relay</td><td>relay.your-domain.com</td></tr>
+      <tr><td>relay-health</td><td>127.0.0.1:3001</td><td>health</td><td>health.your-domain.com</td></tr>
+      <tr><td>relay-finance</td><td>127.0.0.1:3002</td><td>finance</td><td>finance.your-domain.com</td></tr>
+      <tr><td>relay-legal</td><td>127.0.0.1:3003</td><td>legal</td><td>legal.your-domain.com</td></tr>
+      <tr><td>relay-iot</td><td>127.0.0.1:3004</td><td>iot</td><td>iot.your-domain.com</td></tr>
+      <tr><td>admin</td><td>127.0.0.1:4200</td><td>—</td><td>your-domain.com/admin/</td></tr>
+    </table>
+
+    <h3>Key .env variables</h3>
+    <table>
+      <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+      <tr><td>ADMIN_TOKEN</td><td>Yes</td><td>Admin panel password (min 32 chars, hex)</td></tr>
+      <tr><td>TOTP_SECRET</td><td>Recommended</td><td>Base32 TOTP secret — enables MFA on admin login</td></tr>
+      <tr><td>PLK_KEY</td><td>No</td><td>License key — unlocks &gt;5 users (Community = free, max 5)</td></tr>
+      <tr><td>RESEND_API_KEY</td><td>No</td><td>Email provider key (for key delivery notifications)</td></tr>
+      <tr><td>LOG_LEVEL</td><td>No</td><td>info (default) · debug · warn · error</td></tr>
+      <tr><td>RAM_LIMIT_MB</td><td>No</td><td>Blob storage memory cap per container (default 1024)</td></tr>
+    </table>
+
+    <h2 id="selfhost-nginx">nginx &amp; TLS</h2>
+    <p>Use system nginx as a TLS terminator in front of the Docker containers. Certbot handles certificate renewal automatically.</p>
+
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre><span class="cm"># Install nginx + certbot</span>
+apt install -y nginx python3-certbot-nginx
+
+<span class="cm"># Obtain wildcard TLS certificates</span>
+certbot certonly --nginx -d your-domain.com \
+  -d relay.your-domain.com \
+  -d health.your-domain.com \
+  -d finance.your-domain.com \
+  -d legal.your-domain.com \
+  -d iot.your-domain.com</pre>
+    </div>
+
+    <p>Add an nginx server block for each subdomain that proxies to the matching container port:</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">nginx</span></div>
+      <pre>server {
+    listen 443 ssl;
+    server_name health.your-domain.com;
+    ssl_certificate     /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host $host;
+        proxy_read_timeout 3600s;
+    }
+}
+<span class="cm"># Repeat for relay (:3000), finance (:3002), legal (:3003), iot (:3004)</span></pre>
+    </div>
+
+    <h2 id="selfhost-users">First user</h2>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre><span class="cm"># Create your first API key</span>
+python3 scripts/paramant-admin.py add \
+  --label "alice" \
+  --plan  pro \
+  --email alice@example.com
+
+<span class="cm"># Push to all relay containers</span>
+python3 scripts/paramant-admin.py sync
+
+<span class="cm"># Admin panel (requires ADMIN_TOKEN + TOTP if configured)</span>
+open https://your-domain.com/admin/</pre>
+    </div>
+    <p>Community Edition enforces a hard cap of 5 users — the 6th <code>add</code> returns HTTP 402. Add a <code>PLK_KEY</code> to <code>.env</code> to unlock unlimited users.</p>
+
+    <h2 id="selfhost-upgrade">Upgrade</h2>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre>cd /opt/paramant-relay
+git pull --ff-only
+docker compose up -d --build
+<span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
+    </div>
+    <div class="callout warn">
+      <p><strong style="color:#9a8a4a">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code> — do not delete this volume or the relay will lose its registered identity.</p>
+    </div>
+
+    <!-- ── paramant-client .deb ─────────────────────────────────── -->
+    <h2 id="client-deb">paramant-client — .deb install</h2>
+    <p>The paramant-client package bundles the sender, receiver, and admin scripts as system commands. Supports amd64 and arm64 (including Raspberry Pi).</p>
+
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre><span class="cm"># One-line install (Ubuntu / Debian / Raspberry Pi OS)</span>
+curl -fsSL https://paramant.app/install-client.sh | bash
+
+<span class="cm"># Or download and install manually</span>
+wget https://github.com/Apolloccrypt/paramant-relay/releases/latest/download/paramant-client.deb
+dpkg -i paramant-client.deb</pre>
+    </div>
+
+    <h2 id="client-cli">CLI reference</h2>
+    <table>
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td>paramant-send</td><td>Encrypt and upload a file or stdin</td></tr>
+      <tr><td>paramant-receive</td><td>Download and decrypt by hash</td></tr>
+      <tr><td>paramant-watch</td><td>Watch a directory and auto-send new files</td></tr>
+      <tr><td>paramant-stream</td><td>Listen for incoming blobs via WebSocket</td></tr>
+      <tr><td>paramant-admin</td><td>Manage users, keys, and relay config</td></tr>
+      <tr><td>paramant-scan</td><td>Discover relay nodes on the network</td></tr>
+    </table>
+    <pre><span class="cm"># Example — send a file and wait for ACK</span>
+paramant-send --key pgp_xxx --sector health --ack scan.dcm
+
+<span class="cm"># Example — stream mode (process persists, receives all blobs)</span>
+paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/api</pre>
+
+    <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Crypto stack</h2>
+    <p>All encryption happens client-side. The relay never sees plaintext and never holds a private key.</p>
     <table>
       <tr><th>Algorithm</th><th>Role</th><th>Standard</th></tr>
       <tr><td>ML-KEM-768</td><td>Post-quantum key encapsulation</td><td>NIST FIPS 203</td></tr>
-      <tr><td>ECDH P-256</td><td>Classical key exchange (hybrid)</td><td>NIST SP 800-56A</td></tr>
-      <tr><td>AES-256-GCM</td><td>Symmetric encryption</td><td>NIST FIPS 197</td></tr>
-      <tr><td>HKDF-SHA256</td><td>Key derivation</td><td>RFC 5869</td></tr>
-      <tr><td>SHA3-256</td><td>Merkle CT log · DID hashes · PSS commitments</td><td>NIST FIPS 202</td></tr>
-      <tr><td>ML-DSA-65</td><td>Post-quantum signatures (optional)</td><td>NIST FIPS 204</td></tr>
+      <tr><td>ECDH P-256</td><td>Classical key exchange (hybrid, defence-in-depth)</td><td>NIST SP 800-56A</td></tr>
+      <tr><td>AES-256-GCM</td><td>Symmetric authenticated encryption</td><td>NIST FIPS 197</td></tr>
+      <tr><td>HKDF-SHA256</td><td>Key derivation from hybrid KEM output</td><td>RFC 5869</td></tr>
+      <tr><td>SHA3-256</td><td>CT log Merkle hashing · DID hashes</td><td>NIST FIPS 202</td></tr>
+      <tr><td>ML-DSA-65</td><td>Relay identity signatures (relay-to-relay auth)</td><td>NIST FIPS 204</td></tr>
+      <tr><td>Argon2id</td><td>Password-protected blob derive</td><td>RFC 9106</td></tr>
     </table>
+    <p>Browser-side encryption runs as <strong>Rust/WASM</strong> compiled from <code>crypto-wasm/</code>. The WASM binary is SHA-256 verified at runtime before first use. The relay JS code has no access to decryption keys at any point.</p>
 
     <h2 id="burn">Burn-on-read</h2>
-    <p>After <code>GET /v2/outbound/:hash</code> the relay overwrites the blob buffer with random bytes and removes it from memory. Encrypted payload data is never written to disk. No backup, no recovery. (The CT log persists cryptographic hashes to disk, but never payload content.)</p>
+    <p>After <code>GET /v2/outbound/:hash</code> the relay immediately overwrites the blob buffer with cryptographically random bytes and removes the entry from memory. Encrypted payload data is <strong>never written to disk</strong> at any point during the transfer.</p>
+    <p>The CT log persists cryptographic hashes (Merkle leaf hashes, tree hashes, device hashes) to disk — never payload content. Even a complete disk image of the relay server reveals no file contents.</p>
+    <p>Two-step burn: first the blob is zeroed in-place, then the Map entry is deleted. This prevents a brief window where a partial read could occur.</p>
 
     <h2 id="padding">5MB fixed padding</h2>
-    <p>All blobs are padded to exactly 5MB with cryptographically random bytes before upload. An observer on the network cannot determine the size or type of the transferred file.</p>
+    <p>All blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. An observer on the network cannot determine the size, type, or content of the transferred file. All transfers look identical at the network layer — effective DPI masking for classified data flows.</p>
 
+    <h2 id="ct-log">Certificate Transparency log</h2>
+    <p>Every transfer hash and device registration is appended to a public Merkle tree. The root hash changes with every write and is publicly verifiable. Anyone can prove a transfer occurred without learning what was transferred.</p>
+    <pre>GET https://health.paramant.app/v2/ct/log?limit=100&offset=0
+
+<span class="cm">{
+  "root": "cf7436a9efa4ee9a...",
+  "entries": [
+    { "index": 56, "leaf_hash": "ecb779...", "tree_hash": "cf7436...",
+      "device_hash": "ce56ff...", "ts": "2026-04-14T19:07:57Z" }
+  ]
+}</span></pre>
+    <p>Live CT log: <a href="/ct-log" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">paramant.app/ct-log →</a></p>
+
+    <!-- ── Identity & Teams ─────────────────────────────────────── -->
     <h2 id="did">W3C Decentralized Identity</h2>
+    <p>Devices can register a W3C DID backed by ML-DSA-65 and ECDH keys. Once registered, subsequent requests are signed — no API key in the header.</p>
     <pre>POST /v2/did/register
-{ <span class="st">"device_id"</span>: <span class="st">"mri-001"</span>, <span class="st">"ecdh_pub"</span>: <span class="st">"base64..."</span>, <span class="st">"dsa_pub"</span>: <span class="st">"base64..."</span> }
+{ "device_id": "mri-001", "ecdh_pub": "base64...", "dsa_pub": "base64..." }
 
 <span class="cm">{ "did": "did:paramant:abc123...", "ct_index": 42 }
 
-# Authenticate subsequent requests:
+# Authenticate with DID:
 X-DID: did:paramant:abc123...
 X-DID-Signature: base64_request_signed_with_dsa_key</span></pre>
 
-    <h2 id="ct-log">Certificate Transparency log</h2>
-    <p>Every public key registration is appended to a public Merkle tree at <code>GET /v2/ct/log</code>. Anyone can verify a device registration without seeing transferred data.</p>
-
     <h2 id="teams">Team management</h2>
-    <pre><span class="cm"># Create team</span>
-python3 paramant-admin.py team-create --label my-org --stripe-sub sub_xxx --sector health
+    <pre><span class="cm"># Create an API key (admin script)</span>
+python3 scripts/paramant-admin.py add \
+  --label "scanner-room-3" --plan pro --email admin@hospital.nl
 
-<span class="cm"># Add device — auto-bills +€12/mo</span>
-python3 paramant-admin.py team-add --team team_abc123 --label laptop-jan --sector health
+<span class="cm"># Sync to all relay containers</span>
+python3 scripts/paramant-admin.py sync
 
-<span class="cm"># List teams</span>
-python3 paramant-admin.py team-list</pre>
+<span class="cm"># Revoke a key immediately</span>
+python3 scripts/paramant-admin.py revoke --label "scanner-room-3"
+python3 scripts/paramant-admin.py sync</pre>
+    <p>Key changes are zero-downtime — the relay hot-reloads <code>users.json</code> on sync without restart. Revoked keys receive WebSocket close code <code>4401</code> within seconds.</p>
 
     <h2 id="retention">Retention policy</h2>
     <table>
-      <tr><th>Plan</th><th>Default TTL</th><th>Maximum TTL</th></tr>
-      <tr><td>dev</td><td>5 min</td><td>1 hour</td></tr>
-      <tr><td>pro</td><td>5 min</td><td>24 hours</td></tr>
-      <tr><td>enterprise</td><td>5 min</td><td>7 days</td></tr>
+      <tr><th>Plan</th><th>Default TTL</th><th>Maximum TTL</th><th>Max file size</th></tr>
+      <tr><td>Free (pgp_)</td><td>1 hour</td><td>1 hour</td><td>5 MB (padded)</td></tr>
+      <tr><td>Pro</td><td>1 hour</td><td>24 hours</td><td>5 MB</td></tr>
+      <tr><td>Enterprise</td><td>1 hour</td><td>7 days</td><td>5 MB</td></tr>
     </table>
 
-    <h2 id="sectors">Relay routing domains</h2>
-    <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Separate subdomains exist for traffic routing, isolation, and sector-specific compliance documentation — not for different relay configurations.</p>
+    <h2 id="sectors">Relay sectors</h2>
+    <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Sectors are routing domains — they provide traffic isolation and sector-specific compliance documentation. The crypto stack and API surface are identical.</p>
     <table>
-      <tr><th>Domain</th><th>URL</th><th>Primary use case</th><th>Compliance reference</th></tr>
-      <tr><td>health</td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td>NEN 7510, GDPR</td></tr>
-      <tr><td>legal</td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>AVG, eIDAS</td></tr>
-      <tr><td>finance</td><td>finance.paramant.app</td><td>Compliance data, signing keys</td><td>No CLOUD Act, NIS2/DORA</td></tr>
-      <tr><td>iot</td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td>IEC 62443</td></tr>
+      <tr><th>Sector</th><th>URL</th><th>Primary use</th><th>Compliance</th></tr>
+      <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td><a href="/compliance/nen7510" style="color:#5a7a5a">NEN 7510</a>, GDPR</td></tr>
+      <tr><td><span class="sector-badge">legal</span></td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>AVG, eIDAS</td></tr>
+      <tr><td><span class="sector-badge">finance</span></td><td>finance.paramant.app</td><td>ISO 20022, compliance data</td><td><a href="/compliance/nis2" style="color:#5a7a5a">NIS2</a>, DORA</td></tr>
+      <tr><td><span class="sector-badge">iot</span></td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td><a href="/compliance/iec62443" style="color:#5a7a5a">IEC 62443</a></td></tr>
     </table>
-    <p>The <code>sector</code> parameter in the SDK is a routing hint — it selects which subdomain to connect to. The crypto stack, API surface, and burn-on-read behaviour are identical across all domains.</p>
+
+    <!-- ── Security ─────────────────────────────────────────────── -->
+    <h2 id="threat-model">Security — threat model</h2>
+    <p>The relay is <strong>untrusted by design</strong>. Security does not depend on trusting the operator.</p>
+    <table>
+      <tr><th>What a compromised relay can do</th><th>What it cannot do</th></tr>
+      <tr><td>Deny or delay service</td><td>Read file contents (no decryption key)</td></tr>
+      <tr><td>Learn transfer timing and frequency</td><td>Substitute a registered ML-KEM public key (CT log prevents rollback)</td></tr>
+      <tr><td>Observe blob sizes (all fixed 5 MB)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
+      <tr><td>Block a specific device hash</td><td>Decrypt any stored ciphertext</td></tr>
+    </table>
+    <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not sufficient — both must be broken simultaneously.</p>
+
+    <div class="callout">
+      <p><strong style="color:#7a9a7a">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata — not plaintext.</p>
+    </div>
+
+    <h3>Jurisdiction</h3>
+    <p>Managed relay infrastructure runs exclusively on <strong>Hetzner Frankfurt, Germany</strong>. EU/GDPR jurisdiction applies. No US Cloud Act jurisdiction — Hetzner is a German company with no US parent. No metadata leaves the EU.</p>
+
+    <h2 id="audits">Security audits</h2>
+    <table>
+      <tr><th>Date</th><th>Auditor</th><th>Findings</th><th>Status</th></tr>
+      <tr><td>Apr 2026</td><td>R. Zwarts (verification)</td><td>14 total (1H · 8M · 5L)</td><td>All resolved — e6f216d</td></tr>
+      <tr><td>Apr 2026</td><td>R. Zwarts (independent)</td><td>6 total (3H · 3M)</td><td>All resolved — 0db3ef0</td></tr>
+      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>All resolved — 0db3ef0</td></tr>
+    </table>
+    <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">SECURITY.md</a>. To report a vulnerability: <a href="mailto:privacy@paramant.app" style="color:#6a9a6a">privacy@paramant.app</a>.</p>
+
+    <!-- ── Compliance ───────────────────────────────────────────── -->
+    <h2 id="compliance-nis2">Compliance — NIS2 / DORA</h2>
+    <p><strong>NIS2 (EU 2022/2555)</strong> applies to operators of essential services in the EU. PARAMANT supports NIS2 compliance through:</p>
+    <ul>
+      <li>Post-quantum encryption (future-proof cryptographic resilience)</li>
+      <li>Merkle CT log — tamper-evident audit trail for every transfer</li>
+      <li>EU-only infrastructure (Hetzner DE) — no data leaves EU jurisdiction</li>
+      <li>Burn-on-read — minimises data retention exposure</li>
+      <li>Zero-downtime key revocation — immediate incident response capability</li>
+    </ul>
+    <p><strong>DORA (EU 2022/2554)</strong> applies to financial entities. The finance.paramant.app sector is designed with DORA in mind: per-transaction Merkle proof, no US Cloud Act jurisdiction, ISO 20022 compatible.</p>
+    <p><a href="/compliance/nis2" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">View full NIS2 compliance documentation →</a></p>
+
+    <h2 id="compliance-nen7510">NEN 7510 (Healthcare)</h2>
+    <p>NEN 7510 is the Dutch standard for information security in healthcare. The health.paramant.app sector is designed for NEN 7510 compliance:</p>
+    <ul>
+      <li>Encrypted in transit and at rest (technically: RAM only, never disk)</li>
+      <li>Access logging via CT log — cryptographic proof of every access event</li>
+      <li>Device identity registration (DID) — traceable per-device access</li>
+      <li>Key-based access control — per-user API keys with revocation</li>
+      <li>Hetzner DE — EU GDPR jurisdiction, suitable for patient data routing</li>
+    </ul>
+    <p><a href="/compliance/nen7510" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">View full NEN 7510 compliance documentation →</a></p>
+
+    <h2 id="compliance-iec62443">IEC 62443 (Industrial / OT)</h2>
+    <p>IEC 62443 is the international standard for operational technology security. The iot.paramant.app sector supports IEC 62443 deployments:</p>
+    <ul>
+      <li>Acts as a quantum-safe data diode — PLCs/sensors push data without opening inbound ports</li>
+      <li>No VPN, no certificates on OT side — works with Raspberry Pi and any Linux device</li>
+      <li>Fixed 5MB padding — traffic analysis cannot distinguish heartbeats from payloads</li>
+      <li>Network segmentation — OT side connects outbound only; IT side receives inbound only</li>
+      <li>ML-DSA-65 device signatures — cryptographic device authentication</li>
+    </ul>
+    <p><a href="/compliance/iec62443" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">View full IEC 62443 compliance documentation →</a></p>
+
+    <!-- ── FAQ ──────────────────────────────────────────────────── -->
+    <h2 id="faq">Frequently asked questions</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">Can the relay operator read my files?</div>
+      <div class="faq-a">No. Encryption happens in the browser or SDK before the file leaves your device. The relay receives ciphertext it cannot decrypt. Even a full root compromise of the relay server yields only encrypted blobs and Merkle hashes.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What happens after the file is downloaded?</div>
+      <div class="faq-a">The blob buffer is immediately overwritten with random bytes and removed from memory. There is no recovery, no backup, and no second download. The CT log records a cryptographic hash of the event but never the file content.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Is Community Edition really free forever?</div>
+      <div class="faq-a">Yes. Up to 5 users, no license key required, no time limit. The 6th user returns HTTP 402 — add a <code>PLK_KEY</code> to .env to unlock unlimited users. Source is available under BUSL-1.1.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What is the difference between pgp_ and plk_ keys?</div>
+      <div class="faq-a"><code>pgp_</code> keys are for end users — they authenticate API calls to send and receive files. <code>plk_</code> keys are relay license keys for operators — they go in .env, not in API calls, and unlock unlimited user capacity. They are never the same key and cannot be substituted for each other.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How does 5MB padding protect me?</div>
+      <div class="faq-a">All transfers — regardless of actual file size — appear as identical 5 MiB blobs on the network. A passive observer cannot determine whether you transferred a 1 KB heartbeat or a 4.9 MB DICOM scan. This defeats traffic analysis and DPI-based content classification.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I run this on a Raspberry Pi?</div>
+      <div class="faq-a">Yes. The relay runs on arm64 — Raspberry Pi 3B+, 4, and 5 are supported. The <code>curl -fsSL https://paramant.app/install-pi.sh | bash</code> script detects your Pi model, installs Docker, disables swap, and starts the relay. Minimum 512 MB RAM for a single-sector relay.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Is the source code auditable?</div>
+      <div class="faq-a">Yes. The full relay source is at <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:#6a9a6a">github.com/Apolloccrypt/paramant-relay</a> under BUSL-1.1. Three independent security audits were conducted in April 2026 — all findings are publicly documented in SECURITY.md. The relay binary checksum is verified on startup and logged to the CT log.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What is Ghost Pipe?</div>
+      <div class="faq-a">Ghost Pipe is the relay protocol: a WebSocket-based, post-quantum encrypted transfer protocol where data is stored in RAM only, destroyed after one download, and padded to a fixed size. It is designed for adversarial environments where the relay itself may be compromised.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I get a pgp_ API key?</div>
+      <div class="faq-a">Send an email to <a href="mailto:privacy@paramant.app?subject=Free+API+key+request" style="color:#6a9a6a">privacy@paramant.app</a> with subject "Free API key request". Free keys allow 10 uploads/day, 1-hour TTL. No account, no credit card required.</div>
+    </div>
+
   </div>
 </div>
 
@@ -286,6 +663,5 @@ window.addEventListener('scroll', () => {
   links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
 }, { passive: true });
 </script>
-
 </body>
 </html>

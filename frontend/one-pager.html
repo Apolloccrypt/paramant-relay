@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Post-Quantum Encrypted File Relay</title>
+<style>
+  @page { size: A4; margin: 18mm 20mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.5pt;
+    color: #111;
+    background: #fff;
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 18mm 20mm;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2.5px solid #111;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+  }
+  .logo-block h1 {
+    font-size: 22pt;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+  .logo-block p {
+    font-size: 9pt;
+    color: #555;
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .badge-block {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .badge {
+    font-size: 7.5pt;
+    font-weight: 700;
+    border: 1.5px solid #111;
+    border-radius: 3px;
+    padding: 2px 7px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+
+  /* Section headings */
+  h2 {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #555;
+    margin-bottom: 6px;
+    margin-top: 18px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 3px;
+  }
+
+  /* Problem */
+  .problem-block {
+    background: #f5f5f5;
+    border-left: 4px solid #111;
+    padding: 10px 14px;
+    margin-top: 18px;
+    margin-bottom: 0;
+  }
+  .problem-block p {
+    font-size: 13pt;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #111;
+  }
+  .problem-block small {
+    display: block;
+    margin-top: 5px;
+    font-size: 9pt;
+    color: #555;
+    font-weight: 400;
+  }
+
+  /* Solution */
+  .solution-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 0;
+  }
+  .solution-list li {
+    background: #fff;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .solution-list li strong {
+    display: block;
+    font-size: 9.5pt;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .solution-list li span {
+    font-size: 8.5pt;
+    color: #555;
+    line-height: 1.4;
+  }
+
+  /* Use cases */
+  .usecases {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .uc {
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 9px 10px;
+  }
+  .uc strong {
+    display: block;
+    font-size: 8.5pt;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .uc span {
+    font-size: 8pt;
+    color: #555;
+    line-height: 1.35;
+  }
+  .uc .tag {
+    display: inline-block;
+    font-size: 6.5pt;
+    font-weight: 700;
+    background: #f0f0f0;
+    border-radius: 2px;
+    padding: 1px 5px;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  /* Specs + Compliance side by side */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Tech specs table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+  td {
+    padding: 4px 0;
+    vertical-align: top;
+    border-bottom: 1px solid #ebebeb;
+    line-height: 1.4;
+  }
+  td:first-child {
+    font-weight: 600;
+    color: #333;
+    width: 46%;
+    padding-right: 8px;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* Compliance pills */
+  .compliance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .comp-item {
+    border: 1.5px solid #ddd;
+    border-radius: 3px;
+    padding: 6px 8px;
+  }
+  .comp-item strong {
+    display: block;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+  .comp-item span {
+    font-size: 7.5pt;
+    color: #666;
+    line-height: 1.3;
+  }
+
+  /* Pricing */
+  .pricing {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .tier {
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .tier.highlight {
+    border-color: #111;
+    background: #fafafa;
+  }
+  .tier .tier-name {
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tier .price {
+    font-size: 16pt;
+    font-weight: 800;
+    margin: 4px 0 2px;
+    line-height: 1;
+  }
+  .tier .price sub {
+    font-size: 8pt;
+    font-weight: 400;
+    color: #888;
+  }
+  .tier .tier-desc {
+    font-size: 8pt;
+    color: #555;
+    line-height: 1.4;
+  }
+  .tier ul {
+    margin-top: 6px;
+    padding-left: 12px;
+    font-size: 8pt;
+    color: #444;
+    line-height: 1.55;
+  }
+
+  /* Footer / CTA */
+  footer {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 2px solid #111;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cta-left {
+    font-size: 11pt;
+    font-weight: 700;
+  }
+  .cta-left span {
+    font-weight: 400;
+    color: #555;
+    font-size: 9pt;
+    display: block;
+    margin-top: 2px;
+  }
+  .cta-right {
+    text-align: right;
+    font-size: 8.5pt;
+    color: #555;
+    line-height: 1.6;
+  }
+  .cta-right a {
+    color: #111;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  /* Print button — hidden when printing */
+  .print-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #111;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 10pt;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  @media print {
+    .print-btn { display: none; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Post-Quantum Encrypted File Relay</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge">ML-KEM-768</span>
+    <span class="badge">Burn-on-read</span>
+    <span class="badge">EU hosted</span>
+    <span class="badge">NIS2 ready</span>
+  </div>
+</header>
+
+<!-- PROBLEM -->
+<div class="problem-block">
+  <p>Sensitive files in transit are your biggest audit risk.</p>
+  <small>Email attachments linger in inboxes, cloud shares remain accessible long after a deal closes, and legacy transfer tools have no post-quantum protection. One breach exposes patient records, legal strategy, or industrial controls — and triggers mandatory reporting under NIS2, DORA, and NEN 7510.</small>
+</div>
+
+<!-- SOLUTION -->
+<h2>Solution</h2>
+<ul class="solution-list">
+  <li>
+    <strong>Post-quantum by default</strong>
+    <span>ML-KEM-768 + ECDH P-256 hybrid key exchange. Files are unreadable even by a future quantum adversary.</span>
+  </li>
+  <li>
+    <strong>Burn-on-read</strong>
+    <span>Each file is destroyed immediately after the first authorised download. No residual copies, no shared drives, no data leakage.</span>
+  </li>
+  <li>
+    <strong>EU jurisdiction, your keys</strong>
+    <span>Servers on Hetzner DE. End-to-end encryption means we never hold plaintext. Tamper-evident CT log for every transfer.</span>
+  </li>
+</ul>
+
+<!-- USE CASES -->
+<h2>Use Cases</h2>
+<div class="usecases">
+  <div class="uc">
+    <span class="tag">Healthcare</span>
+    <strong>Patient data &amp; imaging</strong>
+    <span>DICOM, EPD exports, and lab results — compliant with NEN 7510 and AVG. One-time links, logged in the CT chain.</span>
+  </div>
+  <div class="uc">
+    <span class="tag">Legal</span>
+    <strong>Contracts &amp; discovery</strong>
+    <span>Send due-diligence packages under eIDAS-compliant identity. Files vanish after counsel opens them.</span>
+  </div>
+  <div class="uc">
+    <span class="tag">Finance</span>
+    <strong>Reports &amp; SWIFT documents</strong>
+    <span>DORA-ready audit trail. Every transfer timestamped and included in an immutable Merkle log.</span>
+  </div>
+  <div class="uc">
+    <span class="tag">Industrial IoT</span>
+    <strong>Firmware &amp; config push</strong>
+    <span>IEC 62443-aligned. Signed device identity, Ghost Pipe streaming for bandwidth-constrained edges.</span>
+  </div>
+</div>
+
+<!-- SPECS + COMPLIANCE -->
+<div class="two-col">
+  <div>
+    <h2>Technical Specifications</h2>
+    <table>
+      <tr><td>Key exchange</td><td>ML-KEM-768 + ECDH P-256 hybrid (FIPS 203 draft)</td></tr>
+      <tr><td>Symmetric cipher</td><td>AES-256-GCM with per-file random IV</td></tr>
+      <tr><td>Integrity</td><td>Merkle CT log, SHA-256 leaf hashes</td></tr>
+      <tr><td>Relay identity</td><td>ML-DSA-65 self-signed certificate</td></tr>
+      <tr><td>Transport</td><td>TLS 1.3, optional WebSocket streaming</td></tr>
+      <tr><td>File size</td><td>Up to 5 MB (padded to hide true size)</td></tr>
+      <tr><td>Infrastructure</td><td>Hetzner Falkenstein DE, no US sub-processors</td></tr>
+      <tr><td>License</td><td>BUSL-1.1 CE (≤5 users free), Pro key for unlimited</td></tr>
+    </table>
+  </div>
+  <div>
+    <h2>Compliance</h2>
+    <div class="compliance-grid">
+      <div class="comp-item">
+        <strong>NIS2</strong>
+        <span>Incident reporting, audit logging, and post-quantum transport satisfy NIS2 Annex I &amp; II obligations.</span>
+      </div>
+      <div class="comp-item">
+        <strong>NEN 7510</strong>
+        <span>Healthcare information security standard met via end-to-end encryption, burn-on-read, and access logging.</span>
+      </div>
+      <div class="comp-item">
+        <strong>DORA</strong>
+        <span>Immutable CT log and resilient multi-relay architecture support DORA ICT risk management requirements.</span>
+      </div>
+      <div class="comp-item">
+        <strong>IEC 62443</strong>
+        <span>Signed device identities, segmented relay sectors, and encrypted OT/IoT payloads align with IEC 62443-3-3.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<h2>Pricing</h2>
+<div class="pricing">
+  <div class="tier">
+    <div class="tier-name">Community</div>
+    <div class="price">Free</div>
+    <div class="tier-desc">Self-hosted, open source</div>
+    <ul>
+      <li>Up to 5 users</li>
+      <li>All encryption features</li>
+      <li>CT log included</li>
+      <li>Community support</li>
+    </ul>
+  </div>
+  <div class="tier highlight">
+    <div class="tier-name">Professional</div>
+    <div class="price">€149<sub>/mo</sub></div>
+    <div class="tier-desc">Managed or self-hosted</div>
+    <ul>
+      <li>Unlimited users</li>
+      <li>Pro license key (<code>plk_</code>)</li>
+      <li>SLA + email support</li>
+      <li>Compliance export</li>
+    </ul>
+  </div>
+  <div class="tier">
+    <div class="tier-name">Enterprise</div>
+    <div class="price">Custom</div>
+    <div class="tier-desc">On-premise or private cloud</div>
+    <ul>
+      <li>Air-gapped deployment</li>
+      <li>Custom sectors &amp; identity</li>
+      <li>MSA + DPA included</li>
+      <li>Dedicated onboarding</li>
+    </ul>
+  </div>
+</div>
+
+<!-- FOOTER / CTA -->
+<footer>
+  <div class="cta-left">
+    Start free today — deploy in under 5 minutes.
+    <span>Docker image: <code>docker pull mtty001/relay:latest</code></span>
+  </div>
+  <div class="cta-right">
+    <a href="https://paramant.app">paramant.app</a><br>
+    <a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
+    <a href="https://github.com/Apolloccrypt/paramant-relay">github.com/Apolloccrypt/paramant-relay</a>
+  </div>
+</footer>
+
+<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+
+</body>
+</html>
