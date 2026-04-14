@@ -1,10 +1,10 @@
-# PARAMANT Ghost Pipe Relay — v2.4.2
+# PARAMANT Ghost Pipe Relay — v2.4.5
 
 Node.js relay for PARAMANT Ghost Pipe. One codebase, five sector containers.
 
 ## Requirements
 
-- Node.js >= 20
+- Node.js >= 22
 - Docker 24+ (recommended — use `docker compose`, not bare Node)
 - `npm install` in `relay/` to install `@noble/post-quantum` and other deps
 

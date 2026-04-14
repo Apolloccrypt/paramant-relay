@@ -206,6 +206,22 @@ The relay is **untrusted by design** — it never holds a decryption key.
 
 All findings publicly documented in [SECURITY.md](SECURITY.md). To report: privacy@paramant.app
 
+**v2.4.5 (April 2026):** Full security hardening — all 20 R. Zwarts audit findings:
+- Node.js 20 EOL → **node:22-alpine**; express 4.x → **5.x**; 0 npm vulnerabilities
+- `timingSafeEqual` + per-IP rate limiter on admin login (max 5/min)
+- TOTP: full window scan + `_usedTotpCodes` replay prevention
+- Async CT log write stream + size-based rotation
+- Webhook SSRF: DNS resolved immediately before connect + port allowlist (443/80)
+- Relay registry cap + `limit`/`offset` pagination; WebSocket close on key revoke (`4401`)
+- `VALID_PLANS` allowlist; `TOTP_SECRET` validated at startup
+- install.sh + install-pi.sh: pinned to v2.4.5; nginx exact-match location blocks for `.sh` install scripts
+
+**v2.4.4 (April 2026):** RAPTOR audit — relay findings:
+- Admin container now has `read_only: true` + `tmpfs: /tmp` (H1)
+- `timingSafeEqual` on `ADMIN_TOKEN` (M1); per-IP MFA rate limit (M2)
+- `device_id` length cap 256 chars (M3); sdk-py synced to v2.4.1 (M4)
+- XSS escape in admin overview sector names (M5); email + label validation on key create (L4)
+
 **v2.4.2 (April 2026):** Relay registry:
 - Each relay generates an ML-DSA-65 identity keypair on first boot (`/data/relay-identity.json`)
 - `POST /v2/relays/register` — signed self-registration appended to CT log (public, no API key)
