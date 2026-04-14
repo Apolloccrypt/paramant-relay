@@ -102,6 +102,7 @@ tr:last-child td{border-bottom:none}
     <h3>paramant-client</h3>
     <a href="#client-deb">.deb install</a>
     <a href="#client-cli">CLI reference</a>
+    <a href="#paramant-os-tools">ParamantOS tools</a>
     <h3>Protocol</h3>
     <a href="#crypto">Crypto stack</a>
     <a href="#burn">Burn-on-read</a>
@@ -504,6 +505,50 @@ paramant-send --key pgp_xxx --sector health --ack scan.dcm
 
 <span class="cm"># Example — stream mode (process persists, receives all blobs)</span>
 paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/api</pre>
+
+    <!-- ── ParamantOS CLI tools ───────────────────────────────────── -->
+    <h2 id="paramant-os-tools">ParamantOS — 38 operator tools</h2>
+    <p><a href="https://github.com/Apolloccrypt/ParamantOS" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">ParamantOS</a> is a hardened Linux distribution (NixOS + Mint editions) for relay operators. All 38 tools are pre-installed.</p>
+    <table>
+      <tr><th>Category</th><th>Command</th><th>What it does</th></tr>
+      <tr><td rowspan="5" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Setup &amp; diagnostics</td><td>paramant-setup</td><td>First-boot wizard — password, relay URL, API key</td></tr>
+      <tr><td>paramant-help</td><td>Full command reference</td></tr>
+      <tr><td>paramant-info</td><td>System overview — OS, relay version, uptime</td></tr>
+      <tr><td>paramant-doctor</td><td>Automated health check for relay + security</td></tr>
+      <tr><td>paramant-install</td><td>Interactive disk installer</td></tr>
+      <tr><td rowspan="7" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Relay control</td><td>paramant-status</td><td>Relay health, version, edition, uptime</td></tr>
+      <tr><td>paramant-relay-setup</td><td>Clone relay repo + configure .env + start Docker</td></tr>
+      <tr><td>paramant-relay-ctl</td><td>Privileged relay service control (start/stop/reload)</td></tr>
+      <tr><td>paramant-restart</td><td>Restart the relay</td></tr>
+      <tr><td>paramant-dashboard</td><td>Live TUI dashboard — stats, connections, throughput</td></tr>
+      <tr><td>paramant-logs</td><td>Live relay log stream</td></tr>
+      <tr><td>paramant-update</td><td>Check for relay updates and show upgrade path</td></tr>
+      <tr><td rowspan="7" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Sector tools</td><td>paramant-referral</td><td>Healthcare referral — NEN 7510, HL7 FHIR, DICOM</td></tr>
+      <tr><td>paramant-notary</td><td>Legal document transport — eIDAS, KNB notary</td></tr>
+      <tr><td>paramant-legal</td><td>Court document relay (replaces Zivver/e-Court)</td></tr>
+      <tr><td>paramant-payslip</td><td>HR payslip distribution — GDPR compliant bulk send</td></tr>
+      <tr><td>paramant-firmware</td><td>IoT/body cam firmware updates — IEC 62443</td></tr>
+      <tr><td>paramant-cra</td><td>Software supply chain relay — EU CRA 2027, SBOM</td></tr>
+      <tr><td>paramant-ticket</td><td>One-time transit ticket issuer and verifier</td></tr>
+      <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Key management</td><td>paramant-keys</td><td>List all API keys</td></tr>
+      <tr><td>paramant-key-add</td><td>Add a new API key</td></tr>
+      <tr><td>paramant-key-revoke</td><td>Revoke an API key</td></tr>
+      <tr><td>paramant-license</td><td>Show license status and upgrade path</td></tr>
+      <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Network</td><td>paramant-ip</td><td>IP addresses, interfaces, relay accessibility</td></tr>
+      <tr><td>paramant-ports</td><td>Firewall rules and listening ports</td></tr>
+      <tr><td>paramant-wifi</td><td>Interactive WiFi manager</td></tr>
+      <tr><td>paramant-scan</td><td>Discover paramant relay nodes via registry</td></tr>
+      <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Security</td><td>security-status</td><td>All security layers at a glance</td></tr>
+      <tr><td>paramant-security</td><td>Firewall, SSH, kernel hardening status</td></tr>
+      <tr><td>paramant-verify</td><td>Out-of-band TOFU fingerprint verification</td></tr>
+      <tr><td>paramant-hybrid-check</td><td>Verify relay hybrid post-quantum mode support</td></tr>
+      <tr><td rowspan="5" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Backup &amp; data</td><td>paramant-backup</td><td>Backup relay keys and CT log</td></tr>
+      <tr><td>paramant-restore</td><td>Restore from backup</td></tr>
+      <tr><td>paramant-export</td><td>Export audit log to USB drive</td></tr>
+      <tr><td>paramant-data-ctl</td><td>Privileged relay data-dir management</td></tr>
+      <tr><td>paramant-cron</td><td>Manage systemd timers for relay maintenance</td></tr>
+    </table>
+    <p>Download ParamantOS: <a href="https://github.com/Apolloccrypt/ParamantOS/releases" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">NixOS edition (v2.4.5)</a> · <a href="https://github.com/Apolloccrypt/ParamantOS/releases/tag/v1.0-mint" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">Mint edition (v1.0-β)</a></p>
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Crypto stack</h2>
