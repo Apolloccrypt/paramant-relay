@@ -40,7 +40,7 @@ x-relay-env: &relay-env
   ADMIN_TOKEN: "${ADMIN_TOKEN}"
   TOTP_SECRET: "${TOTP_SECRET:-}"
   USERS_FILE: "/data/users.json"
-  CT_LOG_FILE: "/data/ct-log.json"
+  CT_FILE: "/data/ct-log.json"
   RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
   RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
   LOG_LEVEL: "${LOG_LEVEL:-info}"
@@ -67,6 +67,8 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "relay"
+      RELAY_SELF_URL: "https://relay.paramant.app"
+      RELAY_PRIMARY_URL: "https://health.paramant.app"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -89,6 +91,8 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "health"
+      RELAY_SELF_URL: "https://health.paramant.app"
+      RELAY_PRIMARY_URL: "https://health.paramant.app"
     ports:
       - "127.0.0.1:3001:3000"
     volumes:
@@ -111,6 +115,8 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "finance"
+      RELAY_SELF_URL: "https://finance.paramant.app"
+      RELAY_PRIMARY_URL: "https://health.paramant.app"
     ports:
       - "127.0.0.1:3002:3000"
     volumes:
@@ -133,6 +139,8 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "legal"
+      RELAY_SELF_URL: "https://legal.paramant.app"
+      RELAY_PRIMARY_URL: "https://health.paramant.app"
     ports:
       - "127.0.0.1:3003:3000"
     volumes:
@@ -156,6 +164,8 @@ services:
       <<: *relay-env
       SECTOR: "iot"
       RELAY_MODE: "${IOT_RELAY_MODE:-iot}"
+      RELAY_SELF_URL: "https://iot.paramant.app"
+      RELAY_PRIMARY_URL: "https://health.paramant.app"
     ports:
       - "127.0.0.1:3004:3000"
     volumes:
