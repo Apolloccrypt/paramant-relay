@@ -1112,7 +1112,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v2/ct/log') {
     const limit = Math.min(parseInt(query.limit || '100'), 1000);
     const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
+    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
   }
