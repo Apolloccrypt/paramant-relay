@@ -233,7 +233,16 @@ if (CT_FILE) {
   try {
     const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
     for (const line of lines) {
-      try { ctLog.push(JSON.parse(line)); } catch {}
+      try {
+        const parsed = JSON.parse(line);
+        if (Array.isArray(parsed)) {
+          for (const entry of parsed) {
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) ctLog.push(entry);
+          }
+        } else {
+          ctLog.push(parsed);
+        }
+      } catch {}
     }
     if (ctLog.length) log('info', 'ct_log_loaded', { entries: ctLog.length, file: CT_FILE });
   } catch (e) {
