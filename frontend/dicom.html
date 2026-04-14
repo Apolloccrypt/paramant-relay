@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DICOM via Paramant — NEN 7510 compliant file relay for healthcare</title>
+<meta name="description" content="Send DICOM files with post-quantum encryption. Burn-on-read relay, zero storage, Merkle audit trail. NEN 7510 · GDPR · EU only.">
+<style>
+:root{
+  --bg:#0a0f0b;
+  --surface:#111612;
+  --border:#1e2b20;
+  --text:#ededed;
+  --muted:#9a9a9a;
+  --quiet:#6e6e6e;
+  --green:#2d8a5c;
+  --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;line-height:1.65}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(10,15,11,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 40px;height:52px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--text);text-decoration:none}
+.nav-links{list-style:none;display:flex;gap:28px}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono);letter-spacing:.02em;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+@media(max-width:600px){nav{padding:0 20px}.nav-links{gap:16px}}
+
+/* LAYOUT */
+.page-wrap{max-width:860px;margin:0 auto;padding:64px 40px 100px}
+@media(max-width:600px){.page-wrap{padding:40px 20px 80px}}
+
+/* HERO */
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--green);letter-spacing:.05em;margin-bottom:24px}
+.hero-badge span{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
+h1{font-size:clamp(26px,5vw,42px);font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-bottom:16px}
+h1 em{font-style:normal;color:var(--green)}
+.hero-sub{font-size:16px;color:var(--muted);max-width:620px;line-height:1.7;margin-bottom:32px}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:56px}
+.btn-p{display:inline-block;background:var(--green);color:#fff;font-size:13px;font-family:var(--mono);font-weight:600;padding:10px 22px;border-radius:5px;text-decoration:none;letter-spacing:.02em;transition:opacity .15s}
+.btn-p:hover{opacity:.85}
+.btn-s{display:inline-block;background:transparent;color:var(--muted);border:1px solid var(--border);font-size:13px;font-family:var(--mono);padding:10px 22px;border-radius:5px;text-decoration:none;letter-spacing:.02em;transition:color .15s,border-color .15s}
+.btn-s:hover{color:var(--text);border-color:var(--text)}
+
+/* COMPLIANCE STRIP */
+.compliance-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:56px}
+.comp-pill{font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);border-radius:3px;padding:4px 10px;letter-spacing:.04em}
+
+/* DIVIDER */
+hr{border:none;border-top:1px solid var(--border);margin:48px 0}
+
+/* SECTION HEADINGS */
+h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+h3{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:28px 0 10px;color:var(--text)}
+p.lead{font-size:15px;color:var(--muted);line-height:1.75;margin-bottom:20px;max-width:680px}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;margin:16px 0 24px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);padding:8px 12px;border-bottom:1px solid var(--border)}
+td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;line-height:1.5}
+td:first-child{color:var(--text);font-weight:500;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+
+/* ARCHITECTURE */
+.arch-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px 28px;font-family:var(--mono);font-size:13px;color:var(--muted);line-height:2.1;margin:16px 0 24px}
+.arch-block .node{color:var(--text);font-weight:600}
+.arch-block .label{color:var(--quiet);font-size:11px}
+.arch-block .relay{color:var(--green)}
+
+/* STEP */
+.steps{counter-reset:step;list-style:none;margin:0 0 24px}
+.steps>li{counter-increment:step;margin-bottom:36px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);border:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--quiet);font-weight:700;margin-bottom:8px}
+
+/* CODE */
+pre{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 20px;font-family:var(--mono);font-size:12.5px;color:#c8d3c9;line-height:1.75;overflow-x:auto;margin:10px 0 16px;tab-size:2}
+pre .cm{color:var(--quiet)}
+pre .kw{color:#7db8a0}
+pre .st{color:#b8c9a4}
+code{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:#c8d3c9}
+
+/* COMPLIANCE TABLE */
+.comp-table td:nth-child(3){font-size:12px;color:var(--quiet)}
+.check-green{color:var(--green);font-weight:700}
+
+/* FAQ */
+.faq{margin-top:4px}
+.faq-item{border-top:1px solid var(--border);padding:18px 0}
+.faq-item:last-child{border-bottom:1px solid var(--border)}
+.faq-q{font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px}
+.faq-a{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* CTA BLOCK */
+.cta-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;margin-top:48px}
+.cta-block h3{margin:0 0 6px;font-size:16px}
+.cta-block p{font-size:13px;color:var(--muted);margin:0}
+.cta-links{display:flex;gap:12px;flex-wrap:wrap}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--quiet);font-family:var(--mono)}
+footer a{color:var(--quiet);text-decoration:none}
+footer a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li><a href="/#sectors">Use cases</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="/#pricing">Pricing</a></li>
+    <li><a href="/#selfhost">Self-host</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- HERO -->
+  <div class="hero-badge"><span></span>Healthcare · NEN 7510 · GDPR</div>
+  <h1>DICOM files delivered.<br><em>Then destroyed.</em></h1>
+  <p class="hero-sub">Send MRI, CT, and X-ray files via post-quantum encrypted relay. Client-side encryption, burn-on-read, Merkle audit trail. Zero persistent storage. EU only.</p>
+  <div class="hero-btns">
+    <a href="mailto:privacy@paramant.app?subject=DICOM+key+request" class="btn-p">Request access &rarr;</a>
+    <a href="#setup" class="btn-s">Setup guide &darr;</a>
+  </div>
+
+  <div class="compliance-strip">
+    <span class="comp-pill">NEN 7510-1/2</span>
+    <span class="comp-pill">GDPR Art. 32</span>
+    <span class="comp-pill">EU jurisdiction — Hetzner DE</span>
+    <span class="comp-pill">ML-KEM-768 (FIPS 203)</span>
+    <span class="comp-pill">Burn-on-read</span>
+    <span class="comp-pill">Verwerkersovereenkomst beschikbaar</span>
+  </div>
+
+  <hr>
+
+  <!-- THE PROBLEM -->
+  <h2>The problem with DICOM transport</h2>
+  <p class="lead">DICOM files carry the most sensitive patient data there is: images, metadata with BSN, birth date, diagnosis codes, referring physician. Every transfer is a compliance event.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Requirement</th><th>Regulation</th><th>Legacy solutions fail because...</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>End-to-end encrypted transport</td><td>GDPR Art. 32 · NEN 7510-2</td><td>SFTP encrypts the channel, not the file. Email is plaintext. WeTransfer has no E2E.</td></tr>
+        <tr><td>No persistent storage of patient data</td><td>GDPR Art. 5(1)(e) · NEN 7510-1</td><td>Cloud shares, email attachments, and SFTP all retain copies indefinitely.</td></tr>
+        <tr><td>Tamper-evident audit trail</td><td>NEN 7510-1 §9.4 · WGBO</td><td>SFTP logs are mutable. Email headers are forgeable. WeTransfer provides no audit export.</td></tr>
+        <tr><td>EU jurisdiction only</td><td>GDPR Art. 46</td><td>Most SaaS solutions route through US infrastructure (AWS, Azure, GCP).</td></tr>
+        <tr><td>Post-quantum readiness by 2030</td><td>NCSC PQC migration guideline</td><td>No widely deployed file transfer tool uses ML-KEM or equivalent today.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- ARCHITECTURE -->
+  <h2>Architecture</h2>
+  <p class="lead">All encryption happens on the client. The relay sees only opaque ciphertext. The file is destroyed after the first authorised download.</p>
+
+  <div class="arch-block">
+<span class="node">[PACS / radiology workstation / MRI scanner export]</span>
+  │
+  ▼  <span class="label">encrypt client-side — ML-KEM-768 + ECDH P-256 → AES-256-GCM</span>
+<span class="node">paramant-sender.py</span>
+  │
+  ▼  <span class="label">ciphertext only — relay has zero plaintext access</span>
+<span class="relay">health.paramant.app</span>  <span class="label">(Hetzner Frankfurt DE · RAM only · no disk write)</span>
+  │
+  ▼  <span class="label">burn-on-read — destroyed after first download</span>
+<span class="node">paramant-receiver.py</span>
+  │
+  ▼  <span class="label">decrypts client-side, forwards to PACS</span>
+<span class="node">[Destination PACS / reading station / archive]</span>
+  │
+  ▼  <span class="label">Merkle leaf hash recorded in CT log — proof of delivery, no content</span>
+<span class="relay">health.paramant.app/v2/ct/log</span>
+  </div>
+
+  <hr>
+
+  <!-- SETUP GUIDE -->
+  <h2 id="setup">Step-by-step setup</h2>
+
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <h3>Install the paramant client</h3>
+      <p class="lead">Runs on any Debian/Ubuntu system, including Raspberry Pi and embedded Linux. No Python environment needed — the .deb bundles everything.</p>
+      <pre><span class="cm"># Debian / Ubuntu (amd64 or arm64)</span>
+curl -fsSL https://paramant.app/install-client.sh | bash
+
+<span class="cm"># Or manual .deb install</span>
+wget https://github.com/Apolloccrypt/paramant-relay/releases/latest/download/paramant-client_amd64.deb
+sudo dpkg -i paramant-client_amd64.deb
+
+<span class="cm"># Verify</span>
+paramant-sender.py --version
+<span class="cm"># paramant-client 2.4.5</span></pre>
+    </li>
+
+    <li>
+      <div class="step-num">2</div>
+      <h3>Configure</h3>
+      <p class="lead">Request a <code>pgp_</code> API key at <a href="mailto:privacy@paramant.app?subject=DICOM+key+request" style="color:var(--green);text-decoration:none">privacy@paramant.app</a>. Keys for healthcare are issued against the <code>health.paramant.app</code> sector.</p>
+      <pre><span class="cm"># Interactive setup</span>
+paramant-setup
+<span class="cm"># Relay:  health.paramant.app</span>
+<span class="cm"># Key:    pgp_xxxxxxxxxxxxxxxx</span>
+<span class="cm"># Device: mri-001</span>
+
+<span class="cm"># Or write config directly</span>
+mkdir -p ~/.paramant
+cat &gt; ~/.paramant/config.json &lt;&lt;EOF
+{
+  <span class="st">"relay"</span>:  <span class="st">"https://health.paramant.app"</span>,
+  <span class="st">"key"</span>:    <span class="st">"pgp_xxxxxxxxxxxxxxxx"</span>,
+  <span class="st">"device"</span>: <span class="st">"mri-001"</span>,
+  <span class="st">"sector"</span>: <span class="st">"health"</span>
+}
+EOF</pre>
+    </li>
+
+    <li>
+      <div class="step-num">3</div>
+      <h3>Send a DICOM file</h3>
+      <p class="lead">Files are encrypted before leaving the machine. The relay only sees ciphertext.</p>
+      <pre><span class="cm"># Single file</span>
+paramant-sender.py --key pgp_xxx --device mri-001 --sector health scan.dcm
+<span class="cm"># → Uploaded: https://health.paramant.app/v2/blob/abc123</span>
+<span class="cm"># → CT leaf:  3fa7b2c4d8e1...</span>
+<span class="cm"># → Expires:  burn-on-read (no TTL)</span>
+
+<span class="cm"># Watch folder — auto-send new DICOM files as they appear</span>
+paramant-sender.py \
+  --watch /dicom/outbox/ \
+  --device mri-001 \
+  --sector health \
+  --key pgp_xxx</pre>
+      <h3>Persistent watch with systemd</h3>
+      <pre><span class="cm"># /etc/systemd/system/paramant-dicom.service</span>
+[Unit]
+Description=Paramant DICOM sender
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/paramant-sender.py \
+  --watch /dicom/outbox/ \
+  --device mri-001 \
+  --sector health \
+  --key pgp_xxx
+Restart=always
+RestartSec=10
+User=paramant
+
+[Install]
+WantedBy=multi-user.target</pre>
+      <pre>sudo systemctl enable --now paramant-dicom</pre>
+    </li>
+
+    <li>
+      <div class="step-num">4</div>
+      <h3>Receive and forward to PACS</h3>
+      <p class="lead">The receiver polls the relay, decrypts locally, and forwards the raw DICOM bytes to your PACS.</p>
+      <pre><span class="cm"># STOW-RS compatible endpoint</span>
+paramant-receiver.py \
+  --key pgp_xxx \
+  --sector health \
+  --forward http://pacs.hospital.nl:11112/api/dicom
+
+<span class="cm"># DICOM DIMSE (C-STORE SCU)</span>
+paramant-receiver.py \
+  --key pgp_xxx \
+  --sector health \
+  --forward-dcm pacs.hospital.nl:11112 \
+  --forward-aet DESTINATION_AET</pre>
+    </li>
+
+    <li>
+      <div class="step-num">5</div>
+      <h3>Verify delivery in the CT log</h3>
+      <p class="lead">Every transfer creates a Merkle leaf hash. The log proves delivery at a specific timestamp without storing any patient data.</p>
+      <pre>curl https://health.paramant.app/v2/ct/log?limit=5 \
+  -H <span class="st">"X-Api-Key: pgp_xxx"</span> \
+  | python3 -m json.tool</pre>
+      <pre><span class="cm"># Example response</span>
+{
+  <span class="st">"ok"</span>: true,
+  <span class="st">"root"</span>: <span class="st">"3fa7b2c4..."</span>,
+  <span class="st">"entries"</span>: [
+    {
+      <span class="st">"index"</span>: 47,
+      <span class="st">"leaf_hash"</span>: <span class="st">"3fa7b2c4d8e1..."</span>,
+      <span class="st">"tree_hash"</span>: <span class="st">"9b4c1a2e..."</span>,
+      <span class="st">"device_hash"</span>: <span class="st">"a1b2c3..."</span>,
+      <span class="st">"ts"</span>: 1744649123
+    }
+  ]
+}</pre>
+    </li>
+  </ol>
+
+  <hr>
+
+  <!-- COMPLIANCE -->
+  <h2>Compliance summary</h2>
+  <p class="lead">How Paramant maps to the NEN 7510 and GDPR requirements for DICOM transport.</p>
+
+  <div class="tbl-wrap">
+    <table class="comp-table">
+      <thead>
+        <tr><th>Aspect</th><th>Implementation</th><th>Standard</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Encryption</td><td>ML-KEM-768 (FIPS 203) + AES-256-GCM, client-side only</td><td>NEN 7510-2 A.10.1 · NCSC PQC</td></tr>
+        <tr><td>Storage</td><td>Zero bytes on relay — RAM only, destroyed after first read</td><td>AVG Art. 5(1)(e) · NEN 7510-1</td></tr>
+        <tr><td>Jurisdiction</td><td>Hetzner Falkenstein, Germany — no US sub-processors</td><td>AVG Art. 46</td></tr>
+        <tr><td>Audit trail</td><td>Merkle CT log — SHA-256 leaf hashes, append-only</td><td>NEN 7510-1 §9.4 · WGBO</td></tr>
+        <tr><td>Relay identity</td><td>ML-DSA-65 self-signed relay certificate</td><td>FIPS 204</td></tr>
+        <tr><td>DPA</td><td>Verwerkersovereenkomst (GDPR Art. 28) available on request</td><td>AVG Art. 28</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- FAQ -->
+  <h2>FAQ</h2>
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q">Does the relay store the DICOM file?</div>
+      <div class="faq-a">No. Ciphertext is held in RAM only. It is destroyed immediately after the first authorised download. No disk write occurs at any point. The CT log records only a hash — never the content.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can we run paramant on-premise within the hospital network?</div>
+      <div class="faq-a">Yes. The relay is open source (BUSL-1.1). Deploy it in your own infrastructure. The sender and receiver apply client-side encryption regardless of where the relay runs — even an on-premise operator has zero plaintext access.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What happens if the receiver doesn't download the file?</div>
+      <div class="faq-a">By default, files are burn-on-read with no TTL — they wait in RAM until downloaded. You can set an optional TTL (Professional tier). If the relay restarts, RAM-only blobs are lost — configure disk persistence for resilience in critical workflows.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">DICOM files are often larger than 5 MB — how do you handle that?</div>
+      <div class="faq-a">The relay currently pads all transfers to 5 MB and enforces a hard limit per blob. For large CT/MRI series, split by series UID or use the Enterprise streaming mode which supports up to 500 MB via WebSocket chunking.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is there a verwerkersovereenkomst?</div>
+      <div class="faq-a">Yes. Required under GDPR Art. 28 when patient data is processed by a third party. Available on request: <a href="mailto:privacy@paramant.app?subject=Verwerkersovereenkomst" style="color:var(--green);text-decoration:none">privacy@paramant.app</a></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-block">
+    <div>
+      <h3>Start sending DICOM files today</h3>
+      <p>Request a <code>pgp_</code> key for the healthcare relay. Verwerkersovereenkomst included.</p>
+    </div>
+    <div class="cta-links">
+      <a href="mailto:privacy@paramant.app?subject=DICOM+access+request" class="btn-p">Request access &rarr;</a>
+      <a href="https://health.paramant.app" class="btn-s" target="_blank">Live relay &rarr;</a>
+    </div>
+  </div>
+
+</div><!-- /page-wrap -->
+
+<footer>
+  <a href="/">PARAMANT</a>
+  <span>health.paramant.app &nbsp;·&nbsp; Hetzner Frankfurt DE &nbsp;·&nbsp; NEN 7510 · GDPR</span>
+  <a href="/docs">Docs</a>
+</footer>
+
+</body>
+</html>
