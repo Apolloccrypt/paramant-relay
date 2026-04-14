@@ -745,7 +745,14 @@ initCrypto().catch(e => console.error('WASM init failed:', e));
 </script>
 
 <script>
-const RELAY_API = 'https://health.paramant.app';
+const RELAY_SECTORS = {
+  health:  'https://health.paramant.app',
+  legal:   'https://legal.paramant.app',
+  finance: 'https://finance.paramant.app',
+  iot:     'https://iot.paramant.app',
+};
+let RELAY_API = RELAY_SECTORS.health;
+let activeSector = 'health';
 const RELAY_WS  = 'wss://relay.paramant.app';
 
 // Blocked file extensions
@@ -856,9 +863,25 @@ function clearFile() {
   updateCreateBtn();
 }
 
+// ── Relay discovery ──
+async function discoverRelay(key) {
+  const results = await Promise.allSettled(
+    Object.entries(RELAY_SECTORS).map(async ([sector, url]) => {
+      const r = await fetch(`${url}/v2/check-key`, {headers:{'X-Api-Key':key},signal:AbortSignal.timeout(5000)});
+      const d = await r.json();
+      if (!d.valid) throw new Error('invalid');
+      return { sector, url, plan: d.plan };
+    })
+  );
+  const valid = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (!valid.length) return null;
+  return valid.find(v => v.sector === 'health') || valid[0];
+}
+
 // ── API key validation ──
 async function validateKey() {
   apiKey = document.getElementById('api-key-input').value.trim();
+  if (apiKey) localStorage.setItem('paramant_api_key', apiKey);
   const st = document.getElementById('key-status');
   if (!apiKey.startsWith('pgp_') || apiKey.length < 10) {
     st.textContent = 'Invalid format'; st.className = 'status err';
@@ -866,11 +889,18 @@ async function validateKey() {
   }
   st.textContent = 'Checking...'; st.className = 'status';
   try {
-    const r = await fetch(`${RELAY_API}/v2/check-key`, {headers:{'X-Api-Key':apiKey},signal: AbortSignal.timeout(5000)});
-    const d = await r.json();
-    keyValid = d.valid;
-    st.textContent = d.valid ? `✓ Valid — ${d.plan}` : 'Invalid key';
-    st.className = d.valid ? 'status ok' : 'status err';
+    const found = await discoverRelay(apiKey);
+    if (found) {
+      RELAY_API = found.url;
+      activeSector = found.sector;
+      const sectorLabel = found.sector !== 'health' ? ` · ${found.sector}` : '';
+      st.textContent = `✓ Valid — ${found.plan}${sectorLabel}`;
+      st.className = 'status ok';
+      keyValid = true;
+    } else {
+      st.textContent = 'Invalid or revoked key'; st.className = 'status err';
+      keyValid = false;
+    }
   } catch { st.textContent = 'Cannot verify'; st.className = 'status err'; keyValid = false; }
   updateCreateBtn();
 }
@@ -885,7 +915,7 @@ async function createSession() {
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
   // API key intentionally NOT included in receiver URL — ontvang.html uses the session token only.
   // Relay accepts inv_* session tokens without an API key (INVITE_RE path).
-  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}`;
+  const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&r=${activeSector}`;
 
   // Show QR step
   document.getElementById('send-step-file').style.display = 'none';
@@ -1121,6 +1151,15 @@ function resetReceive() {
   document.getElementById('recv-step-scan').style.display = '';
   document.getElementById('manual-link').value = '';
 }
+
+// ── Restore saved API key ──
+(function() {
+  const saved = localStorage.getItem('paramant_api_key');
+  if (saved) {
+    const input = document.getElementById('api-key-input');
+    if (input) { input.value = saved; validateKey(); }
+  }
+})();
 
 // ── PWA install prompt ──
 let deferredPrompt;
