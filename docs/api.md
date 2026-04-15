@@ -338,6 +338,17 @@ curl https://relay.paramant.app/v2/relays
 # {"total":5,"relays":[{"url":"…","version":"2.4.5","sector":"relay",…}]}
 ```
 
+### POST /v2/request-trial — Request a free trial API key
+
+```bash
+curl -X POST https://relay.paramant.app/v2/request-trial \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane Smith","email":"jane@example.com","use_case":"DICOM transfer for radiology dept"}'
+# {"ok":true,"message":"Trial key sent to jane@example.com"}
+```
+
+Rate limits: 3 requests per IP per 24 hours, 1 request per email address per 7 days. Key is delivered via Resend. Also available via the web form at `https://paramant.app/request-key`.
+
 ### POST /v2/pubkey — Register device public keys
 
 ```bash

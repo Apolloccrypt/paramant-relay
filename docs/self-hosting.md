@@ -115,8 +115,8 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 - See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
 
 **Dockerfile — two-stage build:**
-- Stage 1 (`build`): `node:20-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
-- Stage 2 (`runtime`): lean `node:20-alpine` → copies only compiled `node_modules` + `relay.js`. No compilers, no build tools in the production image.
+- Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
+- Stage 2 (`runtime`): lean `node:22-alpine` → copies only compiled `node_modules` + `relay.js`. No compilers, no build tools in the production image.
 
 ---
 

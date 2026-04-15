@@ -11,15 +11,48 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 - Applied all 20 findings from R. Zwarts audits (2026-04-10 + 2026-04-11)
-- Server hardening: SSH (`PermitRootLogin prohibit-password`, `MaxAuthTries 3`), HSTS on all 6 nginx blocks, CSP cleaned (Google Fonts removed), `.env` permissions fixed, `atd` disabled, NATS moved to dedicated non-root user
+- Server hardening: SSH (`PermitRootLogin prohibit-password`, `MaxAuthTries 3`), HSTS on all 7 nginx server blocks, TLS restricted to 1.2/1.3 with forward-secret cipher suite (`ECDHE-*-GCM` + `CHACHA20-POLY1305`) on all 443 vhosts, CSP cleaned (Google Fonts removed), `.env` permissions (600) fixed, `atd` disabled, NATS moved to dedicated non-root user
 - Docker containers confirmed running as non-root (admin + relay)
+- Stale debug process killed (API key was visible in `ps aux`)
+- Spurious `arm64` architecture removed from `apt` sources
 - `/download` (outdated v0.2.0) and `/chat` (orphaned) return 410 Gone
 - `/security` and `/changelog` redirect to GitHub
+- CIS Ubuntu 24.04 benchmark: 114 checks applied (full results in SECURITY.md)
 
-### Dependencies
-- `node:20-alpine` → `node:22-alpine` (Node 20 EOL April 2026)
+### Certificate Transparency
+- Inclusion proofs (`GET /v2/ct/proof?index=N`) now included with every upload response — senders receive the Merkle audit path at time of upload without a second round-trip
+- Delivery receipts (`POST /v2/verify-receipt`) — receiver gets an ML-DSA-65 signed receipt on download; any party can later submit it to confirm the blob was destroyed and the event is in the CT log
+- STH persistence fix — `data/sth.json` now written atomically (write to `.tmp` then rename); prevents empty-file corruption on unclean shutdown
+- Cross-relay gossip: STHs pushed to all registered peers after every tree update; peer STH history stored in `data/peer-sths/{pk_hash}.jsonl`
+- RSS feed (`GET /ct/feed.xml`) — last 20 STHs as RSS items for independent archiving
+
+### SDK
+- **JS SDK**: added `verifyReceipt(receipt)` method — was present in Python SDK but missing from JS SDK
+- **Python SDK**: version corrected to `2.4.5`; all Dutch docstrings and section headers translated to English; module docstring rewritten
+- **`scripts/`**: `paramant_sdk.py` and `paramant-receipt` converted from stale file copies to symlinks `→ ../sdk-py/` — eliminates future drift between the pip package and the scripts directory
+
+### CLI
+- `paramant-verify-sth`: falls back to unauthenticated `GET /v2/sth` when admin token is unavailable; `--relay` flag selects target relay
+- `paramant-verify-peers`: fetches mirrored STH history from each peer, verifies ML-DSA-65 signatures, cross-checks against source relay, reports tree-size rollbacks
+
+### Infrastructure
+- `docker-compose.yml` fully restored — file had been emptied, breaking self-hosting. Now contains all 5 relay services + admin with full security hardening (`cap_drop: ALL`, `no-new-privileges`, `read_only`, `tmpfs`, 1500 MB memory limit, `127.0.0.1` port binding)
+- `install.sh` / `install-pi.sh` fixed — GitHub raw URL was returning 404 due to path change; both scripts updated to current repo layout
+- Base image `node:20-alpine` → `node:22-alpine` (Node 20 EOL April 2026)
 - `express` 4.x → 5.x
 - 0 npm audit vulnerabilities across all packages
+
+### Website
+- Navbar rebuilt — horizontal scrolling eliminated; layout rewritten with flex wrap + scroll-on-overflow; all navigation links verified
+- Dutch strings removed from frontend — UI is now fully English
+- `/verwerkersovereenkomst` → `/dpa` (canonical URL, old URL still serves the page)
+- `/government` page added (public sector use cases)
+- HNDL risk indicator stripped from the homepage hero
+- CT log widget added to homepage — shows live tree size + latest root
+- Professional tier added to pricing page
+- Request-key form (`/request-key`) fixed — form submission was silently failing due to wrong JSON field name
+
+### Dependencies
 - New Ed25519 license token (stricter validation in v2.4.4+)
 
 ### Fixed

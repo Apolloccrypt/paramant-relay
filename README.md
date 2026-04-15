@@ -427,7 +427,7 @@ open https://relay.paramant.app/ct/
 | IEC 62443 (Industrial IoT) | Ready | [Compliance page](https://paramant.app/compliance/iec62443) |
 | DORA (Finance EU) | Ready | NIS2 compliance covers DORA Art. 6 |
 | EU CRA 2027 | Designed for | paramant-cra tool + CT log |
-| GDPR Art. 28 | Ready | [Verwerkersovereenkomst](https://paramant.app/verwerkersovereenkomst) |
+| GDPR Art. 28 | Ready | [DPA](https://paramant.app/dpa) |
 
 *NEN 7510: finding #4 (filename in transit RAM) patched in v2.4.5 — filename encrypted in relay RAM and never written to disk.
 
