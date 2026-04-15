@@ -387,6 +387,7 @@ The relay is **untrusted by design** — it never holds a decryption key.
 
 **Security audits (April 2026):**
 
+- **2026-04-15 — R. Zwarts RAPTOR review:** 10 findings (3 high · 3 medium · 4 low), all resolved. Commit [769f163](https://github.com/Apolloccrypt/paramant-relay/commit/769f163)
 - **2026-04-13 — R. Zwarts dependency review:** 0 npm vulnerabilities. Node 20 EOL → node:22-alpine. express 4.x → 5.x. Commit [e6f216d](https://github.com/Apolloccrypt/paramant-relay/commit/e6f216d)
 - **2026-04-11 — R. Zwarts verification review:** 14 findings (1 high · 8 medium · 5 low), all resolved. Commit [e6f216d](https://github.com/Apolloccrypt/paramant-relay/commit/e6f216d)
 - **2026-04-10 — R. Zwarts independent audit:** 6 findings (3 high · 3 medium), all resolved. Commit [0db3ef0](https://github.com/Apolloccrypt/paramant-relay/commit/0db3ef0)
