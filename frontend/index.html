@@ -96,8 +96,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   .proto-cell{flex:1 1 50%;border-bottom:1px solid var(--border)}
   footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
   .hndl-strip{padding:24px 20px}
-  .hndl-strip-timeline{flex-direction:column}
+  .hndl-strip-timeline{flex-direction:column;gap:16px}
   .hndl-strip-connector{display:none}
+  .hndl-strip-step{padding-left:12px}
+  .hndl-strip-step:first-child{padding-left:12px}
   .footer-meta{text-align:left}
   /* Inline-style grid overrides */
   .role-banner{grid-template-columns:1fr!important}
@@ -118,20 +120,24 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
-.hndl-strip{border-top:1px solid #1e3a28;border-bottom:1px solid #1e3a28;background:#0b1d12;padding:32px 48px;max-width:none}
-.hndl-strip-header{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;max-width:960px;margin-left:auto;margin-right:auto}
-.hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid #e05050;padding:2px 8px;border-radius:3px;font-family:var(--mono);flex-shrink:0}
-.hndl-strip-title{font-size:13px;color:#c8e8d6;font-weight:500;font-family:var(--mono)}
-.hndl-strip-link{font-size:12px;color:#3dbe7a;text-decoration:none;margin-left:auto;font-family:var(--mono)}
-.hndl-strip-link:hover{text-decoration:underline}
-.hndl-strip-timeline{display:flex;align-items:flex-start;gap:16px;max-width:960px;margin:0 auto}
-.hndl-strip-connector{color:#3dbe7a;opacity:.4;margin-top:4px;flex-shrink:0;font-size:14px}
-.hndl-strip-step{flex:1;min-width:0}
-.hndl-strip-step-time{font-size:11px;color:#3dbe7a;font-weight:600;margin-bottom:4px;font-family:var(--mono)}
+.hndl-strip{padding:32px 48px;border-top:1px solid rgba(224,80,80,.2);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
+.hndl-strip-header{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid rgba(224,80,80,.4);padding:2px 8px;border-radius:3px;flex-shrink:0}
+.hndl-strip-title{font-size:13px;color:#c8e8d6;font-weight:500}
+.hndl-strip-link{font-size:12px;color:#9fd4b5;text-decoration:none;margin-left:auto;opacity:.7;transition:opacity .15s}
+.hndl-strip-link:hover{opacity:1;text-decoration:none}
+.hndl-strip-timeline{display:flex;align-items:flex-start;gap:0}
+.hndl-strip-connector{color:rgba(224,80,80,.3);margin-top:5px;flex-shrink:0;font-size:12px;padding:0 4px}
+.hndl-strip-step{flex:1;padding:0 16px;border-left:2px solid transparent}
+.hndl-strip-step:first-child{padding-left:0}
+.hndl-strip-step--active{border-left-color:#e05050}
+.hndl-strip-step--danger{border-left-color:#f59e0b}
+.hndl-strip-step-time{font-size:11px;font-weight:600;margin-bottom:4px;letter-spacing:.03em}
 .hndl-strip-step--active .hndl-strip-step-time{color:#e05050}
 .hndl-strip-step--danger .hndl-strip-step-time{color:#f59e0b}
+.hndl-strip-step:not(.hndl-strip-step--active):not(.hndl-strip-step--danger) .hndl-strip-step-time{color:#9fd4b5}
 .hndl-strip-step-label{font-size:13px;color:#c8e8d6;font-weight:500;margin-bottom:4px}
-.hndl-strip-step-desc{font-size:12px;color:#6b9e82;line-height:1.5}
+.hndl-strip-step-desc{font-size:12px;color:#5a8a6a;line-height:1.5}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 </style>
 <link rel="stylesheet" href="/nav.css">
@@ -197,6 +203,33 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </div>
   <div style="margin-top:20px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
 </div>
+
+<section class="hndl-strip">
+  <div class="hndl-strip-header">
+    <span class="hndl-strip-label">Active threat</span>
+    <span class="hndl-strip-title">Harvest Now, Decrypt Later</span>
+    <a href="/hndl" class="hndl-strip-link">What is HNDL? &rarr;</a>
+  </div>
+  <div class="hndl-strip-timeline">
+    <div class="hndl-strip-step hndl-strip-step--active">
+      <div class="hndl-strip-step-time">Now</div>
+      <div class="hndl-strip-step-label">Harvest (active)</div>
+      <div class="hndl-strip-step-desc">State actors archive encrypted traffic to decrypt later</div>
+    </div>
+    <div class="hndl-strip-connector">&rarr;</div>
+    <div class="hndl-strip-step">
+      <div class="hndl-strip-step-time">2026&ndash;2028</div>
+      <div class="hndl-strip-step-label">Preparation</div>
+      <div class="hndl-strip-step-desc">NIST FIPS 203/204 finalized. Transition becomes legally required</div>
+    </div>
+    <div class="hndl-strip-connector">&rarr;</div>
+    <div class="hndl-strip-step hndl-strip-step--danger">
+      <div class="hndl-strip-step-time">~2029</div>
+      <div class="hndl-strip-step-label">Q-Day</div>
+      <div class="hndl-strip-step-desc">CRQC breaks RSA. The archive opens. Retroactive decryption</div>
+    </div>
+  </div>
+</section>
 
 <div class="proto-bar">
   <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">post-quantum key exchange</div></div>
@@ -417,33 +450,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 </section>
 
 <hr class="divider">
-
-<section class="hndl-strip">
-  <div class="hndl-strip-header">
-    <span class="hndl-strip-label">Active threat</span>
-    <span class="hndl-strip-title">Harvest Now, Decrypt Later</span>
-    <a href="/hndl" class="hndl-strip-link">What is HNDL? &rarr;</a>
-  </div>
-  <div class="hndl-strip-timeline">
-    <div class="hndl-strip-step hndl-strip-step--active">
-      <div class="hndl-strip-step-time">Now</div>
-      <div class="hndl-strip-step-label">Harvest (active)</div>
-      <div class="hndl-strip-step-desc">State actors archive encrypted traffic to decrypt later</div>
-    </div>
-    <div class="hndl-strip-connector">&rarr;</div>
-    <div class="hndl-strip-step">
-      <div class="hndl-strip-step-time">2026&ndash;2028</div>
-      <div class="hndl-strip-step-label">Preparation</div>
-      <div class="hndl-strip-step-desc">NIST FIPS 203/204 finalized. Transition becomes legally required</div>
-    </div>
-    <div class="hndl-strip-connector">&rarr;</div>
-    <div class="hndl-strip-step hndl-strip-step--danger">
-      <div class="hndl-strip-step-time">~2029</div>
-      <div class="hndl-strip-step-label">Q-Day</div>
-      <div class="hndl-strip-step-desc">CRQC breaks RSA. The archive opens. Retroactive decryption</div>
-    </div>
-  </div>
-</section>
 
 <section id="sectors">
   <div class="eyebrow">Use cases</div>
