@@ -38,10 +38,11 @@ nav.nav .nav-links {
 /* Dropdown container */
 nav.nav .nav-dropdown { position: relative; }
 
+/* Top-level triggers: neutral, not green — green is reserved for hover/accent */
 nav.nav .nav-dropdown-trigger {
   background: none;
   border: none;
-  color: #00cc33;
+  color: #888;
   font-size: 13px;
   font-family: inherit;
   padding: .5rem .75rem;
@@ -51,7 +52,7 @@ nav.nav .nav-dropdown-trigger {
   white-space: nowrap;
 }
 nav.nav .nav-dropdown-trigger:hover,
-nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: #00ff41; }
+nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: #ededed; }
 
 /* Dropdown menu */
 nav.nav .nav-dropdown-menu {
@@ -79,10 +80,11 @@ nav.nav .nav-dropdown:hover .nav-dropdown-menu { display: block; }
   list-style: none;
 }
 
+/* Dropdown items: neutral by default, green on hover */
 nav.nav .nav-dropdown-menu li a {
   display: block;
   padding: .5rem 1rem;
-  color: #00cc33;
+  color: #aaa;
   text-decoration: none;
   font-size: 13px;
   transition: color .15s, background .15s;
@@ -90,12 +92,12 @@ nav.nav .nav-dropdown-menu li a {
 }
 nav.nav .nav-dropdown-menu li a:hover {
   color: #00ff41;
-  background: rgba(61,190,122,.08);
+  background: rgba(0,255,65,.06);
 }
 
 /* Direct standalone links */
 nav.nav .nav-link {
-  color: #00cc33;
+  color: #888;
   font-size: 13px;
   padding: .5rem .75rem;
   text-decoration: none;
@@ -103,7 +105,7 @@ nav.nav .nav-link {
   transition: color .15s;
   white-space: nowrap;
 }
-nav.nav .nav-link:hover { color: #00ff41; }
+nav.nav .nav-link:hover { color: #ededed; }
 
 /* Hamburger button — hidden on desktop */
 nav.nav .nav-hamburger {
@@ -119,7 +121,7 @@ nav.nav .nav-hamburger span {
   display: block;
   width: 22px;
   height: 2px;
-  background: #00cc33;
+  background: #888;
   border-radius: 2px;
   transition: transform .2s, opacity .2s;
 }
@@ -146,6 +148,8 @@ nav.nav .nav-hamburger span {
   flex-direction: column;
   gap: .625rem;
 }
+
+/* Category labels: bright green — the only green in the mobile menu */
 .nav-mobile-label {
   font-size: 11px;
   text-transform: uppercase;
@@ -154,21 +158,25 @@ nav.nav .nav-hamburger span {
   margin-bottom: .25rem;
   font-family: 'SF Mono','Fira Code',monospace;
 }
+
+/* Mobile links: neutral */
 .nav-mobile a {
-  color: #00ff41;
+  color: #aaa;
   text-decoration: none;
   font-size: 1.0625rem;
   padding: .5rem 0;
-  border-bottom: 1px solid #242424;
+  border-bottom: 1px solid #1e1e1e;
   display: block;
+  transition: color .15s;
 }
-.nav-mobile a:hover { color: #00ff41; }
+.nav-mobile a:hover { color: #ededed; }
 .nav-mobile-standalone {
-  color: #00ff41 !important;
+  color: #aaa !important;
   font-size: 1.0625rem;
   text-decoration: none;
   border-bottom: none !important;
 }
+
 /* Mobile breakpoint */
 @media (max-width: 1023px) {
   nav.nav { padding: 0 1rem; }
