@@ -23,8 +23,8 @@ nav.nav .nav-logo {
   letter-spacing: .08em;
   text-decoration: none;
 }
-.logo-para { color: #e8e8e8; }
-.logo-mant { color: #3dbe7a; }
+nav.nav .nav-logo .logo-para { color: #e8e8e8; }
+nav.nav .nav-logo .logo-mant { color: #3dbe7a; }
 
 nav.nav .nav-links {
   display: flex;
@@ -70,6 +70,14 @@ nav.nav .nav-dropdown-menu {
   z-index: 200;
 }
 nav.nav .nav-dropdown:hover .nav-dropdown-menu { display: block; }
+
+.nav-dropdown-divider {
+  height: 1px;
+  background: #1e3a28;
+  margin: .25rem 0;
+  pointer-events: none;
+  list-style: none;
+}
 
 nav.nav .nav-dropdown-menu li a {
   display: block;
