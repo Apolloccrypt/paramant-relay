@@ -17,6 +17,7 @@
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
 nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
+.logo-para{color:#e8e8e8}.logo-mant{color:#3dbe7a}
 .nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
 .nav-back{font-size:12px;color:var(--muted);text-decoration:none}
 .nav-back:hover{color:var(--text)}
@@ -78,13 +79,54 @@ code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2p
   .cta-meta{text-align:left}
 }
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 
-<nav>
+<nav class="nav">
   <a href="/" class="nav-logo">PARAMANT</a>
-  <a href="/" class="nav-back">&#8592; paramant.app</a>
+  <ul class="nav-links">
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
+  </ul>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+</div>
 
 <div class="reg-band">
   <div class="reg-tag">Compliance &middot; EU 2022/2555</div>
@@ -257,5 +299,6 @@ code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2p
 </div>
 
 </main>
+<script src="/nav.js" defer></script>
 </body>
 </html>

@@ -171,12 +171,53 @@ main { background: transparent !important }
   .fingerprint{font-size:18px;letter-spacing:.08em}
 }
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
-<nav style="justify-content:space-between;position:relative;z-index:20">
-  <a href="/" class="logo">PARAMANT</a>
-  
+<nav class="nav">
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
+  </ul>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+</div>
 <main style="position:relative;z-index:10">
 
 <!-- STEP 1: Setup -->
@@ -1029,5 +1070,6 @@ function updateGlobeTransfer(userLat, userLng) {
   _globeApplyState('idle');
 }
 </script>
+<script src="/nav.js" defer></script>
 </body>
 </html>

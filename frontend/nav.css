@@ -21,9 +21,10 @@ nav.nav .nav-logo {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .08em;
-  color: #3dbe7a;
   text-decoration: none;
 }
+.logo-para { color: #e8e8e8; }
+.logo-mant { color: #3dbe7a; }
 
 nav.nav .nav-links {
   display: flex;

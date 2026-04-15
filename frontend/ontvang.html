@@ -41,9 +41,53 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   .fingerprint{font-size:20px;letter-spacing:.08em;padding:16px}
 }
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
-<nav><a href="/" class="logo">PARAMANT</a></nav>
+<nav class="nav">
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
+  </ul>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+</div>
 <main>
 
 <!-- STEP 1: Generating keypair -->
@@ -487,5 +531,6 @@ window.addEventListener('mlkem-ready', () => {
   if (sessionToken) init();
 });
 </script>
+<script src="/nav.js" defer></script>
 </body>
 </html>

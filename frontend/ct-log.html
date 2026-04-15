@@ -134,13 +134,54 @@ nav a.back:hover { color:#aaa; }
   .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 
-<nav>
-  <a class="logo" href="/">PARAMANT</a>
-  <a class="back" href="/">&#8592; paramant.app</a>
+<nav class="nav">
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
+  </ul>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+</div>
 
 <div class="hero">
   <div class="tag">Public Audit Log</div>
@@ -489,5 +530,6 @@ async function loadRelays() {
 load();
 setInterval(load, 30000);
 </script>
+<script src="/nav.js" defer></script>
 </body>
 </html>

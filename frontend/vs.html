@@ -22,6 +22,7 @@
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;line-height:1.65}
 
 nav{position:sticky;top:0;z-index:100;background:rgba(10,15,11,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 40px;height:52px;display:flex;align-items:center;justify-content:space-between}
+.logo-para{color:#e8e8e8}.logo-mant{color:#3dbe7a}
 .nav-logo{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--text);text-decoration:none}
 .nav-links{list-style:none;display:flex;gap:28px}
 .nav-links a{font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono);letter-spacing:.02em;transition:color .15s}
@@ -94,7 +95,7 @@ footer a:hover{color:var(--text)}
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav-logo">PARAMANT</a>
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
   <ul class="nav-links">
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Products &#9662;</button>

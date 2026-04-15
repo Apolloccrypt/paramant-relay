@@ -9,6 +9,7 @@
 :root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;--mono:"SF Mono","Fira Code",monospace}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.7}
 nav.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.95);backdrop-filter:blur(8px);z-index:100}
+.logo-para{color:#e8e8e8}.logo-mant{color:#3dbe7a}
 .nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
 .nav-links{display:flex;gap:28px;list-style:none}
 .nav-links a{font-size:13px;color:var(--muted);text-decoration:none}
@@ -30,7 +31,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav-logo">PARAMANT</a>
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
   <ul class="nav-links">
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Products &#9662;</button>
