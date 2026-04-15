@@ -248,5 +248,5 @@ Additional fixes applied 2026-04-13:
 | Researcher | Contribution | Date |
 |------------|-------------|------|
 | Ryan Williams ([@scs-labrat](https://github.com/scs-labrat)) | Independent security review — 20 findings | April 2026 |
-| R. Zwarts ([@rzwarts74](https://github.com/rzwarts74)) | Code audit — 20 findings across two reports | April 2026 |
+| R. Zwarts ([@raymond-itsec](https://github.com/raymond-itsec)) | Code audit — 20 findings across two reports | April 2026 |
 | Hendrik Bruinsma ([@readefries](https://github.com/readefries)) | FileLink extension + bug reports | April 2026 |

@@ -105,7 +105,7 @@ Internal security hardening pass concurrent with the audit. All findings identif
 |------|-------|
 | 2026-04-08 | Ryan Williams submits full report |
 | 2026-04-09 | Report reviewed, findings triaged, this tracking page published |
-| 2026-04-09 | Additional findings P1–P4 submitted by Raymond Zwarts ([@rzwarts74](https://github.com/rzwarts74)) and patched same day |
+| 2026-04-09 | Additional findings P1–P4 submitted by Raymond Zwarts ([@raymond-itsec](https://github.com/raymond-itsec)) and patched same day |
 | 2026-04-09 | Internal hardening pass (H1–H8) — self-hosting stack, Docker, nginx, relay response headers |
 | 2026-04-10 | Critical patches shipped — C1 (already fixed, confirmed), C2 (try/catch in ws.onmessage), C3 (Python SDK zeroization, patched 2026-04-11), C4 (plaintext filename, patched 2026-04-13 in v2.4.5) |
 | 2026-04-11 | Relay registry launched — ML-DSA-65 signed relay identity, `GET /v2/relays`, `POST /v2/relays/register`, CT log relay_reg entries. All 5 production relays registered. |
