@@ -1171,6 +1171,16 @@ function log(level, msg, data = {}) {
 
 function J(o) { return JSON.stringify(o); }
 
+// ── Client IP — prefers CF-Connecting-IP (production), falls back to X-Real-IP set by nginx ──
+function getClientIp(req) {
+  return req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+}
+
+// ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
+function escHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ── Key zeroization ───────────────────────────────────────────────────────────
 function zeroBuffer(buf) {
   if (buf && Buffer.isBuffer(buf)) {
@@ -1606,7 +1616,7 @@ const server = http.createServer(async (req, res) => {
       // IP rate limit: max 3 per IP per 24h
       // Use CF-Connecting-IP (Cloudflare) or X-Real-IP (nginx $remote_addr) instead of
       // socket address, which collapses to the proxy IP in reverse-proxy deployments.
-      const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+      const clientIp = getClientIp(req);
       const ipTimes = (trialIpRequests.get(clientIp) || []).filter(t => now - t < DAY_MS);
       if (ipTimes.length >= 3) {
         res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
@@ -1659,7 +1669,7 @@ const server = http.createServer(async (req, res) => {
       // Welcome email to requester
       const welcomeHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
           <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Hi ${name},</p>
+          <p style="color:#888;margin-bottom:16px">Hi ${escHtml(name)},</p>
           <p style="color:#888;margin-bottom:24px">Your free trial API key is ready. It gives you access to the community relay — burn-on-read, ML-KEM-768 encryption, EU/DE jurisdiction.</p>
           <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
             <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
@@ -1721,7 +1731,7 @@ session = client.create_session('recipient@example.com')</pre>
 
       // Rate limit: max 3 DPA signatures per IP per 24h, max 1 per email per 24h
       const dpaNow = Date.now(), DPA_WIN = 86_400_000;
-      const dpaIp = req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+      const dpaIp = getClientIp(req);
       const dpaIpTimes = (dpaIpRequests.get(dpaIp) || []).filter(t => dpaNow - t < DPA_WIN);
       if (dpaIpTimes.length >= 3) {
         res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
@@ -1740,7 +1750,7 @@ session = client.create_session('recipient@example.com')</pre>
 
       // Persist DPA signature record (append-only)
       const DPA_FILE = process.env.DPA_FILE || '/etc/paramant/dpa-signatures.jsonl';
-      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown' });
+      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: getClientIp(req) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
       // Send countersigned DPA email
@@ -2840,7 +2850,7 @@ session = client.create_session('recipient@example.com')</pre>
   // ── POST /v2/admin/verify-mfa ─────────────────────────────────────────────
   if (path === '/v2/admin/verify-mfa' && req.method === 'POST') {
     // M2: rate limit — max 5 attempts per IP per minute
-    const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+    const clientIp = getClientIp(req);
     if (!checkMfaRateLimit(clientIp)) {
       log('warn', 'mfa_rate_limited', { ip: clientIp });
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });

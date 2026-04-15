@@ -12,19 +12,22 @@ All reports are treated with responsible disclosure.
 
 ## Security audits
 
-### 2026-04-15 — Internal security review
+### 2026-04-15 — RAPTOR security review (R. Zwarts)
 
-7 findings, all resolved in commit `8e6d4d2`.
+10 findings, all resolved.
 
 | # | Severity | Finding | Status |
 |---|----------|---------|--------|
-| 1 | High | DOM XSS in relay registry viewer — relay fields unescaped in `innerHTML` | Fixed: `esc()` helper applied to all API-sourced values incl. `title=""` attributes |
-| 2 | High | AES-256 key stored alongside ciphertext in Thunderbird FileLink blobs | Fixed: key excluded from blob (packet v0x02), travels via URL fragment only |
-| 3 | High | Malformed percent-encoding crashes relay process (public DoS, destroys in-flight blobs) | Fixed: `try/catch` on `decodeURIComponent()` at all 4 affected routes → HTTP 400 |
-| 4 | High | X-Forwarded-For spoofing bypasses admin brute-force rate limiter | Fixed: `X-Real-IP` (`nginx $remote_addr`) used instead of XFF first-entry |
-| 5 | Medium | `users.json` read-modify-write race condition | Fixed: `_mutateUsersJson()` serialises full read-modify-write cycle inside write queue |
-| 6 | Medium | Relay rate limits collapse to proxy loopback IP | Fixed: proxy-aware IP chain (`CF-Connecting-IP` → `X-Real-IP` → socket) |
-| 7 | Medium | `/v2/sign-dpa` unauthenticated, unlimited, email-abusable | Fixed: per-IP (3/24 h) and per-email (1/24 h) in-process limits + nginx `limit_req` |
+| 1 | High | DOM XSS in `ct-log.html` — CT log entry fields and verify result rendered via `innerHTML` without escaping (CWE-79) | Fixed: `esc()` applied to all API-sourced values in log entry renderer, verify result, and proof hash list |
+| 2 | High | AES-256 key embedded in Thunderbird FileLink upload blob (CWE-320) | Fixed: key excluded from blob (packet v0x02), travels via URL fragment only — relay never holds decryption material |
+| 3 | High | `X-Forwarded-For: $proxy_add_x_forwarded_for` in nginx — client-controlled header passed to backend (CWE-290) | Fixed: both `nginx-paramant-live.conf` and `nginx-selfhost.conf` changed to `$remote_addr`; relay uses `CF-Connecting-IP` → `X-Real-IP` → socket via `getClientIp()` helper |
+| 4 | Medium | `decodeURIComponent()` without try/catch crashes relay process on malformed `%` sequences (CWE-248) | Fixed: all 4 routes (`/v2/did`, `/v2/pubkey`, `/v2/fingerprint`, `/v2/attest`) wrapped in try/catch → HTTP 400 |
+| 5 | Medium | `users.json` read-modify-write race condition under concurrent key operations (CWE-362) | Fixed: `_mutateUsersJson()` serialises all read-modify-write cycles inside a promise queue |
+| 6 | Medium | `/v2/sign-dpa` unauthenticated and unthrottled (CWE-770) | Fixed: per-IP (3/24 h) and per-email (1/24 h) in-process limits + nginx `limit_req zone=api` |
+| 7 | Low | HTML injection in trial key email templates — `name`, `email`, `useCase` interpolated raw (CWE-116) | Fixed: `escHtml()` helper applied to all user-supplied fields in `welcomeHtml` and `notifyHtml` |
+| 8 | Low | `drop.html` QR fallback uses `innerHTML` with relay-returned URL (CWE-79) | Fixed: replaced with `document.createElement` + `textContent` |
+| 9 | Low | SDK `pyproject.toml` allows vulnerable `requests` and `cryptography` versions | Fixed: floors raised to `requests>=2.33`, `cryptography>=43.0.1`, `pytest>=9`; `requires-python` bumped to `>=3.10`; `requirements.txt` lockfile generated |
+| 10 | Low | Duplicate IP-derivation logic at 4 call sites in `relay.js` | Fixed: consolidated into `getClientIp()` helper |
 
 ### 2026-04-13 — CIS Ubuntu 24.04 benchmark (production server)
 

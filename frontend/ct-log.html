@@ -401,7 +401,7 @@ async function load() {
     render();
   } catch(e) {
     document.getElementById('entries').innerHTML =
-      '<div class="loading">Error loading log: ' + e.message + '</div>';
+      '<div class="loading">Error loading log: ' + esc(e.message) + '</div>';
   }
 }
 
@@ -441,23 +441,23 @@ function render() {
     if (e.proof && e.proof.length) {
       proofHtml = '<div class="drow"><span class="dkey">Merkle proof</span>'
         + '<span class="dval"><div class="proof-chain">'
-        + e.proof.map(function(h){return '<span class="proof-hash">'+h.slice(0,16)+'…</span>';}).join('')
+        + e.proof.map(function(h){return '<span class="proof-hash">'+esc(h.slice(0,16))+'…</span>';}).join('')
         + '</div></span></div>';
     }
     return '<div class="entry" onclick="toggle('+gi+')">'
-      + '<div class="idx">'+idx+'</div>'
-      + '<div class="hash leaf">'+leaf+'</div>'
-      + '<div class="hash">'+tree+'</div>'
-      + '<div class="hash">'+device+'</div>'
-      + '<div class="ts">'+time+'</div>'
+      + '<div class="idx">'+esc(String(idx))+'</div>'
+      + '<div class="hash leaf">'+esc(leaf)+'</div>'
+      + '<div class="hash">'+esc(tree)+'</div>'
+      + '<div class="hash">'+esc(device)+'</div>'
+      + '<div class="ts">'+esc(time)+'</div>'
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
-      + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+e.type+'</span></div>' : '')
-      + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+(e.leaf_hash||'—')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+(e.tree_hash||'—')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+(e.device_hash||'—')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+idx+'</span></div>'
-      + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? new Date(ts).toISOString() : '—')+'</span></div>'
+      + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
+      + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+esc(e.leaf_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+esc(e.tree_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+esc(e.device_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
+      + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : '—')+'</span></div>'
       + proofHtml
       + '</div>';
   }).join('');
@@ -526,15 +526,15 @@ function verifyHash() {
   el.className = 'verify-result found';
   var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
              : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
-  el.innerHTML = '<strong>✓ Verified — found at index ' + match.index + '</strong>'
+  el.innerHTML = '<strong>✓ Verified — found at index ' + esc(String(match.index)) + '</strong>'
     + '<pre>'
-    + 'Matched field : ' + field + '\n'
-    + 'Index         : ' + match.index + '\n'
-    + 'Leaf hash     : ' + (match.leaf_hash||'—') + '\n'
-    + 'Tree hash     : ' + (match.tree_hash||'—') + '\n'
-    + 'Device hash   : ' + (match.device_hash||'—') + '\n'
-    + 'Timestamp     : ' + (match.ts ? new Date(match.ts).toISOString() : '—') + '\n'
-    + (match.proof && match.proof.length ? 'Merkle proof  : ' + match.proof.join(' → ') : '')
+    + 'Matched field : ' + esc(field) + '\n'
+    + 'Index         : ' + esc(String(match.index)) + '\n'
+    + 'Leaf hash     : ' + esc(match.leaf_hash||'—') + '\n'
+    + 'Tree hash     : ' + esc(match.tree_hash||'—') + '\n'
+    + 'Device hash   : ' + esc(match.device_hash||'—') + '\n'
+    + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : '—') + '\n'
+    + (match.proof && match.proof.length ? 'Merkle proof  : ' + esc(match.proof.join(' → ')) : '')
     + '</pre>';
 }
 
