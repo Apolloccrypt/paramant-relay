@@ -63,6 +63,7 @@ h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
 .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:52px}
 .pc{background:var(--bg);padding:32px 28px}
 .pc.featured{background:var(--surface)}
+.pc.coming-soon{opacity:.82}
 .price-name{font-size:11px;font-family:var(--mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
 .price-amount{font-size:36px;font-weight:600;letter-spacing:-.03em;color:var(--text);margin-bottom:4px}
 .price-amount sub{font-size:14px;font-weight:400;color:var(--muted);vertical-align:baseline}
@@ -348,14 +349,16 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     </div>
     <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;white-space:nowrap;margin-left:24px">Self-host ↓</div>
   </a>
-  <a href="#pricing" style="display:flex;align-items:center;justify-content:space-between;padding:24px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1c1c1c'" onmouseout="this.style.background='var(--surface)'">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 40px;background:var(--surface)">
     <div>
       <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">End user</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">Use a managed relay</div>
       <div style="font-size:11px;color:var(--quiet);margin-top:2px">Free tier — 10 uploads/day, no account, pgp_ API key</div>
+      <a href="/request-key" style="display:inline-block;margin-top:10px;font-size:11px;font-family:var(--mono);color:#888;text-decoration:none;border:1px solid #333;border-radius:4px;padding:5px 10px">Request free API key &rarr;</a>
+      <p style="font-size:10px;color:#555;margin:6px 0 0;font-family:var(--mono)">10 uploads/day &middot; 1h TTL &middot; 5MB &middot; no credit card</p>
     </div>
-    <div style="font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap;margin-left:24px">Pricing ↓</div>
-  </a>
+    <a href="#pricing" style="font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap;margin-left:24px;text-decoration:none">Pricing &darr;</a>
+  </div>
 </div>
 
 <section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:64px 32px 0">
@@ -753,7 +756,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <button id="tab-user" onclick="showTab('user')" style="flex:1;padding:8px 0;border:none;background:transparent;color:#888;border-radius:4px;font-size:12px;font-family:var(--mono);font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .15s">For end users</button>
   </div>
 
-  <div id="pane-op" class="pricing-grid" style="grid-template-columns:1fr 1fr">
+  <div id="pane-op" class="pricing-grid">
 
     <div class="pc">
       <div class="price-name" style="color:#2d8a5c">COMMUNITY</div>
@@ -770,6 +773,24 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> Community support only</li>
       </ul>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" class="price-btn p">Download v2.4.5 &rarr;</a>
+    </div>
+
+    <div class="pc coming-soon">
+      <div class="popular-badge">Coming soon</div>
+      <div class="price-name">PROFESSIONAL</div>
+      <div class="price-amount">€149<sub>/mo</sub></div>
+      <div class="price-note">Up to 50 users &middot; plk_ license key &middot; billed monthly</div>
+      <div class="price-tagline">Outgrown 5 users. Full features, email support.</div>
+      <ul class="pf">
+        <li><span class="check">&#10003;</span> Everything in Community</li>
+        <li><span class="check">&#10003;</span> Up to 50 active users</li>
+        <li><span class="check">&#10003;</span> Webhook delivery notifications</li>
+        <li><span class="check">&#10003;</span> 24-hour blob retention</li>
+        <li><span class="check">&#10003;</span> Email support &mdash; response &lt;48h</li>
+        <li><span class="check">&#10003;</span> Priority security updates</li>
+        <li><span class="check">&#10003;</span> Compliance documentation</li>
+      </ul>
+      <a href="mailto:privacy@paramant.app?subject=Professional+waitlist" class="price-btn ghost">Join waitlist &rarr;</a>
     </div>
 
     <div class="pc">
