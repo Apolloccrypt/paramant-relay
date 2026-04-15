@@ -42,10 +42,12 @@ async function encryptChunk(chunkData, fileMeta) {
   const nonce  = crypto.getRandomValues(new Uint8Array(12));
   const ct     = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, symKey, plain));
 
-  // 0x01 packet: version(1) | nonce(12) | rawKey(32) | ctLen(4) | ct
+  // 0x02 packet: version(1) | nonce(12) | ctLen(4) | ct
+  // rawKey is NOT included in the blob — it travels via the URL fragment so the
+  // relay never holds enough information to decrypt. (0x01 had key in blob — fixed.)
   const ctLen = new Uint8Array(4);
   new DataView(ctLen.buffer).setUint32(0, ct.length, false);
-  const packet = concat(new Uint8Array([0x01]), nonce, rawKey, ctLen, ct);
+  const packet = concat(new Uint8Array([0x02]), nonce, ctLen, ct);
 
   // Pad to PADDED_BLOCK with random bytes (DPI resistance)
   const padded = new Uint8Array(PADDED_BLOCK);
@@ -53,7 +55,8 @@ async function encryptChunk(chunkData, fileMeta) {
   for (let p = packet.length; p < PADDED_BLOCK; p += 65536) {
     crypto.getRandomValues(padded.subarray(p, Math.min(p + 65536, PADDED_BLOCK)));
   }
-  return padded;
+  // Return both padded blob and rawKey — key goes in URL fragment, never to the relay
+  return { padded, rawKey };
 }
 
 // ── Upload one padded blob ────────────────────────────────────────────────────
@@ -136,12 +139,13 @@ browser.cloudFile.onFileUpload.addListener(async (account, { id, name, data }) =
     .map(b => b.toString(16).padStart(2, "0")).join("");
   const ttl_ms      = totalChunks > 1 ? 900_000 : 3_600_000;
 
-  const tokens = [];
+  const tokens = [], keys = [];
   for (let i = 0; i < totalChunks; i++) {
     const start     = Math.round(i * CHUNK_PLAIN);
     const chunkData = fileBytes.slice(start, Math.min(start + CHUNK_PLAIN, fileBytes.length));
 
-    const padded = await encryptChunk(chunkData, {
+    // encryptChunk now returns { padded, rawKey } — key never goes to relay
+    const { padded, rawKey } = await encryptChunk(chunkData, {
       file_id: fileId, file_name: name, file_size: fileBytes.length,
       chunk_index: i, total_chunks: totalChunks, chunk_size: chunkData.length,
     });
@@ -151,9 +155,13 @@ browser.cloudFile.onFileUpload.addListener(async (account, { id, name, data }) =
       file_id: fileId, chunk_index: i, total_chunks: totalChunks, ttl_ms,
     });
     tokens.push(token);
+    // Encode rawKey as URL-safe base64 — stays in fragment, never sent to server
+    keys.push(btoa(String.fromCharCode(...rawKey)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''));
   }
 
-  const url = `${PARASHARE_BASE}?t=${encodeURIComponent(tokens.join(","))}&n=${encodeURIComponent(name)}&c=${totalChunks}`;
+  // Keys travel in the URL fragment (#k=...) — browsers never send fragments to servers.
+  // The relay sees only the download tokens, never the decryption keys.
+  const url = `${PARASHARE_BASE}?t=${encodeURIComponent(tokens.join(","))}&n=${encodeURIComponent(name)}&c=${totalChunks}&r=${encodeURIComponent(relay)}#k=${keys.join(",")}`;
   return { url };
 });
 

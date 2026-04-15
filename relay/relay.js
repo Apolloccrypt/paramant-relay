@@ -780,6 +780,15 @@ function verifyTotp(token) {
 // ── Download tokens — one-time public download links
 const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 
+// ── DPA rate limiting — prevents spam/storage churn on the public sign-dpa endpoint
+const dpaIpRequests    = new Map(); // ip    → [timestamps]
+const dpaEmailRequests = new Map(); // email → timestamp
+setInterval(() => {
+  const cutoff = Date.now() - 86_400_000;
+  for (const [k, times] of dpaIpRequests) { const kept = times.filter(t => t > cutoff); if (kept.length) dpaIpRequests.set(k, kept); else dpaIpRequests.delete(k); }
+  for (const [k, t]     of dpaEmailRequests) { if (t < cutoff) dpaEmailRequests.delete(k); }
+}, 3_600_000);
+
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
 
@@ -1246,12 +1255,23 @@ function outboundRateOk(apiKey, plan) {
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
 
-// Fix 6: serialized async write queue for users.json — prevents lost-update race
+// Serialized async write queue for users.json — prevents lost-update race.
+// _writeUsersJson: low-level write (caller must already hold the snapshot).
+// _mutateUsersJson: safe read-modify-write inside the queue (use this at call sites).
 let _usersWriteQueue = Promise.resolve();
 function _writeUsersJson(data) {
   _usersWriteQueue = _usersWriteQueue.then(() =>
     fs.promises.writeFile(USERS_FILE, JSON.stringify(data, null, 2))
   ).catch(e => log('warn', 'users_write_error', { err: e.message }));
+  return _usersWriteQueue;
+}
+function _mutateUsersJson(fn) {
+  _usersWriteQueue = _usersWriteQueue.then(async () => {
+    const raw = await fs.promises.readFile(USERS_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    fn(data);
+    await fs.promises.writeFile(USERS_FILE, JSON.stringify(data, null, 2));
+  }).catch(e => log('warn', 'users_write_error', { err: e.message }));
   return _usersWriteQueue;
 }
 
@@ -1573,7 +1593,9 @@ const server = http.createServer(async (req, res) => {
       const DAY_MS = 86_400_000;
 
       // IP rate limit: max 3 per IP per 24h
-      const clientIp = req.socket?.remoteAddress || 'unknown';
+      // Use CF-Connecting-IP (Cloudflare) or X-Real-IP (nginx $remote_addr) instead of
+      // socket address, which collapses to the proxy IP in reverse-proxy deployments.
+      const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
       const ipTimes = (trialIpRequests.get(clientIp) || []).filter(t => now - t < DAY_MS);
       if (ipTimes.length >= 3) {
         res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
@@ -1606,13 +1628,11 @@ const server = http.createServer(async (req, res) => {
       const trialRecord = JSON.stringify({ key: newKey, label, email: rawEmail, active: true, created: trialCreated, trial_metadata: { name, use_case: useCase } });
       fs.promises.appendFile(TRIAL_KEYS_FILE, trialRecord + '\n').catch(e => log('warn', 'trial_key_jsonl_failed', { err: e.message }));
 
-      // Also persist to users.json (admin visibility)
-      fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
-        const usersData = JSON.parse(raw);
-        usersData.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date(trialCreated).toISOString(), trial_metadata: { name, use_case: useCase } });
-        usersData.updated = new Date().toISOString();
-        return _writeUsersJson(usersData);
-      }).catch(we => log('warn', 'trial_key_users_persist_failed', { err: we.message }));
+      // Also persist to users.json (admin visibility) — full read-modify-write inside queue
+      _mutateUsersJson(d => {
+        d.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date(trialCreated).toISOString(), trial_metadata: { name, use_case: useCase } });
+        d.updated = new Date().toISOString();
+      });
 
       const RESEND_KEY = process.env.RESEND_API_KEY || '';
       function sendEmail(to, subject, html) {
@@ -1688,12 +1708,28 @@ session = client.create_session('recipient@example.com')</pre>
         return res.end(J({ error: 'Invalid email address' }));
       }
 
+      // Rate limit: max 3 DPA signatures per IP per 24h, max 1 per email per 24h
+      const dpaNow = Date.now(), DPA_WIN = 86_400_000;
+      const dpaIp = req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+      const dpaIpTimes = (dpaIpRequests.get(dpaIp) || []).filter(t => dpaNow - t < DPA_WIN);
+      if (dpaIpTimes.length >= 3) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+        return res.end(J({ error: 'Too many requests' }));
+      }
+      if (dpaEmailRequests.has(email) && dpaNow - dpaEmailRequests.get(email) < DPA_WIN) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+        return res.end(J({ error: 'Too many requests' }));
+      }
+      dpaIpTimes.push(dpaNow);
+      dpaIpRequests.set(dpaIp, dpaIpTimes);
+      dpaEmailRequests.set(email, dpaNow);
+
       const ref = 'DPA-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
       const signed_at = new Date().toISOString();
 
       // Persist DPA signature record (append-only)
       const DPA_FILE = process.env.DPA_FILE || '/etc/paramant/dpa-signatures.jsonl';
-      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: req.socket?.remoteAddress || 'unknown' });
+      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown' });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
       // Send countersigned DPA email
@@ -2013,7 +2049,10 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/did/:did — publiek DID document resolven ─────────────────────────
   const didm0 = path.match(/^\/v2\/did\/([^/]+)$/);
   if (didm0 && req.method === 'GET') {
-    const entry = didRegistry.get(decodeURIComponent(didm0[1]));
+    let _didParam;
+    try { _didParam = decodeURIComponent(didm0[1]); }
+    catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
+    const entry = didRegistry.get(_didParam);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'DID not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/did+json' });
     return res.end(J(entry.doc));
@@ -2246,7 +2285,9 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/pubkey/:device ───────────────────────────────────────────────────
   const pkm = path.match(/^\/v2\/pubkey\/([^/]+)$/);
   if (pkm && req.method === 'GET') {
-    const deviceId = decodeURIComponent(pkm[1]);
+    let deviceId;
+    try { deviceId = decodeURIComponent(pkm[1]); }
+    catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
     // Invite sessions: stored and retrieved without API key
     const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
     const entry = pubkeys.get(_pkKey);
@@ -2264,7 +2305,9 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/fingerprint/:device — Return just the fingerprint for out-of-band verification
   const fpm = path.match(/^\/v2\/fingerprint\/([^/]+)$/);
   if (fpm && req.method === 'GET') {
-    const deviceId = decodeURIComponent(fpm[1]);
+    let deviceId;
+    try { deviceId = decodeURIComponent(fpm[1]); }
+    catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
     const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
     const entry = pubkeys.get(_fKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
@@ -2756,7 +2799,10 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/attest/:device ───────────────────────────────────────────────────
   const attm = path.match(/^\/v2\/attest\/([^/]+)$/);
   if (attm && req.method === 'GET') {
-    const deviceHash = crypto.createHash('sha3-256').update(decodeURIComponent(attm[1])).digest('hex');
+    let _attParam;
+    try { _attParam = decodeURIComponent(attm[1]); }
+    catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
+    const deviceHash = crypto.createHash('sha3-256').update(_attParam).digest('hex');
     const att = attestations.get(deviceHash);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, device_hash: deviceHash, attestation: att || { attested: false, reason: 'never_attested' } }));
@@ -2778,7 +2824,7 @@ session = client.create_session('recipient@example.com')</pre>
   // ── POST /v2/admin/verify-mfa ─────────────────────────────────────────────
   if (path === '/v2/admin/verify-mfa' && req.method === 'POST') {
     // M2: rate limit — max 5 attempts per IP per minute
-    const clientIp = req.socket?.remoteAddress || 'unknown';
+    const clientIp = req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
     if (!checkMfaRateLimit(clientIp)) {
       log('warn', 'mfa_rate_limited', { ip: clientIp });
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
@@ -2825,17 +2871,11 @@ session = client.create_session('recipient@example.com')</pre>
       }
       const email = rawEmail;
       apiKeys.set(newKey, { plan, label, active: true });
-      // Fix 6: async serialized write — no sync I/O on hot path
-      fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
-        const usersData = JSON.parse(raw);
-        usersData.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
-        usersData.updated = new Date().toISOString();
-        return _writeUsersJson(usersData);
-      }).then(() => {
-        log('info', 'key_created_via_admin', { label, plan, persisted: true });
-      }).catch(we => {
-        log('warn', 'key_persist_failed', { err: we.message, label });
-      });
+      _mutateUsersJson(d => {
+        d.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
+        d.updated = new Date().toISOString();
+      }).then(() => log('info', 'key_created_via_admin', { label, plan, persisted: true }))
+        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, plan, label }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -2858,18 +2898,12 @@ session = client.create_session('recipient@example.com')</pre>
       if (!apiKeys.has(d.key)) { res.writeHead(404); return res.end(J({ error: 'Key not found' })); }
       apiKeys.get(d.key).active = false;
       const revokedKey = d.key;
-      // Fix 6: async serialized write — no sync I/O on hot path
-      fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
-        const usersData = JSON.parse(raw);
-        const ue = usersData.api_keys.find(k => k.key === revokedKey);
+      _mutateUsersJson(ud => {
+        const ue = ud.api_keys.find(k => k.key === revokedKey);
         if (ue) { ue.active = false; ue.revoked_at = new Date().toISOString(); }
-        usersData.updated = new Date().toISOString();
-        return _writeUsersJson(usersData);
-      }).then(() => {
-        log('info', 'key_revoked_via_admin', { key: revokedKey.slice(0,16), persisted: true });
-      }).catch(we => {
-        log('warn', 'key_revoke_persist_failed', { err: we.message });
-      });
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'key_revoked_via_admin', { key: revokedKey.slice(0,16), persisted: true }))
+        .catch(we => log('warn', 'key_revoke_persist_failed', { err: we.message }));
       // Fix 12: close active WebSocket connections for the revoked key
       const revokedWsClients = wsClients.get(revokedKey);
       if (revokedWsClients) {

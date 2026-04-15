@@ -355,6 +355,8 @@ const RELAY = 'https://health.paramant.app';
 const PAGE_SIZE = 20;
 let allEntries = [], page = 0, filtered = [], typeFilter = 'all';
 
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 async function load() {
   try {
     const [ctRes, hRes] = await Promise.all([
@@ -580,18 +582,18 @@ async function loadRelays() {
       var last = relay.last_seen
         ? new Date(relay.last_seen).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
         : '—';
-      var urlShort = relay.url.replace(/^https?:\/\//, '');
+      var urlShort = esc(relay.url.replace(/^https?:\/\//, ''));
       return '<div class="relay-row">'
-        + '<div class="url" title="' + relay.url + '">' + urlShort + '</div>'
-        + '<div class="cell green">' + (relay.sector || '—') + '</div>'
-        + '<div class="cell">v' + (relay.version || '?') + '</div>'
-        + '<div class="cell">' + (relay.edition || 'community') + '</div>'
-        + '<div class="cell dim" title="CT log index ' + relay.ct_index + '">' + since + '</div>'
+        + '<div class="url" title="' + esc(relay.url) + '">' + urlShort + '</div>'
+        + '<div class="cell green">' + esc(relay.sector || '—') + '</div>'
+        + '<div class="cell">v' + esc(relay.version || '?') + '</div>'
+        + '<div class="cell">' + esc(relay.edition || 'community') + '</div>'
+        + '<div class="cell dim" title="CT log index ' + esc(String(relay.ct_index ?? '')) + '">' + since + '</div>'
         + '<div class="cell dim">' + last + '</div>'
         + '</div>';
     }).join('');
   } catch (e) {
-    el.innerHTML = '<div class="loading">Error loading relay registry: ' + e.message + '</div>';
+    el.innerHTML = '<div class="loading">Error loading relay registry: ' + esc(e.message) + '</div>';
   }
 }
 

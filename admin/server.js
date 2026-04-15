@@ -125,8 +125,9 @@ app.use(BASE_PATH || '/', express.static(path.join(__dirname, 'public')));
 const api = express.Router();
 
 api.post('/auth/login', async (req, res) => {
-  // Fix 1: rate limit by IP (proxy-aware — trust X-Forwarded-For behind nginx)
-  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  // Rate limit by IP — use X-Real-IP (set by nginx to $remote_addr, not client-spoofable)
+  // rather than X-Forwarded-For first-entry, which an attacker can set arbitrarily.
+  const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
   if (!checkLoginRateLimit(ip)) {
     return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
   }
@@ -285,7 +286,7 @@ api.post('/reload-all', authMiddleware, async (req, res) => {
 
 // ── Self-service trial key request (public, no auth) ──────────────────────
 api.post('/request-key', async (req, res) => {
-  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
   if (!checkTrialIpLimit(ip)) return res.status(429).json({ error: 'Too many requests — try again in a minute' });
 
   const { email, name, usecase, website } = req.body || {};
