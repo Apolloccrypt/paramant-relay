@@ -1,0 +1,22 @@
+# Documentation placeholder examples (not real secrets)
+0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:147
+0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:344
+0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:354
+82f4cae2c61f7564441d20b13a18946562e0dd63:README.md:curl-auth-header:212
+82f4cae2c61f7564441d20b13a18946562e0dd63:README.md:curl-auth-header:222
+82f4cae2c61f7564441d20b13a18946562e0dd63:README.md:curl-auth-header:237
+231b07467f42fa96269ef086c4ff3f8ed617639d:frontend/docs.html:curl-auth-header:163
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:73
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:112
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:131
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:155
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:170
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:186
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:212
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:232
+82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:403
+6cb717bbbfe7978cdf9e5153ac2b583e21a0ba3d:frontend/docs.html:curl-auth-header:392
+
+# Documentation example PSS (pre-shared secret demo string)
+19b13732281f02e2f63835d3c4a3d37f69a5261f:docs/security.md:generic-api-key:268
+19b13732281f02e2f63835d3c4a3d37f69a5261f:docs/security.md:generic-api-key:274
