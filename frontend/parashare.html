@@ -691,7 +691,7 @@ async function confirmFingerprint() {
       return { name: file.name, size: file.size, tokens };
     }
 
-    // Upload alle bestanden
+    // Upload all files
     const files = [...$('file-input').files];
     const vaultFiles = [];
     for (let fi = 0; fi < files.length; fi++) {

@@ -141,7 +141,7 @@ async function runE2ETest(){
     const st=await fetch(relay.u+"/v2/status/"+hash,{
       headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)
     }).then(r=>r.json());
-    if(!st.available)throw new Error("Blob niet beschikbaar na upload");
+    if(!st.available)throw new Error("Blob not available after upload");
     addTestLog("Blob aanwezig in RAM | "+Math.round((st.size||5*1024*1024)/1024)+"KB","ok");
 
     // Stap 5 — Download + burn
@@ -161,7 +161,7 @@ async function runE2ETest(){
     const burned=await fetch(relay.u+"/v2/status/"+hash,{
       headers:{"X-Api-Key":apiKey}
     }).then(r=>r.json()).catch(()=>({available:false}));
-    if(burned.available)throw new Error("Blob nog beschikbaar na read — burn-on-read defect");
+    if(burned.available)throw new Error("Blob still available after read — burn-on-read defect");
     addTestLog("Blob vernietigd na download","ok");
 
     const total=upMs+dlMs;
