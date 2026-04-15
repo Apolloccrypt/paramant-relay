@@ -193,7 +193,8 @@ Additional fixes applied 2026-04-13:
 | Stale debug process | Killed (API key was visible in ps aux) |
 | SSH | PermitRootLogin prohibit-password, MaxAuthTries 3 |
 | Spurious arm64 arch | Removed from apt |
-| HSTS | max-age=63072000 on all HTTPS blocks |
+| HSTS | `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` on all 7 HTTPS server blocks (paramant.app + 5 relay subdomains). Applied directly in `/etc/nginx/sites-enabled/paramant-public` — the deploy-time nginx config (`deploy/nginx-paramant-live.conf`) also carries this header but the Cloudflare-facing config is gitignored. |
+| TLS | `ssl_protocols TLSv1.2 TLSv1.3` + forward-secret cipher suite (`ECDHE-*-GCM` + `CHACHA20-POLY1305`) explicit on all 443 vhosts; `ssl_prefer_server_ciphers off` (client chooses) |
 | Google Fonts | Removed from CSP |
 | atd | Stopped and disabled |
 | NATS | Dedicated system user, systemd hardening |
