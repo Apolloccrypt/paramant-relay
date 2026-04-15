@@ -10,12 +10,6 @@
 :root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
-.logo-para{color:#e8e8e8}.logo-mant{color:#3dbe7a}
-.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
-.nav-links{display:flex;gap:28px;list-style:none}
-.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .15s}
-.nav-links a:hover{color:var(--text)}
 .wrap{max-width:720px;margin:0 auto;padding:80px 48px 120px}
 .eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
 h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
@@ -23,7 +17,7 @@ h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--text);margi
 h2{font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--text);margin-bottom:12px;margin-top:52px}
 h2:first-of-type{margin-top:0}
 p{color:var(--muted);margin-bottom:16px;line-height:1.8}
-.sla-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:40px}
+.sla-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:40px}
 .sla-cell{background:var(--bg);padding:24px 20px}
 .sla-cell.head{background:var(--surface)}
 .tier{font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);margin-bottom:6px}
@@ -170,7 +164,7 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
   <h1>Service Level Agreement</h1>
   <p class="sub">Uptime commitments, downtime credits, and support response times for all PARAMANT relay plans.</p>
 
-  <nav class="toc">
+  <div class="toc">
     <a href="#uptime">1. Uptime commitments</a>
     <a href="#credits">2. Downtime credits</a>
     <a href="#support">3. Support tiers</a>
@@ -178,7 +172,7 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
     <a href="#measurement">5. Measurement methodology</a>
     <a href="#changes">6. SLA changes</a>
     <a href="#contact">7. Contact</a>
-  </nav>
+  </div>
 
   <!-- 1. Uptime -->
   <h2 id="uptime">1. Uptime commitments</h2>
@@ -189,11 +183,6 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
       <div class="tier">Community</div>
       <div class="uptime">99.5%</div>
       <div class="uptime-sub">~3.6 h/month max downtime</div>
-    </div>
-    <div class="sla-cell head">
-      <div class="tier">Professional</div>
-      <div class="uptime">99.9%</div>
-      <div class="uptime-sub">~43 min/month max downtime</div>
     </div>
     <div class="sla-cell head">
       <div class="tier">Enterprise</div>
@@ -213,7 +202,6 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
       <tr>
         <th>Monthly uptime</th>
         <th>Community credit</th>
-        <th>Professional credit</th>
         <th>Enterprise credit</th>
       </tr>
     </thead>
@@ -222,24 +210,20 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
         <td>99.5% &ndash; 99.9%</td>
         <td>&mdash;</td>
         <td>5%</td>
-        <td>5%</td>
       </tr>
       <tr>
         <td>99.0% &ndash; 99.5%</td>
         <td>&mdash;</td>
-        <td>10%</td>
         <td>15%</td>
       </tr>
       <tr>
         <td>95.0% &ndash; 99.0%</td>
         <td>&mdash;</td>
-        <td>25%</td>
         <td>30%</td>
       </tr>
       <tr>
         <td>Below 95.0%</td>
         <td>&mdash;</td>
-        <td>50%</td>
         <td>50%</td>
       </tr>
     </tbody>
@@ -266,12 +250,6 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
         <td>GitHub Issues</td>
         <td>Best effort</td>
         <td>Bug reports, documentation questions</td>
-      </tr>
-      <tr>
-        <td><span class="badge badge-pro">Professional</span></td>
-        <td>Email</td>
-        <td>2 business days</td>
-        <td>Integration support, configuration, billing</td>
       </tr>
       <tr>
         <td><span class="badge badge-ent">Enterprise</span></td>
@@ -314,7 +292,7 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
 </div>
 
 <footer>
-  <span>&copy; 2025 Paramant &mdash; EU/DE &middot; BUSL-1.1</span>
+  <span>&copy; 2026 Paramant &mdash; EU/DE &middot; BUSL-1.1</span>
   <div style="display:flex;gap:24px">
     <a href="/">Home</a>
     <a href="/docs">Docs</a>
