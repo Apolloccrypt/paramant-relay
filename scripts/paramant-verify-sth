@@ -92,11 +92,17 @@ async function main() {
   // 4. Load @noble/post-quantum for ML-DSA-65 verification
   let mlDsa;
   try {
-    const { ml_dsa65 } = require('@noble/post-quantum/ml-dsa.js');
-    mlDsa = ml_dsa65;
+    let mod;
+    try {
+      mod = require('@noble/post-quantum/ml-dsa.js');
+    } catch (_) {
+      const path = require('path');
+      mod = require(path.join(__dirname, '../relay/node_modules/@noble/post-quantum/ml-dsa.js'));
+    }
+    mlDsa = mod.ml_dsa65;
   } catch (e) {
     console.error(`FAIL: @noble/post-quantum not available — ${e.message}`);
-    console.error('Install with: npm install @noble/post-quantum');
+    console.error('Install with: npm install @noble/post-quantum  (or npm install inside relay/)');
     process.exit(1);
   }
 
