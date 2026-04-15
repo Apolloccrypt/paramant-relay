@@ -9,7 +9,7 @@
 
   function setDot(ok) {
     var dot = document.getElementById('ct-dot');
-    if (dot) dot.style.background = ok ? '#3aaa70' : '#c84040';
+    if (dot) dot.style.background = ok ? '#00cc33' : '#c84040';
   }
 
   // Primary: /v2/ct/log — size, root, last 3 entries
@@ -57,7 +57,7 @@
       if (!el) return;
       if (d.tree_size != null) {
         el.textContent = '✓ signed';
-        el.style.color = '#3aaa70';
+        el.style.color = '#00cc33';
       } else {
         el.textContent = 'RAM-only';
         el.style.color = '#555';

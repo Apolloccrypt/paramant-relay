@@ -7,6 +7,15 @@
     {name:"iot",     url:"https://iot.paramant.app",     stat:"ps-iot"},
   ];
 
+  // Per-sector accent colors — each relay has a distinct identity
+  const COLORS = {
+    relay:   '#00ff41',  // terminal green  — main relay
+    health:  '#4dc8e8',  // cyan            — healthcare
+    legal:   '#a78bfa',  // soft purple     — legal/notary
+    finance: '#f5c430',  // amber/gold      — finance
+    iot:     '#fb923c',  // orange          — industrial IoT
+  };
+
   const pc = document.getElementById("pipeCanvas");
   const pctx = pc.getContext("2d");
   let pdots = [], relayStatus = {};
@@ -26,6 +35,7 @@
     RELAYS.forEach((r,i) => {
       const y = ((i+1)/(RELAYS.length+1)) * ch;
       const on = relayStatus[r.name]?.ok || relayStatus[r.name]?.status === 'ok';
+      const accent = COLORS[r.name] || '#00cc33';
 
       pctx.strokeStyle = "#252525";
       pctx.lineWidth = 1;
@@ -34,20 +44,20 @@
       pctx.setLineDash([]);
 
       pctx.fillStyle = "#161616";
-      pctx.strokeStyle = on ? "#2d7a50" : "#383838";
+      pctx.strokeStyle = on ? accent : "#383838";
       pctx.lineWidth = 1.5;
       pctx.beginPath(); pctx.arc(LX-24, y, 11, 0, Math.PI*2); pctx.fill(); pctx.stroke();
 
-      pctx.fillStyle = on ? "#3aaa70" : "#484848";
+      pctx.fillStyle = on ? accent : "#484848";
       pctx.beginPath(); pctx.arc(LX-24, y, 4, 0, Math.PI*2); pctx.fill();
 
-      pctx.fillStyle = on ? "#cccccc" : "#666";
+      pctx.fillStyle = on ? accent : "#666";
       pctx.font = "500 11px 'SF Mono','Fira Code',monospace";
       pctx.textAlign = "left";
       pctx.fillText(r.name.toUpperCase(), LX+4, y+4);
 
       if(relayStatus[r.name]?.uptime_s != null){
-        pctx.fillStyle = "#666";
+        pctx.fillStyle = "#555";
         pctx.font = "10px 'SF Mono','Fira Code',monospace";
         pctx.textAlign = "right";
         pctx.fillText(Math.floor(relayStatus[r.name].uptime_s/3600)+"h up", RX-6, y+4);
@@ -56,16 +66,17 @@
 
     pdots.forEach(d => {
       const y = ((d.relay+1)/(RELAYS.length+1)) * ch;
+      const accent = COLORS[RELAYS[d.relay].name] || '#00cc33';
       d.x += d.speed;
       const alpha = Math.min(1, Math.min(d.x - LX, RX - d.x) / 40);
       const a = Math.max(0, alpha);
 
-      pctx.globalAlpha = a * 0.18;
-      pctx.fillStyle = "#3aaa70";
+      pctx.globalAlpha = a * 0.15;
+      pctx.fillStyle = accent;
       pctx.beginPath(); pctx.arc(d.x, y, 9, 0, Math.PI*2); pctx.fill();
 
-      pctx.globalAlpha = a * 0.95;
-      pctx.fillStyle = "#3aaa70";
+      pctx.globalAlpha = a * 0.9;
+      pctx.fillStyle = accent;
       pctx.beginPath(); pctx.arc(d.x, y, 3.5, 0, Math.PI*2); pctx.fill();
 
       pctx.globalAlpha = 1;
@@ -87,7 +98,7 @@
       if(checked === 0) return;
       if(online === RELAYS.length){
         stxt.textContent = "All relays operational \u00b7 v2.4.5";
-        if(sdot) sdot.style.background = "#3aaa70";
+        if(sdot) sdot.style.background = "#00cc33";
       } else if(online > 0){
         stxt.textContent = online + " of " + RELAYS.length + " relays online";
         if(sdot) sdot.style.background = "#e67e22";
