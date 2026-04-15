@@ -1,0 +1,139 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * paramant-verify-sth — Verify a Signed Tree Head from a PARAMANT relay
+ *
+ * Usage:
+ *   paramant-verify-sth --relay https://relay.paramant.app
+ *   paramant-verify-sth --relay https://relay.paramant.app --verbose
+ *
+ * Exit codes:
+ *   0 — STH signature is valid
+ *   1 — verification failed (bad sig, network error, missing ML-DSA-65)
+ */
+
+const https  = require('https');
+const http   = require('http');
+const crypto = require('crypto');
+
+// ── Parse args ────────────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+let relayUrl = null;
+let verbose  = false;
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--relay' && args[i + 1]) { relayUrl = args[++i].replace(/\/$/, ''); }
+  if (args[i] === '--verbose' || args[i] === '-v') verbose = true;
+}
+if (!relayUrl) {
+  console.error('Usage: paramant-verify-sth --relay <url>');
+  process.exit(1);
+}
+
+function log(msg) { if (verbose) console.log('[verbose]', msg); }
+
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https://') ? https : http;
+    mod.get(url, { headers: { 'User-Agent': 'paramant-verify-sth/1.0' } }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch (e) { reject(new Error(`JSON parse error: ${e.message}`)); }
+      });
+    }).on('error', reject);
+  });
+}
+
+// Canonical JSON: sorted keys, no whitespace, UTF-8 — must match produceSth() in relay.js
+function canonicalJson(sth) {
+  const keys = ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'version'];
+  return JSON.stringify(Object.fromEntries(keys.map(k => [k, sth[k]])));
+}
+
+async function main() {
+  // 1. Fetch STH
+  log(`fetching STH from ${relayUrl}/v2/sth`);
+  let sthResp;
+  try { sthResp = await fetchJson(`${relayUrl}/v2/sth`); }
+  catch (e) { console.error(`FAIL: could not fetch STH — ${e.message}`); process.exit(1); }
+
+  if (!sthResp.ok || !sthResp.sth) {
+    console.error(`FAIL: relay returned error — ${JSON.stringify(sthResp)}`);
+    process.exit(1);
+  }
+  const sth = sthResp.sth;
+  log(`STH: tree_size=${sth.tree_size} sha3_root=${(sth.sha3_root||'').slice(0,16)}… ts=${sth.timestamp}`);
+
+  // 2. Validate STH fields
+  if (sth.version !== 1) { console.error(`FAIL: unsupported STH version ${sth.version}`); process.exit(1); }
+  for (const f of ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'signature']) {
+    if (sth[f] === undefined || sth[f] === null) {
+      console.error(`FAIL: STH missing required field '${f}'`); process.exit(1);
+    }
+  }
+
+  // 3. Fetch relay public key
+  log(`fetching public key from ${relayUrl}/v2/pubkey`);
+  let pkResp;
+  try { pkResp = await fetchJson(`${relayUrl}/v2/pubkey`); }
+  catch (e) { console.error(`FAIL: could not fetch public key — ${e.message}`); process.exit(1); }
+
+  if (!pkResp.ok || !pkResp.public_key) {
+    console.error(`FAIL: relay returned error on /v2/pubkey — ${JSON.stringify(pkResp)}`);
+    process.exit(1);
+  }
+  if (pkResp.alg !== 'ML-DSA-65') {
+    console.error(`FAIL: unexpected algorithm '${pkResp.alg}' (expected ML-DSA-65)`);
+    process.exit(1);
+  }
+  log(`relay public key hash: ${pkResp.pk_hash}`);
+
+  // 4. Load @noble/post-quantum for ML-DSA-65 verification
+  let mlDsa;
+  try {
+    const { ml_dsa65 } = require('@noble/post-quantum/ml-dsa.js');
+    mlDsa = ml_dsa65;
+  } catch (e) {
+    console.error(`FAIL: @noble/post-quantum not available — ${e.message}`);
+    console.error('Install with: npm install @noble/post-quantum');
+    process.exit(1);
+  }
+
+  // 5. Verify ML-DSA-65 signature
+  let pkBytes, sigBytes;
+  try {
+    pkBytes  = Buffer.from(pkResp.public_key, 'base64');
+    sigBytes = Buffer.from(sth.signature, 'base64');
+  } catch (e) {
+    console.error(`FAIL: invalid base64 in public_key or signature — ${e.message}`);
+    process.exit(1);
+  }
+
+  const canonical = canonicalJson(sth);
+  log(`canonical JSON: ${canonical}`);
+
+  let valid = false;
+  try {
+    valid = mlDsa.verify(sigBytes, Buffer.from(canonical, 'utf8'), pkBytes);
+  } catch (e) {
+    console.error(`FAIL: signature verification threw — ${e.message}`);
+    process.exit(1);
+  }
+
+  if (!valid) {
+    console.error('FAIL: ML-DSA-65 signature is INVALID');
+    process.exit(1);
+  }
+
+  // 6. Print result
+  console.log('OK: STH signature verified (ML-DSA-65 NIST FIPS 204)');
+  console.log(`  relay_id   : ${sth.relay_id}`);
+  console.log(`  tree_size  : ${sth.tree_size}`);
+  console.log(`  sha3_root  : ${sth.sha3_root}`);
+  console.log(`  timestamp  : ${new Date(sth.timestamp).toISOString()}`);
+  console.log(`  pk_hash    : ${pkResp.pk_hash}`);
+  process.exit(0);
+}
+
+main().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

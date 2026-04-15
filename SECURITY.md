@@ -90,6 +90,99 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
 ---
 
+## CT Log gossip protocol & external anchoring
+
+### Trust model
+
+Before Mission 4, tamper-evidence depended on trusting Paramant's own servers:
+> "Trust Paramant's servers"
+
+After Mission 4, the trust model is:
+> "Trust that **at least one relay operator is honest**"
+
+This is the same trust model as RFC 6962 Certificate Transparency. Any relay operator running `paramant-verify-peers` becomes an independent auditor.
+
+### Signed Tree Heads (STH)
+
+Every change to the CT log produces a Signed Tree Head (STH) — an ML-DSA-65 signed commitment to the current Merkle root:
+
+```json
+{
+  "version": 1,
+  "relay_id": "https://health.paramant.app",
+  "tree_size": 59,
+  "sha3_root": "deed04dd...",
+  "timestamp": 1713000000000,
+  "signature": "<base64 ML-DSA-65 over canonical JSON>"
+}
+```
+
+Signature is over the canonical JSON of `{relay_id, sha3_root, timestamp, tree_size, version}` (keys sorted). Signed with the relay's ML-DSA-65 identity key (NIST FIPS 204).
+
+### Gossip protocol (push STH)
+
+After every STH is produced, the relay broadcasts it to all registered peers:
+
+```
+POST /v2/sth/ingest
+Body: { relay_id, sha3_root, timestamp, tree_size, version, signature, public_key, relay_pk_hash }
+```
+
+- Receiver verifies ML-DSA-65 signature before storing
+- Invalid signatures are logged and rejected (HTTP 400)
+- Valid STHs are stored in `data/peer-sths/{relay_pk_hash}.jsonl`
+- Non-blocking, best-effort — peer failures do not affect the local relay
+
+### Cross-relay verification endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /v2/sth/peers` | List all peer relays + their latest mirrored root |
+| `GET /v2/sth/peers/:pk_hash` | Full STH history mirrored from a specific peer |
+| `GET /v2/sth/consistency?from=N&to=M` | RFC 6962 consistency proof between two tree sizes |
+| `GET /ct/feed.xml` | RSS feed of signed tree heads for external archiving |
+
+### Consistency proof (append-only guarantee)
+
+`GET /v2/sth/consistency?from=<old_size>&to=<new_size>` returns an RFC 6962-style proof that the new tree contains the old tree as a prefix. This is the key property that prevents a relay from "rewinding" its log.
+
+```bash
+# Verify no entries were removed or reordered between size 10 and current
+curl "https://health.paramant.app/v2/sth/consistency?from=10" | jq .
+```
+
+### RSS feed anchoring
+
+Subscribe to `/ct/feed.xml` with any RSS reader to independently archive STH roots:
+
+```
+https://health.paramant.app/ct/feed.xml
+```
+
+If a relay later claims a different root for a published timestamp, any subscriber has cryptographic proof of the original commitment.
+
+### paramant-verify-peers CLI
+
+```bash
+# Install
+npm install -g @noble/post-quantum  # required for ML-DSA-65
+
+# Verify all peer STHs are consistent
+paramant-verify-peers --relay https://health.paramant.app
+
+# Exit 0 = all consistent (or 0 peers)
+# Exit 1 = inconsistency detected
+```
+
+The tool:
+1. Fetches the peer STH mirror from the local relay
+2. Verifies ML-DSA-65 signatures on each peer's latest STH
+3. Cross-checks by fetching the STH directly from the peer relay
+4. Checks for tree_size rollbacks (append-only violation)
+5. Reports inconsistencies with full details
+
+---
+
 ## Server hardening (paramant.app)
 
 Additional fixes applied 2026-04-13:

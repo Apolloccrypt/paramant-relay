@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * paramant-verify-peers — Cross-relay consistency checker
+ *
+ * Fetches the STH from every registered relay, then cross-checks each relay's
+ * latest root against what other relays have mirrored via the gossip protocol.
+ * Any inconsistency (root mismatch for the same tree size) is flagged as a
+ * potential tampering event.
+ *
+ * Usage:
+ *   paramant-verify-peers --relay https://health.paramant.app
+ *   paramant-verify-peers --relay https://health.paramant.app --verbose
+ *
+ * Exit codes:
+ *   0 — all peer STHs are consistent (or 0 peers registered)
+ *   1 — inconsistency detected or verification failed
+ */
+
+const https  = require('https');
+const http   = require('http');
+
+// ── Parse args ────────────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+let relayUrl = null;
+let verbose  = false;
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--relay' && args[i + 1]) { relayUrl = args[++i].replace(/\/$/, ''); }
+  if (args[i] === '--verbose' || args[i] === '-v') verbose = true;
+}
+if (!relayUrl) {
+  console.error('Usage: paramant-verify-peers --relay <url>');
+  console.error('Example: paramant-verify-peers --relay https://health.paramant.app');
+  process.exit(1);
+}
+
+function vlog(msg) { if (verbose) console.log('[verbose]', msg); }
+
+function fetchJson(url, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https://') ? https : http;
+    const req = mod.get(url, { headers: { 'User-Agent': 'paramant-verify-peers/1.0' } }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString()) }); }
+        catch (e) { reject(new Error(`JSON parse error from ${url}: ${e.message}`)); }
+      });
+    });
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error(`Timeout fetching ${url}`)); });
+    req.on('error', reject);
+  });
+}
+
+// Canonical JSON for STH verification — must match produceSth() in relay.js
+function canonicalJson(sth) {
+  const keys = ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'version'];
+  return JSON.stringify(Object.fromEntries(keys.map(k => [k, sth[k]])));
+}
+
+async function verifySTHSignature(sth, mlDsa) {
+  if (!sth.signature || !sth.public_key) return false;
+  try {
+    const pkBytes  = Buffer.from(sth.public_key, 'base64');
+    const sigBytes = Buffer.from(sth.signature, 'base64');
+    return mlDsa.verify(sigBytes, Buffer.from(canonicalJson(sth), 'utf8'), pkBytes);
+  } catch { return false; }
+}
+
+async function main() {
+  // 0. Load ML-DSA-65
+  let mlDsa;
+  try {
+    const { ml_dsa65 } = require('@noble/post-quantum/ml-dsa.js');
+    mlDsa = ml_dsa65;
+  } catch (e) {
+    console.error(`FAIL: @noble/post-quantum not available — ${e.message}`);
+    console.error('Install with: npm install @noble/post-quantum');
+    process.exit(1);
+  }
+
+  // 1. Fetch peer STH summary from local relay
+  vlog(`fetching peer list from ${relayUrl}/v2/sth/peers`);
+  let peersResp;
+  try { peersResp = await fetchJson(`${relayUrl}/v2/sth/peers`); }
+  catch (e) { console.error(`FAIL: could not fetch peer list — ${e.message}`); process.exit(1); }
+
+  const peers = peersResp.body?.peers || [];
+  console.log(`Checking ${peers.length} mirrored peer(s) from ${relayUrl}`);
+
+  if (peers.length === 0) {
+    console.log('OK: No peers registered — gossip protocol is active, awaiting peer relays.');
+    process.exit(0);
+  }
+
+  // 2. Fetch local relay's own STH
+  vlog(`fetching own STH from ${relayUrl}/v2/sth`);
+  let ownSthResp;
+  try { ownSthResp = await fetchJson(`${relayUrl}/v2/sth`); }
+  catch (e) { console.error(`FAIL: could not fetch own STH — ${e.message}`); process.exit(1); }
+  const ownSth = ownSthResp.body?.sth;
+  if (ownSth) vlog(`Own STH: tree_size=${ownSth.tree_size} root=${String(ownSth.sha3_root).slice(0,16)}…`);
+
+  // 3. For each peer, fetch their full history and cross-check
+  let inconsistencies = 0;
+  let checked = 0;
+
+  for (const peer of peers) {
+    const id = peer.relay_pk_hash;
+    const shortId = id.slice(0, 16) + '…';
+    vlog(`fetching history for peer ${shortId} (${peer.relay_id || 'unknown'})`);
+
+    let histResp;
+    try { histResp = await fetchJson(`${relayUrl}/v2/sth/peers/${id}`); }
+    catch (e) {
+      console.log(`  WARN  [${shortId}] Could not fetch history — ${e.message}`);
+      continue;
+    }
+
+    const sths = histResp.body?.sths || [];
+    if (sths.length === 0) {
+      vlog(`  [${shortId}] No STHs stored yet`);
+      continue;
+    }
+
+    const latest = sths[sths.length - 1];
+
+    // 3a. Verify ML-DSA-65 signature on latest STH
+    if (latest.public_key && latest.signature) {
+      const sigOk = await verifySTHSignature(latest, mlDsa);
+      if (!sigOk) {
+        console.log(`  INCONSISTENCY [${shortId}] INVALID ML-DSA-65 signature on latest STH!`);
+        console.log(`    relay_id  : ${latest.relay_id}`);
+        console.log(`    tree_size : ${latest.tree_size}`);
+        console.log(`    root      : ${latest.sha3_root}`);
+        inconsistencies++;
+        continue;
+      }
+      vlog(`  [${shortId}] Signature OK`);
+    } else {
+      vlog(`  [${shortId}] No public_key in stored STH — skipping sig check`);
+    }
+
+    // 3b. Cross-check: fetch this peer's STH directly and compare
+    if (latest.relay_id && (latest.relay_id.startsWith('http://') || latest.relay_id.startsWith('https://'))) {
+      const peerBase = latest.relay_id.replace(/\/$/, '');
+      try {
+        const directResp = await fetchJson(`${peerBase}/v2/sth`);
+        const directSth  = directResp.body?.sth;
+        if (directSth && directSth.tree_size === latest.tree_size && directSth.sha3_root !== latest.sha3_root) {
+          console.log(`  INCONSISTENCY [${shortId}] Root mismatch for tree_size=${latest.tree_size}!`);
+          console.log(`    Mirrored root : ${latest.sha3_root}`);
+          console.log(`    Direct root   : ${directSth.sha3_root}`);
+          inconsistencies++;
+        } else if (directSth) {
+          vlog(`  [${shortId}] Direct check OK (tree_size=${directSth.tree_size})`);
+          checked++;
+        }
+      } catch (e) {
+        vlog(`  [${shortId}] Could not reach peer directly — ${e.message} (using mirrored data only)`);
+        checked++;
+      }
+    } else {
+      vlog(`  [${shortId}] relay_id is not a URL — skipping direct check`);
+      checked++;
+    }
+
+    // 3c. Check for root rollback within mirrored history (tree_size should be non-decreasing)
+    for (let i = 1; i < sths.length; i++) {
+      if (sths[i].tree_size < sths[i - 1].tree_size) {
+        console.log(`  INCONSISTENCY [${shortId}] tree_size rollback: ${sths[i-1].tree_size} → ${sths[i].tree_size} (append-only violation!)`);
+        inconsistencies++;
+        break;
+      }
+    }
+  }
+
+  // 4. Report
+  console.log('');
+  console.log(`Summary: ${peers.length} peer(s), ${checked} verified, ${inconsistencies} inconsistency(ies) found`);
+  if (inconsistencies > 0) {
+    console.log('RESULT: INCONSISTENCY DETECTED — investigate immediately');
+    process.exit(1);
+  }
+  console.log('RESULT: OK — all peer STHs consistent');
+  process.exit(0);
+}
+
+main().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

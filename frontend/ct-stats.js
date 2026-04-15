@@ -1,18 +1,29 @@
-// Relay count from registry
-fetch('https://health.paramant.app/v2/relays',{signal:AbortSignal.timeout(5000)})
+// CT log — tree_size (count) + Merkle root
+fetch('https://relay.paramant.app/v2/ct',{signal:AbortSignal.timeout(5000)})
   .then(function(r){return r.json()})
   .then(function(d){
     var ce=document.getElementById('ct-count');
-    if(ce && d.total!=null) ce.textContent=d.total.toLocaleString();
-  }).catch(function(){});
-
-// Merkle root from CT log
-fetch('https://health.paramant.app/v2/ct/log?limit=1',{signal:AbortSignal.timeout(5000)})
-  .then(function(r){return r.json()})
-  .then(function(d){
     var re=document.getElementById('ct-root');
-    if(re && d.root && d.root!=='0'.repeat(64)) re.textContent=d.root.slice(0,16)+'...'+d.root.slice(-8);
-  }).catch(function(){});
+    var count = d.tree_size != null ? d.tree_size : d.total;
+    if(ce && count != null) ce.textContent=count.toLocaleString();
+    var root = d.root || d.hash;
+    if(re && root && root!=='0'.repeat(64)) re.textContent=root.slice(0,16)+'...'+root.slice(-8);
+  }).catch(function(){
+    // fallback: try health relay registry
+    fetch('https://health.paramant.app/v2/relays',{signal:AbortSignal.timeout(5000)})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        var ce=document.getElementById('ct-count');
+        if(ce && d.total!=null) ce.textContent=d.total.toLocaleString();
+      }).catch(function(){});
+    fetch('https://health.paramant.app/v2/ct/log?limit=1',{signal:AbortSignal.timeout(5000)})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        var re=document.getElementById('ct-root');
+        var root = d.root || d.hash;
+        if(re && root && root!=='0'.repeat(64)) re.textContent=root.slice(0,16)+'...'+root.slice(-8);
+      }).catch(function(){});
+  });
 
 // Pricing tab toggle
 window.showTab = function(tab) {

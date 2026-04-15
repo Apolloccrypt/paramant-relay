@@ -57,3 +57,5 @@ pentest-report*.txt
 poc_report*.txt
 frontend/r34ct0r.html
 deploy/nginx-paramant.conf
+CLAUDE.md
+.claude/

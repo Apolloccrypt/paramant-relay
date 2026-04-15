@@ -71,13 +71,13 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/ct'],
+               '/v2/sth','/v2/verify-receipt','/ct','/ct/feed'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/ct'],
+               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/ct','/ct/feed'],
   full:       null,
 };
 
@@ -944,33 +944,41 @@ async function verify(){
   btn.disabled=true;btn.textContent='Verifying...';vb.style.display='none';
   try{
     var res=await Promise.all([fetch('/ct/feed'),fetch('/v2/sth')]);
-    var feed=await res[0].json(),sth=await res[1].json();
+    var feed=await res[0].json();
+    var sthResp=await res[1].json();
+    var sth=sthResp.sth||sthResp; // /v2/sth returns {ok,sth:{...}}
     var lines=[],ok=true;
-    if(feed.root&&sth.root){
-      if(feed.root===sth.root){
+    var sthRoot=sth.sha3_root||sth.root;
+    var sthSize=sth.tree_size;
+    if(feed.root&&sthRoot){
+      if(feed.root===sthRoot){
         lines.push('[OK]   Merkle root consistent across /ct/feed and /v2/sth');
         lines.push('       '+feed.root.slice(0,40)+'...');
       }else{ok=false;lines.push('[FAIL] Root mismatch between endpoints!');
         lines.push('  feed: '+feed.root.slice(0,32)+'...');
-        lines.push('  sth:  '+sth.root.slice(0,32)+'...');}
+        lines.push('  sth:  '+sthRoot.slice(0,32)+'...');}
+    }else if(!sthRoot){
+      lines.push('[INFO] No STH yet — CT log is empty (no transfers recorded)');
     }
-    if(sth.tree_size!==undefined&&feed.tree_size!==undefined){
-      var diff=Math.abs(sth.tree_size-feed.tree_size);
-      if(diff<=1)lines.push('[OK]   Tree size: '+feed.tree_size+' entries'+(diff?' (\u00b11 in-flight write)':''));
-      else{ok=false;lines.push('[WARN] Tree size mismatch: feed='+feed.tree_size+' sth='+sth.tree_size);}
+    if(sthSize!==undefined&&feed.tree_size!==undefined){
+      var diff=Math.abs(sthSize-feed.tree_size);
+      if(diff<=1)lines.push('[OK]   Tree size: '+feed.tree_size+' entries'+(diff?' (±1 in-flight write)':''));
+      else{ok=false;lines.push('[WARN] Tree size mismatch: feed='+feed.tree_size+' sth='+sthSize);}
     }
-    if(sth.relay_id){
-      lines.push('[OK]   Relay identity: '+sth.relay_id.slice(0,20)+'...');
-      lines.push('       Algorithm: '+(sth.alg||'?'));
+    var rid=sth.relay_id||feed.relay_id;
+    if(rid){
+      lines.push('[OK]   Relay identity: '+rid.slice(0,20)+'...');
+      lines.push('       Algorithm: ML-DSA-65 (NIST FIPS 204)');
     }else lines.push('[INFO] Relay identity not configured (RELAY_IDENTITY_FILE not set)');
-    if(sth.sig){
+    var sig=sth.signature||sth.sig;
+    if(sig){
       lines.push('[OK]   ML-DSA-65 signature present');
-      lines.push('       sig: '+sth.sig.slice(0,24)+'...');
+      lines.push('       sig: '+sig.slice(0,24)+'...');
       lines.push('[INFO] Full sig verification requires ML-DSA-65 WASM module');
       lines.push('       Browser WebCrypto does not support post-quantum algorithms yet.');
     }else lines.push('[INFO] No ML-DSA-65 signature (relay identity not configured)');
     vb.className='vbox '+(ok?'ok':'err');vb.style.display='block';
-    vb.innerHTML='<pre>'+esc(lines.join('\\n'))+'</pre>';
+    vb.innerHTML='<pre>'+esc(lines.join('\n'))+'</pre>';
   }catch(e){vb.className='vbox err';vb.style.display='block';vb.textContent='Verification failed: '+e.message;}
   finally{btn.disabled=false;btn.textContent='Verify this relay';}
 }
@@ -1653,6 +1661,33 @@ session = client.create_session('recipient@example.com')</pre>
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
     return res.end(renderPrometheus());
+  }
+
+  // ── GET /ct, /ct/ — public CT log web UI (no auth) ─────────────────────────
+  if ((path === '/ct' || path === '/ct/') && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    return res.end(CT_PAGE);
+  }
+
+  // ── GET /ct/feed — public JSON feed for CT log UI (no auth, no keys) ─────────
+  if (path === '/ct/feed' && req.method === 'GET') {
+    const last50 = ctLog.slice(-50);
+    const root   = ctLog.length ? ctLog[ctLog.length - 1].tree_hash : '0'.repeat(64);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    return res.end(J({
+      relay_id: relayIdentity ? relayIdentity.pk_hash : null,
+      sector:   SECTOR,
+      version:  VERSION,
+      tree_size: ctLog.length,
+      root,
+      entries: last50.map(e => ({
+        i:    e.index,
+        t:    e.ts,
+        h:    e.leaf_hash ? e.leaf_hash.slice(0, 16) + '...' : null,
+        type: e.type || 'key_reg',
+        s:    e.relay_sector || SECTOR,
+      })),
+    }));
   }
 
   // ── GET /v2/ct/log + /v2/ct/proof — publiek, geen auth ──────────────────────

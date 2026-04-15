@@ -129,6 +129,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#selfhost">Self-host</a></li>
     <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/drop">ParaDrop</a></li>
     <li><a href="/docs">Docs</a></li>
     <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
   </ul>
@@ -146,6 +147,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
   <div style="margin-top:16px;font-size:12px;color:var(--quiet)">No account &nbsp;&middot;&nbsp; No credit card &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--quiet);text-decoration:underline;text-decoration-color:#333">Request free API key &rarr;</a></div>
+  <div style="margin-top:12px;font-size:12px;color:var(--quiet)"><a href="/drop" style="color:var(--muted);text-decoration:none">ParaDrop</a> &mdash; encrypted AirDrop alternative &nbsp;&middot;&nbsp; no Apple &nbsp;&middot;&nbsp; no cloud &nbsp;&middot;&nbsp; burn-on-read</div>
   <div style="margin-top:24px"><a href="/hndl" style="display:inline-flex;align-items:center;gap:8px;background:rgba(200,40,40,.12);border:1px solid rgba(200,40,40,.35);border-radius:4px;padding:7px 16px;font-size:11px;font-family:var(--mono);color:#c84040;text-decoration:none;letter-spacing:.04em;animation:pulse 2.5s ease-in-out infinite">&#9888; Your data is being harvested NOW &mdash; Q-Day est. 2029 &rarr;</a></div>
 </div>
 
@@ -199,11 +201,11 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       </div>
       <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
       <div class="pipe-stats" style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)">
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Relay</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-main">—</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">—</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">—</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Finance</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-finance">—</div></div>
-        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">IoT</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-iot">—</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Relay</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-main">checking...</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">checking...</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">checking...</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Finance</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-finance">checking...</div></div>
+        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">IoT</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-iot">checking...</div></div>
       </div>
     </div>
 
@@ -313,12 +315,12 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <div class="ct-pair" style="display:grid;grid-template-columns:auto 1fr;gap:0">
       <div style="padding:24px 32px;border-right:1px solid var(--border);min-width:180px">
         <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Relay registrations</div>
-        <div style="font-size:40px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-count">—</div>
+        <div style="font-size:40px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-count">syncing...</div>
         <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">relay self-registrations</div>
       </div>
       <div style="padding:24px 28px">
         <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Current Merkle root</div>
-        <div style="font-size:12.5px;font-family:var(--mono);color:var(--muted);word-break:break-all;line-height:1.7" id="ct-root">—</div>
+        <div style="font-size:12.5px;font-family:var(--mono);color:var(--muted);word-break:break-all;line-height:1.7" id="ct-root">syncing...</div>
         <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">SHA3-256 · public · tamper-evident</div>
       </div>
     </div>
@@ -699,8 +701,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div class="footer-links" style="flex-direction:column;gap:10px">
         <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
         <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-        <a href="/compliance/nen7510">NEN 7510 (Healthcare NL)</a>
-        <a href="/verwerkersovereenkomst">Verwerkersovereenkomst</a>
+        <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+        <a href="/verwerkersovereenkomst">Verwerkersovereenkomst (GDPR Art. 28)</a>
         <a href="/overheid">Overheid &amp; publieke sector</a>
         <a href="/hndl">HNDL threat</a>
         <a href="/crypto-agility">Crypto agility</a>
@@ -721,7 +723,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
 </footer>
 
-<script src="ct-stats.js" integrity="sha384-j+futtWeqXD2ws5wrW615OsXprV4M4cWMsUJ0ccRYlM+GtEScnGlN86Lp7yPOt96" crossorigin="anonymous" defer></script>
+<script src="ct-stats.js" integrity="sha384-jishlbYsc4h4EM732XrOJl/x3Obj7JP7SQnQG8GwnRsPU9zUoo8JEcDg/+t466us" crossorigin="anonymous" defer></script>
 <script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='☰';}});});</script>
 </body>
 </html>

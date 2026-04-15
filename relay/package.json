@@ -2,8 +2,12 @@
   "name": "paramant-relay",
   "version": "2.4.5",
   "main": "relay.js",
+  "bin": {
+    "paramant-verify-sth": "../scripts/paramant-verify-sth"
+  },
   "scripts": {
-    "start": "node relay.js"
+    "start": "node relay.js",
+    "verify-sth": "node ../scripts/paramant-verify-sth"
   },
   "dependencies": {
     "@noble/post-quantum": "^0.6.0",

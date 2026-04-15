@@ -59,6 +59,8 @@ X-Api-Key header           blob destroyed on read          X-Api-Key header
 **What the relay never sees:** plaintext, encryption keys, filenames, or recipient identity.  
 **What it does see:** fixed-size (5 MB) ciphertext blobs, blob hashes, API key identifiers.
 
+Every transfer is hashed into a SHA3-256 Merkle tree. The relay signs each tree head with ML-DSA-65 and publishes it publicly — anyone can verify that a specific blob was delivered, and that the log has not been tampered with, without reading its contents.
+
 ---
 
 ## Use cases
@@ -231,11 +233,24 @@ curl https://health.paramant.app/health
 # {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
 ```
 
-### CT log (authenticated)
+### CT log (public)
 
 ```bash
-curl https://health.paramant.app/v2/ct -H "X-Api-Key: pgp_your_key"
-# {"size":58,"root":"deed04dd...","entries":[...]}
+# Latest Signed Tree Head — ML-DSA-65 signed, public
+curl https://relay.paramant.app/v2/sth
+# {"ok":true,"sth":{"relay_id":"relay.paramant.app","sha3_root":"c7a9…","tree_size":43,"timestamp":1744123456789,"signature":"…"}}
+
+# Verify the signature
+paramant-verify-sth --relay https://relay.paramant.app
+
+# Relay identity public key (for independent signature verification)
+curl https://relay.paramant.app/v2/pubkey
+# {"ok":true,"alg":"ML-DSA-65","public_key":"base64…","pk_hash":"sha3-256…"}
+
+# Verify a delivery receipt
+curl -X POST https://relay.paramant.app/v2/verify-receipt \
+  -d '{"receipt":"<base64url from X-Paramant-Receipt header>"}'
+# {"valid":true,"blob_hash":"a3f2…","burn_confirmed":true}
 ```
 
 Full API reference: [docs/api.md](docs/api.md)
@@ -280,6 +295,14 @@ paramant-key-add           # add new API key
 paramant-key-revoke        # revoke an API key
 ```
 
+### CT log verification
+
+```
+paramant-verify-sth        # fetch /v2/sth + /v2/pubkey, verify ML-DSA-65 signature
+paramant-receipt           # view, save, or verify a delivery receipt
+paramant-verify-peers      # cross-check STH consistency across all peer relays
+```
+
 ### Security & network
 
 ```
@@ -311,15 +334,21 @@ from paramant_sdk import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
 
-# Send — returns blob hash
-hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
+# Send — returns (hash, inclusion_proof)
+hash_, proof = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
+# proof contains leaf_hash, leaf_index, tree_size, audit_path, root, sth
 
-# Receive — burn-on-read, returns plaintext bytes
-data = gp.receive(hash_)
+# Receive — returns (data, receipt)
+data, receipt = gp.receive(hash_)
+# receipt contains blob_hash, burn_confirmed, tree_size_at_retrieval, ML-DSA-65 signature
+
+# Verify receipt (calls POST /v2/verify-receipt)
+result = gp.verify_receipt(receipt)
+assert result["valid"]
 
 # Anonymous drop with 12-word mnemonic
 mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data     = gp.pickup(mnemonic)
+data, _  = gp.receive(mnemonic)
 ```
 
 ---
@@ -358,6 +387,34 @@ The relay is **untrusted by design** — it never holds a decryption key.
 - **2026-04-08 — Ryan Williams, Smart Cyber Solutions (AU):** 4 critical · 5 high · 6 medium · 5 low. [Full report](docs/security-audit-2026-04.md)
 
 All findings publicly documented in [SECURITY.md](SECURITY.md).
+
+---
+
+## Certificate Transparency log
+
+Every transfer is appended to a public SHA3-256 Merkle tree. The trust model mirrors [RFC 6962](https://tools.ietf.org/html/rfc6962): you don't trust the relay operator, you verify the math.
+
+| What you can prove | How |
+|-------------------|-----|
+| A specific blob was uploaded | `merkle_proof` in `POST /v2/inbound` response |
+| A specific blob was delivered and burned | `X-Paramant-Receipt` header on `GET /v2/outbound` |
+| Receipt is genuine and unmodified | `POST /v2/verify-receipt` |
+| Log has not been forked | `GET /v2/sth/consistency?from=N&to=M` |
+| Peer relays agree on the tree | `GET /v2/sth/peers` |
+
+```bash
+# Independent verification — no trust required
+curl https://relay.paramant.app/v2/sth       # latest tree root
+curl https://relay.paramant.app/v2/pubkey    # relay signing key
+paramant-verify-sth --relay https://relay.paramant.app
+paramant-verify-peers
+
+# RSS archiving (subscribe to independently retain signed tree heads)
+curl https://relay.paramant.app/ct/feed.xml
+
+# Public web UI
+open https://relay.paramant.app/ct/
+```
 
 ---
 
