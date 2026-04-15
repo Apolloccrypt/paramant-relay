@@ -187,10 +187,10 @@ cat /tmp/recv-test/recv_000001.json
 
 | Problem | Cause | Fix |
 |---------|-------|-----|
-| `Geen receiver pubkeys` | Receiver not running | Start receiver before sender |
-| `Decrypt fout` | Keypair mismatch | Delete `~/.paramant/<device>.keypair.json`, restart receiver |
+| `No receiver pubkeys` | Receiver not running | Start receiver before sender |
+| `Decrypt error` | Keypair mismatch | Delete `~/.paramant/<device>.keypair.json`, restart receiver |
 | `HTTP 401` | Invalid API key | Check key starts with `pgp_`, check plan |
 | `HTTP 403` | Cloudflare block | User-Agent is set correctly in v5.0 |
-| `Relay niet bereikbaar` | Network issue | Try `--relay https://health.paramant.app` explicitly |
+| `Relay unreachable` | Network issue | Try `--relay https://health.paramant.app` explicitly |
 | `base64 decode error` | Old receiver v4.x | Upgrade to v5.0 |
 | WebSocket connects but no data | Polling fallback active | Normal — polling picks up what WS misses |
