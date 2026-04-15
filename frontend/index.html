@@ -129,6 +129,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#selfhost">Self-host</a></li>
     <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/ct-log">CT Log</a></li>
     <li><a href="/docs">Docs</a></li>
     <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
   </ul>
@@ -140,26 +141,27 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="status"><span class="status-dot" id="sdot" style="background:#2d8a5c"></span><span id="stxt">Checking relay status...</span></div>
   <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.4.5 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
-  <p class="hero-sub">Post-quantum file transfer. Encrypted client-side, stored in RAM only, destroyed after one download. For healthcare, legal, and critical infrastructure.</p>
+  <p class="hero-sub">Post-quantum. Client-side. RAM-only. Destroyed after one read.<br>No account. No storage. No trace.</p>
   <div class="btns" style="margin-top:36px">
     <a href="/parashare" class="btn-p">Try ParaShare free &rarr;</a>
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
-  <div style="margin-top:16px;font-size:12px;color:var(--quiet)">No account &nbsp;&middot;&nbsp; No credit card &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--quiet);text-decoration:underline;text-decoration-color:#333">Request free API key &rarr;</a></div>
+  <div style="margin-top:20px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.02em">Independent security audit &nbsp;&middot;&nbsp; 4 critical findings &nbsp;&middot;&nbsp; all resolved &nbsp;&middot;&nbsp; <a href="/security" style="color:var(--muted);text-decoration:underline;text-decoration-color:#333">SECURITY.md &rarr;</a></div>
+  <div style="margin-top:12px;font-size:12px;color:var(--quiet)">No account &nbsp;&middot;&nbsp; No credit card &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--quiet);text-decoration:underline;text-decoration-color:#333">Request free API key &rarr;</a></div>
   <div style="margin-top:12px;font-size:12px;color:var(--quiet)"><a href="/drop" style="color:var(--muted);text-decoration:none">ParaDrop</a> &mdash; encrypted AirDrop alternative &nbsp;&middot;&nbsp; no Apple &nbsp;&middot;&nbsp; no cloud &nbsp;&middot;&nbsp; burn-on-read</div>
   <div style="margin-top:24px"><a href="/hndl" style="display:inline-flex;align-items:center;gap:8px;background:rgba(200,40,40,.12);border:1px solid rgba(200,40,40,.35);border-radius:4px;padding:7px 16px;font-size:11px;font-family:var(--mono);color:#c84040;text-decoration:none;letter-spacing:.04em;animation:pulse 2.5s ease-in-out infinite">&#9888; Your data is being harvested NOW &mdash; Q-Day est. 2029 &rarr;</a></div>
 </div>
 
 <div class="proto-bar">
-  <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">NIST FIPS 203</div></div>
-  <div class="proto-cell"><div class="label">ML-DSA-65</div><div class="pdesc">NIST FIPS 204</div></div>
-  <div class="proto-cell"><div class="label">AES-256-GCM</div><div class="pdesc">Symmetric</div></div>
-  <div class="proto-cell"><div class="label">HKDF-SHA256</div><div class="pdesc">Key derivation</div></div>
+  <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">post-quantum key exchange</div></div>
+  <div class="proto-cell"><div class="label">AES-256-GCM</div><div class="pdesc">symmetric encryption</div></div>
+  <div class="proto-cell"><div class="label">ML-DSA-65</div><div class="pdesc">post-quantum signatures</div></div>
   <div class="proto-cell"><div class="label">Burn-on-read</div><div class="pdesc">RAM-only</div></div>
-  <div class=proto-cell><div class=label>5MB padding</div><div class=pdesc>DPI masking</div></div>
-  <div class=proto-cell><div class=label>Argon2id</div><div class=pdesc>RFC 9106</div></div>
-  <div class=proto-cell><div class=label>Two-step burn</div><div class=pdesc>Preload-proof</div></div>
+  <div class="proto-cell"><div class="label">5MB padding</div><div class="pdesc">DPI masking</div></div>
   <div class="proto-cell"><div class="label">Hetzner DE</div><div class="pdesc">EU jurisdiction</div></div>
+  <div class="proto-cell"><div class="label">HKDF-SHA256</div><div class="pdesc">Key derivation</div></div>
+  <div class="proto-cell"><div class="label">Argon2id</div><div class="pdesc">RFC 9106</div></div>
+  <div class="proto-cell"><div class="label">Two-step burn</div><div class="pdesc">Preload-proof</div></div>
 </div>
 
 <hr class="divider">
@@ -306,26 +308,42 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="width:6px;height:6px;border-radius:50%;background:#3aaa70;display:inline-block;box-shadow:0 0 6px #3aaa7066"></span>
+        <span id="ct-dot" style="width:6px;height:6px;border-radius:50%;background:#333;display:inline-block;transition:background .3s"></span>
         <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Certificate Transparency Log — live</span>
       </div>
       <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none">view all →</a>
     </div>
-    <div class="ct-pair" style="display:grid;grid-template-columns:auto 1fr;gap:0">
-      <div style="padding:24px 32px;border-right:1px solid var(--border);min-width:180px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Relay registrations</div>
-        <div style="font-size:40px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-count">syncing...</div>
-        <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">relay self-registrations</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)">
+      <div style="padding:16px 20px;border-right:1px solid var(--border)">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Verified transfers</div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-transfers">—</div>
       </div>
-      <div style="padding:24px 28px">
-        <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Current Merkle root</div>
-        <div style="font-size:12.5px;font-family:var(--mono);color:var(--muted);word-break:break-all;line-height:1.7" id="ct-root">syncing...</div>
-        <div style="font-size:11px;color:var(--quiet);margin-top:8px;font-family:var(--mono)">SHA3-256 · public · tamper-evident</div>
+      <div style="padding:16px 20px;border-right:1px solid var(--border)">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Relay registrations</div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-relays">—</div>
+      </div>
+      <div style="padding:16px 20px">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">STH</div>
+        <div style="font-size:13px;font-family:var(--mono);color:#555;margin-top:4px" id="ct-sth-status">checking...</div>
       </div>
     </div>
-    <div class="ct-foot" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <div class="ct-pair" style="display:grid;grid-template-columns:auto 1fr;gap:0">
+      <div style="padding:20px 24px;border-right:1px solid var(--border);min-width:200px">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Current root</div>
+        <div style="font-size:12px;font-family:var(--mono);color:var(--muted);word-break:break-all;line-height:1.7" id="ct-root">syncing...</div>
+        <div style="font-size:10px;color:var(--quiet);margin-top:6px;font-family:var(--mono)">SHA3-256 · tamper-evident · public</div>
+      </div>
+      <div style="padding:20px 24px">
+        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Recent activity</div>
+        <div id="ct-feed" style="font-size:11px;font-family:var(--mono);color:var(--muted);line-height:2"><span style="color:var(--quiet)">loading...</span></div>
+      </div>
+    </div>
+    <div class="ct-foot" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Every transfer hashed into a Merkle tree — content never stored</div>
-      <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
+        <a href="/ct-log#verify" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Verify this relay →</a>
+      </div>
     </div>
   </div>
 </section>
@@ -341,9 +359,12 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     All relay nodes run identical Ghost Pipe software &nbsp;·&nbsp; subdomains provide routing isolation, not different configurations
   </div>
 
-  <div class="grid g2" style="margin-bottom:24px">
+  <div class="grid g2" style="margin-bottom:1px">
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x2295; Healthcare</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x2295; Healthcare</div>
+        <span style="font-size:10px;font-family:var(--mono);color:#2d8a5c;background:#0d1f17;border:1px solid #1a3d28;border-radius:3px;padding:2px 7px;letter-spacing:.04em">NEN 7510</span>
+      </div>
       <h3 style="margin-bottom:8px">DICOM files that vanish after delivery</h3>
       <p class="desc" style="margin-bottom:14px">MRI / CT → Ghost Pipe → PACS. The file exists only for the duration of the transfer, then burns. Nothing to audit, nothing to breach. Designed with NEN 7510 in mind.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
@@ -356,7 +377,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <a href="/compliance/nen7510" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">NEN 7510 &rarr;</a>
     </div>
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x00a7; Legal &amp; Notary</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x00a7; Legal &amp; Notary</div>
+        <span style="font-size:10px;font-family:var(--mono);color:#6e6e6e;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">eIDAS</span>
+      </div>
       <h3 style="margin-bottom:8px">Contracts that leave no recoverable trace</h3>
       <p class="desc" style="margin-bottom:14px">Document → Ghost Pipe → counterparty. After retrieval it's cryptographically gone. The Merkle audit log proves delivery without storing what was delivered — supports eIDAS-compatible audit trails.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
@@ -367,8 +391,14 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <a href="https://legal.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on legal.paramant.app &rarr;</a>
       <a href="/docs#compliance" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">eIDAS compliance &rarr;</a>
     </div>
+  </div>
+  <hr class="divider" style="margin-bottom:1px">
+  <div class="grid g2" style="margin-bottom:24px">
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x223f; Industrial IoT / OT</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x223f; Industrial IoT / OT</div>
+        <span style="font-size:10px;font-family:var(--mono);color:#6e6e6e;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">IEC 62443</span>
+      </div>
       <h3 style="margin-bottom:8px">Sensor data without exposing your OT network</h3>
       <p class="desc" style="margin-bottom:14px">PLC → Ghost Pipe → SCADA. No VPN, no certificates, no direct IT connection. Designed with IEC 62443 in mind — quantum-safe data diode. Runs on Raspberry Pi and any Linux device.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
@@ -380,7 +410,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <a href="/compliance/iec62443" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">IEC 62443 compliance &rarr;</a>
     </div>
     <div class="cell">
-      <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">&#x25ca; Finance &amp; Compliance</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x25ca; Finance &amp; Compliance</div>
+        <span style="font-size:10px;font-family:var(--mono);color:#6e6e6e;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">NIS2</span>
+      </div>
       <h3 style="margin-bottom:8px">No US CLOUD Act. No metadata leakage.</h3>
       <p class="desc" style="margin-bottom:14px">Hetzner Frankfurt only — no US infrastructure. Fixed 5 MB padding means all transfers look identical. Per-transaction Merkle proof for NIS2/DORA audits — verifiable without knowing the content.</p>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
@@ -430,6 +463,13 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
   <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
 
+  <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:6px;padding:16px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:12px;font-family:var(--mono);color:#2d8a5c;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Community Edition — free forever</div>
+      <div style="font-size:12px;color:#6e6e6e;line-height:1.6">Up to 5 users &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; BUSL-1.1 &nbsp;&middot;&nbsp; Works on a Raspberry Pi. One command.</div>
+    </div>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" style="font-size:11px;font-family:var(--mono);color:#2d8a5c;border:1px solid #1a3d28;border-radius:4px;padding:7px 14px;text-decoration:none;white-space:nowrap">Download free &rarr;</a>
+  </div>
   <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
   <div class="install-three" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
 
@@ -693,6 +733,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <a href="/install.sh">install.sh</a>
         <a href="/install-pi.sh">install-pi.sh</a>
         <a href="/install-client.sh">install-client.sh</a>
+        <a href="/status">Status</a>
       </div>
     </div>
     <div>
@@ -722,7 +763,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
 </footer>
 
-<script src="ct-stats.js" integrity="sha384-jishlbYsc4h4EM732XrOJl/x3Obj7JP7SQnQG8GwnRsPU9zUoo8JEcDg/+t466us" crossorigin="anonymous" defer></script>
+<script src="ct-stats.js" defer></script>
 <script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='☰';}});});</script>
 </body>
 </html>
