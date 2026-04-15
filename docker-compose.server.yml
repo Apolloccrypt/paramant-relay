@@ -1,37 +1,19 @@
-# docker-compose.server.yml — production server override
-# Use when the server already has its own nginx handling TLS (e.g. Let's Encrypt via system nginx)
+# docker-compose.server.yml — production server notes
+#
+# The base docker-compose.yml already binds all ports to 127.0.0.1 and is
+# production-ready as-is. System nginx (e.g. Let's Encrypt via Certbot) proxies
+# inbound TLS traffic to those localhost ports.
+#
+# Port mapping (host → relay container):
+#   relay-main:    127.0.0.1:3000  (relay.paramant.app)
+#   relay-health:  127.0.0.1:3001  (health.paramant.app)
+#   relay-finance: 127.0.0.1:3002  (finance.paramant.app)
+#   relay-legal:   127.0.0.1:3003  (legal.paramant.app)
+#   relay-iot:     127.0.0.1:3004  (iot.paramant.app)
+#   admin:         127.0.0.1:4200  (/admin/ via nginx)
 #
 # Usage:
-#   docker compose \
-#     -f docker-compose.yml \
-#     -f docker-compose.server.yml \
-#     -f docker-compose.integrations.yml \
-#     up -d
+#   docker compose up -d --build
 #
-# What this does:
-#   - Disables the Docker-managed nginx (system nginx handles TLS + routing)
-#   - Binds relay ports to 127.0.0.1 so system nginx can proxy to them
-
-services:
-
-  # Disable Docker nginx — system nginx handles TLS/routing
-  nginx:
-    profiles:
-      - disabled
-
-  # Bind relay ports to localhost for system nginx to proxy
-  relay-health:
-    ports:
-      - "127.0.0.1:3005:3005"
-
-  relay-legal:
-    ports:
-      - "127.0.0.1:3002:3002"
-
-  relay-finance:
-    ports:
-      - "127.0.0.1:3003:3003"
-
-  relay-iot:
-    ports:
-      - "127.0.0.1:3004:3004"
+# The nginx Cloudflare proxy (if used) should proxy HTTPS → http://127.0.0.1:<port>
+# See deploy/nginx-paramant.conf for a reference nginx config.

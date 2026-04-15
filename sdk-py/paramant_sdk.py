@@ -1,18 +1,18 @@
 """
-PARAMANT Ghost Pipe SDK v1.0.0
-Python SDK voor quantum-safe datatransport
+PARAMANT Ghost Pipe SDK v2.4.5
+Post-quantum encrypted file relay — zero plaintext, burn-on-read.
 
-pip install cryptography
+pip install paramant-sdk
 
-Gebruik:
-  from paramant import GhostPipe
+Usage:
+  from paramant_sdk import GhostPipe
 
-  # Zender
+  # Sender
   gp = GhostPipe(api_key='pgp_xxx', device='mri-001')
-  hash = gp.send(open('scan.dcm','rb').read())
-  print(f'Hash voor ontvanger: {hash}')
+  hash = gp.send(open('scan.dcm', 'rb').read())
+  print(f'Hash for recipient: {hash}')
 
-  # Ontvanger
+  # Receiver
   gp = GhostPipe(api_key='pgp_xxx', device='mri-001')
   gp.listen(on_receive=lambda data, meta: save(data))
 """
@@ -20,9 +20,9 @@ import base64, ctypes, hashlib, json, os, struct, sys, time, warnings
 import urllib.request, urllib.error
 from typing import Callable, Optional
 
-__version__ = '1.0.0'
+__version__ = '2.4.5'
 
-# ── Blokgroottes voor padding ──────────────────────────────────────────────────
+# ── Padding block sizes ────────────────────────────────────────────────────────
 BLOCKS = {
     '4k':   4 * 1024,
     '64k':  64 * 1024,
@@ -30,7 +30,7 @@ BLOCKS = {
     '5m':   5 * 1024 * 1024,
 }
 
-# ── Sleutelzeroïsatie ─────────────────────────────────────────────────────────
+# ── Key zeroization ───────────────────────────────────────────────────────────
 _ZEROIZE_OK = (sys.implementation.name == 'cpython')
 if not _ZEROIZE_OK:
     warnings.warn(
@@ -41,7 +41,7 @@ if not _ZEROIZE_OK:
 
 
 def _zero(b: bytes) -> None:
-    """Overschrijf sleutelmateriaal in geheugen met nullen (CPython, best-effort)."""
+    """Overwrite key material in memory with zeros (CPython, best-effort)."""
     if not b:
         return
     try:
@@ -55,7 +55,7 @@ def _zero(b: bytes) -> None:
 
 # ── BIP39 helpers ─────────────────────────────────────────────────────────────
 def _bip39_encode(entropy: bytes) -> str:
-    """Zet 16 bytes entropy om naar 12-woord BIP39 mnemonic."""
+    """Convert 16 bytes of entropy to a 12-word BIP39 mnemonic."""
     try:
         from mnemonic import Mnemonic
         return Mnemonic('english').to_mnemonic(entropy)
@@ -63,7 +63,7 @@ def _bip39_encode(entropy: bytes) -> str:
         raise GhostPipeError('pip install mnemonic (vereist voor drop/pickup)')
 
 def _bip39_decode(phrase: str) -> bytes:
-    """Zet 12-woord BIP39 mnemonic terug naar 16 bytes entropy."""
+    """Convert a 12-word BIP39 mnemonic back to 16 bytes of entropy."""
     try:
         from mnemonic import Mnemonic
         m = Mnemonic('english')
@@ -74,7 +74,7 @@ def _bip39_decode(phrase: str) -> bytes:
         raise GhostPipeError('pip install mnemonic (vereist voor drop/pickup)')
 
 def _derive_drop_keys(entropy: bytes) -> tuple:
-    """Leid AES sleutel en relay lookup-hash af van entropy."""
+    """Derive AES key and relay lookup hash from entropy."""
     try:
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
         from cryptography.hazmat.primitives import hashes
@@ -234,7 +234,7 @@ class GhostPipe:
             print(f'           Verify this out-of-band before trusting.')
         return fp
 
-    # ── Relay detectie ────────────────────────────────────────────────────────
+    # ── Relay detection ───────────────────────────────────────────────────────
     def _detect_relay(self) -> Optional[str]:
         for relay in SECTOR_RELAYS.values():
             try:
@@ -297,7 +297,7 @@ class GhostPipe:
             return None
 
     def _load_keypair(self):
-        """Laad of genereer keypair voor dit device."""
+        """Load or generate keypair for this device."""
         if self._keypair:
             return self._keypair
         state_dir = os.path.expanduser('~/.paramant')
@@ -322,16 +322,16 @@ class GhostPipe:
         return kp
 
     def _register_pubkeys(self):
-        """Registreer pubkeys bij relay."""
+        """Register public keys with the relay."""
         kp = self._load_keypair()
         body = json.dumps({'device_id': self.device, 'ecdh_pub': kp['ecdh_pub'],
                            'kyber_pub': kp.get('kyber_pub', '')}).encode()
         status, resp = self._post('/v2/pubkey', body)
         if status != 200:
-            raise GhostPipeError(f'Pubkey registratie mislukt: {resp.decode()[:100]}')
+            raise GhostPipeError(f'Pubkey registration failed: {resp.decode()[:100]}')
 
     def _fetch_receiver_pubkeys(self, recipient: str = None):
-        """Haal pubkeys op van relay (voor encryptie). Returns (ecdh_pub, kyber_pub, raw_ecdh_hex, raw_kyber_hex, registered_at)."""
+        """Fetch receiver public keys from relay (for encryption). Returns (ecdh_pub, kyber_pub, raw_ecdh_hex, raw_kyber_hex, registered_at)."""
         target = recipient or self.device
         status, body, _ = self._get(f'/v2/pubkey/{target}')
         if status == 404:
@@ -418,7 +418,7 @@ class GhostPipe:
             for b in (ecdh_ss, kss, ikm, ss, pss_hash):
                 if b: _zero(b)
 
-    # ── Publieke API ──────────────────────────────────────────────────────────
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def send(self, data: bytes, ttl: int = 300, max_views: int = 1,
              pad_block: int = None, recipient: str = None,
@@ -461,17 +461,17 @@ class GhostPipe:
 
     def drop(self, data: bytes, ttl: int = 3600, pad_block: int = None) -> str:
         """
-        Stuur data als anonieme drop met 12-woord BIP39 mnemonic als access token.
-        Geen ECDH keypairs nodig — de mnemonic IS de gedeelde sleutel.
-        Altijd burn-on-read (max_views=1).
+        Send data as an anonymous drop using a 12-word BIP39 mnemonic as the access token.
+        No ECDH keypairs required — the mnemonic IS the shared key.
+        Always burn-on-read (max_views=1).
 
         Args:
-            data:      Bytes om te droppen
-            ttl:       Seconden beschikbaar (default 3600)
-            pad_block: Blokgrootte voor padding (default 5MB)
+            data:      Bytes to drop
+            ttl:       Seconds available (default 3600)
+            pad_block: Padding block size (default 5MB)
 
         Returns:
-            12-woord BIP39 mnemonic — geef dit aan de ontvanger
+            12-word BIP39 mnemonic — pass this to the recipient
         """
         entropy = os.urandom(16)
         phrase  = _bip39_encode(entropy)
@@ -571,14 +571,14 @@ class GhostPipe:
 
     def fingerprint(self, device_id: str = None) -> str:
         """
-        Haal fingerprint op van een device (voor out-of-band verificatie).
-        Vraagt relay, berekent fingerprint lokaal, toont resultaat.
+        Fetch the fingerprint of a device (for out-of-band verification).
+        Queries relay, computes fingerprint locally, returns result.
 
         Args:
             device_id: Device ID (default: self.device)
 
         Returns:
-            Fingerprint string in XXXX-XXXX-XXXX-XXXX-XXXX formaat
+            Fingerprint string in XXXX-XXXX-XXXX-XXXX-XXXX format
         """
         target = device_id or self.device
         status, body, _ = self._get(f'/v2/pubkey/{target}')
@@ -614,12 +614,12 @@ class GhostPipe:
         return fp
 
     def untrust(self, device_id: str):
-        """Verwijder device uit known_keys."""
+        """Remove device from known_keys."""
         self._remove_known_key(device_id)
         print(f'[paramant] Removed: {device_id}')
 
     def known_devices(self) -> list:
-        """Geef lijst van alle trusted devices met fingerprints."""
+        """Return list of all trusted devices with fingerprints."""
         keys = self._load_known_keys()
         if not keys:
             print('[paramant] No trusted devices yet.')
@@ -641,12 +641,12 @@ class GhostPipe:
 
     def register_webhook(self, callback_url: str, secret: str = ''):
         """
-        Registreer webhook voor push notificaties.
-        Relay POSTt naar callback_url zodra een blok klaarstaat.
-        
+        Register a webhook for push notifications.
+        The relay POSTs to callback_url when a new blob is ready.
+
         Args:
-            callback_url: URL die de relay aanroept bij nieuw blok
-            secret:       Optioneel HMAC-SHA256 secret voor verificatie
+            callback_url: URL the relay calls on new blob
+            secret:       Optional HMAC-SHA256 secret for verification
         """
         body = json.dumps({'device_id': self.device, 'url': callback_url, 'secret': secret}).encode()
         status, resp = self._post('/v2/webhook', body)
@@ -682,7 +682,7 @@ class GhostPipe:
             time.sleep(interval)
 
     def audit(self, limit: int = 100) -> list:
-        """Haal audit log op voor deze API key."""
+        """Fetch the audit log for this API key."""
         _, body, _ = self._get('/v2/audit', {'limit': limit})
         return json.loads(body).get('entries', [])
 
@@ -733,7 +733,7 @@ class GhostPipe:
         os.replace(p + '.tmp', p)
 
 
-# ── Gebruik als script ────────────────────────────────────────────────────────
+# ── CLI entry point ───────────────────────────────────────────────────────────
 if __name__ == '__main__':
     import sys, argparse
 
@@ -904,7 +904,7 @@ class GhostPipeCluster:
             t.sleep(30)
 
     def _get_client(self) -> 'GhostPipe':
-        """Geef GhostPipe client voor actieve relay."""
+        """Return GhostPipe client for the active relay."""
         with self._lock:
             relay = self._active
         if not relay:
@@ -922,13 +922,13 @@ class GhostPipeCluster:
                 return gp.send(data, ttl=ttl)
             except GhostPipeError as e:
                 errors.append(f'{relay}: {e}')
-                # Markeer als ongezond
+                # Mark as unhealthy
                 with self._lock:
                     self._healthy[relay] = {'ok': False}
         raise GhostPipeError(f'Alle relays mislukt: {errors}')
 
     def receive(self, hash_: str) -> bytes:
-        """Ontvang van eerste relay die het blok heeft."""
+        """Receive from the first relay that has the blob."""
         for relay in self.relays:
             try:
                 gp = GhostPipe(self.api_key, self.device, relay=relay)
@@ -940,7 +940,7 @@ class GhostPipeCluster:
         raise GhostPipeError('Blok niet gevonden op een van de relays')
 
     def health(self) -> dict:
-        """Status van alle nodes in de cluster."""
+        """Status of all nodes in the cluster."""
         with self._lock:
             return {'active': self._active, 'nodes': dict(self._healthy)}
 

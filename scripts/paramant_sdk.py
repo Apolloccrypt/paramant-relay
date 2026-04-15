@@ -1,18 +1,18 @@
 """
-PARAMANT Ghost Pipe SDK v1.0.0
-Python SDK voor quantum-safe datatransport
+PARAMANT Ghost Pipe SDK v2.4.5
+Post-quantum encrypted file relay — zero plaintext, burn-on-read.
 
-pip install cryptography
+pip install paramant-sdk
 
-Gebruik:
-  from paramant import GhostPipe
+Usage:
+  from paramant_sdk import GhostPipe
 
-  # Zender
+  # Sender
   gp = GhostPipe(api_key='pgp_xxx', device='mri-001')
-  hash = gp.send(open('scan.dcm','rb').read())
-  print(f'Hash voor ontvanger: {hash}')
+  hash = gp.send(open('scan.dcm', 'rb').read())
+  print(f'Hash for recipient: {hash}')
 
-  # Ontvanger
+  # Receiver
   gp = GhostPipe(api_key='pgp_xxx', device='mri-001')
   gp.listen(on_receive=lambda data, meta: save(data))
 """
@@ -20,9 +20,9 @@ import base64, ctypes, hashlib, json, os, struct, sys, time, warnings
 import urllib.request, urllib.error
 from typing import Callable, Optional
 
-__version__ = '1.0.0'
+__version__ = '2.4.5'
 
-# ── Blokgroottes voor padding ──────────────────────────────────────────────────
+# ── Padding block sizes ────────────────────────────────────────────────────────
 BLOCKS = {
     '4k':   4 * 1024,
     '64k':  64 * 1024,
@@ -30,7 +30,7 @@ BLOCKS = {
     '5m':   5 * 1024 * 1024,
 }
 
-# ── Sleutelzeroïsatie ─────────────────────────────────────────────────────────
+# ── Key zeroization ───────────────────────────────────────────────────────────
 _ZEROIZE_OK = (sys.implementation.name == 'cpython')
 if not _ZEROIZE_OK:
     warnings.warn(
@@ -41,7 +41,7 @@ if not _ZEROIZE_OK:
 
 
 def _zero(b: bytes) -> None:
-    """Overschrijf sleutelmateriaal in geheugen met nullen (CPython, best-effort)."""
+    """Overwrite key material in memory with zeros (CPython, best-effort)."""
     if not b:
         return
     try:
@@ -55,7 +55,7 @@ def _zero(b: bytes) -> None:
 
 # ── BIP39 helpers ─────────────────────────────────────────────────────────────
 def _bip39_encode(entropy: bytes) -> str:
-    """Zet 16 bytes entropy om naar 12-woord BIP39 mnemonic."""
+    """Convert 16 bytes of entropy to a 12-word BIP39 mnemonic."""
     try:
         from mnemonic import Mnemonic
         return Mnemonic('english').to_mnemonic(entropy)
@@ -63,7 +63,7 @@ def _bip39_encode(entropy: bytes) -> str:
         raise GhostPipeError('pip install mnemonic (vereist voor drop/pickup)')
 
 def _bip39_decode(phrase: str) -> bytes:
-    """Zet 12-woord BIP39 mnemonic terug naar 16 bytes entropy."""
+    """Convert a 12-word BIP39 mnemonic back to 16 bytes of entropy."""
     try:
         from mnemonic import Mnemonic
         m = Mnemonic('english')
@@ -74,7 +74,7 @@ def _bip39_decode(phrase: str) -> bytes:
         raise GhostPipeError('pip install mnemonic (vereist voor drop/pickup)')
 
 def _derive_drop_keys(entropy: bytes) -> tuple:
-    """Leid AES sleutel en relay lookup-hash af van entropy."""
+    """Derive AES key and relay lookup hash from entropy."""
     try:
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
         from cryptography.hazmat.primitives import hashes
@@ -234,13 +234,13 @@ class GhostPipe:
             print(f'           Verify this out-of-band before trusting.')
         return fp
 
-    # ── Relay detectie ────────────────────────────────────────────────────────
+    # ── Relay detection ───────────────────────────────────────────────────────
     def _detect_relay(self) -> Optional[str]:
         for relay in SECTOR_RELAYS.values():
             try:
                 r = urllib.request.urlopen(
-                    urllib.request.Request(f'{relay}/v2/check-key?k={self.api_key}',
-                                           headers={'User-Agent': UA}), timeout=4)
+                    urllib.request.Request(f'{relay}/v2/check-key',
+                                           headers={'User-Agent': UA, 'X-Api-Key': self.api_key}), timeout=4)
                 if json.loads(r.read()).get('valid'):
                     return relay
             except Exception:
@@ -255,9 +255,9 @@ class GhostPipe:
         req = urllib.request.Request(url, headers={'User-Agent': UA, 'X-Api-Key': self.api_key})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
-                return r.status, r.read()
+                return r.status, r.read(), dict(r.headers)
         except urllib.error.HTTPError as e:
-            return e.code, e.read()
+            return e.code, e.read(), {}
 
     def _post(self, path: str, body: bytes, content_type: str = 'application/json'):
         req = urllib.request.Request(
@@ -297,7 +297,7 @@ class GhostPipe:
             return None
 
     def _load_keypair(self):
-        """Laad of genereer keypair voor dit device."""
+        """Load or generate keypair for this device."""
         if self._keypair:
             return self._keypair
         state_dir = os.path.expanduser('~/.paramant')
@@ -322,18 +322,18 @@ class GhostPipe:
         return kp
 
     def _register_pubkeys(self):
-        """Registreer pubkeys bij relay."""
+        """Register public keys with the relay."""
         kp = self._load_keypair()
         body = json.dumps({'device_id': self.device, 'ecdh_pub': kp['ecdh_pub'],
                            'kyber_pub': kp.get('kyber_pub', '')}).encode()
         status, resp = self._post('/v2/pubkey', body)
         if status != 200:
-            raise GhostPipeError(f'Pubkey registratie mislukt: {resp.decode()[:100]}')
+            raise GhostPipeError(f'Pubkey registration failed: {resp.decode()[:100]}')
 
     def _fetch_receiver_pubkeys(self, recipient: str = None):
-        """Haal pubkeys op van relay (voor encryptie). Returns (ecdh_pub, kyber_pub, raw_ecdh_hex, raw_kyber_hex, registered_at)."""
+        """Fetch receiver public keys from relay (for encryption). Returns (ecdh_pub, kyber_pub, raw_ecdh_hex, raw_kyber_hex, registered_at)."""
         target = recipient or self.device
-        status, body = self._get(f'/v2/pubkey/{target}')
+        status, body, _ = self._get(f'/v2/pubkey/{target}')
         if status == 404:
             raise GhostPipeError('Geen pubkeys voor dit device. Start ontvanger eerst met receive_setup().')
         if status != 200:
@@ -418,7 +418,7 @@ class GhostPipe:
             for b in (ecdh_ss, kss, ikm, ss, pss_hash):
                 if b: _zero(b)
 
-    # ── Publieke API ──────────────────────────────────────────────────────────
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def send(self, data: bytes, ttl: int = 300, max_views: int = 1,
              pad_block: int = None, recipient: str = None,
@@ -455,21 +455,23 @@ class GhostPipe:
         status, resp = self._post('/v2/inbound', body)
         if status != 200:
             raise GhostPipeError(f'Upload mislukt: HTTP {status}: {resp.decode()[:100]}')
-        return h
+        resp_json = json.loads(resp)
+        inclusion_proof = resp_json.get('merkle_proof')
+        return h, inclusion_proof
 
     def drop(self, data: bytes, ttl: int = 3600, pad_block: int = None) -> str:
         """
-        Stuur data als anonieme drop met 12-woord BIP39 mnemonic als access token.
-        Geen ECDH keypairs nodig — de mnemonic IS de gedeelde sleutel.
-        Altijd burn-on-read (max_views=1).
+        Send data as an anonymous drop using a 12-word BIP39 mnemonic as the access token.
+        No ECDH keypairs required — the mnemonic IS the shared key.
+        Always burn-on-read (max_views=1).
 
         Args:
-            data:      Bytes om te droppen
-            ttl:       Seconden beschikbaar (default 3600)
-            pad_block: Blokgrootte voor padding (default 5MB)
+            data:      Bytes to drop
+            ttl:       Seconds available (default 3600)
+            pad_block: Padding block size (default 5MB)
 
         Returns:
-            12-woord BIP39 mnemonic — geef dit aan de ontvanger
+            12-word BIP39 mnemonic — pass this to the recipient
         """
         entropy = os.urandom(16)
         phrase  = _bip39_encode(entropy)
@@ -511,7 +513,7 @@ class GhostPipe:
         entropy = _bip39_decode(phrase.strip())
         aes_key, lookup_hash = _derive_drop_keys(entropy)
         try:
-            status, raw = self._get(f'/v2/outbound/{lookup_hash}')
+            status, raw, _ = self._get(f'/v2/outbound/{lookup_hash}')
             if status == 404:
                 raise GhostPipeError('Drop niet gevonden. Verlopen, al opgehaald, of ongeldige mnemonic.')
             if status != 200:
@@ -524,7 +526,7 @@ class GhostPipe:
         finally:
             _zero(aes_key); _zero(entropy)
 
-    def receive(self, hash_: str, pre_shared_secret: str = '') -> bytes:
+    def receive(self, hash_: str, pre_shared_secret: str = '') -> tuple:
         """
         Ontvang data van relay via hash.
         Relay vernietigt het blok direct na dit verzoek (burn-on-read).
@@ -534,17 +536,28 @@ class GhostPipe:
             pre_shared_secret:  Moet overeenkomen met waarde die zender gebruikte.
 
         Returns:
-            Ontsleutelde data
+            (data: bytes, receipt: dict|None) — ontsleutelde data + signed delivery receipt
 
         Raises:
             GhostPipeError: Blok niet gevonden, verlopen of al opgehaald
         """
-        status, raw = self._get(f'/v2/outbound/{hash_}')
+        status, raw, headers = self._get(f'/v2/outbound/{hash_}')
         if status == 404:
             raise GhostPipeError('Blok niet gevonden. Verlopen, al opgehaald, of nooit opgeslagen.')
         if status != 200:
             raise GhostPipeError(f'Download mislukt: HTTP {status}')
-        return self._decrypt(raw, pre_shared_secret=pre_shared_secret)
+        receipt = None
+        receipt_b64 = headers.get('x-paramant-receipt') or headers.get('X-Paramant-Receipt')
+        if receipt_b64:
+            try:
+                # Accept base64url (add padding)
+                padded = receipt_b64.replace('-', '+').replace('_', '/')
+                padded += '=' * ((4 - len(padded) % 4) % 4)
+                receipt = json.loads(base64.b64decode(padded).decode('utf-8'))
+            except Exception:
+                pass
+        data = self._decrypt(raw, pre_shared_secret=pre_shared_secret)
+        return data, receipt
 
     def status(self, hash_: str) -> dict:
         """
@@ -553,22 +566,22 @@ class GhostPipe:
         Returns:
             {'available': bool, 'ttl_remaining_ms': int, 'bytes': int}
         """
-        _, body = self._get(f'/v2/status/{hash_}')
+        _, body, _ = self._get(f'/v2/status/{hash_}')
         return json.loads(body)
 
     def fingerprint(self, device_id: str = None) -> str:
         """
-        Haal fingerprint op van een device (voor out-of-band verificatie).
-        Vraagt relay, berekent fingerprint lokaal, toont resultaat.
+        Fetch the fingerprint of a device (for out-of-band verification).
+        Queries relay, computes fingerprint locally, returns result.
 
         Args:
             device_id: Device ID (default: self.device)
 
         Returns:
-            Fingerprint string in XXXX-XXXX-XXXX-XXXX-XXXX formaat
+            Fingerprint string in XXXX-XXXX-XXXX-XXXX-XXXX format
         """
         target = device_id or self.device
-        status, body = self._get(f'/v2/pubkey/{target}')
+        status, body, _ = self._get(f'/v2/pubkey/{target}')
         if status == 404:
             raise GhostPipeError(f'Geen pubkeys voor device {target}')
         if status != 200:
@@ -601,12 +614,12 @@ class GhostPipe:
         return fp
 
     def untrust(self, device_id: str):
-        """Verwijder device uit known_keys."""
+        """Remove device from known_keys."""
         self._remove_known_key(device_id)
         print(f'[paramant] Removed: {device_id}')
 
     def known_devices(self) -> list:
-        """Geef lijst van alle trusted devices met fingerprints."""
+        """Return list of all trusted devices with fingerprints."""
         keys = self._load_known_keys()
         if not keys:
             print('[paramant] No trusted devices yet.')
@@ -628,12 +641,12 @@ class GhostPipe:
 
     def register_webhook(self, callback_url: str, secret: str = ''):
         """
-        Registreer webhook voor push notificaties.
-        Relay POSTt naar callback_url zodra een blok klaarstaat.
-        
+        Register a webhook for push notifications.
+        The relay POSTs to callback_url when a new blob is ready.
+
         Args:
-            callback_url: URL die de relay aanroept bij nieuw blok
-            secret:       Optioneel HMAC-SHA256 secret voor verificatie
+            callback_url: URL the relay calls on new blob
+            secret:       Optional HMAC-SHA256 secret for verification
         """
         body = json.dumps({'device_id': self.device, 'url': callback_url, 'secret': secret}).encode()
         status, resp = self._post('/v2/webhook', body)
@@ -652,12 +665,12 @@ class GhostPipe:
         seq = self._load_seq()
         while True:
             try:
-                _, body = self._get('/v2/stream-next', {'device': self.device, 'seq': seq})
+                _, body, _ = self._get('/v2/stream-next', {'device': self.device, 'seq': seq})
                 d = json.loads(body)
                 if d.get('available'):
                     next_seq = d.get('seq', seq + 1)
                     try:
-                        data = self.receive(d['hash'])
+                        data, _ = self.receive(d['hash'])
                         seq  = next_seq
                         self._save_seq(seq)
                         on_receive(data, {'seq': seq, 'hash': d['hash']})
@@ -669,14 +682,41 @@ class GhostPipe:
             time.sleep(interval)
 
     def audit(self, limit: int = 100) -> list:
-        """Haal audit log op voor deze API key."""
-        _, body = self._get('/v2/audit', {'limit': limit})
+        """Fetch the audit log for this API key."""
+        _, body, _ = self._get('/v2/audit', {'limit': limit})
         return json.loads(body).get('entries', [])
 
     def health(self) -> dict:
         """Relay health check."""
-        _, body = self._get('/health')
+        _, body, _ = self._get('/health')
         return json.loads(body)
+
+    def verify_receipt(self, receipt) -> dict:
+        """
+        Verifieer een delivery receipt via de relay.
+        Controleert ML-DSA-65 handtekening + Merkle inclusie-bewijs.
+
+        Args:
+            receipt: Receipt als dict of base64url-string
+
+        Returns:
+            Dict met { valid, blob_hash, retrieved_at, sector, relay_id, burn_confirmed }
+
+        Raises:
+            GhostPipeError: Als handtekening of inclusie-bewijs ongeldig is
+        """
+        if isinstance(receipt, dict):
+            receipt_b64 = base64.b64encode(json.dumps(receipt).encode()).decode()
+        else:
+            receipt_b64 = receipt
+        body = json.dumps({'receipt': receipt_b64}).encode()
+        status, resp = self._post('/v2/verify-receipt', body)
+        if status != 200:
+            raise GhostPipeError(f'Verificatie mislukt: HTTP {status}: {resp.decode()[:100]}')
+        result = json.loads(resp)
+        if not result.get('valid'):
+            raise GhostPipeError(f'Receipt ongeldig: {result.get("reason", "unknown")}')
+        return result
 
     def _load_seq(self) -> int:
         try:
@@ -693,13 +733,13 @@ class GhostPipe:
         os.replace(p + '.tmp', p)
 
 
-# ── Gebruik als script ────────────────────────────────────────────────────────
+# ── CLI entry point ───────────────────────────────────────────────────────────
 if __name__ == '__main__':
     import sys, argparse
 
     p = argparse.ArgumentParser(description=f'PARAMANT Ghost Pipe SDK v{__version__}')
     p.add_argument('action', choices=['send','receive','status','listen','health','audit',
-                                      'drop','pickup'])
+                                      'drop','pickup','verify-receipt'])
     p.add_argument('--key',       required=True)
     p.add_argument('--device',    default='cli')
     p.add_argument('--relay',     default='')
@@ -712,6 +752,7 @@ if __name__ == '__main__':
                    help='Padding blokgrootte (default: 5m)')
     p.add_argument('--output',    default='')
     p.add_argument('--webhook',   default='')
+    p.add_argument('--receipt',   default='', help='Receipt JSON bestand of base64url-string (verify-receipt)')
     a = p.parse_args()
 
     pad = BLOCKS[a.pad_block]
@@ -720,18 +761,23 @@ if __name__ == '__main__':
     if a.action == 'send':
         data = open(a.file, 'rb').read() if a.file else sys.stdin.buffer.read()
         gp.receive_setup()
-        h = gp.send(data, ttl=a.ttl, max_views=a.max_views, pad_block=pad)
+        h, proof = gp.send(data, ttl=a.ttl, max_views=a.max_views, pad_block=pad)
         print(f'OK hash={h}')
+        if proof:
+            print(f'   leaf_index={proof.get("leaf_index")} tree_size={proof.get("tree_size")} root={str(proof.get("root",""))[:16]}...')
 
     elif a.action == 'receive':
         if not a.hash: sys.exit('--hash vereist')
         gp.receive_setup()
-        data = gp.receive(a.hash)
+        data, receipt = gp.receive(a.hash)
         if a.output:
             with open(a.output, 'wb') as f: f.write(data)
             print(f'OK opgeslagen in {a.output} ({len(data)} bytes)')
         else:
             sys.stdout.buffer.write(data)
+        if receipt:
+            import sys as _sys
+            print(f'[receipt] burn_confirmed={receipt.get("burn_confirmed")} sector={receipt.get("sector")}', file=_sys.stderr)
 
     elif a.action == 'drop':
         data = open(a.file, 'rb').read() if a.file else sys.stdin.buffer.read()
@@ -772,6 +818,21 @@ if __name__ == '__main__':
     elif a.action == 'audit':
         for e in gp.audit():
             print(f"{e['ts']}  {e['event']:<20}  {e.get('hash',''):<20}  {e.get('bytes',0)}B")
+
+    elif a.action == 'verify-receipt':
+        if not a.receipt and not a.file:
+            sys.exit('--receipt <base64url> of --file <receipt.json> vereist')
+        if a.file:
+            with open(a.file) as f:
+                receipt_raw = f.read().strip()
+            try:
+                receipt_data = json.loads(receipt_raw)
+            except json.JSONDecodeError:
+                receipt_data = receipt_raw  # treat as base64url string
+        else:
+            receipt_data = a.receipt
+        result = gp.verify_receipt(receipt_data)
+        print(json.dumps(result, indent=2))
 
 
 # ── Multi-relay failover (gossip light) ───────────────────────────────────────
@@ -843,7 +904,7 @@ class GhostPipeCluster:
             t.sleep(30)
 
     def _get_client(self) -> 'GhostPipe':
-        """Geef GhostPipe client voor actieve relay."""
+        """Return GhostPipe client for the active relay."""
         with self._lock:
             relay = self._active
         if not relay:
@@ -861,13 +922,13 @@ class GhostPipeCluster:
                 return gp.send(data, ttl=ttl)
             except GhostPipeError as e:
                 errors.append(f'{relay}: {e}')
-                # Markeer als ongezond
+                # Mark as unhealthy
                 with self._lock:
                     self._healthy[relay] = {'ok': False}
         raise GhostPipeError(f'Alle relays mislukt: {errors}')
 
     def receive(self, hash_: str) -> bytes:
-        """Ontvang van eerste relay die het blok heeft."""
+        """Receive from the first relay that has the blob."""
         for relay in self.relays:
             try:
                 gp = GhostPipe(self.api_key, self.device, relay=relay)
@@ -879,7 +940,7 @@ class GhostPipeCluster:
         raise GhostPipeError('Blok niet gevonden op een van de relays')
 
     def health(self) -> dict:
-        """Status van alle nodes in de cluster."""
+        """Status of all nodes in the cluster."""
         with self._lock:
             return {'active': self._active, 'nodes': dict(self._healthy)}
 

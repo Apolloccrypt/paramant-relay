@@ -821,6 +821,20 @@ export class GhostPipe {
     return this._json(await this._get(`/v2/ct/${index}`));
   }
 
+  /**
+   * Verify a delivery receipt (calls POST /v2/verify-receipt).
+   * Pass the receipt string from the X-Paramant-Receipt header or as returned
+   * by receive().
+   *
+   * @param {string|object} receipt  Base64url receipt string or parsed object.
+   * @returns {Promise<object>} {ok, valid, hash, relay_id, tree_size, verified_at}
+   */
+  async verifyReceipt(receipt) {
+    const body = typeof receipt === 'string' ? { receipt } : { receipt: JSON.stringify(receipt) };
+    const r = await this._post('/v2/verify-receipt', body);
+    return this._json(r);
+  }
+
   // ── DID ───────────────────────────────────────────────────────────────────
 
   /**

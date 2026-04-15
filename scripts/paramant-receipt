@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""
+paramant-receipt — CLI tool for Paramant delivery receipt verification
+
+Usage:
+  paramant-receipt verify receipt.json [--key pgp_xxx] [--relay URL]
+  paramant-receipt verify receipt.json --offline      # inclusion proof only, no relay call
+
+Verifies:
+  1. Merkle inclusion proof (offline, always)
+  2. ML-DSA-65 receipt signature (requires --key or relay access)
+  3. Signed Tree Head (STH) signature (requires --key or relay access)
+"""
+import argparse, base64, hashlib, json, sys
+
+
+def main():
+    p = argparse.ArgumentParser(
+        description='Paramant delivery receipt verifier',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    sub = p.add_subparsers(dest='cmd')
+
+    v = sub.add_parser('verify', help='Verify a delivery receipt')
+    v.add_argument('receipt_file', help='Path to receipt JSON file, or - for stdin')
+    v.add_argument('--key',     default='', help='API key pgp_xxx (required for signature check)')
+    v.add_argument('--relay',   default='', help='Relay URL override (auto-detected from receipt)')
+    v.add_argument('--offline', action='store_true',
+                   help='Verify inclusion proof only — do not contact relay')
+
+    a = p.parse_args()
+    if not a.cmd:
+        p.print_help()
+        sys.exit(1)
+
+    # Load receipt
+    if a.receipt_file == '-':
+        raw = sys.stdin.read().strip()
+    else:
+        with open(a.receipt_file) as f:
+            raw = f.read().strip()
+
+    try:
+        receipt = json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            padded = raw.replace('-', '+').replace('_', '/')
+            padded += '=' * ((4 - len(padded) % 4) % 4)
+            receipt = json.loads(base64.b64decode(padded).decode('utf-8'))
+        except Exception as e:
+            _die(f'Cannot parse receipt: {e}')
+
+    if a.offline or not a.key:
+        if not a.key:
+            print('[info] No --key provided — verifying inclusion proof only (offline mode)')
+        _verify_offline(receipt)
+    else:
+        _verify_online(receipt, a.key, a.relay)
+
+
+def _die(msg):
+    print(f'ERROR: {msg}', file=sys.stderr)
+    sys.exit(1)
+
+
+def _sha3_256(data: bytes) -> str:
+    return hashlib.sha3_256(data).hexdigest()
+
+
+def _node_hash(left: str, right: str) -> str:
+    """RFC 6962-style inner node: SHA3-256(0x01 || left_bytes || right_bytes)"""
+    return _sha3_256(bytes([0x01]) + bytes.fromhex(left) + bytes.fromhex(right))
+
+
+def _verify_offline(receipt: dict):
+    """Verify Merkle inclusion proof without contacting relay."""
+    proof = receipt.get('inclusion_proof')
+    if not proof:
+        _die('No inclusion_proof in receipt')
+
+    leaf_hash = proof.get('leaf_hash')
+    if not leaf_hash:
+        _die('No leaf_hash in inclusion_proof')
+
+    # Walk audit_path to recompute root
+    h = leaf_hash
+    for step in (proof.get('audit_path') or []):
+        pos  = step.get('position', 'right')
+        sibling = step.get('hash', '')
+        if pos == 'right':
+            h = _node_hash(h, sibling)
+        else:
+            h = _node_hash(sibling, h)
+
+    claimed_root = proof.get('root', '')
+    if h != claimed_root:
+        print('FAIL  Inclusion proof INVALID')
+        print(f'      computed root: {h}')
+        print(f'      claimed  root: {claimed_root}')
+        sys.exit(1)
+
+    # Also check STH root matches proof root
+    sth = proof.get('sth')
+    if sth and sth.get('sha3_root') and sth['sha3_root'] != claimed_root:
+        print('FAIL  STH root does not match inclusion proof root')
+        sys.exit(1)
+
+    print('OK    Inclusion proof valid')
+    _print_summary(receipt, proof, sig_checked=False)
+
+
+def _verify_online(receipt: dict, api_key: str, relay_url: str):
+    """Verify receipt via relay POST /v2/verify-receipt."""
+    import urllib.request, urllib.error
+
+    # Determine relay URL
+    relay = relay_url
+    if not relay:
+        relay = receipt.get('relay_id', '')
+        if relay and not relay.startswith('http'):
+            relay = 'https://' + relay
+    if not relay:
+        relay = 'https://health.paramant.app'
+
+    receipt_b64 = base64.b64encode(json.dumps(receipt).encode()).decode()
+    body = json.dumps({'receipt': receipt_b64}).encode()
+    req = urllib.request.Request(
+        f'{relay}/v2/verify-receipt',
+        data=body, method='POST',
+        headers={
+            'Content-Type': 'application/json',
+            'X-Api-Key': api_key,
+            'User-Agent': 'paramant-receipt/1.0',
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            result = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            result = json.loads(e.read())
+        except Exception:
+            _die(f'HTTP {e.code} from relay')
+
+    if result.get('valid'):
+        print('OK    Receipt VALID (signature + inclusion proof verified by relay)')
+        proof = receipt.get('inclusion_proof', {})
+        _print_summary(receipt, proof, sig_checked=True)
+    else:
+        reason = result.get('reason', result.get('error', 'unknown'))
+        print(f'FAIL  Receipt INVALID: {reason}')
+        sys.exit(1)
+
+
+def _print_summary(receipt: dict, proof: dict, sig_checked: bool):
+    from datetime import datetime, timezone
+    blob_hash = receipt.get('blob_hash', '?')
+    ts = receipt.get('retrieved_at')
+    ts_str = '?'
+    if ts:
+        try:
+            ts_str = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        except Exception:
+            ts_str = str(ts)
+    print()
+    print(f'  blob_hash      : {blob_hash}')
+    print(f'  retrieved_at   : {ts_str}')
+    print(f'  sector         : {receipt.get("sector", "?")}')
+    print(f'  relay_id       : {receipt.get("relay_id", "?")}')
+    print(f'  burn_confirmed : {receipt.get("burn_confirmed", "?")}')
+    print(f'  leaf_index     : {proof.get("leaf_index", "?")}')
+    print(f'  tree_size      : {proof.get("tree_size", "?")}')
+    root = proof.get('root', '?')
+    print(f'  merkle_root    : {root[:32]}...' if len(root) > 32 else f'  merkle_root    : {root}')
+    if not sig_checked:
+        print()
+        print('  [!] Signature NOT verified (offline mode).')
+        print('      Run with --key pgp_xxx for full verification.')
+
+
+if __name__ == '__main__':
+    main()

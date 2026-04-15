@@ -137,6 +137,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <ul class="nav-dropdown-menu">
         <li><a href="/docs">Docs</a></li>
         <li><a href="/security">Security</a></li>
+        <li><a href="/hndl">HNDL Threat</a></li>
         <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
         <li><a href="/#pricing">Pricing</a></li>
       </ul>
@@ -160,6 +161,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <div class="nav-mobile-label">Resources</div>
     <a href="/docs">Docs</a>
     <a href="/security">Security</a>
+    <a href="/hndl">HNDL Threat</a>
     <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
     <a href="/#pricing">Pricing</a>
   </div>
@@ -176,10 +178,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <a href="/parashare" class="btn-p">Try ParaShare free &rarr;</a>
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
-  <div style="margin-top:20px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.02em">Independent security audit &nbsp;&middot;&nbsp; 4 critical findings &nbsp;&middot;&nbsp; all resolved &nbsp;&middot;&nbsp; <a href="/security" style="color:var(--muted);text-decoration:underline;text-decoration-color:#333">SECURITY.md &rarr;</a></div>
-  <div style="margin-top:12px;font-size:12px;color:var(--quiet)">No account &nbsp;&middot;&nbsp; No credit card &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--quiet);text-decoration:underline;text-decoration-color:#333">Request free API key &rarr;</a></div>
-  <div style="margin-top:12px;font-size:12px;color:var(--quiet)"><a href="/drop" style="color:var(--muted);text-decoration:none">ParaDrop</a> &mdash; encrypted AirDrop alternative &nbsp;&middot;&nbsp; no Apple &nbsp;&middot;&nbsp; no cloud &nbsp;&middot;&nbsp; burn-on-read</div>
-  <div style="margin-top:24px"><a href="/hndl" style="display:inline-flex;align-items:center;gap:8px;background:rgba(200,40,40,.12);border:1px solid rgba(200,40,40,.35);border-radius:4px;padding:7px 16px;font-size:11px;font-family:var(--mono);color:#c84040;text-decoration:none;letter-spacing:.04em;animation:pulse 2.5s ease-in-out infinite">&#9888; Your data is being harvested NOW &mdash; Q-Day est. 2029 &rarr;</a></div>
+  <div style="margin-top:20px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
 </div>
 
 <div class="proto-bar">
@@ -353,7 +352,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </div>
 </section>
 
-<script src="relay-status.js" integrity="sha384-zwgp1dUWLvm8iCOTiriHKk1xEDJ602wRXeATIxsWqM4FRoi0GIETSn6kSMN19gPf" crossorigin="anonymous" defer></script>
+<script src="relay-status.js" defer></script>
 
 <section class="sec-pad" style="max-width:960px;margin:0 auto;padding:40px 48px 0">
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
@@ -394,6 +393,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <div style="display:flex;gap:8px;flex-shrink:0">
         <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
         <a href="/ct-log#verify" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Verify this relay →</a>
+        <a href="/hndl" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Why post-quantum matters now →</a>
       </div>
     </div>
   </div>
@@ -815,7 +815,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 </footer>
 
 <script src="ct-stats.js" defer></script>
-<script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='☰';}});});</script>
 <script src="/nav.js" defer></script>
 </body>
 </html>
