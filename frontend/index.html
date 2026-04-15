@@ -969,6 +969,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     });
   },{threshold:0.07});
   document.querySelectorAll('[data-fade]').forEach(function(el){
+    if(el.getBoundingClientRect().top < window.innerHeight){return;}
     el.classList.add('fade-in');
     io.observe(el);
   });
