@@ -66,6 +66,20 @@ All reports are treated with responsible disclosure.
 | 5 | Medium | pgp_ enterprise admin path broken end-to-end | Fixed: removed pgp_ support |
 | 6 | Medium | Blob burned before transfer complete | Fixed: deferred deletion on res.finish() |
 
+### 2026-04-15 — Internal security review
+
+7 findings, all resolved in commit `8e6d4d2`.
+
+| # | Severity | Finding | Status |
+|---|----------|---------|--------|
+| 1 | High | DOM XSS in relay registry viewer — relay fields unescaped in `innerHTML` | Fixed: `esc()` helper applied to all API-sourced values incl. `title=""` attributes |
+| 2 | High | AES-256 key stored alongside ciphertext in Thunderbird FileLink blobs | Fixed: key excluded from blob (packet v0x02), travels via URL fragment only |
+| 3 | High | Malformed percent-encoding crashes relay process (public DoS, destroys in-flight blobs) | Fixed: `try/catch` on `decodeURIComponent()` at all 4 affected routes → HTTP 400 |
+| 4 | High | X-Forwarded-For spoofing bypasses admin brute-force rate limiter | Fixed: `X-Real-IP` (`nginx $remote_addr`) used instead of XFF first-entry |
+| 5 | Medium | `users.json` read-modify-write race condition | Fixed: `_mutateUsersJson()` serialises full read-modify-write cycle inside write queue |
+| 6 | Medium | Relay rate limits collapse to proxy loopback IP | Fixed: proxy-aware IP chain (`CF-Connecting-IP` → `X-Real-IP` → socket) |
+| 7 | Medium | `/v2/sign-dpa` unauthenticated, unlimited, email-abusable | Fixed: per-IP (3/24 h) and per-email (1/24 h) in-process limits + nginx `limit_req` |
+
 ### 2026-04 — Ryan Williams, Smart Cyber Solutions (independent)
 
 20 findings across 4 critical / 5 high / 6 medium / 5 low.
@@ -209,6 +223,23 @@ Additional fixes applied 2026-04-13:
 - express 4.x → 5.x
 - 0 GPL/AGPL/LGPL licenses
 - 0 hardcoded secrets
+
+---
+
+## Security incidents
+
+### 2026-04-15 — Credential exposure in git history
+
+**What:** gitleaks scan revealed historical credential exposure.
+
+| Credential | Committed | Status |
+|------------|-----------|--------|
+| `RESEND_API_KEY` (`re_K1YQ…XvA`) | 2026-04-01 in `deploy/systemd/*.service` | Verified invalid via Resend API on 2026-04-15 |
+| 3× demo API keys (`pgp_…`) | 2026-04-01 – 2026-04-07 in `frontend/index.html`, `poc/README.md` | Revoked via `/admin/` on 2026-04-15 |
+
+**Remediation:** Server `.env` permissions hardened to 600; gitleaks pre-commit hook installed.
+
+**Note on git history:** Historical commits still contain the now-invalid credentials. Rewriting history would break existing clones with no security benefit since the credentials are revoked. Documented here for transparency.
 
 ---
 
