@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Post-kwantum beveiliging voor de overheid</title>
-<meta name="description" content="PARAMANT helpt overheidsorganisaties voldoen aan de NIS2-migratieverplichting en de aanbevelingen van de Algemene Rekenkamer (feb 2026). Crypto-inventarisatie, migratieroadmap, verwerkersovereenkomst.">
+<title>PARAMANT — Post-Quantum File Transfer for Government</title>
+<meta name="description" content="71% of Dutch government organisations have no post-quantum plan (Court of Audit, Feb 2026). NIS2 requires documented cryptographic controls by end of 2026. Paramant is open source, self-hostable, and deployable in days.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -20,17 +20,19 @@ html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
 nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
 .nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
-.nav-links{display:flex;gap:20px;align-items:center}
-.nav-links a{font-size:12px;color:var(--muted);text-decoration:none}
+.nav-links{display:flex;gap:20px;list-style:none;align-items:center}
+.nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
 .nav-links a:hover{color:var(--text)}
+.nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px;text-decoration:none}
+.nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 
-/* ── urgency banner ── */
+/* urgency banner */
 .urgency-bar{background:var(--red-bg);border-bottom:1px solid var(--red-dim);padding:10px 48px;display:flex;align-items:center;gap:12px;font-size:12px;color:#e09090}
 .urgency-bar strong{color:#e87878}
 .urgency-bar a{color:#e09090;text-decoration:underline;text-decoration-color:#7a3030;margin-left:auto;font-family:var(--mono);font-size:11px;white-space:nowrap}
 .urgency-bar a:hover{color:#e87878}
 
-/* ── hero ── */
+/* hero */
 .hero{padding:64px 48px 56px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--border)}
 .hero-tag{font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px}
 .hero h1{font-size:32px;font-weight:600;letter-spacing:-.03em;line-height:1.2;color:var(--text);margin-bottom:14px}
@@ -48,28 +50,27 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px
 
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
 
-/* ── rekenkamer callout ── */
-.rekenkamer{background:var(--orange-bg);border:1px solid var(--orange-dim);border-radius:6px;padding:20px 24px;margin:48px 0 0}
-.rekenkamer-label{font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--orange);margin-bottom:8px}
-.rekenkamer h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px}
-.rekenkamer p{font-size:13px;color:#c8a878;line-height:1.65}
-.rekenkamer a{color:var(--orange);text-decoration:none}
-.rekenkamer a:hover{text-decoration:underline}
+/* callout */
+.callout{background:var(--orange-bg);border:1px solid var(--orange-dim);border-radius:6px;padding:20px 24px;margin:48px 0 0}
+.callout-label{font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--orange);margin-bottom:8px}
+.callout h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px}
+.callout p{font-size:13px;color:#c8a878;line-height:1.65}
+.callout a{color:var(--orange);text-decoration:none}
+.callout a:hover{text-decoration:underline}
 
-/* ── section structure ── */
+/* sections */
 section{margin-top:56px}
 section h2{font-size:20px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:6px}
 section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:28px}
 
-/* ── feature grid ── */
+/* feature grid */
 .feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
 .feature-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 22px}
-.feature-card h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:8px}
-.feature-card h4 span.icon{font-size:16px}
+.feature-card h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
 .feature-card p{font-size:12px;color:var(--muted);line-height:1.6}
 .feature-card code{font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--green);padding:1px 5px;border-radius:3px}
 
-/* ── requirements table ── */
+/* compliance table */
 .req-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
 .req-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--quiet);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--mono)}
 .req-table td{padding:10px 14px;border-bottom:1px solid var(--border-soft);vertical-align:top;color:var(--muted)}
@@ -78,7 +79,7 @@ section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:28px}
 .check{color:var(--green)}
 .partial{color:var(--orange)}
 
-/* ── steps ── */
+/* steps */
 .steps{display:flex;flex-direction:column;gap:14px;margin-top:20px}
 .step{display:flex;gap:16px;align-items:flex-start}
 .step-num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--green);background:var(--green-bg);border:1px solid var(--green-dim);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
@@ -86,19 +87,18 @@ section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:28px}
 .step-body p{font-size:12px;color:var(--muted);line-height:1.6}
 .step-body code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:1px 5px;border-radius:3px;color:var(--muted)}
 
-/* ── compliance pills ── */
+/* pills */
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
 .pill{font-size:11px;font-family:var(--mono);background:var(--green-bg);color:var(--green);padding:3px 10px;border-radius:3px;border:1px solid var(--green-dim)}
 .pill.amber{background:var(--orange-bg);color:var(--orange);border-color:var(--orange-dim)}
 
-/* ── data jurisdiction block ── */
-.jurisdiction{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px 26px;margin-top:28px;display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
-.jurisdiction-flag{font-size:36px;flex-shrink:0}
+/* jurisdiction */
+.jurisdiction{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px 26px;margin-top:28px}
 .jurisdiction h4{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
 .jurisdiction p{font-size:12px;color:var(--muted);line-height:1.6}
 .jurisdiction strong{color:var(--text)}
 
-/* ── CTA ── */
+/* CTA */
 .cta{background:var(--green-bg);border:1px solid var(--green-dim);border-radius:6px;padding:28px 32px;margin-top:48px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:24px}
 .cta h3{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px}
 .cta p{font-size:13px;color:#a8d5b5;line-height:1.6}
@@ -106,183 +106,206 @@ section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:28px}
 .cta-meta{font-size:11px;font-family:var(--mono);color:var(--quiet);line-height:2;text-align:right}
 .cta-meta span{display:block}
 
-@media(max-width:640px){
+/* footer */
+footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:32px}
+.footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:12px;color:var(--quiet);text-decoration:none}
+.footer-links a:hover{color:var(--muted)}
+.footer-meta{font-size:11px;color:var(--quiet);font-family:var(--mono);text-align:right;line-height:1.8}
+
+@media(max-width:768px){
   nav{padding:0 16px}
+  .nav-links{display:none}
+  .nav-burger{display:flex;align-items:center}
+  .nav-open .nav-links{display:flex!important;flex-direction:column;position:absolute;top:56px;left:0;right:0;background:rgba(12,12,12,.97);border-bottom:1px solid var(--border);padding:20px 16px;gap:20px;z-index:99}
   .urgency-bar{padding:10px 16px;flex-wrap:wrap}
-  .hero,.main-pad{padding-left:20px;padding-right:20px}
+  .hero{padding-left:20px;padding-right:20px}
   main{padding-left:20px;padding-right:20px}
   .hero h1{font-size:24px}
   .feature-grid{grid-template-columns:1fr}
   .cta{flex-direction:column}
   .cta-meta{text-align:left}
   .hero-stat{gap:20px}
+  footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
+  .footer-meta{text-align:left}
 }
 </style>
 </head>
 <body>
 <nav>
   <a href="/" class="nav-logo">PARAMANT</a>
-  <div class="nav-links">
-    <a href="/docs">Docs</a>
-    <a href="/parashare">ParaShare</a>
-    <a href="/drop">ParaDrop</a>
-    <a href="/ct-log">CT Log</a>
-    <a href="/compliance/nis2">NIS2</a>
-    <a href="/request-key">Gratis sleutel</a>
-  </div>
+  <ul class="nav-links">
+    <li><a href="/#sectors">Use cases</a></li>
+    <li><a href="/hndl" style="color:#c84040">HNDL threat</a></li>
+    <li><a href="/security">Security</a></li>
+    <li><a href="/vs">Compare</a></li>
+    <li><a href="/#pricing">Pricing</a></li>
+    <li><a href="/#selfhost">Self-host</a></li>
+    <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/ct-log">CT Log</a></li>
+    <li><a href="/drop">ParaDrop</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+  </ul>
+  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-burger" onclick="this.closest('nav').classList.toggle('nav-open');this.textContent=this.closest('nav').classList.contains('nav-open')?'&#10005;':'&#9776;'" aria-label="Menu">&#9776;</button>
 </nav>
 
 <div class="urgency-bar">
-  <strong>Actief risico:</strong>
-  Tegenstanders archiveren versleuteld overheidsverkeer vandaag — om later te ontsleutelen wanneer kwantumcomputers beschikbaar zijn (HNDL).
-  <a href="/hndl">Wat is HNDL? →</a>
+  <strong>Active risk:</strong>
+  Adversaries are archiving encrypted government traffic today &mdash; to decrypt when quantum computers arrive (HNDL).
+  <a href="/hndl">What is HNDL? &rarr;</a>
 </div>
 
-<div class="hero" style="padding-left:48px;padding-right:48px">
-  <div class="hero-tag">Overheid &amp; Publieke Sector</div>
-  <h1>Klaar voor de verplichte<br><em>PQC-migratie voor 2026?</em></h1>
+<div class="hero">
+  <div class="hero-tag">Government &amp; Public Sector</div>
+  <h1>Post-Quantum File Transfer<br><em>for Government</em></h1>
   <p class="subtitle">
-    De Algemene Rekenkamer (februari 2026) constateerde dat 71% van de onderzochte
-    overheidsorganisaties geen migratieplan heeft voor post-kwantumcryptografie.
-    NIS2 vereist gedocumenteerde cryptografische beheersmaatregelen voor eind 2026.
-    PARAMANT levert de tooling om dat in weken te regelen — niet in jaren.
+    The Dutch Court of Audit (February 2026) found that 71% of government
+    organisations surveyed have no post-quantum plan. NIS2 requires
+    documented cryptographic controls by end of 2026. Paramant is open source,
+    self-hostable, and deployable in days &mdash; not quarters.
   </p>
   <div class="hero-actions">
-    <a href="/request-key" class="btn-primary">Vraag gratis crypto-inventarisatie aan</a>
-    <a href="/docs" class="btn-sec">Technische documentatie</a>
+    <a href="/request-key" class="btn-primary">Request free API key &rarr;</a>
+    <a href="/docs" class="btn-sec">Technical documentation</a>
   </div>
   <div class="hero-stat">
-    <div class="stat"><div class="stat-num">71%</div><div class="stat-label">Geen PQC-plan</div></div>
-    <div class="stat"><div class="stat-num">2026</div><div class="stat-label">NIS2-deadline</div></div>
-    <div class="stat"><div class="stat-num">2029</div><div class="stat-label">Q-Day schatting</div></div>
-    <div class="stat"><div class="stat-num">0€</div><div class="stat-label">Community Edition</div></div>
+    <div class="stat"><div class="stat-num">71%</div><div class="stat-label">No PQC plan</div></div>
+    <div class="stat"><div class="stat-num">2026</div><div class="stat-label">NIS2 deadline</div></div>
+    <div class="stat"><div class="stat-num">2029</div><div class="stat-label">Q-Day estimate</div></div>
+    <div class="stat"><div class="stat-num">0&euro;</div><div class="stat-label">Community Edition</div></div>
   </div>
 </div>
 
 <main>
 
-  <div class="rekenkamer">
-    <div class="rekenkamer-label">Algemene Rekenkamer — februari 2026</div>
-    <h3>Rapport: Kwantumcomputers en de veiligheid van digitale communicatie</h3>
+  <div class="callout">
+    <div class="callout-label">Dutch Court of Audit &mdash; February 2026</div>
+    <h3>Report: Quantum computers and the security of digital communications</h3>
     <p>
-      Het rapport stelt vast dat de meeste overheidsorganisaties <strong>onvoldoende zicht hebben
-      op hun cryptografische afhankelijkheden</strong> en geen concreet migratieplan hebben.
-      Aanbeveling: inventariseer vóór Q2 2026 alle systemen die kwantum-kwetsbare versleuteling
-      gebruiken en maak een gedocumenteerd migratieplan conform NIS2 artikel 21.
-      PARAMANT biedt precies die toolchain — als open source, zelf te hosten.
+      The report found that most government organisations have <strong>insufficient insight into their
+      cryptographic dependencies</strong> and no concrete plan for post-quantum cryptography.
+      Recommendation: before Q2 2026, inventory all systems using quantum-vulnerable encryption
+      and produce a documented plan in line with NIS2 Article 21.
+      Paramant provides exactly that foundation &mdash; as open source, self-hostable software.
     </p>
   </div>
 
-  <!-- ── Wat biedt PARAMANT ── -->
+  <!-- What Paramant provides -->
   <section>
-    <h2>Wat PARAMANT biedt voor de overheid</h2>
-    <p class="section-sub">Concrete tools — geen consultancy-rapport, maar uitvoerbare software.</p>
+    <h2>What Paramant provides</h2>
+    <p class="section-sub">Working software &mdash; not a consultancy report.</p>
     <div class="feature-grid">
 
       <div class="feature-card">
-        <h4><span class="icon">🔍</span> Crypto-inventarisatie</h4>
+        <h4>Post-quantum file transfer</h4>
         <p>
-          <code>paramant-crypto-audit</code> scant uw infrastructuur op kwantum-kwetsbare
-          algoritmen: RSA-sleutels, ECDSA-certificaten, SSH host keys, backupversleuteling,
-          GPG-sleutels. Output: JSON-rapport met risiconiveau per component.
+          Ghost Pipe uses <strong>ML-KEM-768 + AES-256-GCM</strong> (NIST FIPS 203).
+          Files are encrypted in the browser before upload.
+          The relay never sees plaintext. Burn-on-read: destroyed after first download.
         </p>
       </div>
 
       <div class="feature-card">
-        <h4><span class="icon">🗺️</span> Migratieroadmap generator</h4>
+        <h4>Tamper-evident audit log</h4>
         <p>
-          <code>paramant-roadmap</code> leest de auditoutput en genereert een concreet
-          drie-fasen migratieplan met wekelijkse prioriteiten, compliancedeadlines
-          en budgetschatting. Bruikbaar als bijlage bij NIS2-documentatie.
+          Every transfer is hashed into a public Merkle tree (CT log).
+          The signed tree head (STH) is independently verifiable via
+          <code>paramant-verify-sth</code>. Exportable for audits, SIEM integration,
+          or BIO/NEN 7510 accountability.
         </p>
       </div>
 
       <div class="feature-card">
-        <h4><span class="icon">🔐</span> Post-kwantum bestandsoverdracht</h4>
+        <h4>Independent relay verification</h4>
         <p>
-          Ghost Pipe gebruikt <strong>ML-KEM-768 + ECDH P-256 hybride</strong> (NIST FIPS 203).
-          Bestanden worden in de browser versleuteld vóór upload.
-          De relay ziet nooit klare tekst. Burn-on-read: weg na eerste download.
+          <code>paramant-verify-sth --relay &lt;url&gt;</code> verifies the ML-DSA-65
+          signed tree head against the relay&rsquo;s public key &mdash; no trust in the operator required.
+          <code>paramant-verify-peers</code> cross-checks all registered relays for
+          root consistency and flags any tampering.
         </p>
       </div>
 
       <div class="feature-card">
-        <h4><span class="icon">📋</span> Audit trail via CT-log</h4>
+        <h4>Self-hostable relay</h4>
         <p>
-          Elke overdracht wordt gelogd in een Merkle-tree CT-log (niet-weerlegbaar).
-          Exporteerbaar voor accountantscontrole, SIEM-integratie of
-          BIO/NEN 7510-verantwoording.
+          The full relay stack runs on your own Ubuntu server or government cloud in one command.
+          No data leaves your jurisdiction.
+          Community Edition: free for up to 5 users under BUSL-1.1.
         </p>
       </div>
 
       <div class="feature-card">
-        <h4><span class="icon">📄</span> Verwerkersovereenkomst (AVG art. 28)</h4>
+        <h4>Data Processing Agreement (GDPR Art. 28)</h4>
         <p>
-          Een modelovereenkomst conform AVG artikel 28 is beschikbaar.
-          Bij zelf-hosten op uw eigen VPS of overheidscloud vervalt de
-          verwerkersrelatie — u bent dan zelf de verwerker.
+          A model agreement under GDPR Article 28 is
+          <a href="/verwerkersovereenkomst" style="color:var(--green)">available here</a>.
+          When self-hosting on your own server, the processing relationship is
+          eliminated &mdash; you are both controller and processor.
         </p>
       </div>
 
       <div class="feature-card">
-        <h4><span class="icon">🏢</span> Zelf te hosten</h4>
+        <h4>Sector routing</h4>
         <p>
-          Volledige relay draait op uw eigen Ubuntu-server of overheidscloud
-          in één commando. Geen data buiten uw jurisdictie.
-          Community Edition: gratis voor tot 5 gebruikers.
+          Dedicated subdomains for each sector &mdash; health, legal, finance, iot &mdash; provide
+          routing isolation and sector-specific compliance documentation.
+          All nodes run identical Ghost Pipe software.
         </p>
       </div>
 
     </div>
   </section>
 
-  <!-- ── Aansluiting ── -->
+  <!-- Compliance table -->
   <section>
-    <h2>Aansluiting op overheidsstandaarden</h2>
-    <p class="section-sub">PARAMANT is ontworpen voor de Nederlandse publieke sector.</p>
+    <h2>Compliance coverage</h2>
+    <p class="section-sub">Designed for the Dutch and EU public sector.</p>
     <table class="req-table">
       <thead>
         <tr>
-          <th>Standaard / wet</th>
-          <th>Vereiste</th>
-          <th>PARAMANT-invulling</th>
+          <th>Standard</th>
+          <th>Requirement</th>
+          <th>How Paramant addresses it</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td>NIS2 art. 21</td>
-          <td>Cryptografische beheersmaatregelen gedocumenteerd</td>
-          <td><span class="check">✓</span> crypto-audit + roadmap = NIS2-documentatie</td>
+          <td>Documented cryptographic controls</td>
+          <td><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM; verifiable via CT log and <code style="font-family:var(--mono);font-size:11px">paramant-verify-sth</code></td>
         </tr>
         <tr>
-          <td>BIO (Baseline Informatiebeveiliging Overheid)</td>
-          <td>Versleuteling van gevoelige gegevens in transit</td>
-          <td><span class="check">✓</span> ML-KEM-768 + AES-256-GCM; geen klare tekst op relay</td>
+          <td>BIO</td>
+          <td>Encryption of sensitive data in transit</td>
+          <td><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM; no plaintext on relay</td>
         </tr>
         <tr>
-          <td>AVG / GDPR art. 28</td>
-          <td>Verwerkersovereenkomst bij externe verwerking</td>
-          <td><span class="check">✓</span> VWO beschikbaar; bij zelf-hosten niet vereist</td>
+          <td>GDPR / AVG art. 28</td>
+          <td>Data Processing Agreement for external processing</td>
+          <td><span class="check">&#10003;</span> DPA available; not required when self-hosting</td>
         </tr>
         <tr>
           <td>NEN 7510</td>
-          <td>Informatiebeveiliging in de zorg (relevant voor GGD/RIVM)</td>
-          <td><span class="check">✓</span> health.paramant.app sector; DICOM-overdracht gedocumenteerd</td>
+          <td>Healthcare information security</td>
+          <td><span class="check">&#10003;</span> health.paramant.app sector; DICOM transfer documented</td>
         </tr>
         <tr>
-          <td>DigiD aansluiteisen</td>
-          <td>TLS 1.3, sterke versleuteling, audit logging</td>
-          <td><span class="partial">○</span> Relay gebruikt TLS 1.3; DigiD-koppeling vereist aanvullende toetsing</td>
+          <td>DigiD connection requirements</td>
+          <td>TLS 1.3, strong encryption, audit logging</td>
+          <td><span class="partial">&#9675;</span> Relay uses TLS 1.3; DigiD coupling requires additional assessment</td>
         </tr>
         <tr>
-          <td>Overheidscloud criteria</td>
-          <td>Gegevenslocatie in EU/NL, geen US CLOUD Act-risico</td>
-          <td><span class="check">✓</span> Hetzner Falkenstein (DE); geen US jurisdictie</td>
+          <td>Government cloud criteria</td>
+          <td>Data location in EU/NL, no US CLOUD Act exposure</td>
+          <td><span class="check">&#10003;</span> Hetzner Falkenstein (DE); no US jurisdiction</td>
         </tr>
         <tr>
           <td>EU CRA (Cyber Resilience Act)</td>
-          <td>Software supply chain PQC by default — 2027</td>
-          <td><span class="check">✓</span> ML-KEM-768 default; hybride mode voor overgangsperiode</td>
+          <td>PQC by default in software supply chain &mdash; 2027</td>
+          <td><span class="check">&#10003;</span> ML-KEM-768 by default; roadmap documented in SECURITY.md</td>
         </tr>
       </tbody>
     </table>
@@ -290,98 +313,145 @@ section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:28px}
       <span class="pill">ML-KEM-768 (FIPS 203)</span>
       <span class="pill">ML-DSA-65 (FIPS 204)</span>
       <span class="pill">AES-256-GCM</span>
-      <span class="pill">ECDH P-256</span>
       <span class="pill">TLS 1.3</span>
       <span class="pill">Hetzner DE</span>
       <span class="pill">BUSL-1.1</span>
-      <span class="pill amber">DigiD: aanvullende toetsing vereist</span>
+      <span class="pill amber">DigiD: additional assessment required</span>
     </div>
   </section>
 
-  <!-- ── Datajurisdictie ── -->
+  <!-- Data jurisdiction -->
   <section>
-    <h2>Datajurisdictie</h2>
-    <p class="section-sub">Geen US CLOUD Act. Geen Cloudflare. Rechtstreeks vanuit Hetzner DE.</p>
+    <h2>Data jurisdiction</h2>
+    <p class="section-sub">No US CLOUD Act. No Cloudflare. Direct from Hetzner DE.</p>
     <div class="jurisdiction">
-      <div class="jurisdiction-flag">🇩🇪</div>
-      <div>
-        <h4>Hetzner Online GmbH — Falkenstein, Duitsland</h4>
-        <p>
-          De beheerde relay draait uitsluitend op servers van Hetzner (DE).
-          <strong>Geen Cloudflare</strong> — TLS-terminatie directe nginx op de server,
-          geen derde partij die meeleest. Hetzner valt onder <strong>Duits en EU-recht</strong>;
-          geen blootstelling aan de US CLOUD Act.<br><br>
-          Bij zelf-hosten kiest u uw eigen locatie: uw eigen datacenter, overheidscloud,
-          of elke EU-provider. De relay-software is volledig open source (BUSL-1.1).
-        </p>
-      </div>
+      <h4>Hetzner Online GmbH &mdash; Falkenstein, Germany</h4>
+      <p>
+        The managed relay runs exclusively on Hetzner servers in Germany.
+        <strong>No Cloudflare</strong> &mdash; TLS terminates directly on nginx, with no third party in the path.
+        Hetzner operates under <strong>German and EU law</strong>. No US CLOUD Act exposure.<br><br>
+        When self-hosting, you choose your own jurisdiction &mdash; your own datacenter,
+        a government cloud, or any EU provider. The relay software is fully open source (BUSL-1.1).
+      </p>
     </div>
   </section>
 
-  <!-- ── Stappenplan ── -->
+  <!-- Getting started -->
   <section>
-    <h2>Van nul naar NIS2-compliant in vier stappen</h2>
-    <p class="section-sub">Gemiddelde doorlooptijd: 2–4 weken.</p>
+    <h2>Getting started</h2>
+    <p class="section-sub">From zero to a running post-quantum relay in under two minutes.</p>
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
         <div class="step-body">
-          <h4>Crypto-inventarisatie (dag 1–2)</h4>
-          <p>Vraag een gratis API-sleutel aan via <a href="/request-key" style="color:var(--green)">paramant.app/request-key</a>.
-          Draai <code>paramant-crypto-audit</code> op uw servers. Output: JSON-rapport met alle kwantum-kwetsbare componenten.</p>
+          <h4>Request a free API key</h4>
+          <p>Go to <a href="/request-key" style="color:var(--green)">paramant.app/request-key</a>.
+          No credit card. No account. You receive a <code>pgp_</code> key for end-user access
+          or a <code>plk_</code> key to unlock your self-hosted relay beyond 5 users.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
         <div class="step-body">
-          <h4>Migratieroadmap genereren (dag 2)</h4>
-          <p>Draai <code>paramant-roadmap --from-audit crypto-audit-*.json</code>.
-          Het script genereert een Markdown-rapport met drie-fasen aanpak,
-          compliance-deadlines en budgetschatting. Klaar voor het management.</p>
+          <h4>Deploy the relay</h4>
+          <p>On any Ubuntu or Debian server: <code>curl -fsSL https://paramant.app/install.sh | bash</code>.
+          For a Raspberry Pi: <code>curl -fsSL https://paramant.app/install-pi.sh | bash</code>.
+          Choose the sector that fits your use case: <strong>health</strong>, <strong>legal</strong>, or <strong>finance</strong>.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-body">
-          <h4>Relay zelf hosten (week 1–2)</h4>
-          <p>Installeer de relay op uw eigen server: <code>curl -fsSL https://paramant.app/install.sh | bash</code>.
-          Kies het <strong>health</strong>-sector voor zorginstellingen, <strong>legal</strong> voor rechtspraak,
-          <strong>finance</strong> voor uitvoeringsorganisaties.</p>
+          <h4>Verify the relay independently</h4>
+          <p>Run <code>paramant-verify-sth --relay https://your-relay-url</code> to verify the
+          ML-DSA-65 signed tree head. Run <code>paramant-verify-peers</code> to cross-check
+          all registered relays for root consistency. Exit 0 means the log is intact.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">4</div>
         <div class="step-body">
-          <h4>Verwerkersovereenkomst ondertekenen</h4>
-          <p>Indien u de beheerde relay gebruikt: onderteken de <a href="/verwerkersovereenkomst" style="color:var(--green)">verwerkersovereenkomst</a>
-          (AVG art. 28). Bij zelf-hosten is dit niet vereist.</p>
+          <h4>Data Processing Agreement (managed relay only)</h4>
+          <p>If using the Paramant-managed relay, sign the <a href="/verwerkersovereenkomst" style="color:var(--green)">Data Processing Agreement</a>
+          (GDPR Art. 28). When self-hosting, no DPA is required &mdash; you control all infrastructure.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── CTA ── -->
+  <!-- CTA -->
   <div class="cta">
     <div>
-      <h3>Start vandaag met uw PQC-inventarisatie</h3>
+      <h3>Paramant Community Edition is free.</h3>
       <p>
-        Gratis API-sleutel — geen creditcard, geen wachttijd.<br>
-        Stel uw vragen via <a href="mailto:privacy@paramant.app?subject=Overheid%20-%20PQC%20inventarisatie" style="color:#a8d5b5">privacy@paramant.app</a>.
-        Verwerkersovereenkomst beschikbaar op aanvraag.
+        Self-host in under two minutes. No credit card. No account required.<br>
+        Questions: <a href="mailto:privacy@paramant.app?subject=Government%20-%20PQC" style="color:#a8d5b5">privacy@paramant.app</a>
       </p>
       <div class="cta-actions" style="margin-top:14px">
-        <a href="/request-key" class="btn-primary">Vraag gratis sleutel aan</a>
-        <a href="/verwerkersovereenkomst" class="btn-sec" style="font-size:12px">Verwerkersovereenkomst (AVG art. 28)</a>
+        <a href="/request-key" class="btn-primary">Request free API key &rarr;</a>
+        <a href="/verwerkersovereenkomst" class="btn-sec" style="font-size:12px">Data Processing Agreement (GDPR Art. 28)</a>
       </div>
     </div>
     <div class="cta-meta">
-      <span>Gratis t/m 5 gebruikers</span>
-      <span>Zelf-host op eigen server</span>
-      <span>Hetzner DE — geen US jurisdictie</span>
-      <span>Broncode: github.com/Apolloccrypt/paramant-relay</span>
+      <span>Free up to 5 users</span>
+      <span>Self-host on your own server</span>
+      <span>Hetzner DE &mdash; no US jurisdiction</span>
+      <span>github.com/Apolloccrypt/paramant-relay</span>
     </div>
   </div>
 
 </main>
+
+<footer>
+  <div>
+    <a href="/" class="footer-logo" style="text-decoration:none;color:inherit;display:block;margin-bottom:8px">PARAMANT</a>
+    <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Post-quantum encrypted file relay</div>
+  </div>
+  <div style="display:flex;gap:48px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Product</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/parashare">ParaShare</a>
+        <a href="/drop">ParaDrop</a>
+        <a href="/ct-log">CT Log</a>
+        <a href="/docs">Docs</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/vs">vs. alternatives</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Self-host</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+        <a href="/status">Status</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Compliance</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+        <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+        <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+        <a href="/verwerkersovereenkomst">Verwerkersovereenkomst (GDPR Art. 28)</a>
+        <a href="/hndl">HNDL threat</a>
+        <a href="/security">Security</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Company</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="mailto:privacy@paramant.app">Contact</a>
+        <a href="/request-key">Free API key</a>
+        <a href="/sla">SLA</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank">License</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
+</footer>
+
+<script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='&#9776;';}});});</script>
 </body>
 </html>
