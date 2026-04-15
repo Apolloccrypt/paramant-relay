@@ -7,11 +7,11 @@
 <meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768. Burn-on-read. Self-hostable. EU/DE jurisdiction. Free to start.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#2d6a4f;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
+:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#009922;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
-.logo-para{color:#e8e8e8}.logo-mant{color:#3dbe7a}
+.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
 .nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text)}
 .nav-links{display:flex;gap:20px;list-style:none}
 .nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
@@ -52,7 +52,7 @@ h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
 .api-table tbody td{padding:12px 0;border-bottom:1px solid var(--border-soft);vertical-align:top}
 .api-table tbody tr:last-child td{border-bottom:none}
 .method{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 8px;border-radius:3px;min-width:44px;text-align:center}
-.get{background:#1a2a1a;color:#4a8c5c}.post{background:#1a1a2a;color:#4a6a9c}
+.get{background:#1a2a1a;color:#009922}.post{background:#1a1a2a;color:#4a6a9c}
 .ep{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .api-desc{color:var(--muted);font-size:13px;padding-left:8px}
 .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:52px}
@@ -110,12 +110,12 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   canvas,svg{max-width:100%}
 }
 .hero-cta-secondary{display:flex;align-items:center;gap:1rem;margin-top:1.5rem;flex-wrap:wrap}
-.cta-secondary{color:#3dbe7a;font-size:.875rem;text-decoration:none;border-bottom:1px solid rgba(61,190,122,.3);padding-bottom:1px;transition:border-color .15s}
-.cta-secondary:hover{border-color:#3dbe7a}
-.cta-note{font-size:.78rem;color:#5a8a6a}
+.cta-secondary{color:#00ff41;font-size:.875rem;text-decoration:none;border-bottom:1px solid rgba(0,255,65,.3);padding-bottom:1px;transition:border-color .15s}
+.cta-secondary:hover{border-color:#00ff41}
+.cta-note{font-size:.78rem;color:#007722}
 .pricing-note{font-size:11px;color:var(--quiet);margin:6px 0 0;font-family:var(--mono)}
 .price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
-.popular-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:#2d8a5c;padding:2px 8px;border-radius:3px;margin-bottom:12px}.price-btn.ghost{background:transparent;border:1px solid #3dbe7a;color:#3dbe7a}.price-btn.ghost:hover{background:rgba(61,190,122,.1);opacity:1}
+.popular-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:#2d8a5c;padding:2px 8px;border-radius:3px;margin-bottom:12px}.price-btn.ghost{background:transparent;border:1px solid #00ff41;color:#00ff41}.price-btn.ghost:hover{background:rgba(0,255,65,.1);opacity:1}
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
@@ -123,8 +123,8 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 .hndl-inner{max-width:960px;margin:0 auto;padding:0 32px}
 .hndl-strip-header{display:flex;align-items:center;gap:16px;margin-bottom:32px;flex-wrap:wrap}
 .hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid rgba(224,80,80,.4);padding:3px 10px;border-radius:3px;flex-shrink:0}
-.hndl-strip-title{font-size:13px;color:#c8e8d6;font-weight:500}
-.hndl-strip-link{font-size:12px;color:#9fd4b5;text-decoration:none;margin-left:auto;opacity:.7;transition:opacity .15s}
+.hndl-strip-title{font-size:13px;color:#00ff41;font-weight:500}
+.hndl-strip-link{font-size:12px;color:#00cc33;text-decoration:none;margin-left:auto;opacity:.7;transition:opacity .15s}
 .hndl-strip-link:hover{opacity:1;text-decoration:none}
 .hndl-strip-timeline{display:flex;align-items:flex-start;gap:0}
 .hndl-strip-connector{color:rgba(224,80,80,.4);margin-top:10px;flex-shrink:0;font-size:14px;padding:0 16px}
@@ -135,9 +135,9 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 .hndl-strip-step-time{font-size:11px;font-weight:700;margin-bottom:7px;letter-spacing:.08em;text-transform:uppercase}
 .hndl-strip-step--active .hndl-strip-step-time{color:#e05050}
 .hndl-strip-step--danger .hndl-strip-step-time{color:#f59e0b}
-.hndl-strip-step:not(.hndl-strip-step--active):not(.hndl-strip-step--danger) .hndl-strip-step-time{color:#9fd4b5}
-.hndl-strip-step-label{font-size:14px;color:#c8e8d6;font-weight:600;margin-bottom:7px}
-.hndl-strip-step-desc{font-size:12px;color:#8abca0;line-height:1.65}
+.hndl-strip-step:not(.hndl-strip-step--active):not(.hndl-strip-step--danger) .hndl-strip-step-time{color:#00cc33}
+.hndl-strip-step-label{font-size:14px;color:#00ff41;font-weight:600;margin-bottom:7px}
+.hndl-strip-step-desc{font-size:12px;color:#009922;line-height:1.65}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 </style>
 <link rel="stylesheet" href="/nav.css">
@@ -348,13 +348,13 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
       <span class="tag">Try free &rarr;</span>
     </a>
     <a href="/drop" class="cell" style="text-decoration:none;display:block;background:#0b1d12">
-      <div class="use-tag" style="color:#3dbe7a">Local transfer</div>
+      <div class="use-tag" style="color:#00ff41">Local transfer</div>
       <h3>ParaDrop</h3>
       <p class="desc" style="margin-top:6px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read.</p>
-      <span class="tag" style="color:#3dbe7a">Try now &rarr;</span>
+      <span class="tag" style="color:#00ff41">Try now &rarr;</span>
     </a>
     <a href="#selfhost" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag" style="color:#2d8a5c">Relay operator</div>
+      <div class="use-tag" style="color:#00aa33">Relay operator</div>
       <h3>Run your own relay</h3>
       <p class="desc" style="margin-top:6px">Community Edition &mdash; free forever, up to 5 users. BUSL-1.1.</p>
       <span class="tag">Self-host &darr;</span>
@@ -381,7 +381,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="width:6px;height:6px;border-radius:50%;background:#3aaa70;display:inline-block;box-shadow:0 0 6px #3aaa7066"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:#00ff41;display:inline-block;box-shadow:0 0 6px #00ff4166"></span>
           <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Relay pipeline</span>
         </div>
         <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)" id="pipe-ts"></span>
@@ -399,7 +399,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <div id="node-map" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column;">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="width:6px;height:6px;border-radius:50%;background:#3aaa70;display:inline-block;box-shadow:0 0 6px #3aaa7066"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:#00ff41;display:inline-block;box-shadow:0 0 6px #00ff4166"></span>
           <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Node map</span>
         </div>
         <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">EU/DE &middot; Anycast</span>
@@ -452,7 +452,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
         <text x="233" y="149" fill="#444" font-size="7" font-family="monospace">planned</text>
         
         <circle cx="252" cy="158" r="9" fill="#161616" stroke="#3d7a50" stroke-width="2"/>
-        <circle cx="252" cy="158" r="4.5" fill="#3aaa70"/>
+        <circle cx="252" cy="158" r="4.5" fill="#00ff41"/>
         <text x="265" y="155" fill="#ddd" font-size="10" font-family="monospace" font-weight="600" letter-spacing=".04em">FRA</text>
         <text x="265" y="167" fill="#777" font-size="8" font-family="monospace">Hetzner DE</text>
         
@@ -478,7 +478,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
       </svg>
       <div class="nodemap-stats" style="display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)">
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">AMS</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">FRA</div><div style="font-size:10px;font-family:var(--mono);color:#3aaa70">live</div></div>
+        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">FRA</div><div style="font-size:10px;font-family:var(--mono);color:#00ff41">live</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ARN</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">CDG</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
         <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ORD</div><div style="font-size:10px;font-family:var(--mono);color:#555">eval</div></div>
@@ -532,7 +532,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
         <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
         <a href="/ct-log#verify" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Verify this relay →</a>
         <a href="/hndl" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Why post-quantum matters now →</a>
-        <a href="/request-key" style="font-size:11px;font-family:var(--mono);color:#3dbe7a;border:1px solid rgba(61,190,122,.3);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Try it free &rarr;</a>
+        <a href="/request-key" style="font-size:11px;font-family:var(--mono);color:#00ff41;border:1px solid rgba(0,255,65,.3);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Try it free &rarr;</a>
       </div>
     </div>
   </div>
@@ -545,7 +545,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   <h2>Real problems. Real stakes.</h2>
   <p class="sub">Ghost Pipe solves the same core problem across every sector: confidential data transport that leaves no trace. One relay engine — routed across dedicated subdomains for isolation and sector-specific compliance documentation.</p>
   <div style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 14px;margin-bottom:40px;font-size:11px;font-family:var(--mono);color:var(--quiet)">
-    <span style="color:#2d8a5c">◉</span>
+    <span style="color:#00aa33">◉</span>
     All relay nodes run identical Ghost Pipe software &nbsp;·&nbsp; subdomains provide routing isolation, not different configurations
   </div>
 
@@ -553,7 +553,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <div class="cell">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x2295; Healthcare</div>
-        <span style="font-size:10px;font-family:var(--mono);color:#2d8a5c;background:#0d1f17;border:1px solid #1a3d28;border-radius:3px;padding:2px 7px;letter-spacing:.04em">NEN 7510</span>
+        <span style="font-size:10px;font-family:var(--mono);color:#00aa33;background:#0d1f17;border:1px solid #1a3d28;border-radius:3px;padding:2px 7px;letter-spacing:.04em">NEN 7510</span>
       </div>
       <h3 style="margin-bottom:8px">DICOM files that vanish after delivery</h3>
       <p class="desc" style="margin-bottom:14px">MRI / CT → Ghost Pipe → PACS. The file exists only for the duration of the transfer, then burns. Nothing to audit, nothing to breach. Designed with NEN 7510 in mind.</p>
@@ -655,20 +655,20 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
   <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:6px;padding:16px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="font-size:12px;font-family:var(--mono);color:#2d8a5c;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Community Edition — free forever</div>
+      <div style="font-size:12px;font-family:var(--mono);color:#00aa33;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Community Edition — free forever</div>
       <div style="font-size:12px;color:#6e6e6e;line-height:1.6">Up to 5 users &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; BUSL-1.1 &nbsp;&middot;&nbsp; Works on a Raspberry Pi. One command.</div>
     </div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" style="font-size:11px;font-family:var(--mono);color:#2d8a5c;border:1px solid #1a3d28;border-radius:4px;padding:7px 14px;text-decoration:none;white-space:nowrap">Download free &rarr;</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" style="font-size:11px;font-family:var(--mono);color:#00aa33;border:1px solid #1a3d28;border-radius:4px;padding:7px 14px;text-decoration:none;white-space:nowrap">Download free &rarr;</a>
   </div>
   <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
   <div class="install-three" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
 
     <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#2d8a5c;margin-bottom:10px">π</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
+      <div style="font-size:20px;font-family:var(--mono);color:#00aa33;margin-bottom:10px">π</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#00aa33;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
       <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Pi 3B+ / 4 / 5</div>
       <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">One command. Detects your Pi, installs Docker, disables swap, shows QR code with your relay URL.</div>
-      <div style="background:#060e09;border:1px solid #1a3d28;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#2d8a5c;word-break:break-all;margin-bottom:16px">curl -fsSL https://paramant.app/install-pi.sh | bash</div>
+      <div style="background:#060e09;border:1px solid #1a3d28;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#00aa33;word-break:break-all;margin-bottom:16px">curl -fsSL https://paramant.app/install-pi.sh | bash</div>
       <div style="font-size:10px;font-family:var(--mono);color:#6e6e6e">ARM64 &middot; 512 MB RAM min &middot; Raspberry Pi OS Lite</div>
     </div>
 
@@ -714,7 +714,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
       docker compose up -d<br><br>
       <span style="color:#6e6e6e"># 4. Verify</span><br>
       curl http://localhost/health<br>
-      <span style="color:#2d8a5c"># {"ok":true,"version":"2.4.5","sector":"relay"}</span>
+      <span style="color:#00aa33"># {"ok":true,"version":"2.4.5","sector":"relay"}</span>
     </div>
   </div>
   <div style="display:flex;gap:32px;flex-wrap:wrap">
@@ -736,10 +736,10 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <div class="price-split" style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:start;gap:0">
 
       <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:28px 24px">
-        <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Relay operator</div>
+        <div style="font-size:11px;font-family:var(--mono);color:#00aa33;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Relay operator</div>
         <div style="font-size:15px;font-weight:600;color:#ededed;margin-bottom:8px">You run the relay</div>
         <div style="font-size:12px;color:#888;line-height:1.7;margin-bottom:16px">You want to self-host a relay for your team or customers. You control the server.</div>
-        <div style="font-size:11px;font-family:var(--mono);background:#111;border:1px solid #1a3d28;border-radius:4px;padding:10px 12px;color:#2d8a5c;line-height:1.8">
+        <div style="font-size:11px;font-family:var(--mono);background:#111;border:1px solid #1a3d28;border-radius:4px;padding:10px 12px;color:#00aa33;line-height:1.8">
           You receive: <span style="color:#ededed">plk_ license key</span><br>
           Adds to .env &rarr; unlocks &gt;5 users
         </div>
@@ -771,7 +771,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   <div id="pane-op" class="pricing-grid">
 
     <div class="pc">
-      <div class="price-name" style="color:#2d8a5c">COMMUNITY</div>
+      <div class="price-name" style="color:#00aa33">COMMUNITY</div>
       <div class="price-amount">Free</div>
       <div class="price-note">Up to 5 users &middot; no credit card &middot; BUSL-1.1</div>
       <div class="price-tagline">Your server, your data, zero lock-in. Free forever.</div>
@@ -828,7 +828,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   <div id="pane-user" class="pricing-grid" style="display:none">
 
     <div class="pc featured">
-      <div class="price-name" style="color:#2d8a5c">FREE &mdash; START HERE</div>
+      <div class="price-name" style="color:#00aa33">FREE &mdash; START HERE</div>
       <div class="price-amount">€0</div>
       <div class="price-note">pgp_ API key &middot; no credit card &middot; no account</div>
       <div class="price-tagline">Try ParaShare now, or request a key for the API.</div>

@@ -24,7 +24,7 @@ nav.nav .nav-logo {
   text-decoration: none;
 }
 nav.nav .nav-logo .logo-para { color: #e8e8e8; }
-nav.nav .nav-logo .logo-mant { color: #3dbe7a; }
+nav.nav .nav-logo .logo-mant { color: #00ff41; }
 
 nav.nav .nav-links {
   display: flex;
@@ -41,7 +41,7 @@ nav.nav .nav-dropdown { position: relative; }
 nav.nav .nav-dropdown-trigger {
   background: none;
   border: none;
-  color: #9fd4b5;
+  color: #00cc33;
   font-size: 13px;
   font-family: inherit;
   padding: .5rem .75rem;
@@ -51,7 +51,7 @@ nav.nav .nav-dropdown-trigger {
   white-space: nowrap;
 }
 nav.nav .nav-dropdown-trigger:hover,
-nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: #3dbe7a; }
+nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: #00ff41; }
 
 /* Dropdown menu */
 nav.nav .nav-dropdown-menu {
@@ -82,20 +82,20 @@ nav.nav .nav-dropdown:hover .nav-dropdown-menu { display: block; }
 nav.nav .nav-dropdown-menu li a {
   display: block;
   padding: .5rem 1rem;
-  color: #9fd4b5;
+  color: #00cc33;
   text-decoration: none;
   font-size: 13px;
   transition: color .15s, background .15s;
   white-space: nowrap;
 }
 nav.nav .nav-dropdown-menu li a:hover {
-  color: #3dbe7a;
+  color: #00ff41;
   background: rgba(61,190,122,.08);
 }
 
 /* Direct standalone links */
 nav.nav .nav-link {
-  color: #9fd4b5;
+  color: #00cc33;
   font-size: 13px;
   padding: .5rem .75rem;
   text-decoration: none;
@@ -103,7 +103,7 @@ nav.nav .nav-link {
   transition: color .15s;
   white-space: nowrap;
 }
-nav.nav .nav-link:hover { color: #3dbe7a; }
+nav.nav .nav-link:hover { color: #00ff41; }
 
 /* Hamburger button — hidden on desktop */
 nav.nav .nav-hamburger {
@@ -119,7 +119,7 @@ nav.nav .nav-hamburger span {
   display: block;
   width: 22px;
   height: 2px;
-  background: #9fd4b5;
+  background: #00cc33;
   border-radius: 2px;
   transition: transform .2s, opacity .2s;
 }
@@ -150,21 +150,21 @@ nav.nav .nav-hamburger span {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: #3dbe7a;
+  color: #00ff41;
   margin-bottom: .25rem;
   font-family: 'SF Mono','Fira Code',monospace;
 }
 .nav-mobile a {
-  color: #c8e8d6;
+  color: #00ff41;
   text-decoration: none;
   font-size: 1.0625rem;
   padding: .5rem 0;
   border-bottom: 1px solid #1e3a28;
   display: block;
 }
-.nav-mobile a:hover { color: #3dbe7a; }
+.nav-mobile a:hover { color: #00ff41; }
 .nav-mobile-standalone {
-  color: #c8e8d6 !important;
+  color: #00ff41 !important;
   font-size: 1.0625rem;
   text-decoration: none;
   border-bottom: none !important;
