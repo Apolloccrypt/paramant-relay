@@ -1,6 +1,81 @@
-# PARAMANT Client Scripts
+# paramant-* CLI tools
 
-Python client tools. Run on your own machine — not on the relay server.
+Command-line tools for managing and using Paramant relays.
+
+## Install
+
+```bash
+curl -fsSL https://paramant.app/install-client.sh | bash
+```
+
+On ParamantOS — all tools are pre-installed. Type `paramant-help`.
+
+## Tools by category
+
+### Setup & diagnostics
+| Tool | Description |
+|------|-------------|
+| `paramant-setup` | First-time wizard — relay URL + API key |
+| `paramant-status` | Relay health across all 5 sectors |
+| `paramant-doctor` | Automated health check with fix instructions |
+| `paramant-info` | System info, uptime, relay version, edition |
+| `paramant-relay-setup` | Clone + configure + start your own relay |
+
+### File transfer
+| Tool | Description |
+|------|-------------|
+| `paramant-sender.py` | Encrypt and send a file to a relay sector |
+| `paramant-receiver.py` | Receive and decrypt from a relay sector |
+
+### Sector tools
+| Tool | Standard | Description |
+|------|----------|-------------|
+| `paramant-referral` | NEN 7510 / HL7 FHIR | Healthcare referral transport |
+| `paramant-notary` | eIDAS / KNB | Legal document transport |
+| `paramant-legal` | eIDAS | Court document relay |
+| `paramant-payslip` | GDPR | HR payslip distribution |
+| `paramant-firmware` | IEC 62443 | IoT firmware updates |
+| `paramant-cra` | EU CRA 2027 | Software supply chain relay |
+| `paramant-ticket` | — | One-time transit ticket |
+
+### CT log & verification
+| Tool | Description |
+|------|-------------|
+| `paramant-verify-sth` | Verify ML-DSA-65 signed tree head against relay |
+| `paramant-receipt` | View or verify a delivery receipt |
+| `paramant-verify-peers` | Cross-check STH consistency across all peer relays |
+
+### Key management
+| Tool | Description |
+|------|-------------|
+| `paramant-keys` | List all API keys |
+| `paramant-key-add` | Add new API key (interactive) |
+| `paramant-key-revoke` | Revoke an API key (interactive) |
+
+### Security & network
+| Tool | Description |
+|------|-------------|
+| `security-status` | All security layers at a glance |
+| `paramant-ports` | Firewall rules + listening ports |
+| `paramant-scan` | LAN relay discovery + registry |
+| `paramant-verify` | TOFU fingerprint verification |
+| `paramant-crypto-audit` | Scan for quantum-vulnerable algorithms |
+
+### Data & maintenance
+| Tool | Description |
+|------|-------------|
+| `paramant-backup` | Backup keys + CT log |
+| `paramant-restore` | Restore from backup |
+| `paramant-export` | Export audit log to USB |
+| `paramant-logs` | Live log stream |
+| `paramant-update` | Check for relay updates |
+| `paramant-roadmap` | PQC migration roadmap generator |
+
+---
+
+## Python client scripts
+
+Run on your own machine — not on the relay server.
 
 ## Install dependencies
 ```bash

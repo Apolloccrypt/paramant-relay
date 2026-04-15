@@ -610,7 +610,7 @@ paramant-send --key pgp_xxx --sector health --ack scan.dcm
 paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/api</pre>
 
     <!-- ── ParamantOS CLI tools ───────────────────────────────────── -->
-    <h2 id="paramant-os-tools">ParamantOS — 38 operator tools</h2>
+    <h2 id="paramant-os-tools">ParamantOS — 41 operator tools</h2>
     <p><a href="https://github.com/Apolloccrypt/ParamantOS" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">ParamantOS</a> is a hardened Linux distribution (NixOS + Mint editions) for relay operators. All 38 tools are pre-installed.</p>
     <table>
       <tr><th>Category</th><th>Command</th><th>What it does</th></tr>
@@ -633,6 +633,9 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
       <tr><td>paramant-firmware</td><td>IoT/body cam firmware updates — IEC 62443</td></tr>
       <tr><td>paramant-cra</td><td>Software supply chain relay — EU CRA 2027, SBOM</td></tr>
       <tr><td>paramant-ticket</td><td>One-time transit ticket issuer and verifier</td></tr>
+      <tr><td rowspan="3" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">CT log &amp; verification</td><td>paramant-verify-sth</td><td>Verify ML-DSA-65 signed tree head against relay</td></tr>
+      <tr><td>paramant-receipt</td><td>View or verify a delivery receipt</td></tr>
+      <tr><td>paramant-verify-peers</td><td>Cross-check STH consistency across all peer relays</td></tr>
       <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Key management</td><td>paramant-keys</td><td>List all API keys</td></tr>
       <tr><td>paramant-key-add</td><td>Add a new API key</td></tr>
       <tr><td>paramant-key-revoke</td><td>Revoke an API key</td></tr>

@@ -119,8 +119,11 @@ echo -e "
 ${G}${BOLD}  Installation complete.${E}
 
   ${D}Usage:${E}
-    paramant upload --key \$API_KEY file.pdf
-    paramant receive \$TOKEN
+    python3 paramant-sender.py --key \$API_KEY --device laptop-01 file.pdf
+    python3 paramant-receiver.py --key \$API_KEY --device laptop-01 --output ./recv/
+
+  ${D}See all available tools:${E}
+    paramant-help
 
   ${D}Get a free API key:${E}
     https://paramant.app/request-key
