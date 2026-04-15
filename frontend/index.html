@@ -15,8 +15,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px
 .nav-links{display:flex;gap:20px;list-style:none}
 .nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
 .nav-links a:hover{color:var(--text)}
-.nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px;text-decoration:none}
-.hero{max-width:680px;margin:0 auto;padding:112px 48px 80px;text-align:center}
+.hero{max-width:680px;margin:0 auto;padding:80px 32px;text-align:center}
 .status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:40px;font-family:var(--mono);letter-spacing:.04em}
 .status-dot{width:5px;height:5px;border-radius:50%;background:#333}
 h1{font-size:48px;font-weight:600;line-height:1.08;letter-spacing:-.03em;color:var(--text);margin-bottom:20px}
@@ -34,12 +33,12 @@ h1 em{color:var(--muted);font-style:normal}
 .code-lang{font-size:11px;color:var(--quiet);font-family:var(--mono)}
 .code-body{padding:20px 24px;font-family:var(--mono);font-size:12.5px;line-height:2}
 .c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#aaa}.c-ok{color:var(--green)}
-.proto-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-top:80px;display:flex;overflow:hidden}
+.proto-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;overflow:hidden}
 .proto-cell{flex:1;padding:16px 20px;border-right:1px solid var(--border);min-width:0}
 .proto-cell:last-child{border-right:none}
 .proto-cell .label{font-size:11px;font-family:var(--mono);color:var(--text);letter-spacing:.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .proto-cell .pdesc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-section{max-width:960px;margin:0 auto;padding:88px 48px}
+section{max-width:960px;margin:0 auto;padding:64px 32px}
 .eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
 h2{font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
 .sub{font-size:15px;color:var(--muted);margin-bottom:52px;max-width:540px}
@@ -89,13 +88,14 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   .hero,.code-wrap{padding-left:20px;padding-right:20px}
   .hero{padding-top:64px}
   h1{font-size:30px}
-  section{padding:56px 20px}
-  .sec-pad{padding-left:20px!important;padding-right:20px!important}
+  section{padding:32px 16px}
+  .sec-pad{padding-left:16px!important;padding-right:16px!important}
   .g3,.g2,.pricing-grid{grid-template-columns:1fr}
   .proto-bar{flex-wrap:wrap}
   .proto-cell{flex:1 1 50%;border-bottom:1px solid var(--border)}
   footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
-  .hndl-strip{padding:24px 20px}
+  .hndl-strip{padding:24px 0}
+  .hndl-inner{padding:0 16px}
   .hndl-strip-timeline{flex-direction:column;gap:16px}
   .hndl-strip-connector{display:none}
   .hndl-strip-step{padding-left:12px}
@@ -120,7 +120,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
-.hndl-strip{padding:32px 48px;border-top:1px solid rgba(224,80,80,.2);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
+.hndl-strip{padding:32px 0;border-top:1px solid rgba(224,80,80,.2);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
+.hndl-inner{max-width:960px;margin:0 auto;padding:0 32px}
 .hndl-strip-header{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
 .hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid rgba(224,80,80,.4);padding:2px 8px;border-radius:3px;flex-shrink:0}
 .hndl-strip-title{font-size:13px;color:#c8e8d6;font-weight:500}
@@ -167,7 +168,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     </li>
     <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
   </ul>
-  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
@@ -189,7 +189,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <a href="/#pricing">Pricing</a>
   </div>
   <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
-  <a href="/parashare" class="nav-mobile-cta">Try it &rarr;</a>
 </div>
 
 <div class="hero">
@@ -204,32 +203,34 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div style="margin-top:20px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
 </div>
 
-<section class="hndl-strip">
-  <div class="hndl-strip-header">
-    <span class="hndl-strip-label">Active threat</span>
-    <span class="hndl-strip-title">Harvest Now, Decrypt Later</span>
-    <a href="/hndl" class="hndl-strip-link">What is HNDL? &rarr;</a>
+<div class="hndl-strip">
+  <div class="hndl-inner">
+    <div class="hndl-strip-header">
+      <span class="hndl-strip-label">Active threat</span>
+      <span class="hndl-strip-title">Harvest Now, Decrypt Later</span>
+      <a href="/hndl" class="hndl-strip-link">What is HNDL? &rarr;</a>
+    </div>
+    <div class="hndl-strip-timeline">
+      <div class="hndl-strip-step hndl-strip-step--active">
+        <div class="hndl-strip-step-time">Now</div>
+        <div class="hndl-strip-step-label">Harvest (active)</div>
+        <div class="hndl-strip-step-desc">State actors archive encrypted traffic to decrypt later</div>
+      </div>
+      <div class="hndl-strip-connector">&rarr;</div>
+      <div class="hndl-strip-step">
+        <div class="hndl-strip-step-time">2026&ndash;2028</div>
+        <div class="hndl-strip-step-label">Preparation</div>
+        <div class="hndl-strip-step-desc">NIST FIPS 203/204 finalized. Transition becomes legally required</div>
+      </div>
+      <div class="hndl-strip-connector">&rarr;</div>
+      <div class="hndl-strip-step hndl-strip-step--danger">
+        <div class="hndl-strip-step-time">~2029</div>
+        <div class="hndl-strip-step-label">Q-Day</div>
+        <div class="hndl-strip-step-desc">CRQC breaks RSA. The archive opens. Retroactive decryption</div>
+      </div>
+    </div>
   </div>
-  <div class="hndl-strip-timeline">
-    <div class="hndl-strip-step hndl-strip-step--active">
-      <div class="hndl-strip-step-time">Now</div>
-      <div class="hndl-strip-step-label">Harvest (active)</div>
-      <div class="hndl-strip-step-desc">State actors archive encrypted traffic to decrypt later</div>
-    </div>
-    <div class="hndl-strip-connector">&rarr;</div>
-    <div class="hndl-strip-step">
-      <div class="hndl-strip-step-time">2026&ndash;2028</div>
-      <div class="hndl-strip-step-label">Preparation</div>
-      <div class="hndl-strip-step-desc">NIST FIPS 203/204 finalized. Transition becomes legally required</div>
-    </div>
-    <div class="hndl-strip-connector">&rarr;</div>
-    <div class="hndl-strip-step hndl-strip-step--danger">
-      <div class="hndl-strip-step-time">~2029</div>
-      <div class="hndl-strip-step-label">Q-Day</div>
-      <div class="hndl-strip-step-desc">CRQC breaks RSA. The archive opens. Retroactive decryption</div>
-    </div>
-  </div>
-</section>
+</div>
 
 <div class="proto-bar">
   <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">post-quantum key exchange</div></div>
@@ -245,7 +246,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
   <a href="/parashare" style="display:flex;align-items:center;gap:16px;padding:18px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1e1e1e'" onmouseout="this.style.background='var(--surface)'">
-    <span style="font-size:18px;flex-shrink:0">⬡</span>
     <div>
       <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Product</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">ParaShare</div>
@@ -254,9 +254,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap">Try free &rarr;</div>
   </a>
   <a href="/drop" style="display:flex;align-items:center;gap:16px;padding:18px 40px;background:#0b1d12;border-left:2px solid #3dbe7a;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#0e2216'" onmouseout="this.style.background='#0b1d12'">
-    <span style="font-size:18px;flex-shrink:0">📡</span>
     <div>
-      <div style="font-size:10px;font-family:var(--mono);color:#3dbe7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">New</div>
+      <div style="font-size:10px;font-family:var(--mono);color:#3dbe7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Product</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">ParaDrop</div>
       <div style="font-size:11px;color:var(--quiet);margin-top:1px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read</div>
     </div>
@@ -285,7 +284,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   </a>
 </div>
 
-<section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:64px 48px 0">
+<section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:64px 32px 0">
   <div class="eyebrow">Relay network</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
   <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
@@ -404,7 +403,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <script src="relay-status.js" defer></script>
 
-<section class="sec-pad" style="max-width:960px;margin:0 auto;padding:40px 48px 0">
+<section class="sec-pad" style="max-width:960px;margin:0 auto;padding:40px 32px 0">
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:8px">
@@ -559,7 +558,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:72px 48px">
+<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:64px 32px">
   <div class="eyebrow">Self-hosting</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
   <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
@@ -729,7 +728,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> On-premise option</li>
         <li><span class="check">&#10003;</span> DICOM / FHIR integration</li>
         <li><span class="check">&#10003;</span> <a href="/compliance/nen7510" style="color:inherit;text-decoration:underline;text-decoration-color:#333">NEN 7510</a> / <a href="/compliance/iec62443" style="color:inherit;text-decoration:underline;text-decoration-color:#333">IEC 62443</a> / <a href="/compliance/nis2" style="color:inherit;text-decoration:underline;text-decoration-color:#333">NIS2</a> compliance docs</li>
-        <li><span class="check">&#10003;</span> <a href="/verwerkersovereenkomst" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Verwerkersovereenkomst</a> (GDPR Art. 28)</li>
+        <li><span class="check">&#10003;</span> <a href="/dpa" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Data Processing Agreement</a> (GDPR Art. 28)</li>
       </ul>
       <a href="mailto:privacy@paramant.app?subject=Enterprise+relay" class="price-btn s">Contact us &rarr;</a>
     </div>
@@ -789,7 +788,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> Admin panel access</li>
         <li><span class="check">&#10003;</span> Unlimited file size</li>
         <li><span class="check">&#10003;</span> SLA + compliance docs</li>
-        <li><span class="check">&#10003;</span> <a href="/verwerkersovereenkomst" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Verwerkersovereenkomst</a> (GDPR Art. 28)</li>
+        <li><span class="check">&#10003;</span> <a href="/dpa" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Data Processing Agreement</a> (GDPR Art. 28)</li>
         <li><span class="check">&#10003;</span> Dedicated support</li>
       </ul>
       <a href="mailto:privacy@paramant.app?subject=Enterprise+user" class="price-btn s">Contact us &rarr;</a>
@@ -843,8 +842,8 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
         <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
         <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-        <a href="/verwerkersovereenkomst">Verwerkersovereenkomst (GDPR Art. 28)</a>
-        <a href="/overheid">Overheid &amp; publieke sector</a>
+        <a href="/dpa">Data Processing Agreement (GDPR Art. 28)<a>
+        <a href="/government">Government &amp; public sector</a>
         <a href="/hndl">HNDL threat</a>
         <a href="/crypto-agility">Crypto agility</a>
       </div>

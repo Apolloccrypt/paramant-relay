@@ -96,21 +96,6 @@ nav.nav .nav-link {
 }
 nav.nav .nav-link:hover { color: #3dbe7a; }
 
-/* CTA button */
-nav.nav .nav-cta {
-  font-size: 13px;
-  font-weight: 500;
-  color: #3dbe7a;
-  padding: .4rem .875rem;
-  border: 1px solid #3dbe7a;
-  border-radius: 4px;
-  text-decoration: none;
-  margin-left: .5rem;
-  transition: background .15s, color .15s;
-  white-space: nowrap;
-}
-nav.nav .nav-cta:hover { background: #3dbe7a; color: #0b1d12; }
-
 /* Hamburger button — hidden on desktop */
 nav.nav .nav-hamburger {
   display: none;
@@ -175,24 +160,9 @@ nav.nav .nav-hamburger span {
   text-decoration: none;
   border-bottom: none !important;
 }
-.nav-mobile-cta {
-  color: #3dbe7a !important;
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  border: 1px solid #3dbe7a !important;
-  border-bottom: 1px solid #3dbe7a !important;
-  padding: .75rem 1.5rem !important;
-  border-radius: 4px;
-  text-align: center;
-  margin-top: .5rem;
-}
-.nav-mobile-cta:hover { background: rgba(61,190,122,.1); }
-
 /* Mobile breakpoint */
 @media (max-width: 1023px) {
   nav.nav { padding: 0 1rem; }
   nav.nav .nav-links { display: none !important; }
-  nav.nav .nav-cta { display: none; }
   nav.nav .nav-hamburger { display: flex; }
 }
