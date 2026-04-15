@@ -1,1 +1,0 @@
-../sdk-py/paramant_sdk.py
