@@ -1,0 +1,20 @@
+[33mb922db8[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m chore: add gitleaks ignore for documentation placeholders
+[33m82f5367[m should be blocked
+[33m15168fd[m docs: log credential rotation per security review
+[33m08eba60[m docs: add security fix documentation for 2026-04-15 pentest findings
+[33m8e6d4d2[m security: fix all 7 findings from pentest report
+[33m8092f94[m docs: full v2.4.5 documentation update
+[33mdd34b07[m fix: Professional — remove price, coming soon only
+[33m62b30fe[m fix: pricing clarity — Professional restored, end user key path
+[33m44d4f04[m fix: consistent Para/MANT logo on p-nav-logo light-theme pages
+[33m089dd1a[m feat: request-key — backend security hardening + prominent homepage placement
+[33ma28526a[m fix: rename Company → Info in navbar (all 22 pages + apply-nav.py template)
+[33m0d999d5[m fix: sla.html — 4 bugs
+[33m45e61ff[m fix: homepage — remove status/version banners, breathe spacing
+[33m00d873d[m fix: request-key form — correct endpoint URL and field name
+[33mcabc141[m feat: rebuild navbar — 4 categories mirroring footer
+[33m39145fb[m fix: navbar logo — Para #e8e8e8 / MANT #3dbe7a across all pages
+[33medcb5cc[m fix: DPA links, broken closing tags, Professional tier coming-soon state
+[33m5d1029d[m fix: operator pricing grid 3-col → 2-col after Professional card removed
+[33me6f86ae[m fix: CORS allowlist + verify-peers per-relay_id rollback detection
+[33m7be58d4[m fix: remove Professional coming-soon pricing card
