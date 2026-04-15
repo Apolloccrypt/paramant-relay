@@ -177,6 +177,40 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 .pc{transition:box-shadow .2s}
 .pc:hover{box-shadow:0 0 0 1px rgba(0,255,65,.2)}
 @media(max-width:640px){.how-arrow{display:none}}
+/* ── Why section ──────────────────────────────── */
+.why-section{max-width:900px;margin:0 auto;padding:5rem 2rem}
+.why-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.75rem;margin-bottom:1.5rem}
+.why-block{padding:1.75rem;border:1px solid var(--border);border-radius:8px;transition:border-color .2s,box-shadow .2s}
+.why-block:hover{border-color:rgba(0,255,65,.25);box-shadow:0 0 16px rgba(0,255,65,.06)}
+.why-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:#00cc33;margin-bottom:.5rem;font-family:var(--mono)}
+.why-title{font-size:1rem;font-weight:500;color:var(--text);margin-bottom:.5rem;line-height:1.4}
+.why-desc{font-size:.85rem;color:var(--muted);line-height:1.6}
+.why-deepdive{font-size:.8rem;color:var(--quiet);text-decoration:none;display:inline-block;margin-top:.25rem}
+.why-deepdive:hover{color:#00cc33}
+/* ── Use case cards ───────────────────────────── */
+.usecase-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+.usecase-card{background:var(--bg);padding:28px 24px;transition:background .15s}
+.usecase-card:hover{background:#141414}
+.usecase-header{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.usecase-icon{font-size:13px;color:var(--quiet)}
+.usecase-name{font-size:11px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.06em}
+.usecase-badge{font-size:10px;font-family:var(--mono);background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;color:var(--quiet);margin-left:auto;letter-spacing:.04em}
+.usecase-card h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
+.usecase-card p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+.usecase-card a{font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none}
+.usecase-card a:hover{color:var(--text)}
+/* ── Self-hosting teaser ──────────────────────── */
+.selfhost-teaser{max-width:700px;margin:0 auto;text-align:center;padding:5rem 2rem}
+.selfhost-options{display:flex;align-items:center;gap:1.25rem;justify-content:center;flex-wrap:wrap;margin-top:1.5rem;margin-bottom:1.5rem}
+.selfhost-options code{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:.5rem 1.1rem;font-family:var(--mono);font-size:12px;color:#00cc33;user-select:all}
+.selfhost-options span{color:var(--quiet);font-size:.85rem}
+@media(max-width:640px){
+  .why-grid{grid-template-columns:1fr}
+  .usecase-grid{grid-template-columns:1fr}
+  .selfhost-options{flex-direction:column}
+  .why-section{padding:3rem 1.25rem}
+  .selfhost-teaser{padding:3rem 1.25rem}
+}
 </style>
 <link rel="stylesheet" href="/nav.css">
 </head>
@@ -308,36 +342,6 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
-<div class="differentiators" data-fade>
-  <div class="eyebrow" style="text-align:center;margin-bottom:2rem">Why PARAMANT</div>
-  <div class="diff-grid">
-    <div class="diff-item">
-      <strong>Post-quantum by default</strong>
-      <span>ML-KEM-768 + AES-256-GCM. Protects against Harvest Now, Decrypt Later — already happening.</span>
-    </div>
-    <div class="diff-item">
-      <strong>RAM-only. Burns on read.</strong>
-      <span>Nothing is written to disk. The file is destroyed after one download. No breach surface.</span>
-    </div>
-    <div class="diff-item">
-      <strong>Self-hostable in 60 seconds</strong>
-      <span>One Docker command. Community Edition free forever up to 5 users. No lock-in.</span>
-    </div>
-    <div class="diff-item">
-      <strong>EU jurisdiction only</strong>
-      <span>Hetzner Frankfurt. No US CLOUD Act. No Patriot Act exposure. GDPR Art. 28 DPA available.</span>
-    </div>
-    <div class="diff-item">
-      <strong>Fixed-size padding</strong>
-      <span>Every blob padded to 5 MB. DPI analysis reveals nothing — all transfers look identical on the wire.</span>
-    </div>
-    <div class="diff-item">
-      <strong>Transparent audit log</strong>
-      <span>Every transfer hashed into a public Merkle tree. Verifiable without revealing content.</span>
-    </div>
-  </div>
-</div>
-
 <div class="hndl-strip" data-fade>
   <div class="hndl-inner">
     <div class="hndl-strip-header">
@@ -367,80 +371,42 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
-<section style="max-width:960px;margin:0 auto;padding:64px 32px" data-fade>
+<section class="why-section" data-fade>
+  <div class="eyebrow" style="margin-bottom:1.25rem">Why PARAMANT</div>
+  <div class="why-grid">
 
-  <div class="grid g3" style="margin-bottom:24px">
-    <div class="cell">
-      <h3>ML-KEM-768</h3>
-      <p class="desc">Post-quantum key exchange</p>
+    <div class="why-block">
+      <div class="why-label">Post-quantum</div>
+      <div class="why-title">Encrypted before it leaves your device</div>
+      <div class="why-desc">ML-KEM-768 + AES-256-GCM. The relay never sees plaintext, keys, or filenames.</div>
     </div>
-    <div class="cell">
-      <h3>AES-256-GCM</h3>
-      <p class="desc">Symmetric encryption</p>
+
+    <div class="why-block">
+      <div class="why-label">Zero storage</div>
+      <div class="why-title">RAM-only. Destroyed after one read.</div>
+      <div class="why-desc">Nothing is written to disk. After download, the ciphertext is gone from every layer of the stack.</div>
     </div>
-    <div class="cell">
-      <h3>ML-DSA-65</h3>
-      <p class="desc">Post-quantum signatures</p>
+
+    <div class="why-block">
+      <div class="why-label">EU compliant</div>
+      <div class="why-title">NIS2, NEN 7510, IEC 62443, eIDAS</div>
+      <div class="why-desc">Hetzner Frankfurt only. No US CLOUD Act. Data Processing Agreement available.</div>
     </div>
-    <div class="cell">
-      <h3>Burn-on-read</h3>
-      <p class="desc">RAM-only &mdash; nothing written to disk</p>
+
+    <div class="why-block">
+      <div class="why-label">Free to start</div>
+      <div class="why-title">Self-host in 2 minutes or use the managed relay</div>
+      <div class="why-desc">Community edition is free forever. Up to 5 users. Full source code on GitHub.</div>
     </div>
-    <div class="cell">
-      <h3>5 MB padding</h3>
-      <p class="desc">Fixed-size blobs mask DPI analysis</p>
-    </div>
-    <div class="cell">
-      <h3>Hetzner DE</h3>
-      <p class="desc">EU jurisdiction &middot; no US CLOUD Act</p>
-    </div>
-    <div class="cell">
-      <h3>HKDF-SHA256</h3>
-      <p class="desc">Key derivation</p>
-    </div>
-    <div class="cell">
-      <h3>Argon2id</h3>
-      <p class="desc">Password hashing &middot; RFC 9106</p>
-    </div>
-    <div class="cell">
-      <h3>Two-step burn</h3>
-      <p class="desc">Preload-proof destruction</p>
-    </div>
+
   </div>
-
-  <div class="grid g2">
-    <a href="/parashare" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag">File sharing</div>
-      <h3>ParaShare</h3>
-      <p class="desc" style="margin-top:6px">Browser-based encrypted file sharing &mdash; no account required.</p>
-      <span class="tag">Try free &rarr;</span>
-    </a>
-    <a href="/drop" class="cell" style="text-decoration:none;display:block;background:var(--surface)">
-      <div class="use-tag" style="color:#00ff41">Local transfer</div>
-      <h3>ParaDrop</h3>
-      <p class="desc" style="margin-top:6px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read.</p>
-      <span class="tag" style="color:#00ff41">Try now &rarr;</span>
-    </a>
-    <a href="#selfhost" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag" style="color:#00cc33">Relay operator</div>
-      <h3>Run your own relay</h3>
-      <p class="desc" style="margin-top:6px">Community Edition &mdash; free forever, up to 5 users. BUSL-1.1.</p>
-      <span class="tag">Self-host &darr;</span>
-    </a>
-    <a href="#pricing" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag">End user</div>
-      <h3>Use a managed relay</h3>
-      <p class="desc" style="margin-top:6px">Free tier &mdash; 10 uploads/day, no account, pgp_ API key.</p>
-      <span class="tag">Pricing &darr;</span>
-    </a>
-  </div>
-
+  <a href="/security" class="why-deepdive">Full technical details &rarr;</a>
 </section>
 
 <hr class="divider">
 
-<section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
-  <div class="eyebrow" style="margin-bottom:8px">How it works</div>
+<section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
+    <div class="eyebrow" style="margin-bottom:8px">How it works</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:32px">Four steps. Nothing stored.</h2>
   <div class="how-it-works">
     <div class="how-step">
@@ -475,8 +441,107 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
       </div>
     </div>
   </div>
-  <hr style="border:none;border-top:1px solid var(--border);margin-bottom:48px">
-  <div class="eyebrow">Relay network</div>
+</section>
+
+<hr class="divider">
+
+<section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
+    <div class="grid g2">
+    <a href="/parashare" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag">File sharing</div>
+      <h3>ParaShare</h3>
+      <p class="desc" style="margin-top:6px">Browser-based encrypted file sharing &mdash; no account required.</p>
+      <span class="tag">Try free &rarr;</span>
+    </a>
+    <a href="/drop" class="cell" style="text-decoration:none;display:block;background:var(--surface)">
+      <div class="use-tag" style="color:#00ff41">Local transfer</div>
+      <h3>ParaDrop</h3>
+      <p class="desc" style="margin-top:6px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read.</p>
+      <span class="tag" style="color:#00ff41">Try now &rarr;</span>
+    </a>
+    <a href="#selfhost" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag" style="color:#00cc33">Relay operator</div>
+      <h3>Run your own relay</h3>
+      <p class="desc" style="margin-top:6px">Community Edition &mdash; free forever, up to 5 users. BUSL-1.1.</p>
+      <span class="tag">Self-host &darr;</span>
+    </a>
+    <a href="#pricing" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag">End user</div>
+      <h3>Use a managed relay</h3>
+      <p class="desc" style="margin-top:6px">Free tier &mdash; 10 uploads/day, no account, pgp_ API key.</p>
+      <span class="tag">Pricing &darr;</span>
+    </a>
+  </div>
+</section>
+
+<hr class="divider">
+
+<section id="sectors" class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
+  <div class="eyebrow">Use cases</div>
+  <h2>One relay engine. Any sector.</h2>
+  <p class="sub">Ghost Pipe solves the same core problem across every sector: confidential data transport that leaves no trace.</p>
+
+  <div class="usecase-grid">
+
+    <div class="usecase-card">
+      <div class="usecase-header">
+        <span class="usecase-icon">&#x2295;</span>
+        <span class="usecase-name">Healthcare</span>
+        <span class="usecase-badge">NEN 7510</span>
+      </div>
+      <h3>DICOM files that vanish after delivery</h3>
+      <p>MRI scans reach the PACS system and burn. Nothing to audit, nothing to breach.</p>
+      <a href="/compliance/nen7510">NEN 7510 compliance &rarr;</a>
+    </div>
+
+    <div class="usecase-card">
+      <div class="usecase-header">
+        <span class="usecase-icon">&#x00a7;</span>
+        <span class="usecase-name">Legal &amp; Notary</span>
+        <span class="usecase-badge">eIDAS</span>
+      </div>
+      <h3>Contracts that leave no recoverable trace</h3>
+      <p>Document reaches the counterparty and burns. The Merkle log proves delivery without storing what was delivered.</p>
+      <a href="/docs#compliance">eIDAS compliance &rarr;</a>
+    </div>
+
+    <div class="usecase-card">
+      <div class="usecase-header">
+        <span class="usecase-icon">&#x223f;</span>
+        <span class="usecase-name">Industrial IoT / OT</span>
+        <span class="usecase-badge">IEC 62443</span>
+      </div>
+      <h3>Sensor data without exposing your OT network</h3>
+      <p>PLC &rarr; Ghost Pipe &rarr; SCADA. No VPN, no certificates, no direct IT connection.</p>
+      <a href="/compliance/iec62443">IEC 62443 compliance &rarr;</a>
+    </div>
+
+    <div class="usecase-card">
+      <div class="usecase-header">
+        <span class="usecase-icon">&#x25ca;</span>
+        <span class="usecase-name">Finance &amp; Compliance</span>
+        <span class="usecase-badge">NIS2</span>
+      </div>
+      <h3>No US CLOUD Act. No metadata leakage.</h3>
+      <p>Hetzner Frankfurt only. Fixed 5&nbsp;MB padding means all transfers look identical on the wire.</p>
+      <a href="/compliance/nis2">NIS2 compliance &rarr;</a>
+    </div>
+
+  </div>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px">Works today. No SDK required.</div>
+      <div style="font-size:12px;font-family:var(--mono);color:var(--quiet)">pip install cryptography &nbsp;&middot;&nbsp; two terminal commands &nbsp;&middot;&nbsp; no infra changes</div>
+    </div>
+    <a href="/docs" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:8px 18px;border-radius:4px;text-decoration:none;white-space:nowrap">View API docs &rarr;</a>
+  </div>
+</section>
+
+<hr class="divider">
+
+<section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
+    <div class="eyebrow">Relay network</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
   <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
 
@@ -591,7 +656,6 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     </div>
   </div>
 </section>
-
 <script src="relay-status.js" defer></script>
 
 <hr class="divider">
@@ -644,199 +708,16 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="sectors" data-fade>
-  <div class="eyebrow">Use cases</div>
-  <h2>Real problems. Real stakes.</h2>
-  <p class="sub">Ghost Pipe solves the same core problem across every sector: confidential data transport that leaves no trace. One relay engine — routed across dedicated subdomains for isolation and sector-specific compliance documentation.</p>
-  <div style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 14px;margin-bottom:40px;font-size:11px;font-family:var(--mono);color:var(--quiet)">
-    <span style="color:#00cc33">◉</span>
-    All relay nodes run identical Ghost Pipe software &nbsp;·&nbsp; subdomains provide routing isolation, not different configurations
+<section id="selfhost" class="selfhost-teaser" data-fade>
+  <div class="eyebrow" style="margin-bottom:1rem">Self-hosting</div>
+  <h2>Run your own relay.</h2>
+  <p class="sub" style="max-width:480px;margin:0 auto 0">Source-available under BUSL-1.1. Free for up to 5 users. Works on a Raspberry Pi.</p>
+  <div class="selfhost-options">
+    <code>curl -fsSL https://paramant.app/install-pi.sh | bash</code>
+    <span>or</span>
+    <code>docker compose up -d</code>
   </div>
-
-  <div class="grid g2" style="margin-bottom:1px">
-    <div class="cell">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x2295; Healthcare</div>
-        <span style="font-size:10px;font-family:var(--mono);color:#00cc33;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">NEN 7510</span>
-      </div>
-      <h3 style="margin-bottom:8px">DICOM files that vanish after delivery</h3>
-      <p class="desc" style="margin-bottom:14px">MRI / CT → Ghost Pipe → PACS. The file exists only for the duration of the transfer, then burns. Nothing to audit, nothing to breach. Designed with NEN 7510 in mind.</p>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># send DICOM file — burned after one download</span><br>
-        python3 paramant-sender.py --key pgp_xxx --device mri-001 scan.dcm<br>
-        python3 paramant-receiver.py --key pgp_xxx --forward https://pacs.hospital/api
-      </div>
-      <a href="https://health.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on health.paramant.app &rarr;</a>
-      <a href="/dicom" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">DICOM setup guide &rarr;</a>
-      <a href="/compliance/nen7510" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">NEN 7510 &rarr;</a>
-    </div>
-    <div class="cell">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x00a7; Legal &amp; Notary</div>
-        <span style="font-size:10px;font-family:var(--mono);color:#6e6e6e;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">eIDAS</span>
-      </div>
-      <h3 style="margin-bottom:8px">Contracts that leave no recoverable trace</h3>
-      <p class="desc" style="margin-bottom:14px">Document → Ghost Pipe → counterparty. After retrieval it's cryptographically gone. The Merkle audit log proves delivery without storing what was delivered — supports eIDAS-compatible audit trails.</p>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># send signed contract — once</span><br>
-        python3 paramant-sender.py --key pgp_xxx --device notary-01 contract.pdf<br>
-        python3 paramant-receiver.py --key pgp_xxx --device counterparty-01
-      </div>
-      <a href="https://legal.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on legal.paramant.app &rarr;</a>
-      <a href="/docs#compliance" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">eIDAS compliance &rarr;</a>
-    </div>
-  </div>
-  <hr class="divider" style="margin-bottom:1px">
-  <div class="grid g2" style="margin-bottom:24px">
-    <div class="cell">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x223f; Industrial IoT / OT</div>
-        <span style="font-size:10px;font-family:var(--mono);color:#6e6e6e;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">IEC 62443</span>
-      </div>
-      <h3 style="margin-bottom:8px">Sensor data without exposing your OT network</h3>
-      <p class="desc" style="margin-bottom:14px">PLC → Ghost Pipe → SCADA. No VPN, no certificates, no direct IT connection. Designed with IEC 62443 in mind — quantum-safe data diode. Runs on Raspberry Pi and any Linux device.</p>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># PLC heartbeat every 15s</span><br>
-        python3 paramant-sender.py --heartbeat 15 --device plc-factory-01<br>
-        python3 paramant-receiver.py --forward https://scada.intern/api
-      </div>
-      <a href="https://iot.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on iot.paramant.app &rarr;</a>
-      <a href="/compliance/iec62443" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">IEC 62443 compliance &rarr;</a>
-    </div>
-    <div class="cell">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.06em;text-transform:uppercase">&#x25ca; Finance &amp; Compliance</div>
-        <span style="font-size:10px;font-family:var(--mono);color:#6e6e6e;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.04em">NIS2</span>
-      </div>
-      <h3 style="margin-bottom:8px">No US CLOUD Act. No metadata leakage.</h3>
-      <p class="desc" style="margin-bottom:14px">Hetzner Frankfurt only — no US infrastructure. Fixed 5 MB padding means all transfers look identical. Per-transaction Merkle proof for NIS2/DORA audits — verifiable without knowing the content.</p>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:12px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.9;margin-bottom:16px">
-        <span style="color:var(--quiet)"># auto-send new ISO 20022 files</span><br>
-        python3 paramant-sender.py --watch /export/iso20022/ --device bank-nl-01<br>
-        python3 paramant-receiver.py --forward https://compliance.bank.nl/api
-      </div>
-      <a href="https://finance.paramant.app" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none">Live on finance.paramant.app &rarr;</a>
-      <a href="/compliance/nis2" style="display:inline-block;font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;margin-left:8px">NIS2 compliance &rarr;</a>
-    </div>
-  </div>
-
-  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
-    <div class="stat-quad" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
-      <div style="background:var(--bg);padding:20px 24px">
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px" id="stat-relay-count">5</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">relay sectors live</div>
-      </div>
-      <div style="background:var(--bg);padding:20px 24px">
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">5MB</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">fixed padding</div>
-      </div>
-      <div style="background:var(--bg);padding:20px 24px">
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">0</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">bytes stored</div>
-      </div>
-      <div style="background:var(--bg);padding:20px 24px">
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:4px">&lt;100ms</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.04em">delivery via WebSocket</div>
-      </div>
-    </div>
-  </div>
-
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
-    <div>
-      <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px">Works today. No SDK required.</div>
-      <div style="font-size:12px;font-family:var(--mono);color:var(--quiet)">pip install cryptography &nbsp;·&nbsp; two terminal commands &nbsp;·&nbsp; no infra changes</div>
-    </div>
-    <a href="/docs" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:8px 18px;border-radius:4px;text-decoration:none;white-space:nowrap">View API docs →</a>
-  </div>
-</section>
-
-<hr class="divider">
-
-<section class="comparison" data-fade>
-  <div class="eyebrow">vs. alternatives</div>
-  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:10px">How PARAMANT compares</h2>
-  <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Most secure-transfer tools were designed before post-quantum was a compliance requirement.</p>
-  <div class="comparison-table-wrap">
-    <table class="comparison-table">
-      <thead>
-        <tr>
-          <th>Feature</th>
-          <th class="col-paramant">PARAMANT</th>
-          <th>Zivver</th>
-          <th>WeTransfer</th>
-          <th>Signal</th>
-          <th>SFTP</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Post-quantum encryption</td>
-          <td class="col-paramant">&#10003; ML-KEM-768</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-        </tr>
-        <tr>
-          <td>Burn-on-read (RAM-only)</td>
-          <td class="col-paramant">&#10003;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-        </tr>
-        <tr>
-          <td>EU jurisdiction (no US CLOUD Act)</td>
-          <td class="col-paramant">&#10003; Hetzner DE</td>
-          <td>&#10003; NL</td>
-          <td>&#8213; US</td>
-          <td>&#8213; US</td>
-          <td>Depends</td>
-        </tr>
-        <tr>
-          <td>Self-hostable</td>
-          <td class="col-paramant">&#10003; Free CE</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td>&#10003;</td>
-        </tr>
-        <tr>
-          <td>No file stored on server</td>
-          <td class="col-paramant">&#10003; RAM-only</td>
-          <td>&#8213; stored</td>
-          <td>&#8213; stored</td>
-          <td>&#8213; stored</td>
-          <td>&#8213; stored</td>
-        </tr>
-        <tr>
-          <td>Public audit log</td>
-          <td class="col-paramant">&#10003; Merkle</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-        </tr>
-        <tr>
-          <td>DPI traffic masking</td>
-          <td class="col-paramant">&#10003; 5 MB pad</td>
-          <td class="nd">&#8213;</td>
-          <td class="nd">&#8213;</td>
-          <td>&#10003;</td>
-          <td class="nd">&#8213;</td>
-        </tr>
-        <tr>
-          <td>Free tier</td>
-          <td class="col-paramant">&#10003; 10/day</td>
-          <td class="nd">&#8213;</td>
-          <td>&#10003; limited</td>
-          <td>&#10003;</td>
-          <td>&#10003; self-host</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <p class="comparison-note">Full analysis: <a href="/vs">paramant.app/vs</a></p>
+  <a href="/docs#self-hosting" class="cta-secondary">Full deploy guide &rarr;</a>
 </section>
 
 <hr class="divider">
@@ -844,38 +725,9 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 <section id="pricing" data-fade>
   <div class="eyebrow">Pricing</div>
   <h2>Simple pricing. Free to start.</h2>
-  <p class="sub">Two ways to use PARAMANT &mdash; pick the one that fits. Operators run the relay; end users connect to it.</p>
+  <p class="sub">Free to start. Scale as needed.</p>
 
-  <div style="margin:40px auto 0;max-width:760px">
-    <div class="price-split" style="display:grid;grid-template-columns:1fr 40px 1fr;align-items:start;gap:0">
 
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px 24px">
-        <div style="font-size:11px;font-family:var(--mono);color:#00cc33;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Relay operator</div>
-        <div style="font-size:15px;font-weight:600;color:#ededed;margin-bottom:8px">You run the relay</div>
-        <div style="font-size:12px;color:#888;line-height:1.7;margin-bottom:16px">You want to self-host a relay for your team or customers. You control the server.</div>
-        <div style="font-size:11px;font-family:var(--mono);background:#111;border:1px solid var(--border);border-radius:4px;padding:10px 12px;color:#00cc33;line-height:1.8">
-          You receive: <span style="color:#ededed">plk_ license key</span><br>
-          Adds to .env &rarr; unlocks &gt;5 users
-        </div>
-        <div style="margin-top:14px;font-size:11px;color:#555">Community: free forever up to 5 users</div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:center;padding-top:60px;color:#333;font-size:20px">&#8942;</div>
-
-      <div style="background:#161616;border:1px solid #242424;border-radius:8px;padding:28px 24px">
-        <div style="font-size:11px;font-family:var(--mono);color:#888;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">End user</div>
-        <div style="font-size:15px;font-weight:600;color:#ededed;margin-bottom:8px">You use a relay</div>
-        <div style="font-size:12px;color:#888;line-height:1.7;margin-bottom:16px">You want to send or receive encrypted files. Someone else runs the relay.</div>
-        <div style="font-size:11px;font-family:var(--mono);background:#111;border:1px solid #242424;border-radius:4px;padding:10px 12px;color:#aaa;line-height:1.8">
-          You receive: <span style="color:#ededed">pgp_ API key</span><br>
-          Sent in X-Api-Key header
-        </div>
-        <div style="margin-top:14px;font-size:11px;color:#555">Free: 10 uploads/day &mdash; no credit card</div>
-      </div>
-
-    </div>
-    <div style="text-align:center;font-size:11px;font-family:var(--mono);color:#444;margin-top:14px;letter-spacing:.04em">plk_ keys are for operators &nbsp;&#183;&nbsp; pgp_ keys are for end users &nbsp;&#183;&nbsp; they are never the same person</div>
-  </div>
 
   <div style="display:flex;justify-content:center;gap:0;margin:48px auto 0;max-width:340px;background:#111;border:1px solid #242424;border-radius:6px;padding:3px">
     <button id="tab-op" onclick="showTab('op')" style="flex:1;padding:8px 0;border:none;background:#ededed;color:#111;border-radius:4px;font-size:12px;font-family:var(--mono);font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .15s">For operators</button>
@@ -1006,85 +858,6 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     &nbsp;&#183;&nbsp; <a href="/one-pager" style="color:#555;text-decoration:none">Download one-pager (PDF) &darr;</a>
   </div>
 
-</section>
-
-<hr class="divider">
-
-<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
-  <div class="eyebrow">Self-hosting</div>
-  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
-  <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
-
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-    <div>
-      <div style="font-size:12px;font-family:var(--mono);color:#00cc33;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Community Edition — free forever</div>
-      <div style="font-size:12px;color:#6e6e6e;line-height:1.6">Up to 5 users &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; BUSL-1.1 &nbsp;&middot;&nbsp; Works on a Raspberry Pi. One command.</div>
-    </div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" style="font-size:11px;font-family:var(--mono);color:#00cc33;border:1px solid var(--border);border-radius:4px;padding:7px 14px;text-decoration:none;white-space:nowrap">Download free &rarr;</a>
-  </div>
-  <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
-  <div class="install-three" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
-
-    <div class="install-card" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#00cc33;margin-bottom:10px">π</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#00cc33;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
-      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Pi 3B+ / 4 / 5</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">One command. Detects your Pi, installs Docker, disables swap, shows QR code with your relay URL.</div>
-      <div style="background:#0c0c0c;border:1px solid var(--border);border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#00cc33;word-break:break-all;margin-bottom:16px">curl -fsSL https://paramant.app/install-pi.sh | bash</div>
-      <div style="font-size:10px;font-family:var(--mono);color:#6e6e6e">ARM64 &middot; 512 MB RAM min &middot; Raspberry Pi OS Lite</div>
-    </div>
-
-    <div class="install-card" style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">⬡</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">DOCKER HUB</div>
-      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Linux &middot; amd64 + arm64</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Pull the pre-built multi-arch image. No build step, no Node.js required. Works on any Docker host.</div>
-      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
-        docker pull mtty001/relay:latest<br>
-        <span style="color:#6e6e6e"># or: docker compose up -d</span>
-      </div>
-      <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">View on Docker Hub &rarr;</a>
-    </div>
-
-    <div class="install-card" style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">&gt;_</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">LINUX / VPS</div>
-      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Ubuntu &middot; Debian &middot; Hetzner</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 5-sector stack with nginx and auto-TLS.</div>
-      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
-        git clone https://github.com/Apolloccrypt/paramant-relay<br>
-        cp .env.example .env &amp;&amp; nano .env<br>
-        docker compose up -d
-      </div>
-      <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">&#9733; View on GitHub &rarr;</a>
-    </div>
-
-  </div>
-
-  <div style="background:#181818;border:1px solid #242424;border-radius:8px;overflow:hidden;margin-bottom:32px">
-    <div style="padding:11px 20px;border-bottom:1px solid #242424;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">Quick start &mdash; Ubuntu / Debian</span>
-      <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">~2 minutes</span>
-    </div>
-    <div style="padding:20px 24px;font-family:var(--mono);font-size:12px;line-height:2.2;color:#aaa">
-      <span style="color:#6e6e6e"># 1. Clone</span><br>
-      git clone https://github.com/Apolloccrypt/paramant-relay &amp;&amp; cd paramant-relay<br><br>
-      <span style="color:#6e6e6e"># 2. Configure</span><br>
-      cp .env.example .env<br>
-      echo "ADMIN_TOKEN=$(openssl rand -hex 32)" &gt;&gt; .env<br><br>
-      <span style="color:#6e6e6e"># 3. Launch</span><br>
-      docker compose up -d<br><br>
-      <span style="color:#6e6e6e"># 4. Verify</span><br>
-      curl http://localhost/health<br>
-      <span style="color:#00cc33"># {"ok":true,"version":"2.4.5","sector":"relay"}</span>
-    </div>
-  </div>
-  <div style="display:flex;gap:32px;flex-wrap:wrap">
-    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">&#9733; Star on GitHub</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CONTRIBUTING.md" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">Contributing &rarr;</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">Changelog &rarr;</a>
-    <a href="/docs" style="font-size:13px;color:#aaa;text-decoration:none">Full docs &rarr;</a>
-  </div>
 </section>
 
 <footer data-fade>
