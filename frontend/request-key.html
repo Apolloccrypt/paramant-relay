@@ -240,10 +240,10 @@ footer a:hover{color:var(--green)}
     errorMsg.style.display   = 'none';
 
     try {
-      var r    = await fetch('/api/request-key', {
+      var r    = await fetch('https://relay.paramant.app/v2/request-trial', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: email, name: name, usecase: usecase, website: document.getElementById('website').value }),
+        body:    JSON.stringify({ email: email, name: name, use_case: usecase, website: document.getElementById('website').value }),
       });
       var data = await r.json();
       if (r.ok && data.ok) {

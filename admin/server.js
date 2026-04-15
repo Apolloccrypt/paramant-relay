@@ -288,7 +288,8 @@ api.post('/request-key', async (req, res) => {
   const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
   if (!checkTrialIpLimit(ip)) return res.status(429).json({ error: 'Too many requests — try again in a minute' });
 
-  const { email, name, usecase } = req.body || {};
+  const { email, name, usecase, website } = req.body || {};
+  if (website) return res.status(400).json({ error: 'Bad request' });
   if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email is required' });
   const norm = email.toLowerCase().trim();
   if (!/^[^@\s]{1,64}@[^@\s]{1,253}\.[^@\s]{2,}$/.test(norm)) return res.status(400).json({ error: 'Enter a valid email address' });
@@ -313,7 +314,18 @@ api.post('/request-key', async (req, res) => {
     const sent = await sendTrialEmail(norm, firstName, key);
     if (!sent) return res.status(503).json({ error: 'Email delivery unavailable — contact privacy@paramant.app' });
     trialEmailTrack.set(norm, { lastAt: now });
-    return res.json({ ok: true, message: `Key sent to ${norm}` });
+    const adminApiKey = process.env.RESEND_API_KEY;
+    if (adminApiKey) fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'PARAMANT <noreply@paramant.app>',
+        to: ['privacy@paramant.app'],
+        subject: `[PARAMANT] New trial key — ${norm}`,
+        html: `<p><b>Email:</b> ${norm}</p><p><b>Name:</b> ${name || '—'}</p><p><b>Use case:</b> ${usecase || '—'}</p><p><b>Key prefix:</b> ${key.slice(0, 12)}…</p><p><b>Expires:</b> ${expiresAt}</p>`,
+      }),
+    }).catch(e => console.warn('[trial] admin notify failed:', e.message));
+    return res.json({ ok: true, key, email: norm, message: `Key sent to ${norm}` });
   } catch (e) {
     console.error('[trial] error:', e.message);
     return res.status(500).json({ error: 'Could not issue key — contact privacy@paramant.app' });
