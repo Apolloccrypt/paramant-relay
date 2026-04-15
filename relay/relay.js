@@ -70,13 +70,14 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa'],
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
+               '/v2/sth','/v2/verify-receipt','/ct'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa'],
+               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/ct'],
   full:       null,
 };
 
@@ -251,6 +252,59 @@ if (CT_FILE) {
   _ctOpenStream();
 }
 
+// ── Signed Tree Head (STH) — RFC 6962 style, ML-DSA-65 signed ───────────────
+const STH_MAX  = 1000;
+const STH_FILE = process.env.STH_FILE || 'data/sth-log.jsonl';
+const sthLog   = []; // rolling array of last STH_MAX signed tree heads
+
+let _sthStream    = null;
+let _sthWriteQueue = [];
+let _sthDraining  = false;
+
+function _sthOpenStream() {
+  try {
+    fs.mkdirSync(path.dirname(STH_FILE), { recursive: true });
+    _sthStream = fs.createWriteStream(STH_FILE, { flags: 'a' });
+    _sthStream.on('error', e => log('warn', 'sth_stream_error', { err: e.message }));
+  } catch (e) { log('warn', 'sth_stream_open_failed', { err: e.message }); }
+}
+
+async function _sthDrain() {
+  if (_sthDraining || !_sthStream) return;
+  _sthDraining = true;
+  while (_sthWriteQueue.length > 0) {
+    const line = _sthWriteQueue.shift();
+    await new Promise((resolve, reject) => {
+      _sthStream.write(line, err => err ? reject(err) : resolve());
+    }).catch(e => log('warn', 'sth_write_error', { err: e.message }));
+  }
+  _sthDraining = false;
+}
+
+function sthWrite(entry) {
+  _sthWriteQueue.push(JSON.stringify(entry) + '\n');
+  setImmediate(_sthDrain);
+}
+
+function _flushSthOnExit() {
+  if (!_sthStream || _sthWriteQueue.length === 0) return;
+  for (const line of _sthWriteQueue) { try { _sthStream.write(line); } catch {} }
+  _sthWriteQueue = [];
+}
+
+// Load persisted STH log on startup
+try {
+  const lines = fs.readFileSync(STH_FILE, 'utf8').split('\n').filter(l => l.trim());
+  for (const line of lines) {
+    try { sthLog.push(JSON.parse(line)); } catch {}
+  }
+  if (sthLog.length > STH_MAX) sthLog.splice(0, sthLog.length - STH_MAX);
+  if (sthLog.length) log('info', 'sth_log_loaded', { entries: sthLog.length });
+} catch (e) {
+  if (e.code !== 'ENOENT') log('warn', 'sth_log_load_failed', { err: e.message });
+}
+_sthOpenStream();
+
 // ── Relay identity — ML-DSA-65 keypair for relay authentication ───────────────
 let relayIdentity = null; // { sk: Buffer, pk: Buffer, pk_hash: string }
 
@@ -376,6 +430,24 @@ function ctInclusionProof(entries, idx) {
   return path;
 }
 
+// Leaf hash for blob/transfer entries — domain separator 0x02 (0x00=pubkey, 0x01=inner node)
+// Commits to transfer hash + sector without exposing payload content.
+function blobLeafHash(blobHash, sector, ts) {
+  const data = Buffer.concat([
+    Buffer.from(blobHash, 'hex'),                                        // 32 bytes — transfer hash
+    crypto.createHash('sha3-256').update(sector || 'relay').digest(),    // 32 bytes — sector identity
+    Buffer.from(ts, 'utf8')                                              // ISO timestamp
+  ]);
+  return crypto.createHash('sha3-256').update(Buffer.from([0x02])).update(data).digest('hex');
+}
+
+// Recursive canonical JSON (sorted keys, no whitespace) — used for signing receipts + STH.
+function canonicalJSON(obj) {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(canonicalJSON).join(',') + ']';
+  return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}';
+}
+
 function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
@@ -389,6 +461,7 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   if (ctLog.length > CT_MAX) ctLog.shift();
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
+  produceSth(entry.index + 1, entry.tree_hash);
   return entry;
 }
 
@@ -416,7 +489,171 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   if (ctLog.length > CT_MAX) ctLog.shift();
   // Fix 8: async write via stream queue
   ctWrite(entry);
+  produceSth(entry.index + 1, entry.tree_hash);
   return entry;
+}
+
+// Appends a blob transfer entry to the CT log and returns the entry with inclusion proof.
+// Leaf hash: SHA3-256(0x02 || SHA3-256(sector) || ts) — commits to transfer identity.
+// Called at inbound upload; the entry is stored in blobStore so the outbound handler
+// can produce a signed delivery receipt without re-querying the CT log.
+function ctAppendTransfer(blobHash, sector) {
+  const ts = new Date().toISOString();
+  const leaf_hash = blobLeafHash(blobHash, sector, ts);
+  const index = ctLog.length;
+  const allEntries = [...ctLog, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, index);
+  const entry = {
+    index, type: 'transfer', leaf_hash, tree_hash,
+    blob_hash: blobHash, sector, ts, proof
+  };
+  ctLog.push(entry);
+  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWrite(entry);
+  const sth = produceSth(entry.index + 1, entry.tree_hash);
+  return { ...entry, sth };
+}
+
+// ── Signed Tree Head — produce, sign, and persist an STH for every root change ─
+// Canonical JSON: sorted keys, no whitespace, UTF-8 (matches RFC 6962 § 3.5 spirit).
+// Signed with the relay's ML-DSA-65 identity key (NIST FIPS 204).
+function produceSth(tree_size, sha3_root) {
+  if (!mlDsa || !relayIdentity) return null;
+  const relay_id = RELAY_SELF_URL || (SECTOR + '.paramant.app');
+  const payload  = { relay_id, sha3_root, timestamp: Date.now(), tree_size, version: 1 };
+  // Canonical JSON: keys sorted alphabetically
+  const sortedKeys = Object.keys(payload).sort();
+  const canonical  = JSON.stringify(Object.fromEntries(sortedKeys.map(k => [k, payload[k]])));
+  let signature;
+  try {
+    signature = Buffer.from(mlDsa.sign(Buffer.from(canonical, 'utf8'), relayIdentity.sk)).toString('base64');
+  } catch (e) {
+    log('warn', 'sth_sign_failed', { err: e.message });
+    return null;
+  }
+  const sth = { ...payload, signature };
+  sthLog.push(sth);
+  if (sthLog.length > STH_MAX) sthLog.shift();
+  sthWrite(sth);
+  // Broadcast to peers asynchronously — non-blocking, best-effort
+  setImmediate(() => broadcastSTH(sth).catch(() => {}));
+  return sth;
+}
+
+// ── Peer STH storage — mirrors signed tree heads from other relays ─────────────
+const PEER_STH_DIR = process.env.PEER_STH_DIR || 'data/peer-sths';
+const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
+// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string }
+const peerSths = new Map();
+const _peerSthStreams = new Map(); // pk_hash → fs.WriteStream
+
+function _peerSthStreamFor(pkHash) {
+  if (_peerSthStreams.has(pkHash)) return _peerSthStreams.get(pkHash);
+  try {
+    fs.mkdirSync(PEER_STH_DIR, { recursive: true });
+    const safe = pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64);
+    const stream = fs.createWriteStream(path.join(PEER_STH_DIR, safe + '.jsonl'), { flags: 'a' });
+    stream.on('error', e => log('warn', 'peer_sth_stream_error', { id: pkHash.slice(0, 16), err: e.message }));
+    _peerSthStreams.set(pkHash, stream);
+    return stream;
+  } catch (e) {
+    log('warn', 'peer_sth_stream_open_failed', { err: e.message });
+    return null;
+  }
+}
+
+function _peerSthWrite(pkHash, sth) {
+  const stream = _peerSthStreamFor(pkHash);
+  if (!stream) return;
+  try { stream.write(JSON.stringify(sth) + '\n'); } catch {}
+}
+
+function loadPeerSths() {
+  try {
+    fs.mkdirSync(PEER_STH_DIR, { recursive: true });
+    const files = fs.readdirSync(PEER_STH_DIR).filter(f => f.endsWith('.jsonl'));
+    for (const file of files) {
+      const id = file.replace(/\.jsonl$/, '');
+      try {
+        const lines = fs.readFileSync(path.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
+        const sths = [];
+        for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
+        const recent = sths.slice(-PEER_STH_MAX);
+        const pk_b64 = recent.length > 0 ? (recent[recent.length - 1].public_key || '') : '';
+        peerSths.set(id, { sths: recent, pk_b64 });
+      } catch {}
+    }
+    if (peerSths.size > 0) log('info', 'peer_sths_loaded', { peers: peerSths.size });
+  } catch (e) {
+    if (e.code !== 'ENOENT') log('warn', 'peer_sths_load_failed', { err: e.message });
+  }
+}
+
+function _flushPeerSthsOnExit() {
+  for (const stream of _peerSthStreams.values()) { try { stream.end(); } catch {} }
+}
+
+// ── Gossip — broadcast our latest STH to all registered peers ─────────────────
+async function broadcastSTH(sth) {
+  if (!sth || !relayIdentity) return;
+  const peers = [...relayRegistry.values()].filter(r => r.url && r.url !== RELAY_SELF_URL);
+  if (peers.length === 0) return;
+  const body = JSON.stringify({
+    ...sth,
+    public_key: relayIdentity.pk.toString('base64'),
+    relay_pk_hash: relayIdentity.pk_hash,
+  });
+  for (const peer of peers) {
+    try {
+      const target = new URL('/v2/sth/ingest', peer.url);
+      const mod = target.protocol === 'https:' ? https : http;
+      await new Promise(resolve => {
+        const r = mod.request({
+          hostname: target.hostname,
+          port: target.port || (target.protocol === 'https:' ? 443 : 80),
+          path: target.pathname,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        }, res2 => { res2.resume(); resolve(); });
+        r.setTimeout(3000, () => { r.destroy(); resolve(); });
+        r.on('error', () => resolve()); // non-blocking, best-effort
+        r.write(body);
+        r.end();
+      });
+    } catch {}
+  }
+}
+
+// ── RFC 6962 consistency proof ─────────────────────────────────────────────────
+// Proves the tree at toSize is an append-only extension of the tree at fromSize.
+function _merkleRootOf(leafHashes) {
+  if (leafHashes.length === 0) return '0'.repeat(64);
+  let h = [...leafHashes];
+  while (h.length > 1) {
+    const next = [];
+    for (let i = 0; i < h.length; i += 2)
+      next.push(i + 1 < h.length ? ctNodeHash(h[i], h[i + 1]) : h[i]);
+    h = next;
+  }
+  return h[0];
+}
+
+function _subproof(m, nodes, b) {
+  const n = nodes.length;
+  if (m === n) return b ? [] : [_merkleRootOf(nodes)];
+  let k = 1;
+  while (k * 2 < n) k *= 2; // k = largest power of 2 strictly less than n
+  if (m <= k) return _subproof(m, nodes.slice(0, k), b).concat([_merkleRootOf(nodes.slice(k))]);
+  return [_merkleRootOf(nodes.slice(0, k))].concat(_subproof(m - k, nodes.slice(k), false));
+}
+
+// 0 ≤ fromSize ≤ toSize ≤ ctLog.length
+function ctConsistencyProof(fromSize, toSize) {
+  if (fromSize < 0 || toSize < fromSize || toSize > ctLog.length) return null;
+  if (fromSize === 0 || fromSize === toSize) return [];
+  const leaves = ctLog.slice(0, toSize).map(e => e.leaf_hash);
+  return _subproof(fromSize, leaves, fromSize === leaves.length);
 }
 
 // ── Fingerprint — out-of-band key verification ────────────────────────────────
@@ -627,6 +864,172 @@ p{color:#666;font-size:.82rem}
 </div>
 </body></html>`;
 }
+
+// ── CT Log public web UI ──────────────────────────────────────────────────────
+const CT_PAGE = (() => {
+  const css = [
+    '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}',
+    ':root{--bg:#0b1d12;--bg2:#0f2318;--border:#1a3a22;--accent:#3dbe7a;--dim:#4a7a5a;--text:#c0ddc8;--err:#ef4444;--ok:#3dbe7a}',
+    'body{background:var(--bg);color:var(--text);font-family:\'Cascadia Code\',\'Fira Mono\',Consolas,monospace;font-size:13px;line-height:1.5;min-height:100vh}',
+    '.hdr{border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:10}',
+    '.logo{color:var(--accent);font-weight:700;font-size:14px;letter-spacing:.05em}',
+    '.badge{color:var(--dim);font-size:11px}',
+    '.main{max-width:980px;margin:0 auto;padding:16px}',
+    '.sec{margin-bottom:18px}',
+    '.sec-title{color:var(--accent);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}',
+    '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:3px;overflow:hidden}',
+    '.cell{background:var(--bg2);padding:9px 12px}',
+    '.cell-label{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px}',
+    '.cell-value{color:var(--text);word-break:break-all;font-size:12px}',
+    '.cell-value.hi{color:var(--accent)}',
+    '.root-box{border:1px solid var(--border);border-radius:3px;background:var(--bg2);padding:10px 12px}',
+    '.root-label{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}',
+    '.root-hash{color:var(--accent);word-break:break-all;font-size:11px;font-family:monospace}',
+    '.status-bar{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:11px;flex-wrap:wrap}',
+    '.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;flex-shrink:0}',
+    '.dot.ok{background:var(--ok);box-shadow:0 0 5px var(--ok)}',
+    '.dot.err{background:var(--err)}',
+    '.dot.idle{background:var(--dim)}',
+    '.btn{background:transparent;border:1px solid var(--accent);color:var(--accent);padding:5px 12px;font-family:inherit;font-size:10px;cursor:pointer;border-radius:2px;letter-spacing:.08em;text-transform:uppercase;transition:background .15s,color .15s}',
+    '.btn:hover:not(:disabled){background:var(--accent);color:var(--bg)}',
+    '.btn:disabled{opacity:.4;cursor:default}',
+    '.refresh-info{color:var(--dim);font-size:10px;margin-left:auto}',
+    '.vbox{margin-top:10px;padding:10px 12px;border-radius:2px;font-size:11px;border:1px solid;display:none}',
+    '.vbox.ok{border-color:var(--accent);background:rgba(61,190,122,.07);color:var(--accent)}',
+    '.vbox.err{border-color:var(--err);background:rgba(239,68,68,.07);color:var(--err)}',
+    '.vbox pre{white-space:pre-wrap;font-family:inherit;font-size:11px}',
+    'table{width:100%;border-collapse:collapse}',
+    'thead th{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:5px 8px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}',
+    'tbody tr{border-bottom:1px solid var(--border)}',
+    'tbody tr:hover{background:var(--bg2)}',
+    'tbody td{padding:4px 8px;font-size:11px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}',
+    '.ci{color:var(--dim)}.ch{color:var(--accent)}.ct-ts{color:var(--dim)}.ctype{color:#7bbf96}',
+    '.empty{text-align:center;padding:28px;color:var(--dim);font-style:italic;max-width:none}',
+    '@media(max-width:600px){.grid{grid-template-columns:1fr 1fr}tbody td{font-size:10px;padding:3px 5px}}',
+  ].join('\n');
+
+  const js = `
+var g=function(i){return document.getElementById(i)};
+function fmtId(x){return x?x.slice(0,16)+'...'+x.slice(-8):'N/A'}
+function fmtTs(x){return x?x.replace('T',' ').replace(/\\.\\d+Z$/,'Z'):'\u2014'}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function load(){
+  try{
+    var r=await fetch('/ct/feed');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var d=await r.json();
+    g('rid').textContent=fmtId(d.relay_id);g('rid').title=d.relay_id||'';
+    g('sec').textContent=d.sector||'\u2014';
+    g('ver').textContent=d.version||'\u2014';
+    g('tsz').textContent=(d.tree_size||0).toLocaleString()+' entries';
+    g('rh').textContent=d.root||'\u2014';
+    var tb=g('tb');
+    if(!d.entries||!d.entries.length){
+      tb.innerHTML='<tr><td colspan="5" class="empty">No entries yet \u2014 waiting for first transfer</td></tr>';
+    }else{
+      tb.innerHTML=d.entries.slice().reverse().map(function(e){
+        return '<tr><td class="ci">'+esc(e.i!==undefined?e.i:'?')+'</td>'
+          +'<td class="ct-ts">'+esc(fmtTs(e.t))+'</td>'
+          +'<td class="ch">'+esc(e.h||'\u2014')+'</td>'
+          +'<td class="ctype">'+esc(e.type||'key_reg')+'</td>'
+          +'<td>'+esc(e.s||'\u2014')+'</td></tr>';
+      }).join('');
+    }
+    g('sdot').className='dot ok';g('stxt').textContent='Live \u00b7 auto-refresh 10s';
+    g('rinfo').textContent='Refreshed '+new Date().toISOString().slice(0,19).replace('T',' ')+'Z';
+  }catch(e){g('sdot').className='dot err';g('stxt').textContent='Error: '+e.message;}
+}
+async function verify(){
+  var vb=g('vbox'),btn=g('vbtn');
+  btn.disabled=true;btn.textContent='Verifying...';vb.style.display='none';
+  try{
+    var res=await Promise.all([fetch('/ct/feed'),fetch('/v2/sth')]);
+    var feed=await res[0].json(),sth=await res[1].json();
+    var lines=[],ok=true;
+    if(feed.root&&sth.root){
+      if(feed.root===sth.root){
+        lines.push('[OK]   Merkle root consistent across /ct/feed and /v2/sth');
+        lines.push('       '+feed.root.slice(0,40)+'...');
+      }else{ok=false;lines.push('[FAIL] Root mismatch between endpoints!');
+        lines.push('  feed: '+feed.root.slice(0,32)+'...');
+        lines.push('  sth:  '+sth.root.slice(0,32)+'...');}
+    }
+    if(sth.tree_size!==undefined&&feed.tree_size!==undefined){
+      var diff=Math.abs(sth.tree_size-feed.tree_size);
+      if(diff<=1)lines.push('[OK]   Tree size: '+feed.tree_size+' entries'+(diff?' (\u00b11 in-flight write)':''));
+      else{ok=false;lines.push('[WARN] Tree size mismatch: feed='+feed.tree_size+' sth='+sth.tree_size);}
+    }
+    if(sth.relay_id){
+      lines.push('[OK]   Relay identity: '+sth.relay_id.slice(0,20)+'...');
+      lines.push('       Algorithm: '+(sth.alg||'?'));
+    }else lines.push('[INFO] Relay identity not configured (RELAY_IDENTITY_FILE not set)');
+    if(sth.sig){
+      lines.push('[OK]   ML-DSA-65 signature present');
+      lines.push('       sig: '+sth.sig.slice(0,24)+'...');
+      lines.push('[INFO] Full sig verification requires ML-DSA-65 WASM module');
+      lines.push('       Browser WebCrypto does not support post-quantum algorithms yet.');
+    }else lines.push('[INFO] No ML-DSA-65 signature (relay identity not configured)');
+    vb.className='vbox '+(ok?'ok':'err');vb.style.display='block';
+    vb.innerHTML='<pre>'+esc(lines.join('\\n'))+'</pre>';
+  }catch(e){vb.className='vbox err';vb.style.display='block';vb.textContent='Verification failed: '+e.message;}
+  finally{btn.disabled=false;btn.textContent='Verify this relay';}
+}
+load();setInterval(load,10000);
+`.trim();
+
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="en">',
+    '<head>',
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<title>CT Log \u2014 paramant relay</title>',
+    '<style>', css, '</style>',
+    '</head>',
+    '<body>',
+    '<div class="hdr">',
+    '  <div class="logo">PARAMANT</div>',
+    '  <div class="badge">Certificate Transparency Log \u2014 Public Audit Interface</div>',
+    '</div>',
+    '<div class="main">',
+    '  <div class="sec">',
+    '    <div class="sec-title">Relay Identity</div>',
+    '    <div class="grid">',
+    '      <div class="cell"><div class="cell-label">Relay ID</div><div class="cell-value" id="rid" title="">\u2014</div></div>',
+    '      <div class="cell"><div class="cell-label">Sector</div><div class="cell-value hi" id="sec">\u2014</div></div>',
+    '      <div class="cell"><div class="cell-label">Version</div><div class="cell-value" id="ver">\u2014</div></div>',
+    '      <div class="cell"><div class="cell-label">Tree Size</div><div class="cell-value hi" id="tsz">\u2014</div></div>',
+    '    </div>',
+    '  </div>',
+    '  <div class="sec">',
+    '    <div class="sec-title">Current Merkle Root</div>',
+    '    <div class="root-box">',
+    '      <div class="root-label">SHA3-256 Merkle Tree Head \u2014 tamper-evident hash of all transfers</div>',
+    '      <div class="root-hash" id="rh">\u2014</div>',
+    '    </div>',
+    '  </div>',
+    '  <div class="sec">',
+    '    <div class="status-bar">',
+    '      <div><span class="dot idle" id="sdot"></span><span id="stxt">Connecting...</span></div>',
+    '      <button class="btn" id="vbtn" onclick="verify()">Verify this relay</button>',
+    '      <div class="refresh-info" id="rinfo"></div>',
+    '    </div>',
+    '    <div class="vbox" id="vbox"></div>',
+    '  </div>',
+    '  <div class="sec">',
+    '    <div class="sec-title">Last 50 Log Entries <span style="color:var(--dim);font-weight:normal;letter-spacing:0">(newest first)</span></div>',
+    '    <div style="overflow-x:auto">',
+    '      <table>',
+    '        <thead><tr><th>#</th><th>Timestamp (UTC)</th><th>Leaf Hash</th><th>Type</th><th>Sector</th></tr></thead>',
+    '        <tbody id="tb"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>',
+    '      </table>',
+    '    </div>',
+    '  </div>',
+    '</div>',
+    '<script>', js, '<\/script>',
+    '</body></html>',
+  ].join('\n');
+})();
 
 // Cleanup expired tokens elke 60s
 setInterval(() => {
@@ -1270,6 +1673,28 @@ session = client.create_session('recipient@example.com')</pre>
     return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: entry.ts }));
   }
 
+  // ── GET /v2/sth, /v2/sth/history, /v2/sth/:timestamp — Signed Tree Head (public) ──
+  if (path === '/v2/sth' && req.method === 'GET') {
+    const latest = sthLog.length ? sthLog[sthLog.length - 1] : null;
+    if (!latest) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'No STH yet — CT log is empty' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, sth: latest }));
+  }
+  if (path === '/v2/sth/history' && req.method === 'GET') {
+    const limit = Math.min(parseInt(query.limit || '100'), 100);
+    const history = sthLog.slice(-limit);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, count: history.length, total: sthLog.length, sths: history }));
+  }
+  const sthTsm = path.match(/^\/v2\/sth\/(\d+)$/);
+  if (sthTsm && req.method === 'GET') {
+    const ts = parseInt(sthTsm[1]);
+    const found = sthLog.find(s => s.timestamp >= ts);
+    if (!found) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'No STH at or after this timestamp' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, sth: found }));
+  }
+
   // ── POST /v2/relays/register — relay self-registration, ML-DSA-65 verified ───
   // Public endpoint — no API key required. Requires valid ML-DSA-65 signature.
   if (path === '/v2/relays/register' && req.method === 'POST') {
@@ -1344,6 +1769,125 @@ session = client.create_session('recipient@example.com')</pre>
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, relays: page, total: relayRegistry.size, limit, offset }));
+  }
+
+  // ── POST /v2/sth/ingest — receive gossip STH from a peer relay ────────────────
+  if (path === '/v2/sth/ingest' && req.method === 'POST') {
+    if (!mlDsa) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'ML-DSA-65 not available — STH ingestion disabled' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 65536)).toString()); } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid JSON body' }));
+    }
+    const { relay_id, sha3_root, timestamp, tree_size, version, signature, public_key, relay_pk_hash } = body || {};
+    if (!relay_id || sha3_root == null || timestamp == null || tree_size == null || !signature || !public_key) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Missing required fields: relay_id, sha3_root, timestamp, tree_size, signature, public_key' }));
+    }
+    let pkBytes, sigBytes;
+    try { pkBytes = Buffer.from(public_key, 'base64'); sigBytes = Buffer.from(signature, 'base64'); } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid base64 in public_key or signature' }));
+    }
+    const computedPkHash = crypto.createHash('sha3-256').update(pkBytes).digest('hex');
+    if (relay_pk_hash && computedPkHash !== relay_pk_hash) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'public_key does not match relay_pk_hash' }));
+    }
+    // Verify ML-DSA-65 signature over canonical payload (same as produceSth)
+    const payload = { relay_id, sha3_root, timestamp, tree_size, version: version || 1 };
+    const canonical = JSON.stringify(Object.fromEntries(Object.keys(payload).sort().map(k => [k, payload[k]])));
+    let verified = false;
+    try { verified = mlDsa.verify(sigBytes, Buffer.from(canonical, 'utf8'), pkBytes); } catch {}
+    if (!verified) {
+      log('warn', 'sth_ingest_bad_sig', { relay_id: String(relay_id).slice(0, 32), pk_hash: computedPkHash.slice(0, 16) });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Signature verification failed' }));
+    }
+    if (!peerSths.has(computedPkHash)) peerSths.set(computedPkHash, { sths: [], pk_b64: public_key });
+    const peer = peerSths.get(computedPkHash);
+    peer.pk_b64 = public_key;
+    const record = { relay_id, relay_pk_hash: computedPkHash, sha3_root, timestamp, tree_size,
+                     version: version || 1, signature, public_key, received_at: new Date().toISOString() };
+    peer.sths.push(record);
+    if (peer.sths.length > PEER_STH_MAX) peer.sths.shift();
+    _peerSthWrite(computedPkHash, record);
+    log('info', 'sth_ingested', { relay_id: String(relay_id).slice(0, 32), tree_size, root: String(sha3_root).slice(0, 16) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, relay_pk_hash: computedPkHash }));
+  }
+
+  // ── GET /v2/sth/peers — list peer relays and their latest mirrored STH root ───
+  if (path === '/v2/sth/peers' && req.method === 'GET') {
+    const result = [];
+    for (const [pkHash, peer] of peerSths) {
+      const latest = peer.sths.length > 0 ? peer.sths[peer.sths.length - 1] : null;
+      result.push({
+        relay_pk_hash: pkHash,
+        relay_id: latest?.relay_id || null,
+        sth_count: peer.sths.length,
+        latest_root: latest?.sha3_root || null,
+        latest_tree_size: latest?.tree_size ?? null,
+        latest_ts: latest?.received_at || null,
+      });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, peers: result, count: result.length }));
+  }
+
+  // ── GET /v2/sth/peers/:id — full STH history mirrored from a specific peer ────
+  const sthPeerMatch = path.match(/^\/v2\/sth\/peers\/([a-f0-9]{1,64})$/);
+  if (sthPeerMatch && req.method === 'GET') {
+    const peer = peerSths.get(sthPeerMatch[1]);
+    if (!peer) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Peer not found', relay_pk_hash: sthPeerMatch[1] }));
+    }
+    const lim = Math.min(parseInt(query.limit || '100') || 100, 500);
+    const off  = Math.max(parseInt(query.offset || '0') || 0, 0);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, relay_pk_hash: sthPeerMatch[1],
+                       sths: peer.sths.slice(off, off + lim), total: peer.sths.length, limit: lim, offset: off }));
+  }
+
+  // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
+  if (path === '/v2/sth/consistency' && req.method === 'GET') {
+    const fromSize = parseInt(query.from);
+    const toSize   = query.to !== undefined ? parseInt(query.to) : ctLog.length;
+    if (isNaN(fromSize) || isNaN(toSize)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Query params required: from=<integer> (and optionally to=<integer>)' }));
+    }
+    if (fromSize < 0 || toSize < fromSize || toSize > ctLog.length) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ log size (${ctLog.length})` }));
+    }
+    const proof = ctConsistencyProof(fromSize, toSize);
+    if (proof === null) { res.writeHead(500); return res.end(J({ error: 'Could not compute proof' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, from: fromSize, to: toSize, proof }));
+  }
+
+  // ── GET /ct/feed.xml — RSS feed of signed tree heads for external archiving ───
+  if (path === '/ct/feed.xml' && req.method === 'GET') {
+    const selfUrl = RELAY_SELF_URL || `http://${SECTOR}.paramant.app`;
+    const items = sthLog.slice(-20).map(s => {
+      const d = new Date(typeof s.timestamp === 'number' ? s.timestamp : Date.parse(s.timestamp));
+      const desc = `tree_size=${s.tree_size} root=${s.sha3_root} relay=${s.relay_id} sig=${String(s.signature).slice(0, 24)}…`;
+      const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `    <item>
+      <title>STH #${s.tree_size} — ${String(s.sha3_root).slice(0, 8)}…</title>
+      <pubDate>${d.toUTCString()}</pubDate>
+      <description>${esc(desc)}</description>
+      <guid isPermaLink="true">${selfUrl}/v2/sth?ts=${d.getTime()}</guid>
+    </item>`;
+    }).join('\n');
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>Paramant CT Log — ${selfUrl}</title>\n    <link>${selfUrl}/ct/feed.xml</link>\n    <description>Signed Tree Heads for independent CT log verification. Subscribe to independently archive roots.</description>\n    <language>en</language>\n    <ttl>10</ttl>\n${items}\n  </channel>\n</rss>`;
+    res.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=UTF-8', 'Cache-Control': 'public, max-age=60' });
+    return res.end(feed);
   }
 
   // ── GET /v2/did/:did — publiek DID document resolven ─────────────────────────
@@ -1521,6 +2065,13 @@ session = client.create_session('recipient@example.com')</pre>
   // inv_ session tokens bypass API key auth for pubkey endpoints only.
   // Public keys are not sensitive; security comes from fingerprint verification.
   const INVITE_RE = /^inv_[a-zA-Z0-9]{32}(_ready)?$/;
+
+  // ── GET /v2/pubkey — relay's ML-DSA-65 identity public key (for STH verification) ─
+  if (path === '/v2/pubkey' && req.method === 'GET') {
+    if (!relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, alg: 'ML-DSA-65', public_key: relayIdentity.pk.toString('base64'), pk_hash: relayIdentity.pk_hash }));
+  }
 
   // ── POST /v2/pubkey — Registreer pubkeys (ML-KEM + ECDH + ML-DSA optioneel) ─
   if (path === '/v2/pubkey' && req.method === 'POST') {
@@ -1762,8 +2313,20 @@ session = client.create_session('recipient@example.com')</pre>
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
         pw_hash = await argon2Lib.hash(password, { type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
       }
+      // Append transfer to CT log before storing — so proof is available at outbound time
+      const ctEntry = ctAppendTransfer(hash, SECTOR);
       blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
-        sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash });
+        sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
+        sector: SECTOR,
+        ct_entry: {
+          index:     ctEntry.index,
+          leaf_hash: ctEntry.leaf_hash,
+          tree_hash: ctEntry.tree_hash,
+          tree_size: ctEntry.index + 1,
+          audit_path: ctEntry.proof,
+          sth:       ctEntry.sth || null,
+        }
+      });
       setTimeout(() => {
         const e = blobStore.get(hash);
         if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
@@ -1793,8 +2356,17 @@ session = client.create_session('recipient@example.com')</pre>
         enc_meta: safeEncMeta,  // encrypted filename/metadata (ciphertext only) — finding #4 closed
         file_size: blob.length,
       });
+      const merkleProof = {
+        leaf_hash:  ctEntry.leaf_hash,
+        leaf_index: ctEntry.index,
+        tree_size:  ctEntry.index + 1,
+        audit_path: ctEntry.proof,
+        root:       ctEntry.tree_hash,
+        sth:        ctEntry.sth || null,
+        sth_signature: ctEntry.sth ? ctEntry.sth.signature : null,
+      };
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid, download_token: dlToken }));
+      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid, download_token: dlToken, merkle_proof: merkleProof }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
     finally { inFlightInbound--; }
   }
@@ -1862,12 +2434,48 @@ session = client.create_session('recipient@example.com')</pre>
       { hash: outm[1].slice(0,16)+'...', bytes: blob.length, views_left: entry.views_remaining });
     log('info', burned ? 'blob_burned' : 'blob_served',
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
-    res.writeHead(200, {
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': blob.length,
-      'X-Paramant-Burned': burned ? 'true' : 'false',
-      'X-Paramant-Hash':   outm[1],
-    });
+
+    // ── Build signed delivery receipt ────────────────────────────────────────
+    let receiptHeader = null;
+    const ctData = entry.ct_entry || null;
+    if (ctData) {
+      const inclusionProof = {
+        leaf_hash:     ctData.leaf_hash,
+        leaf_index:    ctData.index,
+        tree_size:     ctData.tree_size,
+        audit_path:    ctData.audit_path,
+        root:          ctData.tree_hash,
+        sth:           ctData.sth || null,
+        sth_signature: ctData.sth ? ctData.sth.signature : null,
+      };
+      const receiptPayload = {
+        blob_hash:              outm[1],
+        retrieved_at:           Date.now(),
+        sector:                 entry.sector || SECTOR,
+        relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
+        tree_size_at_retrieval: ctLog.length,
+        inclusion_proof:        inclusionProof,
+        burn_confirmed:         burned,
+      };
+      let signature = null;
+      if (mlDsa && relayIdentity) {
+        try {
+          const canonical = canonicalJSON(receiptPayload);
+          signature = Buffer.from(mlDsa.sign(Buffer.from(canonical, 'utf8'), relayIdentity.sk)).toString('base64');
+        } catch(e) { log('warn', 'receipt_sign_failed', { err: e.message }); }
+      }
+      const receipt = { ...receiptPayload, signature };
+      receiptHeader = Buffer.from(JSON.stringify(receipt)).toString('base64url');
+    }
+
+    const outHeaders = {
+      'Content-Type':       'application/octet-stream',
+      'Content-Length':     blob.length,
+      'X-Paramant-Burned':  burned ? 'true' : 'false',
+      'X-Paramant-Hash':    outm[1],
+    };
+    if (receiptHeader) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+    res.writeHead(200, outHeaders);
     if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
     return res.end(blob);
   }
@@ -2341,12 +2949,105 @@ python3 paramant-receiver.py \\
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── POST /v2/verify-receipt — Verify a signed delivery receipt ───────────────
+  // Verifies the ML-DSA-65 signature and re-walks the inclusion proof.
+  // Receipt must be base64url-encoded JSON (as returned in X-Paramant-Receipt header).
+  if (path === '/v2/verify-receipt' && req.method === 'POST') {
+    try {
+      const body = await readBody(req, 65536);
+      const d = JSON.parse(body.toString());
+      if (!d.receipt) { res.writeHead(400); return res.end(J({ error: 'receipt required' })); }
+
+      let receiptObj;
+      try {
+        // Accept both base64 and base64url (add padding before decode)
+        const padded = d.receipt.replace(/-/g, '+').replace(/_/g, '/');
+        const padLen = (4 - padded.length % 4) % 4;
+        receiptObj = JSON.parse(Buffer.from(padded + '='.repeat(padLen), 'base64').toString('utf8'));
+      } catch(e) { res.writeHead(400); return res.end(J({ error: 'invalid receipt encoding' })); }
+
+      if (!receiptObj.blob_hash || !receiptObj.inclusion_proof) {
+        res.writeHead(400); return res.end(J({ error: 'receipt missing required fields (blob_hash, inclusion_proof)' }));
+      }
+
+      // Step 1 — Verify ML-DSA-65 receipt signature
+      if (!mlDsa || !relayIdentity) {
+        res.writeHead(503); return res.end(J({ error: 'Signature verification unavailable — ML-DSA-65 not loaded' }));
+      }
+      if (!receiptObj.signature) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ valid: false, reason: 'no_signature' }));
+      }
+      const { signature, ...receiptWithoutSig } = receiptObj;
+      const canonical = canonicalJSON(receiptWithoutSig);
+      let sigValid = false;
+      try {
+        sigValid = mlDsa.verify(relayIdentity.pk, Buffer.from(canonical, 'utf8'), Buffer.from(signature, 'base64'));
+      } catch(e) { sigValid = false; }
+      if (!sigValid) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ valid: false, reason: 'signature_invalid' }));
+      }
+
+      // Step 2 — Re-walk inclusion proof to recompute Merkle root
+      const proof = receiptObj.inclusion_proof;
+      if (!proof.leaf_hash) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ valid: false, reason: 'inclusion_proof_missing_leaf_hash' }));
+      }
+      let computedRoot = proof.leaf_hash;
+      for (const step of (proof.audit_path || [])) {
+        if (step.position === 'right') {
+          computedRoot = ctNodeHash(computedRoot, step.hash);
+        } else {
+          computedRoot = ctNodeHash(step.hash, computedRoot);
+        }
+      }
+      if (computedRoot !== proof.root) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ valid: false, reason: 'inclusion_proof_invalid',
+          detail: `recomputed root ${computedRoot.slice(0,16)}… ≠ claimed root ${(proof.root||'').slice(0,16)}…` }));
+      }
+
+      // Step 3 — Verify STH signature (if present)
+      if (proof.sth && proof.sth.signature) {
+        const { signature: sthSig, ...sthPayload } = proof.sth;
+        const sthCanonical = canonicalJSON(sthPayload);
+        let sthValid = false;
+        try {
+          sthValid = mlDsa.verify(relayIdentity.pk, Buffer.from(sthCanonical, 'utf8'), Buffer.from(sthSig, 'base64'));
+        } catch(e) { sthValid = false; }
+        if (!sthValid) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ valid: false, reason: 'sth_signature_invalid' }));
+        }
+        if (proof.sth.sha3_root !== proof.root) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ valid: false, reason: 'sth_root_mismatch' }));
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        valid:          true,
+        blob_hash:      receiptObj.blob_hash,
+        retrieved_at:   new Date(receiptObj.retrieved_at).toISOString(),
+        sector:         receiptObj.sector,
+        relay_id:       receiptObj.relay_id,
+        burn_confirmed: receiptObj.burn_confirmed,
+        tree_size:      proof.tree_size,
+        leaf_index:     proof.leaf_index,
+      }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
   // ── 404 ──────────────────────────────────────────────────────────────────────
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(J({ error: 'Not found', version: VERSION, docs: 'https://paramant.app/docs',
     endpoints: ['POST /v2/pubkey','GET /v2/pubkey/:device','POST /v2/inbound',
                 'GET /v2/outbound/:hash','GET /v2/status/:hash','POST /v2/webhook',
-                'GET /v2/stream-next','GET /v2/audit','GET /health','GET /metrics'] }));
+                'GET /v2/stream-next','GET /v2/audit','GET /health','GET /metrics',
+                'POST /v2/verify-receipt'] }));
 });
 
 // ── WebSocket streaming — push blob_ready events zonder polling ───────────────
@@ -2564,6 +3265,12 @@ loadUsers();
 checkLicense();
 loadOrCreateRelayIdentity();
 relayRegistryFromCTLog();
+loadPeerSths();
+// Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
+setInterval(() => {
+  if (sthLog.length === 0 || !relayIdentity) return;
+  broadcastSTH(sthLog[sthLog.length - 1]).catch(() => {});
+}, 10 * 60_000);
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2',
@@ -2574,6 +3281,8 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
 function emergencyZeroAndExit(reason, code = 0) {
   // Fix 8: flush CT write queue before exit
   _flushCtOnExit();
+  _flushSthOnExit();
+  _flushPeerSthsOnExit();
   // Zeroize all in-memory blobs before exit
   try {
     for (const [, e] of blobStore.entries()) {
