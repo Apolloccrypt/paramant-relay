@@ -117,28 +117,31 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 }
 .price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
 .popular-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:#2d8a5c;padding:2px 8px;border-radius:3px;margin-bottom:12px}
+.coming-soon-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0b1d12;background:#3dbe7a;padding:2px 8px;border-radius:3px;margin-bottom:12px}
+.pc.coming-soon{opacity:.82}
+.price-btn.ghost{background:transparent;border:1px solid #3dbe7a;color:#3dbe7a}.price-btn.ghost:hover{background:rgba(61,190,122,.1);opacity:1}
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
-.hndl-strip{padding:32px 0;border-top:1px solid rgba(224,80,80,.2);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
+.hndl-strip{padding:40px 0;border-top:1px solid rgba(224,80,80,.2);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
 .hndl-inner{max-width:960px;margin:0 auto;padding:0 32px}
-.hndl-strip-header{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid rgba(224,80,80,.4);padding:2px 8px;border-radius:3px;flex-shrink:0}
+.hndl-strip-header{display:flex;align-items:center;gap:16px;margin-bottom:32px;flex-wrap:wrap}
+.hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid rgba(224,80,80,.4);padding:3px 10px;border-radius:3px;flex-shrink:0}
 .hndl-strip-title{font-size:13px;color:#c8e8d6;font-weight:500}
 .hndl-strip-link{font-size:12px;color:#9fd4b5;text-decoration:none;margin-left:auto;opacity:.7;transition:opacity .15s}
 .hndl-strip-link:hover{opacity:1;text-decoration:none}
 .hndl-strip-timeline{display:flex;align-items:flex-start;gap:0}
-.hndl-strip-connector{color:rgba(224,80,80,.3);margin-top:5px;flex-shrink:0;font-size:12px;padding:0 4px}
-.hndl-strip-step{flex:1;padding:0 16px;border-left:2px solid transparent}
-.hndl-strip-step:first-child{padding-left:0}
+.hndl-strip-connector{color:rgba(224,80,80,.4);margin-top:10px;flex-shrink:0;font-size:14px;padding:0 16px}
+.hndl-strip-step{flex:1;padding:0 20px;border-left:2px solid transparent}
+.hndl-strip-step:first-child{padding-left:0;border-left:none}
 .hndl-strip-step--active{border-left-color:#e05050}
 .hndl-strip-step--danger{border-left-color:#f59e0b}
-.hndl-strip-step-time{font-size:11px;font-weight:600;margin-bottom:4px;letter-spacing:.03em}
+.hndl-strip-step-time{font-size:11px;font-weight:700;margin-bottom:7px;letter-spacing:.08em;text-transform:uppercase}
 .hndl-strip-step--active .hndl-strip-step-time{color:#e05050}
 .hndl-strip-step--danger .hndl-strip-step-time{color:#f59e0b}
 .hndl-strip-step:not(.hndl-strip-step--active):not(.hndl-strip-step--danger) .hndl-strip-step-time{color:#9fd4b5}
-.hndl-strip-step-label{font-size:13px;color:#c8e8d6;font-weight:500;margin-bottom:4px}
-.hndl-strip-step-desc{font-size:12px;color:#5a8a6a;line-height:1.5}
+.hndl-strip-step-label{font-size:14px;color:#c8e8d6;font-weight:600;margin-bottom:7px}
+.hndl-strip-step-desc{font-size:12px;color:#8abca0;line-height:1.65}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 </style>
 <link rel="stylesheet" href="/nav.css">
@@ -697,12 +700,12 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" class="price-btn p">Download v2.4.5 &rarr;</a>
     </div>
 
-    <div class="pc featured">
-      <div class="popular-badge">Most popular</div>
+    <div class="pc featured coming-soon">
+      <div class="coming-soon-badge">Coming soon</div>
       <div class="price-name">PROFESSIONAL</div>
       <div class="price-amount">€149<sub>/mo</sub></div>
       <div class="price-note">Up to 50 users &middot; <code style="font-size:11px;background:#111;padding:2px 5px;border-radius:3px">plk_</code> key in .env &middot; billed monthly</div>
-      <div class="price-tagline">Outgrown 5 users. Full features, email support, no waitlist.</div>
+      <div class="price-tagline">Outgrown 5 users. Full features, email support.</div>
       <ul class="pf">
         <li><span class="check">&#10003;</span> Everything in Community</li>
         <li><span class="check">&#10003;</span> Up to 50 active users</li>
@@ -712,7 +715,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <li><span class="check">&#10003;</span> Priority security updates</li>
         <li><span class="check">&#10003;</span> Compliance documentation</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Professional+relay+license" class="price-btn p">Contact for invoice &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Professional+waitlist" class="price-btn ghost">Join waitlist &rarr;</a>
     </div>
 
     <div class="pc">
@@ -842,7 +845,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
         <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
         <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-        <a href="/dpa">Data Processing Agreement (GDPR Art. 28)<a>
+        <a href="/dpa">Data Processing Agreement (GDPR Art. 28)</a>
         <a href="/government">Government &amp; public sector</a>
         <a href="/hndl">HNDL threat</a>
         <a href="/crypto-agility">Crypto agility</a>
