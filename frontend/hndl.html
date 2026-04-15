@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Harvest Now, Decrypt Later (HNDL)</title>
-<meta name="description" content="HNDL: tegenstanders archiveren versleuteld dataverkeer vandaag, om het te ontsleutelen wanneer kwantumcomputers beschikbaar zijn. De aanval is actief. Zo beschermt u zich.">
+<title>PARAMANT — Harvest Now, Decrypt Later</title>
+<meta name="description" content="Harvest Now, Decrypt Later: why encrypted data collected today can be decrypted by quantum computers tomorrow, and how RAM-only post-quantum transfer removes the target entirely.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -18,239 +18,317 @@
 }
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+
 nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
 .nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
-.nav-back{font-size:12px;color:var(--muted);text-decoration:none}
-.nav-back:hover{color:var(--text)}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px;text-decoration:none}
+.nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
+.nav-burger:hover{color:var(--muted)}
 
-.hero{padding:60px 48px 48px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--border)}
-.hero-tag{font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.hero-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--red);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.hero h1{font-size:30px;font-weight:600;letter-spacing:-.025em;line-height:1.25;color:var(--text);margin-bottom:14px}
+.hero{padding:64px 48px 52px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--border)}
+.hero-label{font-size:11px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--red);margin-bottom:16px}
+.hero h1{font-size:32px;font-weight:600;letter-spacing:-.025em;line-height:1.2;color:var(--text);margin-bottom:18px}
 .hero h1 em{font-style:normal;color:#e87878}
-.hero .subtitle{font-size:15px;color:var(--muted);max-width:640px;line-height:1.7}
+.hero .lead{font-size:15px;color:var(--muted);max-width:660px;line-height:1.75}
+.hero .lead strong{color:var(--text)}
 
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
 
-.threat-bar{background:var(--red-bg);border:1px solid var(--red-dim);border-radius:6px;padding:16px 22px;margin:40px 0 0;display:flex;gap:14px;align-items:flex-start}
-.threat-icon{font-size:22px;flex-shrink:0;margin-top:2px}
-.threat-bar h3{font-size:13px;font-weight:600;color:#e87878;margin-bottom:4px}
-.threat-bar p{font-size:12px;color:#c08080;line-height:1.65}
-
 section{margin-top:52px}
-section h2{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:6px}
-section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:22px}
+section h2{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+section p{font-size:14px;color:var(--muted);line-height:1.8;max-width:720px}
+section p+p{margin-top:14px}
 
-.timeline{display:flex;flex-direction:column;gap:0;margin-top:22px;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.timeline{margin-top:24px;border:1px solid var(--border);border-radius:6px;overflow:hidden}
 .tl-item{display:flex;gap:0;border-bottom:1px solid var(--border)}
 .tl-item:last-child{border-bottom:none}
-.tl-year{padding:16px 20px;font-family:var(--mono);font-size:12px;font-weight:600;background:var(--surface);border-right:1px solid var(--border);min-width:100px;display:flex;align-items:center;color:var(--green)}
+.tl-year{padding:18px 20px;font-family:var(--mono);font-size:12px;font-weight:600;background:var(--surface);border-right:1px solid var(--border);min-width:110px;display:flex;align-items:center;color:var(--green)}
 .tl-year.red{color:#e87878}
 .tl-year.orange{color:var(--orange)}
-.tl-body{padding:16px 20px}
-.tl-body h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
-.tl-body p{font-size:12px;color:var(--muted);line-height:1.6}
+.tl-body{padding:18px 22px}
+.tl-body h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:5px}
+.tl-body p{font-size:12px;color:var(--muted);line-height:1.65;max-width:none}
 
-.data-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
-.data-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px}
-.data-card h4{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px}
-.data-card p{font-size:11px;color:var(--muted);line-height:1.55}
-.risk-high{border-color:var(--red-dim);background:var(--red-bg)}
-.risk-high h4{color:#e09090}
-.risk-med{border-color:var(--orange-dim);background:var(--orange-bg)}
-.risk-med h4{color:var(--orange)}
+.aside{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-top:28px}
+.aside .label{font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.aside p{font-size:13px;color:var(--muted);line-height:1.7;max-width:none}
+.aside strong{color:var(--text)}
+.aside a{color:var(--green);text-decoration:none}
+.aside a:hover{text-decoration:underline}
 
-.protect-steps{display:flex;flex-direction:column;gap:14px;margin-top:22px}
-.ps{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 20px}
-.ps-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green);background:var(--green-bg);border:1px solid var(--green-dim);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.ps h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
-.ps p{font-size:12px;color:var(--muted);line-height:1.6}
-.ps code{font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--green);padding:1px 5px;border-radius:3px}
-
-.agency-note{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 22px;margin-top:28px}
-.agency-note .label{font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
-.agency-note p{font-size:13px;color:var(--muted);line-height:1.65}
-.agency-note strong{color:var(--text)}
-.agency-note a{color:var(--green)}
-
-.cta{background:var(--green-bg);border:1px solid var(--green-dim);border-radius:6px;padding:26px 30px;margin-top:48px}
-.cta h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px}
-.cta p{font-size:13px;color:#a8d5b5;line-height:1.65;margin-bottom:14px}
+.cta{background:var(--green-bg);border:1px solid var(--green-dim);border-radius:6px;padding:28px 32px;margin-top:52px}
+.cta p{font-size:14px;color:#a8d5b5;line-height:1.75;max-width:none;margin-bottom:18px}
+.cta p code{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.06);color:var(--text);padding:2px 6px;border-radius:3px}
 .btn-primary{display:inline-block;font-size:13px;font-weight:500;text-decoration:none;color:var(--bg);background:var(--text);padding:8px 18px;border-radius:4px;margin-right:10px}
 .btn-primary:hover{opacity:.85}
 .btn-sec{display:inline-block;font-size:13px;font-weight:400;text-decoration:none;color:var(--text);border:1px solid var(--border);padding:8px 18px;border-radius:4px}
 .btn-sec:hover{border-color:var(--muted)}
 
+footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:32px}
+.footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:12px;color:var(--quiet);text-decoration:none}
+.footer-links a:hover{color:var(--muted)}
+.footer-meta{font-size:11px;color:var(--quiet);font-family:var(--mono);text-align:right;line-height:1.8}
+
 @media(max-width:640px){
   nav{padding:0 16px}
+  .nav-links{display:none}
+  .nav-burger{display:flex;align-items:center}
+  .nav-open .nav-links{display:flex!important;flex-direction:column;position:absolute;top:56px;left:0;right:0;background:rgba(12,12,12,.97);border-bottom:1px solid var(--border);padding:20px 16px;gap:20px;z-index:99}
+  .nav-open .nav-links a{font-size:14px}
   .hero,main{padding-left:20px;padding-right:20px}
   .hero{padding-top:40px}
-  .hero h1{font-size:23px}
-  .data-grid{grid-template-columns:1fr}
+  .hero h1{font-size:24px}
+  footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
+  .footer-meta{text-align:left}
 }
 </style>
 </head>
 <body>
+
 <nav>
-  <a href="/" class="nav-logo">PARAMANT</a>
-  <a href="/" class="nav-back">← terug</a>
+  <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
+  <ul class="nav-links">
+    <li><a href="/#sectors">Use cases</a></li>
+    <li><a href="/hndl" style="color:#c84040">HNDL threat</a></li>
+    <li><a href="/security">Security</a></li>
+    <li><a href="/vs">Compare</a></li>
+    <li><a href="/#pricing">Pricing</a></li>
+    <li><a href="/#selfhost">Self-host</a></li>
+    <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/ct-log">CT Log</a></li>
+    <li><a href="/docs">Docs</a></li>
+    <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+  </ul>
+  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-burger" onclick="this.closest('nav').classList.toggle('nav-open');this.textContent=this.closest('nav').classList.contains('nav-open')?'X':'=' " aria-label="Menu">&#9776;</button>
 </nav>
 
 <div class="hero">
-  <div class="hero-tag">Actieve dreiging</div>
+  <div class="hero-label">Active threat</div>
   <h1>Harvest Now, <em>Decrypt Later</em></h1>
-  <p class="subtitle">
-    Inlichtingendiensten en staatsactoren archiveren nu versleuteld dataverkeer —
-    om het te ontsleutelen zodra cryptografisch relevante kwantumcomputers beschikbaar zijn.
-    De aanval hoeft niet te wachten op Q-Day. <strong>Het archiveren is al begonnen.</strong>
+  <p class="lead">
+    Nation-states are collecting encrypted traffic today — medical records,
+    legal documents, financial transfers — to decrypt once quantum computers arrive.
+    The breach is not in the future. <strong>It happened when your data was intercepted.</strong>
   </p>
 </div>
 
 <main>
 
-  <div class="threat-bar">
-    <div class="threat-icon">⚠️</div>
-    <div>
-      <h3>HNDL is geen hypothetische dreiging</h3>
-      <p>NSA, GCHQ en vergelijkbare diensten beschikken over grootschalige tapinfrastructuur
-      die versleuteld verkeer vastlegt voor latere verwerking. Documenten uit het
-      Snowden-archief (2013) bevestigen actieve "collect it all"-programma's.
-      Dossiers die u vandaag verzendt via RSA-2048 of ECDSA zijn beschikbaar voor
-      ontsleuteling zodra de kwantumdrempel wordt bereikt — naar schatting 2029–2031.</p>
-    </div>
-  </div>
-
   <section>
-    <h2>De tijdlijn van de dreiging</h2>
-    <p class="section-sub">Het risicovenster is al open. Elk jaar dat u wacht, vergroot het achteraf-ontcijferbare archief.</p>
+    <h2>How it works</h2>
+    <p>
+      An adversary taps a backbone connection, records the ciphertext, and stores it.
+      No decryption is attempted now. The data sits in an archive and waits.
+      When a cryptographically relevant quantum computer (CRQC) becomes available,
+      Shor's algorithm breaks the key exchange retroactively — and the archive opens.
+    </p>
+    <p>
+      Estimates for Q-Day range from 5 to 15 years depending on the source,
+      though some researchers place it closer. Google's March 2026 research
+      accelerated timelines; Cloudflare has an internal deadline of 2029 for
+      completing post-quantum migration across their infrastructure.
+      The NSA's CNSA 2.0 guidance (September 2022) states that organizations
+      should stop using RSA and elliptic-curve for any data that must remain
+      confidential beyond approximately five years.
+    </p>
+    <p>
+      The window is already open. Every year of delay extends the archive of
+      retroactively decryptable data.
+    </p>
     <div class="timeline">
       <div class="tl-item">
-        <div class="tl-year red">Nu</div>
+        <div class="tl-year red">Now</div>
         <div class="tl-body">
-          <h4>Fase 1: Harvest (actief)</h4>
-          <p>Staatsactoren tappen internet backbone-verbindingen af en slaan versleuteld verkeer op.
-          TLS-sessies, VPN-tunnels, versleutelde e-mail — alles wat RSA- of ECDSA-gebaseerd is,
-          wordt gearchiveerd voor toekomstige verwerking.</p>
+          <h4>Harvest (active)</h4>
+          <p>State actors tap internet backbone connections and archive encrypted traffic.
+          TLS sessions, VPN tunnels, encrypted email — anything protected by RSA or
+          elliptic-curve key exchange is recorded for future processing.</p>
         </div>
       </div>
       <div class="tl-item">
         <div class="tl-year orange">2026–2028</div>
         <div class="tl-body">
-          <h4>Fase 2: Voorbereiding</h4>
-          <p>Kwantumhardware wordt praktisch bruikbaar. Eerste CRQC's verschijnen in geclassificeerde
-          omgevingen. NIST FIPS 203/204/205 zijn gepubliceerd — migratie wordt wettelijk verplicht
-          via NIS2, CRA en nationale regelgeving.</p>
+          <h4>Preparation</h4>
+          <p>Quantum hardware becomes operationally viable. First CRQCs appear in
+          classified environments. NIST FIPS 203/204/205 are finalized — migration
+          becomes legally required under NIS2, DORA, and national frameworks.</p>
         </div>
       </div>
       <div class="tl-item">
         <div class="tl-year red">2029–2031</div>
         <div class="tl-body">
-          <h4>Fase 3: Decrypt Later (Q-Day)</h4>
-          <p>Een CRQC met voldoende qubits breekt RSA-2048 in uren. Het gearchiveerde verkeer
-          van de afgelopen jaren wordt ontsleuteld. Medische dossiers, diplomatieke berichten,
-          financiële transacties — alles met terugwerkende kracht blootgesteld.</p>
+          <h4>Decrypt Later (Q-Day)</h4>
+          <p>A CRQC with sufficient qubit count breaks RSA-2048 in hours. The archived
+          traffic from the preceding decade becomes readable. Healthcare records,
+          diplomatic communications, financial transfers — exposed retroactively.</p>
         </div>
       </div>
     </div>
   </section>
 
   <section>
-    <h2>Welke data loopt het hoogste risico?</h2>
-    <p class="section-sub">Data waarvan de vertrouwelijkheid meer dan 5 jaar geheim moet blijven.</p>
-    <div class="data-grid">
-      <div class="data-card risk-high">
-        <h4>🏥 Medische dossiers &amp; DICOM</h4>
-        <p>Levenslange geheimhoudingsplicht. Patiëntgegevens in transit zijn in 2030 ontsleutelbaar.
-        NEN 7510 vereist PQC voor nieuwe systemen.</p>
-      </div>
-      <div class="data-card risk-high">
-        <h4>🏛️ Overheidsdocumenten</h4>
-        <p>Diplomatieke berichten, BRP-gegevens, inlichtingenrapporten.
-        Standaard geheimhoudingstermijn: 20+ jaar.</p>
-      </div>
-      <div class="data-card risk-high">
-        <h4>⚖️ Juridische correspondentie</h4>
-        <p>Advocaat-cliëntprivilege, notariële akten, strafzaken in voorbereiding.
-        Terugwerkende compromittering ondermijnt rechtsstatelijke garanties.</p>
-      </div>
-      <div class="data-card risk-high">
-        <h4>💰 Financiële transacties</h4>
-        <p>M&amp;A-documenten, handelsgeheimen, pensioenoverdrachten.
-        NIS2 en DORA leggen migratieplicht wettelijk vast.</p>
-      </div>
-      <div class="data-card risk-med">
-        <h4>🔑 Sleutelbeheer &amp; PKI</h4>
-        <p>KMS-exports, CA-hiërarchieën, root keys.
-        Compromittering van een root CA met terugwerkende kracht is catastrofaal.</p>
-      </div>
-      <div class="data-card risk-med">
-        <h4>🏭 Intellectueel eigendom</h4>
-        <p>Patentaanvragen, R&amp;D-data, broncode van kritieke systemen.
-        Staatsgesponsorde economische spionage is een primaire HNDL-motivatie.</p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>Hoe beschermt PARAMANT u tegen HNDL?</h2>
-    <p class="section-sub">Drielaagse bescherming — nu actief, geen wachten op Q-Day.</p>
-    <div class="protect-steps">
-      <div class="ps">
-        <div class="ps-num">1</div>
-        <div>
-          <h4>ML-KEM-768 hybride encryptie (NIST FIPS 203)</h4>
-          <p>Ghost Pipe versleutelt met <code>ML-KEM-768 + ECDH P-256 + AES-256-GCM</code>.
-          Zelfs als ECDH later gebroken wordt door een kwantumcomputer, beschermt ML-KEM-768
-          de sleuteluitwisseling. Een gearchiveerd pakket uit 2026 blijft onleesbaar na Q-Day.</p>
-        </div>
-      </div>
-      <div class="ps">
-        <div class="ps-num">2</div>
-        <div>
-          <h4>Burn-on-read — nul persistentie op de relay</h4>
-          <p>Versleutelde blobs worden opgeslagen in RAM, niet op disk.
-          Na de eerste download wordt het geheugen overschreven met nullen (<code>zeroBuffer()</code>).
-          Er is niets te archiveren — de relay heeft nooit klare tekst en bewaart
-          versleutelde data maximaal de gedefinieerde TTL.</p>
-        </div>
-      </div>
-      <div class="ps">
-        <div class="ps-num">3</div>
-        <div>
-          <h4>End-to-end — relay ziet nooit de sleutel</h4>
-          <p>Sleutelgeneratie en versleuteling gebeuren in de browser of CLI, vóór upload.
-          De relay ontvangt alleen versleutelde bytes en kan nooit worden gedwongen
-          klare tekst te leveren — er is geen klare tekst aanwezig.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <div class="agency-note">
-    <div class="label">NSA / CISA — officieel standpunt</div>
+    <h2>Who is at risk</h2>
     <p>
-      De NSA beveelt aan: <strong>"Organizations should avoid using public-key cryptography
-      based on RSA or elliptic curve for all sensitive data with a secrecy requirement
-      extending beyond approximately five years."</strong> (NSA CNSA 2.0, sep 2022).<br><br>
-      CISA en NCSC-NL bevestigen: begin nu met de migratie naar NIST-goedgekeurde
-      post-kwantumalgoritmen. Wachten op Q-Day is wachten tot het te laat is.
-      <a href="https://media.defense.gov/2022/Sep/07/2003071834/-1/-1/0/CSA_CNSA_2.0_ALGORITHMS_.PDF" target="_blank" rel="noopener">NSA CNSA 2.0 →</a>
+      HNDL targets long-lived sensitive data — not casual messages. The selection
+      criterion is simple: anything that is worth reading in five to ten years.
     </p>
-  </div>
+    <p>
+      Healthcare records carry a lifetime confidentiality obligation. Legal documents —
+      attorney-client correspondence, notarial deeds, criminal cases in preparation —
+      can be used retroactively to undermine proceedings that have not yet occurred.
+      Financial data including M&amp;A documents, trade secrets, and pension transfers
+      represents a primary target for state-sponsored economic espionage. Industrial
+      OT environments and critical infrastructure face a separate risk: control system
+      configurations and firmware rarely change, making archived data indefinitely
+      useful to an adversary.
+    </p>
+    <p>
+      The common factor is not sensitivity today — it is sensitivity at Q-Day.
+      If the data would still matter in ten years, it is a valid harvest target now.
+    </p>
+  </section>
+
+  <section>
+    <h2>Why standard encryption fails</h2>
+    <p>
+      AES-256 is not the problem. Symmetric encryption is unaffected by Shor's algorithm
+      and remains quantum-safe. The failure is in key exchange.
+    </p>
+    <p>
+      RSA and elliptic-curve Diffie-Hellman derive their security from the hardness of
+      integer factorization and the discrete logarithm problem. Shor's algorithm solves
+      both in polynomial time on a quantum computer. An adversary who records an RSA- or
+      ECDH-protected session today can recover the session key after Q-Day and decrypt
+      the contents — even if the private key was discarded years earlier.
+    </p>
+    <p>
+      NIST finalized ML-KEM (FIPS 203) in August 2024 specifically to replace vulnerable
+      key exchange mechanisms. The underlying data encryption — AES-256-GCM — stays.
+      Only the key agreement layer changes.
+    </p>
+  </section>
+
+  <section>
+    <h2>What post-quantum actually means</h2>
+    <p>
+      ML-KEM-768 is a key encapsulation mechanism based on the hardness of the
+      Module Learning With Errors (MLWE) problem. No known quantum algorithm solves
+      MLWE efficiently. An archived ciphertext from a session protected by ML-KEM-768
+      today remains unreadable after Q-Day — there is no retroactive attack.
+    </p>
+    <p>
+      Paramant uses ML-KEM-768 in a hybrid construction: <code>ML-KEM-768 + ECDH P-256 + AES-256-GCM</code>.
+      The shared secret is derived from both key exchanges via HKDF. Breaking ECDH
+      at Q-Day provides no advantage — ML-KEM-768 still protects the session.
+      This hybrid approach is what NIST recommends during the migration period.
+    </p>
+
+    <div class="aside">
+      <div class="label">NSA CNSA 2.0 — September 2022</div>
+      <p>
+        <strong>"Organizations should avoid using public-key cryptography based on RSA
+        or elliptic curve for all sensitive data with a secrecy requirement extending
+        beyond approximately five years."</strong><br><br>
+        CISA, NCSC-UK, and the BSI issue the same guidance: begin migration now.
+        Waiting for Q-Day means the archive is already complete.
+        <a href="https://media.defense.gov/2022/Sep/07/2003071834/-1/-1/0/CSA_CNSA_2.0_ALGORITHMS_.PDF" target="_blank" rel="noopener">NSA CNSA 2.0 (PDF) &rarr;</a>
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why storage matters too</h2>
+    <p>
+      Post-quantum key exchange eliminates the retroactive decryption risk for data
+      in transit. But data at rest creates a different attack surface: court orders,
+      server breaches, and insider access can all expose stored ciphertext regardless
+      of how well it was encrypted during transmission.
+    </p>
+    <p>
+      Paramant removes the storage target entirely. Encrypted blobs exist in RAM only.
+      After the first read, the memory is overwritten with zeros. There is nothing to
+      seize, no archive to subpoena, no breach surface to compromise. A relay that
+      holds no data cannot be compelled to produce it.
+    </p>
+  </section>
 
   <div class="cta">
-    <h3>Bescherm uw gevoelige data vandaag nog</h3>
     <p>
-      Vraag een gratis API-sleutel aan en verstuur uw eerste bestand via Ghost Pipe —
-      versleuteld met ML-KEM-768, burn-on-read, geen klare tekst op de server.
-      Of draai <code>paramant-crypto-audit</code> om te zien welke systemen
-      momenteel kwantum-kwetsbaar zijn.
+      Paramant uses <code>ML-KEM-768 + AES-256-GCM</code>. Files exist in RAM only,
+      destroyed after one read. No storage, no trace, no target.
     </p>
-    <a href="/request-key" class="btn-primary">Vraag gratis sleutel aan</a>
-    <a href="/overheid" class="btn-sec">Overheidspagina</a>
+    <a href="/request-key" class="btn-primary">Get a free API key</a>
+    <a href="/security" class="btn-sec">Security architecture &rarr;</a>
   </div>
 
 </main>
+
+<footer>
+  <div>
+    <a href="/" class="footer-logo" style="text-decoration:none;color:inherit;display:block;margin-bottom:8px">PARAMANT</a>
+    <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Post-quantum encrypted file relay</div>
+  </div>
+  <div style="display:flex;gap:48px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Product</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/parashare">ParaShare</a>
+        <a href="/drop">ParaDrop</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/ct-log">CT Log</a>
+        <a href="/docs">Docs</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/vs">vs. alternatives</a>
+        <a href="/press">Press kit</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Self-host</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/self-hosting.md" target="_blank">Deploy guide</a>
+        <a href="/install.sh">install.sh</a>
+        <a href="/install-pi.sh">install-pi.sh</a>
+        <a href="/install-client.sh">install-client.sh</a>
+        <a href="/status">Status</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Compliance</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+        <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+        <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+        <a href="/verwerkersovereenkomst">Verwerkersovereenkomst (GDPR Art. 28)</a>
+        <a href="/overheid">Overheid &amp; publieke sector</a>
+        <a href="/hndl">HNDL threat</a>
+        <a href="/crypto-agility">Crypto agility</a>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Company</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="mailto:privacy@paramant.app">Contact</a>
+        <a href="/request-key">Free API key</a>
+        <a href="/status">Status</a>
+        <a href="/sla">SLA</a>
+        <a href="/security">Security</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank">License</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
+</footer>
+
+<script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='&#9776;';}});});</script>
 </body>
 </html>

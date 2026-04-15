@@ -202,6 +202,8 @@ footer{border-top:1px solid var(--border);padding:40px 48px;display:flex;align-i
   <h3>Hybrid key exchange</h3>
   <p>Every transfer uses ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both — breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
 
+  <p style="margin-top:10px;font-size:13px;color:var(--quiet)">See also: <a href="/hndl" style="color:var(--green)">Harvest Now, Decrypt Later &rarr;</a> — why data collected today can be decrypted at Q-Day, and how RAM-only transfer removes the target.</p>
+
   <h3>Pre-shared secret (PSS)</h3>
   <p>An optional out-of-band password added to HKDF input. Even a fully compromised relay cannot decrypt PSS-protected transfers — the relay would need to serve the correct ciphertext <em>and</em> know the PSS. Recommended for healthcare and legal workflows.</p>
 
