@@ -144,6 +144,31 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .fade-in{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
 .fade-in.visible{opacity:1;transform:none}
+/* Key differentiators */
+.differentiators{padding:4rem 2rem;border-bottom:1px solid var(--border);max-width:860px;margin:0 auto}
+.diff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5rem}
+.diff-item{display:flex;flex-direction:column;gap:.4rem;padding-left:1rem;border-left:2px solid #00ff41}
+.diff-item strong{font-size:.875rem;color:#00ff41;font-weight:600}
+.diff-item span{font-size:.82rem;color:var(--muted);line-height:1.55}
+/* How it works */
+.how-it-works{display:flex;align-items:flex-start;gap:.5rem;margin-bottom:48px;flex-wrap:wrap}
+.how-step{display:flex;align-items:flex-start;gap:.75rem;flex:1;min-width:160px}
+.how-step-num{width:28px;height:28px;border:1px solid #00ff41;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#00ff41;flex-shrink:0;font-family:var(--mono)}
+.how-step-text strong{display:block;font-size:.875rem;color:var(--text);font-weight:600;margin-bottom:.25rem}
+.how-step-text span{font-size:.8rem;color:var(--muted);line-height:1.55}
+.how-arrow{color:#3a3a3a;margin-top:.35rem;font-size:1.1rem;flex-shrink:0}
+/* Comparison table */
+.comparison{max-width:960px;margin:0 auto;padding:80px 32px}
+.comparison-table-wrap{overflow-x:auto}
+.comparison-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.comparison-table th{text-align:left;padding:.6rem 1rem;color:var(--quiet);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;font-family:var(--mono);font-size:.75rem;letter-spacing:.04em;text-transform:uppercase}
+.comparison-table td{padding:.6rem 1rem;border-bottom:1px solid var(--border-soft);color:var(--muted)}
+.comparison-table .col-paramant{color:#00ff41;font-weight:500;background:rgba(0,255,65,.04)}
+.comparison-table th.col-paramant{color:#00ff41}
+.comparison-table td:first-child{color:var(--text)}
+.comparison-note{font-size:.78rem;color:var(--quiet);margin-top:1.5rem;font-family:var(--mono)}
+.comparison-note a{color:#00ff41;text-decoration:none}
+@media(max-width:640px){.how-arrow{display:none}}
 </style>
 <link rel="stylesheet" href="/nav.css">
 </head>
@@ -275,6 +300,36 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
+<div class="differentiators" data-fade>
+  <div class="eyebrow" style="text-align:center;margin-bottom:2rem">Why PARAMANT</div>
+  <div class="diff-grid">
+    <div class="diff-item">
+      <strong>Post-quantum by default</strong>
+      <span>ML-KEM-768 + AES-256-GCM. Protects against Harvest Now, Decrypt Later — already happening.</span>
+    </div>
+    <div class="diff-item">
+      <strong>RAM-only. Burns on read.</strong>
+      <span>Nothing is written to disk. The file is destroyed after one download. No breach surface.</span>
+    </div>
+    <div class="diff-item">
+      <strong>Self-hostable in 60 seconds</strong>
+      <span>One Docker command. Community Edition free forever up to 5 users. No lock-in.</span>
+    </div>
+    <div class="diff-item">
+      <strong>EU jurisdiction only</strong>
+      <span>Hetzner Frankfurt. No US CLOUD Act. No Patriot Act exposure. GDPR Art. 28 DPA available.</span>
+    </div>
+    <div class="diff-item">
+      <strong>Fixed-size padding</strong>
+      <span>Every blob padded to 5 MB. DPI analysis reveals nothing — all transfers look identical on the wire.</span>
+    </div>
+    <div class="diff-item">
+      <strong>Transparent audit log</strong>
+      <span>Every transfer hashed into a public Merkle tree. Verifiable without revealing content.</span>
+    </div>
+  </div>
+</div>
+
 <div class="hndl-strip" data-fade>
   <div class="hndl-inner">
     <div class="hndl-strip-header">
@@ -377,6 +432,42 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 <hr class="divider">
 
 <section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
+  <div class="eyebrow" style="margin-bottom:8px">How it works</div>
+  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:32px">Four steps. Nothing stored.</h2>
+  <div class="how-it-works">
+    <div class="how-step">
+      <div class="how-step-num">1</div>
+      <div class="how-step-text">
+        <strong>Encrypt client-side</strong>
+        <span>Your file is encrypted in the browser or CLI before it leaves your device. The relay never sees plaintext.</span>
+      </div>
+    </div>
+    <div class="how-arrow">&#8594;</div>
+    <div class="how-step">
+      <div class="how-step-num">2</div>
+      <div class="how-step-text">
+        <strong>Transit via Ghost Pipe</strong>
+        <span>The ciphertext blob moves through the relay — padded to 5 MB, hashed into the Merkle log.</span>
+      </div>
+    </div>
+    <div class="how-arrow">&#8594;</div>
+    <div class="how-step">
+      <div class="how-step-num">3</div>
+      <div class="how-step-text">
+        <strong>One-time download</strong>
+        <span>The recipient decrypts locally. On first download, the relay erases the blob from RAM.</span>
+      </div>
+    </div>
+    <div class="how-arrow">&#8594;</div>
+    <div class="how-step">
+      <div class="how-step-num">4</div>
+      <div class="how-step-text">
+        <strong>Cryptographic proof</strong>
+        <span>The Merkle root is updated. Transfer is proven without storing what was transferred.</span>
+      </div>
+    </div>
+  </div>
+  <hr style="border:none;border-top:1px solid var(--border);margin-bottom:48px">
   <div class="eyebrow">Relay network</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
   <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
@@ -653,81 +744,91 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
-  <div class="eyebrow">Self-hosting</div>
-  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
-  <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
-
-  <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:6px;padding:16px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-    <div>
-      <div style="font-size:12px;font-family:var(--mono);color:#00aa33;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Community Edition — free forever</div>
-      <div style="font-size:12px;color:#6e6e6e;line-height:1.6">Up to 5 users &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; BUSL-1.1 &nbsp;&middot;&nbsp; Works on a Raspberry Pi. One command.</div>
-    </div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" style="font-size:11px;font-family:var(--mono);color:#00aa33;border:1px solid #1a3d28;border-radius:4px;padding:7px 14px;text-decoration:none;white-space:nowrap">Download free &rarr;</a>
+<section class="comparison" data-fade>
+  <div class="eyebrow">vs. alternatives</div>
+  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:10px">How PARAMANT compares</h2>
+  <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Most secure-transfer tools were designed before post-quantum was a compliance requirement.</p>
+  <div class="comparison-table-wrap">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="col-paramant">PARAMANT</th>
+          <th>Zivver</th>
+          <th>WeTransfer</th>
+          <th>Signal</th>
+          <th>SFTP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Post-quantum encryption</td>
+          <td class="col-paramant">&#10003; ML-KEM-768</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+        </tr>
+        <tr>
+          <td>Burn-on-read (RAM-only)</td>
+          <td class="col-paramant">&#10003;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+        </tr>
+        <tr>
+          <td>EU jurisdiction (no US CLOUD Act)</td>
+          <td class="col-paramant">&#10003; Hetzner DE</td>
+          <td>&#10003; NL</td>
+          <td>&#8213; US</td>
+          <td>&#8213; US</td>
+          <td>Depends</td>
+        </tr>
+        <tr>
+          <td>Self-hostable</td>
+          <td class="col-paramant">&#10003; Free CE</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#10003;</td>
+        </tr>
+        <tr>
+          <td>No file stored on server</td>
+          <td class="col-paramant">&#10003; RAM-only</td>
+          <td>&#8213; stored</td>
+          <td>&#8213; stored</td>
+          <td>&#8213; stored</td>
+          <td>&#8213; stored</td>
+        </tr>
+        <tr>
+          <td>Public audit log</td>
+          <td class="col-paramant">&#10003; Merkle</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+        </tr>
+        <tr>
+          <td>DPI traffic masking</td>
+          <td class="col-paramant">&#10003; 5 MB pad</td>
+          <td>&#8213;</td>
+          <td>&#8213;</td>
+          <td>&#10003;</td>
+          <td>&#8213;</td>
+        </tr>
+        <tr>
+          <td>Free tier</td>
+          <td class="col-paramant">&#10003; 10/day</td>
+          <td>&#8213;</td>
+          <td>&#10003; limited</td>
+          <td>&#10003;</td>
+          <td>&#10003; self-host</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
-  <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
-  <div class="install-three" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
-
-    <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#00aa33;margin-bottom:10px">π</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#00aa33;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
-      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Pi 3B+ / 4 / 5</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">One command. Detects your Pi, installs Docker, disables swap, shows QR code with your relay URL.</div>
-      <div style="background:#060e09;border:1px solid #1a3d28;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#00aa33;word-break:break-all;margin-bottom:16px">curl -fsSL https://paramant.app/install-pi.sh | bash</div>
-      <div style="font-size:10px;font-family:var(--mono);color:#6e6e6e">ARM64 &middot; 512 MB RAM min &middot; Raspberry Pi OS Lite</div>
-    </div>
-
-    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">⬡</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">DOCKER HUB</div>
-      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Linux &middot; amd64 + arm64</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Pull the pre-built multi-arch image. No build step, no Node.js required. Works on any Docker host.</div>
-      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
-        docker pull mtty001/relay:latest<br>
-        <span style="color:#6e6e6e"># or: docker compose up -d</span>
-      </div>
-      <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">View on Docker Hub &rarr;</a>
-    </div>
-
-    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
-      <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">&gt;_</div>
-      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">LINUX / VPS</div>
-      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Ubuntu &middot; Debian &middot; Hetzner</div>
-      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 5-sector stack with nginx and auto-TLS.</div>
-      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
-        git clone https://github.com/Apolloccrypt/paramant-relay<br>
-        cp .env.example .env &amp;&amp; nano .env<br>
-        docker compose up -d
-      </div>
-      <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">&#9733; View on GitHub &rarr;</a>
-    </div>
-
-  </div>
-
-  <div style="background:#181818;border:1px solid #242424;border-radius:8px;overflow:hidden;margin-bottom:32px">
-    <div style="padding:11px 20px;border-bottom:1px solid #242424;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">Quick start &mdash; Ubuntu / Debian</span>
-      <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">~2 minutes</span>
-    </div>
-    <div style="padding:20px 24px;font-family:var(--mono);font-size:12px;line-height:2.2;color:#aaa">
-      <span style="color:#6e6e6e"># 1. Clone</span><br>
-      git clone https://github.com/Apolloccrypt/paramant-relay &amp;&amp; cd paramant-relay<br><br>
-      <span style="color:#6e6e6e"># 2. Configure</span><br>
-      cp .env.example .env<br>
-      echo "ADMIN_TOKEN=$(openssl rand -hex 32)" &gt;&gt; .env<br><br>
-      <span style="color:#6e6e6e"># 3. Launch</span><br>
-      docker compose up -d<br><br>
-      <span style="color:#6e6e6e"># 4. Verify</span><br>
-      curl http://localhost/health<br>
-      <span style="color:#00aa33"># {"ok":true,"version":"2.4.5","sector":"relay"}</span>
-    </div>
-  </div>
-  <div style="display:flex;gap:32px;flex-wrap:wrap">
-    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">&#9733; Star on GitHub</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CONTRIBUTING.md" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">Contributing &rarr;</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">Changelog &rarr;</a>
-    <a href="/docs" style="font-size:13px;color:#aaa;text-decoration:none">Full docs &rarr;</a>
-  </div>
+  <p class="comparison-note">Full analysis: <a href="/vs">paramant.app/vs</a></p>
 </section>
 
 <hr class="divider">
@@ -897,6 +998,85 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     &nbsp;&#183;&nbsp; <a href="/one-pager" style="color:#555;text-decoration:none">Download one-pager (PDF) &darr;</a>
   </div>
 
+</section>
+
+<hr class="divider">
+
+<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
+  <div class="eyebrow">Self-hosting</div>
+  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
+  <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
+
+  <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:6px;padding:16px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:12px;font-family:var(--mono);color:#00aa33;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Community Edition — free forever</div>
+      <div style="font-size:12px;color:#6e6e6e;line-height:1.6">Up to 5 users &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; BUSL-1.1 &nbsp;&middot;&nbsp; Works on a Raspberry Pi. One command.</div>
+    </div>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" style="font-size:11px;font-family:var(--mono);color:#00aa33;border:1px solid #1a3d28;border-radius:4px;padding:7px 14px;text-decoration:none;white-space:nowrap">Download free &rarr;</a>
+  </div>
+  <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">Choose your install method</div>
+  <div class="install-three" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px">
+
+    <div style="background:#0d1a12;border:1px solid #1a3d28;border-radius:8px;padding:24px;display:flex;flex-direction:column">
+      <div style="font-size:20px;font-family:var(--mono);color:#00aa33;margin-bottom:10px">π</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#00aa33;letter-spacing:.08em;margin-bottom:6px">RASPBERRY PI</div>
+      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Pi 3B+ / 4 / 5</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">One command. Detects your Pi, installs Docker, disables swap, shows QR code with your relay URL.</div>
+      <div style="background:#060e09;border:1px solid #1a3d28;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#00aa33;word-break:break-all;margin-bottom:16px">curl -fsSL https://paramant.app/install-pi.sh | bash</div>
+      <div style="font-size:10px;font-family:var(--mono);color:#6e6e6e">ARM64 &middot; 512 MB RAM min &middot; Raspberry Pi OS Lite</div>
+    </div>
+
+    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
+      <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">⬡</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">DOCKER HUB</div>
+      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Linux &middot; amd64 + arm64</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Pull the pre-built multi-arch image. No build step, no Node.js required. Works on any Docker host.</div>
+      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
+        docker pull mtty001/relay:latest<br>
+        <span style="color:#6e6e6e"># or: docker compose up -d</span>
+      </div>
+      <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">View on Docker Hub &rarr;</a>
+    </div>
+
+    <div style="background:#181818;border:1px solid #242424;border-radius:8px;padding:24px;display:flex;flex-direction:column">
+      <div style="font-size:20px;font-family:var(--mono);color:#6e6e6e;margin-bottom:10px">&gt;_</div>
+      <div style="font-size:11px;font-family:var(--mono);color:#6e6e6e;letter-spacing:.08em;margin-bottom:6px">LINUX / VPS</div>
+      <div style="font-size:13px;font-weight:600;color:#ededed;margin-bottom:8px">Ubuntu &middot; Debian &middot; Hetzner</div>
+      <div style="font-size:11px;color:#6e6e6e;line-height:1.7;margin-bottom:16px;flex:1">Clone the repo, configure your .env, and start the full 5-sector stack with nginx and auto-TLS.</div>
+      <div style="background:#111;border:1px solid #242424;border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:10px;color:#aaa;margin-bottom:16px">
+        git clone https://github.com/Apolloccrypt/paramant-relay<br>
+        cp .env.example .env &amp;&amp; nano .env<br>
+        docker compose up -d
+      </div>
+      <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:11px;font-family:var(--mono);color:#ededed;background:#242424;border:1px solid #333;border-radius:4px;padding:8px 14px;text-decoration:none;text-align:center">&#9733; View on GitHub &rarr;</a>
+    </div>
+
+  </div>
+
+  <div style="background:#181818;border:1px solid #242424;border-radius:8px;overflow:hidden;margin-bottom:32px">
+    <div style="padding:11px 20px;border-bottom:1px solid #242424;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">Quick start &mdash; Ubuntu / Debian</span>
+      <span style="font-size:11px;font-family:var(--mono);color:#6e6e6e">~2 minutes</span>
+    </div>
+    <div style="padding:20px 24px;font-family:var(--mono);font-size:12px;line-height:2.2;color:#aaa">
+      <span style="color:#6e6e6e"># 1. Clone</span><br>
+      git clone https://github.com/Apolloccrypt/paramant-relay &amp;&amp; cd paramant-relay<br><br>
+      <span style="color:#6e6e6e"># 2. Configure</span><br>
+      cp .env.example .env<br>
+      echo "ADMIN_TOKEN=$(openssl rand -hex 32)" &gt;&gt; .env<br><br>
+      <span style="color:#6e6e6e"># 3. Launch</span><br>
+      docker compose up -d<br><br>
+      <span style="color:#6e6e6e"># 4. Verify</span><br>
+      curl http://localhost/health<br>
+      <span style="color:#00aa33"># {"ok":true,"version":"2.4.5","sector":"relay"}</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:32px;flex-wrap:wrap">
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">&#9733; Star on GitHub</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CONTRIBUTING.md" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">Contributing &rarr;</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank" style="font-size:13px;color:#aaa;text-decoration:none">Changelog &rarr;</a>
+    <a href="/docs" style="font-size:13px;color:#aaa;text-decoration:none">Full docs &rarr;</a>
+  </div>
 </section>
 
 <footer data-fade>
