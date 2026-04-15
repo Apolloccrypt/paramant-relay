@@ -7,6 +7,22 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### CLI
+- 12 new operator tools added to `scripts/` and available via `install-client.sh`:
+  - **Sector tools:** `paramant-cra`, `paramant-firmware`, `paramant-legal`, `paramant-notary`, `paramant-payslip`, `paramant-referral`, `paramant-ticket`
+  - **Security:** `paramant-crypto-audit` (scan for quantum-vulnerable algorithms), `paramant-hybrid-check` (verify PQC hybrid mode)
+  - **Maintenance:** `paramant-migrate`, `paramant-roadmap` (PQC migration planner), `paramant-supply-chain`
+- Total operator tools: 38 → 44
+
+### Repository
+- `scripts/` in `paramant-relay` is now the single source of truth for all CLI tools — previously split between this repo and `ParamantOS/nixos/scripts/`
+- Server-side tools moved from `scripts/` to `deploy/`: `fix-nginx-ports.py`, `paramant-admin.py`, `post-install.sh`, `preflight.sh`, `server-fix.sh`, `verify-license.js`
+- `ParamantOS` now consumes `paramant-relay` as a Nix flake input — no more script duplication between repos
+
+---
+
 ## [2.4.5] — 2026-04-13
 
 ### Security

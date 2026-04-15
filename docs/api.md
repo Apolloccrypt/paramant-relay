@@ -434,7 +434,7 @@ Install via:
 curl -fsSL https://paramant.app/install-client.sh | bash
 ```
 
-Or included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS).
+Or included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS). Full list and source: [`scripts/`](../scripts/).
 
 ### CT log verification
 

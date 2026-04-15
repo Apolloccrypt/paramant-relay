@@ -259,7 +259,7 @@ Full API reference: [docs/api.md](docs/api.md)
 
 ## CLI tools
 
-All 38 `paramant-*` tools are included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS) and installable via `.deb`:
+All 44 `paramant-*` tools are included in [paramantOS](https://github.com/Apolloccrypt/ParamantOS) and installable via `.deb`:
 
 ```bash
 curl -fsSL https://paramant.app/install-client.sh | bash
@@ -310,15 +310,21 @@ security-status            # all security layers at a glance
 paramant-ports             # firewall rules + listening ports
 paramant-scan              # LAN relay discovery + registry
 paramant-verify            # TOFU fingerprint verification
+paramant-crypto-audit      # scan for quantum-vulnerable algorithms
+paramant-hybrid-check      # verify PQC hybrid mode is active
 ```
 
 ### Data management
 
 ```
 paramant-backup            # backup keys + CT log
+paramant-restore           # restore from backup
 paramant-export            # export audit log to USB
 paramant-logs              # live log stream
 paramant-update            # check for updates
+paramant-migrate           # migrate relay data between versions
+paramant-roadmap           # PQC migration roadmap generator
+paramant-supply-chain      # software supply chain audit
 ```
 
 ---
