@@ -52,6 +52,10 @@ h1{font-size:42px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin-b
 .cta-secondary:hover{border-color:var(--muted);color:var(--text)}
 .cta-contact{background:var(--green);color:#e8f4ee}
 .cta-contact:hover{opacity:.88}
+.badge-coming-soon{color:#0b1d12;background:var(--green);border:1px solid var(--green)}
+.plan.coming-soon{opacity:.82}
+.cta-waitlist{border:1px solid var(--green);color:var(--green);background:transparent;text-decoration:none}
+.cta-waitlist:hover{background:rgba(61,190,122,.1);opacity:1}
 .plan-features{list-style:none;display:flex;flex-direction:column;gap:11px;flex:1}
 .plan-features li{font-size:13px;color:var(--muted);display:flex;align-items:flex-start;gap:9px;line-height:1.5}
 .plan-features li::before{content:'✓';color:var(--green);font-size:11px;flex-shrink:0;margin-top:2px}
@@ -177,13 +181,13 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
     </ul>
   </div>
 
-  <!-- Licensed -->
-  <div class="plan highlighted">
-    <span class="plan-badge badge-licensed">Licensed</span>
+  <!-- Licensed / Coming soon -->
+  <div class="plan highlighted coming-soon">
+    <span class="plan-badge badge-coming-soon">Coming soon</span>
     <div class="plan-name">Pro</div>
     <div class="plan-price">€149 <span class="period">/ month</span></div>
     <p class="plan-desc">Unlimited API keys. For organizations running their own relay with multiple users or teams.</p>
-    <a href="mailto:hello@paramant.app?subject=Pro%20license%20request" class="plan-cta cta-primary">Get a license key →</a>
+    <a href="mailto:privacy@paramant.app?subject=Professional+waitlist" class="plan-cta cta-waitlist">Join waitlist →</a>
     <ul class="plan-features">
       <li>Unlimited API keys</li>
       <li>All Community features</li>
