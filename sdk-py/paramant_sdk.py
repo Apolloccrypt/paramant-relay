@@ -138,25 +138,30 @@ class GhostPipe:
     """
     PARAMANT Ghost Pipe client.
     
-    Quantum-safe end-to-end encrypted datatransport.
-    Relay ziet NOOIT plaintext. Burn-on-read na ophalen.
-    
+    Quantum-safe end-to-end encrypted data transport.
+    The relay never sees plaintext. Burn-on-read after retrieval.
+
     Args:
-        api_key:  pgp_... API key van paramant.app/dashboard
-        device:   Uniek apparaat-ID (zender en ontvanger gebruiken hetzelfde)
-        relay:    Relay URL (automatisch gedetecteerd op basis van key)
-        secret:   Extra geheim voor encryptie (optioneel, default=api_key)
+        api_key:   pgp_... API key from paramant.app/dashboard
+        device:    Unique device ID (sender and receiver use the same value)
+        relay:     Relay URL (auto-detected from key if omitted)
+        relay_url: Alias for relay (accepted for compatibility)
+        sector:    Sector name ('health', 'legal', 'finance', 'iot', 'relay');
+                   used to resolve relay URL when relay/relay_url is not given
+        secret:    Additional secret for encryption (optional, defaults to api_key)
     """
 
-    def __init__(self, api_key: str, device: str, relay: str = '', secret: str = ''):
+    def __init__(self, api_key: str, device: str, relay: str = '', secret: str = '',
+                 relay_url: str = '', sector: str = ''):
         if not api_key.startswith('pgp_'):
-            raise GhostPipeError('API key moet beginnen met pgp_')
+            raise GhostPipeError('API key must start with pgp_')
         self.api_key = api_key
         self.device  = device
         self.secret  = secret or api_key
-        self.relay   = relay or self._detect_relay()
+        _relay = relay or relay_url or (get_relay_url(sector) if sector else '') or self._detect_relay()
+        self.relay   = _relay
         if not self.relay:
-            raise GhostPipeError('Geen relay bereikbaar. Controleer API key.')
+            raise GhostPipeError('No relay reachable. Check your API key.')
         self._keypair = None
 
     # ── TOFU / known-keys ─────────────────────────────────────────────────────

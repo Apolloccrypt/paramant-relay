@@ -254,7 +254,7 @@ if (CT_FILE) {
 
 // ── Signed Tree Head (STH) — RFC 6962 style, ML-DSA-65 signed ───────────────
 const STH_MAX  = 1000;
-const STH_FILE = process.env.STH_FILE || 'data/sth-log.jsonl';
+const STH_FILE = process.env.STH_FILE || '/data/sth-log.jsonl';
 const sthLog   = []; // rolling array of last STH_MAX signed tree heads
 
 let _sthStream    = null;
@@ -542,7 +542,7 @@ function produceSth(tree_size, sha3_root) {
 }
 
 // ── Peer STH storage — mirrors signed tree heads from other relays ─────────────
-const PEER_STH_DIR = process.env.PEER_STH_DIR || 'data/peer-sths';
+const PEER_STH_DIR = process.env.PEER_STH_DIR || '/data/peer-sths';
 const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
 // peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string }
 const peerSths = new Map();
@@ -3301,6 +3301,13 @@ checkLicense();
 loadOrCreateRelayIdentity();
 relayRegistryFromCTLog();
 loadPeerSths();
+// Generate a startup STH if the CT log has entries but no STH was persisted.
+// Covers the case where the STH file was missing or the relay restarted after
+// new CT entries were written without a corresponding STH flush.
+if (ctLog.length > 0 && sthLog.length === 0) {
+  const last = ctLog[ctLog.length - 1];
+  produceSth(ctLog.length, last.tree_hash);
+}
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {
   if (sthLog.length === 0 || !relayIdentity) return;
