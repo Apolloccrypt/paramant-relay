@@ -12,8 +12,8 @@ html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
 .nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text)}
-.nav-links{display:flex;gap:28px;list-style:none}
-.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .15s}
+.nav-links{display:flex;gap:20px;list-style:none}
+.nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
 .nav-links a:hover{color:var(--text)}
 .nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px;text-decoration:none}
 .hero{max-width:680px;margin:0 auto;padding:112px 48px 80px;text-align:center}
@@ -129,6 +129,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#selfhost">Self-host</a></li>
     <li><a href="/parashare">ParaShare</a></li>
+    <li><a href="/drop">ParaDrop</a></li>
     <li><a href="/ct-log">CT Log</a></li>
     <li><a href="/docs">Docs</a></li>
     <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
@@ -162,6 +163,27 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   <div class="proto-cell"><div class="label">HKDF-SHA256</div><div class="pdesc">Key derivation</div></div>
   <div class="proto-cell"><div class="label">Argon2id</div><div class="pdesc">RFC 9106</div></div>
   <div class="proto-cell"><div class="label">Two-step burn</div><div class="pdesc">Preload-proof</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <a href="/parashare" style="display:flex;align-items:center;gap:16px;padding:18px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1e1e1e'" onmouseout="this.style.background='var(--surface)'">
+    <span style="font-size:18px;flex-shrink:0">⬡</span>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Product</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text)">ParaShare</div>
+      <div style="font-size:11px;color:var(--quiet);margin-top:1px">Browser-based encrypted file sharing &mdash; no account</div>
+    </div>
+    <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap">Try free &rarr;</div>
+  </a>
+  <a href="/drop" style="display:flex;align-items:center;gap:16px;padding:18px 40px;background:#0b1d12;border-left:2px solid #3dbe7a;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#0e2216'" onmouseout="this.style.background='#0b1d12'">
+    <span style="font-size:18px;flex-shrink:0">📡</span>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:#3dbe7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">New</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text)">ParaDrop</div>
+      <div style="font-size:11px;color:var(--quiet);margin-top:1px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read</div>
+    </div>
+    <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:#3dbe7a;white-space:nowrap">Try now &rarr;</div>
+  </a>
 </div>
 
 <hr class="divider">
