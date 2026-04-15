@@ -87,27 +87,56 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   .footer-meta{text-align:left}
 }
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 
-<nav>
-  <a href="/" class="nav-logo" style="text-decoration:none;color:inherit">PARAMANT</a>
+<nav class="nav">
+  <a href="/" class="nav-logo">PARAMANT</a>
   <ul class="nav-links">
-    <li><a href="/#sectors">Use cases</a></li>
-    <li><a href="/hndl" style="color:#c84040">HNDL threat</a></li>
-    <li><a href="/security">Security</a></li>
-    <li><a href="/vs">Compare</a></li>
-    <li><a href="/#pricing">Pricing</a></li>
-    <li><a href="/#selfhost">Self-host</a></li>
-    <li><a href="/parashare">ParaShare</a></li>
-    <li><a href="/drop">ParaDrop</a></li>
-    <li><a href="/ct-log">CT Log</a></li>
-    <li><a href="/docs">Docs</a></li>
-    <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
   </ul>
   <a href="/parashare" class="nav-cta">Try it &rarr;</a>
-  <button class="nav-burger" onclick="this.closest('nav').classList.toggle('nav-open');this.textContent=this.closest('nav').classList.contains('nav-open')?'X':'=' " aria-label="Menu">&#9776;</button>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+  <a href="/parashare" class="nav-mobile-cta">Try it &rarr;</a>
+</div>
 
 <div class="hero">
   <div class="hero-label">Active threat</div>
@@ -331,5 +360,6 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 </footer>
 
 <script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='&#9776;';}});});</script>
+<script src="/nav.js" defer></script>
 </body>
 </html>

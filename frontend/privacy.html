@@ -25,22 +25,56 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 @media(max-width:900px){nav.topbar{padding:0 24px}.nav-links{gap:16px}.content{padding:40px 24px}footer{padding:24px}}
 @media(max-width:600px){.nav-links{display:none}}
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 
-<nav class="topbar">
+<nav class="nav">
   <a href="/" class="nav-logo">PARAMANT</a>
   <ul class="nav-links">
-    <li><a href="/">Home</a></li>
-    <li><a href="/developers">Developers</a></li>
-    <li><a href="/docs">Docs</a></li>
-    <li><a href="/#pricing">Pricing</a></li>
-    <li><a href="/parashare">ParaShare</a></li>
-    <li><a href="/drop">ParaDrop</a></li>
-    <li><a href="/outlook">Outlook</a></li>
-    <li><a href="/dashboard">Dashboard</a></li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
   </ul>
+  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+  <a href="/parashare" class="nav-mobile-cta">Try it &rarr;</a>
+</div>
 
 <div class="content">
 
@@ -124,5 +158,6 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
   <div style="text-align:right;line-height:1.4">Ghost Pipe v2.4.5 &middot; Zero storage &middot; Burn-on-read &middot; EU/DE only</div>
 </footer>
 
+<script src="/nav.js" defer></script>
 </body>
 </html>

@@ -66,19 +66,55 @@ tr:last-child td{border-bottom:none}
 .sector-badge{display:inline-block;font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:#3a7a3a;background:#0c160c;border:1px solid #1a2e1a;border-radius:3px;padding:2px 7px;margin-right:6px}
 @media(max-width:900px){nav{padding:0 20px}.sidebar{display:none}.content{padding:32px 24px 60px}}
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 
-<nav>
-  <a class="logo" href="/">PARAMANT</a>
-  <div class="nav-links">
-    <a href="/#pricing">Pricing</a>
+<nav class="nav">
+  <a href="/" class="nav-logo">PARAMANT</a>
+  <ul class="nav-links">
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
+  </ul>
+  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
     <a href="/parashare">ParaShare</a>
     <a href="/drop">ParaDrop</a>
     <a href="/ct-log">CT Log</a>
     <a href="/status">Status</a>
   </div>
-  <a class="back" href="/">← back</a>
-</nav>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+  <a href="/parashare" class="nav-mobile-cta">Try it &rarr;</a>
+</div>
 
 <div class="layout">
   <div class="sidebar">
@@ -753,5 +789,6 @@ window.addEventListener('scroll', () => {
   links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
 }, { passive: true });
 </script>
+<script src="/nav.js" defer></script>
 </body>
 </html>

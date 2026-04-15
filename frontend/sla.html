@@ -48,18 +48,55 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-i
 footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--muted)}
 @media(max-width:640px){.wrap{padding:48px 24px 80px}.sla-grid{grid-template-columns:1fr}nav{padding:0 24px}footer{padding:24px;flex-direction:column;gap:16px}}
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
-<nav>
+<nav class="nav">
   <a href="/" class="nav-logo">PARAMANT</a>
   <ul class="nav-links">
-    <li><a href="/#pricing">Pricing</a></li>
-    <li><a href="/docs">Docs</a></li>
-    <li><a href="/parashare">Try ParaShare</a></li>
-    <li><a href="/drop">ParaDrop</a></li>
-    <li><a href="/ct-log">CT Log</a></li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+    </li>
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
   </ul>
+  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Products</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Resources</div>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+    <a href="/#pricing">Pricing</a>
+  </div>
+  <a href="/#selfhost" class="nav-mobile-standalone">Self-host</a>
+  <a href="/parashare" class="nav-mobile-cta">Try it &rarr;</a>
+</div>
 
 <div class="wrap">
   <div class="eyebrow">Legal &mdash; effective 1 January 2025</div>
@@ -217,5 +254,6 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
     <a href="mailto:privacy@paramant.app">Contact</a>
   </div>
 </footer>
+<script src="/nav.js" defer></script>
 </body>
 </html>

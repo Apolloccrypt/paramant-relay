@@ -1,0 +1,198 @@
+/* PARAMANT shared navbar — paramantOS style
+   Uses nav.nav selector to override per-page nav{} embedded styles */
+
+nav.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  height: 56px;
+  background: rgba(6,14,9,.97);
+  border-bottom: 1px solid #1e3a28;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+nav.nav .nav-logo {
+  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: #3dbe7a;
+  text-decoration: none;
+}
+
+nav.nav .nav-links {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Dropdown container */
+nav.nav .nav-dropdown { position: relative; }
+
+nav.nav .nav-dropdown-trigger {
+  background: none;
+  border: none;
+  color: #9fd4b5;
+  font-size: 13px;
+  font-family: inherit;
+  padding: .5rem .75rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color .15s;
+  white-space: nowrap;
+}
+nav.nav .nav-dropdown-trigger:hover,
+nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: #3dbe7a; }
+
+/* Dropdown menu */
+nav.nav .nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: #0f2219;
+  border: 1px solid #1e3a28;
+  border-radius: 6px;
+  padding: .5rem 0;
+  list-style: none;
+  margin: 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  z-index: 200;
+}
+nav.nav .nav-dropdown:hover .nav-dropdown-menu { display: block; }
+
+nav.nav .nav-dropdown-menu li a {
+  display: block;
+  padding: .5rem 1rem;
+  color: #9fd4b5;
+  text-decoration: none;
+  font-size: 13px;
+  transition: color .15s, background .15s;
+  white-space: nowrap;
+}
+nav.nav .nav-dropdown-menu li a:hover {
+  color: #3dbe7a;
+  background: rgba(61,190,122,.08);
+}
+
+/* Direct standalone links */
+nav.nav .nav-link {
+  color: #9fd4b5;
+  font-size: 13px;
+  padding: .5rem .75rem;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: color .15s;
+  white-space: nowrap;
+}
+nav.nav .nav-link:hover { color: #3dbe7a; }
+
+/* CTA button */
+nav.nav .nav-cta {
+  font-size: 13px;
+  font-weight: 500;
+  color: #3dbe7a;
+  padding: .4rem .875rem;
+  border: 1px solid #3dbe7a;
+  border-radius: 4px;
+  text-decoration: none;
+  margin-left: .5rem;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+nav.nav .nav-cta:hover { background: #3dbe7a; color: #0b1d12; }
+
+/* Hamburger button — hidden on desktop */
+nav.nav .nav-hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: .5rem;
+}
+nav.nav .nav-hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #9fd4b5;
+  border-radius: 2px;
+  transition: transform .2s, opacity .2s;
+}
+
+/* Mobile overlay */
+.nav-mobile {
+  display: none;
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0b1d12;
+  padding: 2rem;
+  z-index: 99;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 2rem;
+}
+.nav-mobile.open { display: flex; }
+
+.nav-mobile-group {
+  display: flex;
+  flex-direction: column;
+  gap: .625rem;
+}
+.nav-mobile-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #3dbe7a;
+  margin-bottom: .25rem;
+  font-family: 'SF Mono','Fira Code',monospace;
+}
+.nav-mobile a {
+  color: #c8e8d6;
+  text-decoration: none;
+  font-size: 1.0625rem;
+  padding: .5rem 0;
+  border-bottom: 1px solid #1e3a28;
+  display: block;
+}
+.nav-mobile a:hover { color: #3dbe7a; }
+.nav-mobile-standalone {
+  color: #c8e8d6 !important;
+  font-size: 1.0625rem;
+  text-decoration: none;
+  border-bottom: none !important;
+}
+.nav-mobile-cta {
+  color: #3dbe7a !important;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid #3dbe7a !important;
+  border-bottom: 1px solid #3dbe7a !important;
+  padding: .75rem 1.5rem !important;
+  border-radius: 4px;
+  text-align: center;
+  margin-top: .5rem;
+}
+.nav-mobile-cta:hover { background: rgba(61,190,122,.1); }
+
+/* Mobile breakpoint */
+@media (max-width: 1023px) {
+  nav.nav { padding: 0 1rem; }
+  nav.nav .nav-links { display: none !important; }
+  nav.nav .nav-cta { display: none; }
+  nav.nav .nav-hamburger { display: flex; }
+}
