@@ -34,11 +34,6 @@ h1 em{color:var(--muted);font-style:normal}
 .code-lang{font-size:11px;color:var(--quiet);font-family:var(--mono)}
 .code-body{padding:20px 24px;font-family:var(--mono);font-size:12.5px;line-height:2}
 .c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#aaa}.c-ok{color:var(--green)}
-.proto-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;overflow:hidden}
-.proto-cell{flex:1;padding:20px 22px;border-right:1px solid var(--border);min-width:0}
-.proto-cell:last-child{border-right:none}
-.proto-cell .label{font-size:11px;font-family:var(--mono);color:var(--text);letter-spacing:.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.proto-cell .pdesc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 section{max-width:960px;margin:0 auto;padding:80px 32px}
 .eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
 h2{font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
@@ -93,8 +88,6 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   section{padding:32px 16px}
   .sec-pad{padding-left:16px!important;padding-right:16px!important}
   .g3,.g2,.pricing-grid{grid-template-columns:1fr}
-  .proto-bar{flex-wrap:wrap}
-  .proto-cell{flex:1 1 50%;border-bottom:1px solid var(--border)}
   footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
   .hndl-strip{padding:24px 0}
   .hndl-inner{padding:0 16px}
@@ -104,7 +97,6 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   .hndl-strip-step:first-child{padding-left:12px}
   .footer-meta{text-align:left}
   /* Inline-style grid overrides */
-  .role-banner{grid-template-columns:1fr!important}
   .net-pair{grid-template-columns:1fr!important}
   .pipe-stats{grid-template-columns:repeat(2,1fr)!important}
   .nodemap-stats{grid-template-columns:repeat(3,1fr)!important}
@@ -307,59 +299,77 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
-<div class="proto-bar">
-  <div class="proto-cell"><div class="label">ML-KEM-768</div><div class="pdesc">post-quantum key exchange</div></div>
-  <div class="proto-cell"><div class="label">AES-256-GCM</div><div class="pdesc">symmetric encryption</div></div>
-  <div class="proto-cell"><div class="label">ML-DSA-65</div><div class="pdesc">post-quantum signatures</div></div>
-  <div class="proto-cell"><div class="label">Burn-on-read</div><div class="pdesc">RAM-only</div></div>
-  <div class="proto-cell"><div class="label">5MB padding</div><div class="pdesc">DPI masking</div></div>
-  <div class="proto-cell"><div class="label">Hetzner DE</div><div class="pdesc">EU jurisdiction</div></div>
-  <div class="proto-cell"><div class="label">HKDF-SHA256</div><div class="pdesc">Key derivation</div></div>
-  <div class="proto-cell"><div class="label">Argon2id</div><div class="pdesc">RFC 9106</div></div>
-  <div class="proto-cell"><div class="label">Two-step burn</div><div class="pdesc">Preload-proof</div></div>
-</div>
+<section style="max-width:960px;margin:0 auto;padding:64px 32px">
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
-  <a href="/parashare" style="display:flex;align-items:center;gap:16px;padding:24px 32px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1e1e1e'" onmouseout="this.style.background='var(--surface)'">
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">File sharing</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">ParaShare</div>
-      <div style="font-size:11px;color:var(--quiet);margin-top:3px">Browser-based encrypted file sharing &mdash; no account</div>
+  <div class="grid g3" style="margin-bottom:24px">
+    <div class="cell">
+      <h3>ML-KEM-768</h3>
+      <p class="desc">Post-quantum key exchange</p>
     </div>
-    <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap">Try free &rarr;</div>
-  </a>
-  <a href="/drop" style="display:flex;align-items:center;gap:16px;padding:24px 32px;background:#0b1d12;border-left:2px solid #3dbe7a;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#0e2216'" onmouseout="this.style.background='#0b1d12'">
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:#3dbe7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Local transfer</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">ParaDrop</div>
-      <div style="font-size:11px;color:var(--quiet);margin-top:3px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read</div>
+    <div class="cell">
+      <h3>AES-256-GCM</h3>
+      <p class="desc">Symmetric encryption</p>
     </div>
-    <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:#3dbe7a;white-space:nowrap">Try now &rarr;</div>
-  </a>
-</div>
+    <div class="cell">
+      <h3>ML-DSA-65</h3>
+      <p class="desc">Post-quantum signatures</p>
+    </div>
+    <div class="cell">
+      <h3>Burn-on-read</h3>
+      <p class="desc">RAM-only &mdash; nothing written to disk</p>
+    </div>
+    <div class="cell">
+      <h3>5 MB padding</h3>
+      <p class="desc">Fixed-size blobs mask DPI analysis</p>
+    </div>
+    <div class="cell">
+      <h3>Hetzner DE</h3>
+      <p class="desc">EU jurisdiction &middot; no US CLOUD Act</p>
+    </div>
+    <div class="cell">
+      <h3>HKDF-SHA256</h3>
+      <p class="desc">Key derivation</p>
+    </div>
+    <div class="cell">
+      <h3>Argon2id</h3>
+      <p class="desc">Password hashing &middot; RFC 9106</p>
+    </div>
+    <div class="cell">
+      <h3>Two-step burn</h3>
+      <p class="desc">Preload-proof destruction</p>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <a href="/parashare" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag">File sharing</div>
+      <h3>ParaShare</h3>
+      <p class="desc" style="margin-top:6px">Browser-based encrypted file sharing &mdash; no account required.</p>
+      <span class="tag">Try free &rarr;</span>
+    </a>
+    <a href="/drop" class="cell" style="text-decoration:none;display:block;background:#0b1d12">
+      <div class="use-tag" style="color:#3dbe7a">Local transfer</div>
+      <h3>ParaDrop</h3>
+      <p class="desc" style="margin-top:6px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read.</p>
+      <span class="tag" style="color:#3dbe7a">Try now &rarr;</span>
+    </a>
+    <a href="#selfhost" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag" style="color:#2d8a5c">Relay operator</div>
+      <h3>Run your own relay</h3>
+      <p class="desc" style="margin-top:6px">Community Edition &mdash; free forever, up to 5 users. BUSL-1.1.</p>
+      <span class="tag">Self-host &darr;</span>
+    </a>
+    <a href="#pricing" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag">End user</div>
+      <h3>Use a managed relay</h3>
+      <p class="desc" style="margin-top:6px">Free tier &mdash; 10 uploads/day, no account, pgp_ API key.</p>
+      <span class="tag">Pricing &darr;</span>
+    </a>
+  </div>
+
+</section>
 
 <hr class="divider">
-
-<div class="role-banner" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
-  <a href="#selfhost" style="display:flex;align-items:center;justify-content:space-between;padding:24px 32px;background:var(--bg);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#111'" onmouseout="this.style.background='var(--bg)'">
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Relay operator</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">Run your own relay</div>
-      <div style="font-size:11px;color:var(--quiet);margin-top:2px">Community Edition — free forever, up to 5 users, BUSL-1.1</div>
-    </div>
-    <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;white-space:nowrap;margin-left:24px">Self-host ↓</div>
-  </a>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 32px;background:var(--surface)">
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">End user</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">Use a managed relay</div>
-      <div style="font-size:11px;color:var(--quiet);margin-top:2px">Free tier — 10 uploads/day, no account, pgp_ API key</div>
-      <a href="/request-key" style="display:inline-block;margin-top:10px;font-size:11px;font-family:var(--mono);color:#888;text-decoration:none;border:1px solid #333;border-radius:4px;padding:5px 10px">Request free API key &rarr;</a>
-      <p style="font-size:10px;color:#555;margin:6px 0 0;font-family:var(--mono)">10 uploads/day &middot; 1h TTL &middot; 5MB &middot; no credit card</p>
-    </div>
-    <a href="#pricing" style="font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap;margin-left:24px;text-decoration:none">Pricing &darr;</a>
-  </div>
-</div>
 
 <section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px">
   <div class="eyebrow">Relay network</div>
