@@ -19,13 +19,14 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px
 .hero{max-width:680px;margin:0 auto;padding:96px 32px 88px;text-align:center}
 .status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:40px;font-family:var(--mono);letter-spacing:.04em}
 .status-dot{width:5px;height:5px;border-radius:50%;background:#333}
-h1{font-size:48px;font-weight:600;line-height:1.1;letter-spacing:-.03em;color:var(--text);margin-bottom:28px}
+h1{font-size:56px;font-weight:600;line-height:1.08;letter-spacing:-.04em;color:var(--text);margin-bottom:28px}
 h1 em{color:var(--muted);font-style:normal}
 .hero-sub{font-size:16px;color:var(--muted);max-width:480px;margin:0 auto 48px;line-height:1.75}
 .btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:44px}
-.btn-p{background:var(--text);color:var(--bg);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500}
-.btn-s{border:1px solid var(--border);color:var(--muted);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px}
-.btn-p:hover,.btn-s:hover{opacity:.8}
+.btn-p{background:var(--text);color:var(--bg);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500;transition:opacity .15s,transform .15s}
+.btn-s{border:1px solid var(--border);color:var(--muted);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;transition:opacity .15s,border-color .15s,transform .15s}
+.btn-p:hover{opacity:.9;transform:translateY(-1px)}
+.btn-s:hover{opacity:.9;border-color:#3a3a3a;transform:translateY(-1px)}
 .code-wrap{max-width:540px;margin:64px auto 0;padding:0 48px}
 .code-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .code-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
@@ -36,13 +37,15 @@ h1 em{color:var(--muted);font-style:normal}
 .c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#aaa}.c-ok{color:var(--green)}
 section{max-width:960px;margin:0 auto;padding:80px 32px}
 .eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
-h2{font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
+h2{font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--text);margin-bottom:10px}
 .sub{font-size:15px;color:var(--muted);margin-bottom:52px;max-width:540px}
 hr.divider{border:none;border-top:1px solid var(--border)}
 .grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
 .cell{background:var(--bg);padding:28px 24px}
 .cell-s{background:var(--surface);padding:28px 24px}
+a.cell{transition:background .15s;cursor:pointer}
+a.cell:hover{background:#141414}
 h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
 .desc{font-size:13px;color:var(--muted);line-height:1.6}
 .tag{display:inline-block;margin-top:14px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em}
@@ -67,9 +70,9 @@ h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
 .pf li{font-size:13px;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px}
 .pf li:last-child{border-bottom:none}
 .pf .check{color:var(--text);font-size:11px;flex-shrink:0}
-.price-btn{display:block;text-align:center;padding:10px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500}
+.price-btn{display:block;text-align:center;padding:10px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500;transition:opacity .15s,transform .15s}
 .price-btn.p{background:var(--text);color:var(--bg)}.price-btn.s{border:1px solid var(--border);color:var(--muted)}
-.price-btn:hover{opacity:.8}
+.price-btn:hover{opacity:.85;transform:translateY(-1px)}
 footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:32px}
 .footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
 .footer-links{display:flex;gap:24px}
@@ -84,7 +87,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   .nav-open .nav-links a{font-size:14px}
   .hero,.code-wrap{padding-left:20px;padding-right:20px}
   .hero{padding-top:64px}
-  h1{font-size:30px}
+  h1{font-size:34px}
   section{padding:32px 16px}
   .sec-pad{padding-left:16px!important;padding-right:16px!important}
   .g3,.g2,.pricing-grid{grid-template-columns:1fr}
@@ -139,6 +142,8 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 .hndl-strip-step-label{font-size:14px;color:#00ff41;font-weight:600;margin-bottom:7px}
 .hndl-strip-step-desc{font-size:12px;color:#009922;line-height:1.65}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.fade-in{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.fade-in.visible{opacity:1;transform:none}
 </style>
 <link rel="stylesheet" href="/nav.css">
 </head>
@@ -270,7 +275,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
-<div class="hndl-strip">
+<div class="hndl-strip" data-fade>
   <div class="hndl-inner">
     <div class="hndl-strip-header">
       <span class="hndl-strip-label">Active threat</span>
@@ -299,7 +304,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
-<section style="max-width:960px;margin:0 auto;padding:64px 32px">
+<section style="max-width:960px;margin:0 auto;padding:64px 32px" data-fade>
 
   <div class="grid g3" style="margin-bottom:24px">
     <div class="cell">
@@ -371,7 +376,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px">
+<section id="network" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
   <div class="eyebrow">Relay network</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
   <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
@@ -492,7 +497,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px">
+<section class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
   <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:8px">
@@ -540,7 +545,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="sectors">
+<section id="sectors" data-fade>
   <div class="eyebrow">Use cases</div>
   <h2>Real problems. Real stakes.</h2>
   <p class="sub">Ghost Pipe solves the same core problem across every sector: confidential data transport that leaves no trace. One relay engine — routed across dedicated subdomains for isolation and sector-specific compliance documentation.</p>
@@ -648,7 +653,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px">
+<section id="selfhost" class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
   <div class="eyebrow">Self-hosting</div>
   <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;margin-bottom:12px">Run your own relay.</h2>
   <p class="sub" style="max-width:580px;margin-bottom:40px">Source-available under BUSL-1.1. Free for up to 5 users. Full control &mdash; your server, your keys, no data leaving your infrastructure.</p>
@@ -727,7 +732,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <hr class="divider">
 
-<section id="pricing">
+<section id="pricing" data-fade>
   <div class="eyebrow">Pricing</div>
   <h2>Simple pricing. Free to start.</h2>
   <p class="sub">Two ways to use PARAMANT &mdash; pick the one that fits. Operators run the relay; end users connect to it.</p>
@@ -894,7 +899,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 </section>
 
-<footer>
+<footer data-fade>
   <div>
     <a href="/" class="footer-logo" style="text-decoration:none;color:inherit;display:block;margin-bottom:8px">PARAMANT</a>
     <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Post-quantum encrypted file relay</div>
@@ -956,5 +961,18 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 
 <script src="ct-stats.js" defer></script>
 <script src="/nav.js" defer></script>
+<script>
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}
+    });
+  },{threshold:0.07});
+  document.querySelectorAll('[data-fade]').forEach(function(el){
+    el.classList.add('fade-in');
+    io.observe(el);
+  });
+})();
+</script>
 </body>
 </html>
