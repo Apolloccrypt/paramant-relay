@@ -606,6 +606,7 @@ async function broadcastSTH(sth) {
     relay_pk_hash: relayIdentity.pk_hash,
   });
   for (const peer of peers) {
+    if (!isSsrfSafeUrl(peer.url)) { log('warn', 'gossip_ssrf_blocked', { url: (peer.url||'').slice(0,60) }); continue; }
     try {
       const target = new URL('/v2/sth/ingest', peer.url);
       const mod = target.protocol === 'https:' ? https : http;
@@ -1868,6 +1869,11 @@ session = client.create_session('recipient@example.com')</pre>
     if (!rUrl || !rSector || !rVersion || !public_key || !signature || !timestamp) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Missing required fields: url, sector, version, public_key, signature, timestamp' }));
+    }
+    // Fix: validate relay URL before storing — prevents SSRF via gossip broadcastSTH
+    if (!isSsrfSafeUrl(rUrl)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' }));
     }
     // Timestamp freshness check — reject if older than 5 minutes (replay prevention)
     const ageSec = (Date.now() - new Date(timestamp).getTime()) / 1000;
