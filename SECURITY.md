@@ -12,6 +12,20 @@ All reports are treated with responsible disclosure.
 
 ## Security audits
 
+### 2026-04-15 — Internal security review
+
+7 findings, all resolved in commit `8e6d4d2`.
+
+| # | Severity | Finding | Status |
+|---|----------|---------|--------|
+| 1 | High | DOM XSS in relay registry viewer — relay fields unescaped in `innerHTML` | Fixed: `esc()` helper applied to all API-sourced values incl. `title=""` attributes |
+| 2 | High | AES-256 key stored alongside ciphertext in Thunderbird FileLink blobs | Fixed: key excluded from blob (packet v0x02), travels via URL fragment only |
+| 3 | High | Malformed percent-encoding crashes relay process (public DoS, destroys in-flight blobs) | Fixed: `try/catch` on `decodeURIComponent()` at all 4 affected routes → HTTP 400 |
+| 4 | High | X-Forwarded-For spoofing bypasses admin brute-force rate limiter | Fixed: `X-Real-IP` (`nginx $remote_addr`) used instead of XFF first-entry |
+| 5 | Medium | `users.json` read-modify-write race condition | Fixed: `_mutateUsersJson()` serialises full read-modify-write cycle inside write queue |
+| 6 | Medium | Relay rate limits collapse to proxy loopback IP | Fixed: proxy-aware IP chain (`CF-Connecting-IP` → `X-Real-IP` → socket) |
+| 7 | Medium | `/v2/sign-dpa` unauthenticated, unlimited, email-abusable | Fixed: per-IP (3/24 h) and per-email (1/24 h) in-process limits + nginx `limit_req` |
+
 ### 2026-04-13 — CIS Ubuntu 24.04 benchmark (production server)
 
 114 checks applied across 13 categories on paramant.app:
@@ -65,20 +79,6 @@ All reports are treated with responsible disclosure.
 | 4 | Medium | SDK uses ?k= query param rejected by relay | Fixed: X-Api-Key header |
 | 5 | Medium | pgp_ enterprise admin path broken end-to-end | Fixed: removed pgp_ support |
 | 6 | Medium | Blob burned before transfer complete | Fixed: deferred deletion on res.finish() |
-
-### 2026-04-15 — Internal security review
-
-7 findings, all resolved in commit `8e6d4d2`.
-
-| # | Severity | Finding | Status |
-|---|----------|---------|--------|
-| 1 | High | DOM XSS in relay registry viewer — relay fields unescaped in `innerHTML` | Fixed: `esc()` helper applied to all API-sourced values incl. `title=""` attributes |
-| 2 | High | AES-256 key stored alongside ciphertext in Thunderbird FileLink blobs | Fixed: key excluded from blob (packet v0x02), travels via URL fragment only |
-| 3 | High | Malformed percent-encoding crashes relay process (public DoS, destroys in-flight blobs) | Fixed: `try/catch` on `decodeURIComponent()` at all 4 affected routes → HTTP 400 |
-| 4 | High | X-Forwarded-For spoofing bypasses admin brute-force rate limiter | Fixed: `X-Real-IP` (`nginx $remote_addr`) used instead of XFF first-entry |
-| 5 | Medium | `users.json` read-modify-write race condition | Fixed: `_mutateUsersJson()` serialises full read-modify-write cycle inside write queue |
-| 6 | Medium | Relay rate limits collapse to proxy loopback IP | Fixed: proxy-aware IP chain (`CF-Connecting-IP` → `X-Real-IP` → socket) |
-| 7 | Medium | `/v2/sign-dpa` unauthenticated, unlimited, email-abusable | Fixed: per-IP (3/24 h) and per-email (1/24 h) in-process limits + nginx `limit_req` |
 
 ### 2026-04 — Ryan Williams, Smart Cyber Solutions (independent)
 
