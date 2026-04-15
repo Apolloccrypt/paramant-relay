@@ -1,6 +1,6 @@
 // CT log widget — fetches live data from public relay endpoints
 (function() {
-  var RELAY = 'https://relay.paramant.app';
+  var RELAY = 'https://health.paramant.app';
 
   function set(id, val) {
     var el = document.getElementById(id);
