@@ -16,13 +16,13 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px
 .nav-links{display:flex;gap:20px;list-style:none}
 .nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
 .nav-links a:hover{color:var(--text)}
-.hero{max-width:680px;margin:0 auto;padding:80px 32px;text-align:center}
+.hero{max-width:680px;margin:0 auto;padding:96px 32px 88px;text-align:center}
 .status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:40px;font-family:var(--mono);letter-spacing:.04em}
 .status-dot{width:5px;height:5px;border-radius:50%;background:#333}
-h1{font-size:48px;font-weight:600;line-height:1.08;letter-spacing:-.03em;color:var(--text);margin-bottom:20px}
+h1{font-size:48px;font-weight:600;line-height:1.1;letter-spacing:-.03em;color:var(--text);margin-bottom:28px}
 h1 em{color:var(--muted);font-style:normal}
-.hero-sub{font-size:16px;color:var(--muted);max-width:460px;margin:0 auto 40px;line-height:1.7}
-.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.hero-sub{font-size:16px;color:var(--muted);max-width:480px;margin:0 auto 48px;line-height:1.75}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:44px}
 .btn-p{background:var(--text);color:var(--bg);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500}
 .btn-s{border:1px solid var(--border);color:var(--muted);padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px}
 .btn-p:hover,.btn-s:hover{opacity:.8}
@@ -35,11 +35,11 @@ h1 em{color:var(--muted);font-style:normal}
 .code-body{padding:20px 24px;font-family:var(--mono);font-size:12.5px;line-height:2}
 .c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#aaa}.c-ok{color:var(--green)}
 .proto-bar{border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;overflow:hidden}
-.proto-cell{flex:1;padding:16px 20px;border-right:1px solid var(--border);min-width:0}
+.proto-cell{flex:1;padding:20px 22px;border-right:1px solid var(--border);min-width:0}
 .proto-cell:last-child{border-right:none}
 .proto-cell .label{font-size:11px;font-family:var(--mono);color:var(--text);letter-spacing:.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .proto-cell .pdesc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-section{max-width:960px;margin:0 auto;padding:64px 32px}
+section{max-width:960px;margin:0 auto;padding:80px 32px}
 .eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
 h2{font-size:30px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
 .sub{font-size:15px;color:var(--muted);margin-bottom:52px;max-width:540px}
@@ -121,7 +121,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 /* Hamburger */
 .nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 .nav-burger:hover{color:var(--muted)}
-.hndl-strip{padding:40px 0;border-top:1px solid rgba(224,80,80,.2);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
+.hndl-strip{padding:52px 0;border-top:1px solid rgba(224,80,80,.3);border-bottom:1px solid rgba(224,80,80,.2);background:rgba(224,80,80,.04)}
 .hndl-inner{max-width:960px;margin:0 auto;padding:0 32px}
 .hndl-strip-header{display:flex;align-items:center;gap:16px;margin-bottom:32px;flex-wrap:wrap}
 .hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#e05050;border:1px solid rgba(224,80,80,.4);padding:3px 10px;border-radius:3px;flex-shrink:0}
@@ -259,15 +259,13 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 </div>
 
 <div class="hero">
-  <div class="status"><span class="status-dot" id="sdot" style="background:#2d8a5c"></span><span id="stxt">Checking relay status...</span></div>
-  <div style="display:inline-flex;align-items:center;gap:8px;background:#0d1f17;border:1px solid #1a3d28;border-radius:20px;padding:6px 16px;margin-bottom:24px"><span style="width:5px;height:5px;border-radius:50%;background:#2d8a5c;display:inline-block"></span><span style="font-size:11px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.06em">v2.4.5 &mdash; SELF-HOSTABLE &mdash; docker compose up -d</span></div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum. Client-side. RAM-only. Destroyed after one read.<br>No account. No storage. No trace.</p>
-  <div class="btns" style="margin-top:36px">
+  <div class="btns">
     <a href="/parashare" class="btn-p">Try ParaShare free &rarr;</a>
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
-  <div style="margin-top:20px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
+  <div style="margin-top:24px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
 </div>
 
 <div class="hndl-strip">
@@ -312,19 +310,19 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
-  <a href="/parashare" style="display:flex;align-items:center;gap:16px;padding:18px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1e1e1e'" onmouseout="this.style.background='var(--surface)'">
+  <a href="/parashare" style="display:flex;align-items:center;gap:16px;padding:24px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1e1e1e'" onmouseout="this.style.background='var(--surface)'">
     <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Product</div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">File sharing</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">ParaShare</div>
-      <div style="font-size:11px;color:var(--quiet);margin-top:1px">Browser-based encrypted file sharing &mdash; no account</div>
+      <div style="font-size:11px;color:var(--quiet);margin-top:3px">Browser-based encrypted file sharing &mdash; no account</div>
     </div>
     <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted);white-space:nowrap">Try free &rarr;</div>
   </a>
-  <a href="/drop" style="display:flex;align-items:center;gap:16px;padding:18px 40px;background:#0b1d12;border-left:2px solid #3dbe7a;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#0e2216'" onmouseout="this.style.background='#0b1d12'">
+  <a href="/drop" style="display:flex;align-items:center;gap:16px;padding:24px 40px;background:#0b1d12;border-left:2px solid #3dbe7a;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#0e2216'" onmouseout="this.style.background='#0b1d12'">
     <div>
-      <div style="font-size:10px;font-family:var(--mono);color:#3dbe7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Product</div>
+      <div style="font-size:10px;font-family:var(--mono);color:#3dbe7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Local transfer</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">ParaDrop</div>
-      <div style="font-size:11px;color:var(--quiet);margin-top:1px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read</div>
+      <div style="font-size:11px;color:var(--quiet);margin-top:3px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read</div>
     </div>
     <div style="margin-left:auto;font-size:11px;font-family:var(--mono);color:#3dbe7a;white-space:nowrap">Try now &rarr;</div>
   </a>
@@ -333,7 +331,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
 <hr class="divider">
 
 <div class="role-banner" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
-  <a href="#selfhost" style="display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:var(--bg);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#111'" onmouseout="this.style.background='var(--bg)'">
+  <a href="#selfhost" style="display:flex;align-items:center;justify-content:space-between;padding:24px 40px;background:var(--bg);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#111'" onmouseout="this.style.background='var(--bg)'">
     <div>
       <div style="font-size:10px;font-family:var(--mono);color:#2d8a5c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Relay operator</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">Run your own relay</div>
@@ -341,7 +339,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     </div>
     <div style="font-size:11px;font-family:var(--mono);color:#2d8a5c;white-space:nowrap;margin-left:24px">Self-host ↓</div>
   </a>
-  <a href="#pricing" style="display:flex;align-items:center;justify-content:space-between;padding:18px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1c1c1c'" onmouseout="this.style.background='var(--surface)'">
+  <a href="#pricing" style="display:flex;align-items:center;justify-content:space-between;padding:24px 40px;background:var(--surface);text-decoration:none;transition:background .15s" onmouseover="this.style.background='#1c1c1c'" onmouseout="this.style.background='var(--surface)'">
     <div>
       <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">End user</div>
       <div style="font-size:13px;font-weight:600;color:var(--text)">Use a managed relay</div>
