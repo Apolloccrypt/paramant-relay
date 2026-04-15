@@ -87,6 +87,16 @@ function modeAllows(p) {
   return !a || a.some(x => p === x || p.startsWith(x + '/'));
 }
 
+// HTML-escape user-supplied strings before embedding in email templates.
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 // ── NATS.io JetStream — push transport (vervangt polling) ────────────────────
 let natsClient = null;
 let natsJs = null;
@@ -1673,9 +1683,9 @@ session = client.create_session('recipient@example.com')</pre>
       const notifyHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:32px;max-width:480px">
           <div style="font-size:14px;font-weight:600;margin-bottom:16px;letter-spacing:.08em">PARAMANT — new trial key</div>
           <table style="font-size:12px;color:#888;border-collapse:collapse">
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Name</td><td>${name}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td>${rawEmail}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Use case</td><td>${useCase.slice(0, 120)}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Name</td><td>${escHtml(name)}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td>${escHtml(rawEmail)}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Use case</td><td>${escHtml(useCase.slice(0, 120))}</td></tr>
             <tr><td style="padding:4px 12px 4px 0;color:#555">Key prefix</td><td>${newKey.slice(0, 12)}…</td></tr>
             <tr><td style="padding:4px 12px 4px 0;color:#555">Time</td><td>${new Date(now).toISOString()}</td></tr>
           </table>
@@ -1738,14 +1748,14 @@ session = client.create_session('recipient@example.com')</pre>
       if (RESEND_KEY) {
         const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
           <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Dear ${name},</p>
-          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${org}</strong>.</p>
+          <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
+          <p style="color:#888;margin-bottom:24px">This email confirms that a Data Processing Agreement (GDPR Art. 28) has been signed on behalf of <strong style="color:#ededed">${escHtml(org)}</strong>.</p>
           <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px;font-size:13px">
             <div style="color:#555;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Agreement details</div>
             <table style="width:100%;border-collapse:collapse">
               <tr><td style="color:#555;padding:4px 0;width:40%">Reference</td><td style="color:#ededed">${ref}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${org}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${name}${title ? ' — ' + title : ''}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
               <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${version}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner DE (FSN1)</td></tr>
