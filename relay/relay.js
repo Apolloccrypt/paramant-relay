@@ -55,6 +55,7 @@ const SECTOR              = process.env.SECTOR              || 'relay';
 const RELAY_SELF_URL      = process.env.RELAY_SELF_URL      || null; // e.g. https://relay.paramant.app — this relay's public URL
 const RELAY_PRIMARY_URL   = process.env.RELAY_PRIMARY_URL   || null; // e.g. https://health.paramant.app — where to register
 const RELAY_IDENTITY_FILE = process.env.RELAY_IDENTITY_FILE || '/data/relay-identity.json';
+const TRIAL_KEYS_FILE     = process.env.TRIAL_KEYS_FILE     || '/data/trial-keys.jsonl';
 
 // Probeer @noble/post-quantum te laden voor ML-DSA
 let mlDsa = null;
@@ -1114,8 +1115,9 @@ setInterval(() => {
 const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub}
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
-// Trial key request rate limiting (1 per email per 24h, in-memory)
-const trialRequests = new Map(); // 'trial:email' → timestamp
+// Trial key request rate limiting (in-memory)
+const trialRequests   = new Map(); // email_lc → last_request_ts
+const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
@@ -1263,10 +1265,37 @@ function loadUsers() {
       if (k.active) apiKeys.set(k.key, {
         plan: k.plan, label: k.label||'', active: true, dsa_pub: k.dsa_pub||'',
         daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
+        is_trial: !!(k.plan === 'community' && k.trial_metadata),
+        trial_created: k.created ? new Date(k.created).getTime() : null,
+        uploads_today: 0, last_upload_day: '',
       });
     });
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
   } catch(e) { log('warn', 'no_users_file'); }
+}
+
+function loadTrialKeys() {
+  try {
+    const lines = fs.readFileSync(TRIAL_KEYS_FILE, 'utf8').split('\n').filter(Boolean);
+    let loaded = 0;
+    for (const line of lines) {
+      try {
+        const k = JSON.parse(line);
+        if (!k.key || !k.active) continue;
+        // Don't overwrite a key already loaded from users.json
+        if (!apiKeys.has(k.key)) {
+          apiKeys.set(k.key, {
+            plan: 'community', label: k.label||'', active: true, dsa_pub: '',
+            daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
+            is_trial: true, trial_created: k.created || Date.now(),
+            uploads_today: 0, last_upload_day: '',
+          });
+          loaded++;
+        }
+      } catch {}
+    }
+    if (loaded > 0) log('info', 'trial_keys_loaded', { count: loaded });
+  } catch(e) { /* file may not exist yet */ }
 }
 
 // Pubkey plan limits and TTL
@@ -1524,6 +1553,10 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v2/request-trial' && req.method === 'POST') {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
+
+      // Honeypot: bots fill hidden fields; legitimate browsers leave them empty
+      if (d._hp) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true })); }
+
       const rawEmail = (d.email || '').toString().trim();
       const name = (d.name || '').toString().trim().slice(0, 128);
       const useCase = ((d.use_case || d.usecase) || '').toString().trim().slice(0, 512);
@@ -1535,27 +1568,65 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(J({ error: 'Invalid email address' }));
       }
-      // Simple in-memory rate limit: 1 trial per email per 24h
-      const rlKey = 'trial:' + rawEmail.toLowerCase();
+
       const now = Date.now();
-      if (trialRequests.has(rlKey) && now - trialRequests.get(rlKey) < 604800000) {
-        res.writeHead(429, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'A trial key was already requested for this email in the last 7 days. Check your inbox.' }));
+      const DAY_MS = 86_400_000;
+
+      // IP rate limit: max 3 per IP per 24h
+      const clientIp = req.socket?.remoteAddress || 'unknown';
+      const ipTimes = (trialIpRequests.get(clientIp) || []).filter(t => now - t < DAY_MS);
+      if (ipTimes.length >= 3) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
+        return res.end(J({ error: 'Too many requests' }));
       }
-      trialRequests.set(rlKey, now);
+
+      // Email rate limit: 1 per 7 days — generic 429 (no info disclosure about existing key)
+      const emailKey = rawEmail.toLowerCase();
+      if (trialRequests.has(emailKey) && now - trialRequests.get(emailKey) < 7 * DAY_MS) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '604800' });
+        return res.end(J({ error: 'Too many requests' }));
+      }
+
+      // Record rate limit entries
+      ipTimes.push(now);
+      trialIpRequests.set(clientIp, ipTimes);
+      trialRequests.set(emailKey, now);
+
       const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
       const label = `trial:${name.replace(/\s+/g, '_').toLowerCase().slice(0, 40)}`;
-      apiKeys.set(newKey, { plan: 'community', label, active: true });
+      const trialCreated = now;
+      apiKeys.set(newKey, {
+        plan: 'community', label, active: true, dsa_pub: '',
+        daily_uploads: 0, daily_reset_ts: now + DAY_MS,
+        is_trial: true, trial_created: trialCreated,
+        uploads_today: 0, last_upload_day: '',
+      });
+
+      // Persist to JSONL (append-only, survives restarts independently of users.json)
+      const trialRecord = JSON.stringify({ key: newKey, label, email: rawEmail, active: true, created: trialCreated, trial_metadata: { name, use_case: useCase } });
+      fs.promises.appendFile(TRIAL_KEYS_FILE, trialRecord + '\n').catch(e => log('warn', 'trial_key_jsonl_failed', { err: e.message }));
+
+      // Also persist to users.json (admin visibility)
       fs.promises.readFile(USERS_FILE, 'utf8').then(raw => {
         const usersData = JSON.parse(raw);
-        usersData.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date().toISOString(), trial_metadata: { name, use_case: useCase } });
+        usersData.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date(trialCreated).toISOString(), trial_metadata: { name, use_case: useCase } });
         usersData.updated = new Date().toISOString();
         return _writeUsersJson(usersData);
-      }).catch(we => log('warn', 'trial_key_persist_failed', { err: we.message }));
-      // Send welcome email via Resend if configured
+      }).catch(we => log('warn', 'trial_key_users_persist_failed', { err: we.message }));
+
       const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (RESEND_KEY) {
-        const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
+      function sendEmail(to, subject, html) {
+        if (!RESEND_KEY) return;
+        const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [to], subject, html });
+        const r = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+        }, res2 => { res2.on('data', () => {}); res2.on('end', () => {}); });
+        r.on('error', e => log('warn', 'trial_email_failed', { to, err: e.message }));
+        r.write(body); r.end();
+      }
+
+      // Welcome email to requester
+      const welcomeHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
           <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
           <p style="color:#888;margin-bottom:16px">Hi ${name},</p>
           <p style="color:#888;margin-bottom:24px">Your free trial API key is ready. It gives you access to the community relay — burn-on-read, ML-KEM-768 encryption, EU/DE jurisdiction.</p>
@@ -1566,6 +1637,7 @@ const server = http.createServer(async (req, res) => {
           <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
             IMPORTANT: Save this key in your password manager immediately. It is generated once and cannot be recovered.
           </div>
+          <p style="font-size:12px;color:#555">Limits: 10 uploads/day · 1h TTL · 5MB · 30-day trial</p>
           <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install paramant-sdk
 
 from paramant import ParamantClient
@@ -1574,13 +1646,21 @@ session = client.create_session('recipient@example.com')</pre>
           <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> &nbsp;&middot;&nbsp; <a href="https://paramant.app" style="color:#888">Dashboard</a></p>
           <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 &nbsp;&middot;&nbsp; Burn-on-read &nbsp;&middot;&nbsp; EU/DE &nbsp;&middot;&nbsp; BUSL-1.1</p>
         </div>`;
-        const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [rawEmail], subject: 'Your PARAMANT trial API key', html });
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'trial_welcome_sent', { email: rawEmail, id: p.id }); } catch(e) {} }); });
-        req2.on('error', e => log('warn', 'trial_welcome_send_failed', { err: e.message }));
-        req2.write(body); req2.end();
-      }
+      sendEmail(rawEmail, 'Your PARAMANT trial API key', welcomeHtml);
+
+      // Notification email to operator
+      const notifyHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:32px;max-width:480px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:16px;letter-spacing:.08em">PARAMANT — new trial key</div>
+          <table style="font-size:12px;color:#888;border-collapse:collapse">
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Name</td><td>${name}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td>${rawEmail}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Use case</td><td>${useCase.slice(0, 120)}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Key prefix</td><td>${newKey.slice(0, 12)}…</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#555">Time</td><td>${new Date(now).toISOString()}</td></tr>
+          </table>
+        </div>`;
+      sendEmail('privacy@paramant.app', `New trial key: ${name} <${rawEmail}>`, notifyHtml);
+
       log('info', 'trial_key_requested', { name, email: rawEmail, use_case: useCase.slice(0, 80) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, email: rawEmail,
@@ -2320,6 +2400,35 @@ session = client.create_session('recipient@example.com')</pre>
       if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
       if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
+
+      // Trial key enforcement
+      if (keyData?.is_trial) {
+        const TRIAL_MAX_SIZE = 5 * 1024 * 1024;
+        const TRIAL_MAX_TTL  = 3_600_000; // 1h
+        const TRIAL_EXPIRY   = 30 * 86_400_000;
+        const TRIAL_DAILY    = 10;
+        if (keyData.trial_created && Date.now() - keyData.trial_created > TRIAL_EXPIRY) {
+          apiKeys.delete(apiKey);
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'Trial key expired' }));
+        }
+        const today = new Date().toDateString();
+        if (keyData.last_upload_day !== today) { keyData.uploads_today = 0; keyData.last_upload_day = today; }
+        if (keyData.uploads_today >= TRIAL_DAILY) {
+          res.writeHead(429, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'Daily upload limit reached (trial: 10/day)' }));
+        }
+        const blobPreview = Buffer.byteLength(payload, 'base64');
+        if (blobPreview > TRIAL_MAX_SIZE) {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'Max 5MB on trial' }));
+        }
+        if (ttl_ms && parseInt(ttl_ms) > TRIAL_MAX_TTL) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'Max TTL 1h on trial' }));
+        }
+        keyData.uploads_today++;
+      }
 
       // enc_meta: sender-encrypted filename/metadata (relay stores ciphertext only — finding #4)
       // Max 2048 bytes base64; relay never decrypts it.
@@ -3302,6 +3411,7 @@ async function registerSelf() {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
+loadTrialKeys();
 checkLicense();
 loadOrCreateRelayIdentity();
 relayRegistryFromCTLog();

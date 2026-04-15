@@ -116,6 +116,11 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
   /* Canvas/SVG media */
   canvas,svg{max-width:100%}
 }
+.hero-cta-secondary{display:flex;align-items:center;gap:1rem;margin-top:1.5rem;flex-wrap:wrap}
+.cta-secondary{color:#3dbe7a;font-size:.875rem;text-decoration:none;border-bottom:1px solid rgba(61,190,122,.3);padding-bottom:1px;transition:border-color .15s}
+.cta-secondary:hover{border-color:#3dbe7a}
+.cta-note{font-size:.78rem;color:#5a8a6a}
+.pricing-note{font-size:11px;color:var(--quiet);margin:6px 0 0;font-family:var(--mono)}
 .price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
 .popular-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:#2d8a5c;padding:2px 8px;border-radius:3px;margin-bottom:12px}.price-btn.ghost{background:transparent;border:1px solid #3dbe7a;color:#3dbe7a}.price-btn.ghost:hover{background:rgba(61,190,122,.1);opacity:1}
 /* Hamburger */
@@ -266,6 +271,10 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
   <div style="margin-top:24px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
+  <div class="hero-cta-secondary">
+    <a href="/request-key" class="cta-secondary">Get a free API key &rarr;</a>
+    <span class="cta-note">10 uploads/day &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; 30-second form</span>
+  </div>
 </div>
 
 <div class="hndl-strip">
@@ -508,6 +517,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
         <a href="/ct-log#verify" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Verify this relay →</a>
         <a href="/hndl" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Why post-quantum matters now →</a>
+        <a href="/request-key" style="font-size:11px;font-family:var(--mono);color:#3dbe7a;border:1px solid rgba(61,190,122,.3);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Try it free &rarr;</a>
       </div>
     </div>
   </div>
@@ -803,6 +813,7 @@ footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;ju
         <a href="/parashare" class="price-btn p">Try ParaShare &rarr;</a>
         <a href="/request-key" class="price-btn s">Request API key &rarr;</a>
       </div>
+      <p class="pricing-note">10 uploads/day &nbsp;&middot;&nbsp; 1h TTL &nbsp;&middot;&nbsp; 5MB &nbsp;&middot;&nbsp; 30-day trial</p>
     </div>
 
     <div class="pc">
