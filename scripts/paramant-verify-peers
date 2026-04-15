@@ -172,12 +172,27 @@ async function main() {
       checked++;
     }
 
-    // 3c. Check for root rollback within mirrored history (tree_size should be non-decreasing)
-    for (let i = 1; i < sths.length; i++) {
-      if (sths[i].tree_size < sths[i - 1].tree_size) {
-        console.log(`  INCONSISTENCY [${shortId}] tree_size rollback: ${sths[i-1].tree_size} → ${sths[i].tree_size} (append-only violation!)`);
-        inconsistencies++;
-        break;
+    // 3c. Check for tree_size rollback within each relay_id sequence.
+    // STHs are grouped by relay_id — a different relay_id means a new identity
+    // (relay restarted without persisted keypair) and resets the sequence.
+    // Within a sequence, sort by timestamp so out-of-order gossip receipt doesn't
+    // produce false positives, then verify tree_size is non-decreasing.
+    const byId = new Map();
+    for (const s of sths) {
+      const rid = s.relay_id || 'unknown';
+      if (!byId.has(rid)) byId.set(rid, []);
+      byId.get(rid).push(s);
+    }
+    for (const [rid, seq] of byId) {
+      seq.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      let maxSize = 0;
+      for (const s of seq) {
+        if (s.tree_size < maxSize) {
+          console.log(`  INCONSISTENCY [${shortId}] tree_size rollback in sequence for ${rid}: ${maxSize} → ${s.tree_size} (append-only violation!)`);
+          inconsistencies++;
+          break;
+        }
+        maxSize = s.tree_size;
       }
     }
   }

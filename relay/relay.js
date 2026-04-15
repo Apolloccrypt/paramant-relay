@@ -1411,11 +1411,16 @@ function authByDid(didStr, signature, payload) {
 }
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = ['https://paramant.app', 'https://www.paramant.app'];
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  if (origin === 'https://paramant.app' || origin.endsWith('.paramant.app')) return true;
+  if (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://')) return true;
+  if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
+  return false;
+}
 function setHeaders(res, req) {
   const origin = req?.headers?.origin || '';
-  // Reflect any origin — API key is the auth. Allows browser extensions (moz-extension://, chrome-extension://) and self-hosted frontends.
-  const allowOrigin = origin || '*';
+  const allowOrigin = isAllowedOrigin(origin) ? origin : 'https://paramant.app';
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
