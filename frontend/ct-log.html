@@ -274,8 +274,12 @@ nav a.back:hover { color:#aaa; }
 
 <div class="stats">
   <div class="stat">
+    <div class="val" id="stat-total">—</div>
+    <div class="lbl">Log entries</div>
+  </div>
+  <div class="stat">
     <div class="val" id="stat-count">—</div>
-    <div class="lbl">Relay registrations</div>
+    <div class="lbl">Registered relays</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-transfers">—</div>
@@ -307,7 +311,7 @@ nav a.back:hover { color:#aaa; }
 
 <div class="type-filter">
   <button class="tf active" id="tf-all"      onclick="setTypeFilter('all')">All</button>
-  <button class="tf"        id="tf-relay_reg" onclick="setTypeFilter('relay_reg')">Relay registrations</button>
+  <button class="tf"        id="tf-relay_reg" onclick="setTypeFilter('relay_reg')">Relay reg</button>
   <button class="tf"        id="tf-transfer"  onclick="setTypeFilter('transfer')">Transfer proofs</button>
 </div>
 
@@ -367,9 +371,10 @@ async function load() {
     allEntries = (d.entries || []).slice().reverse();
     filtered   = allEntries;
 
-    var relayRegCount = allEntries.filter(function(e){ return e.type === 'relay_reg'; }).length;
+    var keyRegCount   = allEntries.filter(function(e){ return !e.type || e.type === 'key_reg'; }).length;
     var transferCount = allEntries.filter(function(e){ return e.type === 'transfer' || e.type === 'pubkey'; }).length;
-    document.getElementById('stat-count').textContent = relayRegCount;
+    document.getElementById('stat-total').textContent = d.size != null ? d.size : allEntries.length;
+    document.getElementById('stat-count').textContent = keyRegCount;
     document.getElementById('stat-transfers').textContent = transferCount;
     const root = d.root || '';
     document.getElementById('stat-root').textContent =

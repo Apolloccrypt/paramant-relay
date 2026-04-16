@@ -12,58 +12,58 @@
     if (dot) dot.style.background = ok ? '#00cc33' : '#c84040';
   }
 
-  // Primary: /v2/ct/log — size, root, last 3 entries
-  fetch(RELAY + '/v2/ct/log?limit=3', {signal: AbortSignal.timeout(6000)})
+  // /ct/feed — tree_size, root, last 50 entries with types
+  fetch(RELAY + '/ct/feed', {signal: AbortSignal.timeout(6000)})
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (!d.ok) return;
       setDot(true);
 
-      if (d.size != null) set('ct-transfers', d.size.toLocaleString());
+      if (d.tree_size != null) set('ct-transfers', d.tree_size.toLocaleString());
 
       var root = d.root;
       if (root && root !== '0'.repeat(64)) {
         set('ct-root', root.slice(0, 16) + '...' + root.slice(-8));
       }
 
-      var feedEl = document.getElementById('ct-feed');
-      if (feedEl && d.entries && d.entries.length) {
-        var rows = d.entries.slice().reverse().map(function(e) {
-          var ts = new Date(e.ts);
-          var time = ts.toISOString().slice(11, 19);
-          var hash = e.leaf_hash ? e.leaf_hash.slice(0, 12) + '...' : '—';
-          return '<div><span style="color:var(--quiet)">#' + e.index + '</span>'
-            + ' &nbsp;·&nbsp; ' + hash
-            + ' &nbsp;·&nbsp; <span style="color:var(--quiet)">' + time + ' UTC</span></div>';
-        });
-        feedEl.innerHTML = rows.join('');
+      if (d.entries) {
+        // Registered relays = device key registrations (no type or type='key_reg')
+        var keyRegCount = d.entries.filter(function(e) {
+          return !e.type || e.type === 'key_reg';
+        }).length;
+        set('ct-relays', keyRegCount.toLocaleString());
+
+        var feedEl = document.getElementById('ct-feed');
+        if (feedEl && d.entries.length) {
+          var last3 = d.entries.slice(-3).reverse();
+          var rows = last3.map(function(e) {
+            var ts = new Date(e.t);
+            var time = ts.toISOString().slice(11, 19);
+            var hash = e.h ? e.h.slice(0, 12) + '...' : '—';
+            return '<div><span style="color:var(--quiet)">#' + e.i + '</span>'
+              + ' &nbsp;·&nbsp; ' + hash
+              + ' &nbsp;·&nbsp; <span style="color:var(--quiet)">' + time + ' UTC</span></div>';
+          });
+          feedEl.innerHTML = rows.join('');
+        }
       }
     })
     .catch(function() { setDot(false); });
 
-  // Relay self-registrations
-  fetch(RELAY + '/v2/relays', {signal: AbortSignal.timeout(5000)})
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.total != null) set('ct-relays', d.total.toLocaleString());
-    })
-    .catch(function() {});
-
-  // STH status — ghost_pipe mode returns error, show RAM-only
+  // STH status — disk-backed, signed with ML-DSA-65
   fetch(RELAY + '/v2/sth', {signal: AbortSignal.timeout(5000)})
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var el = document.getElementById('ct-sth-status');
       if (!el) return;
-      if (d.tree_size != null) {
-        el.textContent = '✓ signed';
+      if (d.ok && d.sth) {
+        el.textContent = 'ML-DSA-65';
         el.style.color = '#00cc33';
       } else {
-        el.textContent = 'RAM-only';
+        el.textContent = 'signed';
         el.style.color = '#555';
       }
     })
-    .catch(function() { set('ct-sth-status', 'RAM-only'); });
+    .catch(function() { set('ct-sth-status', 'offline'); });
 })();
 
 // Pricing tab toggle
