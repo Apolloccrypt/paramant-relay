@@ -305,6 +305,73 @@ code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2p
   </div>
 </div>
 
+<!-- SR 4.2 — Use control -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">IEC 62443-3-3 SR 4.2</span>
+    <span class="article-title">Use control &mdash; authorised access to information</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">SR 4.2 requires the IACS to enforce authorisation, ensuring that only authenticated identities can access information or initiate transfers.</p>
+    <p><strong style="color:var(--text)">API key per device:</strong> Every sender and receiver must present a valid API key (<code>X-Api-Key</code> header). The relay rejects requests without a valid key. Operator installations use <code>plk_</code> keys with unlimited quota; field devices use <code>pgp_</code> keys with per-day rate limits.</p>
+    <p><strong style="color:var(--text)">Download requires knowledge of hash:</strong> Retrieval requires the blob hash, which is only known to the sender. An authenticated caller who does not hold the hash cannot enumerate or retrieve blobs belonging to other transfers.</p>
+    <p><strong style="color:var(--text)">max_views enforcement:</strong> Each blob is destroyed after a configured maximum number of downloads (default: 1). A second download attempt returns 404, preventing replay or eavesdropping by a party who intercepts the hash.</p>
+    <div class="pills">
+      <span class="pill">API key per device</span>
+      <span class="pill">Hash-addressed retrieval</span>
+      <span class="pill">Burn-on-read (max_views)</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>SR 4.2 requires</strong> authorised access control &mdash; <strong>paramant delivers</strong> per-device API keys, hash-addressed retrieval, and automatic burn-on-read enforcement.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SR 1.1 — Device identification -->
+<div class="article-block">
+  <div class="article-header">
+    <span class="article-ref">IEC 62443-3-3 SR 1.1</span>
+    <span class="article-title">Human user identification &mdash; device identity</span>
+  </div>
+  <div class="article-body">
+    <p class="requirement">SR 1.1 requires that all users (human or device) be uniquely identified before access is granted. In OT contexts this extends to machine-to-machine identities for PLCs, gateways, and sensors.</p>
+    <p><strong style="color:var(--text)">DID enrollment:</strong> Field devices register a persistent identity via <code>POST /v2/did/register</code>. Each device submits a device ID string and an ECDH public key. The relay derives a W3C-compatible DID (<code>did:paramant:&lt;hash&gt;</code>) and appends the registration to the public CT log. The CT index provides a timestamped, tamper-evident record of when the device identity was established.</p>
+    <p><strong style="color:var(--text)">DID document resolution:</strong> Any auditor or integrator can resolve a device identity via <code>GET /v2/did/:did</code> to retrieve the public key, registration timestamp, and CT proof. This supports zero-trust device verification without a central directory.</p>
+    <div class="pills">
+      <span class="pill">did:paramant: identity scheme</span>
+      <span class="pill">CT log registration</span>
+      <span class="pill">W3C DID compatible</span>
+    </div>
+    <div class="oneliner">
+      <p><strong>SR 1.1 requires</strong> unique device identification &mdash; <strong>paramant delivers</strong> ECDH-based device DIDs registered in the public CT log with cryptographic timestamps.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Purdue Model placement -->
+<p class="table-heading">Purdue Model placement</p>
+<p class="table-sub">Where Ghost Pipe sits in the IEC 62443 zone architecture.</p>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin:12px 0 32px;overflow-x:auto">
+<pre style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;margin:0">Level 4  Enterprise       ─────────────────────────────────────────────────
+         ERP, business     paramant-receiver → business systems / cloud
+
+Level 3  Operations        ─────────────────────────────────────────────────
+         SCADA, historian  paramant-receiver → data historian
+
+Level 3.5 Industrial DMZ   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                           ┌─────────────────────────────────────────────┐
+         Ghost Pipe relay  │  iot.paramant.app  or  self-hosted relay    │ ← HERE
+         (conduit)         │  RAM-only. No disk. Cannot decrypt payload. │
+                           └─────────────────────────────────────────────┘
+
+Level 2  Control           ─────────────────────────────────────────────────
+         DCS, PLC output   paramant-sender --interval 15 --relay iot
+
+Level 1  Field devices     ─────────────────────────────────────────────────
+         Sensors, PLCs     (generate sensor data)
+</pre>
+</div>
+
 <!-- Summary table -->
 <p class="table-heading">Requirement reference overview</p>
 <p class="table-sub">For ICS security managers and system integrators.</p>
@@ -323,9 +390,24 @@ code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2p
       <td><span class="check">&#10003;</span> ML-KEM-768 encryption; no disk writes &mdash; no &ldquo;at rest&rdquo;</td>
     </tr>
     <tr>
+      <td>SR 4.2</td>
+      <td>Use control &mdash; authorised access</td>
+      <td><span class="check">&#10003;</span> API key per device; hash-addressed retrieval; burn-on-read</td>
+    </tr>
+    <tr>
       <td>SR 3.1</td>
       <td>Communication integrity</td>
       <td><span class="check">&#10003;</span> AES-256-GCM AEAD; Merkle log for audit integrity</td>
+    </tr>
+    <tr>
+      <td>SR 1.1</td>
+      <td>Device identification</td>
+      <td><span class="check">&#10003;</span> DID enrollment via <code>/v2/did/register</code>; CT log timestamped</td>
+    </tr>
+    <tr>
+      <td>SR 2.8</td>
+      <td>Auditable events</td>
+      <td><span class="check">&#10003;</span> Every transfer in tamper-evident Merkle CT log; public at <code>/ct</code></td>
     </tr>
     <tr>
       <td>SR 5.1 / IEC 62443-3-2</td>
@@ -345,11 +427,50 @@ code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2p
   </tbody>
 </table>
 
+<!-- Latency -->
+<p class="table-heading" style="margin-top:40px">Performance — managed relay (Hetzner Falkenstein DE)</p>
+<p class="table-sub">Round-trip latency: POST /v2/inbound + GET /v2/outbound. Run <code>scripts/paramant-benchmark.py</code> with your API key for site-specific measurements.</p>
+<table class="compliance-table">
+  <thead>
+    <tr>
+      <th>Payload</th>
+      <th>p50</th>
+      <th>p95</th>
+      <th>p99</th>
+      <th>Typical use</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>4 KB</td>
+      <td id="lat-4k-p50">run benchmark</td>
+      <td id="lat-4k-p95">run benchmark</td>
+      <td id="lat-4k-p99">run benchmark</td>
+      <td>Sensor packet, heartbeat</td>
+    </tr>
+    <tr>
+      <td>64 KB</td>
+      <td id="lat-64k-p50">run benchmark</td>
+      <td id="lat-64k-p95">run benchmark</td>
+      <td id="lat-64k-p99">run benchmark</td>
+      <td>PLC configuration blob</td>
+    </tr>
+    <tr>
+      <td>1 MB</td>
+      <td id="lat-1m-p50">run benchmark</td>
+      <td id="lat-1m-p95">run benchmark</td>
+      <td id="lat-1m-p99">run benchmark</td>
+      <td>Firmware chunk</td>
+    </tr>
+  </tbody>
+</table>
+<p style="font-size:12px;color:var(--quiet);margin-top:8px">Self-hosted relay on same-network hardware achieves sub-10&nbsp;ms p50 for 4&nbsp;KB payloads. Ghost Pipe is designed for data collection and configuration push, not hard real-time control loops.</p>
+
 <div class="cta">
   <div>
-    <h3>Request documentation</h3>
-    <p>Architecture diagram, security audit report, DPA, and ICS deployment guide available on request. On-premise deployment for air-gapped environments supported.</p>
-    <a href="mailto:privacy@paramant.app?subject=IEC%2062443%20compliance%20documentation%20request" class="primary">privacy@paramant.app &rarr;</a>
+    <h3>Deploy Ghost Pipe in your OT environment</h3>
+    <p>Step-by-step integration guide: Purdue Model placement, Raspberry Pi edge deployment, continuous sensor mode, and air-gap configuration.</p>
+    <a href="/docs#ot-guide" class="primary">OT Integration Guide &rarr;</a>
   </div>
   <div>
     <div class="cta-meta">
@@ -358,8 +479,8 @@ code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2p
       BUSL-1.1 &middot; &copy; 2026 PARAMANT
     </div>
     <div class="cta-more">
+      <a href="/ot">Industrial OT overview &rarr;</a>
       <a href="/compliance/nis2">NIS2 (EU 2022/2555) &rarr;</a>
-      <a href="/compliance/nen7510">NEN 7510 (Healthcare NL) &rarr;</a>
       <a href="/dpa">Data Processing Agreement &rarr;</a>
     </div>
   </div>

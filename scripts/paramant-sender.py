@@ -166,71 +166,186 @@ def main():
                    help="Hybrid encryption: klassiek (P-256 HKDF) + post-quantum (ML-KEM-768 HKDF) XOR'd")
     p.add_argument("--drop",       action="store_true",
                    help="Verstuur als anonieme drop met BIP39 mnemonic")
+    p.add_argument("--interval",   type=float, metavar="SECONDS",
+                   help="Send continuously every N seconds (e.g. --interval 15)")
+    p.add_argument("--device-id",  metavar="ID",
+                   help="Device identifier logged per transmission (e.g. plc-factory-01)")
+    p.add_argument("--count",      type=int, default=0,
+                   help="Stop after N transmissions (default: 0 = infinite)")
+    p.add_argument("--watch",      metavar="DIR",
+                   help="Watch directory for new files and send each one")
     p.add_argument("--version",    action="version", version=f"%(prog)s {VERSION}")
     args = p.parse_args()
 
     relay_url = RELAYS[args.relay]
     blob_size = BLOCKS[args.pad_block]
+    dev = f"[{args.device_id}] " if args.device_id else ""
     log(f"{B}PARAMANT Sender v{VERSION}{E}")
     log(f"Relay: {relay_url}")
+    if args.interval:
+        limit = f", stop na {args.count}" if args.count else ""
+        log(f"Interval: {args.interval}s{(f'  device: {args.device_id}') if args.device_id else ''}{limit}")
 
-    if args.file:
-        if not os.path.exists(args.file):
-            log(f"{R}Bestand niet gevonden: {args.file}{E}"); sys.exit(1)
-        data = open(args.file, "rb").read()
-        log(f"Bestand: {args.file} ({len(data):,} bytes)")
-    elif args.stdin:
-        log("Wacht op stdin..."); data = sys.stdin.buffer.read()
-    elif args.text:
-        data = args.text.encode()
-    else:
-        log(f"{R}Geef --file, --stdin of --text{E}"); sys.exit(1)
+    # Pre-read stdin before any loop — pipe closes after first read
+    _stdin_buf = None
+    if args.stdin and (args.interval or args.watch):
+        log("Wacht op stdin (eenmalig gelezen)...")
+        _stdin_buf = sys.stdin.buffer.read()
 
-    if args.drop:
-        log("Drop — BIP39 mnemonic genereren...")
-        entropy = os.urandom(16)
-        aes_key = None
-        try:
-            phrase  = _bip39_encode(entropy)
-            aes_key, lookup_hash = _derive_drop_keys(entropy)
-            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-            nonce  = secrets.token_bytes(12)
-            ct     = AESGCM(aes_key).encrypt(nonce, data, None)
-            packet = nonce + struct.pack(">I", len(ct)) + ct
-            blob   = packet + secrets.token_bytes(blob_size - len(packet))
-            log("Versturen...")
-            send_blob(relay_url, args.key, blob,
-                      ttl_ms=args.ttl * 1000, max_views=1, lookup_hash=lookup_hash)
-            log(f"{G}Drop verstuurd{E}")
-            log(f"{G}Mnemonic: {phrase}{E}")
-            log(f"\nOm op te halen:")
-            log(f"  paramant-receiver --key {args.key} --relay {args.relay} --pickup \"{phrase}\"")
-        except Exception as e:
-            log(f"{R}Drop mislukt: {e}{E}"); sys.exit(1)
-        finally:
-            if aes_key: _zero(aes_key)
-            _zero(entropy)
-        return
+    def _load():
+        if args.file:
+            if not os.path.exists(args.file):
+                log(f"{R}Bestand niet gevonden: {args.file}{E}"); sys.exit(1)
+            return open(args.file, "rb").read()
+        if args.stdin:
+            if _stdin_buf is not None:
+                return _stdin_buf
+            log("Wacht op stdin..."); return sys.stdin.buffer.read()
+        if args.text:
+            return args.text.encode()
+        log(f"{R}Geef --file, --stdin, --text of --watch{E}"); sys.exit(1)
 
-    if not args.no_encrypt:
-        if args.hybrid:
-            log("Hybrid-modus — klassiek + post-quantum...")
-            blob, _ = encrypt_hybrid(data, args.key, blob_size=blob_size)
+    def _send_one(data):
+        """Encrypt and relay one payload. Returns (hash, phrase_or_None). Raises on error."""
+        if args.drop:
+            entropy = os.urandom(16)
+            aes_key = None
+            try:
+                phrase  = _bip39_encode(entropy)
+                aes_key, lookup_hash = _derive_drop_keys(entropy)
+                from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                nonce  = secrets.token_bytes(12)
+                ct     = AESGCM(aes_key).encrypt(nonce, data, None)
+                packet = nonce + struct.pack(">I", len(ct)) + ct
+                blob   = packet + secrets.token_bytes(blob_size - len(packet))
+                h = send_blob(relay_url, args.key, blob,
+                              ttl_ms=args.ttl * 1000, max_views=1, lookup_hash=lookup_hash)
+                return h, phrase
+            finally:
+                if aes_key: _zero(aes_key)
+                _zero(entropy)
+        if not args.no_encrypt:
+            if args.hybrid:
+                blob, _ = encrypt_hybrid(data, args.key, blob_size=blob_size)
+            else:
+                blob, _ = encrypt(data, args.key, blob_size=blob_size)
         else:
-            log("Versleutelen..."); blob, _ = encrypt(data, args.key, blob_size=blob_size)
-    else:
-        blob = pad(data, blob_size)
-
-    log("Versturen...")
-    try:
+            blob = pad(data, blob_size)
         h = send_blob(relay_url, args.key, blob,
                       ttl_ms=args.ttl * 1000, max_views=args.max_views)
-        log(f"{G}Verstuurd{E}")
-        log(f"{G}Hash: {h}{E}")
-        log(f"\nOm te ontvangen:")
-        log(f"  paramant-receiver --key {args.key} --relay {args.relay} --hash {h}")
-    except Exception as e:
-        log(f"{R}Verzenden mislukt: {e}{E}"); sys.exit(1)
+        return h, None
+
+    # ── Watch mode ────────────────────────────────────────────────────────────
+    if args.watch:
+        if not os.path.isdir(args.watch):
+            log(f"{R}Map niet gevonden: {args.watch}{E}"); sys.exit(1)
+        interval = args.interval or 10
+        log(f"Watch: {args.watch}  (poll elke {interval}s)")
+        seen = set(os.listdir(args.watch))
+        n = 0
+        try:
+            while True:
+                current = set(os.listdir(args.watch))
+                for fname in sorted(current - seen):
+                    fpath = os.path.join(args.watch, fname)
+                    if not os.path.isfile(fpath):
+                        continue
+                    try:
+                        data = open(fpath, "rb").read()
+                        ts = time.strftime("%H:%M:%S")
+                        log(f"{dev}#{n+1} {ts} — {fname} ({len(data):,}b)")
+                        h, phrase = _send_one(data)
+                        log(f"{G}OK: {phrase or h[:16] + '...'}{E}")
+                        n += 1
+                        if args.count and n >= args.count:
+                            log(f"{G}Klaar — {n} bestanden verstuurd{E}"); return
+                    except Exception as e:
+                        log(f"{R}Fout bij {fname}: {e}{E}")
+                seen = current
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            log(f"\n{Y}Gestopt — {n} bestanden verstuurd{E}")
+        return
+
+    # ── Single-shot mode (original behavior unchanged) ────────────────────────
+    if not args.interval:
+        if args.file:
+            if not os.path.exists(args.file):
+                log(f"{R}Bestand niet gevonden: {args.file}{E}"); sys.exit(1)
+            data = open(args.file, "rb").read()
+            log(f"Bestand: {args.file} ({len(data):,} bytes)")
+        elif args.stdin:
+            log("Wacht op stdin..."); data = sys.stdin.buffer.read()
+        elif args.text:
+            data = args.text.encode()
+        else:
+            log(f"{R}Geef --file, --stdin of --text{E}"); sys.exit(1)
+
+        if args.drop:
+            log("Drop — BIP39 mnemonic genereren...")
+            entropy = os.urandom(16)
+            aes_key = None
+            try:
+                phrase  = _bip39_encode(entropy)
+                aes_key, lookup_hash = _derive_drop_keys(entropy)
+                from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                nonce  = secrets.token_bytes(12)
+                ct     = AESGCM(aes_key).encrypt(nonce, data, None)
+                packet = nonce + struct.pack(">I", len(ct)) + ct
+                blob   = packet + secrets.token_bytes(blob_size - len(packet))
+                log("Versturen...")
+                send_blob(relay_url, args.key, blob,
+                          ttl_ms=args.ttl * 1000, max_views=1, lookup_hash=lookup_hash)
+                log(f"{G}Drop verstuurd{E}")
+                log(f"{G}Mnemonic: {phrase}{E}")
+                log(f"\nOm op te halen:")
+                log(f"  paramant-receiver --key {args.key} --relay {args.relay} --pickup \"{phrase}\"")
+            except Exception as e:
+                log(f"{R}Drop mislukt: {e}{E}"); sys.exit(1)
+            finally:
+                if aes_key: _zero(aes_key)
+                _zero(entropy)
+            return
+
+        if not args.no_encrypt:
+            if args.hybrid:
+                log("Hybrid-modus — klassiek + post-quantum...")
+                blob, _ = encrypt_hybrid(data, args.key, blob_size=blob_size)
+            else:
+                log("Versleutelen..."); blob, _ = encrypt(data, args.key, blob_size=blob_size)
+        else:
+            blob = pad(data, blob_size)
+
+        log("Versturen...")
+        try:
+            h = send_blob(relay_url, args.key, blob,
+                          ttl_ms=args.ttl * 1000, max_views=args.max_views)
+            log(f"{G}Verstuurd{E}")
+            log(f"{G}Hash: {h}{E}")
+            log(f"\nOm te ontvangen:")
+            log(f"  paramant-receiver --key {args.key} --relay {args.relay} --hash {h}")
+        except Exception as e:
+            log(f"{R}Verzenden mislukt: {e}{E}"); sys.exit(1)
+        return
+
+    # ── Interval mode ─────────────────────────────────────────────────────────
+    n = 0
+    try:
+        while True:
+            ts = time.strftime("%H:%M:%S")
+            try:
+                data = _load()
+                h, phrase = _send_one(data)
+                label = phrase or h[:16] + "..."
+                log(f"{G}{dev}#{n+1} {ts} — {label}{E}")
+            except Exception as e:
+                log(f"{R}{dev}#{n+1} {ts} fout: {e}{E}")
+            n += 1
+            if args.count and n >= args.count:
+                log(f"{G}Klaar — {n} berichten verstuurd{E}"); return
+            time.sleep(args.interval)
+    except KeyboardInterrupt:
+        log(f"\n{Y}Gestopt — {n} berichten verstuurd{E}")
 
 if __name__ == "__main__":
     main()

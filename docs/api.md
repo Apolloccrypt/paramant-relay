@@ -369,6 +369,106 @@ curl https://relay.paramant.app/v2/pubkey/phone-001 \
 
 ---
 
+## Device Identity
+
+Ghost Pipe supports W3C-compatible decentralised identifiers (`did:paramant:`) for field devices. Registering a device identity enrolls it in the CT log and allows transfers to be attributed to a specific device without exposing the API key.
+
+### POST /v2/did/register — Enroll a device
+
+```bash
+curl -X POST https://iot.paramant.app/v2/did/register \
+  -H "X-Api-Key: plk_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "plc-factory-01",
+    "ecdh_pub":  "<base64 ECDH P-256 or X25519 public key>",
+    "dsa_pub":   "<base64 ML-DSA-65 public key — optional>"
+  }'
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "did": "did:paramant:a3f2b7c1…",
+  "document": {
+    "id": "did:paramant:a3f2b7c1…",
+    "verificationMethod": [
+      {
+        "id": "did:paramant:a3f2b7c1…#keys-1",
+        "type": "JsonWebKey2020",
+        "controller": "did:paramant:a3f2b7c1…",
+        "publicKeyHex": "<ecdh_pub>"
+      }
+    ]
+  },
+  "ct_index": 42
+}
+```
+
+`ct_index` is the CT log position of this registration — auditors can verify the enrollment timestamp via `/v2/ct/proof?index=42`.
+
+Limits: max 500 DIDs per API key. Receiver sessions (`device_id` starting with `inv_`) do not require an API key.
+
+---
+
+### GET /v2/did/:did — Resolve a DID document
+
+Public endpoint — no API key required.
+
+```bash
+curl https://iot.paramant.app/v2/did/did:paramant:a3f2b7c1…
+```
+
+Returns the W3C DID document including the device's public key and CT registration index.
+
+---
+
+### GET /v2/did — List enrolled devices
+
+```bash
+curl https://iot.paramant.app/v2/did \
+  -H "X-Api-Key: plk_your_key"
+```
+
+```json
+{
+  "ok": true,
+  "count": 3,
+  "dids": [
+    { "did": "did:paramant:a3f2…", "device": "plc-factory-01", "ts": "2026-04-01T…" },
+    { "did": "did:paramant:b8e1…", "device": "plc-factory-02", "ts": "2026-04-01T…" }
+  ]
+}
+```
+
+---
+
+### POST /v2/attest — Attest a device
+
+Verify that a device holds the private key corresponding to its registered public key:
+
+```bash
+curl -X POST https://iot.paramant.app/v2/attest \
+  -H "X-Api-Key: plk_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id":   "plc-factory-01",
+    "attestation": {
+      "method":    "ecdh-challenge",
+      "challenge": "<base64 challenge bytes>",
+      "response":  "<base64 signed response>"
+    }
+  }'
+```
+
+```json
+{ "ok": true, "valid": true, "device": "plc-factory-01" }
+```
+
+---
+
 ## Rate limits
 
 | Tier | Uploads/day | Retention |

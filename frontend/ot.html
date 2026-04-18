@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT for Industrial OT — IEC 62443 quantum-safe conduit</title>
+<meta name="description" content="Ghost Pipe as a quantum-safe data conduit for OT environments. PLC → Ghost Pipe → SCADA. No VPN, no network changes, no persistent connection. IEC 62443 aligned.">
+<style>
+:root{--bg:#0c0c0c;--bg2:#111;--surface:#181818;--border:#242424;--border2:#1e1e1e;--text:#ededed;--muted:#aaa;--dim:#6e6e6e;--green:#2d8a5c;--green-dim:#1a3d28;--green-bg:#0d1a12;--mono:'SF Mono','Fira Code','Cascadia Code',monospace;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;padding-top:56px}
+a{color:var(--green);text-decoration:none}
+code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:2px 6px;border-radius:3px;color:var(--muted)}
+pre{font-family:var(--mono);font-size:11px;line-height:1.7;overflow-x:auto}
+
+.hero{padding:80px 24px 64px;max-width:960px;margin:0 auto}
+.hero-tag{font-size:10px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:18px}
+.hero h1{font-size:clamp(30px,5vw,52px);font-weight:800;letter-spacing:-.025em;line-height:1.1;margin-bottom:18px}
+.hero h1 .acc{color:var(--green)}
+.hero-sub{font-size:15px;color:var(--muted);max-width:580px;line-height:1.8;margin-bottom:32px}
+.ctas{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:52px}
+.btn-p{padding:11px 26px;background:var(--green);color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;border:none;cursor:pointer;text-decoration:none;letter-spacing:.04em;display:inline-block}
+.btn-s{padding:11px 22px;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:12px;text-decoration:none;letter-spacing:.04em;display:inline-block}
+.btn-p:hover{opacity:.88}.btn-s:hover{border-color:var(--muted);color:var(--text)}
+
+.section{padding:64px 24px;border-top:1px solid var(--border)}
+.section-inner{max-width:960px;margin:0 auto}
+.section-tag{font-size:10px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.section h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.section p{font-size:14px;color:var(--muted);line-height:1.75;max-width:680px}
+
+.arch-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:24px 28px;margin:28px 0;overflow-x:auto}
+.arch-box pre{color:var(--muted)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px 24px}
+.card-tag{font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.card h3{font-size:14px;font-weight:600;margin-bottom:8px}
+.card p{font-size:13px;color:var(--muted);line-height:1.65}
+.card code{font-size:10px}
+
+.prop-list{margin-top:28px;display:flex;flex-direction:column;gap:0}
+.prop{display:flex;align-items:baseline;gap:16px;padding:12px 0;border-bottom:1px solid var(--border2)}
+.prop:last-child{border-bottom:none}
+.prop-key{font-family:var(--mono);font-size:11px;color:var(--green);min-width:200px;flex-shrink:0}
+.prop-val{font-size:13px;color:var(--muted);line-height:1.5}
+
+.sr-table{width:100%;border-collapse:collapse;margin-top:24px;font-size:13px}
+.sr-table th{text-align:left;padding:8px 12px;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--dim);border-bottom:1px solid var(--border);background:var(--surface)}
+.sr-table td{padding:10px 12px;border-bottom:1px solid var(--border2);vertical-align:top;color:var(--muted)}
+.sr-table td:first-child{font-family:var(--mono);font-size:11px;color:var(--green);white-space:nowrap}
+.sr-table tr:last-child td{border-bottom:none}
+.check{color:var(--green)}
+
+.cta-band{padding:64px 24px;border-top:1px solid var(--border);background:var(--bg2)}
+.cta-inner{max-width:960px;margin:0 auto;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:32px}
+.cta-band h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+.cta-band p{font-size:14px;color:var(--muted);max-width:500px;line-height:1.75;margin-bottom:20px}
+.cta-meta{font-size:11px;font-family:var(--mono);color:var(--dim);line-height:2}
+</style>
+<link rel="stylesheet" href="/nav.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+  <ul class="nav-links">
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Product &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/docs">Docs</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/vs">vs. alternatives</a></li>
+        <li><a href="/press">Press kit</a></li>
+        <li><a href="/changelog">Changelog</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Self-host &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a></li>
+        <li><a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a></li>
+        <li><a href="/docs#self-hosting">Deploy guide</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/install.sh">install.sh</a></li>
+        <li><a href="/install-pi.sh">install-pi.sh</a></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Compliance &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/compliance/nis2">NIS2 (EU 2022/2555)</a></li>
+        <li><a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a></li>
+        <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
+        <li><a href="/dpa">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/government">Government &amp; public sector</a></li>
+        <li><a href="/hndl">HNDL threat</a></li>
+        <li><a href="/crypto-agility">Crypto agility</a></li>
+      </ul>
+    </li>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Info &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="mailto:privacy@paramant.app">Contact</a></li>
+        <li><a href="/request-key">Free API key</a></li>
+        <li><a href="/status">Status</a></li>
+        <li><a href="/sla">SLA</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="/license">License</a></li>
+      </ul>
+    </li>
+  </ul>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Product</div>
+    <a href="/parashare">ParaShare</a><a href="/drop">ParaDrop</a>
+    <a href="/dashboard">Dashboard</a><a href="/ct-log">CT Log</a>
+    <a href="/docs">Docs</a><a href="/#pricing">Pricing</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Compliance</div>
+    <a href="/compliance/iec62443">IEC 62443</a>
+    <a href="/compliance/nis2">NIS2</a>
+    <a href="/dpa">Data Processing Agreement</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Info</div>
+    <a href="mailto:privacy@paramant.app">Contact</a>
+    <a href="/request-key">Free API key</a>
+  </div>
+</div>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-tag">Industrial OT &middot; IEC 62443</div>
+  <h1>Sensor data without exposing<br>your <span class="acc">OT network</span></h1>
+  <p class="hero-sub">Ghost Pipe is a quantum-safe data conduit for the OT/IT boundary. PLC &rarr; Ghost Pipe relay &rarr; SCADA. No VPN, no certificates, no direct network connection between zones. Data is encrypted on the field device and destroyed after delivery.</p>
+  <div class="ctas">
+    <a href="/request-key" class="btn-p">Request API key &rarr;</a>
+    <a href="/compliance/iec62443" class="btn-s">IEC 62443 compliance</a>
+    <a href="/docs#ot-guide" class="btn-s">OT integration guide</a>
+  </div>
+
+  <!-- Traffic analysis visualisation -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:720px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px">
+      <div style="font-size:9px;font-family:var(--mono);color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px">Without Ghost Pipe</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:6px">
+        <div><span style="color:#c0392b">12 B</span> &mdash; keep-alive</div>
+        <div><span style="color:#c0392b">8 B</span> &mdash; sensor ping</div>
+        <div><span style="color:#e74c3c;font-weight:700">2.3 MB</span> &mdash; FIRMWARE UPDATE!</div>
+        <div><span style="color:#e74c3c;font-weight:700">980 KB</span> &mdash; CONFIG CHANGE!</div>
+      </div>
+      <div style="font-size:11px;color:var(--dim);margin-top:12px;line-height:1.5">Attacker knows exactly when critical updates happen.</div>
+    </div>
+    <div style="background:var(--green-bg);border:1px solid var(--green-dim);border-radius:6px;padding:18px 20px">
+      <div style="font-size:9px;font-family:var(--mono);color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px">With Ghost Pipe</div>
+      <div style="font-family:var(--mono);font-size:11px;color:#a8d5b5;display:flex;flex-direction:column;gap:6px">
+        <div>5 MB</div>
+        <div>5 MB</div>
+        <div>5 MB</div>
+        <div>5 MB</div>
+      </div>
+      <div style="font-size:11px;color:var(--green);margin-top:12px;line-height:1.5">Uniform stream. No pattern. No intent visible.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Architecture section -->
+<div class="section">
+  <div class="section-inner">
+    <div class="section-tag">Architecture</div>
+    <h2>Purdue Model — where Ghost Pipe sits</h2>
+    <p>Ghost Pipe deploys as the IEC 62443 conduit at Level 3.5 (Industrial DMZ). The relay stores nothing on disk — data lives in RAM only and is destroyed on delivery. No persistent connection crosses the OT/IT boundary.</p>
+    <div class="arch-box">
+<pre>Level 4  Enterprise     ────────────────────────────────────────────────────
+         ERP, cloud       paramant-receiver → business systems
+
+Level 3  Operations     ────────────────────────────────────────────────────
+         SCADA, historian  paramant-receiver → data historian
+
+Level 3.5 DMZ            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                         ┌──────────────────────────────────────────────┐
+                         │  Ghost Pipe relay                            │ ← HERE
+                         │  RAM-only. No disk. Cannot decrypt payload.  │
+                         │  Self-hosted (Pi, VM) or iot.paramant.app   │
+                         └──────────────────────────────────────────────┘
+
+Level 2  Control        ────────────────────────────────────────────────────
+         DCS, PLC         paramant-sender --interval 15 --relay iot
+
+Level 1  Field devices  ────────────────────────────────────────────────────
+         Sensors, PLCs    (generate sensor data)</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Capabilities -->
+<div class="section">
+  <div class="section-inner">
+    <div class="section-tag">Capabilities</div>
+    <h2>Built for OT constraints</h2>
+    <p>Designed for environments where network changes are change-controlled and direct connectivity between zones is prohibited.</p>
+    <div class="grid2" style="margin-top:28px">
+      <div class="card">
+        <div class="card-tag">Continuous sensor data</div>
+        <h3>Periodic push without a cron job</h3>
+        <p>The <code>--interval</code> flag streams sensor readings continuously. One command, one connection, unlimited readings.</p>
+        <div style="margin-top:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px">
+          <pre style="color:var(--muted)">paramant-sender \
+  --stdin \
+  --interval 15 \
+  --device-id plc-A1 \
+  --relay iot \
+  --key pgp_xxx</pre>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-tag">Firmware distribution</div>
+        <h3>Signed firmware push to device groups</h3>
+        <p>Ed25519-signed firmware delivered to named device groups. Devices verify signature before applying. CT log records every update event.</p>
+        <div style="margin-top:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px">
+          <pre style="color:var(--muted)">paramant-firmware \
+  firmware-v2.1.bin \
+  --sign \
+  --device-group factory-floor.txt \
+  --version 2.1</pre>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-tag">Edge deployment</div>
+        <h3>Raspberry Pi 4 and ARM64 gateways</h3>
+        <p>The relay runs on Raspberry Pi 3B+/4, Siemens SIMATIC gateways, and Advantech ARMs. Install in 2 minutes with <code>install-pi.sh</code>.</p>
+        <div style="margin-top:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px">
+          <pre style="color:var(--muted)">curl -fsSL \
+  https://paramant.app/install-pi.sh \
+  | sudo bash</pre>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-tag">Self-hosted / air-gap</div>
+        <h3>No external dependency required</h3>
+        <p>Deploy your own relay entirely within your OT DMZ. No outbound internet from the relay host. CT log stays local and can be archived to an air-gapped audit server.</p>
+        <div style="margin-top:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px">
+          <pre style="color:var(--muted)">docker run -d \
+  -e RELAY_MODE=iot \
+  -e LICENSE_KEY=plk_xxx \
+  -p 3000:3000 \
+  mtty001/relay:latest</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Technical properties -->
+<div class="section">
+  <div class="section-inner">
+    <div class="section-tag">Technical specifications</div>
+    <h2>Security properties</h2>
+    <div class="prop-list">
+      <div class="prop"><span class="prop-key">Key exchange</span><span class="prop-val">ML-KEM-768 + ECDH X25519 hybrid (NIST FIPS 203). Files are unreadable even by a quantum adversary.</span></div>
+      <div class="prop"><span class="prop-key">Symmetric cipher</span><span class="prop-val">AES-256-GCM with per-transfer random IV. AEAD authentication tag detects any in-transit modification.</span></div>
+      <div class="prop"><span class="prop-key">Traffic obfuscation</span><span class="prop-val">All transfers padded to a fixed 5 MB block. An observer cannot determine payload size, type, or intent from packet captures.</span></div>
+      <div class="prop"><span class="prop-key">Burn-on-read</span><span class="prop-val">Each blob is destroyed after the first authorised download. No residual data in the relay after delivery.</span></div>
+      <div class="prop"><span class="prop-key">Relay identity</span><span class="prop-val">ML-DSA-65 (FIPS 204) self-signed certificate. Post-quantum digital signature. Cannot be impersonated without the signing key.</span></div>
+      <div class="prop"><span class="prop-key">Audit trail</span><span class="prop-val">Every transfer appended to a Merkle CT log. Tamper-evident, append-only. SHA-256 leaf hashes, published STH every 30 seconds.</span></div>
+      <div class="prop"><span class="prop-key">Device identity</span><span class="prop-val">W3C-compatible DID scheme (<code>did:paramant:</code>) for PLC/sensor enrollment. Registered in CT log at provisioning time.</span></div>
+      <div class="prop"><span class="prop-key">Infrastructure</span><span class="prop-val">Managed relay: Hetzner Falkenstein DE only. No US sub-processors. No US CLOUD Act exposure. Self-hosted option for full control.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- IEC 62443 compliance summary -->
+<div class="section">
+  <div class="section-inner">
+    <div class="section-tag">Compliance</div>
+    <h2>IEC 62443 alignment</h2>
+    <p>Ghost Pipe maps directly to the IEC 62443 zones-and-conduits model. Full compliance documentation available at <a href="/compliance/iec62443">/compliance/iec62443</a>.</p>
+    <table class="sr-table">
+      <thead>
+        <tr><th>SR requirement</th><th>How Ghost Pipe addresses it</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>SR 4.1</td><td><span class="check">&#10003;</span> ML-KEM-768 client-side encryption. Relay never holds plaintext. No data at rest.</td></tr>
+        <tr><td>SR 4.2</td><td><span class="check">&#10003;</span> API key per device. Hash-addressed retrieval. Burn-on-read (max_views enforcement).</td></tr>
+        <tr><td>SR 3.1</td><td><span class="check">&#10003;</span> AES-256-GCM AEAD authentication tag on every payload. Tamper-evident Merkle CT log.</td></tr>
+        <tr><td>SR 1.1</td><td><span class="check">&#10003;</span> Device DID enrollment via <code>/v2/did/register</code>. CT log timestamped registration.</td></tr>
+        <tr><td>SR 2.8</td><td><span class="check">&#10003;</span> Every transfer in public, tamper-evident Merkle CT log. RSS feed for external archiving.</td></tr>
+        <tr><td>SR 5.1 / 62443-3-2</td><td><span class="check">&#10003;</span> Dedicated <code>iot.paramant.app</code> sector. No cross-sector data. Self-hostable in DMZ.</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:16px"><a href="/compliance/iec62443">Full IEC 62443 compliance documentation &rarr;</a></p>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-band">
+  <div class="cta-inner">
+    <div>
+      <h2>Start a Ghost Pipe OT pilot</h2>
+      <p>Community edition is free for up to 5 devices. Enterprise licensing includes dedicated relay, custom SLA, and on-site deployment support.</p>
+      <div class="ctas">
+        <a href="/request-key" class="btn-p">Get free API key &rarr;</a>
+        <a href="mailto:privacy@paramant.app?subject=OT%20pilot%20inquiry" class="btn-s">Contact for enterprise</a>
+      </div>
+    </div>
+    <div class="cta-meta">
+      iot.paramant.app<br>
+      IEC 62443 &middot; NIS2<br>
+      ML-KEM-768 &middot; FIPS 203/204<br>
+      Hetzner DE &middot; BUSL-1.1<br>
+      &copy; 2026 PARAMANT
+    </div>
+  </div>
+</div>
+
+<script src="/nav.js" defer></script>
+</body>
+</html>
