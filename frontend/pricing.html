@@ -200,13 +200,14 @@
         <div class="tier-name">Free</div>
         <div class="tier-price">&euro;0</div>
         <div class="tier-price-note">Forever &middot; no card required</div>
+        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-5);line-height:1.65">For one-off anonymous sends. No account, no tracking.</p>
         <ul class="tier-features">
           <li>AES-256-GCM, browser-generated key</li>
-          <li>Burn-on-read, RAM only, no disk</li>
           <li>5 MB per file</li>
-          <li>1 hour TTL</li>
+          <li>1 hour link expiry</li>
+          <li>Burn on first read</li>
           <li>10 uploads per hour per IP</li>
-          <li>CT audit proof per transfer</li>
+          <li>Up to 5 registered devices for ParaShare</li>
         </ul>
         <a href="/send" class="btn btn-primary" style="display:block;text-align:center">Send a file free &rarr;</a>
       </div>
@@ -215,11 +216,16 @@
         <div class="tier-name">Pro</div>
         <div class="tier-price" style="font-size:var(--text-xl)">Coming soon</div>
         <div class="tier-price-note">On the roadmap. Join the waitlist for launch pricing.</div>
+        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
         <ul class="tier-features">
-          <li class="dim">AES-256-GCM or ML-KEM-768 hybrid (your choice per send)</li>
-          <li class="dim">5 MB per file, 24 hour TTL</li>
-          <li class="dim">Unlimited uploads, no IP rate limit</li>
-          <li class="dim">Webhooks, send history, email notifications</li>
+          <li class="dim">Everything in Free</li>
+          <li class="dim">24 hour link expiry</li>
+          <li class="dim">Up to 10 reads per link</li>
+          <li class="dim">Up to 50 registered devices</li>
+          <li class="dim">Send history and link management</li>
+          <li class="dim">Webhooks on upload and download</li>
+          <li class="dim">Email notifications via Resend</li>
+          <li class="dim">No IP rate limit</li>
         </ul>
         <a href="mailto:privacy@paramant.app?subject=Pro+waitlist" class="btn btn-secondary" style="display:block;text-align:center">Get notified &rarr;</a>
       </div>
@@ -228,14 +234,18 @@
         <div class="tier-name">Enterprise</div>
         <div class="tier-price">Custom</div>
         <div class="tier-price-note">Dedicated relay &middot; SLA &middot; compliance</div>
+        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
         <ul class="tier-features">
-          <li>Dedicated relay — higher file size limits via per-tenant config</li>
-          <li>5 MB default per file, 7 day TTL</li>
-          <li>ML-KEM-768 + ECDH hybrid, ML-DSA-65 signatures</li>
-          <li>Fingerprint verification, proof-of-delivery</li>
+          <li>Everything in Pro</li>
+          <li>7 day link expiry</li>
+          <li>Up to 100 reads per link</li>
+          <li>Unlimited registered devices</li>
+          <li>Dedicated relay on our infra or yours</li>
+          <li>Configurable file size limits per tenant (default 5 MB, tested up to 50 MB on dedicated deployments)</li>
           <li>IEC 62443 / NIS2 / NEN 7510 documentation</li>
-          <li>DPA (GDPR Art. 28), on-premise option</li>
-          <li>SLA 99.9%, priority support, named contact</li>
+          <li>Signed Data Processing Agreement (GDPR Art. 28)</li>
+          <li>SLA 99.9%, priority incident response</li>
+          <li>On-premise and air-gapped deployment support</li>
         </ul>
         <a href="mailto:privacy@paramant.app?subject=Enterprise" class="btn btn-secondary" style="display:block;text-align:center">Contact &rarr;</a>
       </div>
@@ -250,22 +260,22 @@
 
     <div class="prose-section">
       <h3>Limits</h3>
-      <p>Every tier uses RAM-only storage with a 5 MB per-file cap. Tiers differ in retention, rate limits, and features, not in file size. Enterprise deployments with dedicated relays can be configured for larger files per tenant.</p>
+      <p>Every tier stores transfers in RAM with a 5 MB default per file. What differs by tier is how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure the 5 MB default upward within the RAM budget of their deployment.</p>
     </div>
 
     <div class="prose-section">
       <h3>Encryption</h3>
-      <p>Anonymous transfers use AES-256-GCM with a browser-generated key delivered in the URL fragment. The relay never sees the key. Verified transfers via ParaShare use ML-KEM-768 + ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. Both are end-to-end, both are RAM-only, both leave no trace.</p>
+      <p>Every tier uses the same cryptography. Anonymous transfers use AES-256-GCM with a browser-generated key that lives only in the URL fragment. Verified transfers via ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
     </div>
 
     <div class="prose-section">
       <h3>Compliance</h3>
-      <p>All tiers meet NIS2 and GDPR requirements. NEN 7510, eIDAS, and IEC 62443 mappings are included with Enterprise. A signed Data Processing Agreement under GDPR Article 28 is available on request for all paid tiers. Paramant does not hold third-party certification for these frameworks; documentation supports your own certification process.</p>
+      <p>All tiers meet NIS2 and GDPR requirements by design. NEN 7510, eIDAS, and IEC 62443 mappings ship with Pro and Enterprise. A signed Data Processing Agreement under GDPR Article 28 is available on request for all paid tiers.</p>
     </div>
 
     <div class="prose-section">
       <h3>Support</h3>
-      <p>Free is self-service via documentation. Pro gets email support at response targets. Enterprise gets a named contact, 99.9% SLA, and priority incident handling.</p>
+      <p>Free tier is self-service via public documentation and the CT log. Pro tier includes email support with published response targets. Enterprise customers get a named contact, a 99.9% SLA, priority incident handling, and deployment assistance for air-gapped and regulated environments.</p>
     </div>
 
   </div>
