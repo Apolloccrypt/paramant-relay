@@ -2,220 +2,92 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Post-Quantum Encrypted File Transfer</title>
-<meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768. Burn-on-read. Self-hostable. EU/DE jurisdiction. Free to start.">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text)}
-.nav-links{display:flex;gap:20px;list-style:none}
-.nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
-.nav-links a:hover{color:var(--text)}
-.hero{max-width:680px;margin:0 auto;padding:96px 32px 88px;text-align:center}
-.status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:40px;font-family:var(--mono);letter-spacing:.04em}
-.status-dot{width:5px;height:5px;border-radius:50%;background:#333}
-h1{font-size:56px;font-weight:600;line-height:1.08;letter-spacing:-.04em;color:var(--text);margin-bottom:28px}
-h1 em{color:var(--muted);font-style:normal}
-.hero-sub{font-size:16px;color:var(--muted);max-width:480px;margin:0 auto 48px;line-height:1.75}
-.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:44px}
-.btn-p{background:#00ff41;color:#0c0c0c;padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500;transition:box-shadow .15s,transform .15s}
-.btn-s{border:1px solid rgba(0,255,65,.35);color:#00ff41;padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;transition:border-color .15s,transform .15s}
-.btn-p:hover{box-shadow:0 0 20px rgba(0,255,65,.38);transform:translateY(-1px)}
-.btn-s:hover{border-color:#00ff41;transform:translateY(-1px)}
-.code-wrap{max-width:540px;margin:64px auto 0;padding:0 48px}
-.code-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.code-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
-.code-dots{display:flex;gap:6px}
-.code-dots span{width:10px;height:10px;border-radius:50%;background:#1e1e1e}
-.code-lang{font-size:11px;color:var(--quiet);font-family:var(--mono)}
-.code-body{padding:20px 24px;font-family:var(--mono);font-size:12.5px;line-height:2}
-.c-comment{color:var(--quiet)}.c-kw{color:var(--text)}.c-str{color:#aaa}.c-ok{color:var(--green)}
-section{max-width:960px;margin:0 auto;padding:80px 32px}
-.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
-h2{font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--text);margin-bottom:10px}
-.sub{font-size:15px;color:var(--muted);margin-bottom:52px;max-width:540px}
-hr.divider{border:none;border-top:1px solid var(--border)}
-.grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
-.cell{background:var(--bg);padding:28px 24px}
-.cell-s{background:var(--surface);padding:28px 24px}
-a.cell{transition:background .15s;cursor:pointer}
-a.cell:hover{background:#141414}
-h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
-.desc{font-size:13px;color:var(--muted);line-height:1.6}
-.tag{display:inline-block;margin-top:14px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em}
-.use-tag{font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em;margin-top:16px;display:block}
-.api-table{width:100%;border-collapse:collapse;font-size:13px}
-.api-table thead th{text-align:left;padding:10px 0;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);border-bottom:1px solid var(--border);font-family:var(--mono)}
-.api-table tbody td{padding:12px 0;border-bottom:1px solid var(--border-soft);vertical-align:top}
-.api-table tbody tr:last-child td{border-bottom:none}
-.method{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 8px;border-radius:3px;min-width:44px;text-align:center}
-.get{background:#111;color:#00cc33}.post{background:#1a1a2a;color:#4a6a9c}
-.ep{font-family:var(--mono);font-size:12px;color:var(--muted)}
-.api-desc{color:var(--muted);font-size:13px;padding-left:8px}
-.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:52px}
-.pc{background:var(--bg);padding:32px 28px}
-.pc.featured{background:var(--surface)}
-.pc.coming-soon{opacity:.82}
-.price-name{font-size:11px;font-family:var(--mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
-.price-amount{font-size:36px;font-weight:600;letter-spacing:-.03em;color:var(--text);margin-bottom:4px}
-.price-amount sub{font-size:14px;font-weight:400;color:var(--muted);vertical-align:baseline}
-.price-note{font-size:12px;color:var(--muted);margin-bottom:28px}
-.pf{list-style:none;margin-bottom:28px}
-.pf li{font-size:13px;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--border-soft);display:flex;gap:10px}
-.pf li:last-child{border-bottom:none}
-.pf .check{color:var(--text);font-size:11px;flex-shrink:0}
-.price-btn{display:block;text-align:center;padding:10px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:500;transition:opacity .15s,transform .15s}
-.price-btn.p{background:#00ff41;color:#0c0c0c}.price-btn.s{border:1px solid rgba(0,255,65,.35);color:#00ff41}
-.price-btn:hover{opacity:.9;transform:translateY(-1px)}
-.price-btn.p:hover{box-shadow:0 0 16px rgba(0,255,65,.35);opacity:1}
-footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:32px}
-.footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
-.footer-links{display:flex;gap:24px}
-.footer-links a{font-size:12px;color:var(--quiet);text-decoration:none}
-.footer-links a:hover{color:var(--muted)}
-.footer-meta{font-size:11px;color:var(--quiet);font-family:var(--mono);text-align:right;line-height:1.8}
-@media(max-width:768px){
-  nav{padding:0 16px}
-  .nav-links{display:none}
-  .nav-burger{display:flex;align-items:center}
-  .nav-open .nav-links{display:flex!important;flex-direction:column;position:absolute;top:56px;left:0;right:0;background:rgba(12,12,12,.97);border-bottom:1px solid var(--border);padding:20px 16px;gap:20px;z-index:99}
-  .nav-open .nav-links a{font-size:14px}
-  .hero,.code-wrap{padding-left:20px;padding-right:20px}
-  .hero{padding-top:64px}
-  h1{font-size:34px}
-  section{padding:32px 16px}
-  .sec-pad{padding-left:16px!important;padding-right:16px!important}
-  .g3,.g2,.pricing-grid{grid-template-columns:1fr}
-  footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
-  .hndl-strip{padding:24px 0}
-  .hndl-inner{padding:0 16px}
-  .hndl-strip-timeline{flex-direction:column;gap:16px}
-  .hndl-strip-connector{display:none}
-  .hndl-strip-step{padding-left:12px}
-  .hndl-strip-step:first-child{padding-left:12px}
-  .footer-meta{text-align:left}
-  /* Inline-style grid overrides */
-  .net-pair{grid-template-columns:1fr!important}
-  .pipe-stats{grid-template-columns:repeat(2,1fr)!important}
-  .nodemap-stats{grid-template-columns:repeat(3,1fr)!important}
-  .ct-pair{grid-template-columns:1fr!important}
-  .ct-foot{flex-wrap:wrap!important;gap:10px!important}
-  .stat-quad{grid-template-columns:repeat(2,1fr)!important}
-  .install-three{grid-template-columns:1fr!important}
-  .price-split{grid-template-columns:1fr!important}
-  .price-split>*:nth-child(2){display:none}
-  /* Canvas/SVG media */
-  canvas,svg{max-width:100%}
-}
-.hero-cta-secondary{display:flex;align-items:center;gap:1rem;margin-top:1.5rem;flex-wrap:wrap}
-.cta-secondary{color:#00ff41;font-size:.875rem;text-decoration:none;border-bottom:1px solid rgba(0,255,65,.3);padding-bottom:1px;transition:border-color .15s}
-.cta-secondary:hover{border-color:#00ff41}
-.cta-note{font-size:.78rem;color:var(--quiet)}
-.pricing-note{font-size:11px;color:var(--quiet);margin:6px 0 0;font-family:var(--mono)}
-.price-tagline{font-size:13px;color:var(--muted);margin:8px 0 20px;line-height:1.5}
-.popular-badge{display:inline-block;font-size:10px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:#00cc33;padding:2px 8px;border-radius:3px;margin-bottom:12px}.price-btn.ghost{background:transparent;border:1px solid #00ff41;color:#00ff41}.price-btn.ghost:hover{background:rgba(0,255,65,.1);opacity:1}
-/* Hamburger */
-.nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
-.nav-burger:hover{color:var(--muted)}
-.hndl-strip{padding:52px 0;border-top:1px solid rgba(245,158,11,.3);border-bottom:1px solid rgba(245,158,11,.2);background:rgba(245,158,11,.04)}
-.hndl-inner{max-width:960px;margin:0 auto;padding:0 32px}
-.hndl-strip-header{display:flex;align-items:center;gap:16px;margin-bottom:32px;flex-wrap:wrap}
-.hndl-strip-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#f59e0b;border:1px solid rgba(245,158,11,.4);padding:3px 10px;border-radius:3px;flex-shrink:0}
-.hndl-strip-title{font-size:13px;color:#00ff41;font-weight:500}
-.hndl-strip-link{font-size:12px;color:#00cc33;text-decoration:none;margin-left:auto;opacity:.7;transition:opacity .15s}
-.hndl-strip-link:hover{opacity:1;text-decoration:none}
-.hndl-strip-timeline{display:flex;align-items:flex-start;gap:0}
-.hndl-strip-connector{color:rgba(245,158,11,.4);margin-top:10px;flex-shrink:0;font-size:14px;padding:0 16px}
-.hndl-strip-step{flex:1;padding:0 20px;border-left:2px solid transparent}
-.hndl-strip-step:first-child{padding-left:0;border-left:none}
-.hndl-strip-step--active{border-left-color:#00cc33}
-.hndl-strip-step--danger{border-left-color:#f59e0b}
-.hndl-strip-step-time{font-size:11px;font-weight:700;margin-bottom:7px;letter-spacing:.08em;text-transform:uppercase}
-.hndl-strip-step--active .hndl-strip-step-time{color:#00cc33}
-.hndl-strip-step--danger .hndl-strip-step-time{color:#f59e0b}
-.hndl-strip-step:not(.hndl-strip-step--active):not(.hndl-strip-step--danger) .hndl-strip-step-time{color:#00cc33}
-.hndl-strip-step-label{font-size:14px;color:#00ff41;font-weight:600;margin-bottom:7px}
-.hndl-strip-step-desc{font-size:12px;color:var(--muted);line-height:1.65}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
-.fade-in{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
-.fade-in.visible{opacity:1;transform:none}
-/* Key differentiators */
-.differentiators{padding:4rem 2rem;border-bottom:1px solid var(--border);max-width:860px;margin:0 auto}
-.diff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5rem}
-.diff-item{display:flex;flex-direction:column;gap:.4rem;padding-left:1rem;border-left:2px solid #00ff41}
-.diff-item strong{font-size:.875rem;color:#00ff41;font-weight:600}
-.diff-item span{font-size:.82rem;color:var(--muted);line-height:1.55}
-/* How it works */
-.how-it-works{display:flex;align-items:flex-start;gap:.5rem;margin-bottom:48px;flex-wrap:wrap}
-.how-step{display:flex;align-items:flex-start;gap:.75rem;flex:1;min-width:160px}
-.how-step-num{width:28px;height:28px;border:1px solid #00ff41;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#00ff41;flex-shrink:0;font-family:var(--mono)}
-.how-step-text strong{display:block;font-size:.875rem;color:var(--text);font-weight:600;margin-bottom:.25rem}
-.how-step-text span{font-size:.8rem;color:var(--muted);line-height:1.55}
-.how-arrow{color:#3a3a3a;margin-top:.35rem;font-size:1.1rem;flex-shrink:0}
-/* Comparison table */
-.comparison{max-width:960px;margin:0 auto;padding:80px 32px}
-.comparison-table-wrap{overflow-x:auto}
-.comparison-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.comparison-table th{text-align:left;padding:.6rem 1rem;color:var(--quiet);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;font-family:var(--mono);font-size:.75rem;letter-spacing:.04em;text-transform:uppercase}
-.comparison-table td{padding:.6rem 1rem;border-bottom:1px solid var(--border-soft);color:var(--muted)}
-.comparison-table .col-paramant{color:#00ff41;font-weight:600;background:rgba(0,255,65,.06)}
-.comparison-table th.col-paramant{color:#00ff41}
-.comparison-table td:first-child{color:var(--text)}
-.comparison-note{font-size:.78rem;color:var(--quiet);margin-top:1.5rem;font-family:var(--mono)}
-.comparison-note a{color:#00ff41;text-decoration:none}
-.comparison-table tbody tr:nth-child(even) td{background:rgba(255,255,255,.018)}
-.comparison-table tbody tr:hover td{background:rgba(0,255,65,.03)}
-.comparison-table td.nd{color:#555}
-.install-card{transition:border-color .2s,box-shadow .2s}
-.install-card:hover{border-color:rgba(0,255,65,.3)!important;box-shadow:0 0 18px rgba(0,255,65,.07)}
-.pc{transition:box-shadow .2s}
-.pc:hover{box-shadow:0 0 0 1px rgba(0,255,65,.2)}
-@media(max-width:640px){.how-arrow{display:none}}
-/* ── Why section ──────────────────────────────── */
-.why-section{max-width:900px;margin:0 auto;padding:5rem 2rem}
-.why-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.75rem;margin-bottom:1.5rem}
-.why-block{padding:1.75rem;border:1px solid var(--border);border-radius:8px;transition:border-color .2s,box-shadow .2s}
-.why-block:hover{border-color:rgba(0,255,65,.25);box-shadow:0 0 16px rgba(0,255,65,.06)}
-.why-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:#00cc33;margin-bottom:.5rem;font-family:var(--mono)}
-.why-title{font-size:1rem;font-weight:500;color:var(--text);margin-bottom:.5rem;line-height:1.4}
-.why-desc{font-size:.85rem;color:var(--muted);line-height:1.6}
-.why-deepdive{font-size:.8rem;color:var(--quiet);text-decoration:none;display:inline-block;margin-top:.25rem}
-.why-deepdive:hover{color:#00cc33}
-/* ── Use case cards ───────────────────────────── */
-.usecase-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
-.usecase-card{background:var(--bg);padding:28px 24px;transition:background .15s}
-.usecase-card:hover{background:#141414}
-.usecase-header{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-.usecase-icon{font-size:13px;color:var(--quiet)}
-.usecase-name{font-size:11px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.06em}
-.usecase-badge{font-size:10px;font-family:var(--mono);background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 7px;color:var(--quiet);margin-left:auto;letter-spacing:.04em}
-.usecase-card h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
-.usecase-card p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px}
-.usecase-card a{font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none}
-.usecase-card a:hover{color:var(--text)}
-/* ── Self-hosting teaser ──────────────────────── */
-.selfhost-teaser{max-width:700px;margin:0 auto;text-align:center;padding:5rem 2rem}
-.selfhost-options{display:flex;align-items:center;gap:1.25rem;justify-content:center;flex-wrap:wrap;margin-top:1.5rem;margin-bottom:1.5rem}
-.selfhost-options code{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:.5rem 1.1rem;font-family:var(--mono);font-size:12px;color:#00cc33;user-select:all}
-.selfhost-options span{color:var(--quiet);font-size:.85rem}
-@media(max-width:640px){
-  .why-grid{grid-template-columns:1fr}
-  .usecase-grid{grid-template-columns:1fr}
-  .selfhost-options{flex-direction:column}
-  .why-section{padding:3rem 1.25rem}
-  .selfhost-teaser{padding:3rem 1.25rem}
-}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Encrypted File Relay. Burn on Read.</title>
+<meta name="description" content="Encrypted file relay. AES-256-GCM for anonymous links. ML-KEM-768 + ECDH hybrid for verified transfers. RAM-only. Burn-on-read. EU/DE jurisdiction.">
 <link rel="stylesheet" href="/design-system.css?v=3">
 <link rel="stylesheet" href="/nav.css">
+<style>
+.meta-bar{display:flex;align-items:center;gap:var(--space-4);padding:0 var(--space-8);height:32px;border-bottom:1px solid var(--lime-hair);font-size:var(--text-xs);letter-spacing:.08em;overflow:hidden;flex-wrap:nowrap}
+.meta-bar-sep{color:var(--lime-hair)}
+.meta-bar-val{color:var(--lime-dim)}
+.meta-bar-right{margin-left:auto;color:var(--lime-dim)}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-8);align-items:start}
+.how-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-6)}
+.how-num{font-size:var(--text-4xl);font-weight:700;color:var(--lime-dim);line-height:1;margin-bottom:var(--space-4)}
+.how-arrow{display:flex;align-items:center;justify-content:center;color:var(--lime-hair);font-size:var(--text-xl);align-self:center;padding-top:var(--space-10)}
+.modes-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)}
+.products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--black-hair)}
+.product-card{display:block;padding:var(--space-7) var(--space-6);text-decoration:none;color:var(--black);transition:background var(--duration-base) var(--ease-sharp)}
+.product-card:hover{background:rgba(0,0,0,.05)}
+.product-eyebrow{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--black-dim);margin-bottom:var(--space-3)}
+.product-card h3{font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-3)}
+.product-card p{font-size:var(--text-sm);color:var(--black-dim);line-height:1.65;margin-bottom:var(--space-5)}
+.product-card-link{font-size:var(--text-xs);letter-spacing:.08em;color:var(--black);font-weight:700}
+.ct-widget{border:1px solid var(--lime-hair)}
+.ct-header{display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--lime-hair)}
+.ct-stats{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--lime-hair)}
+.ct-stat{padding:var(--space-4) var(--space-5);border-right:1px solid var(--lime-hair)}
+.ct-stat:last-child{border-right:none}
+.ct-stat-label{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:var(--space-2)}
+.ct-stat-val{font-size:var(--text-2xl);font-weight:700;font-variant-numeric:tabular-nums}
+.ct-body{display:grid;grid-template-columns:auto 1fr}
+.ct-root-panel{padding:var(--space-5);border-right:1px solid var(--lime-hair);min-width:200px}
+.ct-feed-panel{padding:var(--space-5)}
+.ct-feed-label{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:var(--space-3)}
+.ct-foot{padding:var(--space-3) var(--space-5);border-top:1px solid var(--lime-hair);display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--black-hair)}
+.pricing-card{padding:var(--space-7) var(--space-6);background:var(--lime)}
+.pricing-tier{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--black-dim);margin-bottom:var(--space-4)}
+.pricing-price{font-size:var(--text-3xl);font-weight:700;color:var(--black);margin-bottom:var(--space-2)}
+.pricing-note{font-size:var(--text-xs);color:var(--black-dim);margin-bottom:var(--space-5)}
+.pricing-features{list-style:none;margin-bottom:var(--space-6)}
+.pricing-features li{font-size:var(--text-sm);color:var(--black-dim);padding:var(--space-2) 0;border-bottom:1px solid var(--black-hair)}
+.pricing-features li:last-child{border-bottom:none}
+.pricing-features li::before{content:'+ ';font-weight:700;color:var(--black)}
+.pricing-features li.coming::before{content:'· ';color:var(--black-dim)}
+.footer-grid{display:grid;grid-template-columns:1fr repeat(4,auto);gap:var(--space-8);align-items:start}
+.footer-col-label{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
+.footer-links{display:flex;flex-direction:column;gap:var(--space-2)}
+.footer-links a{font-size:var(--text-sm);color:var(--lime-dim);text-decoration:none}
+.footer-links a:hover{color:var(--lime)}
+@media(max-width:1023px){
+  .meta-bar-right{display:none}
+  .hero-grid{grid-template-columns:1fr}
+  .how-grid{grid-template-columns:1fr 1fr}
+  .how-arrow{display:none}
+  .modes-grid{grid-template-columns:1fr}
+  .products-grid{grid-template-columns:1fr}
+  .ct-body{grid-template-columns:1fr}
+  .ct-root-panel{border-right:none;border-bottom:1px solid var(--lime-hair)}
+  .pricing-grid{grid-template-columns:1fr}
+  .footer-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:640px){
+  .meta-bar{padding:0 var(--space-5)}
+  .how-grid{grid-template-columns:1fr}
+  .ct-stats{grid-template-columns:1fr}
+  .ct-stat{border-right:none;border-bottom:1px solid var(--lime-hair)}
+  .ct-stat:last-child{border-bottom:none}
+  .footer-grid{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
+
+<div class="meta-bar">
+  <span class="wordmark"><span class="para">Para</span><span class="suffix">MANT</span></span>
+  <span class="meta-bar-sep">·</span>
+  <span class="meta-bar-val">build 2.4.5</span>
+  <span class="meta-bar-sep">·</span>
+  <span class="meta-bar-val">0B stored</span>
+  <span class="meta-bar-sep">·</span>
+  <span class="meta-bar-val">aes-256-gcm / ml-kem-768</span>
+  <span class="meta-bar-sep">·</span>
+  <span class="meta-bar-val" id="ct-dot-meta"><span class="status-dot"></span></span>
+  <span class="meta-bar-right">STH: <span id="ct-root-meta">—</span></span>
+</div>
+
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -354,530 +226,396 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   </div>
 </div>
 
-<div class="hero">
-  <div class="status">
-    <span class="status-dot" style="background:#3dbe7a;box-shadow:0 0 6px rgba(61,190,122,.5)"></span>
-    Relay operational &nbsp;&middot;&nbsp; FRA &middot; Hetzner DE
-  </div>
-  <h1>Encrypted transport<br><em>that burns itself.</em></h1>
-  <p class="hero-sub">Post-quantum. Client-side. RAM-only. Destroyed after one read.<br>No account. No storage. No trace.</p>
-  <div class="btns">
-    <a href="/send" class="btn-p">Send a file free &rarr;</a>
-    <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
-  </div>
-  <div style="margin-top:24px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
-  <div class="hero-cta-secondary">
-    <a href="/request-key" class="cta-secondary">Get a free API key &rarr;</a>
-    <span class="cta-note">10 uploads/day &nbsp;&middot;&nbsp; no credit card &nbsp;&middot;&nbsp; 30-second form</span>
-  </div>
-</div>
+<!-- § 00 HERO -->
+<section style="padding:var(--space-10) 0 var(--space-8)">
+  <div class="container-lg">
+    <div class="hero-grid">
 
-<div class="hndl-strip" data-fade>
-  <div class="hndl-inner">
-    <div class="hndl-strip-header">
-      <span class="hndl-strip-label">Active threat</span>
-      <span class="hndl-strip-title">Harvest Now, Decrypt Later</span>
-      <a href="/hndl" class="hndl-strip-link">What is HNDL? &rarr;</a>
-    </div>
-    <div class="hndl-strip-timeline">
-      <div class="hndl-strip-step hndl-strip-step--active">
-        <div class="hndl-strip-step-time">Now</div>
-        <div class="hndl-strip-step-label">Harvest (active)</div>
-        <div class="hndl-strip-step-desc">State actors archive encrypted traffic to decrypt later</div>
-      </div>
-      <div class="hndl-strip-connector">&rarr;</div>
-      <div class="hndl-strip-step">
-        <div class="hndl-strip-step-time">2026&ndash;2028</div>
-        <div class="hndl-strip-step-label">Preparation</div>
-        <div class="hndl-strip-step-desc">NIST FIPS 203/204 finalized. Transition becomes legally required</div>
-      </div>
-      <div class="hndl-strip-connector">&rarr;</div>
-      <div class="hndl-strip-step hndl-strip-step--danger">
-        <div class="hndl-strip-step-time">~2029</div>
-        <div class="hndl-strip-step-label">Q-Day</div>
-        <div class="hndl-strip-step-desc">CRQC breaks RSA. The archive opens. Retroactive decryption</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<section class="why-section" data-fade>
-  <div class="eyebrow" style="margin-bottom:1.25rem">Why PARAMANT</div>
-  <div class="why-grid">
-
-    <div class="why-block">
-      <div class="why-label">Post-quantum</div>
-      <div class="why-title">Encrypted before it leaves your device</div>
-      <div class="why-desc">ML-KEM-768 + AES-256-GCM. The relay never sees plaintext, keys, or filenames.</div>
-    </div>
-
-    <div class="why-block">
-      <div class="why-label">Zero storage</div>
-      <div class="why-title">RAM-only. Destroyed after one read.</div>
-      <div class="why-desc">Nothing is written to disk. After download, the ciphertext is gone from every layer of the stack.</div>
-    </div>
-
-    <div class="why-block">
-      <div class="why-label">EU compliant</div>
-      <div class="why-title">NIS2, NEN 7510, IEC 62443, eIDAS</div>
-      <div class="why-desc">Hetzner Frankfurt only. No US CLOUD Act. Data Processing Agreement available.</div>
-    </div>
-
-    <div class="why-block">
-      <div class="why-label">Free to start</div>
-      <div class="why-title">Self-host in 2 minutes or use the managed relay</div>
-      <div class="why-desc">Community edition is free forever. Up to 5 users. Full source code on GitHub.</div>
-    </div>
-
-  </div>
-  <a href="/security" class="why-deepdive">Full technical details &rarr;</a>
-</section>
-
-<hr class="divider">
-
-<section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
-    <div class="eyebrow" style="margin-bottom:8px">How it works</div>
-  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:32px">Four steps. Nothing stored.</h2>
-  <div class="how-it-works">
-    <div class="how-step">
-      <div class="how-step-num">1</div>
-      <div class="how-step-text">
-        <strong>Encrypt client-side</strong>
-        <span>Your file is encrypted in the browser or CLI before it leaves your device. The relay never sees plaintext.</span>
-      </div>
-    </div>
-    <div class="how-arrow">&#8594;</div>
-    <div class="how-step">
-      <div class="how-step-num">2</div>
-      <div class="how-step-text">
-        <strong>Transit via Ghost Pipe</strong>
-        <span>The ciphertext blob moves through the relay — padded to 5 MB, hashed into the Merkle log.</span>
-      </div>
-    </div>
-    <div class="how-arrow">&#8594;</div>
-    <div class="how-step">
-      <div class="how-step-num">3</div>
-      <div class="how-step-text">
-        <strong>One-time download</strong>
-        <span>The recipient decrypts locally. On first download, the relay erases the blob from RAM.</span>
-      </div>
-    </div>
-    <div class="how-arrow">&#8594;</div>
-    <div class="how-step">
-      <div class="how-step-num">4</div>
-      <div class="how-step-text">
-        <strong>Cryptographic proof</strong>
-        <span>The Merkle root is updated. Transfer is proven without storing what was transferred.</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<hr class="divider">
-
-<section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
-  <div class="grid g3">
-    <a href="/send" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag">Zero friction</div>
-      <h3>Send a file</h3>
-      <p class="desc" style="margin-top:6px">Drop a file. Get a burn link. No account, no API key required.</p>
-      <span class="tag">Try now &rarr;</span>
-    </a>
-    <a href="/parashare" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag">Verified E2E</div>
-      <h3>ParaShare</h3>
-      <p class="desc" style="margin-top:6px">ML-KEM-768 key exchange. Recipient verifies relay identity before download.</p>
-      <span class="tag">Try free &rarr;</span>
-    </a>
-    <a href="/drop" class="cell" style="text-decoration:none;display:block;background:var(--surface)">
-      <div class="use-tag">Local transfer</div>
-      <h3>ParaDrop</h3>
-      <p class="desc" style="margin-top:6px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read.</p>
-      <span class="tag">Try now &rarr;</span>
-    </a>
-  </div>
-</section>
-
-<hr class="divider">
-
-<section id="sectors" class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
-  <div class="eyebrow">Use cases</div>
-  <h2>One relay engine. Any sector.</h2>
-  <p class="sub">Ghost Pipe solves the same core problem across every sector: confidential data transport that leaves no trace.</p>
-
-  <div class="usecase-grid">
-
-    <div class="usecase-card">
-      <div class="usecase-header">
-        <span class="usecase-icon">&#x2295;</span>
-        <span class="usecase-name">Healthcare</span>
-        <span class="usecase-badge">NEN 7510</span>
-      </div>
-      <h3>DICOM files that vanish after delivery</h3>
-      <p>MRI scans reach the PACS system and burn. Nothing to audit, nothing to breach.</p>
-      <a href="/compliance/nen7510">NEN 7510 compliance &rarr;</a>
-    </div>
-
-    <div class="usecase-card">
-      <div class="usecase-header">
-        <span class="usecase-icon">&#x00a7;</span>
-        <span class="usecase-name">Legal &amp; Notary</span>
-        <span class="usecase-badge">eIDAS</span>
-      </div>
-      <h3>Contracts that leave no recoverable trace</h3>
-      <p>Document reaches the counterparty and burns. The Merkle log proves delivery without storing what was delivered.</p>
-      <a href="/docs#compliance">eIDAS compliance &rarr;</a>
-    </div>
-
-    <div class="usecase-card">
-      <div class="usecase-header">
-        <span class="usecase-icon">&#x223f;</span>
-        <span class="usecase-name">Industrial IoT / OT</span>
-        <span class="usecase-badge">IEC 62443</span>
-      </div>
-      <h3>Sensor data without exposing your OT network</h3>
-      <p>PLC &rarr; Ghost Pipe &rarr; SCADA. No VPN, no certificates, no direct IT connection.</p>
-      <a href="/compliance/iec62443">IEC 62443 compliance &rarr;</a>
-    </div>
-
-    <div class="usecase-card">
-      <div class="usecase-header">
-        <span class="usecase-icon">&#x25ca;</span>
-        <span class="usecase-name">Finance &amp; Compliance</span>
-        <span class="usecase-badge">NIS2</span>
-      </div>
-      <h3>No US CLOUD Act. No metadata leakage.</h3>
-      <p>Hetzner Frankfurt only. Fixed 5&nbsp;MB padding means all transfers look identical on the wire.</p>
-      <a href="/compliance/nis2">NIS2 compliance &rarr;</a>
-    </div>
-
-  </div>
-
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
-    <div>
-      <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px">Works today. No SDK required.</div>
-      <div style="font-size:12px;font-family:var(--mono);color:var(--quiet)">pip install cryptography &nbsp;&middot;&nbsp; two terminal commands &nbsp;&middot;&nbsp; no infra changes</div>
-    </div>
-    <a href="/docs" style="font-size:12px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:8px 18px;border-radius:4px;text-decoration:none;white-space:nowrap">View API docs &rarr;</a>
-  </div>
-</section>
-
-<hr class="divider">
-
-<section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
-    <div class="eyebrow">Relay network</div>
-  <h2 style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px">Ghost Pipe — real-time transport</h2>
-  <p style="font-size:15px;color:var(--muted);margin-bottom:40px;max-width:520px">Public feed. Every dot is an encrypted blob in transit across the relay network. Data is destroyed on arrival.</p>
-
-  <div class="net-pair" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-
-    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="width:6px;height:6px;border-radius:50%;background:#00ff41;display:inline-block;box-shadow:0 0 6px #00ff4166"></span>
-          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Relay pipeline</span>
+      <div>
+        <h1 style="font-size:var(--text-5xl);line-height:1.0;letter-spacing:-.04em;margin-bottom:var(--space-6)">
+          Encrypted transport<br>
+          <span style="color:transparent;-webkit-text-stroke:1px var(--lime);text-stroke:1px var(--lime)">that burns</span> itself.
+        </h1>
+        <p style="font-size:var(--text-md);color:var(--lime-dim);line-height:1.7;max-width:480px;margin-bottom:var(--space-7)">
+          Client-side encryption. A relay that never writes to disk and destroys the ciphertext after one read. No account needed to start. Post-quantum key exchange available for verified transfers.
+        </p>
+        <div class="cluster" style="--cluster-gap:var(--space-3)">
+          <a href="/send" class="btn btn-primary">Send a file free</a>
+          <a href="#modes" class="btn btn-secondary">Two trust modes</a>
         </div>
-        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)" id="pipe-ts"></span>
+        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-top:var(--space-5);letter-spacing:.06em">
+          Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--lime)">Free API key</a>
+        </p>
       </div>
-      <canvas id="pipeCanvas" style="width:100%;display:block;height:220px"></canvas>
-      <div class="pipe-stats" style="display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border)">
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Relay</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-main">checking...</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Health</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-health">checking...</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Legal</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-legal">checking...</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">Finance</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-finance">checking...</div></div>
-        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:3px">IoT</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted)" id="ps-iot">checking...</div></div>
-      </div>
-    </div>
 
-    <div id="node-map" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column;">
-      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="width:6px;height:6px;border-radius:50%;background:#00ff41;display:inline-block;box-shadow:0 0 6px #00ff4166"></span>
-          <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Node map</span>
+      <div>
+        <div class="dropzone">
+          <div class="dropzone-num">01</div>
+          <div class="dropzone-main">Drop to send</div>
+          <div class="dropzone-sub">Anonymous. No account required.</div>
+          <div class="dropzone-spec" style="margin-top:var(--space-6)">
+            <div class="dropzone-spec-cell">
+              <span class="dropzone-spec-key">cipher</span>
+              <span class="dropzone-spec-val">aes-256-gcm</span>
+            </div>
+            <div class="dropzone-spec-cell">
+              <span class="dropzone-spec-key">key</span>
+              <span class="dropzone-spec-val">url fragment</span>
+            </div>
+            <div class="dropzone-spec-cell">
+              <span class="dropzone-spec-key">rate</span>
+              <span class="dropzone-spec-val">10/hr</span>
+            </div>
+            <div class="dropzone-spec-cell">
+              <span class="dropzone-spec-key">account</span>
+              <span class="dropzone-spec-val">none</span>
+            </div>
+          </div>
+          <a href="/send" class="btn btn-primary" style="margin-top:var(--space-6);width:100%;text-align:center">Send a file &rarr;</a>
         </div>
-        <span style="font-size:10px;font-family:var(--mono);color:var(--quiet)">EU/DE &middot; Anycast</span>
       </div>
-      <svg viewBox="0 0 500 310" style="width:100%;height:240px;flex:1;" xmlns="http://www.w3.org/2000/svg">
-        
-        <path d="M230,10 L245,8 L258,12 L265,25 L268,45 L262,65 L255,85 L248,105 L245,125 L240,125 L235,105 L228,85 L222,65 L218,45 L220,25 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M268,12 L285,10 L298,18 L305,35 L300,55 L290,75 L278,90 L268,80 L262,65 L265,45 L268,25 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M225,128 L232,122 L238,128 L235,138 L228,140 L224,133 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M170,95 L182,88 L192,92 L195,108 L188,122 L178,128 L168,122 L162,108 L168,98 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M148,108 L158,104 L162,114 L156,124 L146,120 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M205,138 L218,132 L228,138 L225,150 L215,155 L205,150 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M175,148 L205,138 L215,155 L218,175 L208,195 L192,205 L175,200 L162,185 L160,168 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M158,205 L175,200 L192,205 L195,225 L188,248 L170,262 L148,258 L132,245 L128,225 L138,210 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M225,138 L248,132 L265,140 L268,160 L258,178 L238,182 L218,175 L215,155 Z" fill="#222" stroke="#333" stroke-width="1.5"/>
-        
-        <path d="M268,138 L295,132 L315,140 L318,160 L305,175 L278,178 L265,165 L265,140 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M248,182 L278,178 L292,188 L288,202 L265,208 L245,202 L238,192 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M222,202 L238,195 L248,208 L252,228 L245,252 L235,268 L225,278 L218,265 L215,245 L218,225 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M208,195 L222,192 L228,202 L218,210 L205,205 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M278,182 L310,178 L325,195 L322,218 L308,232 L288,235 L272,222 L268,205 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
-        
-        <path d="M290,235 L308,228 L318,242 L312,258 L298,262 L285,252 Z" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="1"/>
 
-        <line x1="220" y1="142" x2="252" y2="158" stroke="#2a4a2a" stroke-width="1.5"/>
-        <line x1="220" y1="142" x2="242" y2="92"  stroke="#2a4a2a" stroke-width="1.5"/>
-        <line x1="220" y1="142" x2="185" y2="168" stroke="#2a4a2a" stroke-width="1.5"/>
-        <line x1="252" y1="158" x2="242" y2="92"  stroke="#2a4a2a" stroke-width="1.5"/>
-        <line x1="252" y1="158" x2="185" y2="168" stroke="#2a4a2a" stroke-width="1.5"/>
-        
-        <line x1="55" y1="180" x2="185" y2="168" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="4,4"/>
-        
-        <line x1="220" y1="142" x2="310" y2="262" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="3,4"/>
+    </div>
 
-        <circle cx="220" cy="142" r="9" fill="#161616" stroke="#2a4a2a" stroke-width="1.5" stroke-dasharray="3,2"/>
-        <circle cx="220" cy="142" r="4" fill="#2a5a3a"/>
-        <text x="233" y="139" fill="#666" font-size="10" font-family="monospace" font-weight="500" letter-spacing=".04em">AMS</text>
-        <text x="233" y="149" fill="#444" font-size="7" font-family="monospace">planned</text>
-        
-        <circle cx="252" cy="158" r="9" fill="#161616" stroke="#3d7a50" stroke-width="2"/>
-        <circle cx="252" cy="158" r="4.5" fill="#00ff41"/>
-        <text x="265" y="155" fill="#ddd" font-size="10" font-family="monospace" font-weight="600" letter-spacing=".04em">FRA</text>
-        <text x="265" y="167" fill="#777" font-size="8" font-family="monospace">Hetzner DE</text>
-        
-        <circle cx="242" cy="92" r="9" fill="#161616" stroke="#2a4a2a" stroke-width="1.5" stroke-dasharray="3,2"/>
-        <circle cx="242" cy="92" r="4" fill="#2a5a3a"/>
-        <text x="255" y="89" fill="#666" font-size="10" font-family="monospace" font-weight="500" letter-spacing=".04em">ARN</text>
-        <text x="255" y="100" fill="#444" font-size="7" font-family="monospace">planned</text>
-        
-        <circle cx="185" cy="168" r="9" fill="#161616" stroke="#2a4a2a" stroke-width="1.5" stroke-dasharray="3,2"/>
-        <circle cx="185" cy="168" r="4" fill="#2a5a3a"/>
-        <text x="130" y="163" fill="#666" font-size="10" font-family="monospace" font-weight="500" letter-spacing=".04em">CDG</text>
-        <text x="130" y="175" fill="#444" font-size="7" font-family="monospace">planned</text>
-        
-        <circle cx="48" cy="180" r="6" fill="#161616" stroke="#333" stroke-width="1" stroke-dasharray="3,2"/>
-        <circle cx="48" cy="180" r="2.5" fill="#444"/>
-        <text x="15" y="196" fill="#555" font-size="8" font-family="monospace">ORD</text>
-        <text x="12" y="205" fill="#444" font-size="7" font-family="monospace">eval</text>
-        
-        <circle cx="310" cy="262" r="6" fill="#161616" stroke="#333" stroke-width="1" stroke-dasharray="3,2"/>
-        <circle cx="310" cy="262" r="2.5" fill="#444"/>
-        <text x="320" y="259" fill="#555" font-size="9" font-family="monospace">Fly.io</text>
-        <text x="320" y="269" fill="#444" font-size="8" font-family="monospace">planned</text>
-      </svg>
-      <div class="nodemap-stats" style="display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border)">
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">AMS</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">FRA</div><div style="font-size:10px;font-family:var(--mono);color:#00ff41">live</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ARN</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">CDG</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
-        <div style="padding:8px 10px;border-right:1px solid var(--border)"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">ORD</div><div style="font-size:10px;font-family:var(--mono);color:#555">eval</div></div>
-        <div style="padding:8px 10px"><div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;margin-bottom:2px">Fly.io</div><div style="font-size:10px;font-family:var(--mono);color:#555">planned</div></div>
-      </div>
+    <div class="compliance-strip" style="margin-top:var(--space-8)">
+      <div class="compliance-strip-cell">NIS2</div>
+      <div class="compliance-strip-cell">IEC 62443</div>
+      <div class="compliance-strip-cell">NEN 7510</div>
+      <div class="compliance-strip-cell">eIDAS</div>
+      <div class="compliance-strip-cell">FIPS 203</div>
+      <div class="compliance-strip-cell">FIPS 204</div>
     </div>
   </div>
 </section>
-<script src="relay-status.js" defer></script>
 
-<hr class="divider">
-
-<section class="sec-pad" style="max-width:960px;margin:0 auto;padding:80px 32px" data-fade>
-  <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span id="ct-dot" style="width:6px;height:6px;border-radius:50%;background:#333;display:inline-block;transition:background .3s"></span>
-        <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Certificate Transparency Log — live</span>
-      </div>
-      <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--quiet);text-decoration:none">view all →</a>
+<!-- § 01 HOW IT WORKS -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="how">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <h2>Four steps. Nothing stored.</h2>
+      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">How it works</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)">
-      <div style="padding:16px 20px;border-right:1px solid var(--border)">
-        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Log entries</div>
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-transfers">—</div>
+    <div class="how-grid">
+      <div>
+        <div class="how-num">1</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Encrypt client-side</strong>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">Your file is encrypted in the browser before it leaves your device. The relay never sees plaintext.</p>
       </div>
-      <div style="padding:16px 20px;border-right:1px solid var(--border)">
-        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Registered relays</div>
-        <div style="font-size:28px;font-weight:600;letter-spacing:-.04em;color:var(--text);font-family:var(--mono);line-height:1" id="ct-relays">—</div>
+      <div>
+        <div class="how-num">2</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Transit via Ghost Pipe</strong>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">The ciphertext moves through the relay, padded to 5 MB and hashed into the CT Merkle log.</p>
       </div>
-      <div style="padding:16px 20px">
-        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">STH</div>
-        <div style="font-size:13px;font-family:var(--mono);color:#555;margin-top:4px" id="ct-sth-status">checking...</div>
+      <div>
+        <div class="how-num">3</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">One-time download</strong>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">The recipient decrypts locally. On download, the relay erases the blob from RAM. Burn-on-read.</p>
       </div>
-    </div>
-    <div class="ct-pair" style="display:grid;grid-template-columns:auto 1fr;gap:0">
-      <div style="padding:20px 24px;border-right:1px solid var(--border);min-width:200px">
-        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Current root</div>
-        <div style="font-size:12px;font-family:var(--mono);color:var(--muted);word-break:break-all;line-height:1.7" id="ct-root">syncing...</div>
-        <div style="font-size:10px;color:var(--quiet);margin-top:6px;font-family:var(--mono)">SHA3-256 · tamper-evident · public</div>
-      </div>
-      <div style="padding:20px 24px">
-        <div style="font-size:9px;font-family:var(--mono);color:var(--quiet);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Recent activity</div>
-        <div id="ct-feed" style="font-size:11px;font-family:var(--mono);color:var(--muted);line-height:2"><span style="color:var(--quiet)">loading...</span></div>
-      </div>
-    </div>
-    <div class="ct-foot" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-      <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Every transfer hashed into a Merkle tree — content never stored</div>
-      <div style="display:flex;gap:8px;flex-shrink:0">
-        <a href="/ct-log" style="font-size:11px;font-family:var(--mono);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">View live CT log →</a>
-        <a href="/ct-log#verify" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Verify this relay →</a>
-        <a href="/hndl" style="font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Why post-quantum matters now →</a>
-        <a href="/request-key" style="font-size:11px;font-family:var(--mono);color:#00ff41;border:1px solid rgba(0,255,65,.3);padding:6px 14px;border-radius:4px;text-decoration:none;white-space:nowrap">Try it for free &rarr;</a>
+      <div>
+        <div class="how-num">4</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Cryptographic proof</strong>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">The Merkle root is updated. Transfer is proven without storing what was transferred.</p>
       </div>
     </div>
   </div>
 </section>
 
-<hr class="divider">
+<!-- § 01.5 TWO TRUST MODES -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="modes">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num" style="font-size:clamp(3rem,7vw,7rem)">01.5</span>
+      <h2>Two modes. Pick your trust model.</h2>
+      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Architecture</span>
+    </div>
+    <div class="modes-grid">
 
-<section id="selfhost" class="selfhost-teaser" data-fade>
-  <div class="eyebrow" style="margin-bottom:1rem">Self-hosting</div>
-  <h2>Run your own relay.</h2>
-  <p class="sub" style="max-width:480px;margin:0 auto 0">Source-available under BUSL-1.1. Free for up to 5 users. Works on a Raspberry Pi.</p>
-  <div class="selfhost-options">
-    <code>curl -fsSL https://paramant.app/install-pi.sh | bash</code>
-    <span>or</span>
-    <code>docker compose up -d</code>
+      <div class="card">
+        <p style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)">Anonymous</p>
+        <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-4)">AES-256-GCM</h3>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-3)">Browser-generated key lives only in the URL fragment, never sent to the relay. Prove-by-design that we cannot decrypt what we relay.</p>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-6)">Ideal for one-off sends that need zero setup. No registration. No key exchange.</p>
+        <a href="/send" class="btn btn-secondary">Send a file &rarr;</a>
+      </div>
+
+      <div class="card">
+        <p style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)">Verified end-to-end</p>
+        <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-4)">ML-KEM-768 Hybrid</h3>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-3)">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS 204). Fingerprint verification before send.</p>
+        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-6)">For when the audit trail matters. The receiver can prove who sent what.</p>
+        <a href="/parashare" class="btn btn-secondary">Try ParaShare &rarr;</a>
+      </div>
+
+    </div>
   </div>
-  <a href="/docs#self-hosting" class="cta-secondary">Full deploy guide &rarr;</a>
 </section>
 
-<hr class="divider">
-
-<section id="pricing" data-fade>
-  <div class="eyebrow">Pricing</div>
-  <h2>Simple pricing. Free to start.</h2>
-  <p class="sub">Send files for free, no account required. Scale when you're ready.</p>
-
-  <div class="pricing-grid" style="margin-top:52px">
-
-    <div class="pc featured">
-      <div class="price-name" style="color:#3dbe7a">FREE</div>
-      <div class="price-amount">&euro;0</div>
-      <div class="price-note">No account &middot; no credit card &middot; 10 uploads/day</div>
-      <ul class="pf" style="margin-top:20px">
-        <li><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM</li>
-        <li><span class="check">&#10003;</span> Burn-on-read &mdash; RAM only, never stored</li>
-        <li><span class="check">&#10003;</span> 5 MB per file &middot; 1-hour TTL</li>
-      </ul>
-      <a href="/send" class="price-btn p" style="margin-top:20px;display:block;text-align:center">Send a file free &rarr;</a>
+<!-- § 02 PRODUCTS -->
+<section class="invert" style="padding:var(--space-9) 0" id="products">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num">02</span>
+      <h2>Products</h2>
+      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--black-dim)">Three tools</span>
     </div>
+    <div class="products-grid">
 
-    <div class="pc">
-      <div class="price-name">PRO</div>
-      <div class="price-amount" style="font-size:26px">Coming soon</div>
-      <div class="price-note">Unlimited &middot; webhooks &middot; 24h retention</div>
-      <ul class="pf" style="margin-top:20px">
-        <li><span class="check">&#10003;</span> Unlimited uploads &middot; 500 MB per file</li>
-        <li><span class="check">&#10003;</span> 24-hour blob TTL</li>
-        <li><span class="check">&#10003;</span> Webhooks &amp; streaming</li>
-      </ul>
-      <a href="mailto:privacy@paramant.app?subject=Pro+user+interest" class="price-btn s" style="margin-top:20px;display:block;text-align:center">Get notified &rarr;</a>
+      <a href="/send" class="product-card">
+        <p class="product-eyebrow">ParaSend</p>
+        <h3>Send a file</h3>
+        <p>AES-256-GCM. Key in URL fragment. Drop a file, get a burn link. 5 MB, up to 1 hour.</p>
+        <span class="product-card-link">Try now &rarr;</span>
+      </a>
+
+      <a href="/parashare" class="product-card">
+        <p class="product-eyebrow">ParaShare</p>
+        <h3>Verified transfer</h3>
+        <p>ML-KEM-768 hybrid with fingerprint verification. Post-quantum key exchange. Proof-of-delivery.</p>
+        <span class="product-card-link">Try free &rarr;</span>
+      </a>
+
+      <a href="/drop" class="product-card" style="background:rgba(0,0,0,.04)">
+        <p class="product-eyebrow">ParaDrop</p>
+        <h3>Local transfer</h3>
+        <p>Browser to browser via WebRTC. No relay storage. No Apple. No cloud. Burn-on-read.</p>
+        <span class="product-card-link">Try now &rarr;</span>
+      </a>
+
     </div>
-
-    <div class="pc">
-      <div class="price-name">ENTERPRISE</div>
-      <div class="price-amount">Custom</div>
-      <div class="price-note">Dedicated relay &middot; SLA &middot; compliance docs</div>
-      <ul class="pf" style="margin-top:20px">
-        <li><span class="check">&#10003;</span> Dedicated relay &middot; on-premise option</li>
-        <li><span class="check">&#10003;</span> IEC 62443 / NIS2 / NEN 7510</li>
-        <li><span class="check">&#10003;</span> SLA 99.9% + priority support</li>
-      </ul>
-      <a href="mailto:privacy@paramant.app?subject=Enterprise" class="price-btn s" style="margin-top:20px;display:block;text-align:center">Contact us &rarr;</a>
-    </div>
-
   </div>
-
-  <div style="text-align:center;margin-top:24px">
-    <a href="/pricing" style="font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono)">See all plans and compare features &rarr;</a>
-  </div>
-  <div style="text-align:center;margin-top:12px;font-size:11px;font-family:var(--mono);color:#444">
-    License: BUSL-1.1 &mdash; source available &nbsp;&#183;&nbsp; <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank" style="color:#555;text-decoration:none">view LICENSE</a>
-  </div>
-
 </section>
 
-<footer data-fade>
-  <div>
-    <a href="/" class="footer-logo" style="text-decoration:none;color:inherit;display:block;margin-bottom:8px">PARAMANT</a>
-    <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Post-quantum encrypted file relay</div>
-  </div>
-  <div style="display:flex;gap:48px;flex-wrap:wrap">
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Product</div>
-      <div class="footer-links" style="flex-direction:column;gap:10px">
-        <a href="/send">Send a file</a>
-        <a href="/parashare">ParaShare</a>
-        <a href="/drop">ParaDrop</a>
-        <a href="/dashboard">Dashboard</a>
-        <a href="/ct-log">CT Log</a>
-        <a href="/docs">Docs</a>
-        <a href="/pricing">Pricing</a>
-        <a href="/vs">vs. alternatives</a>
-        <a href="/press">Press kit</a>
-        <a href="/changelog">Changelog</a>
-      </div>
+<!-- § 03 VERIFIABLE — CT LOG -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="ct">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num">03</span>
+      <h2>Verifiable</h2>
+      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">CT log</span>
     </div>
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Self-host</div>
-      <div class="footer-links" style="flex-direction:column;gap:10px">
-        <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-        <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/self-hosting.md" target="_blank">Deploy guide</a>
-        <a href="/install.sh">install.sh</a>
-        <a href="/install-pi.sh">install-pi.sh</a>
-        <a href="/install-client.sh">install-client.sh</a>
-        <a href="/download">ParamantOS</a>
-        <a href="/status">Status</a>
+
+    <div class="ct-widget">
+      <div class="ct-header">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <span class="status-dot" id="ct-dot"></span>
+          <span style="font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--lime-dim)">Certificate Transparency Log — live</span>
+        </div>
+        <a href="/ct-log" style="font-size:var(--text-xs);color:var(--lime-dim);letter-spacing:.06em">View all &rarr;</a>
       </div>
-    </div>
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Compliance</div>
-      <div class="footer-links" style="flex-direction:column;gap:10px">
-        <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-        <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-        <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-        <a href="/dpa">Data Processing Agreement (GDPR Art. 28)</a>
-        <a href="/government">Government &amp; public sector</a>
-        <a href="/ot">OT guide</a>
-        <a href="/hndl">HNDL threat</a>
-        <a href="/crypto-agility">Crypto agility</a>
+
+      <div class="ct-stats">
+        <div class="ct-stat">
+          <div class="ct-stat-label">Log entries</div>
+          <div class="ct-stat-val" id="ct-transfers">—</div>
+        </div>
+        <div class="ct-stat">
+          <div class="ct-stat-label">Registered relays</div>
+          <div class="ct-stat-val" id="ct-relays">—</div>
+        </div>
+        <div class="ct-stat">
+          <div class="ct-stat-label">STH signature</div>
+          <div class="ct-stat-val" style="font-size:var(--text-lg)" id="ct-sth-status">checking...</div>
+        </div>
       </div>
-    </div>
-    <div>
-      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Company</div>
-      <div class="footer-links" style="flex-direction:column;gap:10px">
-        <a href="mailto:privacy@paramant.app">Contact</a>
-        <a href="/request-key">Free API key</a>
-        <a href="/status">Status</a>
-        <a href="/sla">SLA</a>
-        <a href="/security">Security</a>
-        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank">License</a>
+
+      <div class="ct-body">
+        <div class="ct-root-panel">
+          <div class="ct-feed-label">Current root</div>
+          <div style="font-size:var(--text-sm);font-family:var(--mono);color:var(--lime-dim);word-break:break-all;line-height:1.7" id="ct-root">syncing...</div>
+          <div style="font-size:var(--text-xs);color:var(--lime-dim);margin-top:var(--space-3);letter-spacing:.04em">SHA3-256 · tamper-evident · public</div>
+        </div>
+        <div class="ct-feed-panel">
+          <div class="ct-feed-label">Recent activity</div>
+          <div id="ct-feed" style="font-size:var(--text-sm);font-family:var(--mono);color:var(--lime-dim);line-height:2">
+            <span>loading...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ct-foot">
+        <div style="font-size:var(--text-xs);color:var(--lime-dim);letter-spacing:.04em">Every transfer hashed into a Merkle tree. Content never stored.</div>
+        <div style="display:flex;gap:var(--space-3);flex-shrink:0;flex-wrap:wrap">
+          <a href="/ct-log" class="btn btn-tertiary" style="font-size:var(--text-xs)">View live CT log &rarr;</a>
+          <a href="/hndl" class="btn btn-tertiary" style="font-size:var(--text-xs)">Why post-quantum now &rarr;</a>
+        </div>
       </div>
     </div>
   </div>
-  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
+</section>
+
+<!-- § 04 PRICING -->
+<section class="invert" style="padding:var(--space-9) 0" id="pricing">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num">04</span>
+      <h2>Pricing</h2>
+      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--black-dim)">Three tiers</span>
+    </div>
+
+    <div class="pricing-grid">
+
+      <div class="pricing-card">
+        <div class="pricing-tier">Free</div>
+        <div class="pricing-price">&euro;0</div>
+        <div class="pricing-note">No account &middot; no card &middot; forever</div>
+        <ul class="pricing-features">
+          <li>AES-256-GCM, client-side</li>
+          <li>5 MB per file</li>
+          <li>1 hour TTL</li>
+          <li>10 uploads / hour / IP</li>
+          <li>RAM-only, burn-on-read</li>
+        </ul>
+        <a href="/send" class="btn btn-primary" style="display:block;text-align:center">Send a file free &rarr;</a>
+      </div>
+
+      <div class="pricing-card" style="background:var(--black);color:var(--lime)">
+        <div class="pricing-tier" style="color:var(--lime-dim)">Pro</div>
+        <div class="pricing-price" style="color:var(--lime);font-size:var(--text-xl)">Coming soon</div>
+        <div class="pricing-note" style="color:var(--lime-dim)">Join waitlist for launch pricing</div>
+        <ul class="pricing-features" style="color:var(--lime-dim)">
+          <li class="coming">AES-256-GCM or ML-KEM-768 (your choice)</li>
+          <li class="coming">5 MB per file, 24 hour TTL</li>
+          <li class="coming">Unlimited uploads, no IP rate limit</li>
+          <li class="coming">Webhooks, send history, email notifications</li>
+        </ul>
+        <a href="mailto:privacy@paramant.app?subject=Pro+waitlist" class="btn btn-secondary" style="display:block;text-align:center;border-color:var(--lime-hair);color:var(--lime)">Get notified &rarr;</a>
+      </div>
+
+      <div class="pricing-card">
+        <div class="pricing-tier">Enterprise</div>
+        <div class="pricing-price">Custom</div>
+        <div class="pricing-note">Dedicated relay &middot; SLA &middot; compliance</div>
+        <ul class="pricing-features">
+          <li>ML-KEM-768 + ECDH hybrid, ML-DSA-65</li>
+          <li>5 MB default, larger via per-tenant config</li>
+          <li>7 day TTL, dedicated relay</li>
+          <li>IEC 62443 / NIS2 / NEN 7510 docs</li>
+          <li>DPA, on-premise option, SLA 99.9%</li>
+        </ul>
+        <a href="mailto:privacy@paramant.app?subject=Enterprise" class="btn btn-primary" style="display:block;text-align:center">Contact &rarr;</a>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:var(--space-6)">
+      <a href="/pricing" style="font-size:var(--text-sm);color:var(--black-dim);font-family:var(--mono)">Full plan details and comparison &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- § 05 SELF-HOST -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="selfhost">
+  <div class="container-md" style="text-align:center">
+    <div class="sec-head" style="text-align:left">
+      <span class="num">05</span>
+      <h2>Run your own relay.</h2>
+      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Self-host</span>
+    </div>
+    <p style="font-size:var(--text-base);color:var(--lime-dim);line-height:1.7;margin-bottom:var(--space-7)">
+      Source-available under BUSL-1.1. Free for up to 5 users. Works on a Raspberry Pi. If the managed service ever closes, every self-hosted relay keeps running indefinitely.
+    </p>
+    <div class="cluster" style="--cluster-gap:var(--space-4);justify-content:center;flex-direction:column;align-items:center">
+      <code style="background:var(--lime-ghost);border:1px solid var(--lime-hair);padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">curl -fsSL https://paramant.app/install.sh | bash</code>
+      <span style="color:var(--lime-dim);font-size:var(--text-sm)">or</span>
+      <code style="background:var(--lime-ghost);border:1px solid var(--lime-hair);padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">docker compose up -d</code>
+    </div>
+    <div style="margin-top:var(--space-6)">
+      <a href="/docs#self-hosting" class="btn btn-secondary">Full deploy guide &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)">
+  <div class="container-lg">
+    <div class="footer-grid">
+
+      <div>
+        <div class="wordmark" style="font-size:var(--text-base);margin-bottom:var(--space-3)">
+          <span class="para">Para</span><span class="suffix">MANT</span>
+        </div>
+        <p style="font-size:var(--text-xs);color:var(--lime-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-top:var(--space-4);line-height:1.8">
+          FIPS 203 / 204 &middot; Hetzner DE<br>
+          GDPR &middot; no US CLOUD Act<br>
+          BUSL-1.1 &middot; &copy; 2026 PARAMANT
+        </p>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </footer>
 
 <script src="ct-stats.js" defer></script>
 <script src="/nav.js" defer></script>
 <script>
-window.addEventListener('load', function(){
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}
-    });
-  },{threshold:0.07});
-  document.querySelectorAll('[data-fade]').forEach(function(el){
-    if(el.getBoundingClientRect().top < window.innerHeight){return;}
-    el.classList.add('fade-in');
-    io.observe(el);
+(function(){
+  var root = document.getElementById('ct-root');
+  var rootMeta = document.getElementById('ct-root-meta');
+  if (!root || !rootMeta) return;
+  var ob = new MutationObserver(function(){
+    var t = root.textContent;
+    rootMeta.textContent = t && t !== 'syncing...' ? t.slice(0,8) + '...' : '—';
   });
-});
+  ob.observe(root, {childList:true, characterData:true, subtree:true});
+})();
 </script>
 </body>
 </html>
