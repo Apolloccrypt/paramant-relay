@@ -59,28 +59,35 @@ pre{font-family:var(--mono);font-size:11px;line-height:1.7;overflow-x:auto}
 .cta-band p{font-size:14px;color:var(--muted);max-width:500px;line-height:1.75;margin-bottom:20px}
 .cta-meta{font-size:11px;font-family:var(--mono);color:var(--dim);line-height:2}
 </style>
+<link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
   <ul class="nav-links">
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Product &#9662;</button>
       <ul class="nav-dropdown-menu">
+        <li><a href="/send">Send a file</a></li>
         <li><a href="/parashare">ParaShare</a></li>
         <li><a href="/drop">ParaDrop</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
         <li><a href="/ct-log">CT Log</a></li>
         <li><a href="/docs">Docs</a></li>
         <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs#api">API reference</a></li>
         <li><a href="/vs">vs. alternatives</a></li>
         <li><a href="/press">Press kit</a></li>
         <li><a href="/changelog">Changelog</a></li>
       </ul>
     </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Self-host &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -91,9 +98,13 @@ pre{font-family:var(--mono);font-size:11px;line-height:1.7;overflow-x:auto}
         <li class="nav-dropdown-divider"></li>
         <li><a href="/install.sh">install.sh</a></li>
         <li><a href="/install-pi.sh">install-pi.sh</a></li>
+        <li><a href="/install-client.sh">install-client.sh</a></li>
+        <li><a href="/download">ParamantOS</a></li>
+        <li class="nav-dropdown-divider"></li>
         <li><a href="/status">Status</a></li>
       </ul>
     </li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Compliance &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -102,11 +113,13 @@ pre{font-family:var(--mono);font-size:11px;line-height:1.7;overflow-x:auto}
         <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
         <li><a href="/dpa">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider"></li>
+        <li><a href="/ot">OT guide</a></li>
         <li><a href="/government">Government &amp; public sector</a></li>
         <li><a href="/hndl">HNDL threat</a></li>
         <li><a href="/crypto-agility">Crypto agility</a></li>
       </ul>
     </li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Info &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -118,7 +131,9 @@ pre{font-family:var(--mono);font-size:11px;line-height:1.7;overflow-x:auto}
         <li><a href="/license">License</a></li>
       </ul>
     </li>
+
   </ul>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
@@ -126,20 +141,51 @@ pre{font-family:var(--mono);font-size:11px;line-height:1.7;overflow-x:auto}
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Product</div>
-    <a href="/parashare">ParaShare</a><a href="/drop">ParaDrop</a>
-    <a href="/dashboard">Dashboard</a><a href="/ct-log">CT Log</a>
-    <a href="/docs">Docs</a><a href="/#pricing">Pricing</a>
+    <a href="/send">Send a file</a>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/docs">Docs</a>
+    <a href="/docs#api">API reference</a>
+    <a href="/vs">vs. alternatives</a>
+    <a href="/press">Press kit</a>
+    <a href="/changelog">Changelog</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Pricing</div>
+    <a href="/pricing" class="nav-mobile-standalone">Pricing plans →</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Self-host</div>
+    <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+    <a href="/docs#self-hosting">Deploy guide</a>
+    <a href="/install.sh">install.sh</a>
+    <a href="/install-pi.sh">install-pi.sh</a>
+    <a href="/download">ParamantOS</a>
+    <a href="/status">Status</a>
   </div>
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Compliance</div>
-    <a href="/compliance/iec62443">IEC 62443</a>
     <a href="/compliance/nis2">NIS2</a>
+    <a href="/compliance/iec62443">IEC 62443</a>
+    <a href="/compliance/nen7510">NEN 7510</a>
     <a href="/dpa">Data Processing Agreement</a>
+    <a href="/ot">OT guide</a>
+    <a href="/government">Government</a>
+    <a href="/hndl">HNDL threat</a>
+    <a href="/crypto-agility">Crypto agility</a>
   </div>
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Info</div>
     <a href="mailto:privacy@paramant.app">Contact</a>
     <a href="/request-key">Free API key</a>
+    <a href="/status">Status</a>
+    <a href="/sla">SLA</a>
+    <a href="/security">Security</a>
+    <a href="/license">License</a>
   </div>
 </div>
 

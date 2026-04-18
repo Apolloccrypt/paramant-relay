@@ -171,6 +171,7 @@ main { background: transparent !important }
   .fingerprint{font-size:18px;letter-spacing:.08em}
 }
 </style>
+<link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
@@ -182,18 +183,21 @@ main { background: transparent !important }
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Product &#9662;</button>
       <ul class="nav-dropdown-menu">
+        <li><a href="/send">Send a file</a></li>
         <li><a href="/parashare">ParaShare</a></li>
         <li><a href="/drop">ParaDrop</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
         <li><a href="/ct-log">CT Log</a></li>
         <li><a href="/docs">Docs</a></li>
         <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs#api">API reference</a></li>
         <li><a href="/vs">vs. alternatives</a></li>
         <li><a href="/press">Press kit</a></li>
         <li><a href="/changelog">Changelog</a></li>
       </ul>
     </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Self-host &#9662;</button>
@@ -206,6 +210,7 @@ main { background: transparent !important }
         <li><a href="/install.sh">install.sh</a></li>
         <li><a href="/install-pi.sh">install-pi.sh</a></li>
         <li><a href="/install-client.sh">install-client.sh</a></li>
+        <li><a href="/download">ParamantOS</a></li>
         <li class="nav-dropdown-divider"></li>
         <li><a href="/status">Status</a></li>
       </ul>
@@ -219,6 +224,7 @@ main { background: transparent !important }
         <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
         <li><a href="/dpa">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider"></li>
+        <li><a href="/ot">OT guide</a></li>
         <li><a href="/government">Government &amp; public sector</a></li>
         <li><a href="/hndl">HNDL threat</a></li>
         <li><a href="/crypto-agility">Crypto agility</a></li>
@@ -246,15 +252,20 @@ main { background: transparent !important }
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Product</div>
+    <a href="/send">Send a file</a>
     <a href="/parashare">ParaShare</a>
     <a href="/drop">ParaDrop</a>
     <a href="/dashboard">Dashboard</a>
     <a href="/ct-log">CT Log</a>
     <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
+    <a href="/docs#api">API reference</a>
     <a href="/vs">vs. alternatives</a>
     <a href="/press">Press kit</a>
     <a href="/changelog">Changelog</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Pricing</div>
+    <a href="/pricing" class="nav-mobile-standalone">Pricing plans →</a>
   </div>
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Self-host</div>
@@ -264,6 +275,7 @@ main { background: transparent !important }
     <a href="/docs#self-hosting">Deploy guide</a>
     <a href="/install.sh">install.sh</a>
     <a href="/install-pi.sh">install-pi.sh</a>
+    <a href="/download">ParamantOS</a>
     <a href="/status">Status</a>
   </div>
   <div class="nav-mobile-group">
@@ -272,6 +284,7 @@ main { background: transparent !important }
     <a href="/compliance/iec62443">IEC 62443</a>
     <a href="/compliance/nen7510">NEN 7510</a>
     <a href="/dpa">Data Processing Agreement</a>
+    <a href="/ot">OT guide</a>
     <a href="/government">Government</a>
     <a href="/hndl">HNDL threat</a>
     <a href="/crypto-agility">Crypto agility</a>
@@ -288,8 +301,30 @@ main { background: transparent !important }
 </div>
 <main style="position:relative;z-index:10">
 
+<!-- Path chooser -->
+<div id="step-choose" style="max-width:640px;margin:0 auto;padding:64px 24px 0">
+  <div class="hero-block">
+    <h1>Send a file</h1>
+    <p class="sub" style="margin-bottom:0">Choose how you want to send.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <a href="/send" style="display:block;background:var(--surface);border:1px solid var(--border2);padding:20px 18px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='#3dbe7a'" onmouseout="this.style.borderColor=''">
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Zero friction</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Send anonymously</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6">Drop a file. Get a burn link. No key, no account.</div>
+      <div style="font-size:11px;color:#3dbe7a;margin-top:12px">Go to /send &rarr;</div>
+    </a>
+    <button onclick="document.getElementById('step-choose').style.display='none';document.getElementById('step-setup').classList.add('active')" style="display:block;background:var(--surface);border:1px solid rgba(0,255,65,.35);padding:20px 18px;text-align:left;cursor:pointer;font-family:var(--mono);width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='#00ff41'" onmouseout="this.style.borderColor='rgba(0,255,65,.35)'">
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Verified E2E</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Send with ParaShare</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6">ML-KEM-768 key exchange. Recipient verifies relay identity.</div>
+      <div style="font-size:11px;color:#00ff41;margin-top:12px">Use ParaShare &rarr;</div>
+    </button>
+  </div>
+</div>
+
 <!-- STEP 1: Setup -->
-<div class="step active" id="step-setup">
+<div class="step" id="step-setup">
   <div class="hero-block">
     <h1>Secure file transfer</h1>
     <p class="sub" style="margin-bottom:0">The receiver gets a unique link. Their browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees the key.</p>

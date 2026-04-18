@@ -134,6 +134,7 @@ nav a.back:hover { color:#aaa; }
   .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
 }
 </style>
+<link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
@@ -146,18 +147,21 @@ nav a.back:hover { color:#aaa; }
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Product &#9662;</button>
       <ul class="nav-dropdown-menu">
+        <li><a href="/send">Send a file</a></li>
         <li><a href="/parashare">ParaShare</a></li>
         <li><a href="/drop">ParaDrop</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
         <li><a href="/ct-log">CT Log</a></li>
         <li><a href="/docs">Docs</a></li>
         <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs#api">API reference</a></li>
         <li><a href="/vs">vs. alternatives</a></li>
         <li><a href="/press">Press kit</a></li>
         <li><a href="/changelog">Changelog</a></li>
       </ul>
     </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Self-host &#9662;</button>
@@ -170,6 +174,7 @@ nav a.back:hover { color:#aaa; }
         <li><a href="/install.sh">install.sh</a></li>
         <li><a href="/install-pi.sh">install-pi.sh</a></li>
         <li><a href="/install-client.sh">install-client.sh</a></li>
+        <li><a href="/download">ParamantOS</a></li>
         <li class="nav-dropdown-divider"></li>
         <li><a href="/status">Status</a></li>
       </ul>
@@ -183,6 +188,7 @@ nav a.back:hover { color:#aaa; }
         <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
         <li><a href="/dpa">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider"></li>
+        <li><a href="/ot">OT guide</a></li>
         <li><a href="/government">Government &amp; public sector</a></li>
         <li><a href="/hndl">HNDL threat</a></li>
         <li><a href="/crypto-agility">Crypto agility</a></li>
@@ -210,15 +216,20 @@ nav a.back:hover { color:#aaa; }
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Product</div>
+    <a href="/send">Send a file</a>
     <a href="/parashare">ParaShare</a>
     <a href="/drop">ParaDrop</a>
     <a href="/dashboard">Dashboard</a>
     <a href="/ct-log">CT Log</a>
     <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
+    <a href="/docs#api">API reference</a>
     <a href="/vs">vs. alternatives</a>
     <a href="/press">Press kit</a>
     <a href="/changelog">Changelog</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Pricing</div>
+    <a href="/pricing" class="nav-mobile-standalone">Pricing plans →</a>
   </div>
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Self-host</div>
@@ -228,6 +239,7 @@ nav a.back:hover { color:#aaa; }
     <a href="/docs#self-hosting">Deploy guide</a>
     <a href="/install.sh">install.sh</a>
     <a href="/install-pi.sh">install-pi.sh</a>
+    <a href="/download">ParamantOS</a>
     <a href="/status">Status</a>
   </div>
   <div class="nav-mobile-group">
@@ -236,6 +248,7 @@ nav a.back:hover { color:#aaa; }
     <a href="/compliance/iec62443">IEC 62443</a>
     <a href="/compliance/nen7510">NEN 7510</a>
     <a href="/dpa">Data Processing Agreement</a>
+    <a href="/ot">OT guide</a>
     <a href="/government">Government</a>
     <a href="/hndl">HNDL threat</a>
     <a href="/crypto-agility">Crypto agility</a>

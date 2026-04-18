@@ -1,0 +1,259 @@
+/* PARAMANT design system — single source of truth for colors, type, and components */
+
+:root {
+  /* Background layers */
+  --bg:          #0b1d12;
+  --surface:     #0f2318;
+  --surface-2:   #142b1c;
+  --surface-3:   #193323;
+
+  /* Borders */
+  --border:      #1e3828;
+  --border-soft: #192d22;
+
+  /* Text */
+  --text-primary: #e8e8e8;
+  --text-muted:   #8aab99;
+  --text-quiet:   #4a6b58;
+
+  /* Brand green */
+  --green:        #3dbe7a;
+  --green-dim:    #2a8f59;
+  --green-bg:     rgba(61,190,122,.08);
+  --green-border: rgba(61,190,122,.22);
+
+  /* Semantic */
+  --red:   #e05c5c;
+  --amber: #d4935a;
+  --blue:  #5a8fd4;
+
+  /* Typography */
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius:    8px;
+  --radius-lg: 12px;
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Typography ─────────────────────────────────────────── */
+.ds-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--green);
+  font-family: var(--mono);
+  margin-bottom: 12px;
+}
+
+.ds-h1 {
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -.04em;
+  color: var(--text-primary);
+}
+
+.ds-h2 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.ds-h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.ds-lead {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1.75;
+}
+
+.ds-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+.ds-btn {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: box-shadow .15s, transform .15s, opacity .15s;
+  cursor: pointer;
+  border: none;
+  font-family: var(--font);
+}
+
+.ds-btn-primary {
+  background: var(--green);
+  color: var(--bg);
+}
+.ds-btn-primary:hover {
+  box-shadow: 0 0 20px rgba(61,190,122,.38);
+  transform: translateY(-1px);
+}
+
+.ds-btn-secondary {
+  border: 1px solid var(--green-border);
+  color: var(--green);
+  background: transparent;
+}
+.ds-btn-secondary:hover {
+  border-color: var(--green);
+  transform: translateY(-1px);
+}
+
+.ds-btn-ghost {
+  color: var(--text-muted);
+  background: transparent;
+}
+.ds-btn-ghost:hover { color: var(--text-primary); }
+
+/* ── Cards / surfaces ───────────────────────────────────── */
+.ds-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.ds-card-sm {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+
+/* ── Code blocks ────────────────────────────────────────── */
+.ds-code-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ds-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-code-dots { display: flex; gap: 6px; }
+.ds-code-dots span {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--surface-3);
+}
+
+.ds-code-lang {
+  font-size: 11px;
+  color: var(--text-quiet);
+  font-family: var(--mono);
+}
+
+.ds-code-body {
+  padding: 20px 24px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 2;
+  color: var(--text-muted);
+}
+
+/* ── Grid layouts ───────────────────────────────────────── */
+.ds-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.ds-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.ds-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.ds-grid-cell { background: var(--bg); padding: 28px 24px; }
+.ds-grid-cell-surface { background: var(--surface); padding: 28px 24px; }
+
+/* ── Table ──────────────────────────────────────────────── */
+.ds-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ds-table th {
+  text-align: left;
+  padding: 10px 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-quiet);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+}
+.ds-table td {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+  color: var(--text-muted);
+}
+.ds-table tr:last-child td { border-bottom: none; }
+
+/* ── Status dot ─────────────────────────────────────────── */
+.ds-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  display: inline-block;
+  box-shadow: 0 0 6px var(--green);
+  animation: ds-pulse 2.4s ease-in-out infinite;
+}
+@keyframes ds-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .45; }
+}
+
+/* ── Utility ────────────────────────────────────────────── */
+.ds-divider { border: none; border-top: 1px solid var(--border); }
+.ds-mono { font-family: var(--mono); }
+.ds-green { color: var(--green); }
+.ds-muted { color: var(--text-muted); }
+.ds-quiet { color: var(--text-quiet); }
+
+/* ── Section wrapper ────────────────────────────────────── */
+.ds-section {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 80px 32px;
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ds-h1 { font-size: 36px; }
+  .ds-h2 { font-size: 24px; }
+  .ds-grid-2,
+  .ds-grid-3 { grid-template-columns: 1fr; }
+  .ds-section { padding: 56px 20px; }
+}

@@ -1,5 +1,4 @@
-/* PARAMANT shared navbar — paramantOS style
-   Uses nav.nav selector to override per-page nav{} embedded styles */
+/* PARAMANT shared navbar — uses design-system.css variables */
 
 nav.nav {
   display: flex;
@@ -7,8 +6,8 @@ nav.nav {
   justify-content: space-between;
   padding: 0 2rem;
   height: 56px;
-  background: rgba(12,12,12,.97);
-  border-bottom: 1px solid #242424;
+  background: rgba(11,29,18,.97);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -17,14 +16,14 @@ nav.nav {
 }
 
 nav.nav .nav-logo {
-  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-family: var(--mono);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .08em;
   text-decoration: none;
 }
-nav.nav .nav-logo .logo-para { color: #e8e8e8; }
-nav.nav .nav-logo .logo-mant { color: #00ff41; }
+nav.nav .nav-logo .logo-para { color: var(--text-primary); }
+nav.nav .nav-logo .logo-mant { color: var(--green); }
 
 nav.nav .nav-links {
   display: flex;
@@ -38,21 +37,20 @@ nav.nav .nav-links {
 /* Dropdown container */
 nav.nav .nav-dropdown { position: relative; }
 
-/* Top-level triggers: neutral, not green — green is reserved for hover/accent */
 nav.nav .nav-dropdown-trigger {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-quiet);
   font-size: 13px;
-  font-family: inherit;
+  font-family: var(--font);
   padding: .5rem .75rem;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: color .15s;
   white-space: nowrap;
 }
 nav.nav .nav-dropdown-trigger:hover,
-nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: #ededed; }
+nav.nav .nav-dropdown:hover .nav-dropdown-trigger { color: var(--text-primary); }
 
 /* Dropdown menu */
 nav.nav .nav-dropdown-menu {
@@ -61,8 +59,8 @@ nav.nav .nav-dropdown-menu {
   top: calc(100% + 4px);
   left: 0;
   min-width: 180px;
-  background: #181818;
-  border: 1px solid #242424;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: .5rem 0;
   list-style: none;
@@ -74,38 +72,37 @@ nav.nav .nav-dropdown:hover .nav-dropdown-menu { display: block; }
 
 .nav-dropdown-divider {
   height: 1px;
-  background: #242424;
+  background: var(--border);
   margin: .25rem 0;
   pointer-events: none;
   list-style: none;
 }
 
-/* Dropdown items: neutral by default, green on hover */
 nav.nav .nav-dropdown-menu li a {
   display: block;
   padding: .5rem 1rem;
-  color: #aaa;
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 13px;
   transition: color .15s, background .15s;
   white-space: nowrap;
 }
 nav.nav .nav-dropdown-menu li a:hover {
-  color: #00ff41;
-  background: rgba(0,255,65,.06);
+  color: var(--green);
+  background: var(--green-bg);
 }
 
 /* Direct standalone links */
 nav.nav .nav-link {
-  color: #888;
+  color: var(--text-quiet);
   font-size: 13px;
   padding: .5rem .75rem;
   text-decoration: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: color .15s;
   white-space: nowrap;
 }
-nav.nav .nav-link:hover { color: #ededed; }
+nav.nav .nav-link:hover { color: var(--text-primary); }
 
 /* Hamburger button — hidden on desktop */
 nav.nav .nav-hamburger {
@@ -121,7 +118,7 @@ nav.nav .nav-hamburger span {
   display: block;
   width: 22px;
   height: 2px;
-  background: #888;
+  background: var(--text-quiet);
   border-radius: 2px;
   transition: transform .2s, opacity .2s;
 }
@@ -134,7 +131,7 @@ nav.nav .nav-hamburger span {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #0c0c0c;
+  background: var(--bg);
   padding: 2rem;
   z-index: 99;
   overflow-y: auto;
@@ -149,29 +146,27 @@ nav.nav .nav-hamburger span {
   gap: .625rem;
 }
 
-/* Category labels: bright green — the only green in the mobile menu */
 .nav-mobile-label {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: #00ff41;
+  color: var(--green);
   margin-bottom: .25rem;
-  font-family: 'SF Mono','Fira Code',monospace;
+  font-family: var(--mono);
 }
 
-/* Mobile links: neutral */
 .nav-mobile a {
-  color: #aaa;
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 1.0625rem;
   padding: .5rem 0;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid var(--border-soft);
   display: block;
   transition: color .15s;
 }
-.nav-mobile a:hover { color: #ededed; }
+.nav-mobile a:hover { color: var(--text-primary); }
 .nav-mobile-standalone {
-  color: #aaa !important;
+  color: var(--text-muted) !important;
   font-size: 1.0625rem;
   text-decoration: none;
   border-bottom: none !important;

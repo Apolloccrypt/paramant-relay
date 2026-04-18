@@ -131,28 +131,35 @@ body.annual .note-annual{display:block}
 .trial-banner-cta{margin-left:auto;font-size:12px;font-weight:500;color:var(--green);border:1px solid rgba(0,204,51,.3);padding:7px 16px;border-radius:4px;text-decoration:none;white-space:nowrap}
 .trial-banner-cta:hover{border-color:var(--green)}
 </style>
+<link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
   <ul class="nav-links">
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Product &#9662;</button>
       <ul class="nav-dropdown-menu">
+        <li><a href="/send">Send a file</a></li>
         <li><a href="/parashare">ParaShare</a></li>
         <li><a href="/drop">ParaDrop</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
         <li><a href="/ct-log">CT Log</a></li>
         <li><a href="/docs">Docs</a></li>
         <li class="nav-dropdown-divider"></li>
-        <li><a href="/pricing">Pricing</a></li>
+        <li><a href="/docs#api">API reference</a></li>
         <li><a href="/vs">vs. alternatives</a></li>
         <li><a href="/press">Press kit</a></li>
         <li><a href="/changelog">Changelog</a></li>
       </ul>
     </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Self-host &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -164,10 +171,12 @@ body.annual .note-annual{display:block}
         <li><a href="/install.sh">install.sh</a></li>
         <li><a href="/install-pi.sh">install-pi.sh</a></li>
         <li><a href="/install-client.sh">install-client.sh</a></li>
+        <li><a href="/download">ParamantOS</a></li>
         <li class="nav-dropdown-divider"></li>
         <li><a href="/status">Status</a></li>
       </ul>
     </li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Compliance &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -176,11 +185,13 @@ body.annual .note-annual{display:block}
         <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
         <li><a href="/dpa">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider"></li>
+        <li><a href="/ot">OT guide</a></li>
         <li><a href="/government">Government &amp; public sector</a></li>
         <li><a href="/hndl">HNDL threat</a></li>
         <li><a href="/crypto-agility">Crypto agility</a></li>
       </ul>
     </li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Info &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -192,7 +203,9 @@ body.annual .note-annual{display:block}
         <li><a href="/license">License</a></li>
       </ul>
     </li>
+
   </ul>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
@@ -200,15 +213,20 @@ body.annual .note-annual{display:block}
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Product</div>
+    <a href="/send">Send a file</a>
     <a href="/parashare">ParaShare</a>
     <a href="/drop">ParaDrop</a>
     <a href="/dashboard">Dashboard</a>
     <a href="/ct-log">CT Log</a>
     <a href="/docs">Docs</a>
-    <a href="/pricing">Pricing</a>
+    <a href="/docs#api">API reference</a>
     <a href="/vs">vs. alternatives</a>
     <a href="/press">Press kit</a>
     <a href="/changelog">Changelog</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Pricing</div>
+    <a href="/pricing" class="nav-mobile-standalone">Pricing plans →</a>
   </div>
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Self-host</div>
@@ -218,6 +236,7 @@ body.annual .note-annual{display:block}
     <a href="/docs#self-hosting">Deploy guide</a>
     <a href="/install.sh">install.sh</a>
     <a href="/install-pi.sh">install-pi.sh</a>
+    <a href="/download">ParamantOS</a>
     <a href="/status">Status</a>
   </div>
   <div class="nav-mobile-group">
@@ -226,6 +245,7 @@ body.annual .note-annual{display:block}
     <a href="/compliance/iec62443">IEC 62443</a>
     <a href="/compliance/nen7510">NEN 7510</a>
     <a href="/dpa">Data Processing Agreement</a>
+    <a href="/ot">OT guide</a>
     <a href="/government">Government</a>
     <a href="/hndl">HNDL threat</a>
     <a href="/crypto-agility">Crypto agility</a>
@@ -245,6 +265,9 @@ body.annual .note-annual{display:block}
   <div class="eyebrow">Pricing</div>
   <h1>Two ways to use Paramant</h1>
   <p class="hero-sub">Pay for what you need. Free to start — no card required.<br>Self-host free forever under BUSL-1.1.</p>
+  <div style="margin-top:16px;margin-bottom:8px">
+    <a href="/send" style="font-size:12px;font-family:var(--mono);color:#3dbe7a;text-decoration:none;border:1px solid rgba(61,190,122,.3);padding:7px 16px;border-radius:4px">No account? Send a file instantly &rarr;</a>
+  </div>
   <div class="toggle-wrap">
     <span class="toggle-label active" id="lbl-monthly">Monthly</span>
     <label class="toggle">

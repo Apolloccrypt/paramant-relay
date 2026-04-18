@@ -212,6 +212,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
   .selfhost-teaser{padding:3rem 1.25rem}
 }
 </style>
+<link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
@@ -223,18 +224,21 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Product &#9662;</button>
       <ul class="nav-dropdown-menu">
+        <li><a href="/send">Send a file</a></li>
         <li><a href="/parashare">ParaShare</a></li>
         <li><a href="/drop">ParaDrop</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
         <li><a href="/ct-log">CT Log</a></li>
         <li><a href="/docs">Docs</a></li>
         <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs#api">API reference</a></li>
         <li><a href="/vs">vs. alternatives</a></li>
         <li><a href="/press">Press kit</a></li>
         <li><a href="/changelog">Changelog</a></li>
       </ul>
     </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Self-host &#9662;</button>
@@ -247,6 +251,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
         <li><a href="/install.sh">install.sh</a></li>
         <li><a href="/install-pi.sh">install-pi.sh</a></li>
         <li><a href="/install-client.sh">install-client.sh</a></li>
+        <li><a href="/download">ParamantOS</a></li>
         <li class="nav-dropdown-divider"></li>
         <li><a href="/status">Status</a></li>
       </ul>
@@ -260,6 +265,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
         <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
         <li><a href="/dpa">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider"></li>
+        <li><a href="/ot">OT guide</a></li>
         <li><a href="/government">Government &amp; public sector</a></li>
         <li><a href="/hndl">HNDL threat</a></li>
         <li><a href="/crypto-agility">Crypto agility</a></li>
@@ -287,15 +293,20 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Product</div>
+    <a href="/send">Send a file</a>
     <a href="/parashare">ParaShare</a>
     <a href="/drop">ParaDrop</a>
     <a href="/dashboard">Dashboard</a>
     <a href="/ct-log">CT Log</a>
     <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
+    <a href="/docs#api">API reference</a>
     <a href="/vs">vs. alternatives</a>
     <a href="/press">Press kit</a>
     <a href="/changelog">Changelog</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Pricing</div>
+    <a href="/pricing" class="nav-mobile-standalone">Pricing plans →</a>
   </div>
   <div class="nav-mobile-group">
     <div class="nav-mobile-label">Self-host</div>
@@ -305,6 +316,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <a href="/docs#self-hosting">Deploy guide</a>
     <a href="/install.sh">install.sh</a>
     <a href="/install-pi.sh">install-pi.sh</a>
+    <a href="/download">ParamantOS</a>
     <a href="/status">Status</a>
   </div>
   <div class="nav-mobile-group">
@@ -313,6 +325,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <a href="/compliance/iec62443">IEC 62443</a>
     <a href="/compliance/nen7510">NEN 7510</a>
     <a href="/dpa">Data Processing Agreement</a>
+    <a href="/ot">OT guide</a>
     <a href="/government">Government</a>
     <a href="/hndl">HNDL threat</a>
     <a href="/crypto-agility">Crypto agility</a>
@@ -329,10 +342,14 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 </div>
 
 <div class="hero">
+  <div class="status">
+    <span class="status-dot" style="background:#3dbe7a;box-shadow:0 0 6px rgba(61,190,122,.5)"></span>
+    Relay operational &nbsp;&middot;&nbsp; FRA &middot; Hetzner DE
+  </div>
   <h1>Encrypted transport<br><em>that burns itself.</em></h1>
   <p class="hero-sub">Post-quantum. Client-side. RAM-only. Destroyed after one read.<br>No account. No storage. No trace.</p>
   <div class="btns">
-    <a href="/parashare" class="btn-p">Try ParaShare free &rarr;</a>
+    <a href="/send" class="btn-p">Send a file free &rarr;</a>
     <a href="#selfhost" class="btn-s">Self-host in 60s &darr;</a>
   </div>
   <div style="margin-top:24px;font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.04em">Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction</div>
@@ -446,30 +463,24 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 <hr class="divider">
 
 <section class="sec-pad" data-fade style="max-width:960px;margin:0 auto;padding:5rem 2rem">
-    <div class="grid g2">
+  <div class="grid g3">
+    <a href="/send" class="cell" style="text-decoration:none;display:block">
+      <div class="use-tag">Zero friction</div>
+      <h3>Send a file</h3>
+      <p class="desc" style="margin-top:6px">Drop a file. Get a burn link. No account, no API key required.</p>
+      <span class="tag">Try now &rarr;</span>
+    </a>
     <a href="/parashare" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag">File sharing</div>
+      <div class="use-tag">Verified E2E</div>
       <h3>ParaShare</h3>
-      <p class="desc" style="margin-top:6px">Browser-based encrypted file sharing &mdash; no account required.</p>
+      <p class="desc" style="margin-top:6px">ML-KEM-768 key exchange. Recipient verifies relay identity before download.</p>
       <span class="tag">Try free &rarr;</span>
     </a>
     <a href="/drop" class="cell" style="text-decoration:none;display:block;background:var(--surface)">
-      <div class="use-tag" style="color:#00ff41">Local transfer</div>
+      <div class="use-tag">Local transfer</div>
       <h3>ParaDrop</h3>
       <p class="desc" style="margin-top:6px">AirDrop alternative &middot; no Apple &middot; no cloud &middot; burn-on-read.</p>
-      <span class="tag" style="color:#00ff41">Try now &rarr;</span>
-    </a>
-    <a href="#selfhost" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag" style="color:#00cc33">Relay operator</div>
-      <h3>Run your own relay</h3>
-      <p class="desc" style="margin-top:6px">Community Edition &mdash; free forever, up to 5 users. BUSL-1.1.</p>
-      <span class="tag">Self-host &darr;</span>
-    </a>
-    <a href="#pricing" class="cell" style="text-decoration:none;display:block">
-      <div class="use-tag">End user</div>
-      <h3>Use a managed relay</h3>
-      <p class="desc" style="margin-top:6px">Free tier &mdash; 10 uploads/day, no account, pgp_ API key.</p>
-      <span class="tag">Pricing &darr;</span>
+      <span class="tag">Try now &rarr;</span>
     </a>
   </div>
 </section>
@@ -725,137 +736,53 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
 <section id="pricing" data-fade>
   <div class="eyebrow">Pricing</div>
   <h2>Simple pricing. Free to start.</h2>
-  <p class="sub">Free to start. Scale as needed.</p>
+  <p class="sub">Send files for free, no account required. Scale when you're ready.</p>
 
-
-
-  <div style="display:flex;justify-content:center;gap:0;margin:48px auto 0;max-width:340px;background:#111;border:1px solid #242424;border-radius:6px;padding:3px">
-    <button id="tab-op" onclick="showTab('op')" style="flex:1;padding:8px 0;border:none;background:#ededed;color:#111;border-radius:4px;font-size:12px;font-family:var(--mono);font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .15s">For operators</button>
-    <button id="tab-user" onclick="showTab('user')" style="flex:1;padding:8px 0;border:none;background:transparent;color:#888;border-radius:4px;font-size:12px;font-family:var(--mono);font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .15s">For end users</button>
-  </div>
-
-  <div id="pane-op" class="pricing-grid">
-
-    <div class="pc">
-      <div class="price-name" style="color:#00cc33">COMMUNITY</div>
-      <div class="price-amount">Free</div>
-      <div class="price-note">Up to 5 users &middot; no credit card &middot; BUSL-1.1</div>
-      <div class="price-tagline">Your server, your data, zero lock-in. Free forever.</div>
-      <ul class="pf">
-        <li><span class="check">&#10003;</span> Full source code &mdash; audit everything</li>
-        <li><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM + ML-DSA-65</li>
-        <li><span class="check">&#10003;</span> RAM-only, burn-on-read</li>
-        <li><span class="check">&#10003;</span> 5 sector relays via Docker Compose</li>
-        <li><span class="check">&#10003;</span> Auto TLS via Let&rsquo;s Encrypt</li>
-        <li><span class="check">&#10003;</span> Admin panel (/admin/)</li>
-        <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> Community support only</li>
-      </ul>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases/latest" target="_blank" class="price-btn p">Download v2.4.5 &rarr;</a>
-    </div>
-
-    <div class="pc coming-soon">
-      <div class="popular-badge">Coming soon</div>
-      <div class="price-name">PROFESSIONAL</div>
-      <div class="price-amount" style="font-size:28px">Coming soon</div>
-      <div class="price-note">Up to 50 users &middot; plk_ license key &middot; billed monthly</div>
-      <div class="price-tagline">Outgrown 5 users. Full features, email support.</div>
-      <ul class="pf">
-        <li><span class="check">&#10003;</span> Everything in Community</li>
-        <li><span class="check">&#10003;</span> Up to 50 active users</li>
-        <li><span class="check">&#10003;</span> Webhook delivery notifications</li>
-        <li><span class="check">&#10003;</span> 24-hour blob retention</li>
-        <li><span class="check">&#10003;</span> Email support &mdash; response &lt;48h</li>
-        <li><span class="check">&#10003;</span> Priority security updates</li>
-        <li><span class="check">&#10003;</span> Compliance documentation</li>
-      </ul>
-      <a href="mailto:privacy@paramant.app?subject=Professional+waitlist" class="price-btn ghost">Join waitlist &rarr;</a>
-    </div>
-
-    <div class="pc">
-      <div class="price-name">ENTERPRISE RELAY</div>
-      <div class="price-amount">Custom</div>
-      <div class="price-note">Unlimited &middot; SLA 99.9% &middot; regulated industries</div>
-      <div class="price-tagline">Dedicated relay, on-premise option, DICOM / FHIR, compliance docs.</div>
-      <ul class="pf">
-        <li><span class="check">&#10003;</span> Everything in Professional</li>
-        <li><span class="check">&#10003;</span> Unlimited users &mdash; no cap</li>
-        <li><span class="check">&#10003;</span> Dedicated relay &mdash; data never shared</li>
-        <li><span class="check">&#10003;</span> SLA 99.9% + priority support</li>
-        <li><span class="check">&#10003;</span> On-premise option</li>
-        <li><span class="check">&#10003;</span> DICOM / FHIR integration</li>
-        <li><span class="check">&#10003;</span> <a href="/compliance/nen7510" style="color:inherit;text-decoration:underline;text-decoration-color:#333">NEN 7510</a> / <a href="/compliance/iec62443" style="color:inherit;text-decoration:underline;text-decoration-color:#333">IEC 62443</a> / <a href="/compliance/nis2" style="color:inherit;text-decoration:underline;text-decoration-color:#333">NIS2</a> compliance docs</li>
-        <li><span class="check">&#10003;</span> <a href="/dpa" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Data Processing Agreement</a> (GDPR Art. 28)</li>
-      </ul>
-      <a href="mailto:privacy@paramant.app?subject=Enterprise+relay" class="price-btn s">Contact us &rarr;</a>
-    </div>
-
-  </div>
-
-  <div id="pane-user" class="pricing-grid" style="display:none">
+  <div class="pricing-grid" style="margin-top:52px">
 
     <div class="pc featured">
-      <div class="price-name" style="color:#00cc33">FREE &mdash; START HERE</div>
-      <div class="price-amount">€0</div>
-      <div class="price-note">pgp_ API key &middot; no credit card &middot; no account</div>
-      <div class="price-tagline">Try ParaShare now, or request a key for the API.</div>
-      <ul class="pf">
-        <li><span class="check">&#10003;</span> 10 uploads per day</li>
-        <li><span class="check">&#10003;</span> 1-hour blob TTL</li>
-        <li><span class="check">&#10003;</span> 1 view per blob (burn-on-read)</li>
+      <div class="price-name" style="color:#3dbe7a">FREE</div>
+      <div class="price-amount">&euro;0</div>
+      <div class="price-note">No account &middot; no credit card &middot; 10 uploads/day</div>
+      <ul class="pf" style="margin-top:20px">
         <li><span class="check">&#10003;</span> ML-KEM-768 + AES-256-GCM</li>
-        <li><span class="check">&#10003;</span> RAM-only &mdash; never written to disk</li>
-        <li><span class="check">&#10003;</span> Max 5 MB per file</li>
-        <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> No webhooks</li>
-        <li><span style="color:#444;flex-shrink:0;font-size:11px">&ndash;</span> No streaming</li>
+        <li><span class="check">&#10003;</span> Burn-on-read &mdash; RAM only, never stored</li>
+        <li><span class="check">&#10003;</span> 5 MB per file &middot; 1-hour TTL</li>
       </ul>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <a href="/parashare" class="price-btn p">Try ParaShare &rarr;</a>
-        <a href="/request-key" class="price-btn s">Request API key &rarr;</a>
-      </div>
-      <p class="pricing-note">10 uploads/day &nbsp;&middot;&nbsp; 1h TTL &nbsp;&middot;&nbsp; 5MB &nbsp;&middot;&nbsp; 30-day trial</p>
+      <a href="/send" class="price-btn p" style="margin-top:20px;display:block;text-align:center">Send a file free &rarr;</a>
     </div>
 
     <div class="pc">
       <div class="price-name">PRO</div>
-      <div class="price-amount" style="font-size:28px">Coming soon</div>
+      <div class="price-amount" style="font-size:26px">Coming soon</div>
       <div class="price-note">Unlimited &middot; webhooks &middot; 24h retention</div>
-      <div class="price-tagline">No limits. Webhooks. Streaming. 24-hour retention.</div>
-      <ul class="pf">
-        <li><span class="check">&#10003;</span> Unlimited uploads</li>
+      <ul class="pf" style="margin-top:20px">
+        <li><span class="check">&#10003;</span> Unlimited uploads &middot; 500 MB per file</li>
         <li><span class="check">&#10003;</span> 24-hour blob TTL</li>
-        <li><span class="check">&#10003;</span> Up to 10 views per blob</li>
-        <li><span class="check">&#10003;</span> Max 500 MB per file</li>
-        <li><span class="check">&#10003;</span> Webhooks on delivery</li>
-        <li><span class="check">&#10003;</span> WebSocket streaming</li>
-        <li><span class="check">&#10003;</span> CSV audit export</li>
-        <li><span class="check">&#10003;</span> DID registration</li>
+        <li><span class="check">&#10003;</span> Webhooks &amp; streaming</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Pro+user+interest" class="price-btn s">Get notified &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Pro+user+interest" class="price-btn s" style="margin-top:20px;display:block;text-align:center">Get notified &rarr;</a>
     </div>
 
     <div class="pc">
-      <div class="price-name">ENTERPRISE USER</div>
+      <div class="price-name">ENTERPRISE</div>
       <div class="price-amount">Custom</div>
-      <div class="price-note">Teams &middot; compliance &middot; SLA</div>
-      <div class="price-tagline">7-day retention, compliance docs, dedicated support.</div>
-      <ul class="pf">
-        <li><span class="check">&#10003;</span> Everything in Pro</li>
-        <li><span class="check">&#10003;</span> 7-day blob TTL</li>
-        <li><span class="check">&#10003;</span> Up to 100 views per blob</li>
-        <li><span class="check">&#10003;</span> Admin panel access</li>
-        <li><span class="check">&#10003;</span> Unlimited file size</li>
-        <li><span class="check">&#10003;</span> SLA + compliance docs</li>
-        <li><span class="check">&#10003;</span> <a href="/dpa" style="color:inherit;text-decoration:underline;text-decoration-color:#333">Data Processing Agreement</a> (GDPR Art. 28)</li>
-        <li><span class="check">&#10003;</span> Dedicated support</li>
+      <div class="price-note">Dedicated relay &middot; SLA &middot; compliance docs</div>
+      <ul class="pf" style="margin-top:20px">
+        <li><span class="check">&#10003;</span> Dedicated relay &middot; on-premise option</li>
+        <li><span class="check">&#10003;</span> IEC 62443 / NIS2 / NEN 7510</li>
+        <li><span class="check">&#10003;</span> SLA 99.9% + priority support</li>
       </ul>
-      <a href="mailto:privacy@paramant.app?subject=Enterprise+user" class="price-btn s">Contact us &rarr;</a>
+      <a href="mailto:privacy@paramant.app?subject=Enterprise" class="price-btn s" style="margin-top:20px;display:block;text-align:center">Contact us &rarr;</a>
     </div>
 
   </div>
 
-  <div style="text-align:center;margin-top:20px;font-size:11px;font-family:var(--mono);color:#444">
+  <div style="text-align:center;margin-top:24px">
+    <a href="/pricing" style="font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono)">See all plans and compare features &rarr;</a>
+  </div>
+  <div style="text-align:center;margin-top:12px;font-size:11px;font-family:var(--mono);color:#444">
     License: BUSL-1.1 &mdash; source available &nbsp;&#183;&nbsp; <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank" style="color:#555;text-decoration:none">view LICENSE</a>
-    &nbsp;&#183;&nbsp; <a href="/one-pager" style="color:#555;text-decoration:none">Download one-pager (PDF) &darr;</a>
   </div>
 
 </section>
@@ -869,6 +796,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
     <div>
       <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Product</div>
       <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/send">Send a file</a>
         <a href="/parashare">ParaShare</a>
         <a href="/drop">ParaDrop</a>
         <a href="/dashboard">Dashboard</a>
@@ -890,6 +818,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
         <a href="/install.sh">install.sh</a>
         <a href="/install-pi.sh">install-pi.sh</a>
         <a href="/install-client.sh">install-client.sh</a>
+        <a href="/download">ParamantOS</a>
         <a href="/status">Status</a>
       </div>
     </div>
@@ -901,6 +830,7 @@ footer{border-top:1px solid var(--border);padding:48px 32px 40px;display:flex;ju
         <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
         <a href="/dpa">Data Processing Agreement (GDPR Art. 28)</a>
         <a href="/government">Government &amp; public sector</a>
+        <a href="/ot">OT guide</a>
         <a href="/hndl">HNDL threat</a>
         <a href="/crypto-agility">Crypto agility</a>
       </div>
