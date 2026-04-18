@@ -222,7 +222,7 @@ See [API reference — Device Identity](api.md#device-identity) for the full enr
 
 | IEC 62443 Requirement | How Ghost Pipe addresses it |
 |---|---|
-| SR 4.1 — Information confidentiality | ML-KEM-768 + ECDH X25519 client-side encryption. Relay never holds plaintext. |
+| SR 4.1 — Information confidentiality | ML-KEM-768 + ECDH P-256 client-side encryption. Relay never holds plaintext. |
 | SR 4.2 — Use control | API key per device. `plk_` operator keys for infrastructure, `pgp_` device keys for field units. |
 | SR 3.1 — Communication integrity | AES-256-GCM AEAD authentication tag on every payload. ML-DSA-65 signed STH in CT log. |
 | SR 1.1 — Device identification | `/v2/did/register` enrollment with ed25519 device key. DID document in public CT log. |

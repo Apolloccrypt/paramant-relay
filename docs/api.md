@@ -381,7 +381,7 @@ curl -X POST https://iot.paramant.app/v2/did/register \
   -H "Content-Type: application/json" \
   -d '{
     "device_id": "plc-factory-01",
-    "ecdh_pub":  "<base64 ECDH P-256 or X25519 public key>",
+    "ecdh_pub":  "<base64 ECDH P-256 uncompressed public key, 65 bytes>",
     "dsa_pub":   "<base64 ML-DSA-65 public key — optional>"
   }'
 ```
