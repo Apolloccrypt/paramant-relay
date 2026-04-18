@@ -22,8 +22,8 @@
 .product-card:hover{background:rgba(0,0,0,.05)}
 .product-eyebrow{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--black-dim);margin-bottom:var(--space-3)}
 .product-card h3{font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-3)}
-.product-card p{font-size:var(--text-sm);color:var(--black-dim);line-height:1.65;margin-bottom:var(--space-5)}
-.product-card-link{font-size:var(--text-xs);letter-spacing:.08em;color:var(--black);font-weight:700}
+.product-card p{font-size:var(--text-base);color:rgba(0,0,0,.75);line-height:1.65;margin-bottom:var(--space-5)}
+.product-card-link{font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--black);font-weight:700}
 .ct-widget{border:1px solid var(--lime-hair)}
 .ct-header{display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--lime-hair)}
 .ct-stats{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--lime-hair)}
@@ -39,10 +39,10 @@
 .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--black-hair)}
 .pricing-card{padding:var(--space-7) var(--space-6);background:var(--lime)}
 .pricing-tier{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--black-dim);margin-bottom:var(--space-4)}
-.pricing-price{font-size:var(--text-3xl);font-weight:700;color:var(--black);margin-bottom:var(--space-2)}
+.pricing-price{font-size:var(--text-4xl);font-weight:700;color:var(--black);margin-bottom:var(--space-2)}
 .pricing-note{font-size:var(--text-xs);color:var(--black-dim);margin-bottom:var(--space-5)}
 .pricing-features{list-style:none;margin-bottom:var(--space-6)}
-.pricing-features li{font-size:var(--text-sm);color:var(--black-dim);padding:var(--space-2) 0;border-bottom:1px solid var(--black-hair)}
+.pricing-features li{font-size:var(--text-sm);color:var(--black);padding:var(--space-2) 0;border-bottom:1px solid var(--black-hair)}
 .pricing-features li:last-child{border-bottom:none}
 .pricing-features li::before{content:'+ ';font-weight:700;color:var(--black)}
 .pricing-features li.coming::before{content:'· ';color:var(--black-dim)}
@@ -232,11 +232,11 @@
     <div class="hero-grid">
 
       <div>
-        <h1 style="font-size:var(--text-5xl);line-height:1.0;letter-spacing:-.04em;margin-bottom:var(--space-6)">
+        <h1 style="font-size:clamp(3rem,8vw,8rem);line-height:1.0;letter-spacing:-.04em;margin-bottom:var(--space-6)">
           Encrypted transport<br>
-          <span style="color:transparent;-webkit-text-stroke:1px var(--lime);text-stroke:1px var(--lime)">that burns</span> itself.
+          <span style="color:transparent;-webkit-text-stroke:3px var(--lime);text-stroke:3px var(--lime)">that burns</span> itself.
         </h1>
-        <p style="font-size:var(--text-md);color:var(--lime-dim);line-height:1.7;max-width:480px;margin-bottom:var(--space-7)">
+        <p style="font-size:var(--text-md);color:rgba(212,255,0,.85);line-height:1.7;max-width:480px;margin-bottom:var(--space-7)">
           Client-side encryption. A relay that never writes to disk and destroys the ciphertext after one read. No account needed to start. Post-quantum key exchange available for verified transfers.
         </p>
         <div class="cluster" style="--cluster-gap:var(--space-3)">
@@ -249,7 +249,7 @@
       </div>
 
       <div>
-        <div class="dropzone">
+        <div class="dropzone" style="min-height:400px">
           <div class="dropzone-num">01</div>
           <div class="dropzone-main">Drop to send</div>
           <div class="dropzone-sub">Anonymous. No account required.</div>
@@ -300,22 +300,22 @@
       <div>
         <div class="how-num">1</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Encrypt client-side</strong>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">Your file is encrypted in the browser before it leaves your device. The relay never sees plaintext.</p>
+        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">Your file is encrypted in the browser before it leaves your device. The relay never sees plaintext.</p>
       </div>
       <div>
         <div class="how-num">2</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Transit via Ghost Pipe</strong>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">The ciphertext moves through the relay, padded to 5 MB and hashed into the CT Merkle log.</p>
+        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">The ciphertext moves through the relay, padded to 5 MB and hashed into the CT Merkle log.</p>
       </div>
       <div>
         <div class="how-num">3</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">One-time download</strong>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">The recipient decrypts locally. On download, the relay erases the blob from RAM. Burn-on-read.</p>
+        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">The recipient decrypts locally. On download, the relay erases the blob from RAM. Burn-on-read.</p>
       </div>
       <div>
         <div class="how-num">4</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Cryptographic proof</strong>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65">The Merkle root is updated. Transfer is proven without storing what was transferred.</p>
+        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">The Merkle root is updated. Transfer is proven without storing what was transferred.</p>
       </div>
     </div>
   </div>
@@ -333,17 +333,17 @@
 
       <div class="card">
         <p style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)">Anonymous</p>
-        <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-4)">AES-256-GCM</h3>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-3)">Browser-generated key lives only in the URL fragment, never sent to the relay. Prove-by-design that we cannot decrypt what we relay.</p>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-6)">Ideal for one-off sends that need zero setup. No registration. No key exchange.</p>
+        <h3 style="font-size:var(--text-lg);text-transform:uppercase;margin-bottom:var(--space-4)">AES-256-GCM</h3>
+        <p style="font-size:var(--text-base);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-3)">Browser-generated key lives only in the URL fragment, never sent to the relay. Prove-by-design that we cannot decrypt what we relay.</p>
+        <p style="font-size:var(--text-base);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-6)">Ideal for one-off sends that need zero setup. No registration. No key exchange.</p>
         <a href="/send" class="btn btn-secondary">Send a file &rarr;</a>
       </div>
 
       <div class="card">
         <p style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)">Verified end-to-end</p>
-        <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-4)">ML-KEM-768 Hybrid</h3>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-3)">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS 204). Fingerprint verification before send.</p>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-6)">For when the audit trail matters. The receiver can prove who sent what.</p>
+        <h3 style="font-size:var(--text-lg);text-transform:uppercase;margin-bottom:var(--space-4)">ML-KEM-768 Hybrid</h3>
+        <p style="font-size:var(--text-base);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-3)">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS 204). Fingerprint verification before send.</p>
+        <p style="font-size:var(--text-base);color:var(--lime-dim);line-height:1.65;margin-bottom:var(--space-6)">For when the audit trail matters. The receiver can prove who sent what.</p>
         <a href="/parashare" class="btn btn-secondary">Try ParaShare &rarr;</a>
       </div>
 

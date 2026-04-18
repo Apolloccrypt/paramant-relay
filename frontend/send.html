@@ -7,7 +7,7 @@
 <meta name="description" content="Send any file securely. No account needed. Encrypts in your browser. Burns after one download.">
 <link rel="icon" href="/icon-192.png">
 <style>
-:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border2:#242424;--text:#ededed;--muted:#888;--quiet:#444;--green:#00cc33;--red:#e05252;--mono:'SF Mono','Fira Code',monospace}
+:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border2:#242424;--text:#ededed;--muted:#888;--quiet:#444;--green:#d4ff00;--red:#e05252;--mono:'SF Mono','Fira Code',monospace}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh}
 main{max-width:580px;margin:0 auto;padding:64px 24px 80px}
@@ -19,16 +19,16 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .card{background:var(--surface);border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:16px}
 .card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .card-head-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(0,255,65,.6)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(212,255,0,.6)}
 .dot.amber{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.6)}
 .dot.red{background:var(--red);box-shadow:0 0 8px rgba(224,82,82,.6)}
 .card-body{padding:20px 18px}
 .drop-zone{border:2px dashed var(--border2);border-radius:6px;padding:40px 24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:12px}
-.drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:rgba(0,204,51,.04)}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:rgba(212,255,0,.04)}
 .drop-zone-icon{font-size:28px;margin-bottom:10px;color:var(--quiet)}
 .drop-zone-text{font-size:13px;color:var(--muted);line-height:1.7}
 .drop-zone-hint{font-size:11px;color:var(--quiet);margin-top:6px}
-.file-info{display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(0,204,51,.06);border:1px solid rgba(0,204,51,.2);border-radius:4px;margin-bottom:12px}
+.file-info{display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(212,255,0,.06);border:1px solid rgba(212,255,0,.2);border-radius:4px;margin-bottom:12px}
 .file-icon{font-size:22px;flex-shrink:0}
 .file-name{font-size:12px;font-weight:700;color:var(--text);word-break:break-all;line-height:1.4}
 .file-size{font-size:11px;color:var(--muted);margin-top:2px}
@@ -48,9 +48,9 @@ select:focus{border-color:var(--green)}
 .status-line.ok{color:var(--green)}
 .status-line.err{color:var(--red)}
 .share-box{background:var(--bg);border:1px solid var(--border2);padding:14px;font-size:11px;color:var(--green);word-break:break-all;line-height:1.7;cursor:pointer;margin:12px 0;transition:border-color .15s}
-.share-box:hover{border-color:#00ff41}
+.share-box:hover{border-color:var(--green)}
 .tag{display:inline-block;font-size:10px;padding:3px 8px;border:1px solid var(--border2);color:var(--quiet);margin-right:4px;margin-top:4px}
-.tag.green{border-color:rgba(0,255,65,.3);color:var(--green)}
+.tag.green{border-color:rgba(212,255,0,.3);color:var(--green)}
 .limit-note{font-size:11px;color:var(--quiet);line-height:1.7;margin-top:8px}
 .limit-note a{color:var(--quiet);text-decoration:underline}
 .copy-btn{width:100%;padding:10px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:2px;transition:all .15s}
