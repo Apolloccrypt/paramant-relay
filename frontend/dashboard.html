@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/nav.css?v=4">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
 input,select,button{font-family:var(--mono);font-size:13px}
 a{color:var(--ink-dim);text-decoration:none}
 a:hover{color:var(--cobalt)}
@@ -25,7 +25,146 @@ a:hover{color:var(--cobalt)}
   <span class="right">STH —</span>
 </div>
 
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Product</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/vs" role="menuitem">vs. alternatives</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Info</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+        <li role="none"><a href="/request-key" role="menuitem">Free API key</a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Product</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/vs">vs. alternatives</a>
+      <a href="/press">Press kit</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="/status">Status</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2</a>
+      <a href="/compliance/iec62443">IEC 62443</a>
+      <a href="/compliance/nen7510">NEN 7510</a>
+      <a href="/dpa">Data Processing Agreement</a>
+      <a href="/ot">OT guide</a>
+      <a href="/government">Government</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/crypto-agility">Crypto agility</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Info</button>
+    <div class="nav-mobile-group-items">
+      <a href="mailto:privacy@paramant.app">Contact</a>
+      <a href="/request-key">Free API key</a>
+      <a href="/status">Status</a>
+      <a href="/sla">SLA</a>
+      <a href="/security">Security</a>
+      <a href="/license">License</a>
+    </div>
+  </div>
+</div>
+
 <div id="root"></div>
+<script src="/nav.js" defer></script>
 <script>
 const RELAYS=[
   {l:"Health",u:"https://health.paramant.app",sector:"healthcare"},
@@ -33,9 +172,15 @@ const RELAYS=[
   {l:"Legal",u:"https://legal.paramant.app",sector:"legal"},
   {l:"IoT",u:"https://iot.paramant.app",sector:"iot"},
 ];
-const V={bg:"#F8FAFC",sur:"#EEF2F6",b:"rgba(11,58,106,.15)",t:"#0B3A6A",m:"rgba(11,58,106,.65)",q:"rgba(11,58,106,.65)",g:"#B2FF3F",
+
+// v4 design tokens — cobalt for success/active states, no lime text
+const V={
+  bg:"#F8FAFC", sur:"#EEF2F6", b:"rgba(11,58,106,.15)",
+  t:"#0B3A6A", m:"rgba(11,58,106,.65)", q:"rgba(11,58,106,.45)",
+  g:"#1D4ED8",  // cobalt (#1D4ED8) — v4 success/active indicator
   font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
-  mono:"'SF Mono','Fira Code','Cascadia Code',monospace"};
+  mono:"'SF Mono','Fira Code','Cascadia Code',monospace"
+};
 
 let apiKey="",relay=RELAYS[0],data=null,health={},lastPoll=null,loading=false;
 let testLog=[],testRunning=false;
@@ -58,7 +203,6 @@ async function fetchMonitor(){
     const r=await fetch(relay.u+"/v2/monitor",{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(8000)});
     if(r.ok){data=await r.json();lastPoll=new Date()}
     else data=null;
-    // Haal CT log op voor audit sectie
     if(data){
       try{
         const ct=await fetch(relay.u+"/v2/ct/log?limit=10",{signal:AbortSignal.timeout(5000)});
@@ -67,7 +211,6 @@ async function fetchMonitor(){
     }
   }catch(e){}
   loading=false;softRender();
-  // Update audit log na fetch
   const al=document.getElementById("audit-log");
   if(al&&data&&data.audit&&data.audit.length){
     al.innerHTML=data.audit.map(e=>
@@ -78,7 +221,7 @@ async function fetchMonitor(){
       </div>`
     ).join("");
   } else if(al&&data){
-    al.innerHTML=`<div style="font-size:12px;color:${V.q};font-family:${V.mono}">Geen audit entries</div>`;
+    al.innerHTML=`<div style="font-size:12px;color:${V.q};font-family:${V.mono}">No audit entries</div>`;
   }
 }
 
@@ -104,32 +247,31 @@ function renderTestLog(){
 }
 
 async function runE2ETest(){
-  if(testRunning){addTestLog("Test al actief","warn");return}
-  if(!apiKey){addTestLog("Geen API key","error");return}
+  if(testRunning){addTestLog("Test already running","warn");return}
+  if(!apiKey){addTestLog("No API key","error");return}
   testRunning=true;testLog=[];
-  addTestLog("E2E test gestart — "+relay.u,"info");
+  addTestLog("E2E test started — "+relay.u,"info");
   try{
-    // Stap 1 — Health
+    // Step 1 — Health
     addTestLog("1/6 — Relay health check","info");
     const hd=await fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
     if(!hd.ok)throw new Error("Relay unhealthy");
     addTestLog("Relay v"+hd.version+" | uptime "+hd.uptime_s+"s","ok");
 
-    // Stap 2 — API key
-    addTestLog("2/6 — API key valideren","info");
+    // Step 2 — API key
+    addTestLog("2/6 — API key validation","info");
     const kd=await fetch(relay.u+"/v2/check-key",{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)}).then(r=>r.json());
-    if(!kd.valid)throw new Error("API key ongeldig");
-    addTestLog("Key geldig | plan: "+kd.plan,"ok");
+    if(!kd.valid)throw new Error("API key invalid");
+    addTestLog("Key valid | plan: "+kd.plan,"ok");
 
-    // Stap 3 — Upload blob (JSON format: sector relay verwacht {hash,payload,ttl_ms})
-    addTestLog("3/6 — 5MB testblob uploaden...","info");
+    // Step 3 — Upload blob
+    addTestLog("3/6 — uploading 5 MB test blob...","info");
     const payload=new TextEncoder().encode("PARAMANT-E2E-"+Date.now());
     const blobBuf=new Uint8Array(5242880);
     blobBuf.set(payload);
-    // SHA-256 hash van raw blob
     const hashBuf=await crypto.subtle.digest("SHA-256",blobBuf);
     const hash=Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-    // Base64 encode in chunks (5MB past niet in één btoa call)
+    // Base64 encode in chunks (5 MB won't fit in a single btoa call)
     let b64="";
     const chunk=8192;
     for(let i=0;i<blobBuf.length;i+=chunk){b64+=String.fromCharCode(...blobBuf.subarray(i,i+chunk));}
@@ -143,19 +285,19 @@ async function runE2ETest(){
     });
     if(!up.ok){const err=await up.json().catch(()=>({}));throw new Error("Upload HTTP "+up.status+(err.error?" — "+err.error:""));}
     const upRes=await up.json();
-    if(!upRes.ok&&!upRes.hash)throw new Error("Upload mislukt: "+(upRes.error||"onbekend"));
+    if(!upRes.ok&&!upRes.hash)throw new Error("Upload failed: "+(upRes.error||"unknown"));
     const upMs=Date.now()-t0;
-    addTestLog("Verstuurd in "+upMs+"ms | hash: "+hash.slice(0,16)+"...","ok");
+    addTestLog("Sent in "+upMs+"ms | hash: "+hash.slice(0,16)+"...","ok");
 
-    // Stap 4 — Status check
-    addTestLog("4/6 — Status verificatie","info");
+    // Step 4 — Status check
+    addTestLog("4/6 — Status verification","info");
     const st=await fetch(relay.u+"/v2/status/"+hash,{
       headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)
     }).then(r=>r.json());
     if(!st.available)throw new Error("Blob not available after upload");
-    addTestLog("Blob aanwezig in RAM | "+Math.round((st.size||5*1024*1024)/1024)+"KB","ok");
+    addTestLog("Blob available in RAM | "+Math.round((st.size||5*1024*1024)/1024)+"KB","ok");
 
-    // Stap 5 — Download + burn
+    // Step 5 — Download + burn
     addTestLog("5/6 — Download + burn-on-read","info");
     const t1=Date.now();
     const dl=await fetch(relay.u+"/v2/outbound/"+hash,{
@@ -164,31 +306,29 @@ async function runE2ETest(){
     if(!dl.ok)throw new Error("Download HTTP "+dl.status);
     const received=await dl.arrayBuffer();
     const dlMs=Date.now()-t1;
-    addTestLog("Ontvangen in "+dlMs+"ms | "+Math.round(received.byteLength/1024)+"KB","ok");
+    addTestLog("Received in "+dlMs+"ms | "+Math.round(received.byteLength/1024)+"KB","ok");
 
-    // Stap 6 — Burn verificatie
-    addTestLog("6/6 — Burn verificatie","info");
+    // Step 6 — Burn verification
+    addTestLog("6/6 — Burn verification","info");
     await new Promise(r=>setTimeout(r,300));
     const burned=await fetch(relay.u+"/v2/status/"+hash,{
       headers:{"X-Api-Key":apiKey}
     }).then(r=>r.json()).catch(()=>({available:false}));
     if(burned.available)throw new Error("Blob still available after read — burn-on-read defect");
-    addTestLog("Blob vernietigd na download","ok");
+    addTestLog("Blob burned after download","ok");
 
-    const total=upMs+dlMs;
     addTestLog("","info");
-    addTestLog("E2E geslaagd in "+(upMs+dlMs)+"ms | upload: "+upMs+"ms | download: "+dlMs+"ms","ok");
-    // Refresh monitor data
+    addTestLog("E2E passed in "+(upMs+dlMs)+"ms | upload: "+upMs+"ms | download: "+dlMs+"ms","ok");
     fetchMonitor();
-  }catch(e){addTestLog("Test mislukt: "+e.message,"error")}
+  }catch(e){addTestLog("Test failed: "+e.message,"error")}
   testRunning=false;
 }
 
 function statCard(label,val,sub,color){
-  return`<div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;padding:20px">
-    <div style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">${label}</div>
-    <div style="font-size:26px;font-weight:600;letter-spacing:-.02em;color:${color||V.t}">${val!=null?val:"—"}</div>
-    ${sub?`<div style="font-size:11px;color:${V.q};margin-top:4px">${sub}</div>`:""}
+  return`<div style="background:${V.sur};border:1px solid ${V.b};padding:20px">
+    <div style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">${label}</div>
+    <div style="font-size:28px;font-weight:800;letter-spacing:-.02em;color:${color||V.t};font-family:${V.font}">${val!=null?val:"—"}</div>
+    ${sub?`<div style="font-size:11px;color:${V.q};margin-top:4px;font-family:${V.mono}">${sub}</div>`:""}
   </div>`
 }
 
@@ -197,8 +337,7 @@ function renderHealthBar(){
   if(!el)return;
   el.innerHTML=RELAYS.map(r=>{
     const hd=health[r.u];const ok=hd&&(hd.ok||hd.status==='ok');const fail=hd===false;
-    return`<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:11px;font-family:${V.mono};border:1px solid ${ok?"#1a2a1a":fail?"#2a1a1a":V.b};color:${ok?V.g:fail?"#7a3a3a":V.q}">
-      <span style="width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0"></span>
+    return`<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:11px;font-family:${V.mono};border:1px solid ${ok?V.g:fail?"#8c3a3a":V.b};background:${ok?V.g:V.bg};color:${ok?V.bg:fail?"#8c3a3a":V.q}">
       ${r.l}${ok&&hd.uptime_s?" "+Math.floor(hd.uptime_s/3600)+"h":""}
     </span>`
   }).join("");
@@ -235,7 +374,7 @@ function softRender(){
         </tr>`).join("")}</tbody>
       </table></div>`;
     } else {
-      dt.innerHTML=`<div style="padding:24px 20px;font-size:12px;color:${V.q};font-family:${V.mono}">Geen bezorgingen in deze sessie</div>`;
+      dt.innerHTML=`<div style="padding:24px 20px;font-size:12px;color:${V.q};font-family:${V.mono}">No deliveries this session</div>`;
     }
   }
   const pi=document.getElementById("poll-info");
@@ -245,18 +384,18 @@ function softRender(){
 function render(){
   if(!apiKey){
     document.getElementById("root").innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
-      <div style="width:100%;max-width:380px">
-        <a href="/" style="font-family:${V.mono};font-size:13px;font-weight:500;letter-spacing:.08em;color:${V.m};text-decoration:none;display:block;margin-bottom:32px">PARAMANT / dashboard</a>
-        <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:32px"></div>
-        <p style="font-size:13px;color:${V.q};margin-bottom:24px;line-height:1.6">Monitor delivery stats, run end-to-end tests, inspect the CT log, and debug your integration.</p>
-        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">API key</label>
-        <input id="ki" placeholder="pgp_..." style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:16px;font-family:${V.mono}">
-        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Relay</label>
-        <select id="rs" style="width:100%;background:${V.sur};border:1px solid ${V.b};border-radius:5px;padding:10px 14px;color:${V.t};font-size:13px;margin-bottom:24px">
+    <div style="padding:80px 24px 64px">
+      <div style="width:100%;max-width:400px;margin:0 auto">
+        <h1 style="font-family:${V.font};font-size:24px;font-weight:700;color:${V.t};letter-spacing:-.02em;margin-bottom:8px">Dashboard</h1>
+        <p style="font-size:13px;color:${V.q};margin-bottom:28px;line-height:1.65">Monitor delivery stats, run end-to-end tests, inspect the CT log, and debug your integration.</p>
+        <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
+        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">API key</label>
+        <input id="ki" placeholder="pgp_..." style="width:100%;background:${V.bg};border:1.5px solid ${V.t};padding:12px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:16px;font-family:${V.mono}">
+        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Relay</label>
+        <select id="rs" style="width:100%;background:${V.bg};border:1.5px solid ${V.t};padding:12px 14px;color:${V.t};font-size:13px;margin-bottom:24px;appearance:none">
           ${RELAYS.map(r=>`<option value="${r.u}">${r.l} — ${r.u.replace("https://","")}</option>`).join("")}
         </select>
-        <button onclick="login()" style="width:100%;background:${V.t};color:${V.bg};border:none;border-radius:5px;padding:11px;font-size:13px;font-weight:500;cursor:pointer">Connect</button>
+        <button onclick="login()" style="width:100%;background:${V.g};color:${V.bg};border:none;padding:13px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.08em;text-transform:uppercase">Connect</button>
       </div>
     </div>`;
     renderHealthBar();
@@ -265,63 +404,67 @@ function render(){
   }
 
   document.getElementById("root").innerHTML=`
-  <nav style="display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:52px;border-bottom:1px solid ${V.b};position:sticky;top:0;background:rgba(12,12,12,.95);z-index:100">
-    <div style="display:flex;align-items:center;gap:24px">
-      <a href="/" style="font-family:${V.mono};font-size:13px;font-weight:500;letter-spacing:.08em;color:${V.t}">PARAMANT</a>
-      <span style="font-size:12px;color:${V.q};font-family:${V.mono}">/ dashboard</span>
+  <div style="border-bottom:1px solid ${V.b};padding:28px 40px 20px">
+    <div style="max-width:1100px;margin:0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
+      <div>
+        <div style="font-family:${V.mono};font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:${V.q};margin-bottom:6px">Relay: ${relay.l}</div>
+        <h1 style="font-family:${V.font};font-size:26px;font-weight:700;letter-spacing:-.02em;color:${V.t}">Dashboard</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding-top:4px;flex-wrap:wrap">
+        <select id="rs2" style="background:${V.bg};border:1px solid ${V.b};padding:6px 10px;color:${V.t};font-size:11px;font-family:${V.mono}" onchange="changeRelay(this.value)">
+          ${RELAYS.map(r=>`<option value="${r.u}" ${r.u===relay.u?"selected":""}>${r.l}</option>`).join("")}
+        </select>
+        <span id="poll-info" style="font-size:11px;color:${V.q};font-family:${V.mono}"></span>
+        <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log</a>
+        <button onclick="logout()" style="background:none;border:1px solid ${V.b};color:${V.q};padding:5px 12px;font-size:11px;cursor:pointer">Sign out</button>
+      </div>
     </div>
-    <div style="display:flex;align-items:center;gap:16px">
-      <select id="rs2" style="background:${V.sur};border:1px solid ${V.b};border-radius:4px;padding:6px 10px;color:${V.t};font-size:12px;font-family:${V.mono}" onchange="changeRelay(this.value)">
-        ${RELAYS.map(r=>`<option value="${r.u}" ${r.u===relay.u?"selected":""}>${r.l}</option>`).join("")}
-      </select>
-      <span id="poll-info" style="font-size:11px;color:${V.q};font-family:${V.mono}"></span>
-      <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log</a>
-      <button onclick="logout()" style="background:none;border:1px solid ${V.b};color:${V.q};border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer">Sign out</button>
-    </div>
-  </nav>
+  </div>
 
-  <div style="max-width:1100px;margin:0 auto;padding:32px">
+  <div style="max-width:1100px;margin:0 auto;padding:28px 40px">
     <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px" id="stats-grid">
-      ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;padding:20px;opacity:.3"><div style="height:26px;background:${V.b};border-radius:3px"></div></div>`).join("")}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:${V.b};border:1px solid ${V.b};margin-bottom:24px" id="stats-grid">
+      ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};padding:20px;opacity:.3"><div style="height:28px;background:${V.b}"></div></div>`).join("")}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;overflow:hidden">
+      <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
         <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">E2E Test trail</span>
-          <button onclick="runE2ETest()" style="background:${V.t};color:${V.bg};border:none;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:500;cursor:pointer;font-family:${V.mono}">Run test</button>
+          <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">E2E Test trail</span>
+          <button onclick="runE2ETest()" style="background:${V.t};color:${V.bg};border:none;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:${V.mono};letter-spacing:.06em">Run test</button>
         </div>
         <div id="test-log" style="padding:16px 20px;min-height:200px;max-height:320px;overflow-y:auto">
           <div style="font-size:12px;color:${V.q};font-family:${V.mono}">Click "Run test" to verify the full send → relay → receive → burn flow.</div>
         </div>
       </div>
 
-      <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;overflow:hidden">
+      <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
         <div style="padding:14px 20px;border-bottom:1px solid ${V.b}">
-          <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">Quick start</span>
+          <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">Quick start</span>
         </div>
-        <div style="padding:20px;font-family:${V.mono};font-size:12px;line-height:2;color:${V.q}">
-          <div style="margin-bottom:8px"># Install</div>
-          <div style="color:${V.m}">pip install paramant-sdk</div><br>
-          <div># Receive</div>
-          <div style="color:${V.m}">python3 paramant-receiver.py \\</div>
-          <div style="color:${V.m}">  --key <span style="color:${V.t}">${apiKey}</span> \\</div>
-          <div style="color:${V.m}">  --device my-device \\</div>
-          <div style="color:${V.m}">  --output /tmp/received/</div><br>
-          <div># Send</div>
-          <div style="color:${V.m}">python3 paramant-sender.py \\</div>
-          <div style="color:${V.m}">  --key <span style="color:${V.t}">${apiKey}</span> \\</div>
-          <div style="color:${V.m}">  --device my-device \\</div>
-          <div style="color:${V.m}">  --file document.pdf</div>
+        <div style="padding:20px;font-family:${V.mono};font-size:12px;line-height:1.9;background:rgba(11,58,106,.04);overflow-x:auto;white-space:nowrap">
+          <div><span style="color:${V.q}"># Install</span></div>
+          <div><span style="color:${V.m}">pip install paramant-sdk</span></div>
+          <div>&nbsp;</div>
+          <div><span style="color:${V.q}"># Receive</span></div>
+          <div><span style="color:${V.m}">python3 paramant-receiver.py \\</span></div>
+          <div><span style="color:${V.m}">  --key </span><span style="color:${V.g}">${esc(apiKey)}</span><span style="color:${V.m}"> \\</span></div>
+          <div><span style="color:${V.m}">  --device my-device \\</span></div>
+          <div><span style="color:${V.m}">  --output /tmp/received/</span></div>
+          <div>&nbsp;</div>
+          <div><span style="color:${V.q}"># Send</span></div>
+          <div><span style="color:${V.m}">python3 paramant-sender.py \\</span></div>
+          <div><span style="color:${V.m}">  --key </span><span style="color:${V.g}">${esc(apiKey)}</span><span style="color:${V.m}"> \\</span></div>
+          <div><span style="color:${V.m}">  --device my-device \\</span></div>
+          <div><span style="color:${V.m}">  --file document.pdf</span></div>
         </div>
       </div>
     </div>
 
-    <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;margin-bottom:16px;overflow:hidden">
+    <div style="background:${V.sur};border:1px solid ${V.b};margin-bottom:16px;overflow:hidden">
       <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">Recent deliveries</span>
+        <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">Recent deliveries</span>
         <span style="font-size:11px;color:${V.q}">Relay: ${relay.l}</span>
       </div>
       <div id="delivery-table">
@@ -329,9 +472,9 @@ function render(){
       </div>
     </div>
 
-    <div style="background:${V.sur};border:1px solid ${V.b};border-radius:6px;overflow:hidden">
+    <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
       <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;font-family:${V.mono};color:${V.q};letter-spacing:.04em;text-transform:uppercase">Merkle audit log</span>
+        <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">Merkle audit log</span>
         <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log →</a>
       </div>
       <div id="audit-log" style="padding:16px 20px;min-height:80px">
