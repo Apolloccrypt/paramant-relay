@@ -1,19 +1,14 @@
 {
-  "name": "ParaDrop by PARAMANT",
-  "short_name": "ParaDrop",
-  "description": "Post-quantum encrypted file drop. Burn-on-read. No account needed.",
-  "start_url": "/drop",
+  "name": "Paramant",
+  "short_name": "Paramant",
+  "description": "Post-quantum encrypted file relay",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#050505",
-  "orientation": "portrait-primary",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0B3A6A",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ],
-  "shortcuts": [
-    { "name": "Send file", "url": "/drop", "description": "Send a file securely" },
-    { "name": "ParaShare", "url": "/parashare", "description": "Share via ParaShare" }
   ]
 }

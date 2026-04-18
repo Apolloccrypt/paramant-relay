@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#F8FAFC"/>
+  <rect x="0" y="0" width="80" height="8" fill="#B2FF3F"/>
+  <text x="80" y="380" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="160" font-weight="800" fill="#0B3A6A"
+        letter-spacing="-0.035em">Paramant</text>
+  <text x="80" y="440" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', monospace"
+        font-size="24" fill="#1D4ED8" letter-spacing="0.1em">POST-QUANTUM ENCRYPTED FILE RELAY</text>
+  <text x="80" y="560" font-family="ui-monospace, monospace"
+        font-size="16" fill="rgba(11,58,106,.65)" letter-spacing="0.15em">ML-KEM-768 · FIPS 203/204 · EU/DE · paramant.app</text>
+</svg>
