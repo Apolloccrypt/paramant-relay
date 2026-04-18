@@ -5,16 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Post-Quantum File Transfer for Government</title>
 <meta name="description" content="71% of Dutch government organisations have no post-quantum plan (Court of Audit, Feb 2026). NIS2 requires documented cryptographic controls by end of 2026. Paramant is open source, self-hostable, and deployable in days.">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
-body{padding-top:56px}
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
 code{font-size:var(--text-xs);padding:1px 5px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
 
 /* urgency banner */
-.urgency-bar{background:rgba(180,20,20,.12);border-bottom:1px solid rgba(180,20,20,.35);padding:10px 48px;display:flex;align-items:center;gap:12px;font-size:12px;color:rgba(230,150,150,.9)}
-.urgency-bar strong{color:rgba(240,130,130,1)}
-.urgency-bar a{color:rgba(230,150,150,.9);text-decoration:underline;text-decoration-color:rgba(180,20,20,.5);margin-left:auto;font-size:11px;white-space:nowrap}
+.urgency-bar{background:rgba(29,78,216,.08);border-bottom:1px solid rgba(29,78,216,.25);padding:10px 48px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--cobalt)}
+.urgency-bar strong{color:var(--navy)}
+.urgency-bar a{color:var(--cobalt);text-decoration:underline;text-decoration-color:rgba(29,78,216,.4);margin-left:auto;font-size:11px;white-space:nowrap}
 
 /* hero */
 .hero{padding:64px 48px 56px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
@@ -34,11 +35,11 @@ code{font-size:var(--text-xs);padding:1px 5px;border:1px solid var(--ink-ghost);
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
 
 /* callout */
-.callout{background:rgba(200,120,20,.08);border:1px solid rgba(200,120,20,.3);padding:20px 24px;margin:48px 0 0}
-.callout-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(200,150,80,.9);margin-bottom:8px}
+.callout{background:rgba(178,255,63,.08);border:1px solid var(--ink-hair);padding:20px 24px;margin:48px 0 0}
+.callout-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:8px}
 .callout h3{font-size:15px;font-weight:600;margin-bottom:8px}
-.callout p{font-size:13px;color:rgba(200,160,100,.8);line-height:1.65}
-.callout a{color:rgba(200,150,80,.9)}
+.callout p{font-size:13px;color:var(--ink-dim);line-height:1.65}
+.callout a{color:var(--cobalt)}
 
 /* sections */
 section{margin-top:56px}
@@ -47,18 +48,18 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
 
 /* feature grid */
 .feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-.feature-card{background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:20px 22px}
+.feature-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:20px 22px}
 .feature-card h4{font-size:13px;font-weight:600;margin-bottom:6px}
 .feature-card p{font-size:12px;color:var(--ink-dim);line-height:1.6}
 
 /* compliance table */
 .req-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
-.req-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(0,0,0,.82)}
+.req-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(178,255,63,.06)}
 .req-table td{padding:10px 14px;border-bottom:1px solid var(--ink-ghost);vertical-align:top;color:var(--ink-dim)}
 .req-table td:first-child{font-size:11px;color:var(--ink);font-weight:600;white-space:nowrap}
 .req-table tr:last-child td{border-bottom:none}
 .check{color:var(--cobalt)}
-.partial{color:rgba(200,150,80,.9)}
+.partial{color:var(--cobalt)}
 
 /* steps */
 .steps{display:flex;flex-direction:column;gap:14px;margin-top:20px}
@@ -70,10 +71,10 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
 /* pills */
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
 .pill{font-size:11px;color:var(--ink);padding:3px 10px;border:1px solid var(--ink-hair)}
-.pill.amber{color:rgba(200,150,80,.9);border-color:rgba(200,120,20,.3)}
+.pill.amber{color:var(--cobalt);border-color:rgba(29,78,216,.3)}
 
 /* jurisdiction */
-.jurisdiction{background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:22px 26px;margin-top:28px}
+.jurisdiction{background:var(--bone-2);border:1px solid var(--ink-hair);padding:22px 26px;margin-top:28px}
 .jurisdiction h4{font-size:14px;font-weight:600;margin-bottom:6px}
 .jurisdiction p{font-size:12px;color:var(--ink-dim);line-height:1.6}
 
@@ -96,8 +97,6 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
   .hero-stat{gap:20px}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=4">
-<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
 <div class="meta-bar">
