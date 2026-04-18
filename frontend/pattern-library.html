@@ -3,564 +3,688 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pattern Library — PARAMANT Design System v2</title>
+<title>Pattern Library — PARAMANT Design System v3</title>
 <link rel="stylesheet" href="/design-system.css">
 <style>
-  /* Page-local only — nothing that belongs in design-system */
-  body { padding-bottom: 120px; }
-  .pl-nav {
-    position: sticky; top: 0; z-index: 100;
-    background: var(--bg); border-bottom: 1px solid var(--border);
-    padding: var(--space-4) var(--space-8);
-    display: flex; align-items: center; gap: var(--space-6);
+  /* Pattern-library-only styles — not part of design-system.css */
+
+  .pl-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--black);
+    border-bottom: 1px solid var(--lime-hair);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-7);
+    font-size: var(--text-xs);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    overflow-x: auto;
   }
-  .pl-nav a { font-family: var(--mono); font-size: 11px; color: var(--text-quiet); text-decoration: none; }
-  .pl-nav a:hover { color: var(--green); }
-  .pl-nav .logo { font-weight: 700; color: var(--text-primary); font-size: 13px; }
-  .pl-section { border-top: 1px solid var(--border); padding: var(--space-12) 0; }
-  .pl-section:first-of-type { border-top: none; }
+  .pl-bar a {
+    color: var(--lime-dim);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .pl-bar a:hover { color: var(--lime); }
+  .pl-bar .pl-title { color: var(--lime); font-weight: 700; flex-shrink: 0; }
+  .pl-bar .pl-sep { color: var(--lime-hair); flex-shrink: 0; }
+
+  .pl-section {
+    padding-block: var(--space-10);
+    border-bottom: 1px solid var(--lime-hair);
+  }
+  .pl-section:last-child { border-bottom: none; }
+
   .pl-label {
-    font-family: var(--mono); font-size: 11px; color: var(--text-quiet);
-    letter-spacing: .1em; text-transform: uppercase;
-    margin-bottom: var(--space-2);
+    font-size: var(--text-xs);
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--lime-dim);
+    margin-bottom: var(--space-3);
   }
-  .pl-token-name {
-    font-family: var(--mono); font-size: 11px; color: var(--green);
+  .pl-demo {
+    padding: var(--space-6);
+    border: 1px solid var(--lime-ghost);
+    margin-top: var(--space-5);
   }
-  .pl-token-value {
-    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+  .pl-demo + .pl-demo {
+    margin-top: var(--space-4);
   }
-  .swatch-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-  .swatch {
-    display: flex; flex-direction: column; gap: var(--space-2);
-    width: 120px;
+  .pl-demo.pl-invert-demo {
+    background: var(--lime);
+    color: var(--black);
+    border-color: var(--black-hair);
   }
-  .swatch-block {
-    height: 48px; border-radius: var(--radius-md);
-    border: 1px solid var(--border-subtle);
+  .pl-demo.pl-doc-demo {
+    background: var(--doc-bg);
+    color: var(--doc-ink);
+    border-color: var(--black-hair);
   }
-  .spacing-row { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; }
-  .spacing-item { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
-  .spacing-bar { background: var(--green-bg); border: 1px solid var(--green-border); width: 24px; }
-  .type-row { display: flex; flex-direction: column; gap: var(--space-5); }
-  .type-item { display: flex; align-items: baseline; gap: var(--space-6); }
-  .type-meta { min-width: 160px; flex-shrink: 0; }
-  .btn-row { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
-  .card-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-5); }
-  .badge-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
-  .metric-row { display: flex; flex-wrap: wrap; gap: var(--space-10); }
-  .pl-subsection { margin-top: var(--space-8); }
-  .pl-subsection + .pl-subsection { margin-top: var(--space-10); }
+  .pl-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: center;
+  }
+  .pl-col-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+  @media (max-width: 768px) {
+    .pl-col-2 { grid-template-columns: 1fr; }
+    .pl-bar { padding-inline: var(--space-5); }
+    .pl-section { padding-block: var(--space-8); }
+  }
 </style>
 </head>
 <body>
 
-<nav class="pl-nav">
-  <span class="logo">PARAMANT / Pattern Library</span>
+<!-- Sticky nav -->
+<nav class="pl-bar">
+  <span class="pl-title"><span style="font-weight:400">Para</span><strong>MANT</strong> / Pattern Library v3</span>
+  <span class="pl-sep">/</span>
   <a href="#colors">Colors</a>
-  <a href="#spacing">Spacing</a>
   <a href="#type">Type</a>
   <a href="#buttons">Buttons</a>
   <a href="#cards">Cards</a>
   <a href="#dropzone">Dropzone</a>
-  <a href="#badges">Badges</a>
-  <a href="#metrics">Metrics</a>
-  <a href="#code">Code</a>
-  <a href="#composition">Composition</a>
+  <a href="#compliance">Compliance</a>
+  <a href="#ctlog">CT&nbsp;Log</a>
+  <a href="#sechead">Sec-Head</a>
+  <a href="#wordmarks">Wordmarks</a>
+  <a href="#status">Status</a>
+  <a href="#hash">Hash</a>
 </nav>
 
-<div class="container" style="padding-top: var(--space-12);">
 
-  <!-- ── COLORS ──────────────────────────────────────── -->
-  <section class="pl-section" id="colors">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Colors</h2>
+<!-- ── INTRO ─────────────────────────────────────────────────────────── -->
+<div class="container" style="padding-top: var(--space-9); padding-bottom: var(--space-8);">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">00</div>
+    <h2>Design System v3</h2>
+    <div class="tag">duochrome brutalist<br>april 2026</div>
+  </div>
+  <p style="max-width: var(--container-md);">
+    Two colors. One font. Two weights. Zero decorations. This page is the
+    auditable reference for every visual element used across the Paramant
+    website, dashboards, and documents. Every component below traces
+    directly to a rule in <code>PARAMANT-DESIGN-SYSTEM.md</code>.
+  </p>
+  <div class="cluster" style="margin-top: var(--space-5);">
+    <span class="status-row"><span class="status-dot" aria-hidden="true"></span>Design system live</span>
+    <span style="font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.08em;">design-system.css v3.0 · commit: see git log</span>
+  </div>
+</div>
 
-    <div class="pl-subsection">
-      <p class="pl-label">Backgrounds</p>
-      <div class="swatch-row">
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--bg)"></div>
-          <span class="pl-token-name">--bg</span>
-          <span class="pl-token-value">#0b1d12</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--surface)"></div>
-          <span class="pl-token-name">--surface</span>
-          <span class="pl-token-value">#0f2318</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--surface-2)"></div>
-          <span class="pl-token-name">--surface-2</span>
-          <span class="pl-token-value">#142b1c</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--surface-3)"></div>
-          <span class="pl-token-name">--surface-3</span>
-          <span class="pl-token-value">#193323</span>
-        </div>
+
+<!-- ── COLORS ────────────────────────────────────────────────────────── -->
+<section id="colors" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">01</div>
+    <h2>Colors</h2>
+    <div class="tag">two hues only<br>opacity derivatives</div>
+  </div>
+
+  <p class="pl-label">Primary swatches</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:80px; background:var(--black); border:1px solid var(--lime-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); letter-spacing:.08em;">--black<br>#000000<br>Paramant Black</p>
+    </div>
+    <div>
+      <div style="width:120px; height:80px; background:var(--lime);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); letter-spacing:.08em;">--lime<br>#d4ff00<br>Paramant Lime</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Lime opacity derivatives (on black)</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime-dim); border:1px solid var(--lime-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--lime-dim<br>rgba(212,255,0,.45)<br>secondary text, meta</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime-hair); border:1px solid var(--lime-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--lime-hair<br>rgba(212,255,0,.22)<br>hairlines, dividers</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime-ghost); border:1px solid var(--lime-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--lime-ghost<br>rgba(212,255,0,.18)<br>decorative outlines</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Black opacity derivatives (on lime)</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime); display:flex; align-items:center; justify-content:center;">
+        <div style="width:80px; height:44px; background:var(--black-dim);"></div>
       </div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--black-dim<br>rgba(0,0,0,.55)<br>secondary text on lime</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime); display:flex; align-items:center; justify-content:center;">
+        <div style="width:80px; height:44px; background:var(--black-hair);"></div>
+      </div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--black-hair<br>rgba(0,0,0,.22)<br>hairlines on lime bg</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime); display:flex; align-items:center; justify-content:center;">
+        <div style="width:80px; height:44px; background:var(--black-ghost);"></div>
+      </div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--black-ghost<br>rgba(0,0,0,.18)<br>decorative on lime</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Document mode colors (Template B)</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:64px; background:var(--doc-bg); border:1px solid var(--lime-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--doc-bg<br>#f4efe2<br>warm bone bg</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--doc-ink);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--lime-dim); letter-spacing:.06em;">--doc-ink<br>#0a0a0a<br>near-black body text</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── TYPOGRAPHY ─────────────────────────────────────────────────────── -->
+<section id="type" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">02</div>
+    <h2>Typography</h2>
+    <div class="tag">system mono only<br>two weights</div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:var(--space-5);">
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-6xl<br>clamp(120px,18vw,280px)<br>hero metrics</div>
+      <span style="font-size:var(--text-6xl); font-weight:700; letter-spacing:-.06em; line-height:0.85;">99</span>
     </div>
 
-    <div class="pl-subsection">
-      <p class="pl-label">Brand green</p>
-      <div class="swatch-row">
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--green)"></div>
-          <span class="pl-token-name">--green</span>
-          <span class="pl-token-value">#3dbe7a</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--green-dim)"></div>
-          <span class="pl-token-name">--green-dim</span>
-          <span class="pl-token-value">#2a8f59</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--green-bg); border-color: var(--green-border)"></div>
-          <span class="pl-token-name">--green-bg</span>
-          <span class="pl-token-value">rgba(61,190,122,.08)</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--surface-glow); border-color: var(--green-border)"></div>
-          <span class="pl-token-name">--surface-glow</span>
-          <span class="pl-token-value">rgba(61,190,122,.12)</span>
-        </div>
-      </div>
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-5xl / h1<br>clamp(56px,11vw,176px)<br>page headline</div>
+      <h1 style="font-size:var(--text-5xl);">Encrypted.</h1>
     </div>
 
-    <div class="pl-subsection">
-      <p class="pl-label">Text</p>
-      <div class="swatch-row">
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--text-primary)"></div>
-          <span class="pl-token-name">--text-primary</span>
-          <span class="pl-token-value">#e8e8e8</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--text-secondary)"></div>
-          <span class="pl-token-name">--text-secondary</span>
-          <span class="pl-token-value">#a8b5ab</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--text-muted)"></div>
-          <span class="pl-token-name">--text-muted</span>
-          <span class="pl-token-value">#8aab99</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--text-tertiary)"></div>
-          <span class="pl-token-name">--text-tertiary</span>
-          <span class="pl-token-value">#6b7a70</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--text-quiet)"></div>
-          <span class="pl-token-name">--text-quiet</span>
-          <span class="pl-token-value">#4a6b58</span>
-        </div>
-      </div>
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-4xl<br>88px · prices, metrics<br>weight 700 · tabular</div>
+      <span style="font-size:var(--text-4xl); font-weight:700; letter-spacing:-.04em; line-height:1; font-variant-numeric:tabular-nums;">0.00</span>
     </div>
 
-    <div class="pl-subsection">
-      <p class="pl-label">Semantic</p>
-      <div class="swatch-row">
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--red)"></div>
-          <span class="pl-token-name">--red</span>
-          <span class="pl-token-value">#e05c5c</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--amber)"></div>
-          <span class="pl-token-name">--amber</span>
-          <span class="pl-token-value">#d4935a</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--blue)"></div>
-          <span class="pl-token-name">--blue</span>
-          <span class="pl-token-value">#60a5fa (ParaDrop)</span>
-        </div>
-      </div>
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-3xl / h2<br>48px · section titles</div>
+      <h2>Every relay logged.</h2>
     </div>
 
-    <div class="pl-subsection">
-      <p class="pl-label">Borders</p>
-      <div class="swatch-row">
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--border)"></div>
-          <span class="pl-token-name">--border</span>
-          <span class="pl-token-value">#1e3828</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--border-soft)"></div>
-          <span class="pl-token-name">--border-soft</span>
-          <span class="pl-token-value">#192d22</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--border-subtle)"></div>
-          <span class="pl-token-name">--border-subtle</span>
-          <span class="pl-token-value">rgba(232,232,232,.08)</span>
-        </div>
-        <div class="swatch">
-          <div class="swatch-block" style="background: var(--border-strong)"></div>
-          <span class="pl-token-name">--border-strong</span>
-          <span class="pl-token-value">rgba(232,232,232,.18)</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── SPACING ────────────────────────────────────── -->
-  <section class="pl-section" id="spacing">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Spacing Scale</h2>
-    <p class="pl-label" style="margin-bottom: var(--space-5);">4 px base — --space-N</p>
-    <div class="spacing-row">
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-1)"></div>
-        <span class="pl-token-name">--space-1</span>
-        <span class="pl-token-value">4px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-2)"></div>
-        <span class="pl-token-name">--space-2</span>
-        <span class="pl-token-value">8px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-3)"></div>
-        <span class="pl-token-name">--space-3</span>
-        <span class="pl-token-value">12px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-4)"></div>
-        <span class="pl-token-name">--space-4</span>
-        <span class="pl-token-value">16px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-5)"></div>
-        <span class="pl-token-name">--space-5</span>
-        <span class="pl-token-value">20px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-6)"></div>
-        <span class="pl-token-name">--space-6</span>
-        <span class="pl-token-value">24px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-8)"></div>
-        <span class="pl-token-name">--space-8</span>
-        <span class="pl-token-value">32px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-10)"></div>
-        <span class="pl-token-name">--space-10</span>
-        <span class="pl-token-value">40px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-12)"></div>
-        <span class="pl-token-name">--space-12</span>
-        <span class="pl-token-value">48px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-14)"></div>
-        <span class="pl-token-name">--space-14</span>
-        <span class="pl-token-value">64px</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-bar" style="height: var(--space-16)"></div>
-        <span class="pl-token-name">--space-16</span>
-        <span class="pl-token-value">96px</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── TYPE ──────────────────────────────────────── -->
-  <section class="pl-section" id="type">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Type Scale</h2>
-    <div class="type-row">
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-5xl / .h1</span><br>
-          <span class="pl-token-value">80px · lh-tight · -0.03em</span>
-        </div>
-        <span class="h1" style="font-size: var(--text-5xl);">Relay</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-4xl</span><br>
-          <span class="pl-token-value">60px · .metric-value</span>
-        </div>
-        <span style="font-size: var(--text-4xl); font-weight: 700; line-height: 1; font-family: var(--mono); letter-spacing: -.04em;">99.9%</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-3xl / .h2</span><br>
-          <span class="pl-token-value">44px · lh-snug · -0.025em</span>
-        </div>
-        <span class="h2" style="font-size: var(--text-3xl);">Zero plaintext.</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-2xl</span><br>
-          <span class="pl-token-value">32px · .h2 mobile</span>
-        </div>
-        <span class="h2" style="font-size: var(--text-2xl);">Burn-on-read transfers.</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-xl / .h3</span><br>
-          <span class="pl-token-value">24px · lh-snug · -0.02em</span>
-        </div>
-        <span class="h3">Quantum-resistant by default.</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-lg / .lede</span><br>
-          <span class="pl-token-value">20px · text-secondary · lh-relaxed</span>
-        </div>
-        <span class="lede">ML-KEM-768 + ECDH P-256 hybrid key exchange.</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-base / .h4</span><br>
-          <span class="pl-token-value">17px · body weight 600</span>
-        </div>
-        <span class="h4">End-to-end encrypted file relay.</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-sm</span><br>
-          <span class="pl-token-value">15px · body default</span>
-        </div>
-        <span style="font-size: var(--text-sm); color: var(--text-secondary);">Files never touch disk. RAM-only. Auto-deleted after download.</span>
-      </div>
-      <div class="type-item">
-        <div class="type-meta">
-          <span class="pl-token-name">--text-xs / .eyebrow</span><br>
-          <span class="pl-token-value">13px · mono · uppercase</span>
-        </div>
-        <span class="eyebrow">Post-quantum relay</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── BUTTONS ────────────────────────────────────── -->
-  <section class="pl-section" id="buttons">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Buttons</h2>
-
-    <div class="pl-subsection">
-      <p class="pl-label" style="margin-bottom: var(--space-4);">.btn-primary</p>
-      <div class="btn-row">
-        <button class="btn btn-primary">Send a file</button>
-        <button class="btn btn-primary" style="box-shadow: 0 0 24px rgba(61,190,122,.4); transform: translateY(-1px);">Hover state</button>
-        <button class="btn btn-primary" style="outline: 2px solid var(--green); outline-offset: 3px;">Focus state</button>
-        <button class="btn btn-primary" disabled>Disabled</button>
-      </div>
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-2xl / h3<br>32px</div>
+      <h3>ML-KEM-768 + ECDH P-256</h3>
     </div>
 
-    <div class="pl-subsection">
-      <p class="pl-label" style="margin-bottom: var(--space-4);">.btn-secondary</p>
-      <div class="btn-row">
-        <button class="btn btn-secondary">View docs</button>
-        <button class="btn btn-secondary" style="border-color: var(--green); background: var(--green-bg); transform: translateY(-1px);">Hover state</button>
-        <button class="btn btn-secondary" style="outline: 2px solid var(--green); outline-offset: 3px;">Focus state</button>
-        <button class="btn btn-secondary" disabled>Disabled</button>
-      </div>
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-xl / h4<br>24px</div>
+      <h4>Files never touch disk.</h4>
     </div>
 
-    <div class="pl-subsection">
-      <p class="pl-label" style="margin-bottom: var(--space-4);">.btn-ghost</p>
-      <div class="btn-row">
-        <button class="btn btn-ghost">Learn more</button>
-        <button class="btn btn-ghost" style="color: var(--text-primary); border-bottom-color: var(--green);">Hover state</button>
-        <button class="btn btn-ghost" disabled>Disabled</button>
-      </div>
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-lg<br>18px · small wordmarks</div>
+      <span style="font-size:var(--text-lg);">RAM-only storage. Zero bytes written.</span>
     </div>
-  </section>
 
-  <!-- ── CARDS ─────────────────────────────────────── -->
-  <section class="pl-section" id="cards">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Cards</h2>
-    <div class="card-row">
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-md<br>16px · emphasis in body</div>
+      <span style="font-size:var(--text-md);">Burn-on-read. One download per token.</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-base<br>14px · body default</div>
+      <span style="font-size:var(--text-base); color:var(--lime-dim);">The relay encrypts your file before transmission. The key never leaves your browser. The relay sees ciphertext only.</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--lime-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-sm<br>12px · labels, nav</div>
+      <span style="font-size:var(--text-sm); letter-spacing:.04em;">AES-256-GCM · ML-KEM-768 · FIPS 203 · NIST</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">--text-xs<br>10px · eyebrows, meta</div>
+      <span style="font-size:var(--text-xs); letter-spacing:.16em; text-transform:uppercase; color:var(--lime-dim);">Post-quantum key exchange · verified · FIPS 203</span>
+    </div>
+
+  </div>
+</div>
+</section>
+
+
+<!-- ── BUTTONS ────────────────────────────────────────────────────────── -->
+<section id="buttons" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">03</div>
+    <h2>Buttons</h2>
+    <div class="tag">three variants<br>no radius</div>
+  </div>
+
+  <p class="pl-label">Normal context (black bg)</p>
+  <div class="pl-demo">
+    <div class="pl-row">
+      <a href="#" class="btn btn-primary">Send a file</a>
+      <a href="#" class="btn btn-primary" style="background:transparent; color:var(--lime); border-color:var(--lime);">Primary hover</a>
+      <button class="btn btn-primary" disabled>Primary disabled</button>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-secondary">Self-host in 60s</a>
+      <a href="#" class="btn btn-secondary" style="background:var(--lime); color:var(--black);">Secondary hover</a>
+      <button class="btn btn-secondary" disabled>Secondary disabled</button>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-tertiary">Read the architecture</a>
+      <a href="#" class="btn btn-tertiary" style="color:var(--lime); text-decoration-color:var(--lime);">Tertiary hover</a>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Inverted context (lime bg)</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <div class="pl-row">
+      <a href="#" class="btn btn-primary">Send a file</a>
+      <a href="#" class="btn btn-primary" style="background:transparent; color:var(--black); border-color:var(--black);">Primary hover</a>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-secondary">Self-host in 60s</a>
+      <a href="#" class="btn btn-secondary" style="background:var(--black); color:var(--lime);">Secondary hover</a>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-tertiary">Read the architecture</a>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── CARDS ─────────────────────────────────────────────────────────── -->
+<section id="cards" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">04</div>
+    <h2>Cards</h2>
+    <div class="tag">1px border<br>zero radius</div>
+  </div>
+
+  <p class="pl-label">Normal context</p>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:var(--space-4);">
+    <div class="card">
+      <p style="font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">01 / send</p>
+      <h4 style="margin-bottom:var(--space-3);">ParaSend</h4>
+      <p style="font-size:var(--text-base); color:var(--lime-dim);">Keyless, anonymous file transfer. No account. Burn-on-read.</p>
+    </div>
+    <div class="card">
+      <p style="font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">02 / share</p>
+      <h4 style="margin-bottom:var(--space-3);">ParaShare</h4>
+      <p style="font-size:var(--text-base); color:var(--lime-dim);">E2E with fingerprint verification. Both parties confirm identity before the link opens.</p>
+    </div>
+    <div class="card">
+      <p style="font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">03 / drop</p>
+      <h4 style="margin-bottom:var(--space-3);">ParaDrop</h4>
+      <p style="font-size:var(--text-base); color:var(--lime-dim);">Peer-to-peer over WebRTC. No server in the data path.</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Inverted context</p>
+  <div class="invert" style="padding:var(--space-6);">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:var(--space-4);">
       <div class="card">
-        <p class="eyebrow">.card</p>
-        <p class="h4" style="margin: var(--space-2) 0;">Base card</p>
-        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">surface + border + radius-lg + space-6 padding</p>
+        <p style="font-size:var(--text-xs); color:var(--black-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">01 / send</p>
+        <h4 style="margin-bottom:var(--space-3);">ParaSend</h4>
+        <p style="font-size:var(--text-base); color:var(--black-dim);">Keyless, anonymous file transfer. No account. Burn-on-read.</p>
       </div>
-      <div class="card-muted">
-        <p class="eyebrow">.card-muted</p>
-        <p class="h4" style="margin: var(--space-2) 0;">Muted card</p>
-        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">surface-1 + border-subtle</p>
-      </div>
-      <div class="card-elevated">
-        <p class="eyebrow">.card-elevated</p>
-        <p class="h4" style="margin: var(--space-2) 0;">Elevated card</p>
-        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">surface-2 + drop shadow</p>
-      </div>
-      <div class="card-accent">
-        <p class="eyebrow">.card-accent</p>
-        <p class="h4" style="margin: var(--space-2) 0;">Accent card</p>
-        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">Green top border · hover: glow ring</p>
+      <div class="card">
+        <p style="font-size:var(--text-xs); color:var(--black-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">02 / share</p>
+        <h4 style="margin-bottom:var(--space-3);">ParaShare</h4>
+        <p style="font-size:var(--text-base); color:var(--black-dim);">E2E with fingerprint verification. Both parties confirm identity before the link opens.</p>
       </div>
     </div>
-  </section>
+  </div>
+</div>
+</section>
 
-  <!-- ── DROPZONE ───────────────────────────────────── -->
-  <section class="pl-section" id="dropzone">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Dropzone</h2>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); max-width: 800px;">
-      <div>
-        <p class="pl-label" style="margin-bottom: var(--space-3);">Default</p>
-        <div class="dropzone">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
-          </svg>
-          <p class="dropzone-label">Drop file here</p>
-          <p class="dropzone-sublabel">or click to browse · up to 5 GB</p>
+
+<!-- ── DROPZONE ───────────────────────────────────────────────────────── -->
+<section id="dropzone" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">05</div>
+    <h2>Dropzone</h2>
+    <div class="tag">2px solid border<br>number label top-left</div>
+  </div>
+
+  <div style="max-width:520px;">
+    <div class="dropzone" role="button" tabindex="0" aria-label="Drop a file here or click to browse">
+      <div class="dropzone-num" aria-hidden="true">01</div>
+      <p class="dropzone-main">Drop a file.</p>
+      <p class="dropzone-sub">or click to browse</p>
+      <div class="dropzone-spec" aria-label="Constraints">
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">max</span>
+          <span class="dropzone-spec-val">5 MB</span>
         </div>
-      </div>
-      <div>
-        <p class="pl-label" style="margin-bottom: var(--space-3);">Drag-over state (.dragover)</p>
-        <div class="dropzone dragover">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
-          </svg>
-          <p class="dropzone-label">Release to upload</p>
-          <p class="dropzone-sublabel">or click to browse · up to 5 GB</p>
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">rate</span>
+          <span class="dropzone-spec-val">10 / hr</span>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── BADGES ─────────────────────────────────────── -->
-  <section class="pl-section" id="badges">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Badges</h2>
-    <div class="badge-row">
-      <span class="badge">v2.4.5</span>
-      <span class="badge">ML-KEM-768</span>
-      <span class="badge">IEC 62443</span>
-      <span class="badge-green badge">ACTIVE</span>
-      <span class="badge-green badge">RAM-ONLY</span>
-      <span class="badge-green badge">BURN-ON-READ</span>
-    </div>
-
-    <!-- Status dot -->
-    <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-8);">
-      <p class="pl-label" style="margin-bottom:0;">Status dot (.status-dot):</p>
-      <span class="status-dot"></span>
-      <span style="font-size: var(--text-xs); color: var(--text-secondary);">Relay operational · FRA · Hetzner DE</span>
-    </div>
-  </section>
-
-  <!-- ── METRICS ────────────────────────────────────── -->
-  <section class="pl-section" id="metrics">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Metrics</h2>
-    <div class="metric-row">
-      <div class="metric">
-        <p class="metric-value">99.9%</p>
-        <p class="metric-label">Uptime SLA</p>
-      </div>
-      <div class="metric">
-        <p class="metric-value">0</p>
-        <p class="metric-label">Bytes stored on disk</p>
-      </div>
-      <div class="metric">
-        <p class="metric-value">&lt;80ms</p>
-        <p class="metric-label">P50 relay latency</p>
-      </div>
-      <div class="metric">
-        <p class="metric-value text-green">5 GB</p>
-        <p class="metric-label">Max file size</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── CODE ──────────────────────────────────────── -->
-  <section class="pl-section" id="code">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Code</h2>
-
-    <div class="pl-subsection">
-      <p class="pl-label" style="margin-bottom: var(--space-3);">.code-line (inline)</p>
-      <p style="font-size: var(--text-sm); color: var(--text-secondary);">
-        Install with <span class="code-line">pip install paramant-sdk</span> or grab the
-        <span class="code-line">relay.paramant.app/v2/inbound</span> endpoint directly.
-      </p>
-    </div>
-
-    <div class="pl-subsection">
-      <p class="pl-label" style="margin-bottom: var(--space-3);">.code-block</p>
-      <div class="code-block" style="max-width: 640px;">
-        <div class="code-block-header">
-          <span>python</span>
-          <span>paramant-sdk</span>
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">account</span>
+          <span class="dropzone-spec-val">none</span>
         </div>
-        <pre>from paramant import ParamantClient
-
-client = ParamantClient(api_key="pgp_...")
-result = client.send("report.pdf", sector="finance")
-print(result.download_url)  # burn-on-read link</pre>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── COMPOSITION ────────────────────────────────── -->
-  <section class="pl-section" id="composition">
-    <h2 class="h3" style="margin-bottom: var(--space-8);">Composition — Hero Block</h2>
-    <p style="font-size: var(--text-xs); color: var(--text-quiet); font-family: var(--mono); margin-bottom: var(--space-8);">
-      eyebrow + h1 + lede + cluster(btn-primary, btn-secondary) + dropzone — as it appears on the homepage
-    </p>
-
-    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: var(--space-12) var(--space-10);">
-      <div class="stack" style="--stack-gap: var(--space-5); max-width: 680px; margin-bottom: var(--space-10);">
-        <p class="eyebrow">Post-quantum file relay</p>
-        <h1 class="h1">Send anything.<br>Leave no trace.</h1>
-        <p class="lede">ML-KEM-768 hybrid encryption. RAM-only relay. Files burn after download. No account needed.</p>
-        <div class="cluster">
-          <a href="/send" class="btn btn-primary">Send a file free</a>
-          <a href="/docs" class="btn btn-secondary">API docs</a>
-          <a href="#" class="btn btn-ghost">How it works</a>
-        </div>
-      </div>
-
-      <div class="dropzone" style="max-width: 560px;">
-        <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
-        </svg>
-        <p class="dropzone-label">Drop any file here</p>
-        <p class="dropzone-sublabel">Up to 5 GB · encrypted in-browser · keyless or API key</p>
-      </div>
-
-      <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-6);">
-        <span class="status-dot"></span>
-        <span style="font-size: var(--text-xs); color: var(--text-quiet); font-family: var(--mono);">
-          Relay operational · FRA · Hetzner DE
-        </span>
-        <span class="badge-green badge" style="margin-left: var(--space-2);">RAM-ONLY</span>
-        <span class="badge-green badge">ML-KEM-768</span>
-      </div>
-    </div>
-
-    <!-- Layout helpers demo -->
-    <div style="margin-top: var(--space-10);">
-      <p class="pl-label" style="margin-bottom: var(--space-4);">Layout helpers — .stack, .cluster</p>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5);">
-        <div class="card">
-          <p class="pl-token-name" style="margin-bottom: var(--space-3);">.stack (--stack-gap)</p>
-          <div class="stack" style="--stack-gap: var(--space-3);">
-            <div style="height: 24px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);"></div>
-            <div style="height: 24px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);"></div>
-            <div style="height: 24px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);"></div>
-          </div>
-        </div>
-        <div class="card">
-          <p class="pl-token-name" style="margin-bottom: var(--space-3);">.cluster (flex row, wrapping)</p>
-          <div class="cluster">
-            <span class="badge">relay</span>
-            <span class="badge">health</span>
-            <span class="badge">finance</span>
-            <span class="badge">legal</span>
-            <span class="badge">iot</span>
-          </div>
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">cipher</span>
+          <span class="dropzone-spec-val">aes-256</span>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-</div><!-- /container -->
+  <p class="pl-label" style="margin-top:var(--space-7);">Drag-over state (.drag-over)</p>
+  <div style="max-width:520px;">
+    <div class="dropzone drag-over" role="presentation">
+      <div class="dropzone-num" aria-hidden="true">01</div>
+      <p class="dropzone-main">Release to upload.</p>
+      <p class="dropzone-sub">encrypted in browser before upload</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── COMPLIANCE STRIP ──────────────────────────────────────────────── -->
+<section id="compliance" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">06</div>
+    <h2>Compliance Strip</h2>
+    <div class="tag">horizontal cells<br>1px vertical rules</div>
+  </div>
+
+  <p class="pl-label">Normal context</p>
+  <div class="compliance-strip">
+    <div class="compliance-strip-cell">NIS2</div>
+    <div class="compliance-strip-cell">IEC 62443</div>
+    <div class="compliance-strip-cell">NEN 7510</div>
+    <div class="compliance-strip-cell">eIDAS</div>
+    <div class="compliance-strip-cell">FIPS 203</div>
+    <div class="compliance-strip-cell">FIPS 204</div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Inverted context</p>
+  <div class="invert" style="padding:var(--space-5);">
+    <div class="compliance-strip">
+      <div class="compliance-strip-cell">NIS2</div>
+      <div class="compliance-strip-cell">IEC 62443</div>
+      <div class="compliance-strip-cell">NEN 7510</div>
+      <div class="compliance-strip-cell">eIDAS</div>
+      <div class="compliance-strip-cell">FIPS 203</div>
+      <div class="compliance-strip-cell">FIPS 204</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── CT LOG FEED ───────────────────────────────────────────────────── -->
+<section id="ctlog" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">07</div>
+    <h2>CT Log Feed</h2>
+    <div class="tag">mono 12px<br>tabular numerals</div>
+  </div>
+
+  <div style="max-width:640px;">
+    <table class="ctlog-feed" role="table" aria-label="Transparency log entries">
+      <thead>
+        <tr>
+          <th scope="col">Idx</th>
+          <th scope="col">Hash</th>
+          <th scope="col">UTC</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>#127</td>
+          <td>e203867a73d8c4fe1b9a2d7c8f4e3b6a...</td>
+          <td>08:52:11</td>
+        </tr>
+        <tr>
+          <td>#126</td>
+          <td>9f1a2c8b4e6d3a7b5c2e9f4a1b8d6c3e...</td>
+          <td>08:38:55</td>
+        </tr>
+        <tr>
+          <td>#125</td>
+          <td>4c7b8e2d1a9f3c6e8b5d2a7c4f1e9b3d...</td>
+          <td>08:12:33</td>
+        </tr>
+        <tr>
+          <td>#124</td>
+          <td>b1d4f7a2c9e6b3d8f5a2c7e4b1d6f9a3...</td>
+          <td>07:51:02</td>
+        </tr>
+        <tr>
+          <td>#123</td>
+          <td>2a7c4e1b9f6d3a8c5e2b7d4f1a9c6e3b...</td>
+          <td>07:28:44</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+
+<!-- ── SECTION HEADERS ───────────────────────────────────────────────── -->
+<section id="sechead" class="pl-section">
+<div class="container">
+  <p class="pl-label" style="margin-bottom:var(--space-6);">Section header — .sec-head</p>
+
+  <p class="pl-label">Normal context</p>
+  <div class="pl-demo">
+    <div class="sec-head">
+      <div class="num" aria-hidden="true">01</div>
+      <h2>How it works.</h2>
+      <div class="tag">four steps<br>nothing stored</div>
+    </div>
+    <p style="font-size:var(--text-base); color:var(--lime-dim);">Section content follows here.</p>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Inverted context</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <div class="sec-head">
+      <div class="num" aria-hidden="true">02</div>
+      <h2>Products.</h2>
+      <div class="tag">three products<br>one relay</div>
+    </div>
+    <p style="font-size:var(--text-base); color:var(--black-dim);">Section content follows here.</p>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Document mode (Template B)</p>
+  <div class="pl-demo pl-doc-demo doc">
+    <div class="sec-head" style="border-bottom-color:var(--doc-ink-dim);">
+      <div class="num" style="color:var(--doc-ink);" aria-hidden="true">01</div>
+      <h2 style="color:var(--doc-ink);">Executive summary.</h2>
+      <div class="tag" style="color:var(--doc-ink-dim);">one page<br>april 2026</div>
+    </div>
+    <p style="font-size:var(--text-base); color:var(--doc-ink-dim);">Document body text follows in warm bone mode.</p>
+  </div>
+</div>
+</section>
+
+
+<!-- ── WORDMARKS ─────────────────────────────────────────────────────── -->
+<section id="wordmarks" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">08</div>
+    <h2>Wordmarks</h2>
+    <div class="tag">para regular<br>suffix bold</div>
+  </div>
+
+  <p class="pl-label">Display sizes</p>
+  <div class="stack" style="--stack-gap: var(--space-5);">
+    <span class="wordmark" style="font-size:var(--text-5xl); letter-spacing:-.04em;">
+      <span class="para">Para</span><span class="suffix">MANT</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">Send</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">Share</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">Drop</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Paramant</span><span class="suffix">OS</span>
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Nav size (bold suffix, same color)</p>
+  <div class="pl-demo">
+    <span class="wordmark" style="font-size:var(--text-md); letter-spacing:.08em;">
+      <span class="para">Para</span><span class="suffix">MANT</span>
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Inverted context</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">MANT</span>
+    </span>
+  </div>
+</div>
+</section>
+
+
+<!-- ── STATUS INDICATOR ──────────────────────────────────────────────── -->
+<section id="status" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">09</div>
+    <h2>Status Indicator</h2>
+    <div class="tag">7px square<br>steps(2) blink</div>
+  </div>
+
+  <p class="pl-label">Three states</p>
+  <div class="stack" style="--stack-gap: var(--space-3);">
+    <span class="status-row">
+      <span class="status-dot" aria-hidden="true"></span>
+      operational
+    </span>
+    <span class="status-row" style="color:var(--lime-dim);">
+      <span class="status-dot" style="animation-duration:0.6s;" aria-hidden="true"></span>
+      degraded
+    </span>
+    <span class="status-row" style="color:var(--lime-ghost);">
+      <span class="status-dot" style="animation:none; opacity:.25;" aria-hidden="true"></span>
+      offline
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Inverted context</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <span class="status-row">
+      <span class="status-dot" aria-hidden="true"></span>
+      operational
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Square shape confirmation (7px, not circle)</p>
+  <div class="pl-demo" style="display:flex; align-items:center; gap:var(--space-4);">
+    <span class="status-dot" style="animation:none;" aria-hidden="true"></span>
+    <span style="font-size:var(--text-xs); color:var(--lime-dim);">7px × 7px · no border-radius · blinks at 1.4s via steps(2)</span>
+  </div>
+</div>
+</section>
+
+
+<!-- ── HASH DECORATION ───────────────────────────────────────────────── -->
+<section id="hash" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">10</div>
+    <h2>Hash Decoration</h2>
+    <div class="tag">lime-ghost outline<br>never repeat per page</div>
+  </div>
+
+  <p class="pl-label">Full-width, clipped, ghost outline</p>
+  <div class="pl-demo" style="overflow:hidden;">
+    <div class="hash-deco" aria-hidden="true">
+      e203867a73d8c4fe1b9a2d7c8f4e3b6a9d2c5e8f1b4a7c3d9e6f2b5a8d1c4e7
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Usage: appears once per page, CT log sections and security pages only.</p>
+  <p style="font-size:var(--text-base); color:var(--lime-dim); max-width:var(--container-md);">
+    The hash decoration is typographic, not ornamental. It references a real STH or entry hash when available. It communicates the character of the system: mathematical, verifiable, specific.
+  </p>
+</div>
+</section>
+
+
+<!-- ── LAYOUT HELPERS ────────────────────────────────────────────────── -->
+<section class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">11</div>
+    <h2>Layout Helpers</h2>
+    <div class="tag">.stack · .cluster<br>token-driven gaps</div>
+  </div>
+
+  <div class="pl-col-2">
+    <div>
+      <p class="pl-label">.stack (vertical, --stack-gap)</p>
+      <div class="pl-demo">
+        <div class="stack" style="--stack-gap: var(--space-3);">
+          <div style="height:var(--space-5); background:var(--lime-ghost); border:1px solid var(--lime-hair);"></div>
+          <div style="height:var(--space-5); background:var(--lime-ghost); border:1px solid var(--lime-hair);"></div>
+          <div style="height:var(--space-5); background:var(--lime-ghost); border:1px solid var(--lime-hair);"></div>
+        </div>
+        <p style="font-size:var(--text-xs); color:var(--lime-dim); margin-top:var(--space-3);">--stack-gap: var(--space-3)</p>
+      </div>
+    </div>
+    <div>
+      <p class="pl-label">.cluster (horizontal, wrapping, --cluster-gap)</p>
+      <div class="pl-demo">
+        <div class="cluster" style="--cluster-gap: var(--space-3);">
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--lime-hair); font-size:var(--text-xs); letter-spacing:.08em;">NIS2</span>
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--lime-hair); font-size:var(--text-xs); letter-spacing:.08em;">IEC 62443</span>
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--lime-hair); font-size:var(--text-xs); letter-spacing:.08em;">NEN 7510</span>
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--lime-hair); font-size:var(--text-xs); letter-spacing:.08em;">FIPS 203</span>
+        </div>
+        <p style="font-size:var(--text-xs); color:var(--lime-dim); margin-top:var(--space-3);">--cluster-gap: var(--space-3)</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── FOOTER ─────────────────────────────────────────────────────────── -->
+<footer style="border-top:1px solid var(--lime-hair); padding:var(--space-6) var(--space-7); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-4);">
+  <span class="wordmark" style="font-size:var(--text-sm); letter-spacing:.08em;">
+    <span class="para">Para</span><span class="suffix">MANT</span>
+  </span>
+  <span style="font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em;">Design System v3.0 · April 2026 · PARAMANT-DESIGN-SYSTEM.md</span>
+  <a href="/" style="font-size:var(--text-xs); color:var(--lime-dim); letter-spacing:.06em; text-decoration:underline; text-underline-offset:3px;">&larr; Back to site</a>
+</footer>
+
 </body>
 </html>
