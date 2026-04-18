@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Send — PARAMANT</title>
+<meta name="description" content="Send any file securely. No account needed. Encrypts in your browser. Burns after one download.">
+<link rel="icon" href="/icon-192.png">
+<style>
+:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--border2:#242424;--text:#ededed;--muted:#888;--quiet:#444;--green:#00cc33;--red:#e05252;--mono:'SF Mono','Fira Code',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh}
+main{max-width:580px;margin:0 auto;padding:64px 24px 80px}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:40px;line-height:1.7}
+.step{display:none;animation:fadeIn .2s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-head-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(0,255,65,.6)}
+.dot.amber{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.6)}
+.dot.red{background:var(--red);box-shadow:0 0 8px rgba(224,82,82,.6)}
+.card-body{padding:20px 18px}
+.drop-zone{border:2px dashed var(--border2);border-radius:6px;padding:40px 24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:12px}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:rgba(0,204,51,.04)}
+.drop-zone-icon{font-size:28px;margin-bottom:10px;color:var(--quiet)}
+.drop-zone-text{font-size:13px;color:var(--muted);line-height:1.7}
+.drop-zone-hint{font-size:11px;color:var(--quiet);margin-top:6px}
+.file-info{display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(0,204,51,.06);border:1px solid rgba(0,204,51,.2);border-radius:4px;margin-bottom:12px}
+.file-icon{font-size:22px;flex-shrink:0}
+.file-name{font-size:12px;font-weight:700;color:var(--text);word-break:break-all;line-height:1.4}
+.file-size{font-size:11px;color:var(--muted);margin-top:2px}
+.file-change{font-size:11px;color:var(--quiet);cursor:pointer;text-decoration:underline;text-decoration-color:var(--border2);flex-shrink:0;margin-left:auto}
+.file-change:hover{color:var(--muted)}
+.label{font-size:10px;color:var(--quiet);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block}
+select{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px 12px;font-family:var(--mono);font-size:12px;outline:none;cursor:pointer}
+select:focus{border-color:var(--green)}
+.btn{width:100%;padding:12px;background:var(--text);color:var(--bg);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn:hover{opacity:.85}
+.btn:disabled{background:var(--quiet);cursor:not-allowed;opacity:1}
+.btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-outline:hover{color:var(--text);border-color:var(--text)}
+.progress-wrap{background:var(--bg);border:1px solid var(--border2);height:3px;overflow:hidden;margin:14px 0 6px}
+.progress-bar{height:100%;background:var(--green);width:0%;transition:width .3s}
+.status-line{font-size:11px;color:var(--muted);padding:2px 0}
+.status-line.ok{color:var(--green)}
+.status-line.err{color:var(--red)}
+.share-box{background:var(--bg);border:1px solid var(--border2);padding:14px;font-size:11px;color:var(--green);word-break:break-all;line-height:1.7;cursor:pointer;margin:12px 0;transition:border-color .15s}
+.share-box:hover{border-color:#00ff41}
+.tag{display:inline-block;font-size:10px;padding:3px 8px;border:1px solid var(--border2);color:var(--quiet);margin-right:4px;margin-top:4px}
+.tag.green{border-color:rgba(0,255,65,.3);color:var(--green)}
+.limit-note{font-size:11px;color:var(--quiet);line-height:1.7;margin-top:8px}
+.limit-note a{color:var(--quiet);text-decoration:underline}
+.copy-btn{width:100%;padding:10px;background:transparent;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:2px;transition:all .15s}
+.copy-btn:hover{border-color:var(--green);color:var(--green)}
+.copy-btn.copied{border-color:var(--green);color:var(--green)}
+@media(max-width:640px){main{padding:32px 16px 60px}h1{font-size:20px}.drop-zone{padding:28px 16px}}
+</style>
+<link rel="stylesheet" href="/nav.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Product &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/send">Send (new)</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/docs">Docs</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/vs">vs. alternatives</a></li>
+        <li><a href="/press">Press kit</a></li>
+        <li><a href="/changelog">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Self-host &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a></li>
+        <li><a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a></li>
+        <li><a href="/docs#self-hosting">Deploy guide</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/install.sh">install.sh</a></li>
+        <li><a href="/install-pi.sh">install-pi.sh</a></li>
+        <li><a href="/install-client.sh">install-client.sh</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/status">Status</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Compliance &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/compliance/nis2">NIS2 (EU 2022/2555)</a></li>
+        <li><a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a></li>
+        <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
+        <li><a href="/dpa">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider"></li>
+        <li><a href="/government">Government &amp; public sector</a></li>
+        <li><a href="/hndl">HNDL threat</a></li>
+        <li><a href="/crypto-agility">Crypto agility</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger">Info &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="mailto:privacy@paramant.app">Contact</a></li>
+        <li><a href="/request-key">Free API key</a></li>
+        <li><a href="/status">Status</a></li>
+        <li><a href="/sla">SLA</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="/license">License</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Product</div>
+    <a href="/parashare">ParaShare</a>
+    <a href="/drop">ParaDrop</a>
+    <a href="/send">Send (new)</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/ct-log">CT Log</a>
+    <a href="/docs">Docs</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/vs">vs. alternatives</a>
+    <a href="/press">Press kit</a>
+    <a href="/changelog">Changelog</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Self-host</div>
+    <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+    <a href="/docs#self-hosting">Deploy guide</a>
+    <a href="/install.sh">install.sh</a>
+    <a href="/install-pi.sh">install-pi.sh</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Compliance</div>
+    <a href="/compliance/nis2">NIS2</a>
+    <a href="/compliance/iec62443">IEC 62443</a>
+    <a href="/compliance/nen7510">NEN 7510</a>
+    <a href="/dpa">Data Processing Agreement</a>
+    <a href="/government">Government</a>
+    <a href="/hndl">HNDL threat</a>
+    <a href="/crypto-agility">Crypto agility</a>
+  </div>
+  <div class="nav-mobile-group">
+    <div class="nav-mobile-label">Info</div>
+    <a href="mailto:privacy@paramant.app">Contact</a>
+    <a href="/request-key">Free API key</a>
+    <a href="/status">Status</a>
+    <a href="/sla">SLA</a>
+    <a href="/security">Security</a>
+    <a href="/license">License</a>
+  </div>
+</div>
+<main>
+
+<!-- STEP 1: Upload -->
+<div class="step active" id="step-upload">
+  <h1>Send a file</h1>
+  <p class="sub">No account needed. File encrypts in your browser before upload. The relay never sees plaintext. Burns after one download.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
+    <div class="card-body">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-zone-icon">&#x1F4C4;</div>
+        <div class="drop-zone-text">Drop file here or click to select</div>
+        <div class="drop-zone-hint">Max 5 MB &nbsp;·&nbsp; any file type</div>
+      </div>
+      <input type="file" id="file-input" style="display:none" onchange="handleFileInput(this.files)">
+      <div id="file-info" style="display:none" class="file-info">
+        <div class="file-icon">&#x1F4CE;</div>
+        <div>
+          <div class="file-name" id="fname"></div>
+          <div class="file-size" id="fsize"></div>
+        </div>
+        <span class="file-change" onclick="changeFile()">Change</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Self-destruct</div></div>
+    <div class="card-body">
+      <span class="label">Link expires after</span>
+      <select id="ttl-select">
+        <option value="3600000" selected>1 hour</option>
+        <option value="21600000">6 hours</option>
+        <option value="86400000">24 hours</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn" id="btn-send" disabled onclick="sendFile()">Encrypt &amp; get link &#x2192;</button>
+
+  <div id="progress-block" style="display:none;margin-top:16px">
+    <div class="progress-wrap"><div class="progress-bar" id="pbar"></div></div>
+    <div class="status-line" id="status-msg"></div>
+  </div>
+
+  <p class="limit-note" style="margin-top:16px">5 MB limit · no account needed · <a href="/parashare">need ML-KEM-768 or larger files?</a></p>
+</div>
+
+<!-- STEP 2: Link ready -->
+<div class="step" id="step-link">
+  <h1>Link ready</h1>
+  <p class="sub">Share this link. The file decrypts in the recipient's browser and is permanently deleted from the relay after one download.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Your secure link</div></div>
+    <div class="card-body">
+      <span class="label">One-time download link</span>
+      <div class="share-box" id="magic-link" onclick="copyLink()">—</div>
+      <button class="copy-btn" id="copy-btn" onclick="copyLink()">Copy link</button>
+      <div id="copy-status" class="status-line" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:24px">
+    <span class="tag green">AES-256-GCM encrypted</span>
+    <span class="tag green">Key in URL fragment only</span>
+    <span class="tag green">Burns after one download</span>
+    <span class="tag green">Relay never sees plaintext</span>
+  </div>
+
+  <button class="btn btn-outline" onclick="startOver()" style="margin-top:0">Send another file</button>
+</div>
+
+</main>
+<script src="/nav.js" defer></script>
+<script>
+const RELAY = 'https://health.paramant.app';
+const MAX_BYTES = 5 * 1024 * 1024;
+
+let selectedFile = null;
+
+// ── Drop zone ──
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('click', () => document.getElementById('file-input').click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFileInput(e.dataTransfer.files); });
+
+function handleFileInput(files) {
+  if (!files || !files.length) return;
+  const f = files[0];
+  if (f.size > MAX_BYTES) {
+    alert('Max 5 MB. Your file is ' + (f.size / 1048576).toFixed(1) + ' MB.\nUse ParaShare for larger files.');
+    return;
+  }
+  selectedFile = f;
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fsize').textContent = formatSize(f.size);
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('file-info').style.display = 'flex';
+  document.getElementById('btn-send').disabled = false;
+}
+
+function changeFile() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('progress-block').style.display = 'none';
+}
+
+// ── Main send flow ──
+async function sendFile() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('btn-send');
+  btn.disabled = true;
+  document.getElementById('progress-block').style.display = 'block';
+
+  try {
+    setStatus('Generating encryption key...', 15);
+
+    // 1. Generate AES-256-GCM key + 12-byte IV
+    const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    setStatus('Reading file...', 30);
+
+    // 2. Read file bytes and prepend header: [uint32-LE nameLen][nameBytes][fileBytes]
+    const fileBytes = new Uint8Array(await selectedFile.arrayBuffer());
+    const nameBytes = new TextEncoder().encode(selectedFile.name);
+    const header = new Uint8Array(4);
+    new DataView(header.buffer).setUint32(0, nameBytes.length, true);
+    const plaintext = concatU8(header, nameBytes, fileBytes);
+
+    setStatus('Encrypting...', 50);
+
+    // 3. Encrypt
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plaintext));
+
+    setStatus('Computing hash...', 65);
+
+    // 4. SHA-256 of ciphertext for relay dedup check
+    const hashBuf = await crypto.subtle.digest('SHA-256', ciphertext);
+    const hash = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    setStatus('Uploading...', 75);
+
+    // 5. Upload to relay
+    const ttl_ms = parseInt(document.getElementById('ttl-select').value);
+    const r = await fetch(RELAY + '/v2/anon-inbound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hash, payload: u8toBase64(ciphertext), ttl_ms }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: 'Upload failed (' + r.status + ')' }));
+      throw new Error(err.error || 'Upload failed');
+    }
+
+    const data = await r.json();
+    if (!data.ok || !data.download_token) throw new Error('Relay returned unexpected response');
+
+    setStatus('Done.', 100, true);
+
+    // 6. Build magic link: fragment = base64url(key[32] || iv[12])
+    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+    const keyIv = new Uint8Array(44);
+    keyIv.set(rawKey, 0);
+    keyIv.set(iv, 32);
+    const fragment = toB64url(keyIv);
+    const magicLink = location.origin + '/get?t=' + data.download_token + '#' + fragment;
+
+    document.getElementById('magic-link').textContent = magicLink;
+    document.getElementById('magic-link').dataset.link = magicLink;
+    showStep('step-link');
+
+  } catch (e) {
+    setStatus('Error: ' + e.message, 0, false, true);
+    btn.disabled = false;
+  }
+}
+
+function copyLink() {
+  const link = document.getElementById('magic-link').dataset.link || '';
+  if (!link) return;
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const status = document.getElementById('copy-status');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    status.textContent = 'Link copied to clipboard';
+    status.className = 'status-line ok';
+    setTimeout(() => {
+      btn.textContent = 'Copy link';
+      btn.classList.remove('copied');
+      status.textContent = '';
+      status.className = 'status-line';
+    }, 3000);
+  }).catch(() => {
+    // Fallback: select the share box text
+    const range = document.createRange();
+    range.selectNode(document.getElementById('magic-link'));
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+}
+
+function startOver() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('progress-block').style.display = 'none';
+  document.getElementById('pbar').style.width = '0%';
+  showStep('step-upload');
+}
+
+// ── Helpers ──
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setStatus(msg, pct, ok = false, err = false) {
+  document.getElementById('pbar').style.width = pct + '%';
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = 'status-line' + (ok ? ' ok' : '') + (err ? ' err' : '');
+}
+
+function formatSize(n) {
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  return n + ' B';
+}
+
+function concatU8(...arrays) {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+function u8toBase64(u8) {
+  let b = '';
+  for (let i = 0; i < u8.length; i += 0x8000) {
+    b += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  }
+  return btoa(b);
+}
+
+function toB64url(u8) {
+  let b = '';
+  for (let i = 0; i < u8.length; i++) b += String.fromCharCode(u8[i]);
+  return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+</script>
+</body>
+</html>

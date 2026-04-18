@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Healthcare Brief</title>
+<style>
+@page { size: A4; margin: 16mm 20mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 10pt;
+  color: #111;
+  background: #fff;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 16mm 20mm;
+  line-height: 1.5;
+}
+header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2.5px solid #111;
+  padding-bottom: 10px;
+  margin-bottom: 18px;
+}
+.logo-block h1 { font-size: 18pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+.logo-block p { font-size: 8pt; color: #555; margin-top: 3px; letter-spacing: 0.8px; text-transform: uppercase; }
+.badge-block { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; padding-top: 2px; }
+.badge { font-size: 7pt; font-weight: 700; border: 1.5px solid #111; padding: 2px 6px; letter-spacing: 0.3px; white-space: nowrap; }
+.badge.blue { border-color: #1a4a8a; color: #1a4a8a; }
+h2 {
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: #555;
+  margin-bottom: 7px;
+  margin-top: 18px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 3px;
+}
+h3 { font-size: 9.5pt; font-weight: 700; margin: 12px 0 5px; }
+p { font-size: 9.5pt; color: #222; line-height: 1.6; margin-bottom: 6px; }
+ul { padding-left: 14px; margin-bottom: 8px; }
+li { font-size: 9.5pt; color: #222; line-height: 1.55; margin-bottom: 2px; }
+.intro-block {
+  background: #f5f8ff;
+  border-left: 3px solid #1a4a8a;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.intro-block p { font-size: 10pt; font-weight: 600; color: #111; margin-bottom: 4px; }
+.intro-block small { font-size: 9pt; color: #444; line-height: 1.6; }
+.incident-box {
+  background: #fff8f0;
+  border-left: 3px solid #c04a00;
+  padding: 9px 13px;
+  margin-bottom: 12px;
+}
+.incident-box p { font-size: 9pt; color: #333; margin: 0; line-height: 1.6; }
+.incident-box strong { color: #c04a00; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 8px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.prop-list { list-style: none; padding: 0; }
+.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px; }
+.prop-list li::before { content: "✓"; color: #1a4a8a; font-weight: 700; flex-shrink: 0; }
+.cross-list { list-style: none; padding: 0; }
+.cross-list li { font-size: 9.5pt; padding: 2px 0; display: flex; gap: 6px; color: #444; }
+.cross-list li::before { content: "✗"; color: #cc2222; font-weight: 700; flex-shrink: 0; }
+.arch-box {
+  background: #f7f7f7;
+  border: 1px solid #ddd;
+  padding: 12px 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 8.5pt;
+  line-height: 1.7;
+  color: #111;
+  margin: 8px 0;
+}
+code {
+  font-family: 'Courier New', monospace;
+  font-size: 8.5pt;
+  background: #f0f0f0;
+  padding: 1px 5px;
+}
+.code-block {
+  font-family: 'Courier New', monospace;
+  font-size: 8pt;
+  background: #f7f7f7;
+  border: 1px solid #ddd;
+  padding: 10px 12px;
+  line-height: 1.65;
+  color: #111;
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9pt; }
+th { background: #1a4a8a; color: #fff; text-align: left; padding: 6px 10px; font-size: 8pt; font-weight: 600; letter-spacing: 0.4px; }
+td { padding: 6px 10px; border-bottom: 1px solid #e8e8e8; vertical-align: top; color: #222; }
+tr:nth-child(even) td { background: #fafafa; }
+.art-ref { font-family: 'Courier New', monospace; font-weight: 700; color: #1a4a8a; white-space: nowrap; }
+.check-col { color: #1a7a3c; font-weight: 700; text-align: center; }
+.tier-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: #ddd; margin: 8px 0; }
+.tier { background: #fff; padding: 10px 12px; }
+.tier.hl { background: #f0f4ff; }
+.tier-name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.tier-price { font-size: 14pt; font-weight: 900; line-height: 1; margin-bottom: 2px; }
+.tier-price sub { font-size: 8pt; font-weight: 400; color: #666; }
+.tier-desc { font-size: 8pt; color: #555; margin-bottom: 6px; }
+.tier ul { font-size: 8.5pt; padding-left: 12px; color: #333; }
+footer {
+  margin-top: 22px;
+  padding-top: 10px;
+  border-top: 2px solid #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-l { font-size: 9pt; font-weight: 700; }
+.footer-l span { font-weight: 400; color: #555; font-size: 8pt; display: block; margin-top: 2px; font-family: 'Courier New', monospace; }
+.footer-r { text-align: right; font-size: 8pt; color: #555; line-height: 1.7; }
+.footer-r a { color: #111; font-weight: 600; text-decoration: none; }
+.page-break { page-break-after: always; padding-bottom: 8px; }
+.print-btn {
+  position: fixed; bottom: 24px; right: 24px;
+  background: #111; color: #fff; border: none;
+  padding: 10px 20px; font-size: 10pt; font-weight: 600; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+@media print {
+  .print-btn { display: none; }
+  body { padding: 0; }
+  a { color: #111 !important; text-decoration: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- PAGE 1 — EXECUTIVE SUMMARY -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Ghost Pipe — Healthcare Brief</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge blue">NEN 7510</span>
+    <span class="badge blue">GDPR Art. 28</span>
+    <span class="badge blue">DICOM</span>
+    <span class="badge">ML-KEM-768</span>
+    <span class="badge">Burn-on-read</span>
+  </div>
+</header>
+
+<div class="intro-block">
+  <p>Patient data transfer has an architectural flaw. Ghost Pipe fixes it.</p>
+  <small>Patient data transferred between healthcare providers passes through servers that store it — even briefly. Each storage point is a breach surface. Every vendor who touches the data in transit is a processor relationship requiring DPA coverage. Ghost Pipe eliminates the storage layer: the relay is a conduit, not a server. Nothing remains after delivery.</small>
+</div>
+
+<div class="incident-box">
+  <p><strong>Chipsoft, April 2026:</strong> Patient portal traffic potentially exposed because data was routed through vendor servers. This is not an implementation error — it is an architectural one. The standard model for healthcare data exchange requires storage. Ghost Pipe does not.</p>
+</div>
+
+<h2>Solution</h2>
+<div class="two-col">
+  <div>
+    <h3>What Ghost Pipe delivers</h3>
+    <p>The PACS scan, the referral letter, the lab result — encrypted on the sender's device, delivered to the recipient, destroyed on arrival. Nothing remains on the relay. Not the filename. Not the patient ID. Not the key. Not the file.</p>
+    <p>The relay is RAM-only. A full compromise of the relay server yields zero patient data.</p>
+  </div>
+  <div>
+    <h3>The DPA implication</h3>
+    <p>Because the relay holds no plaintext and no decryptable content, the processor relationship under GDPR Article 28 is minimal. For self-hosted deployments, the healthcare organisation is both controller and processor — no third-party DPA required.</p>
+    <p>Standard DPA available at paramant.app/dpa for managed relay use.</p>
+  </div>
+</div>
+
+<h2>Key Properties</h2>
+<ul class="prop-list">
+  <li>ML-KEM-768 (NIST FIPS 203) — post-quantum encryption, retroactive decryption eliminated</li>
+  <li>RAM-only relay — no content stored at rest, nothing to breach, nothing to subpoena</li>
+  <li>Burn-on-read — file destroyed immediately after the first authorised download</li>
+  <li>NEN 7510 §10.1, §8.2, §12.4, §13.2 — compliance documentation included and maintained</li>
+  <li>GDPR Art. 28 DPA available — paramant.app/dpa — standard and negotiated versions</li>
+  <li>Hetzner DE jurisdiction — German law, no US CLOUD Act, no data outside EEA</li>
+  <li>Merkle CT log — tamper-evident delivery proof for AP and NZa audit requirements</li>
+  <li>Open source — BUSL-1.1, every line auditable at github.com/Apolloccrypt/paramant-relay</li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- PAGE 2 — ARCHITECTURE + DICOM -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT / Healthcare</h1>
+    <p>Architecture &amp; DICOM Workflow</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge blue">Zero storage</span>
+    <span class="badge blue">DICOM</span>
+    <span class="badge">HL7 FHIR</span>
+  </div>
+</header>
+
+<h2>Architecture</h2>
+<div class="arch-box">Sender (MRI/CT system, EPD, GP workstation)
+  ↓ client-side encryption (ML-KEM-768 — plaintext never leaves the device)
+Ghost Pipe relay (Hetzner DE)
+  → ciphertext stored in RAM only
+  → TTL: 1 hour default (configurable 30 seconds to 24 hours)
+  → destroyed immediately after one download
+Receiver (PACS, specialist workstation, GP portal)
+  ↓ client-side decryption → plaintext appears only on receiver device</div>
+
+<h2>What the relay never sees</h2>
+<div class="two-col">
+  <ul class="cross-list">
+    <li>Patient names or BSN</li>
+    <li>Medical image content (DICOM pixels)</li>
+    <li>File names or document types</li>
+  </ul>
+  <ul class="cross-list">
+    <li>Decryption keys (client-side only)</li>
+    <li>Diagnoses or clinical notes</li>
+    <li>Any personally identifiable information</li>
+  </ul>
+</div>
+
+<h2>DICOM and Clinical Workflows</h2>
+<div class="two-col">
+  <div>
+    <h3>GP → specialist referral (scan)</h3>
+    <div class="code-block">python3 paramant-sender.py \
+  --key pgp_xxx \
+  --device gp-workstation-01 \
+  scan.dcm</div>
+    <p>Sender gets a one-time link. Forwards link to specialist. Specialist downloads once — file burns.</p>
+    <h3>PACS forwarding</h3>
+    <div class="code-block">python3 paramant-receiver.py \
+  --key pgp_xxx \
+  --forward https://pacs.hospital/api</div>
+    <p>Receiver daemon auto-forwards decrypted DICOM to local PACS. No manual download step.</p>
+  </div>
+  <div>
+    <h3>Delivery verification</h3>
+    <div class="code-block">paramant-receipt verify receipt.json
+# → Verified: ML-DSA-65 signature OK
+# → Merkle inclusion: leaf 1847 of 1848
+# → Burned: 2026-04-18T09:41:22Z</div>
+    <p>Every transfer produces a cryptographic receipt. Verifiable by the sender, the receiver, and independent auditors without accessing the content.</p>
+    <h3>Supported formats</h3>
+    <p>DICOM (.dcm), HL7 FHIR bundles, PDF reports, any file format. The relay is format-agnostic — it handles ciphertext only.</p>
+  </div>
+</div>
+
+<h2>No-account magic link (consumer)</h2>
+<p>For patient-facing document delivery (lab results, discharge letters): sender uploads via paramant.app/send — no account required. Patient receives a one-time link by email or message. Clicks once, file downloads and burns. Compliant with GDPR Article 6(c) (legal obligation) and Article 9(2)(h) (medical treatment).</p>
+
+<div class="page-break"></div>
+
+<!-- PAGE 3 — NEN 7510 COMPLIANCE -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT / Healthcare</h1>
+    <p>NEN 7510 Compliance Matrix</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge blue">NEN 7510:2017+A1:2020</span>
+    <span class="badge blue">NEN 7512</span>
+    <span class="badge">GDPR Art. 28</span>
+  </div>
+</header>
+
+<p style="margin-bottom:10px">The table below maps NEN 7510:2017+A1:2020 security controls to Ghost Pipe protocol properties. Full documentation at <strong>paramant.app/compliance/nen7510</strong>.</p>
+
+<table>
+  <tr>
+    <th style="width:16%">Control</th>
+    <th style="width:28%">Title</th>
+    <th style="width:46%">Ghost Pipe implementation</th>
+    <th style="width:10%">Status</th>
+  </tr>
+  <tr>
+    <td class="art-ref">§10.1</td>
+    <td>Cryptographic controls</td>
+    <td>ML-KEM-768 client-side encryption. Relay never holds decryption key. Post-quantum: retroactive decryption of captured traffic is computationally infeasible.</td>
+    <td class="check-col">✓</td>
+  </tr>
+  <tr>
+    <td class="art-ref">§8.2</td>
+    <td>Information classification</td>
+    <td>No patient data stored on relay. Only cryptographic hashes (SHA-256 of ciphertext) in CT log. Classification risk eliminated at architecture level — no storage policy required for relay.</td>
+    <td class="check-col">✓</td>
+  </tr>
+  <tr>
+    <td class="art-ref">§12.4</td>
+    <td>Logging and monitoring</td>
+    <td>Every transfer produces a Merkle CT log entry. Tamper-evident, publicly verifiable at paramant.app/ct. Exportable for SIEM integration and AP/NZa audit requirements (JSON + CSV).</td>
+    <td class="check-col">✓</td>
+  </tr>
+  <tr>
+    <td class="art-ref">§13.2 / NEN 7512</td>
+    <td>Secure health data exchange</td>
+    <td>DICOM transport documented and tested. ML-DSA-65 relay authentication (post-quantum signatures). TOFU fingerprint verification for sender-receiver identity binding. No TTP required.</td>
+    <td class="check-col">✓</td>
+  </tr>
+  <tr>
+    <td class="art-ref">§18.1 / GDPR</td>
+    <td>Legal compliance</td>
+    <td>Hetzner DE: German law, no US CLOUD Act, no data outside EEA. GDPR Art. 28 DPA available on request. Self-hosted: no processor relationship — healthcare org is sole controller.</td>
+    <td class="check-col">✓</td>
+  </tr>
+  <tr>
+    <td class="art-ref">§9.4</td>
+    <td>Access control</td>
+    <td>Per-device API keys, per-key revocation. Device identity registry via <code>/v2/did/register</code>. Audit trail per key. No shared credentials.</td>
+    <td class="check-col">✓</td>
+  </tr>
+  <tr>
+    <td class="art-ref">§14.1</td>
+    <td>Security in development</td>
+    <td>BUSL-1.1 source available. Independent security audit (RAPTOR, April 2026), all findings resolved. Public CT log enables external verification of relay behaviour.</td>
+    <td class="check-col">✓</td>
+  </tr>
+</table>
+
+<div class="two-col" style="margin-top:14px">
+  <div>
+    <h3>DigiD compatibility</h3>
+    <p>TLS 1.3, strong cipher suites. Ghost Pipe does not provide DigiD authentication — this remains with the existing EPD/portal layer. DigiD coupling for patient identity requires separate assessment by the Logius/BRP integration layer.</p>
+  </div>
+  <div>
+    <h3>NEN 7510 note</h3>
+    <p>Compliance documentation maps Ghost Pipe capabilities to NEN 7510 controls. It is not a third-party certification. Organisations seeking formal NEN 7510 certification should engage an accredited auditor. Paramant can provide documentation input and technical clarification.</p>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- PAGE 4 — PRICING, DPA, CONTACT -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT / Healthcare</h1>
+    <p>Pricing, DPA &amp; Contact</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge">Hetzner DE</span>
+    <span class="badge">BUSL-1.1</span>
+    <span class="badge">GDPR</span>
+  </div>
+</header>
+
+<h2>Data Processing Agreement</h2>
+<div class="two-col">
+  <div>
+    <h3>Standard DPA (managed relay)</h3>
+    <p>GDPR Article 28 DPA available at <strong>paramant.app/dpa</strong>. Covers: processing purposes, security measures, sub-processor list (Hetzner DE only), retention (zero — RAM-only), deletion procedures.</p>
+    <p>Can be signed online. Negotiated DPA available for Enterprise.</p>
+  </div>
+  <div>
+    <h3>Self-hosted — no DPA required</h3>
+    <p>If your organisation runs its own relay server, you are both controller and processor. No DPA with Paramant is required. The BUSL-1.1 license is the only applicable agreement.</p>
+    <p>This eliminates the third-party processor risk entirely.</p>
+  </div>
+</div>
+
+<h2>Security Audit</h2>
+<p>Independent RAPTOR security audit completed April 2026. All critical and high findings resolved. Full report available to qualified healthcare prospects on NDA. Source code: github.com/Apolloccrypt/paramant-relay — every line auditable.</p>
+
+<h2>Pricing</h2>
+<div class="tier-row">
+  <div class="tier">
+    <div class="tier-name">Evaluation</div>
+    <div class="tier-price">Free</div>
+    <div class="tier-desc">No account, no CC</div>
+    <ul>
+      <li>10 transfers/day</li>
+      <li>5 MB per transfer</li>
+      <li>30-day trial key</li>
+      <li>Managed relay (DE)</li>
+    </ul>
+  </div>
+  <div class="tier hl">
+    <div class="tier-name">Pro</div>
+    <div class="tier-price">€12<sub>/mo</sub></div>
+    <div class="tier-desc">Managed, unlimited</div>
+    <ul>
+      <li>Unlimited transfers</li>
+      <li>50 MB per transfer</li>
+      <li>Email notifications</li>
+      <li>Send history / audit export</li>
+      <li>Standard DPA included</li>
+    </ul>
+  </div>
+  <div class="tier">
+    <div class="tier-name">Enterprise</div>
+    <div class="tier-price">Custom</div>
+    <div class="tier-desc">Dedicated or on-premise</div>
+    <ul>
+      <li>Dedicated DE relay</li>
+      <li>Custom DPA + MSA</li>
+      <li>NEN 7510 compliance docs</li>
+      <li>99.9% SLA</li>
+      <li>On-premise option</li>
+    </ul>
+  </div>
+</div>
+
+<p>Community self-hosted (BUSL-1.1): free forever, up to 5 users. Your server, your data, no third-party processor relationship.</p>
+
+<h2>Start Evaluation</h2>
+<div class="two-col">
+  <div>
+    <p><strong>Managed relay trial:</strong> paramant.app/request-key<br>
+    (name + email + use case → trial key by email in &lt;60 seconds)</p>
+    <p><strong>Self-hosted:</strong> <code>docker pull mtty001/relay:latest</code><br>
+    Full guide: paramant.app/docs#self-hosting</p>
+  </div>
+  <div>
+    <p><strong>DICOM integration guide:</strong> paramant.app/dicom</p>
+    <p><strong>NEN 7510 documentation:</strong> paramant.app/compliance/nen7510</p>
+    <p><strong>DPA:</strong> paramant.app/dpa</p>
+    <p><strong>Enterprise / custom DPA:</strong> privacy@paramant.app</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-l">
+    Paramant — post-quantum secure transport for Dutch healthcare.
+    <span>ML-KEM-768 · NIST FIPS 203/204 · Hetzner DE · GDPR · BUSL-1.1</span>
+  </div>
+  <div class="footer-r">
+    <a href="https://paramant.app/compliance/nen7510">paramant.app/compliance/nen7510</a><br>
+    <a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
+    © 2026 PARAMANT — Mick Beer
+  </div>
+</footer>
+
+<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>

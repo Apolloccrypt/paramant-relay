@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Investor Brief</title>
+<style>
+@page { size: A4; margin: 16mm 20mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 10pt;
+  color: #111;
+  background: #fff;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 16mm 20mm;
+  line-height: 1.5;
+}
+header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2.5px solid #111;
+  padding-bottom: 10px;
+  margin-bottom: 18px;
+}
+.logo-block h1 { font-size: 18pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+.logo-block p { font-size: 8pt; color: #555; margin-top: 3px; letter-spacing: 0.8px; text-transform: uppercase; }
+.badge-block { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; padding-top: 2px; }
+.badge { font-size: 7pt; font-weight: 700; border: 1.5px solid #111; padding: 2px 6px; letter-spacing: 0.3px; white-space: nowrap; }
+.badge.inv { border-color: #5a1a8a; color: #5a1a8a; }
+h2 {
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: #555;
+  margin-bottom: 7px;
+  margin-top: 18px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 3px;
+}
+h3 { font-size: 9.5pt; font-weight: 700; margin: 12px 0 5px; }
+h3.big { font-size: 11pt; margin-top: 16px; }
+p { font-size: 9.5pt; color: #222; line-height: 1.65; margin-bottom: 6px; }
+ul { padding-left: 14px; margin-bottom: 8px; }
+li { font-size: 9.5pt; color: #222; line-height: 1.6; margin-bottom: 2px; }
+.problem-block {
+  background: #fafafa;
+  border-left: 3px solid #111;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.problem-block p { font-size: 10pt; font-weight: 600; color: #111; margin-bottom: 4px; }
+.problem-block .body { font-size: 9.5pt; font-weight: 400; color: #333; line-height: 1.65; margin: 0; }
+.highlight-box {
+  background: #f8f4ff;
+  border-left: 3px solid #5a1a8a;
+  padding: 9px 13px;
+  margin: 10px 0;
+}
+.highlight-box p { font-size: 9.5pt; color: #222; margin: 0; line-height: 1.65; }
+.highlight-box strong { color: #5a1a8a; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 8px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.prop-list { list-style: none; padding: 0; }
+.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px; }
+.prop-list li::before { content: "✓"; color: #1a7a3c; font-weight: 700; flex-shrink: 0; }
+.moat-list { list-style: none; padding: 0; }
+.moat-list li { font-size: 9.5pt; padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px; }
+.moat-list li .icon { flex-shrink: 0; font-weight: 700; color: #5a1a8a; }
+code {
+  font-family: 'Courier New', monospace;
+  font-size: 8.5pt;
+  background: #f0f0f0;
+  padding: 1px 5px;
+}
+.code-block {
+  font-family: 'Courier New', monospace;
+  font-size: 8pt;
+  background: #f7f7f7;
+  border: 1px solid #ddd;
+  padding: 10px 12px;
+  line-height: 1.65;
+  color: #111;
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9pt; }
+th { background: #111; color: #fff; text-align: left; padding: 6px 10px; font-size: 8pt; font-weight: 600; letter-spacing: 0.4px; }
+td { padding: 6px 10px; border-bottom: 1px solid #e8e8e8; vertical-align: top; color: #222; }
+tr:nth-child(even) td { background: #fafafa; }
+.ok { color: #1a7a3c; font-weight: 700; }
+.na { color: #aaa; }
+.market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.market-card { border: 1px solid #ddd; padding: 10px 12px; }
+.market-card .name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.market-card .size { font-size: 13pt; font-weight: 900; line-height: 1; margin-bottom: 3px; }
+.market-card .desc { font-size: 8.5pt; color: #555; line-height: 1.4; }
+.roadmap-row { display: flex; gap: 0; margin: 6px 0; font-size: 9pt; }
+.roadmap-q { font-family: 'Courier New', monospace; font-weight: 700; width: 60px; flex-shrink: 0; color: #5a1a8a; }
+.roadmap-items { color: #333; line-height: 1.5; }
+.rev-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 8px 0; }
+.rev-table th { background: #f0f0f0; color: #111; padding: 5px 10px; text-align: left; font-weight: 700; border-bottom: 2px solid #ddd; }
+.rev-table td { padding: 5px 10px; border-bottom: 1px solid #eee; }
+.rev-table .period { font-family: 'Courier New', monospace; font-weight: 700; color: #5a1a8a; }
+.quote-block {
+  border-top: 2px solid #111;
+  border-bottom: 2px solid #111;
+  padding: 12px 0;
+  margin: 14px 0;
+  text-align: center;
+}
+.quote-block p { font-size: 11pt; font-weight: 600; color: #111; font-style: italic; margin: 0; }
+.quote-block small { font-size: 8.5pt; color: #666; margin-top: 4px; display: block; }
+footer {
+  margin-top: 22px;
+  padding-top: 10px;
+  border-top: 2px solid #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-l { font-size: 9pt; font-weight: 700; }
+.footer-l span { font-weight: 400; color: #555; font-size: 8pt; display: block; margin-top: 2px; }
+.footer-r { text-align: right; font-size: 8pt; color: #555; line-height: 1.7; }
+.footer-r a { color: #111; font-weight: 600; text-decoration: none; }
+.page-break { page-break-after: always; padding-bottom: 8px; }
+.print-btn {
+  position: fixed; bottom: 24px; right: 24px;
+  background: #111; color: #fff; border: none;
+  padding: 10px 20px; font-size: 10pt; font-weight: 600; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+@media print {
+  .print-btn { display: none; }
+  body { padding: 0; }
+  a { color: #111 !important; text-decoration: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- PAGE 1 — THE PROBLEM -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Investor &amp; Partner Brief — April 2026</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge inv">Post-quantum</span>
+    <span class="badge inv">EU sovereign</span>
+    <span class="badge">BUSL-1.1</span>
+    <span class="badge">Seed stage</span>
+  </div>
+</header>
+
+<div class="problem-block">
+  <p>Every secure file transfer tool stores your data.</p>
+  <p class="body">Encrypted, yes. But stored — on a server, in a database, in a backup. That server gets breached. Gets subpoenaed. Gets quietly harvested by state actors collecting ciphertext today to decrypt with quantum computers tomorrow. This is called Harvest Now, Decrypt Later. The NSA called it in 2022. NIST finalized the post-quantum standards in August 2024. The EU has approximately three years before Q-Day timelines converge with operational readiness.</p>
+</div>
+
+<div class="highlight-box">
+  <p><strong>The structural gap:</strong> No one has built post-quantum file transport with zero persistent storage and a public audit log. Zivver stores files. Tresorit stores files. WeTransfer stores files and does not encrypt end-to-end. Signal handles messages, not document relay. The gap is real and growing.</p>
+</div>
+
+<h2>The Market</h2>
+<div class="market-grid">
+  <div class="market-card">
+    <div class="name">Healthcare</div>
+    <div class="size">€43B EU</div>
+    <div class="desc">NEN 7510 compliance required. DICOM referrals, EPD exports, lab results — all require zero-trace transport. Chipsoft (April 2026): patient data exposed through vendor servers.</div>
+  </div>
+  <div class="market-card">
+    <div class="name">Legal</div>
+    <div class="size">~€20B EU</div>
+    <div class="desc">eIDAS mandates verifiable document exchange. Due diligence packages, contracts, discovery — all require audit trail and burn-on-read semantics.</div>
+  </div>
+  <div class="market-card">
+    <div class="name">Finance</div>
+    <div class="size">~€35B EU</div>
+    <div class="desc">NIS2/DORA requires cryptographic audit trails. SWIFT documents, regulatory filings, board materials — sensitivity demands zero residual storage.</div>
+  </div>
+  <div class="market-card">
+    <div class="name">Industrial OT</div>
+    <div class="size">~€8B EU</div>
+    <div class="desc">IEC 62443 mandates secure conduit between OT and IT zones. Airbus, ASML, ports — sensor data, firmware updates, configuration blobs all crossing zone boundaries today via FTP/SMB.</div>
+  </div>
+</div>
+
+<h2>Competitive Landscape</h2>
+<table>
+  <tr>
+    <th>Product</th>
+    <th>Stores files</th>
+    <th>Post-quantum</th>
+    <th>Zero-knowledge relay</th>
+    <th>Burn-on-read</th>
+    <th>Self-hostable</th>
+    <th>Audit log</th>
+  </tr>
+  <tr><td><strong>Paramant</strong></td><td class="ok">No</td><td class="ok">Yes (ML-KEM-768)</td><td class="ok">Yes</td><td class="ok">Yes</td><td class="ok">Yes (BUSL)</td><td class="ok">Yes (CT)</td></tr>
+  <tr><td>Zivver</td><td style="color:#c00">Yes</td><td class="na">Roadmap</td><td style="color:#c00">No</td><td style="color:#c00">No</td><td style="color:#c00">No</td><td class="na">Partial</td></tr>
+  <tr><td>Tresorit</td><td style="color:#c00">Yes</td><td class="na">No</td><td style="color:#c00">No</td><td style="color:#c00">No</td><td class="na">Enterprise</td><td class="na">Partial</td></tr>
+  <tr><td>WeTransfer</td><td style="color:#c00">Yes</td><td class="na">No</td><td style="color:#c00">No</td><td class="na">7 days</td><td style="color:#c00">No</td><td style="color:#c00">No</td></tr>
+  <tr><td>Signal</td><td class="na">Messages</td><td class="na">X3DH only</td><td class="ok">Yes</td><td style="color:#c00">No files</td><td class="na">No relay</td><td class="na">No</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- PAGE 2 — THE SOLUTION -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>The Solution — Ghost Pipe Protocol</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge inv">Different architecture</span>
+    <span class="badge">Not a better Zivver</span>
+  </div>
+</header>
+
+<div class="problem-block">
+  <p>Not a better version of Zivver. A different architectural answer.</p>
+  <p class="body">Zivver, Tresorit, and WeTransfer are all built on the same assumption: a server stores your files, and security is achieved by encrypting access to those files. The relay is a database. Ghost Pipe eliminates the database. The relay is a conduit — it holds only ciphertext, only in RAM, only until the recipient downloads it. Then it's gone.</p>
+</div>
+
+<h2>The Ghost Pipe Protocol</h2>
+<div class="two-col">
+  <div>
+    <h3>How it works</h3>
+    <ul>
+      <li>Files encrypted client-side with ML-KEM-768 (NIST FIPS 203)</li>
+      <li>Relay receives and stores only ciphertext</li>
+      <li>Ciphertext held in RAM only — never written to disk</li>
+      <li>Destroyed after one read (burn-on-read)</li>
+      <li>Merkle CT log proves delivery without storing content</li>
+      <li>ML-DSA-65 post-quantum signature on every proof</li>
+    </ul>
+  </div>
+  <div>
+    <h3>What this means in practice</h3>
+    <ul>
+      <li><strong>Nothing to breach</strong> — relay holds no persistent content</li>
+      <li><strong>Nothing to subpoena</strong> — no content to compel production of</li>
+      <li><strong>Nothing to harvest</strong> — HNDL attack eliminated by design</li>
+      <li><strong>Verifiable</strong> — public CT log, cryptographic proof per transfer</li>
+      <li><strong>Sovereign</strong> — EU infrastructure, no US CLOUD Act</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Competitive Moat</h2>
+<ul class="moat-list">
+  <li><span class="icon">PQ</span> <span><strong>Post-quantum by default.</strong> Competitors have "roadmaps". ML-KEM-768 is live in production today. The migration window is open — most organisations have not started.</span></li>
+  <li><span class="icon">0S</span> <span><strong>Zero storage architecture.</strong> This is not achievable by Zivver via a software update. Their entire product is built on stored files. Eliminating storage requires a different product from the ground up.</span></li>
+  <li><span class="icon">CT</span> <span><strong>Public Certificate Transparency log.</strong> No competitor has this for file transport. Every transfer produces a cryptographic inclusion proof, verifiable by any party without accessing content.</span></li>
+  <li><span class="icon">OS</span> <span><strong>Open source (BUSL-1.1).</strong> Regulated industries require auditability. Source-available builds trust that no closed-source product can match. Prevents competitor fork-and-resell.</span></li>
+  <li><span class="icon">SH</span> <span><strong>Self-hostable.</strong> Hospitals and factories can run their own relay on their own infrastructure. No vendor dependency. Even if Paramant as a service shuts down, every self-hosted deployment keeps running.</span></li>
+</ul>
+
+<h2>Product Architecture</h2>
+<div class="three-col">
+  <div>
+    <h3>/send — consumer</h3>
+    <p>No account needed. AES-256-GCM in browser. Magic link with key in URL fragment. Burns after one download. WeTransfer replacement, better security.</p>
+  </div>
+  <div>
+    <h3>ParaShare — pro</h3>
+    <p>ML-KEM-768 + ECDH hybrid. Fingerprint verification. Multi-file vault. TTL 30s–24h. API key required. Full post-quantum stack.</p>
+  </div>
+  <div>
+    <h3>Ghost Pipe OT — enterprise</h3>
+    <p>IoT/SCADA relay. IEC 62443 documentation. ARM64 native. Continuous sensor mode. Device identity registry. Self-hosted in DMZ.</p>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- PAGE 3 — TRACTION -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Traction &amp; Product Status — April 2026</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge inv">v2.4.5 live</span>
+    <span class="badge">Audit complete</span>
+    <span class="badge">5 relays</span>
+  </div>
+</header>
+
+<h2>What is Live Today</h2>
+<div class="two-col">
+  <div>
+    <h3>Infrastructure</h3>
+    <ul>
+      <li>5 sector relays: health, legal, finance, industrial IoT, general</li>
+      <li>iot.paramant.app — licensed, v2.4.5, production</li>
+      <li>Public CT log: paramant.app/ct — live, verifiable</li>
+      <li>Hetzner Falkenstein DE — no US sub-processors</li>
+      <li>Independent security audit (RAPTOR, April 2026) — all critical findings resolved</li>
+    </ul>
+    <h3>Frontend</h3>
+    <ul>
+      <li>/send — keyless magic link, no account (live)</li>
+      <li>/parashare — ML-KEM-768 E2E with fingerprint verification</li>
+      <li>/drop — AirDrop alternative, burn-on-read</li>
+      <li>Dashboard, CT log viewer, compliance pages</li>
+      <li>ParamantOS — bootable relay (NixOS, USB → running relay in minutes)</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Developer tooling</h3>
+    <ul>
+      <li>44 CLI tools — sector-specific workflows</li>
+      <li>Python SDK with inclusion proof support</li>
+      <li>JavaScript SDK</li>
+      <li>Docker Hub: <code>mtty001/relay</code> (amd64 + arm64)</li>
+      <li>install.sh / install-pi.sh for one-command deploy</li>
+    </ul>
+    <h3>Compliance documentation</h3>
+    <ul>
+      <li>NIS2, NEN 7510, IEC 62443 compliance matrices</li>
+      <li>GDPR Art. 28 DPA (available, signed online)</li>
+      <li>eIDAS alignment documentation</li>
+      <li>OT integration guide (Purdue Model)</li>
+      <li>DICOM transport guide</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Business Model Summary</h2>
+<table>
+  <tr>
+    <th style="width:18%">Tier</th>
+    <th style="width:18%">Price</th>
+    <th style="width:24%">Key limits</th>
+    <th style="width:40%">Target segment</th>
+  </tr>
+  <tr><td><strong>Free</strong></td><td>€0</td><td>5 MB, 10/day, 1h TTL</td><td>Self-serve top of funnel, trial evaluation</td></tr>
+  <tr><td><strong>Pro</strong></td><td>€12/mo (€9 annual)</td><td>50 MB, unlimited, 30d TTL</td><td>SME, individual professional, GP/notary</td></tr>
+  <tr><td><strong>Team</strong></td><td>€49/mo (€39 annual)</td><td>10 users, shared dashboard</td><td>Law firm, medical practice, SME team</td></tr>
+  <tr><td><strong>Enterprise</strong></td><td>Custom</td><td>Dedicated relay, SLA, on-prem</td><td>Hospital, manufacturer, law firm ≥25 users</td></tr>
+</table>
+
+<p style="font-size:8.5pt;color:#555;margin-top:6px">Community self-hosted (BUSL-1.1): free forever, up to 5 users. Drives awareness, self-qualifies larger deployments, prevents resale by competitors.</p>
+
+<div class="page-break"></div>
+
+<!-- PAGE 4 — MARKET + ROADMAP -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Market Strategy &amp; Roadmap</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge inv">12-month plan</span>
+    <span class="badge">NL first</span>
+  </div>
+</header>
+
+<h2>Go-to-Market — Phase 1 (12 months)</h2>
+<div class="two-col">
+  <div>
+    <h3>Target segments</h3>
+    <ul>
+      <li><strong>EU healthcare:</strong> GP → specialist DICOM referrals. 15,000+ GPs in NL alone. NEN 7510 compliance creates urgent pull.</li>
+      <li><strong>Legal:</strong> Notaries, law firms, eIDAS-mandated workflows. Contracts, due diligence, discovery packages.</li>
+      <li><strong>OT pilot:</strong> 1–2 industrial operators. Airbus tier-2 suppliers, Rotterdam port logistics, ASML supply chain.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Distribution</h3>
+    <ul>
+      <li><strong>Self-serve:</strong> /send as viral top-of-funnel. WeTransfer replacement for anyone who needs zero-trace transfer.</li>
+      <li><strong>Inbound:</strong> LinkedIn thought leadership (HNDL, Chipsoft, NIS2 urgency). Content converts to trial key requests.</li>
+      <li><strong>Direct:</strong> OT prospects via security architect network. Healthcare via IT integrators.</li>
+      <li><strong>Partner:</strong> IT integrators serving healthcare and legal (first conversations in progress).</li>
+    </ul>
+  </div>
+</div>
+
+<h2>12-Month Roadmap</h2>
+<div class="roadmap-row"><div class="roadmap-q">Q2 2026</div><div class="roadmap-items">/send magic link MVP live · OT brief complete · Healthcare brief complete · Investor brief complete</div></div>
+<div class="roadmap-row"><div class="roadmap-q">Q3 2026</div><div class="roadmap-items">Pro billing (Stripe) · 50 MB disk-backed tier · Outlook plugin (Pro) · First paying customers</div></div>
+<div class="roadmap-row"><div class="roadmap-q">Q4 2026</div><div class="roadmap-items">First enterprise OT contract (target: port or Airbus supplier) · Team dashboard · 100 Pro users target</div></div>
+<div class="roadmap-row"><div class="roadmap-q">Q1 2027</div><div class="roadmap-items">NEN 7510 third-party audit (TÜV or equivalent) · ParamantOS v2 (reproducible NixOS build) · 3 enterprise contracts</div></div>
+
+<h2>Revenue Projections (Conservative)</h2>
+<table class="rev-table">
+  <tr>
+    <th style="width:22%">Period</th>
+    <th style="width:28%">Driver</th>
+    <th style="width:22%">MRR</th>
+    <th style="width:28%">Notes</th>
+  </tr>
+  <tr><td class="period">Q3 2026</td><td>25 Pro users, first trial</td><td>€300/mo</td><td>Stripe billing live</td></tr>
+  <tr><td class="period">Q4 2026</td><td>100 Pro + 1 enterprise OT</td><td>€1,200–3,200/mo</td><td>Enterprise: €2,000–5,000/mo range</td></tr>
+  <tr><td class="period">Q1 2027</td><td>200 Pro + 3 enterprise</td><td>€4,400–17,400/mo</td><td>NEN 7510 cert opens healthcare pipeline</td></tr>
+  <tr><td class="period">Q2 2027</td><td>500 Pro + 1 Team + 5 enterprise</td><td>€12,000–30,000/mo</td><td>Partner channel contribution</td></tr>
+</table>
+
+<p style="font-size:8.5pt;color:#555;margin-top:6px">Unit economics: Pro CAC estimated &lt;€30 (self-serve). Enterprise CAC: 1–2 sales conversations + compliance docs. Churn: low — regulated industry switching costs are high and self-hosted deployments never churn.</p>
+
+<div class="page-break"></div>
+
+<!-- PAGE 5 — TEAM + ASK -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Team, Ask &amp; Contact</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge inv">Sole founder</span>
+    <span class="badge">Open source</span>
+    <span class="badge">EU sovereignty</span>
+  </div>
+</header>
+
+<h2>Builder</h2>
+<div class="two-col">
+  <div>
+    <h3>Mick Beer — Security Architect</h3>
+    <p>15+ years operational security across critical infrastructure, healthcare, and industrial environments. Built Ghost Pipe from zero to production in under 12 months — relay, CLI toolchain, SDK, compliance documentation, all sectors.</p>
+    <p>Ships in the open. Every commit public: github.com/Apolloccrypt/paramant-relay.</p>
+  </div>
+  <div>
+    <h3>Why this, why now</h3>
+    <p>NIST finalized post-quantum standards August 2024. The migration window is open. Most EU organizations have not started. Ghost Pipe is the infrastructure that should have existed before Q-Day — built lean, open source, and EU-native from day one.</p>
+    <p>Not building to sell to a US acquirer. Building for EU digital sovereignty. BUSL-1.1 prevents commercial resale by competitors and ensures continuity for every self-hosted deployment, permanently.</p>
+  </div>
+</div>
+
+<h2>What I am Looking For</h2>
+<div class="two-col">
+  <div>
+    <h3>Strategic partners</h3>
+    <ul>
+      <li>Healthcare IT integrators (NL, DE, BE)</li>
+      <li>OT system integrators (manufacturing, ports, utilities)</li>
+      <li>Legal tech platforms building on GDPR-compliant transport</li>
+      <li>EU public sector IT framework agreements</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Funding &amp; grants</h3>
+    <ul>
+      <li>EU grants: NIS2 migration tooling, digital sovereignty programs</li>
+      <li>Pilot customers in healthcare and OT: proof of revenue, basis for Series A</li>
+      <li>Strategic angel: security/healthcare/OT domain expertise</li>
+      <li>Not raising VC at this stage — BUSL self-hosted fork ensures continuity regardless</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Business Continuity Note</h2>
+<p>The BUSL-1.1 license is a deliberate design choice: even if Paramant as a managed service shuts down, every self-hosted deployment keeps running indefinitely. Operators own their relay. There is no vendor lock-in by design. This makes Paramant safe to adopt for regulated industries that cannot accept single-vendor dependency risk.</p>
+
+<div class="quote-block">
+  <p>"Better a warrior in a garden than a gardener in a war."</p>
+  <small>— on building post-quantum infrastructure before the timeline closes</small>
+</div>
+
+<h2>Contact</h2>
+<div class="two-col">
+  <div>
+    <p><strong>privacy@paramant.app</strong> — direct email</p>
+    <p><strong>paramant.app</strong> — product</p>
+    <p><strong>github.com/Apolloccrypt/paramant-relay</strong> — source</p>
+    <p style="margin-top:8px">Trial key (60 seconds, no CC): paramant.app/request-key</p>
+  </div>
+  <div>
+    <p><strong>For due diligence:</strong></p>
+    <ul>
+      <li>RAPTOR security audit report — available on NDA</li>
+      <li>Full source code — public, no NDA required</li>
+      <li>CT log — public, cryptographically verifiable</li>
+      <li>DPA — paramant.app/dpa</li>
+      <li>Compliance matrices — paramant.app/compliance/</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-l">
+    PARAMANT — Post-quantum file relay for a sovereign Europe.
+    <span>ML-KEM-768 · RAM-only · Burn-on-read · BUSL-1.1 · EU/DE</span>
+  </div>
+  <div class="footer-r">
+    <a href="https://paramant.app">paramant.app</a><br>
+    <a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
+    © 2026 Mick Beer
+  </div>
+</footer>
+
+<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>

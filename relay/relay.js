@@ -66,14 +66,14 @@ try {
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'npm install @noble/post-quantum' }); }
 
 const ALLOWED = {
-  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
+  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/ct','/ct/feed'],
-  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/outbound','/v2/status',
+  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -1138,6 +1138,7 @@ const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 // Trial key request rate limiting (in-memory)
 const trialRequests   = new Map(); // email_lc → last_request_ts
 const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
+const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
@@ -2365,6 +2366,62 @@ session = client.create_session('recipient@example.com')</pre>
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── POST /v2/anon-inbound — Keyless upload for magic-link flow ───────────────
+  // No API key required. Rate limited by IP. Sender encrypts AES-256-GCM client-side;
+  // the decryption key travels in the URL fragment only — relay never sees it.
+  if (path === '/v2/anon-inbound' && req.method === 'POST') {
+    const ANON_MAX = 5 * 1024 * 1024;
+    const ANON_RPH = parseInt(process.env.ANON_RATE_PER_HOUR || '10');
+    const HOUR_MS  = 3_600_000;
+    const ip       = getClientIp(req);
+    const now      = Date.now();
+    const ipTimes  = (anonInboundIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
+    if (ipTimes.length >= ANON_RPH) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
+      return res.end(J({ error: 'Rate limit: max ' + ANON_RPH + ' uploads per hour. Try again later.' }));
+    }
+    if (!ramOk()) {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '10' });
+      return res.end(J({ error: 'Relay at capacity. Retry in 10 seconds.' }));
+    }
+    inFlightInbound++;
+    try {
+      const body = await readBody(req, ANON_MAX * 2);
+      const d    = JSON.parse(body.toString());
+      const { hash, payload, ttl_ms, enc_meta } = d;
+      if (!hash || !payload)            { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
+      if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
+      if (blobStore.has(hash))           { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
+      const blob = Buffer.from(payload, 'base64');
+      if (blob.length > ANON_MAX)        { res.writeHead(413); return res.end(J({ error: 'Max 5MB on anonymous uploads' })); }
+      let safeEncMeta = null;
+      if (enc_meta !== undefined && enc_meta !== null) {
+        const em = String(enc_meta);
+        if (em.length > 2048 || !/^[A-Za-z0-9+/=]+$/.test(em)) { res.writeHead(400); return res.end(J({ error: 'enc_meta must be base64, max 2048 chars' })); }
+        safeEncMeta = em;
+      }
+      const ttl     = Math.min(parseInt(ttl_ms || TTL_MS), 86_400_000); // max 24h for anon
+      const ctEntry = ctAppendTransfer(hash, SECTOR);
+      blobStore.set(hash, {
+        blob, ts: now, ttl, size: blob.length,
+        apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
+        ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
+                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null },
+      });
+      setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
+      ipTimes.push(now);
+      anonInboundIpRequests.set(ip, ipTimes);
+      const dlToken = require('crypto').randomBytes(24).toString('hex');
+      downloadTokens.set(dlToken, { hash, key: null, expires_ms: now + ttl, used: false, enc_meta: safeEncMeta, file_size: blob.length });
+      incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
+      stats.inbound++; stats.bytes_in += blob.length;
+      log('info', 'anon_blob_stored', { hash: hash.slice(0, 16), size: blob.length });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, hash, download_token: dlToken, ttl_ms: ttl, size: blob.length }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    finally { inFlightInbound--; }
+  }
+
   // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
   // All other paths: require a valid X-Api-Key (pgp_ key in users.json)
   const isAdminPath = path.startsWith('/v2/admin');
@@ -2476,16 +2533,27 @@ session = client.create_session('recipient@example.com')</pre>
         const TRIAL_MAX_TTL  = 3_600_000; // 1h
         const TRIAL_EXPIRY   = 30 * 86_400_000;
         const TRIAL_DAILY    = 10;
+        const OT_TRIAL_MAX   = 1000; // OT eval: 1000 transfers total, no daily cap
         if (keyData.trial_created && Date.now() - keyData.trial_created > TRIAL_EXPIRY) {
           apiKeys.delete(apiKey);
           res.writeHead(401, { 'Content-Type': 'application/json' });
           return res.end(J({ error: 'Trial key expired' }));
         }
-        const today = new Date().toDateString();
-        if (keyData.last_upload_day !== today) { keyData.uploads_today = 0; keyData.last_upload_day = today; }
-        if (keyData.uploads_today >= TRIAL_DAILY) {
-          res.writeHead(429, { 'Content-Type': 'application/json' });
-          return res.end(J({ error: 'Daily upload limit reached (trial: 10/day)' }));
+        if (RELAY_MODE === 'iot') {
+          // OT evaluation mode: total budget instead of daily cap
+          if ((keyData.total_transfers || 0) >= OT_TRIAL_MAX) {
+            res.writeHead(429, { 'Content-Type': 'application/json' });
+            return res.end(J({ error: 'OT trial limit reached (1000 transfers). Contact us to upgrade.' }));
+          }
+          keyData.total_transfers = (keyData.total_transfers || 0) + 1;
+        } else {
+          const today = new Date().toDateString();
+          if (keyData.last_upload_day !== today) { keyData.uploads_today = 0; keyData.last_upload_day = today; }
+          if (keyData.uploads_today >= TRIAL_DAILY) {
+            res.writeHead(429, { 'Content-Type': 'application/json' });
+            return res.end(J({ error: 'Daily upload limit reached (trial: 10/day)' }));
+          }
+          keyData.uploads_today++;
         }
         const blobPreview = Buffer.byteLength(payload, 'base64');
         if (blobPreview > TRIAL_MAX_SIZE) {
@@ -2496,7 +2564,6 @@ session = client.create_session('recipient@example.com')</pre>
           res.writeHead(400, { 'Content-Type': 'application/json' });
           return res.end(J({ error: 'Max TTL 1h on trial' }));
         }
-        keyData.uploads_today++;
       }
 
       // enc_meta: sender-encrypted filename/metadata (relay stores ciphertext only — finding #4)

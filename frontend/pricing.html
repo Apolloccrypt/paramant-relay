@@ -4,106 +4,132 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pricing — PARAMANT</title>
-<meta name="description" content="PARAMANT pricing. Community free up to 5 keys. Licensed €149/month unlimited. Enterprise custom.">
+<meta name="description" content="PARAMANT pricing: free forever, €12/mo Pro, €49/mo Team, Enterprise custom. Post-quantum encrypted file transfer, zero trace, EU/DE jurisdiction.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0c0c0c;--surface:#111;--surface2:#161616;
-  --border:#1e1e1e;--border-soft:#161616;
-  --text:#ededed;--muted:#888;--quiet:#444;
-  --green:#00cc33;--green-dim:#242424;
-  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;
+  --text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--green-bright:#00ff41;
+  --green-dim:#0e1e0e;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   --mono:'SF Mono','Fira Code','Cascadia Code',monospace
 }
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
 
-/* ── Nav ── */
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.92);backdrop-filter:blur(8px);z-index:100}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text)}
-.nav-links{display:flex;gap:28px;list-style:none}
-.nav-links a{font-size:13px;color:var(--muted);transition:color .15s}
-.nav-links a:hover,.nav-links a.active{color:var(--text)}
+.hero{max-width:600px;margin:0 auto;padding:80px 32px 56px;text-align:center}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:14px;font-family:var(--mono)}
+h1{font-size:42px;font-weight:600;letter-spacing:-.035em;color:var(--text);margin-bottom:14px}
+.hero-sub{font-size:15px;color:var(--muted);margin-bottom:36px;line-height:1.75}
 
-/* ── Hero ── */
-.hero{max-width:640px;margin:0 auto;padding:88px 48px 64px;text-align:center}
-.eyebrow{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--quiet);margin-bottom:18px;font-family:var(--mono)}
-h1{font-size:42px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin-bottom:18px}
-.hero-sub{font-size:16px;color:var(--muted);line-height:1.75;max-width:480px;margin:0 auto}
+.toggle-wrap{display:flex;align-items:center;justify-content:center;gap:14px}
+.toggle-label{font-size:13px;color:var(--quiet);transition:color .15s}
+.toggle-label.active{color:var(--text)}
+.toggle{position:relative;width:44px;height:24px;cursor:pointer;display:inline-block}
+.toggle input{position:absolute;opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:#1c1c1c;border:1px solid var(--border);border-radius:12px;transition:background .2s,border-color .2s}
+.toggle input:checked + .toggle-track{background:var(--green-dim);border-color:#1e3a1e}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--quiet);border-radius:50%;transition:transform .2s,background .2s;pointer-events:none}
+.toggle input:checked ~ .toggle-thumb{transform:translateX(20px);background:var(--green)}
+.save-badge{font-size:10px;font-family:var(--mono);color:var(--green);background:var(--green-dim);padding:2px 7px;border-radius:3px;letter-spacing:.04em;border:1px solid #1e3a1e}
 
-/* ── Pricing grid ── */
-.pricing-wrap{max-width:1000px;margin:0 auto;padding:16px 48px 80px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.plan{background:var(--surface);padding:36px 32px;display:flex;flex-direction:column;position:relative}
-.plan.highlighted{background:var(--surface2)}
-.plan-badge{display:inline-block;font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:3px;margin-bottom:20px;width:fit-content}
-.badge-community{color:var(--muted);background:var(--border);border:1px solid var(--border)}
-.badge-licensed{color:var(--green);background:var(--green-dim);border:1px solid var(--green)}
-.badge-enterprise{color:#888;background:#1a1a1a;border:1px solid #2a2a2a}
-.plan-name{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
-.plan-price{font-size:38px;font-weight:700;letter-spacing:-.04em;margin-bottom:4px;line-height:1}
-.plan-price span{font-size:16px;font-weight:400;color:var(--muted);letter-spacing:0}
-.plan-price .period{font-size:14px;font-weight:400;color:var(--muted)}
-.plan-desc{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.6;min-height:52px}
-.plan-cta{display:block;text-align:center;padding:10px 20px;border-radius:5px;font-size:13px;font-weight:500;margin-bottom:28px;transition:opacity .15s}
-.cta-primary{background:var(--text);color:var(--bg)}
-.cta-primary:hover{opacity:.85}
-.cta-secondary{border:1px solid var(--border);color:var(--muted)}
-.cta-secondary:hover{border-color:var(--muted);color:var(--text)}
-.cta-contact{background:var(--green);color:#e8f4ee}
-.cta-contact:hover{opacity:.88}
-.badge-coming-soon{color:#0b1d12;background:var(--green);border:1px solid var(--green)}
-.plan.coming-soon{opacity:.82}
-.cta-waitlist{border:1px solid var(--green);color:var(--green);background:transparent;text-decoration:none}
-.cta-waitlist:hover{background:rgba(0,255,65,.1);opacity:1}
-.plan-features{list-style:none;display:flex;flex-direction:column;gap:11px;flex:1}
-.plan-features li{font-size:13px;color:var(--muted);display:flex;align-items:flex-start;gap:9px;line-height:1.5}
-.plan-features li::before{content:'✓';color:var(--green);font-size:11px;flex-shrink:0;margin-top:2px}
-.plan-features li.faded{color:var(--quiet)}
-.plan-features li.faded::before{color:var(--quiet);content:'—'}
-.divider-line{border:none;border-top:1px solid var(--border);margin:24px 0}
+.cards-wrap{max-width:1100px;margin:52px auto 0;padding:0 24px 72px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:visible}
+.card{background:var(--bg);padding:28px 22px;display:flex;flex-direction:column;position:relative}
+.card.featured{background:var(--surface);outline:1px solid rgba(0,255,65,.15);outline-offset:0;border-radius:0;z-index:1}
+.card-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#0c0c0c;background:var(--green-bright);padding:3px 10px;border-radius:0 0 5px 5px;white-space:nowrap}
+.tier-name{font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);margin-bottom:14px;margin-top:10px}
+.price{font-size:34px;font-weight:600;letter-spacing:-.03em;color:var(--text);margin-bottom:2px;line-height:1}
+.price sup{font-size:16px;font-weight:500;vertical-align:top;margin-top:7px;margin-right:1px}
+.price-period{font-size:12px;color:var(--quiet);margin-bottom:4px;min-height:17px}
+.price-note{font-size:11px;color:var(--quiet);font-family:var(--mono);margin-bottom:22px;min-height:14px;letter-spacing:.02em}
+.card-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.card-cta{display:block;text-align:center;padding:9px 16px;border-radius:5px;font-size:13px;font-weight:500;text-decoration:none;margin-bottom:22px;transition:opacity .15s,border-color .15s,color .15s}
+.cta-free,.cta-enterprise{border:1px solid var(--border);color:var(--muted)}
+.cta-free:hover,.cta-enterprise:hover{color:var(--text);border-color:var(--quiet)}
+.cta-pro{background:var(--green-bright);color:#0c0c0c}
+.cta-pro:hover{opacity:.85}
+.cta-team{border:1px solid rgba(0,204,51,.3);color:var(--green)}
+.cta-team:hover{border-color:var(--green);opacity:.85}
+.feature-list{flex:1;list-style:none;display:flex;flex-direction:column;gap:8px}
+.feature-list li{font-size:12px;color:#444;padding-left:14px;position:relative;line-height:1.45}
+.feature-list li.yes{color:var(--quiet)}
+.feature-list li.yes::before{content:'✓';position:absolute;left:0;color:var(--green);font-size:10px;top:1px}
+.feature-list li.sec{color:#333;font-size:10px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-top:6px;padding-left:0;padding-top:8px;border-top:1px solid #181818}
+.feature-list li.sec::before{display:none}
 
-/* ── FAQ / notes ── */
-.notes{max-width:800px;margin:0 auto;padding:0 48px 80px}
-.notes h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
-.faq{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.faq-item{padding:20px 24px;border-bottom:1px solid var(--border)}
-.faq-item:last-child{border-bottom:none}
+.note-wrap{max-width:780px;margin:0 auto;padding:0 24px 56px}
+.note-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 22px;font-size:12px;color:var(--quiet);line-height:1.8}
+.note-box strong{color:var(--muted)}
+
+.compare-wrap{max-width:1100px;margin:0 auto;padding:0 24px 72px}
+.compare-wrap h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+.compare-wrap .s{font-size:13px;color:var(--quiet);margin-bottom:28px}
+.compare{width:100%;border-collapse:collapse;font-size:13px}
+.compare thead th{text-align:center;padding:10px 12px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);border-bottom:1px solid var(--border);font-weight:500}
+.compare thead th:first-child{text-align:left}
+.compare thead th.fc{color:var(--green)}
+.compare tbody td{padding:10px 12px;border-bottom:1px solid var(--border-soft);text-align:center;color:#444;vertical-align:middle}
+.compare tbody td:first-child{text-align:left;color:var(--quiet)}
+.compare tbody tr:last-child td{border-bottom:none}
+.compare tbody tr.rg td{background:var(--surface);font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#444;padding:7px 12px;border-bottom:1px solid var(--border)}
+.compare tbody td.fc{background:rgba(0,255,65,.02)}
+.chk{color:var(--green)}
+.dash{color:#282828}
+.val{color:var(--quiet)}
+
+.use-wrap{max-width:960px;margin:0 auto;padding:0 24px 72px}
+.use-wrap h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+.use-wrap .s{font-size:13px;color:var(--quiet);margin-bottom:28px}
+.use-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.use-cell{background:var(--bg);padding:28px 24px}
+.use-cell h3{font-size:11px;font-weight:500;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);margin-bottom:10px}
+.use-cell p{font-size:13px;color:var(--quiet);margin-bottom:16px;line-height:1.65}
+.use-cell ul{list-style:none;display:flex;flex-direction:column;gap:7px}
+.use-cell ul li{font-size:12px;color:#555;padding-left:14px;position:relative;line-height:1.45}
+.use-cell ul li::before{content:'→';position:absolute;left:0;color:var(--green);font-size:10px;top:1px}
+
+.faq-wrap{max-width:720px;margin:0 auto;padding:0 24px 80px}
+.faq-wrap h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
+.faq-item{border-top:1px solid var(--border);padding:18px 0}
+.faq-item:last-child{border-bottom:1px solid var(--border)}
 .faq-q{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
-.faq-a{font-size:13px;color:var(--muted);line-height:1.65}
-.faq-a code{font-family:var(--mono);font-size:12px;color:var(--text);background:var(--surface);padding:1px 5px;border-radius:3px}
+.faq-a{font-size:13px;color:var(--quiet);line-height:1.75}
+.faq-a a{color:var(--muted);text-decoration:underline;text-decoration-color:#333}
+.faq-a a:hover{color:var(--text)}
 
-/* ── Comparison table ── */
-.compare-wrap{max-width:800px;margin:0 auto;padding:0 48px 64px}
-.compare-wrap h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{text-align:left;padding:10px 16px;font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--quiet);font-family:var(--mono);border-bottom:1px solid var(--border)}
-thead th:not(:first-child){text-align:center}
-tbody td{padding:12px 16px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-tbody td:not(:first-child){text-align:center}
-.feat{color:var(--muted)}
-.yes{color:var(--green);font-size:15px}
-.no{color:var(--quiet);font-size:15px}
-.num{font-family:var(--mono);font-size:12px;color:var(--text)}
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--quiet)}
+footer a{color:var(--quiet);text-decoration:none}
+footer a:hover{color:var(--muted)}
 
-/* ── Footer ── */
-footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
-.footer-copy{font-size:12px;color:var(--quiet)}
-.footer-links{display:flex;gap:20px}
-.footer-links a{font-size:12px;color:var(--quiet);transition:color .15s}
-.footer-links a:hover{color:var(--muted)}
+.price-annual,.period-annual,.note-annual{display:none}
+.price-monthly,.period-monthly,.note-monthly{display:block}
+body.annual .price-monthly{display:none}
+body.annual .price-annual{display:block}
+body.annual .period-monthly{display:none}
+body.annual .period-annual{display:block}
+body.annual .note-monthly{display:none}
+body.annual .note-annual{display:block}
 
-@media(max-width:780px){
-  nav{padding:0 20px}
-  .hero{padding:64px 20px 48px}
-  .pricing-wrap{grid-template-columns:1fr;padding:16px 20px 64px;background:none;border:none;gap:12px}
-  .plan{border:1px solid var(--border);border-radius:8px}
-  .notes,.compare-wrap{padding:0 20px 48px}
-  footer{padding:24px 20px}
-  .footer-links{display:none}
+@media(max-width:960px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .card.featured{outline:none;background:var(--surface)}
 }
+@media(max-width:600px){
+  h1{font-size:30px}
+  .cards{grid-template-columns:1fr}
+  .use-grid{grid-template-columns:1fr}
+  footer{flex-direction:column;gap:16px;padding:24px}
+}
+@media(max-width:1100px){
+  .compare-wrap{overflow-x:auto}
+}
+.compare-footnote{max-width:1100px;margin:12px auto 0;padding:0 24px;font-size:11px;color:#444;font-family:var(--mono);line-height:1.7}
+.trial-banner{max-width:1100px;margin:0 auto;padding:0 24px 32px}
+.trial-banner-inner{background:var(--surface);border:1px solid rgba(0,255,65,.12);border-radius:8px;padding:18px 24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.trial-banner-label{font-size:13px;font-weight:500;color:var(--text)}
+.trial-banner-desc{font-size:12px;color:var(--quiet);font-family:var(--mono)}
+.trial-banner-cta{margin-left:auto;font-size:12px;font-weight:500;color:var(--green);border:1px solid rgba(0,204,51,.3);padding:7px 16px;border-radius:4px;text-decoration:none;white-space:nowrap}
+.trial-banner-cta:hover{border-color:var(--green)}
 </style>
 <link rel="stylesheet" href="/nav.css">
 </head>
@@ -111,9 +137,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
-
   <ul class="nav-links">
-
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Product &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -123,13 +147,12 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
         <li><a href="/ct-log">CT Log</a></li>
         <li><a href="/docs">Docs</a></li>
         <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/pricing">Pricing</a></li>
         <li><a href="/vs">vs. alternatives</a></li>
         <li><a href="/press">Press kit</a></li>
         <li><a href="/changelog">Changelog</a></li>
       </ul>
     </li>
-
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Self-host &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -145,7 +168,6 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
         <li><a href="/status">Status</a></li>
       </ul>
     </li>
-
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Compliance &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -159,7 +181,6 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
         <li><a href="/crypto-agility">Crypto agility</a></li>
       </ul>
     </li>
-
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger">Info &#9662;</button>
       <ul class="nav-dropdown-menu">
@@ -171,9 +192,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
         <li><a href="/license">License</a></li>
       </ul>
     </li>
-
   </ul>
-
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
@@ -186,7 +205,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
     <a href="/dashboard">Dashboard</a>
     <a href="/ct-log">CT Log</a>
     <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
+    <a href="/pricing">Pricing</a>
     <a href="/vs">vs. alternatives</a>
     <a href="/press">Press kit</a>
     <a href="/changelog">Changelog</a>
@@ -224,150 +243,328 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 
 <div class="hero">
   <div class="eyebrow">Pricing</div>
-  <h1>Simple pricing. Free to start.</h1>
-  <p class="hero-sub">Free for individuals and small teams. Unlimited keys for growing organizations. Full source code available — self-host if you prefer.</p>
+  <h1>Two ways to use Paramant</h1>
+  <p class="hero-sub">Pay for what you need. Free to start — no card required.<br>Self-host free forever under BUSL-1.1.</p>
+  <div class="toggle-wrap">
+    <span class="toggle-label active" id="lbl-monthly">Monthly</span>
+    <label class="toggle">
+      <input type="checkbox" id="billing-toggle">
+      <div class="toggle-track"></div>
+      <div class="toggle-thumb"></div>
+    </label>
+    <span class="toggle-label" id="lbl-annual">Annual &nbsp;<span class="save-badge">save up to 25%</span></span>
+  </div>
 </div>
 
-<div class="pricing-wrap">
+<div class="cards-wrap">
+  <div class="cards">
 
-  <!-- Community -->
-  <div class="plan">
-    <span class="plan-badge badge-community">Community</span>
-    <div class="plan-name">Free</div>
-    <div class="plan-price">€0 <span class="period">/ forever</span></div>
-    <p class="plan-desc">For developers, researchers, and small teams. Self-host with up to 5 API keys.</p>
-    <a href="https://github.com/Apolloccrypt/paramant-relay" class="plan-cta cta-secondary" target="_blank">Self-host on GitHub →</a>
-    <ul class="plan-features">
-      <li>Up to 5 API keys per relay</li>
-      <li>All transfer features (send, receive, drop)</li>
-      <li>Post-quantum encryption (ML-KEM-768)</li>
-      <li>ParaShare web UI included</li>
-      <li>Docker Compose install</li>
-      <li>ParamantOS ISO (NixOS)</li>
-      <li>Python + JS SDK</li>
-      <li class="faded">No support SLA</li>
-      <li class="faded">No license key required</li>
-    </ul>
+    <div class="card">
+      <div class="tier-name">Free</div>
+      <div class="price price-monthly"><sup>€</sup>0</div>
+      <div class="price price-annual"><sup>€</sup>0</div>
+      <div class="price-period period-monthly">forever</div>
+      <div class="price-period period-annual">forever</div>
+      <div class="price-note note-monthly">no card required</div>
+      <div class="price-note note-annual">no card required</div>
+      <p class="card-desc">Secure transfers with zero trace. RAM-only, burn-on-read.</p>
+      <a href="/parashare" class="card-cta cta-free">Start free</a>
+      <ul class="feature-list">
+        <li class="sec">Transfer</li>
+        <li class="yes">5 MB per transfer</li>
+        <li class="yes">Up to 10 transfers / day</li>
+        <li class="yes">RAM-only storage</li>
+        <li class="yes">Burn-on-read</li>
+        <li class="yes">1h TTL</li>
+        <li class="yes">CT audit proof per transfer</li>
+        <li class="sec">Notifications</li>
+        <li class="yes">Email notification to recipient</li>
+        <li>No send history</li>
+        <li class="sec">IoT / OT</li>
+        <li class="yes">Up to 10 sensor transfers / day</li>
+        <li class="yes"><a href="/request-key" style="color:var(--green);text-decoration:none">OT eval key</a>: 1000 total / 30 days, no daily cap</li>
+        <li class="yes">1 device registration</li>
+        <li class="yes">--interval mode (≥ 60s)</li>
+        <li class="yes">iot.paramant.app managed relay</li>
+      </ul>
+    </div>
+
+    <div class="card featured">
+      <div class="card-badge">Most popular</div>
+      <div class="tier-name">Pro</div>
+      <div class="price price-monthly"><sup>€</sup>12</div>
+      <div class="price price-annual"><sup>€</sup>9</div>
+      <div class="price-period period-monthly">/ month</div>
+      <div class="price-period period-annual">/ month, billed annually</div>
+      <div class="price-note note-monthly">or €9 / mo billed annually</div>
+      <div class="price-note note-annual">€108 / year — save €36</div>
+      <p class="card-desc">For professionals who send sensitive documents regularly.</p>
+      <a href="/request-key" class="card-cta cta-pro">Start Pro trial</a>
+      <ul class="feature-list">
+        <li class="sec">Transfer</li>
+        <li class="yes">50 MB per transfer</li>
+        <li class="yes">Unlimited transfers</li>
+        <li class="yes">RAM-only ≤ 5 MB</li>
+        <li class="yes">Encrypted disk 5–50 MB (AES-256)</li>
+        <li class="yes">Burn-on-read</li>
+        <li class="yes">TTL: 1h / 24h / 7d / 30d</li>
+        <li class="yes">CT audit proof per transfer</li>
+        <li class="sec">Notifications</li>
+        <li class="yes">Email to recipient</li>
+        <li class="yes">Delivery confirmation to sender</li>
+        <li class="yes">Send history (last 30)</li>
+        <li class="yes">Custom expiry message</li>
+        <li class="sec">Features</li>
+        <li class="yes">ParaDrop — AirDrop alternative, local network, no cloud</li>
+        <li class="sec">IoT / OT</li>
+        <li class="yes">Unlimited transfers</li>
+        <li class="yes">5 device registrations</li>
+        <li class="yes">--interval mode (≥ 5s)</li>
+        <li class="yes">WebSocket streaming</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="tier-name">Team</div>
+      <div class="price price-monthly"><sup>€</sup>49</div>
+      <div class="price price-annual"><sup>€</sup>39</div>
+      <div class="price-period period-monthly">/ month — 10 users included</div>
+      <div class="price-period period-annual">/ month, billed annually</div>
+      <div class="price-note note-monthly">or €39 / mo billed annually</div>
+      <div class="price-note note-annual">€468 / year — save €120</div>
+      <p class="card-desc">For teams that need shared oversight and admin controls.</p>
+      <a href="mailto:sales@paramant.app" class="card-cta cta-team">Start Team</a>
+      <ul class="feature-list">
+        <li class="yes">Everything in Pro</li>
+        <li class="sec">Team</li>
+        <li class="yes">10 users included, shared billing</li>
+        <li class="yes">Extra users: €5/user/mo (up to 25 total)</li>
+        <li class="yes">Team send history dashboard</li>
+        <li class="yes">Admin: revoke keys, audit export</li>
+        <li class="yes">Shared relay, team isolation</li>
+        <li class="sec">IoT / OT</li>
+        <li class="yes">100 device registrations</li>
+        <li class="sec">Support</li>
+        <li class="yes">Priority email support</li>
+        <li class="yes">48h response time</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="tier-name">Enterprise</div>
+      <div class="price price-monthly" style="font-size:24px;letter-spacing:-.02em;padding-top:5px">Custom</div>
+      <div class="price price-annual" style="font-size:24px;letter-spacing:-.02em;padding-top:5px">Custom</div>
+      <div class="price-period period-monthly">contact for pricing</div>
+      <div class="price-period period-annual">contact for pricing</div>
+      <div class="price-note note-monthly">&nbsp;</div>
+      <div class="price-note note-annual">&nbsp;</div>
+      <p class="card-desc">Healthcare, legal, defense, critical infrastructure.</p>
+      <a href="mailto:enterprise@paramant.app" class="card-cta cta-enterprise">Contact us</a>
+      <ul class="feature-list">
+        <li class="yes">Everything in Team</li>
+        <li class="sec">Infrastructure</li>
+        <li class="yes">Dedicated relay</li>
+        <li class="yes">On-premise option</li>
+        <li class="yes">Custom TTL + blob size limits</li>
+        <li class="yes">Unlimited users + devices</li>
+        <li class="sec">Compliance</li>
+        <li class="yes">GDPR Art. 28 DPA (customized)</li>
+        <li class="yes">IEC 62443 / NEN 7510 / NIS2 docs</li>
+        <li class="yes">SCADA integration support</li>
+        <li class="sec">SLA &amp; Support</li>
+        <li class="yes">99.9% uptime SLA</li>
+        <li class="yes">Phone + email support</li>
+        <li class="yes">4h response time</li>
+        <li class="yes">Custom onboarding + security review</li>
+      </ul>
+    </div>
+
   </div>
-
-  <!-- Licensed / Coming soon -->
-  <div class="plan highlighted coming-soon">
-    <span class="plan-badge badge-coming-soon">Coming soon</span>
-    <div class="plan-name">Pro</div>
-    <div class="plan-price" style="font-size:26px;padding-top:6px">Coming soon</div>
-    <p class="plan-desc">Unlimited API keys. For organizations running their own relay with multiple users or teams.</p>
-    <a href="mailto:privacy@paramant.app?subject=Professional+waitlist" class="plan-cta cta-waitlist">Join waitlist →</a>
-    <ul class="plan-features">
-      <li>Unlimited API keys</li>
-      <li>All Community features</li>
-      <li>Sector relays (health / legal / finance / iot)</li>
-      <li>TOFU key fingerprinting</li>
-      <li>Pre-shared secret (PSS) transfers</li>
-      <li>CT transparency log</li>
-      <li>Admin panel</li>
-      <li>Email support within 2 business days</li>
-      <li>License key (<code>plk_</code>) for self-hosted relay</li>
-    </ul>
-  </div>
-
-  <!-- Enterprise -->
-  <div class="plan">
-    <span class="plan-badge badge-enterprise">Enterprise</span>
-    <div class="plan-name">Custom</div>
-    <div class="plan-price" style="font-size:26px;padding-top:6px">On request</div>
-    <p class="plan-desc">For healthcare, legal, finance, and government. On-prem, air-gap, compliance documentation, SLA.</p>
-    <a href="mailto:hello@paramant.app?subject=Enterprise%20inquiry" class="plan-cta cta-contact">Contact us →</a>
-    <ul class="plan-features">
-      <li>Everything in Pro</li>
-      <li>On-premise deployment support</li>
-      <li>NEN 7510 / ISO 27001 alignment docs</li>
-      <li>NIS2 / DORA compliance materials</li>
-      <li>HECVAT questionnaire support</li>
-      <li>Custom sector configuration</li>
-      <li>Gateway agent (on-prem → relay)</li>
-      <li>Priority support + dedicated contact</li>
-      <li>Custom MSA / DPA</li>
-    </ul>
-  </div>
-
 </div>
 
-<!-- Comparison table -->
+<div class="trial-banner">
+  <div class="trial-banner-inner">
+    <span class="trial-banner-label">Not sure which plan fits?</span>
+    <span class="trial-banner-desc">30 days &nbsp;&middot;&nbsp; full Pro relay access &nbsp;&middot;&nbsp; no credit card</span>
+    <a href="/request-key" class="trial-banner-cta">Request free trial key &rarr;</a>
+  </div>
+</div>
+
+<div class="note-wrap">
+  <div class="note-box">
+    <strong>Storage transparency.</strong> Files under 5 MB are RAM-only &mdash; they exist only in server memory and leave no disk trace. Files between 5 MB and 50 MB (Pro and above) are stored AES-256-GCM encrypted on disk and automatically wiped when TTL expires. If you need zero disk trace at any size, use the free tier or self-host with RAM-only storage enabled.
+  </div>
+</div>
+
 <div class="compare-wrap">
-  <h2>Feature comparison</h2>
-  <table>
+  <h2>Full comparison</h2>
+  <p class="s">All plans include ML-KEM-768 + ECDH P-256 hybrid encryption, CT audit proof, and EU/DE jurisdiction.</p>
+  <div style="overflow-x:auto">
+  <table class="compare">
     <thead>
       <tr>
-        <th>Feature</th>
-        <th>Community</th>
-        <th>Pro</th>
+        <th style="width:36%;text-align:left">Feature</th>
+        <th>Free</th>
+        <th class="fc">Pro</th>
+        <th>Team</th>
         <th>Enterprise</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td class="feat">API keys per relay</td><td class="num">5</td><td class="num">Unlimited</td><td class="num">Unlimited</td></tr>
-      <tr><td class="feat">ParaShare web UI</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">ML-KEM-768 + ECDH P-256</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Burn-on-read, RAM-only</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Anonymous drop (BIP39)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Pre-shared secret (PSS)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">TOFU fingerprint verification</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">CT transparency log</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Sector relays (health/legal/...)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Python + JS SDK</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">ParamantOS ISO</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Admin panel</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Email support</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Compliance docs (ISO 27001, NEN 7510)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Gateway agent (on-prem)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-      <tr><td class="feat">Custom DPA / MSA</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr class="rg"><td colspan="5">Transfer</td></tr>
+      <tr><td>Max file size</td><td class="val">5 MB</td><td class="val fc">50 MB</td><td class="val">50 MB</td><td class="val">Custom</td></tr>
+      <tr><td>Transfers / day</td><td class="val">10</td><td class="val fc">Unlimited</td><td class="val">Unlimited</td><td class="val">Unlimited</td></tr>
+      <tr><td>Storage model</td><td class="val">RAM-only</td><td class="val fc">RAM ≤5MB · AES-256 disk 5–50MB</td><td class="val">RAM ≤5MB · AES-256 disk 5–50MB</td><td class="val">Custom</td></tr>
+      <tr><td>Burn-on-read</td><td class="chk">✓</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>TTL options</td><td class="val">1h</td><td class="val fc">1h / 24h / 7d / 30d</td><td class="val">1h / 24h / 7d / 30d</td><td class="val">Custom</td></tr>
+      <tr><td>CT audit proof</td><td class="chk">✓</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+
+      <tr class="rg"><td colspan="5">Notifications</td></tr>
+      <tr><td>Email to recipient</td><td class="chk">✓</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Delivery confirmation to sender</td><td class="dash">—</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Send history</td><td class="dash">—</td><td class="val fc">Last 30</td><td class="val">Team dashboard</td><td class="val">Audit export</td></tr>
+      <tr><td>Custom expiry message</td><td class="dash">—</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+
+      <tr class="rg"><td colspan="5">IoT / OT</td></tr>
+      <tr><td>OT transfers / day</td><td class="val">Up to 10</td><td class="val fc">Unlimited</td><td class="val">Unlimited</td><td class="val">Unlimited</td></tr>
+      <tr><td>OT evaluation mode</td><td class="val">1000 total / 30 days *</td><td class="dash fc">—</td><td class="dash">—</td><td class="dash">—</td></tr>
+      <tr><td>Device registrations</td><td class="val">1</td><td class="val fc">5</td><td class="val">100</td><td class="val">Unlimited</td></tr>
+      <tr><td>Min --interval</td><td class="val">60s</td><td class="val fc">5s</td><td class="val">5s</td><td class="val">Custom</td></tr>
+      <tr><td>WebSocket streaming</td><td class="dash">—</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>SCADA integration support</td><td class="dash">—</td><td class="dash fc">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+
+      <tr class="rg"><td colspan="5">Team &amp; Admin</td></tr>
+      <tr><td>Users</td><td class="val">1</td><td class="val fc">1</td><td class="val">Up to 25 (€5/user over 10)</td><td class="val">Unlimited</td></tr>
+      <tr><td>Team dashboard</td><td class="dash">—</td><td class="dash fc">—</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Admin controls + key revocation</td><td class="dash">—</td><td class="dash fc">—</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Audit log export</td><td class="dash">—</td><td class="dash fc">—</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+
+      <tr class="rg"><td colspan="5">Compliance &amp; Legal</td></tr>
+      <tr><td>Standard DPA</td><td class="chk">✓</td><td class="chk fc">✓</td><td class="chk">✓</td><td class="chk">✓</td></tr>
+      <tr><td>Custom / negotiated DPA</td><td class="dash">—</td><td class="dash fc">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+      <tr><td>IEC 62443 / NEN 7510 / NIS2 docs †</td><td class="dash">—</td><td class="dash fc">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+      <tr><td>Dedicated relay</td><td class="dash">—</td><td class="dash fc">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+      <tr><td>On-premise option</td><td class="dash">—</td><td class="dash fc">—</td><td class="dash">—</td><td class="chk">✓</td></tr>
+
+      <tr class="rg"><td colspan="5">Support</td></tr>
+      <tr><td>Channel</td><td class="val">Community</td><td class="val fc">Email</td><td class="val">Email</td><td class="val">Phone + Email</td></tr>
+      <tr><td>Response time</td><td class="dash">—</td><td class="val fc">Best effort</td><td class="val">48h</td><td class="val">4h</td></tr>
+      <tr><td>Uptime SLA</td><td class="dash">—</td><td class="dash fc">—</td><td class="dash">—</td><td class="val">99.9%</td></tr>
     </tbody>
   </table>
+  </div>
+  <p class="compare-footnote">* OT evaluation mode available via trial key (<a href="/request-key" style="color:var(--quiet)">paramant.app/request-key</a>): 1000 transfers or 30 days, no daily cap. Activated automatically when an OT trial key hits the iot relay sector.<br>† Compliance documentation supports your own certification process. Paramant does not hold third-party IEC 62443, NEN 7510, or NIS2 certification.</p>
 </div>
 
-<!-- FAQ -->
-<div class="notes">
-  <h2>Frequently asked questions</h2>
-  <div class="faq">
-    <div class="faq-item">
-      <div class="faq-q">What is a relay? Do I need to run my own?</div>
-      <div class="faq-a">A relay is the server that temporarily holds encrypted blobs. You can use the hosted relay at <code>relay.paramant.app</code> (free, 5 keys), or self-host the relay on your own infrastructure using the Docker Compose stack and a <code>plk_</code> license key.</div>
+<div class="use-wrap">
+  <h2>Two use cases, one relay</h2>
+  <p class="s">Paramant serves both document transfer and industrial IoT telemetry on the same post-quantum relay infrastructure.</p>
+  <div class="use-grid">
+    <div class="use-cell">
+      <h3>Document transfer &mdash; Zivver kant</h3>
+      <p>Send sensitive documents with zero trace. No account needed for the recipient. Burn-on-read, ML-KEM-768 encryption, CT-logged proof of transfer.</p>
+      <ul>
+        <li>Legal filings, contracts, court documents</li>
+        <li>Medical referrals — NEN 7510 compliant</li>
+        <li>HR payslips — GDPR-compliant bulk send</li>
+        <li>Financial documents, eIDAS-grade audit trail</li>
+        <li>Magic link — no account required for recipient</li>
+        <li>Up to 5 MB RAM-only or 50 MB encrypted disk (Pro)</li>
+      </ul>
     </div>
-    <div class="faq-item">
-      <div class="faq-q">What is a license key (<code>plk_</code>)?</div>
-      <div class="faq-a">A <code>plk_</code> license key is an Ed25519-signed JWT you add to your self-hosted relay's <code>.env</code> file. It lifts the 5-key community limit and enables unlimited API keys. The relay verifies the signature on startup and on each hourly reload — no phone-home, no internet required.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">Can I use the hosted relay for free?</div>
-      <div class="faq-a">Yes. The hosted relay at <code>relay.paramant.app</code> and sector relays (<code>health</code>, <code>legal</code>, <code>finance</code>, <code>iot</code>) are free to use. Free accounts are limited to 5 active API keys and standard rate limits. The relay operator never sees your plaintext — all encryption happens in your browser or SDK.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">Is the source code available?</div>
-      <div class="faq-a">Yes. The relay, frontend, SDKs, and ParamantOS ISO are all open source on GitHub under BUSL-1.1. You can read every line of code that handles your data. Commercial use of the relay beyond the community limit requires a <code>plk_</code> license.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">What jurisdictions apply?</div>
-      <div class="faq-a">The hosted relay runs on servers in Germany (EU). It is subject to GDPR and German data protection law (BDSG). It is NOT subject to US CLOUD Act. Zero plaintext is stored — the relay only sees encrypted blobs which are deleted on first download or after TTL expiry.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-q">Do you offer invoicing or bank transfer?</div>
-      <div class="faq-a">Yes. Email <a href="mailto:hello@paramant.app" style="color:var(--green)">hello@paramant.app</a> for an invoice. We support SEPA bank transfer for EU customers and bank wire for international orders.</div>
+    <div class="use-cell">
+      <h3>Industrial IoT &mdash; OT kant</h3>
+      <p>Secure sensor payloads and firmware from edge to cloud. IEC 62443 alignment. Low-latency, high-integrity transport for SCADA environments.</p>
+      <ul>
+        <li>SCADA / PLC sensor data transport</li>
+        <li>Firmware distribution — IEC 62443 compliant</li>
+        <li>WebSocket streaming (Pro and above)</li>
+        <li>iot.paramant.app managed relay</li>
+        <li>--interval mode: ≥ 5s (Pro) or ≥ 60s (Free)</li>
+        <li>Enterprise: dedicated relay, custom SLA, on-premise</li>
+      </ul>
     </div>
   </div>
 </div>
 
+<div class="faq-wrap">
+  <h2>Frequently asked questions</h2>
+
+  <div class="faq-item">
+    <div class="faq-q">What happens to my file after the recipient downloads it?</div>
+    <div class="faq-a">On the free tier, files are RAM-only — they exist only in server memory and are wiped immediately on download (burn-on-read) or on TTL expiry. On Pro with files above 5 MB, the file is AES-256-GCM encrypted on disk and wiped when TTL expires. Nothing persists after expiry on any tier.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Why is the free tier limited to 5 MB?</div>
+    <div class="faq-a">RAM-only storage is finite. 5 MB covers every document that matters: contracts, medical referrals, legal filings, sensor payloads, firmware chunks. If you need to send a video, use WeTransfer. If you need zero trace, use Paramant. The limit is a consequence of the architecture, not an arbitrary upsell gate. If you regularly need more, Pro at €12/mo is the honest answer.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Can I self-host Paramant for free?</div>
+    <div class="faq-a">Yes. The relay is available on <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> under BUSL-1.1. Community self-hosting is free forever. The license prevents competitors from reselling the relay as a managed service without a commercial license. See the <a href="/license">license page</a> for full terms.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Is there a free trial for Pro?</div>
+    <div class="faq-a">Yes. Request a trial API key at <a href="/request-key">/request-key</a> — no credit card required. The key is active for 30 days with full Pro-tier limits.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">What is ParaDrop?</div>
+    <div class="faq-a">ParaDrop is an AirDrop alternative — encrypted local transfer with no Apple, no cloud, no account required. Share files with nearby devices over your local network. Burn-on-read. Available on Pro and above. <a href="/drop">See ParaDrop.</a></div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">Do all plans include a GDPR Data Processing Agreement?</div>
+    <div class="faq-a">The standard DPA is publicly available at <a href="/dpa">/dpa</a> and applies to all plans. Enterprise customers can negotiate custom DPA terms — adjusted sub-processor lists, dedicated relay clauses, jurisdiction overrides — as part of their contract.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">What does "IEC 62443 / NEN 7510 / NIS2 compliance documentation" mean?</div>
+    <div class="faq-a">We provide architecture documents, security controls mappings, and technical reference materials aligned to these frameworks. This is documentation you can use as input for your own compliance process — not a third-party certification. If you need a certified audit scope, contact us to discuss options.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">What happens if Paramant shuts down?</div>
+    <div class="faq-a">Paramant is published under BUSL-1.1. If the managed service ever closes, every self-hosted relay keeps running indefinitely — operators own their infrastructure. The source code is permanently available on <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>. No vendor lock-in by design.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">My team needs more than 10 users. What are the options?</div>
+    <div class="faq-a">Team includes 10 users. Additional users are €5/user/mo, up to 25 total. Over 25 users, contact us at <a href="mailto:enterprise@paramant.app">enterprise@paramant.app</a> for Enterprise pricing. For regulated industries — healthcare, legal, industrial — Enterprise is almost always the right tier anyway due to the dedicated relay and compliance documentation requirements.</div>
+  </div>
+
+</div>
+
 <footer>
-  <span class="footer-copy">© 2026 PARAMANT · BUSL-1.1 · EU/DE</span>
-  <div class="footer-links">
+  <span>&copy; 2026 Paramant &mdash; EU/DE &middot; BUSL-1.1</span>
+  <div style="display:flex;gap:24px">
     <a href="/">Home</a>
-    <a href="/parashare">ParaShare</a>
-    <a href="/docs.html">Docs</a>
-    <a href="/privacy.html">Privacy</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-    <a href="mailto:hello@paramant.app">Contact</a>
+    <a href="/docs">Docs</a>
+    <a href="mailto:privacy@paramant.app">Contact</a>
   </div>
 </footer>
 
 <script src="/nav.js" defer></script>
+<script>
+(function(){
+  var toggle = document.getElementById('billing-toggle');
+  var lblM = document.getElementById('lbl-monthly');
+  var lblA = document.getElementById('lbl-annual');
+  if (!toggle) return;
+  toggle.addEventListener('change', function(){
+    if (this.checked) {
+      document.body.classList.add('annual');
+      lblM.classList.remove('active');
+      lblA.classList.add('active');
+    } else {
+      document.body.classList.remove('annual');
+      lblM.classList.add('active');
+      lblA.classList.remove('active');
+    }
+  });
+})();
+</script>
 </body>
 </html>
