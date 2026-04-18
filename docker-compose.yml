@@ -88,11 +88,20 @@ services:
     container_name: paramant-relay-health
     restart: unless-stopped
     <<: [*relay-hardening, *relay-resources, *relay-logging]
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+          cpus: '4.0'
+        reservations:
+          memory: 4g
     environment:
       <<: *relay-env
       SECTOR: "health"
       RELAY_SELF_URL: "https://health.paramant.app"
       RELAY_PRIMARY_URL: "http://localhost:3000"
+      RAM_LIMIT_MB: "8192"
+      RAM_RESERVE_MB: "512"
     ports:
       - "127.0.0.1:3001:3000"
     volumes:
