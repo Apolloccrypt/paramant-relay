@@ -11,21 +11,22 @@
 .tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--lime-hair)}
 .tier-card{padding:var(--space-7) var(--space-6);background:var(--black)}
 .tier-card.featured{background:var(--lime-ghost)}
-.tier-name{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
+.tier-name{font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
 .tier-price{font-size:var(--text-3xl);font-weight:700;margin-bottom:var(--space-2)}
-.tier-price-note{font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-6)}
+.tier-price-note{font-size:var(--text-sm);color:var(--lime-dim);margin-bottom:var(--space-6)}
 .tier-features{list-style:none;margin-bottom:var(--space-6)}
-.tier-features li{font-size:var(--text-sm);color:var(--lime-dim);padding:var(--space-2) 0;border-bottom:1px solid var(--lime-hair);line-height:1.5}
+.tier-features li{font-size:var(--text-sm);color:var(--lime);padding:var(--space-2) 0;border-bottom:1px solid var(--lime-hair);line-height:1.5}
 .tier-features li:last-child{border-bottom:none}
 .tier-features li::before{content:'+ ';font-weight:700;color:var(--lime)}
+.tier-features li.dim{color:var(--lime-dim)}
 .tier-features li.dim::before{content:'· ';color:var(--lime-dim)}
 .prose-section{padding:var(--space-8) 0;border-top:1px solid var(--lime-hair)}
-.prose-section h3{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
-.prose-section p{font-size:var(--text-sm);color:var(--lime-dim);line-height:1.75;max-width:640px}
+.prose-section h3{font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
+.prose-section p{font-size:var(--text-base);color:var(--lime);line-height:1.75;max-width:640px}
 .faq-item{border-top:1px solid var(--lime-hair);padding:var(--space-5) 0}
 .faq-item:last-child{border-bottom:1px solid var(--lime-hair)}
 .faq-q{font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-3)}
-.faq-a{font-size:var(--text-sm);color:var(--lime-dim);line-height:1.75}
+.faq-a{font-size:var(--text-base);color:var(--lime);line-height:1.75}
 .faq-a a{color:var(--lime)}
 .trial-cta{border:1px solid var(--lime-hair);padding:var(--space-7);display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-8)}
 @media(max-width:1023px){
@@ -182,9 +183,9 @@
     <div class="sec-head" style="text-align:left">
       <span class="num">00</span>
       <h2>Pricing</h2>
-      <span style="font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Three tiers</span>
+      <span style="font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Three tiers</span>
     </div>
-    <p style="font-size:var(--text-md);color:var(--lime-dim);line-height:1.75;margin-bottom:var(--space-6)">
+    <p style="font-size:var(--text-md);color:rgba(212,255,0,.85);line-height:1.75;margin-bottom:var(--space-6)">
       Send files for free. No account required. Scale when you need audit trails, team access, or a dedicated relay.
     </p>
     <a href="/send" class="btn btn-secondary">No account? Send a file instantly &rarr;</a>
@@ -200,7 +201,7 @@
         <div class="tier-name">Free</div>
         <div class="tier-price">&euro;0</div>
         <div class="tier-price-note">Forever &middot; no card required</div>
-        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-5);line-height:1.65">For one-off anonymous sends. No account, no tracking.</p>
+        <p style="font-size:var(--text-base);color:var(--lime);margin-bottom:var(--space-5);line-height:1.65">For one-off anonymous sends. No account, no tracking.</p>
         <ul class="tier-features">
           <li>AES-256-GCM, browser-generated key</li>
           <li>5 MB per file</li>
@@ -216,7 +217,7 @@
         <div class="tier-name">Pro</div>
         <div class="tier-price" style="font-size:var(--text-xl)">Coming soon</div>
         <div class="tier-price-note">On the roadmap. Join the waitlist for launch pricing.</div>
-        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
+        <p style="font-size:var(--text-base);color:var(--lime);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
         <ul class="tier-features">
           <li class="dim">Everything in Free</li>
           <li class="dim">24 hour link expiry</li>
@@ -234,7 +235,7 @@
         <div class="tier-name">Enterprise</div>
         <div class="tier-price">Custom</div>
         <div class="tier-price-note">Dedicated relay &middot; SLA &middot; compliance</div>
-        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
+        <p style="font-size:var(--text-base);color:var(--lime);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
         <ul class="tier-features">
           <li>Everything in Pro</li>
           <li>7 day link expiry</li>
@@ -287,7 +288,7 @@
     <div class="trial-cta">
       <div>
         <p style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-2)">Not sure which plan fits?</p>
-        <p style="font-size:var(--text-sm);color:var(--lime-dim)">Request a trial API key. 30 days, no credit card, full relay access.</p>
+        <p style="font-size:var(--text-sm);color:rgba(212,255,0,.85)">Request a trial API key. 30 days, no credit card, full relay access.</p>
       </div>
       <a href="/request-key" class="btn btn-primary">Request free trial key &rarr;</a>
     </div>
