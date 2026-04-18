@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Crypto Agility</title>
 <meta name="description" content="Crypto agility: the ability to swap cryptographic algorithms without redesigning your system. PARAMANT's hybrid approach keeps you safe today and upgradable tomorrow.">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
-body{padding-top:56px}
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
 code{font-size:var(--text-xs);padding:1px 5px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
@@ -29,17 +30,17 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 
 /* algo comparison */
 .algo-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
-.algo-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(0,0,0,.82)}
+.algo-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(178,255,63,.06)}
 .algo-table td{padding:10px 14px;border-bottom:1px solid var(--ink-ghost);vertical-align:top;color:var(--ink-dim)}
 .algo-table td:first-child{font-size:11px;color:var(--ink);font-weight:600}
 .algo-table tr:last-child td{border-bottom:none}
 .safe{color:var(--cobalt)}
-.unsafe{color:rgba(200,100,100,.9)}
-.hybrid{color:rgba(200,170,60,.9)}
+.unsafe{color:var(--cobalt)}
+.hybrid{color:var(--ink-dim)}
 
 /* mode cards */
 .mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
-.mode-card{background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:18px 20px}
+.mode-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:18px 20px}
 .mode-card.active{border-color:var(--ink-dim);background:var(--ink-ghost)}
 .mode-badge{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
 .mode-card.active .mode-badge{color:var(--cobalt)}
@@ -71,8 +72,6 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   .ar-step:last-child{border-bottom:none}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=4">
-<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
 <div class="meta-bar">
@@ -370,12 +369,12 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   <section>
     <h2>Wire format — versioned by design</h2>
     <p class="section-sub">Every encrypted blob carries a version byte. No flag days.</p>
-    <pre style="background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.8"><span style="color:var(--cobalt)">PQHB</span> <span style="color:rgba(200,170,60,.9)">VER</span> <span style="color:rgba(138,180,232,.9)">u32be(ctKemLen)</span> <span style="color:rgba(138,180,232,.9)">ctKem</span> <span style="color:rgba(138,180,232,.9)">u32be(senderPubLen)</span> <span style="color:rgba(138,180,232,.9)">senderPub</span> <span style="color:rgba(232,180,138,.9)">nonce(12)</span> <span style="color:rgba(232,180,138,.9)">u32be(ctLen)</span> <span style="color:rgba(232,180,138,.9)">ct</span> <span style="color:var(--ink-dim)">+ 5MB padding</span>
-<span style="color:var(--ink-dim)">│     │    │                                              │              │</span>
-<span style="color:var(--ink-dim)">│     │    └─ ML-KEM-768 ciphertext                       └─ AES-256-GCM │</span>
-<span style="color:var(--ink-dim)">│     └─ version byte (0x02 = current)                                   │</span>
-<span style="color:var(--ink-dim)">└─ magic bytes                                          5MB fixed padding ┘</span>
-<span style="color:var(--ink-dim)">                                                        (DPI size masking)</span></pre>
+    <pre style="background:var(--navy);border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.8"><span style="color:var(--lime)">PQHB</span> <span style="color:rgba(178,255,63,.7)">VER</span> <span style="color:rgba(248,250,252,.88)">u32be(ctKemLen)</span> <span style="color:rgba(248,250,252,.88)">ctKem</span> <span style="color:rgba(248,250,252,.88)">u32be(senderPubLen)</span> <span style="color:rgba(248,250,252,.88)">senderPub</span> <span style="color:rgba(178,255,63,.55)">nonce(12)</span> <span style="color:rgba(178,255,63,.55)">u32be(ctLen)</span> <span style="color:rgba(178,255,63,.55)">ct</span> <span style="color:rgba(248,250,252,.4)">+ 5MB padding</span>
+<span style="color:rgba(248,250,252,.4)">│     │    │                                              │              │</span>
+<span style="color:rgba(248,250,252,.4)">│     │    └─ ML-KEM-768 ciphertext                       └─ AES-256-GCM │</span>
+<span style="color:rgba(248,250,252,.4)">│     └─ version byte (0x02 = current)                                   │</span>
+<span style="color:rgba(248,250,252,.4)">└─ magic bytes                                          5MB fixed padding ┘</span>
+<span style="color:rgba(248,250,252,.4)">                                                        (DPI size masking)</span></pre>
     <p style="font-size:12px;color:var(--ink-dim);margin-top:12px">
       The <code>VER</code> byte allows the relay and SDK to support multiple wire formats simultaneously.
       Incrementing the version enables algorithm migration without breaking in-flight blobs.

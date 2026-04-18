@@ -5,16 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Harvest Now, Decrypt Later</title>
 <meta name="description" content="Harvest Now, Decrypt Later: why encrypted data collected today can be decrypted by quantum computers tomorrow, and how RAM-only post-quantum transfer removes the target entirely.">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
-body{padding-top:56px}
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
 code{font-size:var(--text-xs);padding:2px 6px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
 
 .hero{padding:64px 48px 52px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
-.hero-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(230,80,80,.9);margin-bottom:16px}
+.hero-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:16px}
 .hero h1{font-size:32px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-bottom:18px}
-.hero h1 em{font-style:normal;color:rgba(255,80,80,.9)}
+.hero h1 em{font-style:italic;color:var(--cobalt);position:relative;display:inline}
+.hero h1 em::after{content:"";position:absolute;left:0;right:0;bottom:4%;height:22%;background:var(--lime);z-index:-1;pointer-events:none}
 .hero .lead{font-size:15px;color:var(--ink-dim);max-width:660px;line-height:1.75}
 .hero .lead strong{color:var(--cobalt)}
 
@@ -28,14 +30,14 @@ section p+p{margin-top:14px}
 .timeline{margin-top:24px;border:1px solid var(--ink-hair);overflow:hidden}
 .tl-item{display:flex;gap:0;border-bottom:1px solid var(--ink-hair)}
 .tl-item:last-child{border-bottom:none}
-.tl-year{padding:18px 20px;font-size:12px;font-weight:600;background:rgba(0,0,0,.82);border-right:1px solid var(--ink-hair);min-width:110px;display:flex;align-items:center;color:var(--cobalt)}
-.tl-year.red{color:rgba(255,80,80,.9)}
-.tl-year.orange{color:rgba(200,150,80,.9)}
+.tl-year{padding:18px 20px;font-size:12px;font-weight:600;background:var(--bone-2);border-right:1px solid var(--ink-hair);min-width:110px;display:flex;align-items:center;color:var(--cobalt)}
+.tl-year.red{background:var(--navy);color:var(--lime)}
+.tl-year.orange{color:var(--ink-dim)}
 .tl-body{padding:18px 22px}
 .tl-body h4{font-size:13px;font-weight:600;margin-bottom:5px}
 .tl-body p{font-size:12px;color:var(--ink-dim);line-height:1.65;max-width:none}
 
-.aside{background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:20px 24px;margin-top:28px}
+.aside{background:rgba(178,255,63,.08);border:1px solid var(--ink-hair);padding:20px 24px;margin-top:28px}
 .aside .label{font-size:10px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 .aside p{font-size:13px;color:var(--ink-dim);line-height:1.7;max-width:none}
 .aside strong{color:var(--cobalt)}
@@ -53,8 +55,6 @@ section p+p{margin-top:14px}
   .hero h1{font-size:24px}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=4">
-<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
 
