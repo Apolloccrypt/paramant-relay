@@ -19,27 +19,27 @@ a:hover{color:var(--cobalt)}
 h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
 .overall{display:flex;align-items:center;gap:10px;padding:14px 20px;font-size:14px;border:1px solid var(--ink-hair);margin-bottom:8px;transition:background .3s,border-color .3s}
 .overall.ok{background:var(--ink-ghost);border-color:var(--ink-hair)}
-.overall.degraded{background:rgba(255,80,80,.08);border-color:rgba(255,80,80,.3)}
-.overall.checking{background:rgba(0,0,0,.82)}
+.overall.degraded{background:rgba(29,78,216,.08);border-color:rgba(29,78,216,.3)}
+.overall.checking{background:var(--bone-2)}
 .dot-large{width:10px;height:10px;flex-shrink:0;transition:background .3s}
 .dot-large.ok{background:var(--lime)}
-.dot-large.degraded{background:rgba(255,80,80,1)}
+.dot-large.degraded{background:var(--cobalt)}
 .dot-large.checking{background:var(--ink-dim);animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .last-checked{font-size:12px;color:var(--ink-dim);font-family:var(--mono);margin-bottom:36px}
 .sector-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-.sector-card{background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:20px 22px;transition:border-color .3s}
+.sector-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:20px 22px;transition:border-color .3s}
 .sector-card.ok{border-color:var(--ink-hair)}
-.sector-card.degraded{border-color:rgba(255,80,80,.4)}
+.sector-card.degraded{border-color:rgba(29,78,216,.4)}
 .card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .sector-name{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .dot{width:8px;height:8px;flex-shrink:0;transition:background .3s}
 .dot.ok{background:var(--lime)}
-.dot.degraded{background:rgba(255,80,80,1)}
+.dot.degraded{background:var(--cobalt)}
 .dot.checking{background:var(--ink-dim);animation:pulse 1.2s ease-in-out infinite}
 .card-status{font-size:13px;color:var(--ink-dim);margin-bottom:10px}
 .card-status.ok{color:var(--cobalt)}
-.card-status.degraded{color:rgba(255,80,80,1)}
+.card-status.degraded{color:var(--cobalt)}
 .meta-row{display:flex;gap:24px;flex-wrap:wrap}
 .meta-item{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
 .meta-item span{color:var(--cobalt)}
