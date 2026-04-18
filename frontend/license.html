@@ -1,65 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>License — PARAMANT</title>
+<meta name="description" content="PARAMANT Ghost Pipe Protocol — Business Source License 1.1. Free for personal use, MIT on 2030-01-01.">
+<link rel="icon" href="/icon-192.png">
 <style>
-:root{--bg:#ffffff;--bg2:#f9fafb;--border:#e5e7eb;--text:#111827;--muted:#6b7280;--dim:#9ca3af;--green:#059669;--mono:'JetBrains Mono',monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--mono);line-height:1.6;padding:0}
-nav{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 32px}
-.nav-inner{max-width:1100px;margin:0 auto;width:100%;display:flex;align-items:center}
-.logo-para{color:#e8e8e8}.logo-mant{color:#3dbe7a}
-.nav-logo{font-size:14px;font-weight:900;color:var(--text);margin-right:40px;text-decoration:none;letter-spacing:-.01em}
-.nav-link{padding:6px 14px;font-size:11px;color:var(--muted);letter-spacing:.05em;text-decoration:none}
-.nav-link:hover{color:var(--text)}
-.nav-ctas{margin-left:auto;display:flex;gap:8px}
-.btn-nav{padding:7px 14px;border:1px solid var(--border);color:var(--muted);font-size:11px;font-family:var(--mono);background:none;text-decoration:none}
-.btn-solid{padding:7px 16px;background:var(--text);color:#fff;font-size:11px;font-family:var(--mono);font-weight:700;text-decoration:none}
 main{max-width:760px;margin:64px auto;padding:0 24px 80px}
 h1{font-size:32px;font-weight:900;letter-spacing:-.02em;margin-bottom:8px}
-.sub{font-size:13px;color:var(--muted);margin-bottom:40px}
-h2{font-size:14px;font-weight:700;letter-spacing:.06em;margin:32px 0 12px;color:var(--dim)}
-p{font-size:13px;color:var(--muted);line-height:1.85;margin-bottom:12px}
-.license-box{background:var(--bg2);border:1px solid var(--border);padding:24px;font-size:12px;line-height:2;white-space:pre-wrap;overflow-x:auto;margin:24px 0}
-.highlight{background:#f0fdf4;border:1px solid #a7f3d0;padding:16px 20px;margin:24px 0}
-.highlight p{color:#065f46;margin:0}
-footer{padding:32px;border-top:1px solid var(--border);text-align:center;font-size:11px;color:var(--dim)}
+.sub{font-size:var(--text-sm);color:var(--lime-dim);margin-bottom:40px}
+h2{font-size:var(--text-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:32px 0 12px;color:var(--lime-dim)}
+p{font-size:var(--text-base);color:var(--lime);line-height:1.85;margin-bottom:12px}
+p a{color:var(--lime);text-decoration:underline}
+.highlight{border:1px solid var(--lime-hair);padding:16px 20px;margin:24px 0}
+.highlight p{color:var(--lime);margin:0}
+.license-box{border:1px solid var(--lime-hair);padding:24px;font-size:var(--text-sm);line-height:2;white-space:pre-wrap;overflow-x:auto;margin:24px 0;color:var(--lime-dim)}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--lime-hair);font-size:var(--text-xs);color:var(--lime-dim)}
+footer a{color:var(--lime)}
 </style>
+<link rel="stylesheet" href="/design-system.css?v=3">
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
-<nav>
- <div class="nav-inner">
+<nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
-  <div style="display:flex;gap:2px">
-   <a href="/#sectors" class="nav-link">SECTORS</a>
-   <a href="/pricing" class="nav-link">PRICING</a>
-   <a href="/docs" class="nav-link">API DOCS</a>
-  </div>
-  <div class="nav-ctas">
-   <a href="/send" class="btn-nav">Send a file</a>
-   <a href="/dashboard" class="btn-solid">Dashboard →</a>
-  </div>
- </div>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Product</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/vs" role="menuitem">vs. alternatives</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Info</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+        <li role="none"><a href="/request-key" role="menuitem">Free API key</a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Product</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/vs">vs. alternatives</a>
+      <a href="/press">Press kit</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="/status">Status</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2</a>
+      <a href="/compliance/iec62443">IEC 62443</a>
+      <a href="/compliance/nen7510">NEN 7510</a>
+      <a href="/dpa">Data Processing Agreement</a>
+      <a href="/ot">OT guide</a>
+      <a href="/government">Government</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/crypto-agility">Crypto agility</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Info</button>
+    <div class="nav-mobile-group-items">
+      <a href="mailto:privacy@paramant.app">Contact</a>
+      <a href="/request-key">Free API key</a>
+      <a href="/status">Status</a>
+      <a href="/sla">SLA</a>
+      <a href="/security">Security</a>
+      <a href="/license">License</a>
+    </div>
+  </div>
+</div>
 
 <main>
- <h1>License</h1>
- <p class="sub">PARAMANT Ghost Pipe Protocol — Business Source License 1.1</p>
+  <h1>License</h1>
+  <p class="sub">PARAMANT Ghost Pipe Protocol — Business Source License 1.1</p>
 
- <div class="highlight">
-  <p>&#10003; Free to use for personal and non-commercial purposes.<br>
-  Commercial use requires a written license agreement.<br>
-  Contact: <a href="mailto:privacy@paramant.app" style="color:#059669">privacy@paramant.app</a></p>
- </div>
+  <div class="highlight">
+    <p>&#10003; Free to use for personal and non-commercial purposes.<br>
+    Commercial use requires a written license agreement.<br>
+    Contact: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+  </div>
 
- <h2>SUMMARY</h2>
- <p>The PARAMANT source code is publicly visible for transparency and trust. You may inspect, audit, and use the code for non-commercial purposes. Commercial use — including offering the software as a service, integrating it into a paid product, or using it in a business context — requires a written commercial license agreement with the licensor.</p>
- <p>On 1 January 2030 the entire codebase will be released under the MIT License.</p>
+  <h2>Summary</h2>
+  <p>The PARAMANT source code is publicly visible for transparency and trust. You may inspect, audit, and use the code for non-commercial purposes. Commercial use — including offering the software as a service, integrating it into a paid product, or using it in a business context — requires a written commercial license agreement with the licensor.</p>
+  <p>On 1 January 2030 the entire codebase will be released under the MIT License.</p>
 
- <h2>FULL LICENSE TEXT</h2>
- <div class="license-box">Business Source License 1.1
+  <h2>Full license text</h2>
+  <div class="license-box">Business Source License 1.1
 
 Licensor:             Mick Beer
 Licensed Work:        PARAMANT Ghost Pipe Protocol, Relay and Dashboard
@@ -106,13 +224,17 @@ Additional Use Grant:
   with the Licensor.
 
 Contact: privacy@paramant.app
-Website: https://paramant.app
-</div>
+Website: https://paramant.app</div>
 
- <h2>QUESTIONS</h2>
- <p>For licensing questions or commercial agreements: <a href="mailto:privacy@paramant.app" style="color:var(--green)">privacy@paramant.app</a></p>
+  <h2>Questions</h2>
+  <p>For licensing questions or commercial agreements: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
 </main>
 
-<footer>© 2026 Mick Beer · PARAMANT · Business Source License 1.1</footer>
+<footer>
+  © 2026 Mick Beer &middot; PARAMANT &middot; Business Source License 1.1<br>
+  <a href="/">Home</a> &middot; <a href="/pricing">Pricing</a> &middot; <a href="/security">Security</a> &middot; <a href="/privacy">Privacy</a>
+</footer>
+
+<script src="/nav.js" defer></script>
 </body>
 </html>

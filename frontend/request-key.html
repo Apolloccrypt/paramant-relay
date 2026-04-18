@@ -8,41 +8,29 @@
 <link rel="icon" href="/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--green-bg:#181818;--green-dim:#242424;--mono:'Courier New',Courier,monospace}
-html{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;min-height:100vh}
-a{color:var(--text);text-decoration:none}
-a:hover{color:var(--green)}
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
-.nav-links{display:flex;gap:28px;font-size:13px;color:var(--muted)}
 main{max-width:520px;margin:80px auto 120px;padding:0 24px}
-.eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:12px}
+.eyebrow{font-size:var(--text-xs);font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:12px}
 h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
-.sub{color:var(--muted);font-size:14px;margin-bottom:36px;line-height:1.7}
-.limits{background:var(--green-bg);border:1px solid var(--green-dim);border-radius:6px;padding:14px 18px;margin-bottom:32px;font-size:13px;color:var(--muted);font-family:var(--mono)}
-.limits span{color:var(--green)}
+.sub{color:var(--lime-dim);font-size:var(--text-sm);margin-bottom:36px;line-height:1.7}
+.limits{border:1px solid var(--lime-hair);padding:14px 18px;margin-bottom:32px;font-size:var(--text-sm);color:var(--lime-dim)}
+.limits span{color:var(--lime)}
 form{display:flex;flex-direction:column;gap:16px}
 .field{display:flex;flex-direction:column;gap:6px}
-label{font-size:12px;font-family:var(--mono);letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
-input,select{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;width:100%;outline:none;transition:border-color .15s}
-input:focus,select:focus{border-color:var(--green)}
-select option{background:var(--surface)}
-.btn{background:var(--green);color:#0c0c0c;border:none;border-radius:6px;padding:12px 24px;font-size:14px;font-weight:700;font-family:var(--mono);letter-spacing:.04em;cursor:pointer;width:100%;transition:opacity .15s;margin-top:4px;display:flex;align-items:center;justify-content:center;min-height:44px}
+label{font-size:var(--text-xs);letter-spacing:.05em;color:var(--lime-dim);text-transform:uppercase}
+input,select{background:var(--black);border:1px solid var(--lime-hair);padding:10px 14px;color:var(--lime);font-size:var(--text-sm);font-family:inherit;width:100%;outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--lime)}
+select option{background:var(--black);color:var(--lime)}
+.btn{background:var(--lime);color:var(--black);border:none;padding:12px 24px;font-size:var(--text-sm);font-weight:700;font-family:inherit;letter-spacing:.04em;cursor:pointer;width:100%;transition:opacity .15s;margin-top:4px;display:flex;align-items:center;justify-content:center;min-height:44px}
 .btn:hover{opacity:.88}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.msg{display:none;padding:16px 20px;border-radius:6px;font-size:14px;margin-top:8px}
-.msg.success{background:var(--green-bg);border:1px solid var(--green-dim);color:var(--text)}
-.msg.success .key-name{color:var(--green);font-family:var(--mono)}
-.msg.error{background:#1f0d0d;border:1px solid #3d1a1a;color:#e88}
-.note{font-size:12px;color:var(--quiet);text-align:center;margin-top:20px;font-family:var(--mono)}
-.note a{color:var(--quiet);text-decoration:underline;text-decoration-color:#333}
-.spinner{width:16px;height:16px;border:2px solid rgba(12,12,12,.3);border-top-color:#0c0c0c;border-radius:50%;animation:spin .7s linear infinite}
+.msg{display:none;padding:16px 20px;border:1px solid var(--lime-hair);font-size:var(--text-sm);margin-top:8px}
+.msg.error{border-color:rgba(255,80,80,.3);color:rgba(255,120,120,1)}
+.note{font-size:var(--text-xs);color:var(--lime-dim);text-align:center;margin-top:20px}
+.note a{color:var(--lime-dim);text-decoration:underline}
 @keyframes spin{to{transform:rotate(360deg)}}
-footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet)}
-footer a:hover{color:var(--green)}
-@media(max-width:600px){nav{padding:0 20px}main{margin-top:48px}}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--lime-hair);font-size:var(--text-xs);color:var(--lime-dim)}
+footer a{color:var(--lime)}
+@media(max-width:600px){main{margin-top:48px}}
 </style>
 <link rel="stylesheet" href="/design-system.css?v=3">
 <link rel="stylesheet" href="/nav.css">
@@ -201,7 +189,7 @@ footer a:hover{color:var(--green)}
       <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
     </div>
     <div class="field">
-      <label for="name">Your name <span style="color:var(--quiet)">(optional)</span></label>
+      <label for="name">Your name <span style="color:var(--lime-dim)">(optional)</span></label>
       <input type="text" id="name" name="name" placeholder="Jane Smith" autocomplete="name">
     </div>
     <div class="field">
@@ -224,15 +212,15 @@ footer a:hover{color:var(--green)}
 
   <div class="msg success" id="successMsg">
     <div style="margin-bottom:16px">&#10003; <strong>Your API key is ready</strong></div>
-    <div style="background:#181818;border:1px solid var(--green-dim);border-radius:6px;padding:14px 16px;margin-bottom:16px">
-      <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
-      <div style="font-family:var(--mono);font-size:13px;color:var(--text);word-break:break-all;user-select:all" id="keyDisplay"></div>
+    <div style="border:1px solid var(--lime-hair);padding:14px 16px;margin-bottom:16px">
+      <div style="font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
+      <div style="font-size:var(--text-sm);color:var(--lime);word-break:break-all;user-select:all" id="keyDisplay"></div>
     </div>
-    <div style="background:#1c1700;border:1px solid #3a3000;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#cccc00;font-family:var(--mono)">
+    <div style="border:1px solid var(--lime-hair);padding:10px 14px;margin-bottom:16px;font-size:var(--text-xs);color:var(--lime)">
       &#9888; Save this key now in your password manager. It is shown once and cannot be recovered.
     </div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">A copy has also been sent to <span id="sentEmail" style="color:var(--text)"></span></div>
-    <div style="font-size:13px">Next: <a href="/docs" style="color:var(--green)">quick start &rarr;</a></div>
+    <div style="font-size:var(--text-sm);color:var(--lime-dim);margin-bottom:12px">A copy has also been sent to <span id="sentEmail" style="color:var(--lime)"></span></div>
+    <div style="font-size:var(--text-sm)">Next: <a href="/docs" style="color:var(--lime)">quick start &rarr;</a></div>
   </div>
 
   <div class="msg error" id="errorMsg"></div>

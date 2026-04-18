@@ -1,30 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy Policy — PARAMANT</title>
+<meta name="description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
+<link rel="icon" href="/icon-192.png">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;--mono:"SF Mono","Fira Code",monospace}
-body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.7}
-nav.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.95);backdrop-filter:blur(8px);z-index:100}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
-.nav-links{display:flex;gap:28px;list-style:none}
-.nav-links a{font-size:13px;color:var(--muted);text-decoration:none}
+*{box-sizing:border-box;margin:0;padding:0}
 .content{max-width:800px;margin:80px auto;padding:0 48px}
 h1{font-size:32px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
-h2{font-size:20px;margin:48px 0 16px;border-top:1px solid var(--border);padding-top:48px}
-p{margin-bottom:16px;color:var(--muted)}
+.updated{font-size:var(--text-xs);color:var(--lime-dim);margin-bottom:40px}
+h2{font-size:18px;font-weight:600;margin:48px 0 16px;border-top:1px solid var(--lime-hair);padding-top:48px}
+p{margin-bottom:16px;color:var(--lime-dim);font-size:var(--text-base);line-height:1.8}
+p strong{color:var(--lime)}
+p a{color:var(--lime)}
 table{width:100%;border-collapse:collapse;margin:24px 0}
-th,td{padding:12px 0;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
-th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet)}
-ul{margin-left:24px;color:var(--muted)}
-li{margin-bottom:6px}
-footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;font-size:12px;color:var(--quiet)}
-@media(max-width:900px){nav.topbar{padding:0 24px}.nav-links{gap:16px}.content{padding:40px 24px}footer{padding:24px}}
-@media(max-width:600px){.nav-links{display:none}}
+th,td{padding:12px 0;border-bottom:1px solid var(--lime-hair);text-align:left;vertical-align:top;font-size:var(--text-sm)}
+th{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)}
+td{color:var(--lime-dim)}
+td:first-child{color:var(--lime)}
+ul{margin-left:24px;color:var(--lime-dim)}
+li{margin-bottom:6px;font-size:var(--text-base);line-height:1.7}
+li strong{color:var(--lime)}
+code{font-size:var(--text-sm)}
+footer{border-top:1px solid var(--lime-hair);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;font-size:var(--text-xs);color:var(--lime-dim)}
+footer a{color:var(--lime);text-decoration:none}
+@media(max-width:900px){.content{padding:40px 24px}footer{padding:24px}}
 </style>
 <link rel="stylesheet" href="/design-system.css?v=3">
 <link rel="stylesheet" href="/nav.css">
@@ -172,7 +174,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p style="color:#00cc33;font-size:13px;margin-bottom:40px">Last updated: April 2, 2026</p>
+<p class="updated">Last updated: April 2, 2026</p>
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects no personal data.</strong></p>
@@ -191,7 +193,7 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
 <tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
-<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; <code>/data/ct-log.json</code> &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
+<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
 <tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
 </tbody>
 </table>
@@ -211,8 +213,8 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 <ul>
 <li><strong>ECDH + ML-KEM key pairs</strong> &mdash; generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
 <li><strong>Nonce registry</strong> &mdash; replay-attack protection (SDK sessions)</li>
-<li><strong>Free tier usage counter</strong> (<code style="font-family:var(--mono);font-size:13px">ps_free_uses</code>) &mdash; today's date and upload count, used to enforce the 10/day limit client-side</li>
-<li><strong>Docs access key</strong> (<code style="font-family:var(--mono);font-size:13px">pm_docs_key</code>) &mdash; stored if you authenticate to the Docs with a paid API key</li>
+<li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>) &mdash; today's date and upload count, used to enforce the 10/day limit client-side</li>
+<li><strong>Docs access key</strong> (<code>pm_docs_key</code>) &mdash; stored if you authenticate to the Docs with a paid API key</li>
 </ul>
 <p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
 
@@ -236,19 +238,19 @@ footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify
 <p>We may update this policy. Material changes will be noted via the "Last updated" date above. Continued use of the service after a change constitutes acceptance.</p>
 
 <h2>Contact</h2>
-<p>Questions about this Privacy Policy? Email <strong>info@paramant.app</strong>.</p>
+<p>Questions about this Privacy Policy? Email <a href="mailto:info@paramant.app">info@paramant.app</a>.</p>
 
 </div>
 
 <footer>
-  <span style="font-family:var(--mono);font-size:12px;letter-spacing:.06em">PARAMANT</span>
+  <span>PARAMANT</span>
   <div style="display:flex;gap:24px">
-    <a href="/" style="color:var(--quiet);text-decoration:none">Home</a>
-    <a href="/parashare" style="color:var(--quiet);text-decoration:none">ParaShare</a>
-    <a href="/docs" style="color:var(--quiet);text-decoration:none">Docs</a>
-    <a href="/privacy" style="color:var(--quiet);text-decoration:none">Privacy</a>
+    <a href="/">Home</a>
+    <a href="/parashare">ParaShare</a>
+    <a href="/docs">Docs</a>
+    <a href="/security">Security</a>
   </div>
-  <div style="text-align:right;line-height:1.4">Ghost Pipe v2.4.5 &middot; Zero storage &middot; Burn-on-read &middot; EU/DE only</div>
+  <div>Ghost Pipe v2.4.5 &middot; Zero storage &middot; Burn-on-read &middot; EU/DE only</div>
 </footer>
 
 <script src="/nav.js" defer></script>
