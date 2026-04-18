@@ -145,10 +145,14 @@ NEW_MOBILE = '''\
   </div>
 </div>'''
 
-DS_LINK = '<link rel="stylesheet" href="/design-system.css">'
+DS_LINK = '<link rel="stylesheet" href="/design-system.css?v=3">'
 
 
 def inject_design_system(html):
+    # Upgrade bare link (no query string) to versioned link
+    bare = '<link rel="stylesheet" href="/design-system.css">'
+    if bare in html:
+        html = html.replace(bare, DS_LINK, 1)
     if DS_LINK in html:
         return html
     # Inject before nav.css if present, otherwise before </head>
