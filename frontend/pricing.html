@@ -142,122 +142,135 @@ body.annual .note-annual{display:block}
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Product &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/send">Send a file</a></li>
-        <li><a href="/parashare">ParaShare</a></li>
-        <li><a href="/drop">ParaDrop</a></li>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="/ct-log">CT Log</a></li>
-        <li><a href="/docs">Docs</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/docs#api">API reference</a></li>
-        <li><a href="/vs">vs. alternatives</a></li>
-        <li><a href="/press">Press kit</a></li>
-        <li><a href="/changelog">Changelog</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Product</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/vs" role="menuitem">vs. alternatives</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
       </ul>
     </li>
 
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Self-host &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a></li>
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a></li>
-        <li><a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a></li>
-        <li><a href="/docs#self-hosting">Deploy guide</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/install.sh">install.sh</a></li>
-        <li><a href="/install-pi.sh">install-pi.sh</a></li>
-        <li><a href="/install-client.sh">install-client.sh</a></li>
-        <li><a href="/download">ParamantOS</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/status">Status</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Compliance &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/compliance/nis2">NIS2 (EU 2022/2555)</a></li>
-        <li><a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a></li>
-        <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
-        <li><a href="/dpa">Data Processing Agreement</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/ot">OT guide</a></li>
-        <li><a href="/government">Government &amp; public sector</a></li>
-        <li><a href="/hndl">HNDL threat</a></li>
-        <li><a href="/crypto-agility">Crypto agility</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Info &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="mailto:privacy@paramant.app">Contact</a></li>
-        <li><a href="/request-key">Free API key</a></li>
-        <li><a href="/status">Status</a></li>
-        <li><a href="/sla">SLA</a></li>
-        <li><a href="/security">Security</a></li>
-        <li><a href="/license">License</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Info</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+        <li role="none"><a href="/request-key" role="menuitem">Free API key</a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
       </ul>
     </li>
 
   </ul>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Product</div>
-    <a href="/send">Send a file</a>
-    <a href="/parashare">ParaShare</a>
-    <a href="/drop">ParaDrop</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/ct-log">CT Log</a>
-    <a href="/docs">Docs</a>
-    <a href="/docs#api">API reference</a>
-    <a href="/vs">vs. alternatives</a>
-    <a href="/press">Press kit</a>
-    <a href="/changelog">Changelog</a>
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Pricing</div>
-    <a href="/pricing" class="nav-mobile-standalone">Pricing plans →</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Product</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/vs">vs. alternatives</a>
+      <a href="/press">Press kit</a>
+      <a href="/changelog">Changelog</a>
+    </div>
   </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Self-host</div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-    <a href="/docs#self-hosting">Deploy guide</a>
-    <a href="/install.sh">install.sh</a>
-    <a href="/install-pi.sh">install-pi.sh</a>
-    <a href="/download">ParamantOS</a>
-    <a href="/status">Status</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="/status">Status</a>
+    </div>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Compliance</div>
-    <a href="/compliance/nis2">NIS2</a>
-    <a href="/compliance/iec62443">IEC 62443</a>
-    <a href="/compliance/nen7510">NEN 7510</a>
-    <a href="/dpa">Data Processing Agreement</a>
-    <a href="/ot">OT guide</a>
-    <a href="/government">Government</a>
-    <a href="/hndl">HNDL threat</a>
-    <a href="/crypto-agility">Crypto agility</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2</a>
+      <a href="/compliance/iec62443">IEC 62443</a>
+      <a href="/compliance/nen7510">NEN 7510</a>
+      <a href="/dpa">Data Processing Agreement</a>
+      <a href="/ot">OT guide</a>
+      <a href="/government">Government</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/crypto-agility">Crypto agility</a>
+    </div>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Info</div>
-    <a href="mailto:privacy@paramant.app">Contact</a>
-    <a href="/request-key">Free API key</a>
-    <a href="/status">Status</a>
-    <a href="/sla">SLA</a>
-    <a href="/security">Security</a>
-    <a href="/license">License</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Info</button>
+    <div class="nav-mobile-group-items">
+      <a href="mailto:privacy@paramant.app">Contact</a>
+      <a href="/request-key">Free API key</a>
+      <a href="/status">Status</a>
+      <a href="/sla">SLA</a>
+      <a href="/security">Security</a>
+      <a href="/license">License</a>
+    </div>
   </div>
 </div>
 
