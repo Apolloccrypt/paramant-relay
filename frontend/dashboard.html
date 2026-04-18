@@ -4,16 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Developer Dashboard</title>
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#111;--border:#1a1a1a;--text:#ededed;--muted:#888;--quiet:#555;--green:#00cc33;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
-body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
-input,select,button{font-family:var(--font);font-size:13px}
-a{color:var(--muted);text-decoration:none}
-a:hover{color:var(--text)}
+body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+input,select,button{font-family:var(--mono);font-size:13px}
+a{color:var(--ink-dim);text-decoration:none}
+a:hover{color:var(--cobalt)}
 </style>
 </head>
 <body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
 <div id="root"></div>
 <script>
 const RELAYS=[

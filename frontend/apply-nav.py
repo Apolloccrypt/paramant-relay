@@ -145,23 +145,28 @@ NEW_MOBILE = '''\
   </div>
 </div>'''
 
-DS_LINK = '<link rel="stylesheet" href="/design-system.css?v=3">'
+DS_LINK  = '<link rel="stylesheet" href="/design-system.css?v=4">'
+NAV_LINK = '<link rel="stylesheet" href="/nav.css?v=4">'
 
 
 def inject_design_system(html):
-    # Upgrade bare link (no query string) to versioned link
-    bare = '<link rel="stylesheet" href="/design-system.css">'
-    if bare in html:
-        html = html.replace(bare, DS_LINK, 1)
-    if DS_LINK in html:
-        return html
-    # Inject before nav.css if present, otherwise before </head>
-    nav_css = '<link rel="stylesheet" href="/nav.css">'
-    if nav_css in html:
-        return html.replace(nav_css, DS_LINK + '\n' + nav_css, 1)
-    head_close = html.find('</head>')
-    if head_close != -1:
-        return html[:head_close] + DS_LINK + '\n' + html[head_close:]
+    # Normalise any existing design-system link to v4
+    import re
+    html = re.sub(
+        r'<link rel="stylesheet" href="/design-system\.css(?:\?v=\d+)?">',
+        DS_LINK, html)
+    # Normalise any existing nav.css link to v4
+    html = re.sub(
+        r'<link rel="stylesheet" href="/nav\.css(?:\?v=\d+)?">',
+        NAV_LINK, html)
+    # If design-system link is missing altogether, inject before nav.css or </head>
+    if DS_LINK not in html:
+        if NAV_LINK in html:
+            html = html.replace(NAV_LINK, DS_LINK + '\n' + NAV_LINK, 1)
+        else:
+            head_close = html.find('</head>')
+            if head_close != -1:
+                html = html[:head_close] + DS_LINK + '\n' + html[head_close:]
     return html
 
 

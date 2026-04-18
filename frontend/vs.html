@@ -6,95 +6,77 @@
 <title>Paramant vs alternatives — post-quantum encrypted file relay comparison</title>
 <meta name="description" content="How Paramant compares to Tresorit, WeTransfer, SFTP, Q*Bird, and NXP on post-quantum encryption, EU jurisdiction, burn-on-read, audit trail, and self-hosting.">
 <style>
-:root{
-  --bg:#0a0f0b;
-  --surface:#111612;
-  --border:#1e2b20;
-  --text:#ededed;
-  --muted:#9a9a9a;
-  --quiet:#6e6e6e;
-  --green:#00cc33;
-  --red:#8a2d2d;
-  --yellow:#7a6a2d;
-  --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
-}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;line-height:1.65}
-
-nav{position:sticky;top:0;z-index:100;background:rgba(10,15,11,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 40px;height:52px;display:flex;align-items:center;justify-content:space-between}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--text);text-decoration:none}
-.nav-links{list-style:none;display:flex;gap:28px}
-.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono);letter-spacing:.02em;transition:color .15s}
-.nav-links a:hover{color:var(--text)}
-@media(max-width:700px){nav{padding:0 20px}.nav-links{gap:14px}}
+body{font-size:15px;line-height:1.65}
 
 .page-wrap{max-width:1040px;margin:0 auto;padding:64px 40px 100px}
 @media(max-width:700px){.page-wrap{padding:40px 16px 80px}}
 
 /* HERO */
-.eyebrow{font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.eyebrow{font-size:11px;font-family:var(--mono);color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
 h1{font-size:clamp(26px,5vw,40px);font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-bottom:14px}
-h1 em{font-style:normal;color:var(--green)}
-.hero-sub{font-size:15px;color:var(--muted);max-width:620px;line-height:1.7;margin-bottom:48px}
+h1 em{font-style:normal;color:var(--cobalt)}
+.hero-sub{font-size:15px;color:var(--ink-dim);max-width:620px;line-height:1.7;margin-bottom:48px}
 
 /* LEGEND */
-.legend{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:24px;font-size:12px;font-family:var(--mono);color:var(--quiet);align-items:center}
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:24px;font-size:12px;font-family:var(--mono);color:var(--ink-dim);align-items:center}
 .legend-item{display:flex;align-items:center;gap:6px}
 
 /* TABLE */
-.tbl-scroll{overflow-x:auto;margin-bottom:48px;border-radius:8px;border:1px solid var(--border)}
+.tbl-scroll{overflow-x:auto;margin-bottom:48px;border:1px solid var(--ink-hair)}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
-thead tr{background:var(--surface)}
-th{text-align:left;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--quiet);padding:12px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
-th.paramant-col{color:var(--green)}
-td{padding:13px 16px;border-bottom:1px solid var(--border);vertical-align:middle;line-height:1.45}
+thead tr{background:var(--black-hair)}
+th{text-align:left;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-dim);padding:12px 16px;border-bottom:1px solid var(--ink-hair);white-space:nowrap}
+th.paramant-col{color:var(--cobalt)}
+td{padding:13px 16px;border-bottom:1px solid var(--ink-hair);vertical-align:middle;line-height:1.45}
 tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:rgba(255,255,255,.02)}
+tbody tr:hover{background:var(--ink-ghost)}
 
 /* ROW LABEL */
-td.row-label{font-weight:600;color:var(--text);white-space:nowrap;min-width:160px}
-td.row-sub{font-size:11px;color:var(--quiet);font-weight:400;display:block;margin-top:2px;font-family:var(--mono)}
+td.row-label{font-weight:600;color:var(--ink);white-space:nowrap;min-width:160px}
+td.row-sub{font-size:11px;color:var(--ink-dim);font-weight:400;display:block;margin-top:2px;font-family:var(--mono)}
 
 /* VALUE CELLS */
-.v-yes{color:var(--green);font-weight:700;font-size:15px}
-.v-no{color:var(--red);font-weight:700;font-size:15px}
-.v-partial{color:var(--yellow);font-weight:700;font-size:15px}
-.v-note{display:block;font-size:11px;font-family:var(--mono);color:var(--quiet);margin-top:3px;font-weight:400}
-td.paramant-col{background:rgba(45,138,92,.06);border-left:2px solid rgba(45,138,92,.3);border-right:2px solid rgba(45,138,92,.3)}
+.v-yes{color:var(--ink);font-weight:700;font-size:15px}
+.v-no{color:#8a2d2d;font-weight:700;font-size:15px}
+.v-partial{color:#7a6a2d;font-weight:700;font-size:15px}
+.v-note{display:block;font-size:11px;font-family:var(--mono);color:var(--ink-dim);margin-top:3px;font-weight:400}
+td.paramant-col{background:var(--ink-ghost);border-left:2px solid var(--ink-hair);border-right:2px solid var(--ink-hair)}
 .paramant-col .v-yes{font-size:16px}
 
 /* SECTION HEADING */
 h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
-p.lead{font-size:14px;color:var(--muted);max-width:680px;line-height:1.7;margin-bottom:28px}
+p.lead{font-size:14px;color:var(--ink-dim);max-width:680px;line-height:1.7;margin-bottom:28px}
 
 /* NOTES GRID */
 .notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:56px}
-.note-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px}
-.note-card h3{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)}
-.note-card p{font-size:12px;color:var(--muted);line-height:1.65}
-.note-card .tag{display:inline-block;font-size:10px;font-family:var(--mono);background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:2px 7px;color:var(--quiet);margin-bottom:8px;letter-spacing:.04em}
+.note-card{background:var(--black-hair);border:1px solid var(--ink-hair);padding:18px 20px}
+.note-card h3{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--cobalt)}
+.note-card p{font-size:12px;color:var(--ink-dim);line-height:1.65}
+.note-card .tag{display:inline-block;font-size:10px;font-family:var(--mono);border:1px solid var(--ink-hair);padding:2px 7px;color:var(--ink-dim);margin-bottom:8px;letter-spacing:.04em}
 
 /* CTA */
-.cta-strip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.cta-strip{background:var(--black-hair);border:1px solid var(--ink-hair);padding:24px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
 .cta-strip h3{font-size:15px;font-weight:600;margin-bottom:4px}
-.cta-strip p{font-size:13px;color:var(--muted)}
-.btn-p{display:inline-block;background:var(--green);color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;padding:9px 20px;border-radius:4px;text-decoration:none;transition:opacity .15s}
+.cta-strip p{font-size:13px;color:var(--ink-dim)}
+.btn-p{display:inline-block;background:var(--cobalt);color:var(--bone-on-navy);font-size:12px;font-family:var(--mono);font-weight:600;padding:9px 20px;text-decoration:none;transition:opacity .15s}
 .btn-p:hover{opacity:.85}
-.btn-s{display:inline-block;border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:var(--mono);padding:9px 20px;border-radius:4px;text-decoration:none;transition:color .15s,border-color .15s}
-.btn-s:hover{color:var(--text);border-color:var(--text)}
+.btn-s{display:inline-block;border:1px solid var(--ink-hair);color:var(--ink-dim);font-size:12px;font-family:var(--mono);padding:9px 20px;text-decoration:none;transition:color .15s,border-color .15s}
+.btn-s:hover{color:var(--ink);border-color:var(--cobalt)}
 .btns{display:flex;gap:10px;flex-wrap:wrap}
-
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding:28px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet);text-decoration:none}
-footer a:hover{color:var(--text)}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
 
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -301,7 +283,7 @@ footer a:hover{color:var(--text)}
           <td class="row-label">Zero persistent storage
             <span class="row-sub">No bytes written to disk</span>
           </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">RAM-only by default; optional disk for resilience</span></td>
+          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">RAM-only by design. No disk persistence.</span></td>
           <td><span class="v-no">✗</span><span class="v-note">Cloud storage is the product — always persisted</span></td>
           <td><span class="v-no">✗</span><span class="v-note">Files stored in cloud until expiry</span></td>
           <td><span class="v-no">✗</span><span class="v-note">Files written to server disk</span></td>
@@ -373,12 +355,12 @@ footer a:hover{color:var(--text)}
           <td class="row-label">Pricing
             <span class="row-sub">Entry point</span>
           </td>
-          <td class="paramant-col"><span style="color:var(--green);font-weight:700">Free</span><span class="v-note">Community Edition — self-hosted, ≤5 users<br>Professional: €149/mo · Enterprise: custom</span></td>
-          <td><span style="color:var(--muted)">€10/user/mo</span><span class="v-note">Business plans from €10/user/mo</span></td>
-          <td><span style="color:var(--muted)">Free / €12/mo</span><span class="v-note">Pro €12/mo — no E2E, no PQC</span></td>
-          <td><span style="color:var(--green);font-weight:700">Free</span><span class="v-note">Self-managed server costs only</span></td>
-          <td><span style="color:var(--muted)">Hardware</span><span class="v-note">Hardware appliance pricing — on request</span></td>
-          <td><span style="color:var(--muted)">Chip licensing</span><span class="v-note">Volume chip licensing — not a relay product</span></td>
+          <td class="paramant-col"><span style="color:var(--ink);font-weight:700">Free</span><span class="v-note">Community Edition — self-hosted, ≤5 users<br>Professional: coming soon · Enterprise: custom</span></td>
+          <td><span style="color:var(--ink-dim)">€10/user/mo</span><span class="v-note">Business plans from €10/user/mo</span></td>
+          <td><span style="color:var(--ink-dim)">Free / €12/mo</span><span class="v-note">Pro €12/mo — no E2E, no PQC</span></td>
+          <td><span style="color:var(--ink);font-weight:700">Free</span><span class="v-note">Self-managed server costs only</span></td>
+          <td><span style="color:var(--ink-dim)">Hardware</span><span class="v-note">Hardware appliance pricing — on request</span></td>
+          <td><span style="color:var(--ink-dim)">Chip licensing</span><span class="v-note">Volume chip licensing — not a relay product</span></td>
         </tr>
 
       </tbody>
@@ -432,11 +414,69 @@ footer a:hover{color:var(--text)}
 </div>
 
 <footer>
-  <a href="/">PARAMANT</a>
-  <span>Comparison last updated: April 2026</span>
-  <a href="/docs">Docs</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </footer>
 
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=4" defer></script>
 </body>
 </html>

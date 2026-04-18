@@ -5,13 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PARAMANT — Investor Brief</title>
 <style>
+:root {
+  --doc-bg: #f4efe2; --doc-ink: #0a0a0a; --doc-ink-dim: #444; --doc-ink-ghost: #777;
+  --doc-accent: #5a1a8a; --doc-accent-ok: #1a7a3c;
+  --mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+}
 @page { size: A4; margin: 16mm 20mm; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--mono);
   font-size: 10pt;
-  color: #111;
-  background: #fff;
+  color: var(--doc-ink);
+  background: var(--doc-bg);
   max-width: 210mm;
   margin: 0 auto;
   padding: 16mm 20mm;
@@ -21,126 +26,135 @@ header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  border-bottom: 2.5px solid #111;
+  border-bottom: 2.5px solid var(--doc-ink);
   padding-bottom: 10px;
   margin-bottom: 18px;
 }
 .logo-block h1 { font-size: 18pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
-.logo-block p { font-size: 8pt; color: #555; margin-top: 3px; letter-spacing: 0.8px; text-transform: uppercase; }
+.logo-block p { font-size: 8pt; color: var(--doc-ink-dim); margin-top: 3px; letter-spacing: 0.8px; text-transform: uppercase; }
 .badge-block { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; padding-top: 2px; }
-.badge { font-size: 7pt; font-weight: 700; border: 1.5px solid #111; padding: 2px 6px; letter-spacing: 0.3px; white-space: nowrap; }
-.badge.inv { border-color: #5a1a8a; color: #5a1a8a; }
+.badge { font-size: 7pt; font-weight: 700; border: 1.5px solid var(--doc-ink); padding: 2px 6px; letter-spacing: 0.3px; white-space: nowrap; }
+.badge.inv { border-color: var(--doc-accent); color: var(--doc-accent); }
 h2 {
   font-size: 7.5pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.4px;
-  color: #555;
+  color: var(--doc-ink-dim);
   margin-bottom: 7px;
   margin-top: 18px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid rgba(10,10,10,.2);
   padding-bottom: 3px;
 }
 h3 { font-size: 9.5pt; font-weight: 700; margin: 12px 0 5px; }
 h3.big { font-size: 11pt; margin-top: 16px; }
-p { font-size: 9.5pt; color: #222; line-height: 1.65; margin-bottom: 6px; }
+p { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.65; margin-bottom: 6px; }
 ul { padding-left: 14px; margin-bottom: 8px; }
-li { font-size: 9.5pt; color: #222; line-height: 1.6; margin-bottom: 2px; }
+li { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.6; margin-bottom: 2px; }
 .problem-block {
-  background: #fafafa;
-  border-left: 3px solid #111;
+  background: rgba(10,10,10,.04);
+  border-left: 3px solid var(--doc-ink);
   padding: 10px 14px;
   margin-bottom: 14px;
 }
-.problem-block p { font-size: 10pt; font-weight: 600; color: #111; margin-bottom: 4px; }
-.problem-block .body { font-size: 9.5pt; font-weight: 400; color: #333; line-height: 1.65; margin: 0; }
+.problem-block p { font-size: 10pt; font-weight: 600; color: var(--doc-ink); margin-bottom: 4px; }
+.problem-block .body { font-size: 9.5pt; font-weight: 400; color: var(--doc-ink-dim); line-height: 1.65; margin: 0; }
 .highlight-box {
-  background: #f8f4ff;
-  border-left: 3px solid #5a1a8a;
+  background: rgba(90,26,138,.06);
+  border-left: 3px solid var(--doc-accent);
   padding: 9px 13px;
   margin: 10px 0;
 }
-.highlight-box p { font-size: 9.5pt; color: #222; margin: 0; line-height: 1.65; }
-.highlight-box strong { color: #5a1a8a; }
+.highlight-box p { font-size: 9.5pt; color: var(--doc-ink); margin: 0; line-height: 1.65; }
+.highlight-box strong { color: var(--doc-accent); }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 8px; }
 .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
 .prop-list { list-style: none; padding: 0; }
-.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px; }
-.prop-list li::before { content: "✓"; color: #1a7a3c; font-weight: 700; flex-shrink: 0; }
+.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid rgba(10,10,10,.1); display: flex; gap: 6px; }
+.prop-list li::before { content: "✓"; color: var(--doc-accent-ok); font-weight: 700; flex-shrink: 0; }
 .moat-list { list-style: none; padding: 0; }
-.moat-list li { font-size: 9.5pt; padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 6px; }
-.moat-list li .icon { flex-shrink: 0; font-weight: 700; color: #5a1a8a; }
+.moat-list li { font-size: 9.5pt; padding: 4px 0; border-bottom: 1px solid rgba(10,10,10,.1); display: flex; gap: 6px; }
+.moat-list li .icon { flex-shrink: 0; font-weight: 700; color: var(--doc-accent); }
 code {
-  font-family: 'Courier New', monospace;
+  font-family: var(--mono);
   font-size: 8.5pt;
-  background: #f0f0f0;
+  background: rgba(10,10,10,.07);
   padding: 1px 5px;
 }
 .code-block {
-  font-family: 'Courier New', monospace;
+  font-family: var(--mono);
   font-size: 8pt;
-  background: #f7f7f7;
-  border: 1px solid #ddd;
+  background: rgba(10,10,10,.05);
+  border: 1px solid rgba(10,10,10,.2);
   padding: 10px 12px;
   line-height: 1.65;
-  color: #111;
+  color: var(--doc-ink);
   margin: 8px 0;
   white-space: pre-wrap;
 }
 table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9pt; }
-th { background: #111; color: #fff; text-align: left; padding: 6px 10px; font-size: 8pt; font-weight: 600; letter-spacing: 0.4px; }
-td { padding: 6px 10px; border-bottom: 1px solid #e8e8e8; vertical-align: top; color: #222; }
-tr:nth-child(even) td { background: #fafafa; }
-.ok { color: #1a7a3c; font-weight: 700; }
-.na { color: #aaa; }
+th { background: var(--doc-ink); color: var(--doc-bg); text-align: left; padding: 6px 10px; font-size: 8pt; font-weight: 600; letter-spacing: 0.4px; }
+td { padding: 6px 10px; border-bottom: 1px solid rgba(10,10,10,.1); vertical-align: top; color: var(--doc-ink); }
+tr:nth-child(even) td { background: rgba(10,10,10,.03); }
+.ok { color: var(--doc-accent-ok); font-weight: 700; }
+.na { color: var(--doc-ink-ghost); }
 .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
-.market-card { border: 1px solid #ddd; padding: 10px 12px; }
+.market-card { border: 1px solid rgba(10,10,10,.2); padding: 10px 12px; }
 .market-card .name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .market-card .size { font-size: 13pt; font-weight: 900; line-height: 1; margin-bottom: 3px; }
-.market-card .desc { font-size: 8.5pt; color: #555; line-height: 1.4; }
+.market-card .desc { font-size: 8.5pt; color: var(--doc-ink-dim); line-height: 1.4; }
 .roadmap-row { display: flex; gap: 0; margin: 6px 0; font-size: 9pt; }
-.roadmap-q { font-family: 'Courier New', monospace; font-weight: 700; width: 60px; flex-shrink: 0; color: #5a1a8a; }
-.roadmap-items { color: #333; line-height: 1.5; }
+.roadmap-q { font-family: var(--mono); font-weight: 700; width: 60px; flex-shrink: 0; color: var(--doc-accent); }
+.roadmap-items { color: var(--doc-ink-dim); line-height: 1.5; }
 .rev-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 8px 0; }
-.rev-table th { background: #f0f0f0; color: #111; padding: 5px 10px; text-align: left; font-weight: 700; border-bottom: 2px solid #ddd; }
-.rev-table td { padding: 5px 10px; border-bottom: 1px solid #eee; }
-.rev-table .period { font-family: 'Courier New', monospace; font-weight: 700; color: #5a1a8a; }
+.rev-table th { background: rgba(10,10,10,.07); color: var(--doc-ink); padding: 5px 10px; text-align: left; font-weight: 700; border-bottom: 2px solid rgba(10,10,10,.2); }
+.rev-table td { padding: 5px 10px; border-bottom: 1px solid rgba(10,10,10,.1); }
+.rev-table .period { font-family: var(--mono); font-weight: 700; color: var(--doc-accent); }
 .quote-block {
-  border-top: 2px solid #111;
-  border-bottom: 2px solid #111;
+  border-top: 2px solid var(--doc-ink);
+  border-bottom: 2px solid var(--doc-ink);
   padding: 12px 0;
   margin: 14px 0;
   text-align: center;
 }
-.quote-block p { font-size: 11pt; font-weight: 600; color: #111; font-style: italic; margin: 0; }
-.quote-block small { font-size: 8.5pt; color: #666; margin-top: 4px; display: block; }
+.quote-block p { font-size: 11pt; font-weight: 600; color: var(--doc-ink); font-style: italic; margin: 0; }
+.quote-block small { font-size: 8.5pt; color: var(--doc-ink-dim); margin-top: 4px; display: block; }
 footer {
   margin-top: 22px;
   padding-top: 10px;
-  border-top: 2px solid #111;
+  border-top: 2px solid var(--doc-ink);
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 .footer-l { font-size: 9pt; font-weight: 700; }
-.footer-l span { font-weight: 400; color: #555; font-size: 8pt; display: block; margin-top: 2px; }
-.footer-r { text-align: right; font-size: 8pt; color: #555; line-height: 1.7; }
-.footer-r a { color: #111; font-weight: 600; text-decoration: none; }
+.footer-l span { font-weight: 400; color: var(--doc-ink-dim); font-size: 8pt; display: block; margin-top: 2px; }
+.footer-r { text-align: right; font-size: 8pt; color: var(--doc-ink-dim); line-height: 1.7; }
+.footer-r a { color: var(--doc-ink); font-weight: 600; text-decoration: none; }
 .page-break { page-break-after: always; padding-bottom: 8px; }
 .print-btn {
   position: fixed; bottom: 24px; right: 24px;
-  background: #111; color: #fff; border: none;
+  background: var(--doc-ink); color: var(--doc-bg); border: none;
   padding: 10px 20px; font-size: 10pt; font-weight: 600; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,.25);
 }
 @media print {
   .print-btn { display: none; }
   body { padding: 0; }
-  a { color: #111 !important; text-decoration: none !important; }
+  a { color: var(--doc-ink) !important; text-decoration: none !important; }
 }
 </style>
 </head>
 <body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
 
 <!-- PAGE 1 — THE PROBLEM -->
 <header>
@@ -201,10 +215,10 @@ footer {
     <th>Audit log</th>
   </tr>
   <tr><td><strong>Paramant</strong></td><td class="ok">No</td><td class="ok">Yes (ML-KEM-768)</td><td class="ok">Yes</td><td class="ok">Yes</td><td class="ok">Yes (BUSL)</td><td class="ok">Yes (CT)</td></tr>
-  <tr><td>Zivver</td><td style="color:#c00">Yes</td><td class="na">Roadmap</td><td style="color:#c00">No</td><td style="color:#c00">No</td><td style="color:#c00">No</td><td class="na">Partial</td></tr>
-  <tr><td>Tresorit</td><td style="color:#c00">Yes</td><td class="na">No</td><td style="color:#c00">No</td><td style="color:#c00">No</td><td class="na">Enterprise</td><td class="na">Partial</td></tr>
-  <tr><td>WeTransfer</td><td style="color:#c00">Yes</td><td class="na">No</td><td style="color:#c00">No</td><td class="na">7 days</td><td style="color:#c00">No</td><td style="color:#c00">No</td></tr>
-  <tr><td>Signal</td><td class="na">Messages</td><td class="na">X3DH only</td><td class="ok">Yes</td><td style="color:#c00">No files</td><td class="na">No relay</td><td class="na">No</td></tr>
+  <tr><td>Zivver</td><td style="color:#b00">Yes</td><td class="na">Roadmap</td><td style="color:#b00">No</td><td style="color:#b00">No</td><td style="color:#b00">No</td><td class="na">Partial</td></tr>
+  <tr><td>Tresorit</td><td style="color:#b00">Yes</td><td class="na">No</td><td style="color:#b00">No</td><td style="color:#b00">No</td><td class="na">Enterprise</td><td class="na">Partial</td></tr>
+  <tr><td>WeTransfer</td><td style="color:#b00">Yes</td><td class="na">No</td><td style="color:#b00">No</td><td class="na">7 days</td><td style="color:#b00">No</td><td style="color:#b00">No</td></tr>
+  <tr><td>Signal</td><td class="na">Messages</td><td class="na">X3DH only</td><td class="ok">Yes</td><td style="color:#b00">No files</td><td class="na">No relay</td><td class="na">No</td></tr>
 </table>
 
 <div class="page-break"></div>
@@ -345,7 +359,7 @@ footer {
   <tr><td><strong>Enterprise</strong></td><td>Custom</td><td>Dedicated relay, SLA, on-prem</td><td>Hospital, manufacturer, law firm ≥25 users</td></tr>
 </table>
 
-<p style="font-size:8.5pt;color:#555;margin-top:6px">Community self-hosted (BUSL-1.1): free forever, up to 5 users. Drives awareness, self-qualifies larger deployments, prevents resale by competitors.</p>
+<p style="font-size:8.5pt;color:var(--doc-ink-dim);margin-top:6px">Community self-hosted (BUSL-1.1): free forever, up to 5 users. Drives awareness, self-qualifies larger deployments, prevents resale by competitors.</p>
 
 <div class="page-break"></div>
 
@@ -402,7 +416,7 @@ footer {
   <tr><td class="period">Q2 2027</td><td>500 Pro + 1 Team + 5 enterprise</td><td>€12,000–30,000/mo</td><td>Partner channel contribution</td></tr>
 </table>
 
-<p style="font-size:8.5pt;color:#555;margin-top:6px">Unit economics: Pro CAC estimated &lt;€30 (self-serve). Enterprise CAC: 1–2 sales conversations + compliance docs. Churn: low — regulated industry switching costs are high and self-hosted deployments never churn.</p>
+<p style="font-size:8.5pt;color:var(--doc-ink-dim);margin-top:6px">Unit economics: Pro CAC estimated &lt;€30 (self-serve). Enterprise CAC: 1–2 sales conversations + compliance docs. Churn: low — regulated industry switching costs are high and self-hosted deployments never churn.</p>
 
 <div class="page-break"></div>
 

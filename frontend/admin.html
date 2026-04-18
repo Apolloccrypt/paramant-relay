@@ -4,15 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT</title>
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--sur:#111;--b:#1a1a1a;--bs:#141414;--t:#ededed;--m:#888;--q:#555;--g:#00cc33;--r:#8c3a3a;--y:#8c7a2d;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
-body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
-input,select,button,textarea{font-family:var(--font);font-size:13px}
-a{color:var(--m);text-decoration:none}a:hover{color:var(--t)}
+body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+input,select,button,textarea{font-family:var(--mono);font-size:13px}
+a{color:var(--ink-dim);text-decoration:none}a:hover{color:var(--cobalt)}
 </style>
 </head>
 <body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
 <div id="root"></div>
 <script>
 const RELAYS=[
@@ -22,7 +33,7 @@ const RELAYS=[
   {l:"IoT",u:"/rp/iot"},
   {l:"Fly.io",u:"/rp/fly"}
 ];
-const V={bg:"#0c0c0c",sur:"#111",b:"#1a1a1a",t:"#ededed",m:"#888",q:"#555",g:"#00cc33",r:"#8c3a3a",y:"#8c7a2d",
+const V={bg:"#F8FAFC",sur:"#EEF2F6",b:"rgba(11,58,106,.15)",t:"#0B3A6A",m:"rgba(11,58,106,.65)",q:"rgba(11,58,106,.65)",g:"#B2FF3F",r:"#8c3a3a",y:"#8c7a2d",
   font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
   mono:"'SF Mono','Fira Code','Cascadia Code',monospace"};
 
@@ -56,7 +67,7 @@ async function loadRelayData(relay){
   ]);
   relayData[relay.u]={health:health.data,audit:audit.data,ct:ct.data};
   const dot=document.getElementById("dot-"+relay.l.toLowerCase());
-  if(dot)dot.style.background=health.ok?"#00cc33":"#8c3a3a";
+  if(dot)dot.style.background=health.ok?"#B2FF3F":"#8c3a3a";
   if(health.ok)addLog(relay.l+": v"+health.data?.version+" | uptime "+Math.floor((health.data?.uptime_s||0)/3600)+"h","ok");
   else addLog(relay.l+": unreachable","error");
   renderMain();
@@ -93,7 +104,7 @@ function showKeyOverlay(key,label,plan,email){
     '<div style="font-size:11px;font-family:'+V.mono+';color:'+V.g+';letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px">Key created</div>'+
     '<div style="font-size:11px;font-family:'+V.mono+';color:'+V.q+';margin-bottom:12px">'+esc(label)+' · '+esc(plan)+'</div>'+
     '<div style="background:'+V.bg+';border:1px solid '+V.b+';border-radius:5px;padding:16px;margin-bottom:12px;font-family:'+V.mono+';font-size:13px;color:'+V.t+';word-break:break-all;user-select:all">'+esc(key)+'</div>'+
-    '<div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:5px;padding:12px;margin-bottom:20px;font-size:12px;color:#888800">Save this key in a password manager. It is shown once and cannot be recovered.</div>'+
+    '<div style="background:rgba(178,255,63,.12);border:1px solid #0B3A6A;border-radius:5px;padding:12px;margin-bottom:20px;font-size:12px;color:#0B3A6A">Save this key in a password manager. It is shown once and cannot be recovered.</div>'+
     (email?'<div style="font-size:12px;color:'+V.q+';margin-bottom:20px">Welcome email will be sent to '+esc(email)+'</div>':'')+
     '<button onclick="this.closest(\'[data-overlay]\').remove()" style="width:100%;background:'+V.t+';color:'+V.bg+';border:none;border-radius:5px;padding:10px;font-size:13px;font-weight:500;cursor:pointer">I have saved this key</button>'+
     '</div>';
@@ -304,7 +315,7 @@ function render(){
   '<div style="padding:12px"><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'+
   RELAYS.map(r=>'<div style="background:'+V.bg+';border:1px solid '+V.b+';border-radius:5px;padding:12px;text-align:center;cursor:pointer" onclick="selectedRelay=RELAYS.find(x=>x.u===\''+r.u+'\');loadRelayData(selectedRelay)">'+
     '<div style="font-size:11px;font-family:'+V.mono+';color:'+V.m+';margin-bottom:6px">'+r.l+'</div>'+
-    '<div id="dot-'+r.l.toLowerCase()+'" style="width:8px;height:8px;border-radius:50%;margin:0 auto;background:'+V.q+'"></div></div>'
+    '<div id="dot-'+r.l.toLowerCase()+'" style="width:8px;height:8px;border-radius:0;margin:0 auto;background:'+V.q+'"></div></div>'
   ).join("")+
   '</div></div></div></div>'+
 

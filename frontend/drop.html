@@ -8,32 +8,20 @@
 <meta name="theme-color" content="#050505">
 <link rel="manifest" href="/manifest.json">
 <title>ParaDrop</title>
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
-/* Google Fonts removed — self-hosted product must not leak user IPs to third parties */
-
-:root {
-  --bg: #050505;
-  --surface: #0e0e0e;
-  --border: #1c1c1c;
-  --border2: #2a2a2a;
-  --text: #f0f0f0;
-  --muted: #666;
-  --quiet: #333;
-  --green:#00ff41;
-  --green-dim:#242424;
-  --red: #ff4444;
-  --amber: #f5a623;
-  --mono: 'Courier New', 'Menlo', monospace;
-  --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
+/* ParaDrop v4 — full-screen PWA shell */
+/* --green alias so JS-set inline styles still resolve */
+:root { --green: var(--cobalt); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 html, body {
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
+  background: #060c10;
+  color: var(--bone-on-navy);
+  font-family: var(--mono);
   overflow: hidden;
   touch-action: manipulation;
 }
@@ -61,8 +49,8 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
-  background: rgba(5,5,5,.9);
+  border-bottom: 1px solid var(--bone-on-navy-hair);
+  background: rgba(0,0,0,.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -71,23 +59,21 @@ header {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: .12em;
-  color: var(--text);
+  color: var(--bone-on-navy);
 }
-.logo span { color: var(--green); }
+.logo span { color: var(--cobalt); }
 .status-pill {
   display: flex;
   align-items: center;
   gap: 6px;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   letter-spacing: .06em;
 }
 .status-dot {
   width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
+  background: var(--lime);
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse {
@@ -98,8 +84,8 @@ header {
 /* ── Mode switcher ── */
 .mode-bar {
   display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,.82);
+  border-bottom: 1px solid var(--bone-on-navy-hair);
 }
 .mode-btn {
   flex: 1;
@@ -108,7 +94,7 @@ header {
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   background: none;
   border: none;
   cursor: pointer;
@@ -116,14 +102,14 @@ header {
   position: relative;
 }
 .mode-btn.active {
-  color: var(--green);
+  color: var(--bone-on-navy);
 }
 .mode-btn.active::after {
   content: '';
   position: absolute;
   bottom: 0; left: 0; right: 0;
   height: 2px;
-  background: var(--green);
+  background: var(--cobalt);
 }
 
 /* ── Content area ── */
@@ -146,19 +132,18 @@ header {
 
 /* ── Cards ── */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 12px;
+  background: rgba(6,12,16,.88);
+  border: 1px solid var(--bone-on-navy-hair);
   overflow: hidden;
 }
 .card-head {
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bone-on-navy-hair);
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -167,8 +152,7 @@ header {
 
 /* ── Drop zone ── */
 .dropzone {
-  border: 1.5px dashed var(--border2);
-  border-radius: 10px;
+  border: 1.5px dashed var(--bone-on-navy-hair);
   padding: 40px 20px;
   text-align: center;
   cursor: pointer;
@@ -180,12 +164,12 @@ header {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--green-dim);
+  background: rgba(248,250,252,.05);
   opacity: 0;
   transition: opacity .2s;
 }
 .dropzone.dragover {
-  border-color: var(--green);
+  border-color: var(--cobalt);
 }
 .dropzone.dragover::before { opacity: 1; }
 .dz-icon {
@@ -200,14 +184,14 @@ header {
 }
 .dz-sub {
   font-size: 12px;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   line-height: 1.6;
 }
 .dz-types {
   margin-top: 12px;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--quiet);
+  color: rgba(248,250,252,.65);
   letter-spacing: .04em;
 }
 
@@ -217,9 +201,8 @@ header {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: var(--green-dim);
-  border: 1px solid rgba(0,232,122,.2);
-  border-radius: 10px;
+  background: rgba(248,250,252,.06);
+  border: 1px solid var(--bone-on-navy-hair);
 }
 .file-icon { font-size: 24px; }
 .file-info { flex: 1; min-width: 0; }
@@ -233,13 +216,13 @@ header {
 .file-size {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   margin-top: 2px;
 }
 .file-remove {
   background: none;
   border: none;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   cursor: pointer;
   font-size: 18px;
   padding: 4px;
@@ -255,7 +238,6 @@ header {
   padding: 24px 16px;
 }
 #qr-canvas {
-  border-radius: 8px;
   background: #fff;
   padding: 12px;
   max-width: 200px;
@@ -263,19 +245,18 @@ header {
 }
 .qr-hint {
   font-size: 12px;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   text-align: center;
   line-height: 1.6;
 }
 .qr-link {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--green);
+  color: var(--cobalt);
   word-break: break-all;
   text-align: center;
   padding: 10px 14px;
-  background: var(--green-dim);
-  border-radius: 6px;
+  background: rgba(29,78,216,.12);
   width: 100%;
   cursor: pointer;
 }
@@ -286,17 +267,16 @@ header {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: .15em;
-  color: var(--green);
+  color: var(--lime);
   text-align: center;
   padding: 20px;
-  background: var(--bg);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
+  background: var(--navy);
+  border: 1px solid var(--bone-on-navy-hair);
 }
 .fp-label {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   text-align: center;
   letter-spacing: .06em;
   margin-bottom: 8px;
@@ -304,29 +284,26 @@ header {
 
 /* ── Progress ── */
 .progress-wrap {
-  background: var(--bg);
-  border: 1px solid var(--border2);
-  border-radius: 4px;
+  background: var(--navy);
+  border: 1px solid var(--bone-on-navy-hair);
   height: 3px;
   overflow: hidden;
   margin: 12px 0;
 }
 .progress-bar {
   height: 100%;
-  background: var(--green);
+  background: var(--cobalt);
   width: 0%;
   transition: width .3s;
-  box-shadow: 0 0 8px var(--green);
 }
 
 /* ── Buttons ── */
 .btn {
   width: 100%;
   padding: 16px;
-  background: var(--green);
-  color: #000;
+  background: var(--cobalt);
+  color: var(--bone-on-navy);
   border: none;
-  border-radius: 10px;
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 700;
@@ -336,11 +313,11 @@ header {
   -webkit-tap-highlight-color: transparent;
 }
 .btn:active { transform: scale(.98); }
-.btn:disabled { background: var(--quiet); color: var(--muted); cursor: not-allowed; }
+.btn:disabled { background: rgba(29,78,216,.2); color: rgba(248,250,252,.35); cursor: not-allowed; }
 .btn-outline {
   background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border2);
+  color: var(--bone-on-navy);
+  border: 1px solid var(--bone-on-navy-hair);
 }
 .btn-row { display: flex; gap: 10px; }
 .btn-row .btn { flex: 1; }
@@ -348,17 +325,16 @@ header {
 /* ── Status lines ── */
 .status {
   font-size: 12px;
-  color: var(--muted);
+  color: rgba(248,250,252,.65);
   font-family: var(--mono);
   text-align: center;
   padding: 8px 0;
 }
-.status.ok { color: var(--green); }
-.status.err { color: var(--red); }
+.status.ok { color: var(--lime); }
+.status.err { color: rgba(255,80,80,1); }
 
 /* ── Scanner ── */
 #scanner-wrap {
-  border-radius: 12px;
   overflow: hidden;
   background: #000;
   aspect-ratio: 1;
@@ -379,16 +355,14 @@ header {
 .scanner-frame {
   width: 60%;
   aspect-ratio: 1;
-  border: 2px solid var(--green);
-  border-radius: 8px;
+  border: 2px solid var(--cobalt);
   box-shadow: 0 0 0 9999px rgba(0,0,0,.5);
 }
 .scanner-line {
   position: absolute;
   top: 20%; left: 20%; right: 20%;
   height: 2px;
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
+  background: var(--cobalt);
   animation: scan 2s ease-in-out infinite;
 }
 @keyframes scan {
@@ -403,19 +377,18 @@ header {
   flex-wrap: wrap;
   gap: 6px;
   padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--bone-on-navy-hair);
 }
 .tag {
   font-family: var(--mono);
   font-size: 10px;
   padding: 4px 8px;
-  border: 1px solid var(--border2);
-  color: var(--quiet);
-  border-radius: 4px;
+  border: 1px solid var(--bone-on-navy-hair);
+  color: rgba(248,250,252,.65);
 }
 .tag.green {
-  border-color: rgba(0,232,122,.3);
-  color: var(--green);
+  border-color: rgba(178,255,63,.2);
+  color: var(--lime);
 }
 
 /* ── Settings panel ── */
@@ -424,29 +397,27 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bone-on-navy-hair);
 }
 .setting-row:last-child { border-bottom: none; }
 .setting-label { font-size: 13px; }
-.setting-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.setting-sub { font-size: 11px; color: rgba(248,250,252,.65); margin-top: 2px; }
 select {
-  background: var(--bg);
-  border: 1px solid var(--border2);
-  color: var(--text);
+  background: var(--navy);
+  border: 1px solid var(--bone-on-navy-hair);
+  color: var(--bone-on-navy);
   padding: 6px 10px;
-  border-radius: 6px;
   font-family: var(--mono);
   font-size: 11px;
 }
 
 /* ── Allowed types warning ── */
 .blocked-warning {
-  background: rgba(255,68,68,.1);
-  border: 1px solid rgba(255,68,68,.3);
-  border-radius: 8px;
+  background: rgba(255,80,80,.1);
+  border: 1px solid rgba(255,80,80,.3);
   padding: 12px 14px;
   font-size: 12px;
-  color: var(--red);
+  color: rgba(255,80,80,1);
   display: none;
 }
 
@@ -465,6 +436,16 @@ select {
 </style>
 </head>
 <body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
 
 <canvas id="bg-canvas"></canvas>
 
@@ -544,7 +525,7 @@ select {
             </div>
             <input type="password" id="api-key-input"
               placeholder="pgp_..."
-              style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:6px;font-family:var(--mono);font-size:11px;width:130px"
+              style="background:var(--navy);border:1px solid var(--bone-on-navy-hair);color:var(--bone-on-navy);padding:6px 10px;font-family:var(--mono);font-size:11px;width:130px"
               oninput="validateKey()"
               autocomplete="off">
           </div>
@@ -562,7 +543,7 @@ select {
       <div id="send-step-qr" style="display:none">
         <div class="card">
           <div class="card-head">
-            <div class="status-dot" id="qr-dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></div>
+            <div class="status-dot" id="qr-dot" style="background:rgba(245,158,11,.85);box-shadow:0 0 8px rgba(245,158,11,.85)"></div>
             Waiting for receiver
           </div>
           <div class="qr-wrap">
@@ -580,8 +561,8 @@ select {
           <div class="card-body">
             <div class="fp-label">Ask receiver: "What is your fingerprint?"</div>
             <div class="fp-box" id="fp-display">—</div>
-            <label style="display:flex;align-items:flex-start;gap:10px;margin-top:16px;font-size:12px;color:var(--muted);cursor:pointer">
-              <input type="checkbox" id="fp-confirmed" onchange="updateSendBtn()" style="margin-top:2px;accent-color:var(--green)">
+            <label style="display:flex;align-items:flex-start;gap:10px;margin-top:16px;font-size:12px;color:rgba(248,250,252,.65);cursor:pointer">
+              <input type="checkbox" id="fp-confirmed" onchange="updateSendBtn()" style="margin-top:2px;accent-color:var(--cobalt)">
               I verified this fingerprint via phone/Signal — not just by looking at my screen
             </label>
           </div>
@@ -599,7 +580,7 @@ select {
       <div id="send-step-progress" style="display:none">
         <div class="card">
           <div class="card-head">
-            <div class="status-dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></div>
+            <div class="status-dot" style="background:rgba(245,158,11,.85);box-shadow:0 0 8px rgba(245,158,11,.85)"></div>
             Encrypting &amp; sending
           </div>
           <div class="card-body">
@@ -656,7 +637,7 @@ select {
           <div class="card-body">
             <input type="url" id="manual-link"
               placeholder="https://paramant.app/ontvang?s=..."
-              style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:var(--mono);font-size:11px;outline:none">
+              style="width:100%;background:var(--navy);border:1px solid var(--bone-on-navy-hair);color:var(--bone-on-navy);padding:10px 12px;font-family:var(--mono);font-size:11px;outline:none">
             <button class="btn" style="margin-top:10px" onclick="openManualLink()">Open link →</button>
           </div>
         </div>
@@ -666,7 +647,7 @@ select {
       <div id="recv-step-keygen" style="display:none">
         <div class="card">
           <div class="card-head">
-            <div class="status-dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></div>
+            <div class="status-dot" style="background:rgba(245,158,11,.85);box-shadow:0 0 8px rgba(245,158,11,.85)"></div>
             Generating keypair
           </div>
           <div class="card-body">
@@ -697,7 +678,7 @@ select {
       <div id="recv-step-progress" style="display:none">
         <div class="card">
           <div class="card-head">
-            <div class="status-dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></div>
+            <div class="status-dot" style="background:rgba(245,158,11,.85);box-shadow:0 0 8px rgba(245,158,11,.85)"></div>
             Receiving &amp; decrypting
           </div>
           <div class="card-body">

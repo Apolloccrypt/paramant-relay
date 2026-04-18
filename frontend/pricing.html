@@ -5,30 +5,30 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing — PARAMANT</title>
 <meta name="description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only, no account. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
-.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--lime-hair)}
-.tier-card{padding:var(--space-7) var(--space-6);background:var(--black)}
-.tier-card.featured{background:var(--lime-ghost)}
-.tier-name{font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
-.tier-price{font-size:var(--text-3xl);font-weight:700;margin-bottom:var(--space-2)}
-.tier-price-note{font-size:var(--text-sm);color:rgba(212,255,0,.85);margin-bottom:var(--space-6)}
+.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair)}
+.tier-card{padding:var(--space-7) var(--space-6);background:var(--bone);min-height:440px;display:flex;flex-direction:column}
+.tier-card.featured{background:var(--lime)}
+.tier-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
+.tier-price{font-family:var(--mono);font-size:var(--text-3xl);font-weight:700;color:var(--navy);margin-bottom:var(--space-2)}
+.tier-price-note{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-6)}
 .tier-features{list-style:none;margin-bottom:var(--space-6)}
-.tier-features li{font-size:var(--text-sm);color:var(--lime);padding:var(--space-2) 0;border-bottom:1px solid var(--lime-hair);line-height:1.5}
+.tier-features li{font-family:var(--mono);font-size:var(--text-sm);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid var(--ink-hair);line-height:1.5}
 .tier-features li:last-child{border-bottom:none}
-.tier-features li::before{content:'+ ';font-weight:700;color:var(--lime)}
-.tier-features li.dim{color:var(--lime-dim)}
-.tier-features li.dim::before{content:'· ';color:var(--lime-dim)}
-.prose-section{padding:var(--space-8) 0;border-top:1px solid var(--lime-hair)}
-.prose-section h3{font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
-.prose-section p{font-size:var(--text-base);color:var(--lime);line-height:1.75;max-width:640px}
-.faq-item{border-top:1px solid var(--lime-hair);padding:var(--space-5) 0}
-.faq-item:last-child{border-bottom:1px solid var(--lime-hair)}
-.faq-q{font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-3)}
-.faq-a{font-size:var(--text-base);color:var(--lime);line-height:1.75}
-.faq-a a{color:var(--lime)}
-.trial-cta{border:1px solid var(--lime-hair);padding:var(--space-7);display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-8)}
+.tier-features li::before{content:'+ ';font-weight:700;color:var(--cobalt)}
+.tier-features li.dim{color:var(--ink-dim)}
+.tier-features li.dim::before{content:'· ';color:var(--ink-dim)}
+.prose-section{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
+.prose-section h3{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
+.prose-section p{font-size:var(--text-base);color:var(--ink);line-height:1.75;max-width:640px}
+.faq-item{border-top:1px solid var(--ink-hair);padding:var(--space-5) 0}
+.faq-item:last-child{border-bottom:1px solid var(--ink-hair)}
+.faq-q{font-size:var(--text-base);font-weight:700;color:var(--navy);margin-bottom:var(--space-3)}
+.faq-a{font-size:var(--text-base);color:var(--ink);line-height:1.75}
+.faq-a a{color:var(--cobalt)}
+.trial-cta{border:1px solid var(--ink-hair);padding:var(--space-7);display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-8)}
 @media(max-width:1023px){
   .tier-grid{grid-template-columns:1fr}
 }
@@ -39,6 +39,13 @@
 </head>
 <body>
 
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -61,7 +68,7 @@
       </ul>
     </li>
 
-    <li><a href="/pricing" class="nav-link active">Pricing</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
@@ -183,9 +190,9 @@
     <div class="sec-head" style="text-align:left">
       <span class="num">00</span>
       <h2>Pricing</h2>
-      <span style="font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Three tiers</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Three tiers</span>
     </div>
-    <p style="font-size:var(--text-md);color:rgba(212,255,0,.85);line-height:1.75;margin-bottom:var(--space-6)">
+    <p style="font-size:var(--text-md);color:var(--ink);line-height:1.75;margin-bottom:var(--space-6)">
       Send files for free. No account required. Scale when you need audit trails, team access, or a dedicated relay.
     </p>
     <a href="/send" class="btn btn-secondary">No account? Send a file instantly &rarr;</a>
@@ -201,7 +208,7 @@
         <div class="tier-name">Free</div>
         <div class="tier-price">&euro;0</div>
         <div class="tier-price-note">Forever &middot; no card required</div>
-        <p style="font-size:var(--text-base);color:var(--lime);margin-bottom:var(--space-5);line-height:1.65">For one-off anonymous sends. No account, no tracking.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For one-off anonymous sends. No account, no tracking.</p>
         <ul class="tier-features">
           <li>AES-256-GCM, browser-generated key</li>
           <li>5 MB per file</li>
@@ -217,7 +224,7 @@
         <div class="tier-name">Pro</div>
         <div class="tier-price" style="font-size:var(--text-xl)">Coming soon</div>
         <div class="tier-price-note">On the roadmap. Join the waitlist for launch pricing.</div>
-        <p style="font-size:var(--text-base);color:var(--lime);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
         <ul class="tier-features">
           <li class="dim">Everything in Free</li>
           <li class="dim">24 hour link expiry</li>
@@ -235,7 +242,7 @@
         <div class="tier-name">Enterprise</div>
         <div class="tier-price">Custom</div>
         <div class="tier-price-note">Dedicated relay &middot; SLA &middot; compliance</div>
-        <p style="font-size:var(--text-base);color:var(--lime);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
         <ul class="tier-features">
           <li>Everything in Pro</li>
           <li>7 day link expiry</li>
@@ -256,7 +263,7 @@
 </section>
 
 <!-- PROSE SECTIONS -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)">
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)">
   <div class="container-md">
 
     <div class="prose-section">
@@ -288,7 +295,7 @@
     <div class="trial-cta">
       <div>
         <p style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-2)">Not sure which plan fits?</p>
-        <p style="font-size:var(--text-sm);color:rgba(212,255,0,.85)">Request a trial API key. 30 days, no credit card, full relay access.</p>
+        <p style="font-size:var(--text-sm);color:var(--ink)">Request a trial API key. 30 days, no credit card, full relay access.</p>
       </div>
       <a href="/request-key" class="btn btn-primary">Request free trial key &rarr;</a>
     </div>
@@ -296,7 +303,7 @@
 </section>
 
 <!-- FAQ -->
-<section style="padding:var(--space-4) 0 var(--space-9);border-top:1px solid var(--lime-hair)">
+<section style="padding:var(--space-4) 0 var(--space-9);border-top:1px solid var(--ink-hair)">
   <div class="container-md">
     <h2 style="font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-7)">Frequently asked questions</h2>
 
@@ -343,19 +350,70 @@
   </div>
 </section>
 
-<!-- FOOTER -->
-<footer style="padding:var(--space-7) 0;border-top:1px solid var(--lime-hair)">
-  <div class="container" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">
-    <span style="font-size:var(--text-xs);color:var(--lime-dim);letter-spacing:.04em">&copy; 2026 Paramant &middot; EU/DE &middot; BUSL-1.1</span>
-    <div style="display:flex;gap:var(--space-5)">
-      <a href="/" style="font-size:var(--text-sm);color:var(--lime);text-decoration:none">Home</a>
-      <a href="/docs" style="font-size:var(--text-sm);color:var(--lime);text-decoration:none">Docs</a>
-      <a href="/security" style="font-size:var(--text-sm);color:var(--lime);text-decoration:none">Security</a>
-      <a href="mailto:privacy@paramant.app" style="font-size:var(--text-sm);color:var(--lime);text-decoration:none">Contact</a>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=4" defer></script>
 </body>
 </html>

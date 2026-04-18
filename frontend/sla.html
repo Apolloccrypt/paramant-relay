@@ -7,46 +7,54 @@
 <meta name="description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
+:root{
+  --black:var(--navy);;
+  --mono:ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace
+}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 .wrap{max-width:720px;margin:0 auto;padding:80px 48px 120px}
-.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px;font-family:var(--mono)}
-h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:10px}
-.sub{font-size:15px;color:var(--muted);margin-bottom:56px;line-height:1.7}
-h2{font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--text);margin-bottom:12px;margin-top:52px}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;font-family:var(--mono)}
+h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--ink);margin-bottom:10px}
+.sub{font-size:15px;color:var(--ink-dim);margin-bottom:56px;line-height:1.7}
+h2{font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--ink);margin-bottom:12px;margin-top:52px}
 h2:first-of-type{margin-top:0}
-p{color:var(--muted);margin-bottom:16px;line-height:1.8}
-.sla-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:40px}
-.sla-cell{background:var(--bg);padding:24px 20px}
-.sla-cell.head{background:var(--surface)}
-.tier{font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);margin-bottom:6px}
-.uptime{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--text)}
-.uptime-sub{font-size:12px;color:var(--quiet);margin-top:4px}
+p{color:var(--ink-dim);margin-bottom:16px;line-height:1.8}
+.sla-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:40px}
+.sla-cell{background:var(--bone);padding:24px 20px}
+.sla-cell.head{background:var(--ink-ghost)}
+.tier{font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.uptime{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--cobalt)}
+.uptime-sub{font-size:12px;color:var(--ink-dim);margin-top:4px}
 table{width:100%;border-collapse:collapse;margin-bottom:40px;font-size:13px}
-th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);border-bottom:1px solid var(--border);font-weight:500}
-td{padding:12px 16px;color:var(--muted);border-bottom:1px solid var(--border-soft)}
+th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);font-weight:500}
+td{padding:12px 16px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost)}
 tr:last-child td{border-bottom:none}
-td:first-child{color:var(--text);font-weight:500}
-.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-family:var(--mono);letter-spacing:.04em}
-.badge-comm{background:#1a1a1a;color:var(--quiet)}
-.badge-pro{background:#1a2020;color:#5a8a7a}
-.badge-ent{background:#1a1a2a;color:#7a7aaa}
-.note-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:32px;font-size:13px;color:var(--quiet);line-height:1.7}
-.note-box strong{color:var(--muted)}
-a{color:var(--muted);text-decoration:underline;text-decoration-color:#333}
-a:hover{color:var(--text)}
+td:first-child{color:var(--ink);font-weight:500}
+.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:var(--mono);letter-spacing:.04em}
+.badge-comm{background:var(--ink-ghost);color:var(--ink-dim)}
+.badge-pro{background:var(--ink-ghost);color:var(--ink-dim)}
+.badge-ent{background:var(--ink-ghost);color:var(--cobalt)}
+.note-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:32px;font-size:13px;color:var(--ink-dim);line-height:1.7}
+.note-box strong{color:var(--cobalt)}
+a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-hair)}
+a:hover{opacity:.8}
 .toc{display:flex;flex-direction:column;gap:6px;margin-bottom:52px}
-.toc a{font-size:13px;text-decoration:none;color:var(--quiet)}
-.toc a:hover{color:var(--muted)}
-footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--quiet)}
-footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--muted)}
-@media(max-width:640px){.wrap{padding:48px 24px 80px}.sla-grid{grid-template-columns:1fr}nav{padding:0 24px}footer{padding:24px;flex-direction:column;gap:16px}}
+.toc a{font-size:13px;text-decoration:none;color:var(--ink-dim)}
+.toc a:hover{color:var(--cobalt)}
+@media(max-width:640px){.wrap{padding:48px 24px 80px}.sla-grid{grid-template-columns:1fr}}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -202,7 +210,7 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
 
   <!-- 1. Uptime -->
   <h2 id="uptime">1. Uptime commitments</h2>
-  <p>Monthly uptime percentage is calculated as: <code style="font-family:var(--mono);font-size:12px;background:var(--surface);padding:2px 6px;border-radius:3px">(total minutes &minus; downtime minutes) / total minutes &times; 100</code></p>
+  <p>Monthly uptime percentage is calculated as: <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">(total minutes &minus; downtime minutes) / total minutes &times; 100</code></p>
 
   <div class="sla-grid">
     <div class="sla-cell head">
@@ -289,7 +297,7 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
   <!-- 4. Exclusions -->
   <h2 id="exclusions">4. Exclusions</h2>
   <p>The following are not counted as downtime for SLA purposes:</p>
-  <ul style="color:var(--muted);padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
+  <ul style="color:var(--ink-dim);padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
     <li>Scheduled maintenance windows, announced at least 48 hours in advance via <a href="https://github.com/Apolloccrypt/paramant-relay/releases">GitHub Releases</a></li>
     <li>Downtime caused by client-side network failures, DNS misconfiguration, or TLS certificate errors on the client</li>
     <li>Force majeure events (natural disasters, acts of war, upstream provider outages outside our control)</li>
@@ -300,8 +308,8 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
 
   <!-- 5. Measurement -->
   <h2 id="measurement">5. Measurement methodology</h2>
-  <p>PARAMANT measures availability using automated HTTP health checks against <code style="font-family:var(--mono);font-size:12px;background:var(--surface);padding:2px 6px;border-radius:3px">GET /health</code> on each relay sector endpoint, from multiple EU locations, every 60 seconds. An endpoint is considered unavailable when three consecutive checks fail with a non-2xx response or a TCP timeout.</p>
-  <p>Historical uptime data is published in the Certificate Transparency log and available at <a href="/ct-log">/ct-log</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--surface);padding:2px 6px;border-radius:3px">/v2/ct/log</code> API endpoint.</p>
+  <p>PARAMANT measures availability using automated HTTP health checks against <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on each relay sector endpoint, from multiple EU locations, every 60 seconds. An endpoint is considered unavailable when three consecutive checks fail with a non-2xx response or a TCP timeout.</p>
+  <p>Historical uptime data is published in the Certificate Transparency log and available at <a href="/ct-log">/ct-log</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
 
   <!-- 6. Changes -->
   <h2 id="changes">6. SLA changes</h2>
@@ -314,17 +322,72 @@ footer a{color:var(--quiet);text-decoration:none}footer a:hover{color:var(--mute
   PARAMANT &mdash; Hetzner DE (FSN1)<br>
   EU/DE jurisdiction &middot; GDPR Art. 28 compliant &middot; No US CLOUD Act exposure</p>
 
-  <div class="note-box" style="margin-top:40px"><strong>Self-hosting:</strong> This SLA applies exclusively to the managed PARAMANT relay service at <code style="font-family:var(--mono);font-size:12px">*.paramant.app</code>. Self-hosted deployments are governed by the BUSL-1.1 license and carry no uptime warranty. See <a href="/docs/self-hosting">self-hosting documentation</a> for HA configuration guidance.</div>
+  <div class="note-box" style="margin-top:40px"><strong>Self-hosting:</strong> This SLA applies exclusively to the managed PARAMANT relay service at <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 5px">*.paramant.app</code>. Self-hosted deployments are governed by the BUSL-1.1 license and carry no uptime warranty. See <a href="/docs/self-hosting">self-hosting documentation</a> for HA configuration guidance.</div>
 </div>
 
 <footer>
-  <span>&copy; 2026 Paramant &mdash; EU/DE &middot; BUSL-1.1</span>
-  <div style="display:flex;gap:24px">
-    <a href="/">Home</a>
-    <a href="/docs">Docs</a>
-    <a href="mailto:privacy@paramant.app">Contact</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
   </div>
 </footer>
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=4" defer></script>
 </body>
 </html>

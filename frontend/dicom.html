@@ -6,110 +6,93 @@
 <title>DICOM via Paramant — NEN 7510 compliant file relay for healthcare</title>
 <meta name="description" content="Send DICOM files with post-quantum encryption. Burn-on-read relay, zero storage, Merkle audit trail. NEN 7510 · GDPR · EU only.">
 <style>
-:root{
-  --bg:#0a0f0b;
-  --surface:#111612;
-  --border:#1e2b20;
-  --text:#ededed;
-  --muted:#9a9a9a;
-  --quiet:#6e6e6e;
-  --green:#00cc33;
-  --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
-}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;line-height:1.65}
-
-/* NAV */
-nav{position:sticky;top:0;z-index:100;background:rgba(10,15,11,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 40px;height:52px;display:flex;align-items:center;justify-content:space-between}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--text);text-decoration:none}
-.nav-links{list-style:none;display:flex;gap:28px}
-.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono);letter-spacing:.02em;transition:color .15s}
-.nav-links a:hover{color:var(--text)}
-@media(max-width:600px){nav{padding:0 20px}.nav-links{gap:16px}}
+body{font-size:15px;line-height:1.65}
 
 /* LAYOUT */
 .page-wrap{max-width:860px;margin:0 auto;padding:64px 40px 100px}
 @media(max-width:600px){.page-wrap{padding:40px 20px 80px}}
 
 /* HERO */
-.hero-badge{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--green);letter-spacing:.05em;margin-bottom:24px}
-.hero-badge span{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:5px 14px;font-size:11px;font-family:var(--mono);color:var(--ink);letter-spacing:.05em;margin-bottom:24px}
+.hero-badge span{width:6px;height:6px;background:var(--lime);display:inline-block}
 h1{font-size:clamp(26px,5vw,42px);font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-bottom:16px}
-h1 em{font-style:normal;color:var(--green)}
-.hero-sub{font-size:16px;color:var(--muted);max-width:620px;line-height:1.7;margin-bottom:32px}
+h1 em{font-style:normal;color:var(--cobalt)}
+.hero-sub{font-size:16px;color:var(--ink-dim);max-width:620px;line-height:1.7;margin-bottom:32px}
 .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:56px}
-.btn-p{display:inline-block;background:var(--green);color:#fff;font-size:13px;font-family:var(--mono);font-weight:600;padding:10px 22px;border-radius:5px;text-decoration:none;letter-spacing:.02em;transition:opacity .15s}
+.btn-p{display:inline-block;background:var(--cobalt);color:var(--bone-on-navy);font-size:13px;font-family:var(--mono);font-weight:600;padding:10px 22px;text-decoration:none;letter-spacing:.02em;transition:opacity .15s}
 .btn-p:hover{opacity:.85}
-.btn-s{display:inline-block;background:transparent;color:var(--muted);border:1px solid var(--border);font-size:13px;font-family:var(--mono);padding:10px 22px;border-radius:5px;text-decoration:none;letter-spacing:.02em;transition:color .15s,border-color .15s}
-.btn-s:hover{color:var(--text);border-color:var(--text)}
+.btn-s{display:inline-block;background:transparent;color:var(--ink-dim);border:1px solid var(--ink-hair);font-size:13px;font-family:var(--mono);padding:10px 22px;text-decoration:none;letter-spacing:.02em;transition:color .15s,border-color .15s}
+.btn-s:hover{color:var(--ink);border-color:var(--cobalt)}
 
 /* COMPLIANCE STRIP */
 .compliance-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:56px}
-.comp-pill{font-size:11px;font-family:var(--mono);color:var(--quiet);border:1px solid var(--border);border-radius:3px;padding:4px 10px;letter-spacing:.04em}
+.comp-pill{font-size:11px;font-family:var(--mono);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:4px 10px;letter-spacing:.04em}
 
 /* DIVIDER */
-hr{border:none;border-top:1px solid var(--border);margin:48px 0}
+hr{border:none;border-top:1px solid var(--ink-hair);margin:48px 0}
 
 /* SECTION HEADINGS */
 h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
-h3{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:28px 0 10px;color:var(--text)}
-p.lead{font-size:15px;color:var(--muted);line-height:1.75;margin-bottom:20px;max-width:680px}
+h3{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:28px 0 10px;color:var(--cobalt)}
+p.lead{font-size:15px;color:var(--ink-dim);line-height:1.75;margin-bottom:20px;max-width:680px}
 
 /* TABLE */
 .tbl-wrap{overflow-x:auto;margin:16px 0 24px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet);padding:8px 12px;border-bottom:1px solid var(--border)}
-td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;line-height:1.5}
-td:first-child{color:var(--text);font-weight:500;white-space:nowrap}
+th{text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);padding:8px 12px;border-bottom:1px solid var(--ink-hair)}
+td{padding:9px 12px;border-bottom:1px solid var(--ink-hair);color:var(--ink-dim);vertical-align:top;line-height:1.5}
+td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 
 /* ARCHITECTURE */
-.arch-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px 28px;font-family:var(--mono);font-size:13px;color:var(--muted);line-height:2.1;margin:16px 0 24px}
-.arch-block .node{color:var(--text);font-weight:600}
-.arch-block .label{color:var(--quiet);font-size:11px}
-.arch-block .relay{color:var(--green)}
+.arch-block{background:var(--black-hair);border:1px solid var(--ink-hair);padding:24px 28px;font-family:var(--mono);font-size:13px;color:var(--ink-dim);line-height:2.1;margin:16px 0 24px}
+.arch-block .node{color:var(--ink);font-weight:600}
+.arch-block .label{color:var(--ink-dim);font-size:11px}
+.arch-block .relay{color:var(--cobalt)}
 
 /* STEP */
 .steps{counter-reset:step;list-style:none;margin:0 0 24px}
 .steps>li{counter-increment:step;margin-bottom:36px}
-.step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);border:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--quiet);font-weight:700;margin-bottom:8px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--black-hair);border:1px solid var(--ink-hair);font-size:11px;font-family:var(--mono);color:var(--ink-dim);font-weight:700;margin-bottom:8px}
 
 /* CODE */
-pre{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 20px;font-family:var(--mono);font-size:12.5px;color:#c8d3c9;line-height:1.75;overflow-x:auto;margin:10px 0 16px;tab-size:2}
-pre .cm{color:var(--quiet)}
-pre .kw{color:#7db8a0}
-pre .st{color:#b8c9a4}
-code{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:#c8d3c9}
+pre{background:var(--black-hair);border:1px solid var(--ink-hair);padding:16px 20px;font-family:var(--mono);font-size:12.5px;color:var(--ink);line-height:1.75;overflow-x:auto;margin:10px 0 16px;tab-size:2}
+pre .cm{color:var(--ink-dim)}
+pre .kw{color:var(--cobalt)}
+pre .st{color:var(--ink-dim)}
+code{font-family:var(--mono);font-size:12px;background:var(--black-hair);border:1px solid var(--ink-hair);padding:1px 6px;color:var(--cobalt)}
 
 /* COMPLIANCE TABLE */
-.comp-table td:nth-child(3){font-size:12px;color:var(--quiet)}
-.check-green{color:var(--green);font-weight:700}
+.comp-table td:nth-child(3){font-size:12px;color:var(--ink-dim)}
+.check-green{color:var(--ink);font-weight:700}
 
 /* FAQ */
 .faq{margin-top:4px}
-.faq-item{border-top:1px solid var(--border);padding:18px 0}
-.faq-item:last-child{border-bottom:1px solid var(--border)}
-.faq-q{font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px}
-.faq-a{font-size:13px;color:var(--muted);line-height:1.7}
+.faq-item{border-top:1px solid var(--ink-hair);padding:18px 0}
+.faq-item:last-child{border-bottom:1px solid var(--ink-hair)}
+.faq-q{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.faq-a{font-size:13px;color:var(--ink-dim);line-height:1.7}
 
 /* CTA BLOCK */
-.cta-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;margin-top:48px}
+.cta-block{background:var(--black-hair);border:1px solid var(--ink-hair);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;margin-top:48px}
 .cta-block h3{margin:0 0 6px;font-size:16px}
-.cta-block p{font-size:13px;color:var(--muted);margin:0}
+.cta-block p{font-size:13px;color:var(--ink-dim);margin:0}
 .cta-links{display:flex;gap:12px;flex-wrap:wrap}
-
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding:32px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet);text-decoration:none}
-footer a:hover{color:var(--text)}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
 
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -339,7 +322,7 @@ paramant-sender.py --version
     <li>
       <div class="step-num">2</div>
       <h3>Configure</h3>
-      <p class="lead">Request a <code>pgp_</code> API key at <a href="mailto:privacy@paramant.app?subject=DICOM+key+request" style="color:var(--green);text-decoration:none">privacy@paramant.app</a>. Keys for healthcare are issued against the <code>health.paramant.app</code> sector.</p>
+      <p class="lead">Request a <code>pgp_</code> API key at <a href="mailto:privacy@paramant.app?subject=DICOM+key+request" style="color:var(--ink);text-decoration:none">privacy@paramant.app</a>. Keys for healthcare are issued against the <code>health.paramant.app</code> sector.</p>
       <pre><span class="cm"># Interactive setup</span>
 paramant-setup
 <span class="cm"># Relay:  health.paramant.app</span>
@@ -482,7 +465,7 @@ paramant-receiver.py \
     </div>
     <div class="faq-item">
       <div class="faq-q">Is there a verwerkersovereenkomst?</div>
-      <div class="faq-a">Yes. Required under GDPR Art. 28 when patient data is processed by a third party. Available on request: <a href="mailto:privacy@paramant.app?subject=Verwerkersovereenkomst" style="color:var(--green);text-decoration:none">privacy@paramant.app</a></div>
+      <div class="faq-a">Yes. Required under GDPR Art. 28 when patient data is processed by a third party. Available on request: <a href="mailto:privacy@paramant.app?subject=Verwerkersovereenkomst" style="color:var(--ink);text-decoration:none">privacy@paramant.app</a></div>
     </div>
   </div>
 
@@ -501,11 +484,69 @@ paramant-receiver.py \
 </div><!-- /page-wrap -->
 
 <footer>
-  <a href="/">PARAMANT</a>
-  <span>health.paramant.app &nbsp;·&nbsp; Hetzner Frankfurt DE &nbsp;·&nbsp; NEN 7510 · GDPR</span>
-  <a href="/docs">Docs</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </footer>
 
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=4" defer></script>
 </body>
 </html>

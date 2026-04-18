@@ -8,46 +8,53 @@
 <link rel="icon" href="/icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--green-bg:#181818;--green-dim:#242424;--mono:'Courier New',Courier,monospace}
-html{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.65;min-height:100vh}
-a{color:var(--green);text-decoration:none}
+:root{
+  --lime-dim:var(--ink-dim);--lime-hair:var(--ink-hair);--lime-ghost:var(--ink-ghost);
+  --mono:ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace
+}
+html{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.65;min-height:100vh}
+a{color:var(--ink);text-decoration:none}
 a:hover{text-decoration:underline}
 main{max-width:860px;margin:0 auto;padding:60px 24px 100px}
 h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
-h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green);font-family:var(--mono);border-bottom:1px solid var(--border);padding-bottom:10px;margin:48px 0 20px}
-h3{font-size:14px;font-weight:600;color:var(--muted);margin-bottom:8px}
-p{color:var(--muted);margin-bottom:12px;line-height:1.7}
-.subtitle{color:var(--quiet);font-size:14px;margin-bottom:40px;font-family:var(--mono)}
-.blurb{background:var(--green-bg);border-left:3px solid var(--green);padding:16px 20px;border-radius:0 6px 6px 0;margin:0 0 16px}
-.blurb strong{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--green);display:block;margin-bottom:8px}
-.blurb p{margin:0;color:var(--text);font-size:14px;line-height:1.75}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:16px}
+h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-family:var(--mono);border-bottom:1px solid var(--ink-hair);padding-bottom:10px;margin:48px 0 20px}
+h3{font-size:14px;font-weight:600;color:var(--ink-dim);margin-bottom:8px}
+p{color:var(--ink-dim);margin-bottom:12px;line-height:1.7}
+.subtitle{color:var(--ink-dim);font-size:14px;margin-bottom:40px;font-family:var(--mono)}
+.blurb{background:var(--ink-ghost);border-left:3px solid var(--lime);padding:16px 20px;margin:0 0 16px}
+.blurb strong{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:8px}
+.blurb p{margin:0;color:var(--ink);font-size:14px;line-height:1.75}
+.card{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:16px}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:.4rem 1.5rem}
-.facts dt{color:var(--quiet);white-space:nowrap;font-family:var(--mono);font-size:12px}
-.facts dd{margin:0;color:var(--text);font-size:13px}
+.facts dt{color:var(--ink-dim);white-space:nowrap;font-family:var(--mono);font-size:12px}
+.facts dd{margin:0;color:var(--ink);font-size:13px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .bullet-list{list-style:none;padding:0;margin-bottom:16px}
-.bullet-list li{padding:.35rem 0 .35rem 1.4rem;position:relative;color:var(--muted);font-size:14px;line-height:1.7}
-.bullet-list li::before{content:"▸";color:var(--green);position:absolute;left:0}
+.bullet-list li{padding:.35rem 0 .35rem 1.4rem;position:relative;color:var(--ink-dim);font-size:14px;line-height:1.7}
+.bullet-list li::before{content:"▸";color:var(--ink);position:absolute;left:0}
 .download-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-.dl-btn{background:var(--green-bg);border:1px solid var(--green-dim);color:var(--green);padding:.5rem 1rem;border-radius:4px;text-decoration:none;font-size:13px;font-family:var(--mono);transition:background .15s}
-.dl-btn:hover{background:var(--green);color:#0c0c0c;text-decoration:none}
-.contact{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px}
-.contact p{margin-bottom:8px;color:var(--muted);font-size:14px}
-.contact strong{color:var(--text)}
+.dl-btn{background:var(--ink-ghost);border:1px solid var(--ink-hair);color:var(--ink);padding:.5rem 1rem;text-decoration:none;font-size:13px;font-family:var(--mono);transition:background .15s}
+.dl-btn:hover{background:var(--cobalt);color:var(--bone-on-navy);text-decoration:none}
+.contact{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:20px 24px}
+.contact p{margin-bottom:8px;color:var(--ink-dim);font-size:14px}
+.contact strong{color:var(--cobalt)}
 table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
-td,th{border:1px solid var(--border);padding:.55rem .9rem;text-align:left}
-th{background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
-td{color:var(--text)}
-footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet)}
-footer a:hover{color:var(--green)}
+td,th{border:1px solid var(--ink-hair);padding:.55rem .9rem;text-align:left}
+th{background:rgba(178,255,63,.06);color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
+td{color:var(--cobalt)}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -241,13 +248,13 @@ footer a:hover{color:var(--green)}
 
   <h2>Logo &amp; brand assets</h2>
 
-  <p style="color:var(--muted)">Use PARAMANT brand assets only in editorial/press contexts. Do not modify the logo or use it to imply endorsement without written permission.</p>
+  <p style="color:var(--ink-dim)">Use PARAMANT brand assets only in editorial/press contexts. Do not modify the logo or use it to imply endorsement without written permission.</p>
 
   <div class="download-row">
     <a href="/icon-512.png" download class="dl-btn">Logo PNG (512&times;512)</a>
     <a href="/icon-192.png" download class="dl-btn">Logo PNG (192&times;192)</a>
   </div>
-  <p style="color:var(--quiet);font-size:12px;margin-top:12px;font-family:var(--mono)">SVG available on request: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+  <p style="color:var(--ink-dim);font-size:12px;margin-top:12px;font-family:var(--mono)">SVG available on request: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
 
   <h2>Screenshots &amp; product images</h2>
 
@@ -286,10 +293,69 @@ footer a:hover{color:var(--green)}
 </main>
 
 <footer>
-  PARAMANT &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act &middot; BUSL-1.1<br>
-  <a href="/">Home</a> &middot; <a href="/docs">Docs</a> &middot; <a href="/status">Status</a> &middot; <a href="/pricing">Pricing</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </footer>
 
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=4" defer></script>
 </body>
 </html>

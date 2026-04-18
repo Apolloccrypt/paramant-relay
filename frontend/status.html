@@ -6,55 +6,64 @@
 <title>System Status — PARAMANT</title>
 <meta name="description" content="Real-time status of all PARAMANT relay sectors.">
 <link rel="icon" href="/icon-192.png">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--green-bg:#181818;--green-dim:#242424;--red:#a03030;--red-bg:#1f0d0d;--red-dim:#3d1a1a;--amber:#a07030;--amber-bg:#1f1a0d;--amber-dim:#3d340d;--mono:'SF Mono','Fira Code','Cascadia Code',monospace}
-html{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;min-height:100vh}
-a{color:var(--text);text-decoration:none}
-a:hover{color:var(--green)}
+html{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.6;min-height:100vh}
+a{color:var(--ink);text-decoration:none}
+a:hover{color:var(--cobalt)}
 .page{max-width:760px;margin:0 auto;padding:56px 24px 120px}
 .header{margin-bottom:44px}
-.eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:10px}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin-bottom:10px}
 h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
-.overall{display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:6px;font-size:14px;border:1px solid var(--border);margin-bottom:8px;transition:background .3s,border-color .3s}
-.overall.ok{background:var(--green-bg);border-color:var(--green-dim)}
-.overall.degraded{background:var(--red-bg);border-color:var(--red-dim)}
-.overall.checking{background:var(--surface)}
-.dot-large{width:10px;height:10px;border-radius:50%;flex-shrink:0;transition:background .3s}
-.dot-large.ok{background:var(--green)}
-.dot-large.degraded{background:var(--red)}
-.dot-large.checking{background:var(--quiet);animation:pulse 1.2s ease-in-out infinite}
+.overall{display:flex;align-items:center;gap:10px;padding:14px 20px;font-size:14px;border:1px solid var(--ink-hair);margin-bottom:8px;transition:background .3s,border-color .3s}
+.overall.ok{background:var(--ink-ghost);border-color:var(--ink-hair)}
+.overall.degraded{background:rgba(255,80,80,.08);border-color:rgba(255,80,80,.3)}
+.overall.checking{background:rgba(0,0,0,.82)}
+.dot-large{width:10px;height:10px;flex-shrink:0;transition:background .3s}
+.dot-large.ok{background:var(--lime)}
+.dot-large.degraded{background:rgba(255,80,80,1)}
+.dot-large.checking{background:var(--ink-dim);animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.last-checked{font-size:12px;color:var(--quiet);font-family:var(--mono);margin-bottom:36px}
+.last-checked{font-size:12px;color:var(--ink-dim);font-family:var(--mono);margin-bottom:36px}
 .sector-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-.sector-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 22px;transition:border-color .3s}
-.sector-card.ok{border-color:var(--green-dim)}
-.sector-card.degraded{border-color:var(--red-dim)}
+.sector-card{background:rgba(0,0,0,.82);border:1px solid var(--ink-hair);padding:20px 22px;transition:border-color .3s}
+.sector-card.ok{border-color:var(--ink-hair)}
+.sector-card.degraded{border-color:rgba(255,80,80,.4)}
 .card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .sector-name{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}
-.dot.ok{background:var(--green)}
-.dot.degraded{background:var(--red)}
-.dot.checking{background:var(--quiet);animation:pulse 1.2s ease-in-out infinite}
-.card-status{font-size:13px;color:var(--muted);margin-bottom:10px}
-.card-status.ok{color:var(--green)}
-.card-status.degraded{color:#e88}
+.dot{width:8px;height:8px;flex-shrink:0;transition:background .3s}
+.dot.ok{background:var(--lime)}
+.dot.degraded{background:rgba(255,80,80,1)}
+.dot.checking{background:var(--ink-dim);animation:pulse 1.2s ease-in-out infinite}
+.card-status{font-size:13px;color:var(--ink-dim);margin-bottom:10px}
+.card-status.ok{color:var(--cobalt)}
+.card-status.degraded{color:rgba(255,80,80,1)}
 .meta-row{display:flex;gap:24px;flex-wrap:wrap}
-.meta-item{font-family:var(--mono);font-size:11px;color:var(--quiet)}
-.meta-item span{color:var(--muted)}
-.sector-url{font-family:var(--mono);font-size:11px;color:var(--quiet);margin-top:10px}
-.sector-url a{color:var(--quiet)}
-.sector-url a:hover{color:var(--green)}
-.refresh-note{font-size:12px;color:var(--quiet);font-family:var(--mono);text-align:center;margin-top:32px}
-footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet)}
-footer a:hover{color:var(--green)}
+.meta-item{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.meta-item span{color:var(--cobalt)}
+.sector-url{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-top:10px}
+.sector-url a{color:var(--ink-dim)}
+.sector-url a:hover{color:var(--cobalt)}
+.refresh-note{font-size:12px;color:var(--ink-dim);font-family:var(--mono);text-align:center;margin-top:32px}
+.footer-grid{display:grid;grid-template-columns:1fr repeat(4,auto);gap:var(--space-8);align-items:start}
+.footer-col-label{font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--ink-dim);margin-bottom:var(--space-4)}
+.footer-links{display:flex;flex-direction:column;gap:var(--space-2)}
+.footer-links a{font-size:var(--text-sm);color:var(--ink);text-decoration:none}
+@media(max-width:1023px){.footer-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.footer-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.sector-grid{grid-template-columns:1fr}}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -213,7 +222,67 @@ footer a:hover{color:var(--green)}
 </div>
 
 <footer>
-  PARAMANT relay network &middot; Hetzner DE &middot; GDPR &middot; <a href="/docs">docs</a> &middot; <a href="/request-key">free key</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </footer>
 
 <script>
@@ -358,6 +427,6 @@ footer a:hover{color:var(--green)}
   setInterval(checkAll, 30000);
 }());
 </script>
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=4" defer></script>
 </body>
 </html>

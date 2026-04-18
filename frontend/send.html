@@ -6,54 +6,50 @@
 <title>Send a file — PARAMANT</title>
 <meta name="description" content="Send any file securely. No account. Your browser encrypts with AES-256-GCM. The key lives in the link. Burn on first read.">
 <link rel="icon" href="/icon-192.png">
-<link rel="stylesheet" href="/design-system.css?v=3">
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
 .send-hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:var(--space-8);align-items:start}
-.spec-table{width:100%;border:1px solid var(--lime-hair);margin-top:var(--space-6)}
-.spec-table td{font-size:var(--text-sm);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--lime-hair);vertical-align:top;line-height:1.5}
-.spec-table td:first-child{color:var(--lime-dim);letter-spacing:.08em;text-transform:uppercase;width:44%}
-.spec-table td:last-child{color:var(--lime);font-weight:700}
+.spec-table{width:100%;border:1px solid var(--ink-hair);margin-top:var(--space-6)}
+.spec-table td{font-family:var(--mono);font-size:var(--text-sm);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--ink-hair);vertical-align:top;line-height:1.5}
+.spec-table td:first-child{color:var(--ink-dim);letter-spacing:.08em;text-transform:uppercase;width:44%}
+.spec-table td:last-child{color:var(--navy);font-weight:700}
 .spec-table tr:last-child td{border-bottom:none}
-.how-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-6)}
-.how-num{font-size:var(--text-4xl);font-weight:700;color:var(--lime-dim);line-height:1;margin-bottom:var(--space-4)}
 .safety-grid{display:grid;grid-template-columns:1fr 2fr;gap:var(--space-8);align-items:start}
 .step{display:none}
 .step.active{display:block}
-.progress-wrap{border:1px solid var(--lime-hair);height:3px;overflow:hidden;margin:var(--space-4) 0 var(--space-2)}
-#pbar{height:100%;background:var(--lime);width:0%;transition:width .3s}
-.status-line{font-size:var(--text-sm);color:var(--lime-dim);letter-spacing:.04em;padding:var(--space-1) 0}
-.status-line.ok{color:var(--lime)}
-.status-line.err{color:rgba(224,82,82,1)}
-.field-label{display:block;font-size:var(--text-sm);letter-spacing:.2em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:var(--space-2)}
-select#ttl-select{width:100%;background:var(--black);border:1px solid var(--lime-hair);color:var(--lime);padding:var(--space-3) var(--space-4);font-family:var(--mono);font-size:var(--text-sm);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none}
-select#ttl-select:focus{border-color:var(--lime)}
-.share-box{background:var(--black);border:1px solid var(--lime-hair);padding:var(--space-4);font-size:var(--text-sm);color:var(--lime);word-break:break-all;line-height:1.7;cursor:pointer;transition:border-color var(--duration-base) var(--ease-sharp);margin:var(--space-4) 0}
-.share-box:hover{border-color:var(--lime)}
-.copy-btn{width:100%;padding:var(--space-3);background:transparent;border:1px solid var(--lime-hair);color:var(--lime-dim);font-family:var(--mono);font-size:var(--text-sm);font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all var(--duration-base) var(--ease-sharp);margin-top:var(--space-2)}
-.copy-btn:hover,.copy-btn.copied{border-color:var(--lime);color:var(--lime)}
-.send-tag{display:inline-block;font-size:var(--text-sm);padding:var(--space-1) var(--space-3);border:1px solid var(--lime-hair);color:var(--lime-dim);letter-spacing:.06em;text-transform:uppercase;margin-right:var(--space-2);margin-top:var(--space-2)}
-.faq-item{border-top:1px solid var(--lime-hair);padding:var(--space-6) 0}
-.faq-item:last-child{border-bottom:1px solid var(--lime-hair)}
-.faq-a{font-size:var(--text-base);color:var(--lime);line-height:1.75}
-.footer-grid{display:grid;grid-template-columns:1fr repeat(4,auto);gap:var(--space-8);align-items:start}
-.footer-col-label{font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--lime-dim);margin-bottom:var(--space-4)}
-.footer-links{display:flex;flex-direction:column;gap:var(--space-2)}
-.footer-links a{font-size:var(--text-sm);color:var(--lime);text-decoration:none}
-.footer-links a:hover{color:var(--lime)}
-@media(max-width:1023px){
+.progress-wrap{border:1px solid var(--ink-hair);height:3px;overflow:hidden;margin:var(--space-4) 0 var(--space-2)}
+#pbar{height:100%;background:var(--cobalt);width:0%;transition:width .3s}
+.status-line{font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);letter-spacing:.04em;padding:var(--space-1) 0}
+.status-line.ok{color:var(--cobalt)}
+.status-line.err{color:rgba(185,28,28,1)}
+.field-label{display:block;font-family:var(--mono);font-size:var(--text-sm);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-2)}
+select#ttl-select{width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:var(--space-3) var(--space-4);font-family:var(--mono);font-size:var(--text-sm);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none}
+select#ttl-select:focus{border-color:var(--cobalt)}
+.share-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:var(--space-4);font-family:var(--mono);font-size:var(--text-sm);color:var(--navy);word-break:break-all;line-height:1.7;cursor:pointer;transition:border-color var(--duration-base) var(--ease-sharp);margin:var(--space-4) 0}
+.share-box:hover{border-color:var(--cobalt)}
+.copy-btn{width:100%;padding:var(--space-3);background:transparent;border:1px solid var(--ink-hair);color:var(--ink-dim);font-family:var(--mono);font-size:var(--text-sm);font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all var(--duration-base) var(--ease-sharp);margin-top:var(--space-2)}
+.copy-btn:hover,.copy-btn.copied{border-color:var(--cobalt);color:var(--cobalt)}
+.send-tag{display:inline-block;font-family:var(--mono);font-size:var(--text-sm);padding:var(--space-1) var(--space-3);border:1px solid var(--ink-hair);color:var(--ink-dim);letter-spacing:.06em;text-transform:uppercase;margin-right:var(--space-2);margin-top:var(--space-2)}
+.faq-item{border-top:1px solid var(--ink-hair);padding:var(--space-6) 0}
+.faq-item:last-child{border-bottom:1px solid var(--ink-hair)}
+.faq-a{font-size:var(--text-base);color:var(--ink);line-height:1.75}
+@media(max-width:900px){
   .send-hero-grid{grid-template-columns:1fr}
-  .how-grid{grid-template-columns:1fr 1fr}
   .safety-grid{grid-template-columns:1fr}
-  .footer-grid{grid-template-columns:1fr 1fr}
-}
-@media(max-width:640px){
-  .how-grid{grid-template-columns:1fr}
-  .footer-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
@@ -200,9 +196,9 @@ select#ttl-select:focus{border-color:var(--lime)}
 
       <!-- Left: copy + spec -->
       <div>
-        <p style="font-size:var(--text-sm);letter-spacing:.16em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:var(--space-5)">KEYLESS &middot; ANONYMOUS &middot; 5 MB</p>
-        <h1 style="font-size:clamp(3.5rem,8vw,9rem);line-height:1.0;letter-spacing:-.04em;margin-bottom:var(--space-5)">Drop a file.<br>Burn it after<br>one read.</h1>
-        <p style="font-size:var(--text-md);color:rgba(212,255,0,.85);line-height:1.7;max-width:48ch;margin-bottom:var(--space-5)">Your browser encrypts before upload. The key lives in the link, never on the relay. When the receiver opens the link, the file is gone.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-5)">KEYLESS &middot; ANONYMOUS &middot; 5 MB</p>
+        <h1 style="font-size:clamp(3rem,8vw,8rem);line-height:1.0;letter-spacing:-.04em;margin-bottom:var(--space-5)">Drop a file.<br>Burn it after<br>one read.</h1>
+        <p style="font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:48ch;margin-bottom:var(--space-5)">Your browser encrypts before upload. The key lives in the link, never on the relay. When the receiver opens the link, the file is gone.</p>
         <table class="spec-table">
           <tbody>
             <tr><td>cipher</td><td>aes-256-gcm</td></tr>
@@ -246,12 +242,12 @@ select#ttl-select:focus{border-color:var(--lime)}
           <input type="file" id="file-input" style="display:none" onchange="handleFileInput(this.files)">
 
           <!-- File info shown after selection -->
-          <div id="file-info" style="display:none;align-items:center;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--lime-hair);margin-top:var(--space-4)">
+          <div id="file-info" style="display:none;align-items:center;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--ink-hair);margin-top:var(--space-4)">
             <div style="flex:1;min-width:0">
               <div id="fname" style="font-size:var(--text-sm);font-weight:700;word-break:break-all;line-height:1.4"></div>
-              <div id="fsize" style="font-size:var(--text-xs);color:var(--lime-dim);margin-top:var(--space-1)"></div>
+              <div id="fsize" style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-1)"></div>
             </div>
-            <span onclick="changeFile()" style="font-size:var(--text-xs);color:var(--lime-dim);cursor:pointer;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0">Change</span>
+            <span onclick="changeFile()" style="font-size:var(--text-xs);color:var(--ink-dim);cursor:pointer;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0">Change</span>
           </div>
 
           <!-- Expiry -->
@@ -273,15 +269,15 @@ select#ttl-select:focus{border-color:var(--lime)}
             <div class="status-line" id="status-msg"></div>
           </div>
 
-          <p style="font-size:var(--text-sm);color:var(--lime-dim);margin-top:var(--space-3);letter-spacing:.04em">5 MB limit &middot; no account needed &middot; <a href="/parashare" style="color:var(--lime)">need verified transfers?</a></p>
+          <p style="font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-3);letter-spacing:.04em">5 MB limit &middot; no account needed &middot; <a href="/parashare" style="color:var(--cobalt)">need verified transfers?</a></p>
 
         </div>
 
         <!-- Step 2: Link ready -->
         <div id="step-link" class="step">
 
-          <p style="font-size:var(--text-sm);letter-spacing:.12em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:var(--space-3)">Link ready</p>
-          <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.7;margin-bottom:var(--space-5)">Share this link. The file decrypts in the recipient's browser and is deleted from the relay after one download.</p>
+          <p style="font-family:var(--mono);font-size:var(--text-sm);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-3)">Link ready</p>
+          <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin-bottom:var(--space-5)">Share this link. The file decrypts in the recipient's browser and is deleted from the relay after one download.</p>
 
           <label class="field-label">One-time download link</label>
           <div class="share-box" id="magic-link" onclick="copyLink()">—</div>
@@ -305,64 +301,64 @@ select#ttl-select:focus{border-color:var(--lime)}
 </section>
 
 <!-- § 01 HOW IT WORKS -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="how">
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="how">
   <div class="container">
     <div class="sec-head">
       <span class="num">01</span>
       <h2>How it works</h2>
-      <span style="font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Anon flow</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)">Anon flow</span>
     </div>
     <div class="how-grid">
       <div>
         <div class="how-num">1</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Browser generates the key</strong>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">Web Crypto API produces a 256-bit AES key inside your browser. The relay is never involved in this step.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">Web Crypto API produces a 256-bit AES key inside your browser. The relay is never involved in this step.</p>
       </div>
       <div>
         <div class="how-num">2</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">File encrypts locally</strong>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">AES-256-GCM encrypts your file in the browser. The ciphertext is uploaded. Plaintext never leaves your device.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">AES-256-GCM encrypts your file in the browser. The ciphertext is uploaded. Plaintext never leaves your device.</p>
       </div>
       <div>
         <div class="how-num">3</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Key goes in the link</strong>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">The key is placed in the URL fragment after the # symbol. Browsers strip the fragment before sending the URL to any server. The relay cannot log what it does not receive.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The key is placed in the URL fragment after the # symbol. Browsers strip the fragment before sending the URL to any server. The relay cannot log what it does not receive.</p>
       </div>
       <div>
         <div class="how-num">4</div>
         <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Recipient decrypts, relay burns</strong>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.65">The recipient's browser reads the key from the fragment and decrypts locally. The relay overwrites the ciphertext from RAM. Done.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The recipient's browser reads the key from the fragment and decrypts locally. The relay overwrites the ciphertext from RAM. Done.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- § 02 WHY THIS IS SAFE -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="why">
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="why">
   <div class="container">
     <div class="safety-grid">
       <div>
-        <div style="font-family:var(--mono);font-size:clamp(5rem,10vw,10rem);font-weight:700;line-height:0.85;letter-spacing:-.05em;color:var(--lime);margin-bottom:var(--space-5)">02</div>
+        <div style="font-family:var(--mono);font-size:clamp(5rem,10vw,10rem);font-weight:700;line-height:0.85;letter-spacing:-.05em;color:var(--cobalt);margin-bottom:var(--space-5)">02</div>
         <h2 style="font-size:clamp(1.5rem,2.5vw,2rem);letter-spacing:-.02em">Why this is safe without an account.</h2>
       </div>
       <div>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.75">Your browser generates the encryption key. The key is a 256-bit value produced by Web Crypto, the same primitive used by every HTTPS connection you make.</p>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.75;margin-top:var(--space-5)">The key travels in the URL fragment. Browsers never send fragments over the wire to servers, which means Paramant's relay cannot log what it does not receive.</p>
-        <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.75;margin-top:var(--space-5)">The relay holds the ciphertext in RAM only. When the recipient downloads, the memory is overwritten. No disk write, no backup, no deferred deletion queue.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75">Your browser generates the encryption key. The key is a 256-bit value produced by Web Crypto, the same primitive used by every HTTPS connection you make.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75;margin-top:var(--space-5)">The key travels in the URL fragment. Browsers never send fragments over the wire to servers, which means Paramant's relay cannot log what it does not receive.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75;margin-top:var(--space-5)">The relay holds the ciphertext in RAM only. When the recipient downloads, the memory is overwritten. No disk write, no backup, no deferred deletion queue.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- § 03 WHEN TO USE SOMETHING ELSE -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="alternatives">
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="alternatives">
   <div class="container-md">
     <div class="sec-head" style="text-align:left">
       <span class="num">03</span>
       <h2>When you need more than this.</h2>
-      <span style="font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Alternatives</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)">Alternatives</span>
     </div>
-    <p style="font-size:var(--text-base);color:rgba(212,255,0,.75);line-height:1.75;margin-bottom:var(--space-7)">Anonymous links are the fastest way to send something. For transfers where you need to prove who sent the file, or where the receiver must verify the relay before trusting a key, use ParaShare. For sending between two browsers on the same network with no relay in the middle, use ParaDrop.</p>
+    <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75;margin-bottom:var(--space-7)">Anonymous links are the fastest way to send something. For transfers where you need to prove who sent the file, or where the receiver must verify the relay before trusting a key, use ParaShare. For sending between two browsers on the same network with no relay in the middle, use ParaDrop.</p>
     <div class="cluster" style="--cluster-gap:var(--space-4)">
       <a href="/parashare" class="btn btn-secondary">Try ParaShare &rarr;</a>
       <a href="/drop" class="btn btn-secondary">Try ParaDrop &rarr;</a>
@@ -371,42 +367,42 @@ select#ttl-select:focus{border-color:var(--lime)}
 </section>
 
 <!-- § 04 FAQ -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)" id="faq">
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="faq">
   <div class="container-md">
     <div class="sec-head" style="text-align:left">
       <span class="num">04</span>
       <h2>FAQ</h2>
-      <span style="font-size:var(--text-sm);letter-spacing:.1em;text-transform:uppercase;color:var(--lime-dim)">Common questions</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)">Common questions</span>
     </div>
 
     <div class="faq-item">
-      <h4 style="font-size:var(--text-base);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:var(--space-3);line-height:1.4">What happens to my file after the recipient downloads it?</h4>
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">What happens to my file after the recipient downloads it?</h4>
       <p class="faq-a">The relay zeroes the memory holding the ciphertext and removes the entry from its store. The file is gone from every layer of the stack, including our RAM. There is no deleted files bin, no retention for abuse investigation, no copy retained for any purpose.</p>
     </div>
 
     <div class="faq-item">
-      <h4 style="font-size:var(--text-base);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:var(--space-3);line-height:1.4">Who has access to the decryption key?</h4>
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">Who has access to the decryption key?</h4>
       <p class="faq-a">Only the person holding the link. The key lives in the URL fragment after the # symbol. Your browser strips the fragment before sending the URL to any server, including ours. As the sender, only you can reproduce the key, because it was generated in your browser and not persisted anywhere.</p>
     </div>
 
     <div class="faq-item">
-      <h4 style="font-size:var(--text-base);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:var(--space-3);line-height:1.4">How long is the link valid?</h4>
-      <p class="faq-a">One hour by default, or until the first successful download, whichever comes first. Paid tiers extend this up to 24 hours or 7 days, and allow multiple reads per link. See <a href="/pricing" style="color:var(--lime)">pricing</a> for details.</p>
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">How long is the link valid?</h4>
+      <p class="faq-a">One hour by default, or until the first successful download, whichever comes first. Paid tiers extend this up to 24 hours or 7 days, and allow multiple reads per link. See <a href="/pricing" style="color:var(--cobalt)">pricing</a> for details.</p>
     </div>
 
     <div class="faq-item">
-      <h4 style="font-size:var(--text-base);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:var(--space-3);line-height:1.4">Can I send files larger than 5 MB?</h4>
-      <p class="faq-a">Not via the anonymous flow. The 5 MB limit applies to all tiers at the managed relay. Enterprise customers running a dedicated relay can configure a higher limit within their RAM budget. If you need to send larger files regularly, <a href="mailto:privacy@paramant.app" style="color:var(--lime)">contact us</a>.</p>
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">Can I send files larger than 5 MB?</h4>
+      <p class="faq-a">Not via the anonymous flow. The 5 MB limit applies to all tiers at the managed relay. Enterprise customers running a dedicated relay can configure a higher limit within their RAM budget. If you need to send larger files regularly, <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">contact us</a>.</p>
     </div>
 
   </div>
 </section>
 
 <!-- § 05 FINAL CTA -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)">
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)">
   <div class="container-md" style="text-align:center">
-    <p style="font-size:var(--text-sm);letter-spacing:.16em;text-transform:uppercase;color:var(--lime-dim);margin-bottom:var(--space-4)">&sect; end &middot; or begin</p>
-    <h2 style="font-size:clamp(3rem,8vw,7rem);letter-spacing:-.04em;margin-bottom:var(--space-7)">Send one.</h2>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-4)">&sect; end &middot; or begin</p>
+    <h2 style="margin-bottom:var(--space-7)">Send one.</h2>
     <div class="cluster" style="--cluster-gap:var(--space-4);justify-content:center;flex-wrap:wrap">
       <button onclick="window.scrollTo({top:0,behavior:'smooth'})" class="btn btn-primary">Back to dropzone &rarr;</button>
       <a href="/security" class="btn btn-secondary">Read the architecture &rarr;</a>
@@ -416,16 +412,14 @@ select#ttl-select:focus{border-color:var(--lime)}
 </section>
 
 <!-- FOOTER -->
-<footer style="padding:var(--space-9) 0;border-top:1px solid var(--lime-hair)">
+<footer>
   <div class="container-lg">
     <div class="footer-grid">
 
       <div>
-        <div class="wordmark" style="font-size:var(--text-base);margin-bottom:var(--space-3)">
-          <span class="para">Para</span><span class="suffix">MANT</span>
-        </div>
-        <p style="font-size:var(--text-xs);color:var(--lime-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-size:var(--text-xs);color:var(--lime-dim);margin-top:var(--space-4);line-height:1.8">
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">
           FIPS 203 / 204 &middot; Hetzner DE<br>
           GDPR &middot; no US CLOUD Act<br>
           BUSL-1.1 &middot; &copy; 2026 PARAMANT
