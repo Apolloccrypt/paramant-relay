@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pattern Library — PARAMANT Design System v2</title>
+<link rel="stylesheet" href="/design-system.css">
+<style>
+  /* Page-local only — nothing that belongs in design-system */
+  body { padding-bottom: 120px; }
+  .pl-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: var(--space-4) var(--space-8);
+    display: flex; align-items: center; gap: var(--space-6);
+  }
+  .pl-nav a { font-family: var(--mono); font-size: 11px; color: var(--text-quiet); text-decoration: none; }
+  .pl-nav a:hover { color: var(--green); }
+  .pl-nav .logo { font-weight: 700; color: var(--text-primary); font-size: 13px; }
+  .pl-section { border-top: 1px solid var(--border); padding: var(--space-12) 0; }
+  .pl-section:first-of-type { border-top: none; }
+  .pl-label {
+    font-family: var(--mono); font-size: 11px; color: var(--text-quiet);
+    letter-spacing: .1em; text-transform: uppercase;
+    margin-bottom: var(--space-2);
+  }
+  .pl-token-name {
+    font-family: var(--mono); font-size: 11px; color: var(--green);
+  }
+  .pl-token-value {
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+  }
+  .swatch-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .swatch {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    width: 120px;
+  }
+  .swatch-block {
+    height: 48px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+  }
+  .spacing-row { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+  .spacing-item { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+  .spacing-bar { background: var(--green-bg); border: 1px solid var(--green-border); width: 24px; }
+  .type-row { display: flex; flex-direction: column; gap: var(--space-5); }
+  .type-item { display: flex; align-items: baseline; gap: var(--space-6); }
+  .type-meta { min-width: 160px; flex-shrink: 0; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+  .card-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-5); }
+  .badge-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .metric-row { display: flex; flex-wrap: wrap; gap: var(--space-10); }
+  .pl-subsection { margin-top: var(--space-8); }
+  .pl-subsection + .pl-subsection { margin-top: var(--space-10); }
+</style>
+</head>
+<body>
+
+<nav class="pl-nav">
+  <span class="logo">PARAMANT / Pattern Library</span>
+  <a href="#colors">Colors</a>
+  <a href="#spacing">Spacing</a>
+  <a href="#type">Type</a>
+  <a href="#buttons">Buttons</a>
+  <a href="#cards">Cards</a>
+  <a href="#dropzone">Dropzone</a>
+  <a href="#badges">Badges</a>
+  <a href="#metrics">Metrics</a>
+  <a href="#code">Code</a>
+  <a href="#composition">Composition</a>
+</nav>
+
+<div class="container" style="padding-top: var(--space-12);">
+
+  <!-- ── COLORS ──────────────────────────────────────── -->
+  <section class="pl-section" id="colors">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Colors</h2>
+
+    <div class="pl-subsection">
+      <p class="pl-label">Backgrounds</p>
+      <div class="swatch-row">
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--bg)"></div>
+          <span class="pl-token-name">--bg</span>
+          <span class="pl-token-value">#0b1d12</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--surface)"></div>
+          <span class="pl-token-name">--surface</span>
+          <span class="pl-token-value">#0f2318</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--surface-2)"></div>
+          <span class="pl-token-name">--surface-2</span>
+          <span class="pl-token-value">#142b1c</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--surface-3)"></div>
+          <span class="pl-token-name">--surface-3</span>
+          <span class="pl-token-value">#193323</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label">Brand green</p>
+      <div class="swatch-row">
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--green)"></div>
+          <span class="pl-token-name">--green</span>
+          <span class="pl-token-value">#3dbe7a</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--green-dim)"></div>
+          <span class="pl-token-name">--green-dim</span>
+          <span class="pl-token-value">#2a8f59</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--green-bg); border-color: var(--green-border)"></div>
+          <span class="pl-token-name">--green-bg</span>
+          <span class="pl-token-value">rgba(61,190,122,.08)</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--surface-glow); border-color: var(--green-border)"></div>
+          <span class="pl-token-name">--surface-glow</span>
+          <span class="pl-token-value">rgba(61,190,122,.12)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label">Text</p>
+      <div class="swatch-row">
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--text-primary)"></div>
+          <span class="pl-token-name">--text-primary</span>
+          <span class="pl-token-value">#e8e8e8</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--text-secondary)"></div>
+          <span class="pl-token-name">--text-secondary</span>
+          <span class="pl-token-value">#a8b5ab</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--text-muted)"></div>
+          <span class="pl-token-name">--text-muted</span>
+          <span class="pl-token-value">#8aab99</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--text-tertiary)"></div>
+          <span class="pl-token-name">--text-tertiary</span>
+          <span class="pl-token-value">#6b7a70</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--text-quiet)"></div>
+          <span class="pl-token-name">--text-quiet</span>
+          <span class="pl-token-value">#4a6b58</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label">Semantic</p>
+      <div class="swatch-row">
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--red)"></div>
+          <span class="pl-token-name">--red</span>
+          <span class="pl-token-value">#e05c5c</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--amber)"></div>
+          <span class="pl-token-name">--amber</span>
+          <span class="pl-token-value">#d4935a</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--blue)"></div>
+          <span class="pl-token-name">--blue</span>
+          <span class="pl-token-value">#60a5fa (ParaDrop)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label">Borders</p>
+      <div class="swatch-row">
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--border)"></div>
+          <span class="pl-token-name">--border</span>
+          <span class="pl-token-value">#1e3828</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--border-soft)"></div>
+          <span class="pl-token-name">--border-soft</span>
+          <span class="pl-token-value">#192d22</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--border-subtle)"></div>
+          <span class="pl-token-name">--border-subtle</span>
+          <span class="pl-token-value">rgba(232,232,232,.08)</span>
+        </div>
+        <div class="swatch">
+          <div class="swatch-block" style="background: var(--border-strong)"></div>
+          <span class="pl-token-name">--border-strong</span>
+          <span class="pl-token-value">rgba(232,232,232,.18)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SPACING ────────────────────────────────────── -->
+  <section class="pl-section" id="spacing">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Spacing Scale</h2>
+    <p class="pl-label" style="margin-bottom: var(--space-5);">4 px base — --space-N</p>
+    <div class="spacing-row">
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-1)"></div>
+        <span class="pl-token-name">--space-1</span>
+        <span class="pl-token-value">4px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-2)"></div>
+        <span class="pl-token-name">--space-2</span>
+        <span class="pl-token-value">8px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-3)"></div>
+        <span class="pl-token-name">--space-3</span>
+        <span class="pl-token-value">12px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-4)"></div>
+        <span class="pl-token-name">--space-4</span>
+        <span class="pl-token-value">16px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-5)"></div>
+        <span class="pl-token-name">--space-5</span>
+        <span class="pl-token-value">20px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-6)"></div>
+        <span class="pl-token-name">--space-6</span>
+        <span class="pl-token-value">24px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-8)"></div>
+        <span class="pl-token-name">--space-8</span>
+        <span class="pl-token-value">32px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-10)"></div>
+        <span class="pl-token-name">--space-10</span>
+        <span class="pl-token-value">40px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-12)"></div>
+        <span class="pl-token-name">--space-12</span>
+        <span class="pl-token-value">48px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-14)"></div>
+        <span class="pl-token-name">--space-14</span>
+        <span class="pl-token-value">64px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-bar" style="height: var(--space-16)"></div>
+        <span class="pl-token-name">--space-16</span>
+        <span class="pl-token-value">96px</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TYPE ──────────────────────────────────────── -->
+  <section class="pl-section" id="type">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Type Scale</h2>
+    <div class="type-row">
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-5xl / .h1</span><br>
+          <span class="pl-token-value">80px · lh-tight · -0.03em</span>
+        </div>
+        <span class="h1" style="font-size: var(--text-5xl);">Relay</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-4xl</span><br>
+          <span class="pl-token-value">60px · .metric-value</span>
+        </div>
+        <span style="font-size: var(--text-4xl); font-weight: 700; line-height: 1; font-family: var(--mono); letter-spacing: -.04em;">99.9%</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-3xl / .h2</span><br>
+          <span class="pl-token-value">44px · lh-snug · -0.025em</span>
+        </div>
+        <span class="h2" style="font-size: var(--text-3xl);">Zero plaintext.</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-2xl</span><br>
+          <span class="pl-token-value">32px · .h2 mobile</span>
+        </div>
+        <span class="h2" style="font-size: var(--text-2xl);">Burn-on-read transfers.</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-xl / .h3</span><br>
+          <span class="pl-token-value">24px · lh-snug · -0.02em</span>
+        </div>
+        <span class="h3">Quantum-resistant by default.</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-lg / .lede</span><br>
+          <span class="pl-token-value">20px · text-secondary · lh-relaxed</span>
+        </div>
+        <span class="lede">ML-KEM-768 + ECDH P-256 hybrid key exchange.</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-base / .h4</span><br>
+          <span class="pl-token-value">17px · body weight 600</span>
+        </div>
+        <span class="h4">End-to-end encrypted file relay.</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-sm</span><br>
+          <span class="pl-token-value">15px · body default</span>
+        </div>
+        <span style="font-size: var(--text-sm); color: var(--text-secondary);">Files never touch disk. RAM-only. Auto-deleted after download.</span>
+      </div>
+      <div class="type-item">
+        <div class="type-meta">
+          <span class="pl-token-name">--text-xs / .eyebrow</span><br>
+          <span class="pl-token-value">13px · mono · uppercase</span>
+        </div>
+        <span class="eyebrow">Post-quantum relay</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BUTTONS ────────────────────────────────────── -->
+  <section class="pl-section" id="buttons">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Buttons</h2>
+
+    <div class="pl-subsection">
+      <p class="pl-label" style="margin-bottom: var(--space-4);">.btn-primary</p>
+      <div class="btn-row">
+        <button class="btn btn-primary">Send a file</button>
+        <button class="btn btn-primary" style="box-shadow: 0 0 24px rgba(61,190,122,.4); transform: translateY(-1px);">Hover state</button>
+        <button class="btn btn-primary" style="outline: 2px solid var(--green); outline-offset: 3px;">Focus state</button>
+        <button class="btn btn-primary" disabled>Disabled</button>
+      </div>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label" style="margin-bottom: var(--space-4);">.btn-secondary</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary">View docs</button>
+        <button class="btn btn-secondary" style="border-color: var(--green); background: var(--green-bg); transform: translateY(-1px);">Hover state</button>
+        <button class="btn btn-secondary" style="outline: 2px solid var(--green); outline-offset: 3px;">Focus state</button>
+        <button class="btn btn-secondary" disabled>Disabled</button>
+      </div>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label" style="margin-bottom: var(--space-4);">.btn-ghost</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost">Learn more</button>
+        <button class="btn btn-ghost" style="color: var(--text-primary); border-bottom-color: var(--green);">Hover state</button>
+        <button class="btn btn-ghost" disabled>Disabled</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CARDS ─────────────────────────────────────── -->
+  <section class="pl-section" id="cards">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Cards</h2>
+    <div class="card-row">
+      <div class="card">
+        <p class="eyebrow">.card</p>
+        <p class="h4" style="margin: var(--space-2) 0;">Base card</p>
+        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">surface + border + radius-lg + space-6 padding</p>
+      </div>
+      <div class="card-muted">
+        <p class="eyebrow">.card-muted</p>
+        <p class="h4" style="margin: var(--space-2) 0;">Muted card</p>
+        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">surface-1 + border-subtle</p>
+      </div>
+      <div class="card-elevated">
+        <p class="eyebrow">.card-elevated</p>
+        <p class="h4" style="margin: var(--space-2) 0;">Elevated card</p>
+        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">surface-2 + drop shadow</p>
+      </div>
+      <div class="card-accent">
+        <p class="eyebrow">.card-accent</p>
+        <p class="h4" style="margin: var(--space-2) 0;">Accent card</p>
+        <p style="font-size: var(--text-xs); color: var(--text-tertiary);">Green top border · hover: glow ring</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DROPZONE ───────────────────────────────────── -->
+  <section class="pl-section" id="dropzone">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Dropzone</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); max-width: 800px;">
+      <div>
+        <p class="pl-label" style="margin-bottom: var(--space-3);">Default</p>
+        <div class="dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+          </svg>
+          <p class="dropzone-label">Drop file here</p>
+          <p class="dropzone-sublabel">or click to browse · up to 5 GB</p>
+        </div>
+      </div>
+      <div>
+        <p class="pl-label" style="margin-bottom: var(--space-3);">Drag-over state (.dragover)</p>
+        <div class="dropzone dragover">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+          </svg>
+          <p class="dropzone-label">Release to upload</p>
+          <p class="dropzone-sublabel">or click to browse · up to 5 GB</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BADGES ─────────────────────────────────────── -->
+  <section class="pl-section" id="badges">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Badges</h2>
+    <div class="badge-row">
+      <span class="badge">v2.4.5</span>
+      <span class="badge">ML-KEM-768</span>
+      <span class="badge">IEC 62443</span>
+      <span class="badge-green badge">ACTIVE</span>
+      <span class="badge-green badge">RAM-ONLY</span>
+      <span class="badge-green badge">BURN-ON-READ</span>
+    </div>
+
+    <!-- Status dot -->
+    <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-8);">
+      <p class="pl-label" style="margin-bottom:0;">Status dot (.status-dot):</p>
+      <span class="status-dot"></span>
+      <span style="font-size: var(--text-xs); color: var(--text-secondary);">Relay operational · FRA · Hetzner DE</span>
+    </div>
+  </section>
+
+  <!-- ── METRICS ────────────────────────────────────── -->
+  <section class="pl-section" id="metrics">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Metrics</h2>
+    <div class="metric-row">
+      <div class="metric">
+        <p class="metric-value">99.9%</p>
+        <p class="metric-label">Uptime SLA</p>
+      </div>
+      <div class="metric">
+        <p class="metric-value">0</p>
+        <p class="metric-label">Bytes stored on disk</p>
+      </div>
+      <div class="metric">
+        <p class="metric-value">&lt;80ms</p>
+        <p class="metric-label">P50 relay latency</p>
+      </div>
+      <div class="metric">
+        <p class="metric-value text-green">5 GB</p>
+        <p class="metric-label">Max file size</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CODE ──────────────────────────────────────── -->
+  <section class="pl-section" id="code">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Code</h2>
+
+    <div class="pl-subsection">
+      <p class="pl-label" style="margin-bottom: var(--space-3);">.code-line (inline)</p>
+      <p style="font-size: var(--text-sm); color: var(--text-secondary);">
+        Install with <span class="code-line">pip install paramant-sdk</span> or grab the
+        <span class="code-line">relay.paramant.app/v2/inbound</span> endpoint directly.
+      </p>
+    </div>
+
+    <div class="pl-subsection">
+      <p class="pl-label" style="margin-bottom: var(--space-3);">.code-block</p>
+      <div class="code-block" style="max-width: 640px;">
+        <div class="code-block-header">
+          <span>python</span>
+          <span>paramant-sdk</span>
+        </div>
+        <pre>from paramant import ParamantClient
+
+client = ParamantClient(api_key="pgp_...")
+result = client.send("report.pdf", sector="finance")
+print(result.download_url)  # burn-on-read link</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── COMPOSITION ────────────────────────────────── -->
+  <section class="pl-section" id="composition">
+    <h2 class="h3" style="margin-bottom: var(--space-8);">Composition — Hero Block</h2>
+    <p style="font-size: var(--text-xs); color: var(--text-quiet); font-family: var(--mono); margin-bottom: var(--space-8);">
+      eyebrow + h1 + lede + cluster(btn-primary, btn-secondary) + dropzone — as it appears on the homepage
+    </p>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: var(--space-12) var(--space-10);">
+      <div class="stack" style="--stack-gap: var(--space-5); max-width: 680px; margin-bottom: var(--space-10);">
+        <p class="eyebrow">Post-quantum file relay</p>
+        <h1 class="h1">Send anything.<br>Leave no trace.</h1>
+        <p class="lede">ML-KEM-768 hybrid encryption. RAM-only relay. Files burn after download. No account needed.</p>
+        <div class="cluster">
+          <a href="/send" class="btn btn-primary">Send a file free</a>
+          <a href="/docs" class="btn btn-secondary">API docs</a>
+          <a href="#" class="btn btn-ghost">How it works</a>
+        </div>
+      </div>
+
+      <div class="dropzone" style="max-width: 560px;">
+        <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+        </svg>
+        <p class="dropzone-label">Drop any file here</p>
+        <p class="dropzone-sublabel">Up to 5 GB · encrypted in-browser · keyless or API key</p>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-6);">
+        <span class="status-dot"></span>
+        <span style="font-size: var(--text-xs); color: var(--text-quiet); font-family: var(--mono);">
+          Relay operational · FRA · Hetzner DE
+        </span>
+        <span class="badge-green badge" style="margin-left: var(--space-2);">RAM-ONLY</span>
+        <span class="badge-green badge">ML-KEM-768</span>
+      </div>
+    </div>
+
+    <!-- Layout helpers demo -->
+    <div style="margin-top: var(--space-10);">
+      <p class="pl-label" style="margin-bottom: var(--space-4);">Layout helpers — .stack, .cluster</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5);">
+        <div class="card">
+          <p class="pl-token-name" style="margin-bottom: var(--space-3);">.stack (--stack-gap)</p>
+          <div class="stack" style="--stack-gap: var(--space-3);">
+            <div style="height: 24px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);"></div>
+            <div style="height: 24px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);"></div>
+            <div style="height: 24px; background: var(--surface-2); border-radius: var(--radius-sm); border: 1px solid var(--border);"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="pl-token-name" style="margin-bottom: var(--space-3);">.cluster (flex row, wrapping)</p>
+          <div class="cluster">
+            <span class="badge">relay</span>
+            <span class="badge">health</span>
+            <span class="badge">finance</span>
+            <span class="badge">legal</span>
+            <span class="badge">iot</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /container -->
+</body>
+</html>
