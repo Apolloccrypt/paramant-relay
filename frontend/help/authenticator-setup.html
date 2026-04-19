@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Set up your authenticator — PARAMANT Help</title>
+<meta name="description" content="How to set up your authenticator app for Paramant. About 3 minutes. Works with 1Password, Bitwarden, Authy, Google Authenticator, and any RFC 6238 app.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
+.breadcrumb{font-size:var(--text-xs);color:var(--ink-dim);margin-bottom:32px}
+.breadcrumb a{color:var(--cobalt);text-decoration:none}
+.breadcrumb a:hover{opacity:.7}
+.breadcrumb span{margin:0 8px;color:var(--ink-ghost)}
+h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
+.lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
+h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:48px}
+h3{font-size:var(--text-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
+p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
+p strong{color:var(--ink)}
+a{color:var(--cobalt);text-decoration:none}
+a:hover{opacity:.7}
+em{color:var(--cobalt)}
+.step{display:flex;gap:20px;margin-bottom:32px;padding-bottom:32px;border-bottom:1px solid var(--ink-ghost)}
+.step:last-of-type{border-bottom:none}
+.step-num{width:32px;height:32px;background:var(--cobalt);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-body{flex:1}
+.step-body h2{margin-top:0}
+.app-list{list-style:none;margin:16px 0;display:flex;flex-direction:column;gap:8px}
+.app-list li{padding:10px 14px;border:1px solid var(--ink-hair);font-size:var(--text-sm);color:var(--ink-dim)}
+.app-list li strong{color:var(--ink)}
+.app-list li .tag{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--cobalt);margin-left:8px;font-weight:600}
+.code-block{background:var(--ink);color:var(--bone);padding:14px 18px;font-family:var(--mono,ui-monospace);font-size:var(--text-sm);line-height:1.6;margin:16px 0;word-break:break-all}
+.tip{border-left:3px solid var(--cobalt);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
+.tip p{margin:0;font-size:var(--text-sm)}
+.warn{border-left:3px solid var(--lime);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
+.warn p{margin:0;font-size:var(--text-sm)}
+.divider{border:none;border-top:1px solid var(--ink-hair);margin:48px 0}
+.troubleshoot-item{margin-bottom:24px}
+.troubleshoot-item .q{font-size:var(--text-sm);font-weight:600;color:var(--ink);margin-bottom:6px}
+.troubleshoot-item .a{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7}
+.next-steps{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+.next-step-card{border:1px solid var(--ink-hair);padding:18px 20px;text-decoration:none;color:inherit;display:block}
+.next-step-card:hover{border-color:var(--cobalt);opacity:1}
+.next-step-card h3{font-size:var(--text-sm);font-weight:600;color:var(--ink);margin:0 0 4px;text-transform:none;letter-spacing:0}
+.next-step-card p{font-size:var(--text-xs);color:var(--ink-dim);margin:0;line-height:1.5}
+footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+@media(max-width:640px){
+  main{padding:48px 20px 80px}
+  h1{font-size:26px}
+  .next-steps{grid-template-columns:1fr}
+  footer{padding:32px 20px;flex-direction:column}
+}
+</style>
+<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/nav.css?v=6">
+</head>
+<body>
+
+<div class="meta-bar">
+  <span>build 2.4.5</span>
+  <span class="sep">·</span>
+  <span>aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span>eu/de · ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="/help">Help</a>
+    <span>/</span>
+    Set up your authenticator
+  </div>
+
+  <h1>Set up your <em>authenticator</em> app.</h1>
+
+<div style="margin:24px 0;padding:16px;background:rgba(178,255,63,0.08);border-left:3px solid #B2FF3F;">
+  <div style="font-family:var(--mono,monospace);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#0B3A6A;font-weight:700;margin-bottom:8px;">
+    <span style="background:#B2FF3F;color:#0B3A6A;padding:2px 8px;">Rolling out Q2 2026</span>
+  </div>
+  <p style="margin:0;font-size:14px;line-height:1.5;color:#475569;">
+    This guide describes the authenticator flow as it becomes available to your account. Paramant is rolling out TOTP authentication to existing keys during Q2 2026. If you received a setup email, the steps below apply now. If you have not received one yet, your API key continues to work as normal.
+  </p>
+</div>
+
+  <p class="lead">About 3 minutes. One-time setup. Works with 1Password, Bitwarden, Authy, Google Authenticator, and any RFC 6238 compatible app.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h2>Install an authenticator app</h2>
+      <p>Pick one — all are free:</p>
+      <ul class="app-list">
+        <li><strong>1Password</strong><span class="tag">recommended</span> — syncs across devices, family and team plans available</li>
+        <li><strong>Bitwarden</strong> — free, open source, works on all platforms</li>
+        <li><strong>Authy</strong> — cloud backup, multi-device</li>
+        <li><strong>Google Authenticator</strong> — simple, single device</li>
+        <li><strong>Microsoft Authenticator</strong> — good if already using Microsoft 365</li>
+      </ul>
+      <p>Install on your phone before continuing.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h2>Open your Paramant setup link</h2>
+      <p>You received a setup link in your welcome email. It looks like:</p>
+      <div class="code-block">https://paramant.app/auth/setup?token=XXXXXXXX</div>
+      <p>Click it on your computer. The link expires 14 days after issue.</p>
+      <div class="tip"><p>If your link has expired, request a new one at <a href="/auth/resend-setup">paramant.app/auth/resend-setup</a>.</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h2>Scan the QR code</h2>
+      <p>Open your authenticator app on your phone and add a new entry:</p>
+      <ul class="app-list">
+        <li><strong>1Password</strong> — tap + &rarr; "Scan QR Code"</li>
+        <li><strong>Bitwarden</strong> — Add item &rarr; Login &rarr; Authenticator key &rarr; Scan QR</li>
+        <li><strong>Authy</strong> — tap + &rarr; "Scan QR Code"</li>
+        <li><strong>Google Authenticator</strong> — tap + &rarr; "Scan a QR code"</li>
+      </ul>
+      <p>Point the camera at the QR code on paramant.app. The app shows a 6-digit code that changes every 30 seconds.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <h2>Confirm it works</h2>
+      <p>Type the current 6-digit code from your app into the paramant.app setup page. Click <strong>Confirm setup</strong>.</p>
+      <div class="warn"><p>If it says "Invalid code", check that your phone's time is set automatically (Settings &rarr; General &rarr; Date &amp; Time &rarr; Set Automatically). TOTP depends on accurate time.</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <h2>Save your backup codes</h2>
+      <p>After confirming, you'll see 10 backup codes. Each can be used once if you lose access to your authenticator app.</p>
+      <p>Save them in at least one of these places:</p>
+      <ul class="app-list">
+        <li><strong>In your password manager</strong><span class="tag">recommended</span> — 1Password, Bitwarden, etc. as a secure note</li>
+        <li><strong>Printed copy</strong> — print and keep in a locked drawer or safe</li>
+        <li><strong>Encrypted file</strong> — password-protected ZIP or encrypted note</li>
+      </ul>
+      <div class="warn"><p>Don't store backup codes in plain text files, email, unencrypted cloud notes (iCloud Notes, Google Keep), or phone camera roll.</p></div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2 style="margin-top:0">You're done</h2>
+  <p>From now on, sign in at <a href="/auth/login">paramant.app/auth/login</a> with your email and the current 6-digit code from your app. Sessions last 1 hour.</p>
+
+  <hr class="divider">
+
+  <h3>Troubleshooting</h3>
+
+  <div class="troubleshoot-item">
+    <div class="q">"Invalid code" when I know it's correct</div>
+    <div class="a">
+      <p>Phone time drift is the most common cause. Enable automatic time on your phone (Settings &rarr; General &rarr; Date &amp; Time &rarr; Set Automatically).</p>
+      <p>Also possible: the code was already used in the last 90 seconds. Wait 30 seconds for a fresh code and try again.</p>
+    </div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">"Setup link expired"</div>
+    <div class="a">
+      <p>Request a new link at <a href="/auth/resend-setup">paramant.app/auth/resend-setup</a>.</p>
+    </div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">"All backup codes used"</div>
+    <div class="a">
+      <p>Contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account details. We'll verify your identity and manually reset your authenticator setup.</p>
+    </div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">I lost my phone / authenticator app</div>
+    <div class="a">
+      <p>Use one of your backup codes to sign in, then re-enroll a new authenticator app from your account settings. If you've used all backup codes, contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Related</h3>
+  <div class="next-steps">
+    <a href="/help/backup-codes" class="next-step-card">
+      <h3>Backup codes</h3>
+      <p>What they are, when to use them, how to regenerate.</p>
+    </a>
+    <a href="/help/api-key-vs-totp" class="next-step-card">
+      <h3>API key or TOTP?</h3>
+      <p>When to use which authentication method.</p>
+    </a>
+  </div>
+
+</main>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=5" defer></script>
+</body>
+</html>

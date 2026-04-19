@@ -269,7 +269,7 @@ function render(){
   '<nav style="display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid '+V.b+';position:sticky;top:0;background:rgba(12,12,12,.95);z-index:100">'+
   '<div style="display:flex;align-items:center;gap:20px">'+
   '<span style="font-family:'+V.mono+';font-size:13px;font-weight:500;letter-spacing:.08em;color:'+V.t+'">PARAMANT</span>'+
-  '<span style="font-size:12px;color:'+V.q+';font-family:'+V.mono+'">/ r34ct0r</span></div>'+
+  '<span style="font-size:12px;color:'+V.q+';font-family:'+V.mono+'">/ admin</span></div>'+
   '<div style="display:flex;align-items:center;gap:12px">'+
   '<select onchange="selectedRelay=RELAYS.find(r=>r.u===this.value)||RELAYS[0];loadRelayData(selectedRelay)" style="background:'+V.sur+';border:1px solid '+V.b+';border-radius:4px;padding:5px 10px;color:'+V.t+';font-size:12px;font-family:'+V.mono+'">'+
   RELAYS.map(r=>'<option value="'+r.u+'">'+r.l+'</option>').join("")+

@@ -370,6 +370,43 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <hr class="divider">
 
+  <hr class="divider">
+
+  <h2>Authentication</h2>
+  <p style="font-family:var(--mono,monospace);font-size:var(--text-sm);color:var(--ink-dim);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;"><span style="background:var(--lime,#B2FF3F);color:var(--navy,#0B3A6A);padding:2px 8px;font-weight:700;">rolling out Q2 2026</span> &nbsp; Admin access uses TOTP today. User-facing TOTP is being rolled out to existing keys during Q2 2026. API key access remains available throughout.</p>
+  <p>Paramant has no passwords. Humans authenticate with email and a time-based code from an authenticator app. Machines authenticate with long-lived API keys. What we do not have, we cannot leak.</p>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For humans</div>
+      <p style="margin:0">Sign in at paramant.app or through a browser extension with your email address and the current 6-digit code from your authenticator app. Sessions last one hour. Compatible with 1Password, Bitwarden, Authy, Google Authenticator, Microsoft Authenticator, and any RFC 6238 app.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For machines</div>
+      <p style="margin:0">Scripts, SDK calls, SCADA integrations, and IoT devices authenticate with an API key in the X-Api-Key HTTP header. No TOTP, no sessions, no human interaction required. Suitable for headless automation.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">What we do not store</div>
+      <p style="margin:0">No passwords. No password hashes. No security questions. No password reset tokens. Our database cannot leak a password because our database does not have the concept of one.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Session security</div>
+      <p style="margin:0">After TOTP verification, a 256-bit session token is issued as an httpOnly Secure SameSite=Strict cookie. The token lives in Redis with a one-hour sliding expiry. API keys never touch the browser.</p>
+    </div>
+  </div>
+
+  <h3>Rate limiting and replay protection</h3>
+  <p>TOTP codes expire thirty seconds after issue. Each code can be used exactly once across the system, enforced atomically in Redis. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes. After ten consecutive failures, an account locks for thirty minutes.</p>
+
+  <h3>Compared to alternatives</h3>
+  <p>Most encrypted file transfer services use password authentication with optional two-factor as an upgrade. Paramant reverses this. TOTP is required for human access from day one. The surface for credential theft is close to zero because there is nothing to phish, stuff, or reset.</p>
+
+  <p style="margin-top:12px">
+    <a href="/help/authenticator-setup">Setting up your authenticator &rarr;</a> &nbsp;
+    <a href="/help/api-key-vs-totp">When to use API key vs TOTP &rarr;</a> &nbsp;
+    <a href="/help/backup-codes">Backup codes &rarr;</a>
+  </p>
+
   <h2>Four-layer key verification</h2>
   <p>The relay distributes public keys. An attacker who controls the relay could serve wrong keys. These four layers prevent that:</p>
 
