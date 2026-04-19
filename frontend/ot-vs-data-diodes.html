@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OT data transfer: Paramant vs hardware data diodes</title>
+<meta name="description" content="Honest comparison of Paramant software relay against hardware data diodes (Waterfall, Owl, Fox) for IEC 62443 OT environments.">
+
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Product</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/vs" role="menuitem">vs. alternatives</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Info</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+        <li role="none"><a href="/request-key" role="menuitem">Free API key</a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Product</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/vs">vs. alternatives</a>
+      <a href="/press">Press kit</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="/status">Status</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2</a>
+      <a href="/compliance/iec62443">IEC 62443</a>
+      <a href="/compliance/nen7510">NEN 7510</a>
+      <a href="/dpa">Data Processing Agreement</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/government">Government</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Info</button>
+    <div class="nav-mobile-group-items">
+      <a href="mailto:privacy@paramant.app">Contact</a>
+      <a href="/request-key">Free API key</a>
+      <a href="/status">Status</a>
+      <a href="/sla">SLA</a>
+      <a href="/security">Security</a>
+      <a href="/license">License</a>
+    </div>
+  </div>
+</div>
+
+<section class="section section-lg">
+  <div class="container">
+    <div class="eyebrow">
+      <span class="bar"></span>
+      OT comparison · IEC 62443
+    </div>
+
+    <h1 class="hero-h1">
+      When a software relay beats a <em>hardware</em> diode.<br/>
+      And when it doesn't.
+    </h1>
+
+    <p class="lede" style="max-width:720px">
+      Hardware data diodes (Waterfall, Owl, Fox) have been the default for
+      critical infrastructure OT security for 25 years. Paramant is
+      different. This page explains when to use which, honestly.
+    </p>
+
+    <p class="dim mono" style="font-size:11px;margin-top:24px">
+      Last updated: April 2026 · All claims verified against vendor documentation
+      and IEC 62443 / NERC-CIP / ANSSI guidance
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>What hardware data diodes do well.</h2>
+      <div class="tag">hardware<br/>wins here</div>
+    </div>
+
+    <p>Let's start with what the established vendors do better than Paramant can, because an honest comparison starts there.</p>
+
+    <h3>Physical one-way guarantee</h3>
+    <p>A hardware data diode is a fibre optic circuit where the transmit end has an emitter and the receive end has a sensor, with no electrical path in the reverse direction. The one-way property is physics, not software configuration. No firmware update, no compromised CPU, no malware can make data flow backward.</p>
+    <p>Paramant is software. Even with post-quantum encryption, burn-on-read, and RAM-only storage, the underlying network supports bidirectional traffic. A compromised Paramant relay cannot decrypt files (architecturally impossible), but in theory it could be used for signalling attacks through metadata or timing. A hardware diode makes this class of attacks physically impossible.</p>
+
+    <h3>Throughput at scale</h3>
+    <p>Owl Talon Torrent reaches 100 Gbps sustained throughput on a single appliance. Waterfall's top-end gateways similarly support very high bandwidth. For continuous SCADA data replication in power generation, refining, and large manufacturing, this matters.</p>
+    <p>Paramant per-relay throughput is currently measured in tens to hundreds of megabits, constrained by the web relay architecture. For individual file transfers and periodic sensor data push, this is fine. For continuous high-bandwidth historian replication, it is not the right tool.</p>
+
+    <h3>Regulatory endorsements</h3>
+    <p>ANSSI (French national cybersecurity agency) mandates hardware-enforced unidirectional security for critical infrastructure. NERC-CIP provides explicit compliance exemptions for organizations using unidirectional gateways. ISA/IEC 62443-3-3 recommends them by name.</p>
+    <p>These frameworks were written when hardware diodes were the only option. Software-based solutions like Paramant are addressed under different control categories (encryption, zone segmentation) and may require additional documentation to demonstrate equivalence to auditors.</p>
+
+    <h3>Field deployment track record</h3>
+    <p>Waterfall has 25 years of deployments in nuclear, power generation, rail, and defence. Owl has extensive government and defence adoption with Common Criteria evaluations. For risk-averse buyers in highly regulated verticals, this matters.</p>
+    <p>Paramant is newer. No publicly available nuclear facility deployments. No Common Criteria evaluation. For organizations that need 25-year track records, Paramant is currently not the right choice.</p>
+  </div>
+</section>
+
+<section class="section section-cobalt">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2 style="color:var(--bone)">Where Paramant does something different.</h2>
+      <div class="tag" style="color:rgba(248,250,252,.72)">software<br/>advantages</div>
+    </div>
+
+    <p style="color:var(--bone)">Software has constraints hardware doesn't. It also has flexibility hardware can't match. Here is what Paramant brings that hardware diodes do not.</p>
+
+    <h3 style="color:var(--bone)">Bidirectional with integrity guarantees</h3>
+    <p style="color:var(--bone)">Hardware data diodes are inherently one-way. That is their core security property but also their biggest operational limitation. Paramant supports genuine bidirectional file transfer with end-to-end cryptographic integrity guarantees. For OT/IT handoffs that include firmware updates, configuration pushes, or receipt confirmations, this removes the need for complex "return channel" workarounds that most diode deployments require.</p>
+
+    <h3 style="color:var(--bone)">Post-quantum cryptography today</h3>
+    <p style="color:var(--bone)">Hardware data diodes protect against network-level attacks but depend on classical cryptography for identity, integrity, and authentication of the data crossing them. Most current deployments use RSA or classical ECDSA for these functions.</p>
+    <p style="color:var(--bone)">Paramant uses ML-KEM-768 and ML-DSA-65 (NIST FIPS 203/204, Level 3) for all authenticated transfers. This protects archived data from future quantum decryption, which matters because OT configurations and firmware have lifetimes measured in decades.</p>
+
+    <h3 style="color:var(--bone)">Price and deployment speed</h3>
+    <p style="color:var(--bone)">A single hardware data diode pair from established vendors costs €15k to €200k depending on throughput and certification. Deployment requires fibre cabling, rack space, specialist installation, and typically specialist services. Lead times are weeks to months.</p>
+    <p style="color:var(--bone)">Paramant Community Edition is free (BUSL-1.1 non-commercial) or runs on a €80 Raspberry Pi for commercial test deployments. Deploy in 60 seconds with <code style="color:#B2FF3F">install-pi.sh</code>. This does not make it equivalent to a certified hardware diode for nuclear applications, but it does make it suitable for the thousands of OT environments that can't justify diode pricing.</p>
+
+    <h3 style="color:var(--bone)">Auditable source code</h3>
+    <p style="color:var(--bone)">Hardware data diodes are proprietary. Evaluation depends on vendor certifications (Common Criteria, ANSSI qualification, etc.) that are expensive to obtain and update. Customers generally cannot inspect the implementation themselves.</p>
+    <p style="color:var(--bone)">Paramant is open source under BUSL-1.1. Any auditor can read every line. Any security researcher can test assumptions. Any customer can verify that the deployed binary matches the published source.</p>
+
+    <h3 style="color:var(--bone)">Public transparency log</h3>
+    <p style="color:var(--bone)">Hardware data diodes typically log locally or to a SIEM. There is no external audit trail that third parties can verify. If the diode's logging component is compromised, no external observer would know.</p>
+    <p style="color:var(--bone)">Every Paramant transfer is logged in a public Merkle-tree Certificate Transparency log. External auditors, compliance officers, and any curious party can verify that transfers happened without being able to see what was transferred.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2>Feature comparison.</h2>
+      <div class="tag">side by side<br/>factually</div>
+    </div>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Paramant</th>
+          <th>Waterfall</th>
+          <th>Owl</th>
+          <th>Fox DataDiode</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="strong">Architecture</td>
+          <td>Software relay</td>
+          <td>Hardware diode</td>
+          <td>Hardware diode</td>
+          <td>Hardware diode</td>
+        </tr>
+        <tr>
+          <td class="strong">One-way physical guarantee</td>
+          <td class="no">No (bidirectional by design)</td>
+          <td class="yes">Yes, fibre optic</td>
+          <td class="yes">Yes, optical</td>
+          <td class="yes">Yes, optical</td>
+        </tr>
+        <tr>
+          <td class="strong">Maximum throughput</td>
+          <td class="partial">~100 Mbps per relay</td>
+          <td class="yes">Gbps-class</td>
+          <td class="yes">Up to 100 Gbps</td>
+          <td class="yes">Gbps-class</td>
+        </tr>
+        <tr>
+          <td class="strong">Post-quantum cryptography</td>
+          <td class="yes">ML-KEM-768 in production</td>
+          <td class="no">Classical only</td>
+          <td class="no">Classical only</td>
+          <td class="no">Classical only</td>
+        </tr>
+        <tr>
+          <td class="strong">Bidirectional file transfer</td>
+          <td class="yes">End-to-end encrypted</td>
+          <td class="partial">Requires pair of diodes</td>
+          <td class="partial">Bidirectional Owl Talon option</td>
+          <td class="no">Not by design</td>
+        </tr>
+        <tr>
+          <td class="strong">Firmware/config push to devices</td>
+          <td class="yes">Signed with ML-DSA-65</td>
+          <td class="partial">Via return diode</td>
+          <td class="partial">Via bidirectional model</td>
+          <td class="no">Not standard</td>
+        </tr>
+        <tr>
+          <td class="strong">Deployment time</td>
+          <td class="yes">Minutes (Raspberry Pi)</td>
+          <td class="no">Weeks (cabling + install)</td>
+          <td class="no">Weeks</td>
+          <td class="no">Weeks</td>
+        </tr>
+        <tr>
+          <td class="strong">Entry price</td>
+          <td class="yes">€0 (self-host BUSL)</td>
+          <td class="no">€20k-100k+</td>
+          <td class="no">€15k-200k+</td>
+          <td class="no">€15k+</td>
+        </tr>
+        <tr>
+          <td class="strong">Source code auditable</td>
+          <td class="yes">BUSL-1.1 public</td>
+          <td class="no">Proprietary</td>
+          <td class="no">Proprietary</td>
+          <td class="no">Proprietary</td>
+        </tr>
+        <tr>
+          <td class="strong">Common Criteria certified</td>
+          <td class="no">Not certified</td>
+          <td class="yes">Yes (multiple products)</td>
+          <td class="yes">Yes (selected products)</td>
+          <td class="yes">Yes</td>
+        </tr>
+        <tr>
+          <td class="strong">ANSSI qualification</td>
+          <td class="no">Not qualified</td>
+          <td class="yes">Qualified</td>
+          <td class="partial">Not confirmed</td>
+          <td class="yes">Dutch MIVD</td>
+        </tr>
+        <tr>
+          <td class="strong">Public CT log / external audit trail</td>
+          <td class="yes">Merkle tree, signed STH</td>
+          <td class="no">Internal logs</td>
+          <td class="no">Internal logs</td>
+          <td class="no">Internal logs</td>
+        </tr>
+        <tr>
+          <td class="strong">Self-hostable</td>
+          <td class="yes">Docker, Raspberry Pi</td>
+          <td class="no">Vendor appliance only</td>
+          <td class="no">Vendor appliance only</td>
+          <td class="no">Vendor appliance only</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="dim mono" style="font-size:11px;margin-top:16px">
+      Sources: vendor product pages (waterfall-security.com, owlcyberdefense.com, fox-it.com),
+      Common Criteria product listings, ANSSI product qualification register, IEC 62443-3-3 reference.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">04</div>
+      <h2>When to choose which.</h2>
+      <div class="tag">honest<br/>recommendations</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Your situation</th>
+          <th>Best choice</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="strong">Nuclear power plant, Tier 1 compliance</td>
+          <td class="cobalt-text">Hardware diode (Waterfall/Owl)</td>
+          <td>Regulatory track record and Common Criteria needed</td>
+        </tr>
+        <tr>
+          <td class="strong">100 Gbps continuous historian replication</td>
+          <td class="cobalt-text">Hardware diode</td>
+          <td>Bandwidth requirement exceeds Paramant's current capacity</td>
+        </tr>
+        <tr>
+          <td class="strong">Classified government OT network</td>
+          <td class="cobalt-text">Hardware diode</td>
+          <td>ANSSI / BSI / national certifications required</td>
+        </tr>
+        <tr>
+          <td class="strong">Mid-size manufacturer sending daily configs to vendors</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Cost-effective, post-quantum, auditable</td>
+        </tr>
+        <tr>
+          <td class="strong">Water utility sensor telemetry to cloud</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Small files, periodic, needs audit trail</td>
+        </tr>
+        <tr>
+          <td class="strong">Wind farm firmware distribution</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>ML-DSA-65 signed firmware, burn-on-read</td>
+        </tr>
+        <tr>
+          <td class="strong">OEM delivering updates to deployed OT fleet</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Bidirectional, fleet management capable</td>
+        </tr>
+        <tr>
+          <td class="strong">Post-quantum requirement anywhere</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Only provider with ML-KEM-768 in production</td>
+        </tr>
+        <tr>
+          <td class="strong">Budget-constrained pilot / Raspberry Pi edge</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Free Community Edition, runs on €80 hardware</td>
+        </tr>
+        <tr>
+          <td class="strong">Hybrid: hardware diode + encrypted file relay downstream</td>
+          <td class="cobalt-text">Both</td>
+          <td>Diode at DMZ boundary + Paramant for encrypted application layer</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <h4>an often-ignored hybrid pattern</h4>
+      <p>Many mature OT environments use hardware diodes at the critical-infrastructure boundary and need a secondary, cryptographically-strong transport for data that has already crossed the diode. This is where Paramant fits well: post-quantum encrypted, burn-on-read delivery of files that are consumed by analytics, monitoring, or vendor systems. The hardware diode enforces one-way physics; Paramant enforces cryptographic confidentiality and integrity from that point forward.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">05</div>
+      <h2>Position clearly.</h2>
+      <div class="tag">honest<br/>limits</div>
+    </div>
+
+    <h3>Paramant is not a replacement for hardware data diodes in every context</h3>
+    <p>If your regulatory framework explicitly requires hardware-enforced unidirectional transfer (ANSSI-qualified French critical infrastructure, NERC-CIP compliance with specific diode exemptions, nuclear safety cases), Paramant does not replace the diode. It complements it, or serves different use cases.</p>
+
+    <h3>Paramant is a better fit for many OT scenarios that currently use unsuitable alternatives</h3>
+    <p>Many OT environments today use firewalls, VPNs, or plain SFTP for data transfer because hardware diodes are too expensive or too rigid. These alternatives have weaker security properties than Paramant: no post-quantum encryption, persistent storage, mutable logs, and depending on operator for confidentiality.</p>
+    <p>For these scenarios, Paramant is a significant security upgrade at a fraction of the cost of hardware diodes.</p>
+
+    <h3>The honest conclusion</h3>
+    <p>Different tools for different tiers. Hardware diodes for the absolute top tier of critical infrastructure. Paramant for the broad middle tier where post-quantum encryption, burn-on-read, and auditability matter more than physical one-way guarantee. Firewalls and VPNs for nothing, because they are no longer adequate for sensitive OT data.</p>
+
+    <p>If you are currently using SFTP, VPN tunnels, or HTTPS POST for OT data transfer because hardware diodes are too expensive, Paramant is a meaningful upgrade. If you are using hardware diodes and they work, keep them.</p>
+  </div>
+</section>
+
+<section class="section section-dark">
+  <div class="container">
+    <div class="marker">
+      <div class="num">06</div>
+      <h2 style="color:var(--bone)">Start an OT pilot.</h2>
+      <div class="tag" style="color:rgba(248,250,252,.72)">free<br/>60 seconds</div>
+    </div>
+
+    <p style="color:var(--bone);max-width:720px">Install on a Raspberry Pi or Linux VM. Free for up to 5 devices under BUSL-1.1 Community Edition. Enterprise pricing available for dedicated relays and SLA.</p>
+
+    <div style="margin-top:32px;background:rgba(178,255,63,0.1);border:1px solid #B2FF3F;padding:20px;font-family:var(--mono);font-size:13px;color:#B2FF3F;overflow-x:auto">
+      curl -fsSL https://paramant.app/install-pi.sh | sudo bash
+    </div>
+
+    <div style="margin-top:48px;display:flex;gap:16px;flex-wrap:wrap">
+      <a href="/ot" class="btn btn-primary">Full OT overview</a>
+      <a href="/compliance/iec62443" class="btn btn-secondary-inverse">IEC 62443 mapping</a>
+      <a href="/request-key" class="btn btn-secondary-inverse">Get free API key</a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

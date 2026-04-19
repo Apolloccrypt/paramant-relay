@@ -4,59 +4,63 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secure Transfer — PARAMANT</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
 <style>
-/* Page: parashare — transfer UI + globe HUD */
+/* Page: parashare — transfer UI */
 
 .step{display:none;animation:fadeIn .2s var(--ease-sharp)}
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-main{max-width:640px;margin:0 auto;padding:64px 24px;position:relative;z-index:10;background:transparent}
+main{max-width:640px;margin:0 auto;padding:64px 24px;position:relative;z-index:10}
 h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.sub{font-size:var(--text-sm);color:rgba(248,250,252,.65);margin-bottom:40px;line-height:1.7}
-.hero-block{border:1px solid var(--bone-on-navy-hair);padding:24px 28px;margin-bottom:40px;background:rgba(6,12,16,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.sub{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:40px;line-height:1.7}
+.hero-block{border:1px solid var(--ink-hair);padding:24px 28px;margin-bottom:40px}
 
-.card{border:1px solid var(--bone-on-navy-hair);overflow:hidden;margin-bottom:16px;background:rgba(6,12,16,.88);backdrop-filter:blur(2px)}
-.card-head{padding:14px 18px;border-bottom:1px solid var(--bone-on-navy-hair);display:flex;align-items:center;gap:10px}
-.card-head-title{font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:rgba(248,250,252,.65)}
+.card{border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
+.card-head-title{font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
 .dot{width:6px;height:6px;background:var(--lime)}
-.dot.red{background:rgba(255,80,80,1)}
-.dot.amber{background:#f59e0b}
+.dot.red{background:var(--cobalt)}
+.dot.amber{background:var(--cobalt)}
 .card-body{padding:20px 18px}
 
-input[type=text],input[type=password],input[type=file]{width:100%;background:var(--navy);border:1px solid var(--bone-on-navy-hair);color:var(--bone-on-navy);padding:10px 12px;font-family:var(--mono);font-size:var(--text-sm);outline:none;margin-bottom:10px}
+input[type=text],input[type=password],input[type=file]{width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:10px 12px;font-family:var(--mono);font-size:var(--text-sm);outline:none;margin-bottom:10px}
 input:focus{border-color:var(--cobalt)}
 input[type=file]{cursor:pointer}
-select{width:100%;background:var(--navy);border:1px solid var(--bone-on-navy-hair);color:var(--bone-on-navy);padding:10px 12px;font-family:var(--mono);font-size:var(--text-sm);outline:none;margin-bottom:10px;cursor:pointer}
+select{width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:10px 12px;font-family:var(--mono);font-size:var(--text-sm);outline:none;margin-bottom:10px;cursor:pointer}
 select:focus{border-color:var(--cobalt)}
 
-.btn{width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:var(--text-sm);font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn{width:100%;padding:11px;background:var(--cobalt);color:var(--bone);border:none;font-family:var(--mono);font-size:var(--text-sm);font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
 .btn:hover{opacity:.85}
-.btn:disabled{background:rgba(29,78,216,.2);color:rgba(248,250,252,.35);cursor:not-allowed}
-.btn-outline{background:transparent;color:var(--bone-on-navy);border:1px solid var(--bone-on-navy-hair)}
-.btn-outline:hover{background:rgba(248,250,252,.06)}
-.btn-green{background:var(--cobalt);color:var(--bone-on-navy)}
-.btn-red{background:rgba(255,80,80,.12);color:rgba(255,80,80,1);border:1px solid rgba(255,80,80,.3)}
+.btn:disabled{background:rgba(29,78,216,.2);color:var(--ink-dim);cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
+.btn-outline:hover{background:var(--bone-2)}
+.btn-green{background:var(--cobalt);color:var(--bone)}
+.btn-red{background:rgba(29,78,216,.08);color:var(--cobalt);border:1px solid rgba(29,78,216,.2)}
 
-.fingerprint{font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--lime);text-align:center;padding:20px;background:var(--navy);border:1px solid var(--bone-on-navy-hair);margin:16px 0}
-.status-line{font-size:var(--text-sm);color:rgba(248,250,252,.65);padding:8px 0;display:flex;align-items:center;gap:8px}
-.status-line.ok{color:var(--lime)}
-.status-line.err{color:rgba(255,80,80,1)}
-.share-box{background:var(--navy);border:1px solid var(--bone-on-navy-hair);padding:12px;font-size:var(--text-sm);color:var(--bone-on-navy);word-break:break-all;line-height:1.7;cursor:pointer;margin:12px 0}
+.fingerprint{font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--navy);text-align:center;padding:20px;background:var(--bone-2);border:1px solid var(--ink-hair);margin:16px 0}
+.status-line{font-size:var(--text-sm);color:var(--ink-dim);padding:8px 0;display:flex;align-items:center;gap:8px}
+.status-line.ok{color:var(--cobalt)}
+.status-line.err{color:var(--cobalt)}
+.share-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:12px;font-size:var(--text-sm);color:var(--navy);word-break:break-all;line-height:1.7;cursor:pointer;margin:12px 0}
 .share-box:hover{border-color:var(--cobalt)}
-.progress-bar-wrap{background:var(--navy);border:1px solid var(--bone-on-navy-hair);height:4px;overflow:hidden;margin:12px 0}
+.progress-bar-wrap{background:var(--bone-2);border:1px solid var(--ink-hair);height:4px;overflow:hidden;margin:12px 0}
 .progress-bar{height:100%;background:var(--cobalt);width:0%;transition:width .3s}
-.label{font-size:var(--text-xs);color:rgba(248,250,252,.65);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block}
-.tag{display:inline-block;font-size:var(--text-xs);padding:3px 8px;border:1px solid var(--bone-on-navy-hair);color:rgba(248,250,252,.65);margin-right:4px;margin-top:4px}
-.tag.green{border-color:rgba(178,255,63,.2);color:var(--lime)}
-.warn{border:1px solid rgba(245,158,11,.3);color:rgba(245,158,11,.85);padding:12px 14px;font-size:var(--text-sm);line-height:1.7;margin:12px 0}
+.label{font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block}
+.tag{display:inline-block;font-size:var(--text-xs);padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px;margin-top:4px}
+.tag.green{border-color:rgba(11,58,106,.25);color:var(--navy)}
+.warn{border:1px solid rgba(29,78,216,.2);color:var(--ink);background:rgba(29,78,216,.04);padding:12px 14px;font-size:var(--text-sm);line-height:1.7;margin:12px 0}
 
-/* Globe renders through body */
-body{background:transparent!important}
-nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
-
-/* === Globe HUD === */
-#globe-overlay{position:fixed;inset:0;z-index:0;background:#060c10;display:block}
+/* === Globe HUD (hidden by default; Ctrl+G to open) === */
+#globe-overlay{position:fixed;inset:0;z-index:0;background:#060c10;display:none}
 #globe-overlay .hud-top,
 #globe-overlay .hud-bot,
 #globe-overlay .hc,
@@ -106,7 +110,7 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
 .hud-stat{display:flex;flex-direction:column;align-items:center;gap:2px}
 .hud-stat-lbl{font-size:8px;letter-spacing:.16em;color:rgba(178,255,63,.4);text-transform:uppercase}
 .hud-stat-val{font-size:11px;color:var(--lime);letter-spacing:.06em}
-.hud-stat-val.amber{color:#f59e0b}
+.hud-stat-val.amber{color:var(--lime)}
 
 .hud-panel{position:absolute;z-index:30;background:rgba(0,0,0,.85);
   border:1px solid var(--ink-ghost);padding:14px 16px;min-width:200px;
@@ -126,7 +130,7 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
 .hud-session:last-child{border:none}
 .hud-dot{width:5px;height:5px;background:var(--lime);flex-shrink:0;
   animation:blink 2s ease-in-out infinite}
-.hud-dot.amber{background:#f59e0b}
+.hud-dot.amber{background:var(--ink-dim)}
 @keyframes blink{0%,100%{opacity:.5}50%{opacity:1}}
 
 @keyframes globeSpin{to{transform:rotate(360deg)}}
@@ -143,8 +147,6 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
   .fingerprint{font-size:18px;letter-spacing:.08em}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=4">
-<link rel="stylesheet" href="/nav.css?v=4">
 </head>
 <body>
 <div class="meta-bar">
@@ -204,9 +206,12 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
         <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider" role="separator"></li>
         <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
         <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
         <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
         <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
       </ul>
     </li>
 
@@ -273,9 +278,12 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
       <a href="/compliance/nen7510">NEN 7510</a>
       <a href="/dpa">Data Processing Agreement</a>
       <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
       <a href="/government">Government</a>
       <a href="/hndl">HNDL threat</a>
       <a href="/crypto-agility">Crypto agility</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
     </div>
   </div>
 
@@ -300,16 +308,16 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
     <p class="sub" style="margin-bottom:0">Choose how you want to send.</p>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-    <a href="/send" style="display:block;background:rgba(6,12,16,.88);border:1px solid var(--bone-on-navy-hair);padding:20px 18px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cobalt)'" onmouseout="this.style.borderColor=''">
-      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(248,250,252,.6);margin-bottom:8px">Zero friction</div>
-      <div style="font-size:14px;font-weight:700;color:var(--bone-on-navy);margin-bottom:6px">Send anonymously</div>
-      <div style="font-size:12px;color:rgba(248,250,252,.6);line-height:1.6">Drop a file. Get a burn link. No key, no account.</div>
+    <a href="/send" style="display:block;background:var(--bone);border:1px solid var(--ink-hair);padding:20px 18px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cobalt)'" onmouseout="this.style.borderColor=''">
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px">Zero friction</div>
+      <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Send anonymously</div>
+      <div style="font-size:12px;color:var(--ink-dim);line-height:1.6">Drop a file. Get a burn link. No key, no account.</div>
       <div style="font-size:11px;color:var(--cobalt);margin-top:12px">Go to /send &rarr;</div>
     </a>
-    <button onclick="document.getElementById('step-choose').style.display='none';document.getElementById('step-setup').classList.add('active')" style="display:block;background:rgba(6,12,16,.88);border:1px solid var(--bone-on-navy-hair);padding:20px 18px;text-align:left;cursor:pointer;font-family:var(--mono);width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cobalt)'" onmouseout="this.style.borderColor=''">
-      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(248,250,252,.6);margin-bottom:8px">Verified E2E</div>
-      <div style="font-size:14px;font-weight:700;color:var(--bone-on-navy);margin-bottom:6px">Send with ParaShare</div>
-      <div style="font-size:12px;color:rgba(248,250,252,.6);line-height:1.6">ML-KEM-768 key exchange. Recipient verifies relay identity.</div>
+    <button onclick="document.getElementById('step-choose').style.display='none';document.getElementById('step-setup').classList.add('active')" style="display:block;background:var(--bone);border:1px solid var(--ink-hair);padding:20px 18px;text-align:left;cursor:pointer;font-family:var(--mono);width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cobalt)'" onmouseout="this.style.borderColor=''">
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px">Verified E2E</div>
+      <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Send with ParaShare</div>
+      <div style="font-size:12px;color:var(--ink-dim);line-height:1.6">ML-KEM-768 key exchange. Recipient verifies relay identity.</div>
       <div style="font-size:11px;color:var(--cobalt);margin-top:12px">Use ParaShare &rarr;</div>
     </button>
   </div>
@@ -345,7 +353,7 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Self-destruct</div></div>
     <div class="card-body">
       <span class="label">Link expires after</span>
-      <select id="ttl-select" style="width:100%;background:var(--navy);border:1px solid var(--bone-on-navy-hair);color:var(--bone-on-navy);padding:10px 12px;font-family:var(--mono);font-size:12px;outline:none;margin-bottom:10px;cursor:pointer">
+      <select id="ttl-select">
         <option value="30000">30 seconds</option>
         <option value="300000">5 minutes</option>
         <option value="3600000" selected>1 hour</option>
@@ -376,16 +384,16 @@ nav.nav{background:rgba(0,0,0,.9)!important;backdrop-filter:blur(4px)}
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Receiver connected — verify fingerprint</div></div>
     <div class="card-body">
       <p class="status-line" style="margin-bottom:6px">Call or message the receiver via a <strong>separate channel</strong> (phone, Signal, etc.) and ask: <em>"What is your fingerprint?"</em></p>
-      <p class="status-line" style="margin-bottom:8px;color:rgba(245,158,11,.85);font-size:10px">⚠ A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
+      <p class="status-line" style="margin-bottom:8px;color:var(--cobalt);font-size:10px">⚠ A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
       <div class="fingerprint" id="fp-display">—</div>
-      <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--lime);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Matches stored fingerprint from a previous session</div>
-      <div id="fp-new-device" style="display:none;font-size:10px;color:rgba(245,158,11,.85);margin:-4px 0 10px;text-align:center">◈ First contact with this receiver — verify carefully</div>
+      <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Matches stored fingerprint from a previous session</div>
+      <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ First contact with this receiver — verify carefully</div>
       <div style="display:flex;justify-content:center;margin:12px 0 4px">
         <canvas id="fp-qr" style="display:none;border:4px solid #fff"></canvas>
       </div>
-      <p style="font-size:10px;color:rgba(248,250,252,.65);text-align:center;margin-bottom:10px" id="fp-qr-label" style="display:none">QR — receiver can scan to compare</p>
+      <p style="font-size:10px;color:var(--ink-dim);text-align:center;margin-bottom:10px" id="fp-qr-label">QR — receiver can scan to compare</p>
       <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:11px;cursor:pointer;user-select:none">
-        <input type="checkbox" id="fp-confirm-check" onchange="$('fp-confirm-btn').disabled=!this.checked" style="width:14px;height:14px;accent-color:#B2FF3F">
+        <input type="checkbox" id="fp-confirm-check" onchange="$('fp-confirm-btn').disabled=!this.checked" style="width:14px;height:14px;accent-color:var(--cobalt)">
         I have verified this fingerprint with the receiver via a separate channel
       </label>
       <div style="display:flex;gap:8px;margin-top:4px">
@@ -1263,8 +1271,8 @@ function updateGlobeTransfer(userLat, userLng) {
   <div class="footer-grid">
     <div>
       <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-      <p style="font-size:var(--text-xs);color:var(--bone-on-navy-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-      <p style="font-size:var(--text-xs);color:var(--bone-on-navy-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+      <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
     </div>
     <div>
       <div class="footer-col-label">Product</div>

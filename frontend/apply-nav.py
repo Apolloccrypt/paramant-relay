@@ -55,9 +55,12 @@ NEW_NAV = '''\
         <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
         <li class="nav-dropdown-divider" role="separator"></li>
         <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
         <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
         <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
         <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
       </ul>
     </li>
 
@@ -126,9 +129,12 @@ NEW_MOBILE = '''\
       <a href="/compliance/nen7510">NEN 7510</a>
       <a href="/dpa">Data Processing Agreement</a>
       <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
       <a href="/government">Government</a>
       <a href="/hndl">HNDL threat</a>
       <a href="/crypto-agility">Crypto agility</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
     </div>
   </div>
 
