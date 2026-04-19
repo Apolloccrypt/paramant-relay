@@ -444,6 +444,38 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <hr class="divider">
 
+  <h2>Authentication — no passwords</h2>
+  <p>Paramant accounts use an API key and optional TOTP. There is no username/password login. This eliminates phishing, credential stuffing, and breach exposure by design.</p>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">API key</div>
+      <p style="margin:0">A 64-character hex secret generated on account creation. Shown once and never stored server-side in plaintext. Store it in a password manager or secret vault.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">TOTP second factor</div>
+      <p style="margin:0">RFC 6238, HMAC-SHA-256, 6-digit code, 30-second window. Works with any TOTP-compatible authenticator app (Aegis, Authy, 1Password). Replay protection via Redis.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">No passwords to steal</div>
+      <p style="margin:0">No username/password combination exists. Credential stuffing, dictionary attacks, and password reuse attacks have no vector. A leaked API key can be rotated instantly.</p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Session model</div>
+      <p style="margin:0">Sessions are short-lived (1 hour). Each session is a cryptographically random 32-byte token, validated against a server-side store. No cookies, no persistent sessions.</p>
+    </div>
+  </div>
+
+  <h3>Authentication flow</h3>
+  <div class="card" style="font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);line-height:2">
+    <div><span style="color:var(--ink);min-width:120px;display:inline-block">1. Client</span>sends API key + TOTP code</div>
+    <div><span style="color:var(--ink);min-width:120px;display:inline-block">2. Server</span>timing-safe compare of API key, then verifies TOTP window ±1 slot</div>
+    <div><span style="color:var(--ink);min-width:120px;display:inline-block">3. Replay check</span>each TOTP code is single-use, tracked in Redis with 90-second TTL</div>
+    <div><span style="color:var(--ink);min-width:120px;display:inline-block">4. Session</span>random 32-byte session token returned, expires in 1 hour</div>
+  </div>
+
+  <hr class="divider">
+
   <h2>Jurisdiction &amp; privacy</h2>
   <div class="card">
     <table class="table">

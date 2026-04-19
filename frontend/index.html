@@ -374,6 +374,46 @@
   </div>
 </section>
 
+<!-- § 03.5 NO PASSWORDS -->
+<section class="section-cobalt" style="padding:var(--space-9) 0" id="auth">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num" style="font-size:clamp(3rem,7vw,7rem)">03.5</span>
+      <h2>No passwords. Ever.</h2>
+      <span class="tag">Authentication</span>
+    </div>
+    <p style="font-size:var(--text-base);color:var(--bone-on-navy-dim);line-height:1.7;max-width:600px;margin-bottom:var(--space-3)">
+      Paramant has no login form. No username. No password to phish, steal, or breach.
+      Authentication is a cryptographic key and an optional TOTP code — nothing else.
+    </p>
+    <div class="auth-matrix">
+
+      <div class="auth-lane">
+        <span class="auth-lane-label">01 — API key</span>
+        <h3>64-char hex secret</h3>
+        <p>Generated once on account creation. Shown once. Store it in your password manager or secret vault. Rotate instantly if compromised.</p>
+      </div>
+
+      <div class="auth-lane">
+        <span class="auth-lane-label">02 — TOTP</span>
+        <h3>Authenticator app</h3>
+        <p>RFC 6238, SHA-256, 30-second codes. Works with Aegis, Authy, 1Password. Each code is single-use — replay attacks have no window.</p>
+      </div>
+
+      <div class="auth-lane">
+        <span class="auth-lane-label">03 — No password</span>
+        <h3>Zero credential surface</h3>
+        <p>Credential stuffing, dictionary attacks, and phishing require a password to target. With no password those attack vectors don't exist.</p>
+      </div>
+
+    </div>
+    <div class="cta-row">
+      <a href="/security" class="btn btn-secondary">Auth security details &rarr;</a>
+      <a href="/request-key" class="btn btn-secondary">Get a free API key &rarr;</a>
+    </div>
+  </div>
+</section>
+
 <!-- § 04 PRICING -->
 <section class="section-navy" style="padding:var(--space-9) 0" id="pricing">
   <div class="container">
