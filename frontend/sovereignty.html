@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jurisdiction · Paramant</title>
+<meta name="description" content="Why jurisdiction matters for encrypted file transport. Paramant is operated from the Netherlands with infrastructure in Germany. No US owner, no CLOUD Act exposure.">
+
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Product</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/vs" role="menuitem">vs. alternatives</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+        <li class="nav-dropdown-divider" role="separator"></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Info</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+        <li role="none"><a href="/request-key" role="menuitem">Free API key</a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Product</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/vs">vs. alternatives</a>
+      <a href="/press">Press kit</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="/status">Status</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2</a>
+      <a href="/compliance/iec62443">IEC 62443</a>
+      <a href="/compliance/nen7510">NEN 7510</a>
+      <a href="/dpa">Data Processing Agreement</a>
+      <a href="/ot">OT guide</a>
+      <a href="/government">Government</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/crypto-agility">Crypto agility</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Info</button>
+    <div class="nav-mobile-group-items">
+      <a href="mailto:privacy@paramant.app">Contact</a>
+      <a href="/request-key">Free API key</a>
+      <a href="/status">Status</a>
+      <a href="/sla">SLA</a>
+      <a href="/security">Security</a>
+      <a href="/license">License</a>
+    </div>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="section section-lg">
+  <div class="container">
+    <div class="eyebrow">
+      <span class="bar"></span>
+      jurisdiction
+    </div>
+
+    <h1 class="hero-h1">
+      Where your files live <em>is</em><br/>
+      who can read them.
+    </h1>
+
+    <p class="lede" style="max-width:720px">
+      Encryption is only half of data sovereignty. The other half is
+      who owns the company, where the infrastructure sits, and which
+      courts can compel disclosure. Paramant is built for the second
+      half too.
+    </p>
+  </div>
+</section>
+
+<!-- THE PROBLEM -->
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>The problem with encrypted tools that have US owners.</h2>
+      <div class="tag">CLOUD Act<br/>FISA 702</div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <p>The United States CLOUD Act, passed in 2018, allows US authorities to compel US-based companies to hand over data regardless of where that data is physically stored. It applies to any company incorporated in the US, or owned by a US parent company.</p>
+
+        <p>FISA Section 702 authorizes US intelligence agencies to collect communications of non-US persons outside the US without a warrant, when that data flows through US-controlled infrastructure or companies.</p>
+
+        <p>Both apply to subsidiaries. If a European company is acquired by a US parent, CLOUD Act and FISA 702 begin to apply to the acquired company's data handling practices, even if servers stay in Europe.</p>
+      </div>
+
+      <div class="callout">
+        <h4>what changed in 2025</h4>
+        <p>Zivver, a Dutch secure email and file transfer provider, was <strong>acquired by Kiteworks (San Mateo, California)</strong> in June 2025. Kiteworks is a US company with $610M in growth capital raised, primarily from US investors Insight Partners and Sixth Street.</p>
+        <p class="dim mono" style="font-size:11px;margin-top:8px">Sources: Kiteworks press release June 18 2025; PitchBook company profile</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THE PARAMANT POSITION -->
+<section class="section section-cobalt">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2 style="color:var(--bone)">Paramant's ownership, top to bottom.</h2>
+      <div class="tag" style="color:rgba(248,250,252,.72)">100% NL<br/>no US exposure</div>
+    </div>
+
+    <table class="ownership-table">
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>Location</th>
+          <th>Jurisdiction</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="strong">Company registration</td>
+          <td>Harderwijk, Netherlands</td>
+          <td class="cobalt-text">Dutch law, EU jurisdiction</td>
+        </tr>
+        <tr>
+          <td class="strong">Ownership</td>
+          <td>100% founder-owned</td>
+          <td class="cobalt-text">No US subsidiaries, no US parent</td>
+        </tr>
+        <tr>
+          <td class="strong">Funding source</td>
+          <td>Self-funded, no VC</td>
+          <td class="cobalt-text">No US investor influence</td>
+        </tr>
+        <tr>
+          <td class="strong">Server infrastructure</td>
+          <td>Hetzner Nuremberg, Germany</td>
+          <td class="cobalt-text">German law, EU jurisdiction</td>
+        </tr>
+        <tr>
+          <td class="strong">Data location</td>
+          <td>RAM only, destroyed on first read</td>
+          <td class="cobalt-text">Nothing persistent to subpoena</td>
+        </tr>
+        <tr>
+          <td class="strong">Encryption keys</td>
+          <td>Client-side only, never on server</td>
+          <td class="cobalt-text">Architecturally unreadable</td>
+        </tr>
+        <tr>
+          <td class="strong">Source code</td>
+          <td>BUSL-1.1, source available</td>
+          <td class="cobalt-text">Auditable by any third party</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2>Jurisdictional exposure by provider.</h2>
+      <div class="tag">as of April 2026<br/>publicly verifiable</div>
+    </div>
+
+    <p>Comparing public ownership structures and infrastructure locations for major encrypted file transfer providers:</p>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Company jurisdiction</th>
+          <th>Owner</th>
+          <th>CLOUD Act exposure</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="strong">Paramant</td>
+          <td>Netherlands</td>
+          <td>Founder-owned, NL</td>
+          <td class="cobalt-text">None</td>
+        </tr>
+        <tr>
+          <td class="strong">Zivver</td>
+          <td>Netherlands (HQ)</td>
+          <td>Kiteworks, San Mateo CA (since June 2025)</td>
+          <td class="warn-text">Yes, via parent</td>
+        </tr>
+        <tr>
+          <td class="strong">WeTransfer</td>
+          <td>Netherlands</td>
+          <td>Bending Spoons, Italy (since 2024)</td>
+          <td class="cobalt-text">None via ownership</td>
+        </tr>
+        <tr>
+          <td class="strong">Tresorit</td>
+          <td>Switzerland + Hungary</td>
+          <td>Swiss Post (state-owned, CH)</td>
+          <td class="cobalt-text">None</td>
+        </tr>
+        <tr>
+          <td class="strong">Proton</td>
+          <td>Switzerland</td>
+          <td>Proton AG, Swiss Federation</td>
+          <td class="cobalt-text">None</td>
+        </tr>
+        <tr>
+          <td class="strong">Dropbox, Box, Google Drive</td>
+          <td>United States</td>
+          <td>US public companies</td>
+          <td class="warn-text">Full CLOUD Act</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="dim mono" style="font-size:11px;margin-top:16px">Sources: company press releases, SEC filings (US public), PitchBook company profiles, Swiss Post corporate communications. Ownership structures verified April 2026.</p>
+  </div>
+</section>
+
+<!-- WHY IT MATTERS -->
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">04</div>
+      <h2>When jurisdiction matters in practice.</h2>
+      <div class="tag">concrete scenarios<br/>not hypotheticals</div>
+    </div>
+
+    <h3>Dutch healthcare and NEN 7510</h3>
+    <p>NEN 7510 requires healthcare providers to demonstrate that patient data cannot be accessed by non-authorized parties. A file transfer provider owned by a US parent creates a disclosure obligation under CLOUD Act that is in tension with NEN 7510's strict access requirements. EU-owned, EU-infrastructure providers have no such tension.</p>
+
+    <h3>Legal practice and attorney-client privilege</h3>
+    <p>Dutch and German legal codes protect attorney-client privilege against disclosure. A US parent company can be compelled to produce even privileged data under CLOUD Act without notification. Jurisdiction matters not just for compliance but for professional obligations.</p>
+
+    <h3>Government and critical infrastructure under NIS2</h3>
+    <p>Article 21 of NIS2 (EU 2022/2555) requires supply chain security for essential and important entities. Infrastructure providers whose ownership changes jurisdiction mid-contract become supply chain risks. Jurisdictional stability is itself a NIS2 compliance requirement.</p>
+
+    <h3>R&amp;D, intellectual property, and trade secrets</h3>
+    <p>For companies working on pre-patent research or confidential commercial negotiations, foreign government access to transfer metadata can reveal strategic intent. The US has a documented history of economic intelligence collection.</p>
+
+    <div class="pull">
+      <h4>the principle</h4>
+      <p>If your file transfer provider can be legally compelled to disclose data, the strength of their encryption is not the constraint. Their legal structure is.</p>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT PARAMANT DOES DIFFERENTLY -->
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">05</div>
+      <h2>What Paramant does differently.</h2>
+      <div class="tag">architecture<br/>and ownership</div>
+    </div>
+
+    <p>Paramant's answer to jurisdictional risk is two-layered: cryptographic architecture that makes disclosure technically useless, combined with ownership structure that makes disclosure legally inapplicable.</p>
+
+    <h3>Cryptographic layer</h3>
+    <ul>
+      <li><strong>Client-side encryption</strong>: files are encrypted on your device before upload. The relay receives ciphertext, not plaintext.</li>
+      <li><strong>Post-quantum key exchange</strong>: ML-KEM-768 (NIST FIPS 203, Level 3) and ML-DSA-65 (FIPS 204) for authenticated transfers.</li>
+      <li><strong>Keys never on server</strong>: decryption keys are held only by sender and recipient.</li>
+      <li><strong>RAM-only storage</strong>: ciphertext exists in server memory only, never written to disk.</li>
+      <li><strong>Burn on read</strong>: successful download destroys the ciphertext. A second read returns HTTP 410.</li>
+    </ul>
+
+    <p>If Paramant receives a legal demand for user data, the technical answer is: there is no persistent data to hand over. The ciphertext that existed during transit has been destroyed. The keys never existed on our servers.</p>
+
+    <h3>Ownership layer</h3>
+    <ul>
+      <li><strong>Dutch entity, Dutch law</strong>: incorporated in the Netherlands, subject to GDPR and Dutch data protection law.</li>
+      <li><strong>Founder-owned</strong>: no external shareholders, no acquisition risk, no US investor influence.</li>
+      <li><strong>German infrastructure</strong>: all production servers at Hetzner Nuremberg. German law applies to infrastructure.</li>
+      <li><strong>No US presence</strong>: no US office, no US subsidiary, no US employees, no US bank accounts.</li>
+    </ul>
+
+    <p>If US authorities want data that happened to pass through Paramant, they would need to engage a Dutch court via mutual legal assistance treaty, which requires Dutch law compliance for the request itself.</p>
+  </div>
+</section>
+
+<!-- CLOSING -->
+<section class="section section-dark">
+  <div class="container">
+    <div class="marker">
+      <div class="num">06</div>
+      <h2 style="color:var(--bone)">The bet Paramant is making.</h2>
+      <div class="tag" style="color:rgba(248,250,252,.72)">for the<br/>long term</div>
+    </div>
+
+    <p style="color:var(--bone);max-width:680px;font-size:16px;line-height:1.55">Data sovereignty will matter more over time, not less. Quantum computing will eventually break today's classical encryption. Geopolitical tension will make jurisdiction a more important question. Regulatory frameworks will tighten around supply chain accountability.</p>
+
+    <p style="color:var(--bone);max-width:680px;font-size:16px;line-height:1.55;margin-top:20px">Paramant is built to still make sense in five and ten years. That means post-quantum cryptography today, EU jurisdiction permanently, and architecture that makes jurisdictional questions mostly moot because there is simply no data to ask about.</p>
+
+    <div style="margin-top:48px;display:flex;gap:16px;flex-wrap:wrap">
+      <a href="/send" class="btn btn-primary">Send a file</a>
+      <a href="/security" class="btn btn-secondary-inverse">Technical details</a>
+      <a href="/self-host" class="btn btn-secondary-inverse">Self-host option</a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
