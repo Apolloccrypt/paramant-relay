@@ -1460,50 +1460,64 @@ pre code { background: none; padding: 0; }
 /* Two-column layout */
 .two-col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-7);
+  grid-template-columns: 1.5fr 1fr;
+  gap: 48px;
+  margin: 32px 0;
   align-items: start;
 }
 
 /* Callout box */
 .callout {
-  background: var(--ink-ghost);
+  background: rgba(11, 58, 106, 0.04);
   border-left: 3px solid var(--cobalt);
-  padding: var(--space-5) var(--space-6);
+  padding: 20px 24px;
+  margin: 32px 0;
+  max-width: 72ch;
 }
 .callout h4 {
   font-family: var(--mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--cobalt);
-  margin-bottom: var(--space-3);
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.callout p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin: 0;
 }
 .callout.warn {
-  border-left-color: #C2410C;
-  background: rgba(194, 65, 12, 0.06);
+  background: rgba(178, 255, 63, 0.08);
+  border-left-color: #B2FF3F;
 }
 .callout.warn h4 { color: #C2410C; }
 
 /* Pull quote */
 .pull {
-  border-left: 3px solid var(--lime);
-  padding: var(--space-4) var(--space-6);
-  margin: var(--space-6) 0;
+  border-left: 4px solid var(--cobalt);
+  padding: 24px 28px;
+  margin: 40px 0;
   background: var(--ink-ghost);
+  max-width: 72ch;
 }
 .pull h4 {
   font-family: var(--mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-dim);
-  margin-bottom: var(--space-2);
+  color: var(--cobalt);
+  margin-bottom: 10px;
+  font-weight: 700;
 }
 .pull p {
-  font-size: var(--text-md);
-  color: var(--ink);
-  line-height: 1.65;
+  font-size: 16px;
+  color: var(--navy);
+  line-height: 1.55;
+  font-weight: 500;
+  margin: 0;
 }
 
 /* Comparison / ownership tables */
@@ -1554,4 +1568,96 @@ pre code { background: none; padding: 0; }
   .ownership-table th,
   .compare-table td,
   .ownership-table td { padding: var(--space-2) var(--space-3); }
+}
+
+/* ═══════════════════════════════════════════════════
+   SECTION VARIANTS — cobalt + dark
+   ═══════════════════════════════════════════════════ */
+
+.section-cobalt,
+.section-dark {
+  padding: 80px 0;
+  margin: 80px 0;
+  position: relative;
+  clear: both;
+  z-index: 1;
+}
+
+/* Lime top-left stripe */
+.section-cobalt::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80px;
+  height: 8px;
+  background: var(--lime);
+}
+
+/* Lime top-right stripe for dark sections */
+.section-dark::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 40px;
+  width: 120px;
+  height: 8px;
+  background: var(--lime);
+}
+
+/* Constrain container inside colored sections */
+.section-cobalt .container,
+.section-dark .container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+
+/* Body text width */
+.section-cobalt p,
+.section-dark p {
+  max-width: 72ch;
+}
+
+.section-cobalt h3,
+.section-dark h3 {
+  color: var(--bone);
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+.section-cobalt ul,
+.section-dark ul {
+  max-width: 72ch;
+  padding-left: 20px;
+}
+
+.section-cobalt a,
+.section-dark a {
+  color: var(--bone);
+  border-bottom: 1px solid rgba(248,250,252,0.3);
+}
+
+/* Marker z-index inside colored sections */
+.section-dark .marker,
+.section-cobalt .marker {
+  position: relative;
+  z-index: 2;
+}
+
+/* Callout inside dark sections */
+.section-cobalt .callout,
+.section-dark .callout {
+  background: rgba(248, 250, 252, 0.08);
+  border-left-color: var(--lime);
+}
+.section-cobalt .callout h4,
+.section-dark .callout h4 { color: var(--lime); }
+.section-cobalt .callout p,
+.section-dark .callout p  { color: var(--bone); }
+
+@media (max-width: 900px) {
+  .section-cobalt .container,
+  .section-dark .container { padding: 0 24px; }
+  .two-col { grid-template-columns: 1fr; gap: 32px; }
 }

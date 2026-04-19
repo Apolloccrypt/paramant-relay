@@ -159,9 +159,9 @@ NEW_MOBILE = '''\
   </div>
 </div>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=4">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=4">'
-NAV_JS    = '<script src="/nav.js?v=4" defer></script>'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=5">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=5">'
+NAV_JS    = '<script src="/nav.js?v=5" defer></script>'
 
 
 def inject_design_system(html):
@@ -182,7 +182,7 @@ def inject_design_system(html):
 
 
 def inject_nav_js(html):
-    # Normalise any existing nav.js script tag to ?v=4
+    # Normalise any existing nav.js script tag to ?v=5
     html = re.sub(
         r'<script src="/nav\.js(?:\?v=\d+)?" defer></script>',
         NAV_JS, html)
