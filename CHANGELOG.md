@@ -23,6 +23,41 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.9.0-beta] - 2026-04-19
+
+### Added
+- User signup flow at `/signup` with TOTP enrollment (no password required)
+- Admin: resend TOTP setup link button (commit `e0be667`)
+- Admin: five-tab dashboard (Overview, Users, Audit, Billing, Relay) with v4 Denim Edit styling (commit `eb4f496`)
+- Billing scaffold endpoints with Stripe placeholder — checkout, cancel, status, history (commit `a9bff81`)
+- Chromium browser extension with dual-mode authentication (API key + TOTP)
+- Outlook Add-in source scaffold (manifest, taskpane, commands)
+- Navbar with auth-state aware Sign in / Create account CTAs (commit `7253853`)
+- Security audit executed 2026-04-19 — 6-layer scope, low risk rating (0 critical, 0 high)
+- Wazuh SIEM agent connected to Wazuh Manager via Tailscale
+
+### Changed
+- GitHub Actions pinned to commit SHAs for supply-chain security (PR #18)
+- TOTP v2 user authentication rolled out to beta users; Q2 2026 rollout banners removed
+- Setup flow now requires explicit user click before QR code generation (prevents email scanner consumption)
+- `POST /api/user/auth/setup/:token` is idempotent: returns existing TOTP secret for provisional (unactivated) enrollments rather than 409
+- `@noble/post-quantum` dependency updated to 0.6.1
+
+### Fixed
+- Setup token consumption bug: email link scanners (Gmail, Barracuda, Proofpoint) were pre-loading setup URLs, consuming the one-time token before the user clicked (commits `518138e`, `89fd530`)
+- `INTERNAL_AUTH_TOKEN` missing from admin container environment — all internal relay calls returned 401
+- `ENABLE_USER_TOTP` missing from relay container environment — TOTP endpoints were inactive
+- Nginx `/rp/` proxy port mismatches per sector relay
+- Wazuh agent outbound connectivity after UFW default-deny reboot side effect
+
+### Security
+- Setup tokens no longer consumed by email preview scanners; click-gate added to `setup.html`
+- `POST /v2/user/setup-totp` returns existing provisional secret on repeat, eliminating orphaned TOTP state
+- Full 6-layer automated security audit completed; findings fixed before close of session
+- Load tested to 500 req/s with p95 latency 135 ms and zero errors; all containers remained healthy
+
+---
+
 ## [2.4.5] — 2026-04-13
 
 ### Security

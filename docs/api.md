@@ -1,4 +1,4 @@
-# API Reference — PARAMANT v2.4.5
+# API Reference — PARAMANT v0.9.0-beta
 
 ## Base URLs
 
@@ -12,12 +12,18 @@
 
 ## Authentication
 
-All data-plane endpoints require: `X-Api-Key: your_key`
+Three credential types are in use across different API surfaces:
 
-- `pgp_` prefix — end user key (10 uploads/day free, no account needed)
-- `plk_` prefix — operator license key (unlimited, from `.env`)
+| Credential | Header / Mechanism | Used for |
+|------------|-------------------|----------|
+| API key (`pgp_` prefix) | `X-Api-Key: pgp_your_key` | Data plane — uploads, downloads, CT log (developer clients) |
+| Operator key (`plk_` prefix) | `X-Api-Key: plk_your_key` | Data plane — unlimited throughput (operator license) |
+| Session cookie | `Cookie: paramant_user_session=<token>` | `/api/user/*` endpoints — set automatically after TOTP login |
+| Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints — admin panel only |
 
-CT log and STH endpoints are **public** — no API key required.
+CT log and STH endpoints are **public** — no credential required.
+
+The `/v2/auth/capabilities` endpoint is public and returns which authentication modes are enabled on this relay instance.
 
 ---
 
@@ -582,3 +588,166 @@ The CT log follows the same trust model as [Certificate Transparency (RFC 6962)]
 - **RSS archiving** (`/ct/feed.xml`) lets anyone subscribe to the STH feed. Once published, a root cannot be un-published without leaving evidence.
 
 You do not need to trust the relay operator to detect log tampering — you only need to trust that at least one monitor, auditor, or RSS subscriber is honest and retains their copy.
+
+---
+
+## User account API
+
+All `/api/user/` endpoints are served by the **admin panel** (`https://paramant.app`), not the sector relays. They require either an active session cookie or are part of the unauthenticated signup and login flows.
+
+### POST /api/user/signup
+
+```bash
+curl -X POST https://paramant.app/api/user/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com"}'
+# {"ok":true}
+```
+
+Sends a TOTP setup link to the given email address. Rate-limited per IP and per email.
+
+### POST /api/user/auth/setup/:token
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/setup/abc123... \
+  -H "Content-Type: application/json"
+# {"secret":"BASE32SECRET","backup_codes":["code1","code2",…]}
+```
+
+Returns the TOTP secret (as a Base32 string) and one-time backup codes. Idempotent: if the enrollment is provisional (QR scanned but not yet confirmed), the same secret is returned on repeat calls. Returns 409 only if TOTP is already fully activated.
+
+### POST /api/user/auth/setup/:token/confirm
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/setup/abc123.../confirm \
+  -H "Content-Type: application/json" \
+  -d '{"totp_code":"123456"}'
+# {"ok":true}
+```
+
+Verifies the first TOTP code and activates the account. After this call the setup token is consumed and cannot be reused.
+
+### POST /api/user/auth/login
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","totp_code":"123456"}'
+# Sets: Set-Cookie: paramant_user_session=<token>; HttpOnly; Secure; SameSite=Strict
+# {"ok":true}
+```
+
+### POST /api/user/auth/login-with-backup
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/login-with-backup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","backup_code":"abc-def-ghi"}'
+# {"ok":true}
+```
+
+Backup codes are single-use. The account is re-locked after use; a new TOTP enrollment is required.
+
+### POST /api/user/auth/logout
+
+```bash
+curl -X POST https://paramant.app/api/user/auth/logout \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true}
+```
+
+### GET /api/user/session/verify
+
+```bash
+curl https://paramant.app/api/user/session/verify \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true,"user_id":"…","email":"jane@example.com"}
+```
+
+### GET /api/user/account
+
+Returns the account profile, active sessions, and billing status.
+
+```bash
+curl https://paramant.app/api/user/account \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true,"email":"jane@example.com","plan":"free","sessions":[…]}
+```
+
+### DELETE /api/user/account
+
+Permanently deletes the account and all associated Redis state.
+
+```bash
+curl -X DELETE https://paramant.app/api/user/account \
+  -H "Cookie: paramant_user_session=<token>"
+# {"ok":true}
+```
+
+### POST /api/user/account/totp/reset
+
+Sends a new TOTP setup link, invalidating the current TOTP secret. Requires an active session.
+
+### POST /api/user/account/sessions/revoke-others
+
+Revokes all sessions except the current one.
+
+### POST /api/user/account/backup-codes/regenerate
+
+Generates a new set of backup codes and invalidates all previous ones.
+
+### POST /api/user/billing/checkout
+
+Initiates a Stripe checkout session (stub — Stripe integration pending).
+
+### POST /api/user/billing/cancel
+
+Cancels the active subscription.
+
+### GET /api/user/billing/status
+
+Returns current plan and subscription state.
+
+### GET /api/user/billing/history
+
+Returns billing history.
+
+---
+
+## Relay internal endpoints (operators only)
+
+These endpoints are served by the sector relays and are intended for internal calls from the admin panel. They require the `X-Internal-Auth` header set to the value of `INTERNAL_AUTH_TOKEN` in the relay environment.
+
+They are not accessible from the public internet.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/v2/auth/capabilities` | Public — returns `{user_totp_available: bool}` |
+| `POST` | `/v2/user/setup-totp` | Provision a TOTP secret; idempotent for provisional state |
+| `POST` | `/v2/user/verify-totp` | Verify a TOTP code against the stored secret |
+| `POST` | `/v2/user/activate-totp` | Mark TOTP as fully activated |
+| `POST` | `/v2/user/consume-backup` | Consume and invalidate a single backup code |
+| `POST` | `/v2/user/regenerate-backup` | Generate a new backup code set |
+| `POST` | `/v2/user/delete-totp` | Remove all TOTP state for a user |
+| `POST` | `/v2/user/get-totp-provisional` | Return the existing secret if enrollment is provisional |
+| `POST` | `/v2/user/get-backup-codes-plaintext` | Return plaintext backup codes (used during setup display) |
+
+**Idempotency note for `/v2/user/setup-totp`:** If a TOTP secret already exists but `totp_active` is `false` (provisional), the endpoint returns the existing secret and backup codes rather than 409. A 409 is returned only when `totp_active` is `true`.
+
+---
+
+## Error codes
+
+| HTTP | Code | Meaning |
+|------|------|---------|
+| 400 | `bad_request` | Malformed request body or missing required field |
+| 401 | `unauthorized` | Missing or invalid API key, session cookie, or admin token |
+| 401 | `invalid_or_expired_token` | Setup token not found or past TTL |
+| 401 | `invalid_totp_code` | TOTP code incorrect or outside allowed window |
+| 401 | `invalid_backup_code` | Backup code not found or already consumed |
+| 403 | `totp_not_activated` | Account exists but TOTP setup was not completed |
+| 404 | `not_found` | Resource does not exist |
+| 409 | `totp_already_configured` | TOTP is fully activated; cannot re-enroll without a reset |
+| 409 | `email_already_registered` | Signup attempted for an email that already has an account |
+| 429 | `rate_limited` | Too many requests from this IP or email address |
+| 500 | `internal` | Unexpected server error; check relay logs |

@@ -1,8 +1,8 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v2.4.5-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v0.9.0--beta-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
-[![Security Audit](https://img.shields.io/badge/security-audited%20apr%202026-brightgreen.svg)](docs/security-audit-2026-04.md)
+[![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
 [![Jurisdiction](https://img.shields.io/badge/jurisdiction-EU%2FDE%20only-blue.svg)](https://paramant.app/compliance/nis2)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
@@ -40,7 +40,26 @@ curl -fsSL https://paramant.app/install-pi.sh | bash
 Or via the browser — no install:
 **[Try ParaShare →](https://paramant.app/parashare)** (no account, no key needed)
 
+**[Create a free account →](https://paramant.app/signup)** (TOTP, no password)
+
 **[Get a free API key →](https://paramant.app/request-key)** (email delivery, 30-second form)
+
+---
+
+## What is included
+
+| Feature | Status |
+|---------|--------|
+| Post-quantum file relay (ML-KEM-768 + AES-256-GCM) | Live — all 5 sector relays |
+| Anonymous drop (no account, 12-word mnemonic) | Live — [paramant.app/drop](https://paramant.app/drop) |
+| User accounts with TOTP (no password required) | Live — [paramant.app/signup](https://paramant.app/signup) |
+| Admin dashboard (Overview, Users, Audit, Billing, Relay) | Live — `/admin/` |
+| Resend TOTP setup link | Live — admin panel |
+| Developer API keys | Live — [paramant.app/request-key](https://paramant.app/request-key) |
+| Billing (Stripe integration) | Scaffold — Stripe connect pending |
+| Chromium browser extension | Source complete — submission pending |
+| Outlook Add-in | Source complete — DNS pending |
+| Thunderbird FileLink extension | Source in repo |
 
 ---
 
@@ -387,6 +406,7 @@ The relay is **untrusted by design** — it never holds a decryption key.
 
 **Security audits (April 2026):**
 
+- **2026-04-19 — internal automated audit (6-layer + load test):** 0 critical · 0 high · 2 medium (fixed) · 1 low (fixed) · 11 passing checks. Load tested to 500 req/s, p95 latency 135 ms, zero errors. [Full report](SECURITY.md)
 - **2026-04-15 — R. Zwarts RAPTOR review:** 10 findings (3 high · 3 medium · 4 low), all resolved. Commit [769f163](https://github.com/Apolloccrypt/paramant-relay/commit/769f163)
 - **2026-04-13 — R. Zwarts dependency review:** 0 npm vulnerabilities. Node 20 EOL → node:22-alpine. express 4.x → 5.x. Commit [e6f216d](https://github.com/Apolloccrypt/paramant-relay/commit/e6f216d)
 - **2026-04-11 — R. Zwarts verification review:** 14 findings (1 high · 8 medium · 5 low), all resolved. Commit [e6f216d](https://github.com/Apolloccrypt/paramant-relay/commit/e6f216d)

@@ -107,6 +107,38 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
 ---
 
+### 2026-04-19 — Automated internal audit (6 layers + load test)
+
+**Scope:** Static code analysis, authentication flows, network and infrastructure, active penetration testing, cryptographic implementation review, business logic, load testing.
+
+| Severity | Count | Status |
+|----------|-------|--------|
+| Critical | 0 | — |
+| High | 0 | — |
+| Medium | 2 | Fixed in-session |
+| Low | 1 | Fixed in-session |
+| Informational | 11 | All passing |
+
+| ID | Severity | Finding | Resolution |
+|----|----------|---------|------------|
+| A-01 | Medium | Setup token consumed by email scanner before user interaction | Fixed: `setup.html` gates `init()` behind explicit button click |
+| A-02 | Medium | `POST /v2/user/setup-totp` returned 409 for provisional (unactivated) TOTP | Fixed: endpoint is now idempotent; returns existing secret until activation |
+| A-03 | Low | `INTERNAL_AUTH_TOKEN` absent from admin container environment | Fixed: env var injected in `docker-compose.yml` |
+| A-04 through A-15 | Info | Argon2id params, TOTP timing safety, AES-GCM nonces, PQ layer, setup token entropy, billing auth, email canonicalization, rate limits, container hardening, secrets hygiene | All passing |
+
+**Load test results** (tool: `hey`, target: `https://paramant.app/`):
+
+| Load | Requests | p95 latency | Errors | Container state |
+|------|----------|-------------|--------|----------------|
+| 10 rps | 100 | 10 ms | 0 | All healthy |
+| 50 rps | 500 | 18 ms | 0 | All healthy |
+| 100 rps | 1000 | 43 ms | 0 | All healthy |
+| 500 rps | 5000 | 135 ms | 0 | All healthy |
+
+**Next audit:** External third-party penetration test planned before public general availability.
+
+---
+
 ### 2026-04-15 — TOTP algorithm mismatch (internal)
 
 | Severity | Finding | Status |
@@ -251,6 +283,40 @@ Additional fixes applied 2026-04-13:
 **Remediation:** Server `.env` permissions hardened to 600; gitleaks pre-commit hook installed.
 
 **Note on git history:** Historical commits still contain the now-invalid credentials. Rewriting history would break existing clones with no security benefit since the credentials are revoked. Documented here for transparency.
+
+---
+
+## Threat model
+
+### What Paramant protects against
+
+| Threat | Mitigation |
+|--------|------------|
+| Third-party storage provider reading file contents | Zero-knowledge relay: content encrypted client-side before transmission; relay never holds decryption keys |
+| Network-level interception (MITM) | TLS 1.2/1.3 with forward-secret cipher suites; HSTS enforced on all subdomains |
+| Harvest-now-decrypt-later (post-quantum adversary) | ML-KEM-768 key encapsulation inside TLS; classical TLS layer provides defense in depth |
+| Credential stuffing | User accounts require TOTP; no stored passwords |
+| Email link preview scanners consuming one-time tokens | Setup tokens are click-gated; endpoint is idempotent for provisional state |
+| Log tampering (CT log) | SHA3-256 Merkle tree with ML-DSA-65 signed tree heads; gossip protocol between peer relays |
+
+### What Paramant does not protect against
+
+| Threat | Note |
+|--------|------|
+| Endpoint compromise | If your device runs malware, client-side encryption offers no protection |
+| Coerced disclosure | Legal orders directed at the operator can compel log disclosure; content remains encrypted |
+| Social engineering of operators | Administrative access is protected by TOTP but not immune to targeted attacks |
+| Quantum cryptanalysis of prior TLS sessions | Mitigated by the PQ encryption layer inside TLS, which is not retroactively breakable |
+
+---
+
+## Known limitations (beta)
+
+- Beta access only; hardening for general public availability is in progress.
+- Stripe billing integration is a scaffold; production payments are not yet active.
+- Some accounts created before TOTP rollout operate on API-key-only authentication.
+- Rate limits have not been validated under sustained adversarial load; no WAF is deployed.
+- External third-party penetration test has not yet been conducted.
 
 ---
 
