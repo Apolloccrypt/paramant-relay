@@ -3,6 +3,7 @@ const express = require('express');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
+const { initRedis, redis } = require('./lib/redis');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -17,8 +18,23 @@ const SECTORS = {
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
 
-const sessions = new Map();
-setInterval(() => { const now = Date.now(); for (const [k, v] of sessions) if (v.expires < now) sessions.delete(k); }, 60_000);
+async function createSession() {
+  const sid = crypto.randomBytes(32).toString('hex');
+  await redis().set(`paramant:admin:session:${sid}`, '1', { EX: 3600 });
+  return sid;
+}
+
+async function validateSession(sid) {
+  if (!sid) return false;
+  const exists = await redis().get(`paramant:admin:session:${sid}`);
+  if (!exists) return false;
+  await redis().expire(`paramant:admin:session:${sid}`, 3600);
+  return true;
+}
+
+async function destroySession(sid) {
+  if (sid) await redis().del(`paramant:admin:session:${sid}`);
+}
 
 // ── Self-service trial key tracking ──────────────────────────────────────────
 const trialEmailTrack = new Map(); // email → { lastAt }
@@ -67,11 +83,17 @@ function checkLoginRateLimit(ip) {
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of loginAttempts) if (now > v.resetAt + 60_000) loginAttempts.delete(k); }, 120_000);
 
-function authMiddleware(req, res, next) {
-  const s = sessions.get((req.headers['x-session'] || '').trim());
-  if (!s || s.expires < Date.now()) return res.status(401).json({ error: 'unauthorized' });
-  req.sessionToken = s.token || ADMIN_TOKEN;
-  next();
+async function authMiddleware(req, res, next) {
+  const sid = (req.headers['x-session'] || '').trim();
+  try {
+    const valid = await validateSession(sid);
+    if (!valid) return res.status(401).json({ error: 'unauthorized' });
+    req.sessionToken = ADMIN_TOKEN;
+    next();
+  } catch (err) {
+    console.error('[auth] middleware error:', err.message);
+    res.status(503).json({ error: 'session_store_unavailable' });
+  }
 }
 
 function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
@@ -145,8 +167,7 @@ api.post('/auth/login', async (req, res) => {
   try {
     const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, ADMIN_TOKEN);
     if (!r.body?.ok) return res.status(401).json({ error: 'Invalid TOTP code' });
-    const sid = crypto.randomBytes(32).toString('hex');
-    sessions.set(sid, { expires: Date.now() + 3_600_000, token: ADMIN_TOKEN });
+    const sid = await createSession();
     return res.json({ ok: true, session: sid, expires_in: 3600 });
   } catch (e) {
     // Fix 10: don't leak internal relay address in error response
@@ -155,7 +176,7 @@ api.post('/auth/login', async (req, res) => {
   }
 });
 
-api.post('/auth/logout', (req, res) => { sessions.delete((req.headers['x-session'] || '').trim()); res.json({ ok: true }); });
+api.post('/auth/logout', async (req, res) => { await destroySession((req.headers['x-session'] || '').trim()); res.json({ ok: true }); });
 api.get('/auth/check', authMiddleware, (req, res) => res.json({ ok: true }));
 
 function sectorRoute(relPath, method) {
@@ -337,4 +358,10 @@ app.use(`${BASE_PATH}/api`, api);
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`[PARAMANT-ADMIN] listening on :${PORT}${BASE_PATH || '/'}`));
+(async () => {
+  await initRedis();
+  app.listen(PORT, '0.0.0.0', () => console.log(`[PARAMANT-ADMIN] listening on :${PORT}${BASE_PATH || '/'}`));
+})().catch((err) => {
+  console.error('[boot] startup failed:', err);
+  process.exit(1);
+});

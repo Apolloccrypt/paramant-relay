@@ -25,6 +25,7 @@ const https  = require('https');
 const fs     = require('fs');
 const path   = require('path');
 const url_   = require('url');
+const { createClient } = require('redis');
 
 const VERSION    = '2.4.5';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -725,6 +726,43 @@ function renderPrometheus() {
   return L.join('\n')+'\n';
 }
 
+// ── Redis client (required for TOTP replay protection and session state) ─────
+let redisClient = null;
+
+async function initRedis() {
+  if (!process.env.REDIS_URL) {
+    console.error('[redis] FATAL: REDIS_URL not set');
+    process.exit(1);
+  }
+
+  redisClient = createClient({
+    url: process.env.REDIS_URL,
+    socket: {
+      reconnectStrategy: (retries) => {
+        if (retries > 10) {
+          console.error('[redis] max reconnect retries exceeded');
+          return new Error('redis unreachable');
+        }
+        return Math.min(retries * 100, 3000);
+      },
+    },
+  });
+
+  redisClient.on('error', (err) => console.error('[redis] error:', err.message));
+  redisClient.on('connect', () => console.log('[redis] connecting'));
+  redisClient.on('ready',   () => console.log('[redis] ready'));
+  redisClient.on('end',     () => console.error('[redis] disconnected'));
+
+  await redisClient.connect();
+
+  const pong = await redisClient.ping();
+  if (pong !== 'PONG') {
+    console.error('[redis] ping failed:', pong);
+    process.exit(1);
+  }
+  console.log('[redis] connected to', process.env.REDIS_URL.replace(/:[^@]+@/, ':***@'));
+}
+
 // ── TOTP verificatie (RFC 6238) ───────────────────────────────────────────────
 const TOTP_SECRET = process.env.TOTP_SECRET || '';
 const TOTP_WINDOW = 1;
@@ -749,43 +787,92 @@ function base32Decode(s) {
   return Buffer.from(output);
 }
 
-function totpCode(secret, counter) {
+// algorithm: 'sha1' (default, RFC 6238 standard) or 'sha256' (admin, backward compat)
+function totpCode(secret, counter, algorithm = 'sha1') {
+  if (algorithm !== 'sha1' && algorithm !== 'sha256') {
+    throw new Error(`Unsupported TOTP algorithm: ${algorithm}`);
+  }
   const key = base32Decode(secret);
   const buf = Buffer.alloc(8);
   buf.writeBigUInt64BE(BigInt(counter));
-  const mac = crypto.createHmac('sha256', key).update(buf).digest();
+  const mac = crypto.createHmac(algorithm, key).update(buf).digest();
   const offset = mac[mac.length - 1] & 0xf;
   const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
   zeroBuffer(key); zeroBuffer(mac);
   return code.toString().padStart(6, '0');
 }
 
-// Fix 5: used-code tracking — window = 30s each side → 3 windows × 30s = 90s expiry
-const _usedTotpCodes = new Map(); // code+counter → expiry ms
-setInterval(() => { const now = Date.now(); for (const [k, exp] of _usedTotpCodes) if (now > exp) _usedTotpCodes.delete(k); }, 30_000);
+// Replay protection lives in Redis. Key format: {replayKey}:{code}:{counter}
+// TTL: (window + 2) * 30s — covers all counter windows plus buffer
 
-function verifyTotp(token) {
-  if (!TOTP_SECRET) return false;
-  const tokenBuf = Buffer.from(String(token || ''), 'utf8');
-  if (tokenBuf.length !== 6) return false;
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  // Fix 5a: evaluate ALL windows — never short-circuit (constant-time scan)
-  let matched = false;
-  for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
-    const c = counter + i;
-    const expected = totpCode(TOTP_SECRET, c);
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    // Fix 5b: timingSafeEqual (lengths guaranteed equal — both are 6-char strings)
-    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
-    if (eq) {
-      // Fix 5c: reject reused codes — key = token + counter slot
-      const useKey = `${token}:${c}`;
-      if (_usedTotpCodes.has(useKey)) { matched = false; continue; }
-      _usedTotpCodes.set(useKey, (c + 2) * 30 * 1000); // expire after 2 windows past use
-      matched = true;
-    }
+// Generic TOTP verification — used by admin endpoint and (later) user endpoints.
+// Returns { valid: boolean, reason?: string, counter?: number }
+// Security: constant-time scan, atomic Redis SET NX for replay, fails closed.
+async function verifyTotpGeneric(code, secret, opts = {}) {
+  const algorithm = opts.algorithm || 'sha1';
+  const window    = opts.window ?? TOTP_WINDOW;
+  const replayKey = opts.replayKey;
+
+  if (!secret)    return { valid: false, reason: 'no_secret' };
+  if (!replayKey) return { valid: false, reason: 'no_replay_key' };
+  if (!redisClient || !redisClient.isReady) {
+    return { valid: false, reason: 'redis_unavailable' };
   }
-  return matched;
+
+  const codeStr = String(code || '');
+  if (!/^\d{6}$/.test(codeStr)) return { valid: false, reason: 'invalid_format' };
+
+  const tokenBuf = Buffer.from(codeStr, 'utf8');
+  const counter  = Math.floor(Date.now() / 1000 / 30);
+
+  // Constant-time scan: evaluate all windows, never short-circuit on match.
+  let matchedCounter = null;
+  for (let i = -window; i <= window; i++) {
+    const c = counter + i;
+    let expected;
+    try { expected = totpCode(secret, c, algorithm); }
+    catch (e) { return { valid: false, reason: 'secret_decode_failed' }; }
+    const expectedBuf = Buffer.from(expected, 'utf8');
+    const eq = tokenBuf.length === expectedBuf.length &&
+               crypto.timingSafeEqual(tokenBuf, expectedBuf);
+    if (eq) matchedCounter = c;
+  }
+
+  if (matchedCounter === null) return { valid: false, reason: 'invalid_code' };
+
+  // Replay check after scan — atomic SET NX, safe for multi-instance
+  const replayFullKey = `${replayKey}:${codeStr}:${matchedCounter}`;
+  const ttlSeconds    = (window + 2) * 30;
+
+  let setResult;
+  try {
+    setResult = await redisClient.set(replayFullKey, '1', { NX: true, EX: ttlSeconds });
+  } catch (err) {
+    console.error('[totp] redis SET failed:', err.message);
+    return { valid: false, reason: 'redis_error' };
+  }
+
+  if (setResult !== 'OK') return { valid: false, reason: 'replay' };
+  return { valid: true, counter: matchedCounter };
+}
+
+// Backward-compat wrapper for existing admin endpoint.
+// All callsites of verifyTotp(token) need `await`.
+async function verifyTotp(token) {
+  const secret = process.env.ADMIN_TOTP_SECRET || process.env.TOTP_SECRET;
+  if (!secret) {
+    console.error('[totp] ADMIN_TOTP_SECRET / TOTP_SECRET not set');
+    return false;
+  }
+  const result = await verifyTotpGeneric(token, secret, {
+    algorithm: 'sha256', // keep for admin backward compat
+    window: TOTP_WINDOW,
+    replayKey: 'paramant:admin:replay',
+  });
+  if (!result.valid && result.reason !== 'invalid_code' && result.reason !== 'replay') {
+    console.warn('[totp] admin verify failed:', result.reason);
+  }
+  return result.valid;
 }
 
 // ── Download tokens — one-time public download links
@@ -1582,6 +1669,138 @@ const server = http.createServer(async (req, res) => {
       active_keys: [...apiKeys.values()].filter(k => k.active !== false).length };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
+  }
+
+
+  // ── GET /v2/auth/capabilities — public, no auth ─────────────────────────────
+  if (req.method === "GET" && path === "/v2/auth/capabilities") {
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({
+      api_key: true,
+      user_totp: process.env.ENABLE_USER_TOTP === "true",
+      user_totp_status: process.env.ENABLE_USER_TOTP === "true"
+        ? "live"
+        : "rolling_out_q2_2026",
+      capabilities_version: 1,
+    }));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // User TOTP endpoints (internal — X-Internal-Auth only)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  function _internalOk() {
+    const tok = process.env.INTERNAL_AUTH_TOKEN;
+    return tok && req.headers["x-internal-auth"] === tok;
+  }
+  function _internalReject() {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(J({ error: "unauthorized" }));
+  }
+
+  // POST /v2/user/setup-totp
+  if (req.method === "POST" && path === "/v2/user/setup-totp") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, provisional } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const existing = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (existing) { res.writeHead(409); return res.end(J({ error: "totp_already_configured" })); }
+      const secret = userTotp.generateTotpSecret();
+      await userTotp.storeUserTotpSecret(redisClient, user_id, secret);
+      const activeKey = `paramant:user:totp_active:${user_id}`;
+      if (provisional) {
+        await redisClient.set(activeKey, "false", { EX: 14 * 86400 });
+      } else {
+        await redisClient.set(activeKey, "true");
+      }
+      const backupCodes = userTotp.generateBackupCodes();
+      await userTotp.storeBackupCodes(redisClient, user_id, backupCodes);
+      if (provisional) {
+        await redisClient.set(
+          `paramant:user:backup_codes_plaintext:${user_id}`,
+          JSON.stringify(backupCodes),
+          { EX: 14 * 86400 }
+        );
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ secret, backup_codes: backupCodes }));
+    } catch (err) {
+      console.error("[user/setup-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/verify-totp
+  if (req.method === "POST" && path === "/v2/user/verify-totp") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
+      const result = await verifyTotpGeneric(totp, secret, {
+        algorithm: "sha1", window: 1,
+        replayKey: `paramant:user:replay:${user_id}`,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J(result));
+    } catch (err) {
+      console.error("[user/verify-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/activate-totp
+  if (req.method === "POST" && path === "/v2/user/activate-totp") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
+    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ success: true }));
+  }
+
+  // POST /v2/user/consume-backup
+  if (req.method === "POST" && path === "/v2/user/consume-backup") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
+    const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J(result));
+  }
+
+  // POST /v2/user/regenerate-backup
+  if (req.method === "POST" && path === "/v2/user/regenerate-backup") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    await redisClient.del(`paramant:user:backup_codes:${user_id}`);
+    const codes = userTotp.generateBackupCodes();
+    await userTotp.storeBackupCodes(redisClient, user_id, codes);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ backup_codes: codes }));
+  }
+
+  // POST /v2/user/delete-totp
+  if (req.method === "POST" && path === "/v2/user/delete-totp") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    await userTotp.deleteUserTotp(redisClient, user_id);
+    await redisClient.del(`paramant:user:totp_active:${user_id}`);
+    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ success: true }));
+  }
+
+  // POST /v2/user/get-backup-codes-plaintext
+  if (req.method === "POST" && path === "/v2/user/get-backup-codes-plaintext") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    const raw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
+    if (!raw) { res.writeHead(404); return res.end(J({ error: "not_available" })); }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ backup_codes: JSON.parse(raw) }));
   }
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
@@ -2925,7 +3144,7 @@ session = client.create_session('recipient@example.com')</pre>
     }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
-      const valid = verifyTotp(d.totp_code || '');
+      const valid = await verifyTotp(d.totp_code || '');
       log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: clientIp });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: valid, error: valid ? null : 'Invalid TOTP code' }));
@@ -3555,14 +3774,21 @@ setInterval(() => {
   if (sthLog.length === 0 || !relayIdentity) return;
   broadcastSTH(sthLog[sthLog.length - 1]).catch(() => {});
 }, 10 * 60_000);
-server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
-  log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
-      dsa: !!mlDsa, protocol: 'ghost-pipe-v2',
-      relay_identity: relayIdentity ? relayIdentity.pk_hash.slice(0,16)+'…' : 'none' });
-  // Register to the relay registry after a short delay to let the server fully bind
-  if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
+(async () => {
+  await initRedis();
+  server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+    log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
+        dsa: !!mlDsa, protocol: 'ghost-pipe-v2',
+        relay_identity: relayIdentity ? relayIdentity.pk_hash.slice(0,16)+'…' : 'none' });
+    // Register to the relay registry after a short delay to let the server fully bind
+    if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
+  });
+})().catch((err) => {
+  console.error('[boot] startup failed:', err);
+  process.exit(1);
 });
 function emergencyZeroAndExit(reason, code = 0) {
+  if (redisClient) { try { redisClient.disconnect(); } catch (_) {} }
   // Fix 8: flush CT write queue before exit
   _flushCtOnExit();
   _flushSthOnExit();

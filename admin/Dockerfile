@@ -9,6 +9,7 @@ WORKDIR /app
 COPY package.json .
 RUN npm install --production --quiet && npm cache clean --force
 COPY server.js .
+COPY lib/ lib/
 COPY public/ public/
 
 # Non-root user — admin server never needs root

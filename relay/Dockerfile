@@ -24,6 +24,7 @@ WORKDIR /app
 # Copy only compiled node_modules from build stage — no build tools follow
 COPY --from=build /app/node_modules ./node_modules
 COPY relay.js ./
+COPY lib/ ./lib/
 
 # Non-root user — relay never needs root after install
 RUN addgroup -S relay && adduser -S relay -G relay \
