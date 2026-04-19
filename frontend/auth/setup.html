@@ -180,9 +180,24 @@
   </p>
 </section>
 
-<!-- Loading state -->
+<!-- Start state (scanner-safe: no POST until user clicks) -->
 <section id="state-loading" class="section">
-  <p class="lede">Loading your setup token...</p>
+  <div class="marker">
+    <div class="num">&#8594;</div>
+    <h2>Ready to set up.</h2>
+    <div class="tag">click to<br>continue</div>
+  </div>
+  <p class="lede" style="margin-top:16px">
+    Click the button below to generate your QR code and begin setup.
+  </p>
+  <div class="cta-row" style="margin-top:24px">
+    <button type="button" class="btn btn-primary" id="start-btn">Start setup</button>
+  </div>
+</section>
+
+<!-- Connecting state -->
+<section id="state-connecting" class="section hidden">
+  <p class="lede">Generating your QR code&#8230;</p>
 </section>
 
 <!-- Expired/invalid state -->
@@ -420,7 +435,10 @@
     window.location = '/account';
   });
 
-  init();
+  document.getElementById('start-btn').addEventListener('click', function() {
+    show('state-connecting');
+    init();
+  });
 })();
 </script>
 
