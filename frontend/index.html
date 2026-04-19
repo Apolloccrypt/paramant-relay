@@ -172,59 +172,25 @@
 
 <!-- § 00 HERO -->
 <section style="padding:var(--space-10) 0 var(--space-8)">
-  <div class="container-lg">
-    <div class="hero-grid">
-
-      <div>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-5)">Keyless &middot; Anonymous &middot; Burn-on-read</p>
-        <h1>Encrypted transport that <em>burns</em> itself.</h1>
-        <p style="font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:480px;margin-top:var(--space-5);margin-bottom:var(--space-7)">
-          Client-side encryption. A relay that never writes to disk and destroys the ciphertext after one read. No account needed to start. Post-quantum key exchange available for verified transfers.
-        </p>
-        <div class="cluster" style="--cluster-gap:var(--space-3)">
-          <a href="/send" class="btn btn-primary">Send a file free</a>
-          <a href="#modes" class="btn btn-secondary">Two trust modes</a>
-        </div>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-5);letter-spacing:.06em">
-          Audited &nbsp;&middot;&nbsp; Open source &nbsp;&middot;&nbsp; EU jurisdiction &nbsp;&middot;&nbsp; <a href="/request-key" style="color:var(--cobalt)">Free API key</a>
-        </p>
-      </div>
-
-      <div>
-        <div class="spec-card" style="min-height:400px">
-          <div class="spec-card-label">Anonymous send</div>
-          <div class="spec-card-sub">No account. No trace.</div>
-          <div class="dropzone-spec" style="margin-top:var(--space-6)">
-            <div class="dropzone-spec-cell">
-              <span class="dropzone-spec-key">cipher</span>
-              <span class="dropzone-spec-val">aes-256-gcm</span>
-            </div>
-            <div class="dropzone-spec-cell">
-              <span class="dropzone-spec-key">key</span>
-              <span class="dropzone-spec-val">url fragment</span>
-            </div>
-            <div class="dropzone-spec-cell">
-              <span class="dropzone-spec-key">rate</span>
-              <span class="dropzone-spec-val">10/hr</span>
-            </div>
-            <div class="dropzone-spec-cell">
-              <span class="dropzone-spec-key">account</span>
-              <span class="dropzone-spec-val">none</span>
-            </div>
-          </div>
-          <a href="/send" class="drop-btn">Send a file &rarr;</a>
-        </div>
-      </div>
-
+  <div class="container">
+    <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-5)">post-quantum &middot; eu sovereign &middot; zero-knowledge</p>
+    <h1>Encrypted file transport.<br><em>RAM-only.</em> Burn on read.</h1>
+    <p style="font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:560px;margin-top:var(--space-5);margin-bottom:var(--space-7)">
+      Paramant is a post-quantum encrypted file relay.
+      ML-KEM-768 and ML-DSA-65, NIST Level 3. Operated
+      from the Netherlands, infrastructure in Germany.
+      No US owner, no CLOUD Act exposure. Your data
+      lives in RAM only, destroyed on first read.
+    </p>
+    <div class="hero-actions">
+      <a href="/send" class="btn btn-primary">Send a file</a>
+      <a href="/sovereignty" class="btn btn-secondary">Why jurisdiction matters</a>
     </div>
-
-    <div class="compliance-strip" style="margin-top:var(--space-8)">
-      <div class="compliance-strip-cell">NIS2</div>
-      <div class="compliance-strip-cell">IEC 62443</div>
-      <div class="compliance-strip-cell">NEN 7510</div>
-      <div class="compliance-strip-cell">eIDAS</div>
-      <div class="compliance-strip-cell">FIPS 203</div>
-      <div class="compliance-strip-cell">FIPS 204</div>
+    <div class="hero-proof">
+      <div>ML-KEM-768 &middot; FIPS 203</div>
+      <div>RAM-only &middot; burn on read</div>
+      <div>Hetzner DE &middot; EU-Central</div>
+      <div>BUSL-1.1 &middot; self-hostable</div>
     </div>
   </div>
 </section>

@@ -1363,3 +1363,32 @@ pre code { background: none; padding: 0; }
   }
   .status-dot, .dot { animation: none; opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════════════
+   HERO — jurisdiction positioning
+   ═══════════════════════════════════════════════════ */
+.hero-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.hero-proof {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--ink-hair);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+@media (max-width: 768px) {
+  .hero-actions { flex-direction: column; }
+  .hero-actions .btn { text-align: center; }
+  .hero-proof { grid-template-columns: repeat(2, 1fr); }
+}
