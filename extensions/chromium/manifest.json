@@ -25,12 +25,11 @@
   ],
 
   "background": {
-    "service_worker": "src/background/service-worker.js",
-    "type": "module"
+    "service_worker": "background/service-worker.js"
   },
 
   "action": {
-    "default_popup": "src/popup/popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "Paramant",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -41,8 +40,8 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["src/content/shared/banner.js", "src/content/gmail.js"],
-      "css": ["src/content/shared/banner.css"],
+      "js": ["content/shared/banner.js", "content/gmail.js"],
+      "css": ["content/shared/banner.css"],
       "run_at": "document_idle"
     },
     {
@@ -51,15 +50,15 @@
         "https://outlook.office.com/*",
         "https://outlook.office365.com/*"
       ],
-      "js": ["src/content/shared/banner.js", "src/content/outlook.js"],
-      "css": ["src/content/shared/banner.css"],
+      "js": ["content/shared/banner.js", "content/outlook.js"],
+      "css": ["content/shared/banner.css"],
       "run_at": "document_idle"
     }
   ],
 
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.svg"],
+      "resources": ["icons/*.svg", "icons/*.png"],
       "matches": [
         "https://mail.google.com/*",
         "https://outlook.live.com/*",

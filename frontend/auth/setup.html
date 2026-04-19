@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set up authenticator — Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+<script src="/js/qrcode.min.js"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div>
+
+<main class="container-lg">
+
+<section class="section-lg">
+  <div class="eyebrow"><span class="bar"></span>account setup</div>
+  <h1>Scan the <em>QR code</em>.</h1>
+  <p class="lede">
+    One-time setup. Your authenticator app will generate 6-digit codes every 30 seconds.
+  </p>
+</section>
+
+<!-- Loading state -->
+<section id="state-loading" class="section">
+  <p class="lede">Loading your setup token...</p>
+</section>
+
+<!-- Expired/invalid state -->
+<section id="state-invalid" class="section hidden">
+  <div class="marker">
+    <div class="num">&ndash;</div>
+    <h2>This link is no longer valid.</h2>
+    <div class="tag">token expired<br>or already used</div>
+  </div>
+
+  <p style="margin-top:16px">
+    The setup link has expired (14-day limit), been used already, or is invalid.
+  </p>
+
+  <div class="cta-row" style="margin-top:24px">
+    <a href="/signup" class="btn btn-primary">Start over</a>
+  </div>
+</section>
+
+<!-- Active setup -->
+<section id="state-active" class="section hidden">
+  <div class="marker">
+    <div class="num">01</div>
+    <h2>Scan with your authenticator.</h2>
+    <div class="tag">one-time<br>setup</div>
+  </div>
+
+  <div class="setup-grid">
+    <div class="qr-card">
+      <div id="qr-code"></div>
+      <p class="qr-caption">
+        Point your authenticator app at this code.
+      </p>
+    </div>
+
+    <div class="setup-info">
+      <div class="info-row">
+        <div class="info-label">Account</div>
+        <div class="info-value" id="setup-email">&mdash;</div>
+      </div>
+
+      <div class="info-row">
+        <div class="info-label">Algorithm</div>
+        <div class="info-value">SHA-1 &middot; 6 digits &middot; 30 seconds</div>
+      </div>
+
+      <div class="info-row">
+        <div class="info-label">Manual entry</div>
+        <div class="info-value">
+          <code class="secret-display" id="secret-display">&mdash;</code>
+          <button type="button" class="btn btn-small btn-secondary" id="copy-secret">Copy</button>
+        </div>
+        <p class="small mt-2">
+          Use this if scanning fails. Enter it manually in your authenticator app.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Verify -->
+<section id="state-verify" class="section hidden">
+  <div class="marker">
+    <div class="num">02</div>
+    <h2>Enter the current code.</h2>
+    <div class="tag">verify<br>setup works</div>
+  </div>
+
+  <form id="verify-form" class="form-card">
+    <label for="verify-code">6-digit code from your authenticator</label>
+    <input type="text" id="verify-code" required inputmode="numeric"
+           pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+           placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
+
+    <button type="submit" class="btn btn-primary mt-3" id="verify-btn">
+      Confirm and activate account
+    </button>
+
+    <div id="verify-error" class="error"></div>
+  </form>
+</section>
+
+<!-- Success + backup codes -->
+<section id="state-success" class="section hidden">
+  <div class="marker">
+    <div class="num">03</div>
+    <h2>Save your backup codes.</h2>
+    <div class="tag">one-time<br>display</div>
+  </div>
+
+  <div class="warning-box">
+    <strong>Shown once. Save them now.</strong>
+    <p>
+      Each code can be used exactly once to sign in without your authenticator. Save them in a password manager, print them, or store in a secure note.
+    </p>
+  </div>
+
+  <div id="backup-codes" class="backup-grid"></div>
+
+  <div class="cta-row mt-3">
+    <button type="button" class="btn btn-secondary" id="copy-codes">Copy all</button>
+    <button type="button" class="btn btn-secondary" id="download-codes">Download .txt</button>
+    <button type="button" class="btn btn-secondary" id="print-codes">Print</button>
+  </div>
+
+  <div class="form-checkbox mt-4">
+    <input type="checkbox" id="saved-confirm">
+    <label for="saved-confirm">
+      I have saved my backup codes in a safe place.
+    </label>
+  </div>
+
+  <button type="button" class="btn btn-primary mt-3" id="finish-btn" disabled>
+    Continue to account
+  </button>
+</section>
+
+</main>
+
+<script src="/nav.js?v=5" defer></script>
+<script>
+(function() {
+  const token = window.location.pathname.split('/').pop();
+  let setupData = null;
+  let backupCodes = [];
+
+  function show(stateId) {
+    document.querySelectorAll('section[id^="state-"]').forEach(function(s) {
+      s.classList.add('hidden');
+    });
+    document.getElementById(stateId).classList.remove('hidden');
+  }
+
+  async function init() {
+    try {
+      const res = await fetch('/api/user/setup/' + encodeURIComponent(token), {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        show('state-invalid');
+        return;
+      }
+
+      setupData = await res.json();
+      backupCodes = setupData.backup_codes;
+
+      new QRCode(document.getElementById('qr-code'), {
+        text: setupData.otpauth,
+        width: 240,
+        height: 240,
+        colorDark: '#0B3A6A',
+        colorLight: '#F8FAFC',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+
+      document.getElementById('setup-email').textContent = setupData.email;
+      document.getElementById('secret-display').textContent = setupData.secret;
+
+      show('state-active');
+
+      setTimeout(function() {
+        document.getElementById('state-verify').classList.remove('hidden');
+        document.getElementById('verify-code').focus();
+      }, 1500);
+    } catch (err) {
+      show('state-invalid');
+    }
+  }
+
+  document.getElementById('copy-secret').addEventListener('click', function() {
+    if (setupData) navigator.clipboard.writeText(setupData.secret);
+  });
+
+  document.getElementById('verify-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const code = document.getElementById('verify-code').value.trim();
+    const errorDiv = document.getElementById('verify-error');
+    errorDiv.classList.remove('visible');
+
+    const res = await fetch('/api/user/setup/' + encodeURIComponent(token) + '/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ totp: code }),
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      errorDiv.textContent = 'Invalid code. Try the current number shown in your app.';
+      errorDiv.classList.add('visible');
+      return;
+    }
+
+    const data = await res.json();
+    backupCodes = data.backup_codes;
+
+    const grid = document.getElementById('backup-codes');
+    grid.innerHTML = '';
+    backupCodes.forEach(function(c) {
+      const div = document.createElement('div');
+      div.className = 'backup-code';
+      div.textContent = c;
+      grid.appendChild(div);
+    });
+
+    show('state-success');
+  });
+
+  document.getElementById('saved-confirm').addEventListener('change', function(e) {
+    document.getElementById('finish-btn').disabled = !e.target.checked;
+  });
+
+  document.getElementById('copy-codes').addEventListener('click', function() {
+    navigator.clipboard.writeText(backupCodes.join('\n'));
+  });
+
+  document.getElementById('download-codes').addEventListener('click', function() {
+    const blob = new Blob([
+      'Paramant backup codes\n' +
+      'Save these in a safe place. Each can be used once.\n\n' +
+      backupCodes.join('\n') +
+      '\n\nGenerated: ' + new Date().toISOString()
+    ], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'paramant-backup-codes.txt';
+    a.click();
+  });
+
+  document.getElementById('print-codes').addEventListener('click', function() {
+    window.print();
+  });
+
+  document.getElementById('finish-btn').addEventListener('click', function() {
+    window.location = '/account';
+  });
+
+  init();
+})();
+</script>
+
+</body>
+</html>

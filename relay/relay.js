@@ -72,13 +72,13 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/ct','/ct/feed'],
+               '/v2/sth','/v2/verify-receipt','/ct','/ct/feed','/v2/auth','/v2/user'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/ct','/ct/feed'],
+               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/ct','/ct/feed','/v2/auth','/v2/user'],
   full:       null,
 };
 
@@ -3019,6 +3019,24 @@ session = client.create_session('recipient@example.com')</pre>
         wsClients.delete(revokedKey);
       }
       res.writeHead(200); return res.end(J({ ok: true }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/update-plan ─────────────────────────────────────────
+  if (path === '/v2/admin/keys/update-plan' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { key, plan } = JSON.parse((await readBody(req, 1024)).toString());
+      const VALID_PLANS = new Set(['community','dev','pro','licensed','enterprise']);
+      if (!key || !VALID_PLANS.has(plan)) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
+      if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      apiKeys.get(key).plan = plan;
+      _mutateUsersJson(ud => {
+        const entry = ud.api_keys.find(k => k.key === key);
+        if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
+        ud.updated = new Date().toISOString();
+      }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
+      res.writeHead(200); return res.end(J({ ok: true, key, plan }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 

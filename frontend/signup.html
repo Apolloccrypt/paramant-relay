@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create account — Paramant</title>
+<meta name="description" content="Create a Paramant account. No password. Authenticator app required.">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div>
+
+<main class="container-lg">
+
+<section class="section-lg">
+  <div class="eyebrow"><span class="bar"></span>create account</div>
+  <h1>Set up your <em>Paramant</em> account.</h1>
+  <p class="lede">
+    Three minutes. No password to create or remember.
+  </p>
+</section>
+
+<section class="section">
+  <div class="marker">
+    <div class="num">01</div>
+    <h2>What you get.</h2>
+    <div class="tag">three things<br>in one account</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+        Email + authenticator login
+      </div>
+      <p style="margin:0">
+        Sign in with your email address and a 6-digit code from your authenticator app. One hour session. Works on paramant.app and in the Gmail/Outlook extensions.
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+        API key for automation
+      </div>
+      <p style="margin:0">
+        Same account can be used from scripts, SDKs, and IoT devices. Your API key is visible in your account after setup. No TOTP required for headless use.
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+        10 backup codes
+      </div>
+      <p style="margin:0">
+        Single-use recovery codes in case you lose your authenticator app. Shown once during setup. Save them in a password manager or print them.
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+        No password
+      </div>
+      <p style="margin:0">
+        We do not store passwords. There is nothing to forget, reset, or phish. What we do not have, we cannot leak.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="marker">
+    <div class="num">02</div>
+    <h2>Create your account.</h2>
+    <div class="tag">one field<br>to start</div>
+  </div>
+
+  <form id="signup-form" class="form-card" novalidate>
+    <label for="email">Email address</label>
+    <input type="email" id="email" name="email" required autocomplete="email"
+           placeholder="you@example.com">
+
+    <label for="label" class="mt-3">Label (optional)</label>
+    <input type="text" id="label" name="label" autocomplete="organization"
+           placeholder="Acme Legal, Ward 3A, Home Lab, etc.">
+    <p class="small mt-2">
+      A short descriptor that appears in your account. Not shown to recipients.
+    </p>
+
+    <div class="form-checkbox mt-3">
+      <input type="checkbox" id="dpa-accept" required>
+      <label for="dpa-accept">
+        I accept the
+        <a href="/dpa" target="_blank">Data Processing Agreement</a>
+        and
+        <a href="/privacy" target="_blank">privacy policy</a>.
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">
+      Send setup email
+    </button>
+
+    <div id="error" class="error"></div>
+    <div id="success" class="msg-success"></div>
+  </form>
+
+  <p class="footer-text mt-4">
+    Already have an account? <a href="/auth/login">Sign in</a><br>
+    Need API key only, no account? <a href="/request-key">Developer signup</a>
+  </p>
+</section>
+
+<section class="section">
+  <div class="marker">
+    <div class="num">03</div>
+    <h2>What happens next.</h2>
+    <div class="tag">four steps<br>three minutes</div>
+  </div>
+
+  <ol class="numbered-list">
+    <li>
+      <strong>We email you a setup link.</strong>
+      Valid for 14 days, one time use. Check your inbox within a minute.
+    </li>
+    <li>
+      <strong>Click the link, scan a QR code.</strong>
+      In your authenticator app: 1Password, Bitwarden, Authy, Google Authenticator, or any RFC 6238 app.
+    </li>
+    <li>
+      <strong>Enter the first 6-digit code to confirm.</strong>
+      Your account becomes active.
+    </li>
+    <li>
+      <strong>Save your backup codes.</strong>
+      10 single-use codes for recovery. Shown once.
+    </li>
+  </ol>
+</section>
+
+</main>
+
+<script src="/nav.js?v=5" defer></script>
+<script>
+(function() {
+  const form = document.getElementById('signup-form');
+  const errorDiv = document.getElementById('error');
+  const successDiv = document.getElementById('success');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorDiv.classList.remove('visible');
+    successDiv.classList.remove('visible');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+
+    const email = document.getElementById('email').value.trim();
+    const label = document.getElementById('label').value.trim();
+    const dpa = document.getElementById('dpa-accept').checked;
+
+    if (!email || !dpa) {
+      errorDiv.textContent = 'Please fill in email and accept the DPA.';
+      errorDiv.classList.add('visible');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send setup email';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/user/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, label, dpa_accepted: true }),
+      });
+
+      if (res.ok) {
+        successDiv.innerHTML = '<strong>Check your email.</strong> We sent a setup link to ' +
+          email + '. The link expires in 14 days.';
+        successDiv.classList.add('visible');
+        form.style.display = 'none';
+      } else {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          errorDiv.innerHTML = 'An account with this email already exists. <a href="/auth/login">Sign in</a>.';
+        } else if (res.status === 429) {
+          errorDiv.textContent = 'Too many signup attempts. Please try again in an hour.';
+        } else {
+          errorDiv.textContent = err.message || 'Something went wrong. Please try again.';
+        }
+        errorDiv.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send setup email';
+      }
+    } catch (err) {
+      errorDiv.textContent = 'Network error. Please check your connection.';
+      errorDiv.classList.add('visible');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send setup email';
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

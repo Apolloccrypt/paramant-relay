@@ -19,32 +19,18 @@ module.exports = (env, argv) => ({
     clean: true,
   },
 
-  // Service worker must be an ES module for Manifest V3
-  experiments: { outputModule: true },
-
-  module: {
-    rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: { loader: 'babel-loader', options: { presets: ['@babel/preset-env'] } },
-      },
-    ],
-  },
-
   plugins: [
     new CopyPlugin({
       patterns: [
         { from: 'manifest.json' },
-        { from: 'src/popup/popup.html',    to: 'popup/popup.html' },
-        { from: 'src/popup/popup.css',     to: 'popup/popup.css' },
+        { from: 'src/popup/popup.html',          to: 'popup/popup.html' },
+        { from: 'src/popup/popup.css',           to: 'popup/popup.css' },
         { from: 'src/content/shared/banner.css', to: 'content/shared/banner.css' },
-        { from: 'icons',                   to: 'icons' },
-        { from: '_locales',                to: '_locales' },
+        { from: 'icons',                         to: 'icons' },
+        { from: '_locales',                      to: '_locales' },
       ],
     }),
   ],
 
-  // Content scripts are IIFEs — no module wrapper needed
   optimization: { runtimeChunk: false },
 });

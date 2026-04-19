@@ -300,6 +300,22 @@ select{background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);
 
     <!-- Step 1: Select file -->
     <div id="send-step-file">
+
+      <div class="card" id="email-card">
+        <div class="card-head">✉ Your email</div>
+        <div class="card-body">
+          <label for="drop-email" style="font-size:12px;color:var(--ink-dim);margin-bottom:6px;display:block">Email address</label>
+          <input type="email" id="drop-email" autocomplete="email" placeholder="you@example.com"
+            style="width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:8px 10px;font-size:13px;box-sizing:border-box"
+            oninput="updateEmailMode()">
+          <p style="margin:8px 0 0;font-size:11px;color:var(--ink-dim);line-height:1.5">
+            Required for rate limiting if you don't have an API key. Up to 3 free drops per 24 hours. We don't create an account.
+            <br>Want unlimited? <a href="/signup" style="color:var(--cobalt)">Create a free account</a> (3 minutes).
+          </p>
+          <div id="email-error" style="display:none;margin-top:8px;font-size:11px;color:var(--cobalt)"></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">📁 Select file</div>
         <div class="card-body">
@@ -635,7 +651,7 @@ const BLOCKED_EXT = ['exe','sh','bat','ps1','cmd','dmg','pkg','msi','app','vbs',
 const FILE_ICONS = { pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊', jpg:'🖼', jpeg:'🖼', png:'🖼', gif:'🖼', mp4:'🎬', mp3:'🎵', zip:'📦', default:'📁' };
 
 // State
-let selectedFile = null, apiKey = '', keyValid = false;
+let selectedFile = null, apiKey = '', keyValid = false, emailVal = '', emailValid = false;
 let sessionToken = '', ws = null, receiverPubs = null;
 let cameraStream = null;
 
@@ -740,12 +756,49 @@ async function validateKey() {
   updateCreateBtn();
 }
 
+function updateEmailMode() {
+  emailVal = document.getElementById('drop-email').value.trim();
+  emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+  document.getElementById('email-error').style.display = 'none';
+  updateCreateBtn();
+}
+
 function updateCreateBtn() {
-  document.getElementById('btn-create-session').disabled = !(keyValid && selectedFile);
+  document.getElementById('btn-create-session').disabled = !((keyValid || emailValid) && selectedFile);
 }
 
 // ── Session creation ──
 async function createSession() {
+  // Anonymous path: exchange email for a temp relay key (rate-limited to 3/24h)
+  if (!keyValid && emailValid) {
+    const errEl = document.getElementById('email-error');
+    errEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/drop/anon-session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: emailVal}),
+      });
+      if (res.status === 429) {
+        errEl.textContent = 'Daily limit reached for this email (3 drops per 24 h). Create a free account for unlimited drops.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!res.ok) {
+        errEl.textContent = 'Service unavailable. Please try again later.';
+        errEl.style.display = 'block';
+        return;
+      }
+      const d = await res.json();
+      apiKey = d.relay_key;
+      RELAY_API = d.relay_url || RELAY_API;
+    } catch {
+      document.getElementById('email-error').textContent = 'Network error. Please check your connection.';
+      document.getElementById('email-error').style.display = 'block';
+      return;
+    }
+  }
+
   const tokenBytes = crypto.getRandomValues(new Uint8Array(16));
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
   // API key intentionally NOT included in receiver URL — ontvang.html uses the session token only.
