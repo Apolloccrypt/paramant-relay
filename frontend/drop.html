@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 <style>
 /* ParaDrop — light theme */
@@ -202,6 +202,11 @@ select{background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -1007,5 +1012,6 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PARAMANT voor Banken & Finance — Post-Quantum Settlement</title>
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -128,6 +128,11 @@ input:focus,textarea:focus{border-color:var(--cobalt)}
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -372,4 +377,5 @@ async function demoKeygen(){
 }
 </script>
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body></html>

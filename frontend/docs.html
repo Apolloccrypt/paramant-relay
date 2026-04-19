@@ -59,7 +59,7 @@ tr:last-child td{border-bottom:none}
 .sector-badge{display:inline-block;font-size:10px;font-family:var(--mono);color:var(--ink);background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:2px 7px;margin-right:6px}
 @media(max-width:900px){.sidebar{display:none}.content{padding:32px 24px 60px}}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 </head>
 
@@ -148,6 +148,11 @@ tr:last-child td{border-bottom:none}
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -903,6 +908,7 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 </script>
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid">

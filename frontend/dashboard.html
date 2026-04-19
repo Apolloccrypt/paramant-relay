@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Developer Dashboard</title>
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -104,6 +104,11 @@ a:hover{color:var(--cobalt)}
 
   </ul>
 
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
@@ -183,6 +188,7 @@ a:hover{color:var(--cobalt)}
 
 <div id="root"></div>
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 <script>
 const RELAYS=[
   {l:"Health",u:"https://health.paramant.app",sector:"healthcare"},

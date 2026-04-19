@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Post-Quantum File Transfer for Government</title>
 <meta name="description" content="71% of Dutch government organisations have no post-quantum plan (Court of Audit, Feb 2026). NIS2 requires documented cryptographic controls by end of 2026. Paramant is open source, self-hostable, and deployable in days.">
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 <style>
 a{color:var(--ink);text-decoration:none}
@@ -184,6 +184,11 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -577,5 +582,6 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
 </footer>
 
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

@@ -81,7 +81,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--black-hair);border:
 .cta-block p{font-size:13px;color:var(--ink-dim);margin:0}
 .cta-links{display:flex;gap:12px;flex-wrap:wrap}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 </head>
 <body>
@@ -171,6 +171,11 @@ code{font-family:var(--mono);font-size:12px;background:var(--black-hair);border:
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -566,5 +571,6 @@ paramant-receiver.py \
 </footer>
 
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

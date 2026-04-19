@@ -49,7 +49,7 @@ th{background:rgba(178,255,63,.06);color:var(--ink-dim);font-family:var(--mono);
 td{color:var(--cobalt)}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 </head>
 <body>
@@ -138,6 +138,11 @@ td{color:var(--cobalt)}
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -380,5 +385,6 @@ td{color:var(--cobalt)}
 </footer>
 
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

@@ -25,7 +25,7 @@ p a{color:var(--ink);text-decoration:underline}
 footer{text-align:center;padding:40px 24px;border-top:1px solid var(--ink-hair);font-size:var(--text-xs);color:var(--ink-dim)}
 footer a{color:var(--cobalt)}
 </style>
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 </head>
 <body>
@@ -114,6 +114,11 @@ footer a{color:var(--cobalt)}
     </li>
 
   </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -325,5 +330,6 @@ Website: https://paramant.app</div>
 </footer>
 
 <script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

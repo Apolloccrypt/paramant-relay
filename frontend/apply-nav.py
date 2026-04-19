@@ -84,6 +84,11 @@ NEW_NAV = '''\
 
   </ul>
 
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
@@ -166,6 +171,7 @@ NEW_MOBILE = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=6">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=6">'
 NAV_JS    = '<script src="/nav.js?v=5" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js" defer></script>'
 
 
 def inject_design_system(html):
@@ -195,6 +201,21 @@ def inject_nav_js(html):
         body_close = html.rfind('</body>')
         if body_close != -1:
             html = html[:body_close] + NAV_JS + '\n' + html[body_close:]
+    return html
+
+
+def inject_nav_auth_js(html):
+    html = re.sub(
+        r'<script src="/js/nav-auth\.js(?:\?v=\d+)?" defer></script>',
+        NAV_AUTH_JS, html)
+    if NAV_AUTH_JS not in html:
+        # Insert after nav.js if present, else before </body>
+        if NAV_JS in html:
+            html = html.replace(NAV_JS, NAV_JS + '\n' + NAV_AUTH_JS, 1)
+        else:
+            body_close = html.rfind('</body>')
+            if body_close != -1:
+                html = html[:body_close] + NAV_AUTH_JS + '\n' + html[body_close:]
     return html
 
 
@@ -228,6 +249,7 @@ def process(fpath):
     updated = replace_mobile_div(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
+    updated = inject_nav_auth_js(updated)
     if updated == content:
         return False
     with open(fpath, 'w', encoding='utf-8') as f:
