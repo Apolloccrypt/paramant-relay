@@ -22,6 +22,8 @@ x-relay-hardening: &relay-hardening
   read_only: true
   tmpfs:
     - /tmp:size=64m,mode=1777
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 # ── Shared resource limits ────────────────────────────────────────────────────
 x-relay-resources: &relay-resources
@@ -39,6 +41,8 @@ x-relay-env: &relay-env
   RELAY_MODE: "${RELAY_MODE:-ghost_pipe}"
   ADMIN_TOKEN: "${ADMIN_TOKEN}"
   TOTP_SECRET: "${TOTP_SECRET:-}"
+  ADMIN_TOTP_SECRET: "${ADMIN_TOTP_SECRET:-}"
+  PARAMANT_TOTP_MASTER_KEY: "${PARAMANT_TOTP_MASTER_KEY}"
   USERS_FILE: "/data/users.json"
   CT_FILE: "/data/ct-log.json"
   RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
@@ -47,6 +51,7 @@ x-relay-env: &relay-env
   RESEND_API_KEY: "${RESEND_API_KEY:-}"
   # Add your plk_ license key here to unlock unlimited users (Community Edition = max 5)
   PLK_KEY: "${PLK_KEY:-}"
+  REDIS_URL: "${RELAY_REDIS_URL}"
 
 # ── Shared logging ────────────────────────────────────────────────────────────
 x-relay-logging: &relay-logging
@@ -64,6 +69,9 @@ services:
     container_name: paramant-relay-main
     restart: unless-stopped
     <<: [*relay-hardening, *relay-resources, *relay-logging]
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
       <<: *relay-env
       SECTOR: "relay"
@@ -88,6 +96,9 @@ services:
     container_name: paramant-relay-health
     restart: unless-stopped
     <<: [*relay-hardening, *relay-resources, *relay-logging]
+    depends_on:
+      redis:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -121,6 +132,9 @@ services:
     container_name: paramant-relay-finance
     restart: unless-stopped
     <<: [*relay-hardening, *relay-resources, *relay-logging]
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
       <<: *relay-env
       SECTOR: "finance"
@@ -145,6 +159,9 @@ services:
     container_name: paramant-relay-legal
     restart: unless-stopped
     <<: [*relay-hardening, *relay-resources, *relay-logging]
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
       <<: *relay-env
       SECTOR: "legal"
@@ -169,6 +186,9 @@ services:
     container_name: paramant-relay-iot
     restart: unless-stopped
     <<: [*relay-hardening, *relay-resources, *relay-logging]
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
       <<: *relay-env
       SECTOR: "iot"
@@ -187,6 +207,39 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # ── Admin panel ──────────────────────────────────────────────────────────────
+  # ── Redis (relay-internal, not exposed to host) ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: paramant-relay-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+    volumes:
+      - relay-redis-data:/data
+    networks:
+      - relay-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
   # ── Admin panel ──────────────────────────────────────────────────────────────
   admin:
@@ -215,6 +268,7 @@ services:
       RELAY_FINANCE: "http://relay-finance:3000"
       RELAY_LEGAL:   "http://relay-legal:3000"
       RELAY_IOT:     "http://relay-iot:3000"
+      REDIS_URL: "${RELAY_REDIS_URL}"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4200/admin/ > /dev/null || exit 1"]
       interval: 30s
@@ -226,6 +280,7 @@ services:
     networks:
       - relay-net
     depends_on:
+      - redis
       - relay-main
       - relay-health
       - relay-finance
@@ -243,6 +298,7 @@ volumes:
   relay-legal-data:
   relay-finance-data:
   relay-iot-data:
+  relay-redis-data:
 
 networks:
   relay-net:
