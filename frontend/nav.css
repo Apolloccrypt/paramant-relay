@@ -116,6 +116,23 @@ nav.nav .nav-dropdown:hover .nav-dropdown-menu {
   list-style: none;
 }
 
+/* Subheader label inside compliance (and similar) dropdowns */
+.nav-subheader {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding: 16px 16px 6px;
+  border-bottom: 1px solid var(--ink-hair);
+  margin-bottom: 4px;
+  list-style: none;
+  pointer-events: none;
+}
+.nav-subheader:first-child {
+  padding-top: 8px;
+}
+
 /* Panel items */
 nav.nav .nav-dropdown-menu li a {
   display: block;
