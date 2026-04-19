@@ -213,8 +213,13 @@
     <p>This is not a marketing statement. Google's own Quantum AI team produces much of the underlying research on cryptographic resource estimates. When Google moves its deadline, they are moving based on their own threat intelligence.</p>
 
     <h3>March 31, 2026: The qubit requirement drops by 20x</h3>
-    <p>Google Quantum and AI publish new research demonstrating that breaking elliptic curve cryptography requires 20 times fewer qubits and gates than previously estimated. The paper focuses on ECDSA, which protects Bitcoin, Ethereum, most digital signatures, and TLS key exchange on the majority of internet infrastructure.</p>
+    <p>Google Quantum and AI publish new research demonstrating that breaking elliptic curve cryptography requires 20 times fewer qubits and gates than previously estimated. The paper focuses on ECDSA, the signature scheme behind TLS key exchange, SSH authentication, code signing, and most digital signatures on the internet. Cryptocurrency wallets, which also rely on ECDSA, are prominent in the news coverage, but the finding affects all cryptography built on elliptic curves. That includes the key exchange protecting your email, your banking session, your VPN tunnel, and most file transfer tools.</p>
     <p>Separately, a Caltech and Oratomic paper uses AI-assisted algorithm design to further reduce qubit requirements using neutral-atom quantum architectures.</p>
+
+    <div class="callout">
+      <h4>a note on terminology</h4>
+      <p>In 2026 the word "crypto" has two meanings. In financial news it refers to cryptocurrency. In security it refers to cryptography, the mathematics of encryption and digital signatures. The Google research is a cryptography finding that has cryptocurrency implications. Paramant is a cryptography product, not a cryptocurrency product. No coins, no wallets, no tokens. This page, and Paramant generally, uses "crypto" only as shorthand for cryptography.</p>
+    </div>
 
     <h3>April 2026: Industry scrambles</h3>
     <p>Cloudflare's Bas Westerbaan, one of the most respected voices in applied cryptography, tells TIME magazine: "It's a real shock. We'll need to speed up our efforts considerably." Cloudflare announces its own accelerated 2029 deadline for complete post-quantum migration.</p>
@@ -325,7 +330,7 @@
     <p>Audit your file transfer vendors' post-quantum status. Ask specifically: which algorithms are in production today for key exchange, not roadmap. Any vendor whose production key exchange is RSA or classical ECDH is currently contributing to harvestable traffic.</p>
 
     <h3>For compliance officers</h3>
-    <p>NIS2 Article 21 requires "appropriate cryptographic measures." As post-quantum standards become available and industry urgency grows, "appropriate" shifts. A provider on classical crypto in 2027 will be harder to defend in an audit than a provider on PQC in 2026.</p>
+    <p>NIS2 Article 21 requires "appropriate cryptographic measures." As post-quantum standards become available and industry urgency grows, "appropriate" shifts. A provider using classical cryptography in 2027 will be harder to defend in an audit than a provider using post-quantum cryptography in 2026.</p>
 
     <h3>For developers</h3>
     <p>Add ML-KEM to your cryptographic agility plan now. If you run your own infrastructure, OpenSSH 10.0 and OpenSSL with crypto-policies PQ modules already support ML-KEM. For TLS, hybrid ML-KEM-768 + X25519 is implemented in Chrome and available in Cloudflare's edge.</p>

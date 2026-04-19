@@ -240,8 +240,17 @@ section p+p{margin-top:14px}
     <p>
       Estimates for Q-Day range from 5 to 15 years depending on the source,
       though some researchers place it closer. Google's March 2026 research
-      accelerated timelines; Cloudflare has an internal deadline of 2029 for
-      completing post-quantum migration across their infrastructure.
+      accelerated timelines: on March 25, Google shortened its own post-quantum
+      migration deadline to 2029, and on March 31, Google published research
+      showing elliptic curve cryptography can be broken with twenty times
+      fewer qubits than previously estimated. Cloudflare followed with its
+      own 2029 deadline. The research is cryptography news, not cryptocurrency
+      news, though coin wallets are the most visible casualty in press coverage.
+      What the finding actually threatens is the elliptic curve mathematics
+      underneath TLS, SSH, email encryption, file transfer, and digital
+      signatures across the internet.
+    </p>
+    <p>
       The NSA's CNSA 2.0 guidance (September 2022) states that organizations
       should stop using RSA and elliptic-curve for any data that must remain
       confidential beyond approximately five years.
@@ -300,6 +309,28 @@ section p+p{margin-top:14px}
     <p>
       The common factor is not sensitivity today — it is sensitivity at Q-Day.
       If the data would still matter in ten years, it is a valid harvest target now.
+    </p>
+  </section>
+
+  <section>
+    <h2>A note on crypto terminology</h2>
+    <p>
+      The word "crypto" has two meanings in 2026. In financial news it refers
+      to cryptocurrency. In security it refers to cryptography, the mathematics
+      behind encryption and digital signatures. Paramant is a cryptography
+      product. No coins, no wallets, no tokens, no blockchain. This page uses
+      "crypto" only as shorthand for cryptography.
+    </p>
+    <p>
+      The Google March 2026 research does affect cryptocurrency wallets
+      because Bitcoin, Ethereum, and most blockchains use ECDSA signatures
+      that depend on the same elliptic curve mathematics. But the finding
+      is much bigger than coins. It threatens the key exchange in TLS, the
+      authentication in SSH, the signatures in code distribution, and the
+      digital signatures in most file transfer products. Paramant addresses
+      this by using ML-KEM-768 and ML-DSA-65 for its key exchange and
+      signatures, neither of which is affected by Shor's algorithm or the
+      Google finding.
     </p>
   </section>
 
