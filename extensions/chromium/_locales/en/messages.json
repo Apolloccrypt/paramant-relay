@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Paramant — Encrypted Attachments",
+    "description": "Extension name shown in browser UI"
+  },
+  "extDescription": {
+    "message": "Send Gmail and Outlook attachments through Paramant's post-quantum encrypted relay.",
+    "description": "Extension description"
+  },
+  "signIn": { "message": "Sign in" },
+  "signOut": { "message": "Sign out" },
+  "signingIn": { "message": "Signing in…" },
+  "emailLabel": { "message": "Email" },
+  "totpLabel": { "message": "6-digit code" },
+  "sessionActive": { "message": "Session active" },
+  "sendViaParamant": { "message": "Send via Paramant" },
+  "sendNormally": { "message": "Send normally" },
+  "uploadingFile": { "message": "Encrypting and uploading…" },
+  "uploadFailed": { "message": "Upload failed. Please try again." },
+  "invalidCode": { "message": "Invalid email or code." },
+  "noAccount": { "message": "No account?" },
+  "getOne": { "message": "Get one" }
+}

@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Paramant — Verschlüsselte Anhänge",
+    "description": "Extension name shown in browser UI"
+  },
+  "extDescription": {
+    "message": "Senden Sie Gmail- und Outlook-Anhänge über Paramants post-quanten-verschlüsseltes Relay.",
+    "description": "Extension description"
+  },
+  "signIn": { "message": "Anmelden" },
+  "signOut": { "message": "Abmelden" },
+  "signingIn": { "message": "Anmelden…" },
+  "emailLabel": { "message": "E-Mail" },
+  "totpLabel": { "message": "6-stelliger Code" },
+  "sessionActive": { "message": "Sitzung aktiv" },
+  "sendViaParamant": { "message": "Über Paramant senden" },
+  "sendNormally": { "message": "Normal senden" },
+  "uploadingFile": { "message": "Verschlüsseln und hochladen…" },
+  "uploadFailed": { "message": "Upload fehlgeschlagen. Bitte erneut versuchen." },
+  "invalidCode": { "message": "Ungültige E-Mail-Adresse oder Code." },
+  "noAccount": { "message": "Kein Konto?" },
+  "getOne": { "message": "Anfordern" }
+}

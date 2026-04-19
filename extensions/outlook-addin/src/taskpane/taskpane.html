@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paramant</title>
+<link rel="stylesheet" href="taskpane.css">
+<script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+</head>
+<body>
+
+<div id="container">
+  <header>
+    <img src="../../assets/logo.svg" alt="" width="20" height="20">
+    <h1>Paramant</h1>
+  </header>
+
+  <!-- State: loading -->
+  <div id="state-loading" class="state">
+    <div class="spinner"></div>
+    <p>Connecting...</p>
+  </div>
+
+  <!-- State: not authenticated -->
+  <div id="state-login" class="state hidden">
+    <p class="lede">Sign in to encrypt this email's attachments.</p>
+
+    <form id="login-form">
+      <label>Email</label>
+      <input type="email" id="email" required autocomplete="username">
+
+      <label>6-digit code from authenticator</label>
+      <input type="text" id="totp" required inputmode="numeric"
+             pattern="[0-9]{6}" maxlength="6" placeholder="• • • • • •">
+
+      <button type="submit">Sign in</button>
+      <div id="login-error" class="error"></div>
+    </form>
+
+    <a href="https://paramant.app/help/authenticator-setup" target="_blank" class="helper-link">
+      Need an authenticator app?
+    </a>
+  </div>
+
+  <!-- State: authenticated, no attachments -->
+  <div id="state-no-attachments" class="state hidden">
+    <div class="status">
+      <span class="status-indicator active"></span>
+      <div class="status-email" id="status-email"></div>
+    </div>
+
+    <p class="help-text">
+      No attachments yet. Add attachments to this email, then click
+      the <strong>Paramant</strong> button below to encrypt them.
+    </p>
+
+    <button id="refresh-btn" class="secondary">Refresh</button>
+    <button id="logout-btn" class="tertiary">Sign out</button>
+  </div>
+
+  <!-- State: authenticated, has attachments -->
+  <div id="state-has-attachments" class="state hidden">
+    <div class="status">
+      <span class="status-indicator active"></span>
+      <div class="status-email" id="status-email-2"></div>
+    </div>
+
+    <h3>Attachments in this email</h3>
+    <ul id="attachment-list"></ul>
+
+    <div class="options">
+      <label>
+        <span>Link expires after</span>
+        <select id="expiry">
+          <option value="3600">1 hour</option>
+          <option value="86400" selected>24 hours</option>
+          <option value="604800">7 days</option>
+        </select>
+      </label>
+    </div>
+
+    <button id="encrypt-btn">Encrypt all attachments</button>
+    <div id="encrypt-progress" class="progress hidden">
+      <div class="progress-bar" id="progress-bar"></div>
+      <div class="progress-text" id="progress-text">Encrypting...</div>
+    </div>
+
+    <button id="logout-btn-2" class="tertiary">Sign out</button>
+  </div>
+
+  <!-- State: success -->
+  <div id="state-success" class="state hidden">
+    <div class="success-icon">✓</div>
+    <h3>Attachments encrypted</h3>
+    <p>Paramant links have been added to your email body. Original
+    attachments removed.</p>
+    <p>Send the email as normal.</p>
+  </div>
+</div>
+
+<script src="taskpane.js" type="module"></script>
+</body>
+</html>

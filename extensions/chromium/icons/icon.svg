@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background -->
+  <rect width="128" height="128" rx="20" fill="#0B3A6A"/>
+  <!-- Lock body -->
+  <rect x="32" y="58" width="64" height="46" rx="6" fill="#F8FAFC"/>
+  <!-- Lock shackle -->
+  <path d="M44 58V44a20 20 0 0 1 40 0v14" stroke="#F8FAFC" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Keyhole dot -->
+  <circle cx="64" cy="80" r="7" fill="#1D4ED8"/>
+  <!-- Lime accent line -->
+  <rect x="32" y="96" width="64" height="4" rx="2" fill="#B2FF3F"/>
+</svg>

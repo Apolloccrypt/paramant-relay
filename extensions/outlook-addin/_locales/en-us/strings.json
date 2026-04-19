@@ -1,0 +1,16 @@
+{
+  "GroupLabel": "Paramant",
+  "ButtonLabel": "Encrypt attachment",
+  "ButtonTitle": "Send via Paramant",
+  "ButtonDescription": "Replace attachments with encrypted Paramant links. End-to-end encrypted, burn-on-read.",
+  "SignIn": "Sign in",
+  "SignOut": "Sign out",
+  "Refresh": "Refresh",
+  "EncryptAll": "Encrypt all attachments",
+  "Connecting": "Connecting...",
+  "Encrypting": "Encrypting...",
+  "UpdatingEmail": "Updating email...",
+  "EncryptedSuccess": "Attachments encrypted",
+  "NoAttachments": "No attachments yet.",
+  "InvalidCode": "Invalid email or code"
+}

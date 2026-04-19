@@ -1,0 +1,20 @@
+{
+  "name": "paramant-chromium-extension",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev":     "webpack --mode development --watch",
+    "build":   "webpack --mode production",
+    "package": "npm run build && cd dist && zip -r ../paramant-extension.zip .",
+    "lint":    "eslint src/",
+    "test":    "vitest"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^1.4.0",
+    "copy-webpack-plugin": "^12.0.0",
+    "eslint": "^9.0.0",
+    "vitest": "^1.4.0",
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.0"
+  }
+}

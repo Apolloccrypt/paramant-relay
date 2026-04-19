@@ -1,0 +1,137 @@
+/* Paramant injected UI — scoped with paramant- prefix to avoid conflicts */
+
+.paramant-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #F8FAFC;
+  border: 1.5px solid #1D4ED8;
+  border-left: 4px solid #B2FF3F;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: #0B3A6A;
+  z-index: 999999;
+  box-shadow: 0 4px 16px rgba(11, 58, 106, 0.12);
+  margin: 8px 8px 4px;
+}
+
+.paramant-banner-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.paramant-banner-icon {
+  flex-shrink: 0;
+}
+
+.paramant-banner-msg {
+  font-size: 13px;
+  color: #0B3A6A;
+  line-height: 1.4;
+}
+
+.paramant-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.paramant-btn {
+  padding: 6px 14px;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.paramant-btn-primary {
+  background: #0B3A6A;
+  color: #F8FAFC;
+}
+
+.paramant-btn-primary:hover {
+  background: #1D4ED8;
+}
+
+.paramant-btn-secondary {
+  background: transparent;
+  color: #0B3A6A;
+  border: 1.5px solid #0B3A6A;
+}
+
+.paramant-btn-secondary:hover {
+  background: #0B3A6A;
+  color: #F8FAFC;
+}
+
+/* Paramant attach button — injected next to Gmail/Outlook attach button */
+.paramant-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #B2FF3F;
+  color: #0B3A6A;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+}
+
+.paramant-attach-btn:hover {
+  background: #0B3A6A;
+  color: #F8FAFC;
+}
+
+.paramant-attach-btn svg {
+  flex-shrink: 0;
+}
+
+/* Upload progress toast */
+.paramant-upload-ui {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: #0B3A6A;
+  color: #F8FAFC;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  z-index: 999999;
+  box-shadow: 0 4px 20px rgba(11, 58, 106, 0.25);
+}
+
+.paramant-upload-error {
+  background: #7F1D1D;
+}
+
+@keyframes paramant-spin {
+  to { transform: rotate(360deg); }
+}
+
+.paramant-upload-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(248, 250, 252, 0.3);
+  border-top-color: #B2FF3F;
+  border-radius: 50%;
+  animation: paramant-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}

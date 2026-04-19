@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Paramant — Versleutelde Bijlagen",
+    "description": "Extension name shown in browser UI"
+  },
+  "extDescription": {
+    "message": "Stuur Gmail- en Outlook-bijlagen via Paramant's post-kwantum versleuteld relais.",
+    "description": "Extension description"
+  },
+  "signIn": { "message": "Inloggen" },
+  "signOut": { "message": "Uitloggen" },
+  "signingIn": { "message": "Inloggen…" },
+  "emailLabel": { "message": "E-mail" },
+  "totpLabel": { "message": "6-cijferige code" },
+  "sessionActive": { "message": "Sessie actief" },
+  "sendViaParamant": { "message": "Versturen via Paramant" },
+  "sendNormally": { "message": "Normaal versturen" },
+  "uploadingFile": { "message": "Versleutelen en uploaden…" },
+  "uploadFailed": { "message": "Upload mislukt. Probeer opnieuw." },
+  "invalidCode": { "message": "Ongeldig e-mailadres of code." },
+  "noAccount": { "message": "Geen account?" },
+  "getOne": { "message": "Aanvragen" }
+}

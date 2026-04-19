@@ -1,0 +1,230 @@
+/* Paramant extension popup — v4 Denim Edit tokens */
+:root {
+  --bone:     #F8FAFC;
+  --navy:     #0B3A6A;
+  --cobalt:   #1D4ED8;
+  --lime:     #B2FF3F;
+  --ink:      #0F172A;
+  --ink-mid:  #475569;
+  --ink-dim:  #94A3B8;
+  --ink-hair: #E2E8F0;
+  --ink-ghost: rgba(11, 58, 106, 0.06);
+
+  --sans: system-ui, -apple-system, 'Inter', sans-serif;
+  --mono: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 360px;
+  min-height: 420px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bone);
+  -webkit-font-smoothing: antialiased;
+}
+
+#popup-container { padding: 20px 24px 24px; }
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink-hair);
+}
+
+header h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: -0.01em;
+}
+
+/* ── States ─────────────────────────────────────────────────────────────── */
+
+.state.hidden { display: none; }
+
+/* Loading */
+.loading-indicator {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ink-hair);
+  border-top-color: var(--cobalt);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Login form ─────────────────────────────────────────────────────────── */
+
+.lede {
+  font-size: 13px;
+  color: var(--ink-mid);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--navy);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+input[type="email"],
+input[type="text"] {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  border: 1.5px solid var(--ink-hair);
+  background: var(--bone);
+  color: var(--ink);
+  margin-bottom: 16px;
+  transition: border-color 0.12s;
+}
+
+input[type="email"]:focus,
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--cobalt);
+}
+
+#totp {
+  font-family: var(--mono);
+  font-size: 20px;
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+
+button[type="submit"] {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: var(--navy);
+  color: var(--bone);
+  border: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.12s;
+}
+
+button[type="submit"]:hover { background: var(--cobalt); }
+button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.error {
+  display: none;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.06);
+  border-left: 3px solid #dc2626;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #991b1b;
+  line-height: 1.5;
+}
+
+.error.visible { display: block; }
+
+.footer-text {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-top: 20px;
+  text-align: center;
+}
+
+.footer-text a {
+  color: var(--cobalt);
+  text-decoration: none;
+}
+
+.footer-text a:hover { text-decoration: underline; }
+
+/* ── Logged-in state ────────────────────────────────────────────────────── */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--ink-ghost);
+  border-left: 3px solid var(--lime);
+  margin-bottom: 16px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 0 3px rgba(178, 255, 63, 0.25);
+  flex-shrink: 0;
+}
+
+.status-email {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--navy);
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.status-detail {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+
+.help-text {
+  font-size: 13px;
+  color: var(--ink-mid);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.help-text strong {
+  background: var(--lime);
+  color: var(--navy);
+  padding: 1px 5px;
+  font-weight: 700;
+}
+
+.btn-secondary {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: var(--cobalt);
+  border: 1.5px solid var(--cobalt);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.btn-secondary:hover {
+  background: var(--cobalt);
+  color: var(--bone);
+}

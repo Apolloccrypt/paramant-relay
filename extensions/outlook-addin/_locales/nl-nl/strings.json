@@ -1,0 +1,16 @@
+{
+  "GroupLabel": "Paramant",
+  "ButtonLabel": "Bijlage versleutelen",
+  "ButtonTitle": "Versturen via Paramant",
+  "ButtonDescription": "Vervang bijlagen door versleutelde Paramant-links. End-to-end versleuteld, burn-on-read.",
+  "SignIn": "Inloggen",
+  "SignOut": "Uitloggen",
+  "Refresh": "Vernieuwen",
+  "EncryptAll": "Alle bijlagen versleutelen",
+  "Connecting": "Verbinden...",
+  "Encrypting": "Versleutelen...",
+  "UpdatingEmail": "E-mail bijwerken...",
+  "EncryptedSuccess": "Bijlagen versleuteld",
+  "NoAttachments": "Nog geen bijlagen.",
+  "InvalidCode": "Ongeldige e-mail of code"
+}
