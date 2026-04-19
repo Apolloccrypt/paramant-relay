@@ -125,6 +125,23 @@ async function resendMail(key,label,plan,email){
   }
 }
 
+async function resendSetup(key,email){
+  if(!confirm("Send new TOTP setup link to "+email+"?\nThis clears any existing TOTP state for this user."))return;
+  addLog("Sending setup link to "+email+"...","info");
+  try{
+    const r=await fetch('/admin/api/admin/resend-setup',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Token':adminKey,'X-Api-Key':adminKey},body:JSON.stringify({user_id:key,email})});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.success){
+      addLog("Setup link sent to "+email,"ok");
+      alert("Setup email sent to "+email+".\n\nDirect URL (for reference):\n"+d.setup_url+"\n\nValid until "+new Date(d.expires_at).toLocaleDateString());
+    }else{
+      addLog("Setup resend failed: "+(d.error||"unknown"),"error");
+    }
+  }catch(err){
+    addLog("Setup resend error: "+err.message,"error");
+  }
+}
+
 async function revokeKey(key){
   if(!confirm("Revoke "+key.slice(0,20)+"...?"))return;
   addLog("Revoking "+key.slice(0,16)+"... on all sectors","warn");
@@ -185,6 +202,7 @@ function renderKeys(){
       '<td style="padding:8px 12px"><span style="color:'+(k.active!==false?V.g:V.r)+'">'+(k.active!==false?"active":"revoked")+'</span></td>'+
       '<td style="padding:8px 12px;white-space:nowrap">'+
         (k.email?'<button data-action="mail" data-key="'+esc(k.key||'')+'" data-label="'+esc(k.label||'')+'" data-plan="'+esc(k.plan||'')+'" data-email="'+esc(k.email||'')+'" style="background:none;border:1px solid '+V.b+';color:'+V.m+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer;margin-right:4px">Mail</button>':'')+
+        (k.email?'<button data-action="setup" data-key="'+esc(k.key||'')+'" data-email="'+esc(k.email||'')+'" style="background:none;border:1px solid '+V.b+';color:'+V.m+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer;margin-right:4px">Setup</button>':'')+
         '<button data-action="revoke" data-key="'+esc(k.key||'')+'" style="background:none;border:1px solid '+V.b+';color:'+V.q+';border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer">Revoke</button>'+
       '</td>'+
     '</tr>').join("")+
@@ -195,6 +213,7 @@ function renderKeys(){
     const{action,key,label,plan,email}=t.dataset;
     if(action==="view")showKeyOverlay(key,label,plan,email);
     else if(action==="mail")resendMail(key,label,plan,email);
+    else if(action==="setup")resendSetup(key,email);
     else if(action==="revoke")revokeKey(key);
   };
 }

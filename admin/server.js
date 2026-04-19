@@ -287,6 +287,42 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
   res.status(anyRevoked ? 200 : 502).json({ ok: anyRevoked, results });
 });
 
+
+api.post('/admin/resend-setup', async (req, res) => {
+  const tok = (req.headers['x-admin-token'] || req.headers['x-api-key'] || '').trim();
+  if (!ADMIN_TOKEN || tok.length !== ADMIN_TOKEN.length ||
+      !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(ADMIN_TOKEN)))
+    return res.status(401).json({ error: 'unauthorized' });
+  const { user_id, email } = req.body || {};
+  if (!user_id || !email) return res.status(400).json({ error: 'missing_fields' });
+  try {
+    await Promise.all([
+      redis().del(`paramant:user:totp:${user_id}`),
+      redis().del(`paramant:user:totp_active:${user_id}`),
+      redis().del(`paramant:user:backup_codes:${user_id}`),
+      redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
+    ]);
+    for await (const k of redis().scanIterator({ MATCH: 'paramant:user:setup_token:*', COUNT: 100 })) {
+      const raw = await redis().get(k);
+      if (raw) { try { const d = JSON.parse(raw); if (d.user_id === user_id) await redis().del(k); } catch {} }
+    }
+    const setupToken = crypto.randomBytes(32).toString('hex');
+    await redis().set(
+      `paramant:user:setup_token:${setupToken}`,
+      JSON.stringify({ user_id, email }),
+      { EX: 14 * 86400 }
+    );
+    await sendSetupEmail(email, setupToken);
+    const expiresAt = Date.now() + 14 * 86400 * 1000;
+    const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
+    console.log(`[admin/resend-setup] sent to ${email}`);
+    res.json({ success: true, email, expires_at: expiresAt, setup_url: setupUrl });
+  } catch (err) {
+    console.error('[admin/resend-setup]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 api.get('/license-status', authMiddleware, async (req, res) => {
   const sectors = await eachSector(Object.keys(SECTORS), async s => {
     const r = await relayFetch(s, '/health', 'GET', null, false, ADMIN_TOKEN);
