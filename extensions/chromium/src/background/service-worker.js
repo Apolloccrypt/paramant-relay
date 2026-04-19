@@ -1,19 +1,34 @@
-import { loginWithTotp, verifySession, logout, uploadFile } from './auth-client.js';
+import {
+  getCapabilities,
+  loginWithApiKey,
+  loginWithTotp,
+  verifySession,
+  logout,
+  uploadFile,
+} from './auth-client.js';
 
 // ── Message router ────────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.type) {
+    case 'GET_CAPABILITIES':
+      getCapabilities().then(sendResponse);
+      return true;
+
     case 'CHECK_SESSION':
       verifySession().then(sendResponse);
       return true;
 
-    case 'LOGIN':
+    case 'LOGIN_APIKEY':
+      loginWithApiKey(msg.apikey).then(sendResponse);
+      return true;
+
+    case 'LOGIN_TOTP':
       loginWithTotp(msg.email, msg.totp).then(sendResponse);
       return true;
 
     case 'LOGOUT':
-      logout().then(broadcastAuthState).then(sendResponse);
+      logout().then(() => broadcastAuthState()).then(sendResponse);
       return true;
 
     case 'UPLOAD_FILE':
@@ -40,5 +55,4 @@ async function broadcastAuthState() {
   }
 }
 
-// Broadcast on install / service worker wake
 chrome.runtime.onInstalled.addListener(broadcastAuthState);

@@ -1,4 +1,11 @@
-import { login, verifySession, logout, uploadAttachment } from '../shared/paramant-api.js';
+import {
+  getCapabilities,
+  loginWithApiKey,
+  loginWithTotp,
+  verifySession,
+  logout,
+  uploadAttachment,
+} from '../shared/paramant-api.js';
 import { getAttachments, removeAttachments, insertIntoBody } from '../shared/office-helpers.js';
 
 Office.onReady(async (info) => {
@@ -8,41 +15,97 @@ Office.onReady(async (info) => {
   if (session.authenticated) {
     showEmail(session.email);
     await refreshAttachments();
-  } else {
-    showLogin();
+    return;
   }
+
+  const caps = await getCapabilities();
+
+  if (caps.user_totp) {
+    document.getElementById('show-totp').classList.remove('hidden');
+    document.getElementById('banner-rolling-out').classList.add('hidden');
+  } else {
+    document.getElementById('show-totp').classList.add('hidden');
+    document.getElementById('banner-rolling-out').classList.remove('hidden');
+  }
+
+  showLogin();
 });
+
+// ── Login state ───────────────────────────────────────────────────────────────
 
 function showLogin() {
   switchState('state-login');
-  document.getElementById('login-form').addEventListener('submit', onLoginSubmit);
+  wireLoginForms();
 }
 
-async function onLoginSubmit(e) {
-  e.preventDefault();
-  const email = document.getElementById('email').value.trim();
-  const totp = document.getElementById('totp').value.trim();
-  const errorDiv = document.getElementById('login-error');
+let formsWired = false;
 
-  errorDiv.classList.remove('visible');
+function wireLoginForms() {
+  if (formsWired) return;
+  formsWired = true;
 
-  const result = await login(email, totp);
-  if (result.success) {
-    showEmail(email);
-    await refreshAttachments();
-  } else {
-    errorDiv.textContent = result.message || 'Invalid email or code';
-    errorDiv.classList.add('visible');
-    document.getElementById('totp').value = '';
-  }
+  document.getElementById('show-totp').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('form-apikey').classList.add('hidden');
+    document.getElementById('form-totp').classList.remove('hidden');
+  });
+  document.getElementById('show-apikey').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('form-totp').classList.add('hidden');
+    document.getElementById('form-apikey').classList.remove('hidden');
+  });
+
+  document.getElementById('form-apikey').addEventListener('submit', async e => {
+    e.preventDefault();
+    const apikey   = document.getElementById('apikey').value.trim();
+    const errorDiv = document.getElementById('error-apikey');
+    const btn      = e.target.querySelector('button[type="submit"]');
+    errorDiv.classList.remove('visible');
+    btn.disabled = true;
+
+    const result = await loginWithApiKey(apikey);
+    if (result.success) {
+      showEmail(result.email);
+      await refreshAttachments();
+    } else {
+      errorDiv.textContent = result.message || 'Invalid API key.';
+      errorDiv.classList.add('visible');
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('form-totp').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email    = document.getElementById('email').value.trim();
+    const totp     = document.getElementById('totp').value.trim();
+    const errorDiv = document.getElementById('error-totp');
+    const btn      = e.target.querySelector('button[type="submit"]');
+    errorDiv.classList.remove('visible');
+    btn.disabled = true;
+
+    const result = await loginWithTotp(email, totp);
+    if (result.success) {
+      showEmail(result.email);
+      await refreshAttachments();
+    } else {
+      errorDiv.textContent = result.message || 'Invalid email or code.';
+      errorDiv.classList.add('visible');
+      document.getElementById('totp').value = '';
+      btn.disabled = false;
+    }
+  });
 }
+
+// ── Session helpers ───────────────────────────────────────────────────────────
 
 function showEmail(email) {
   for (const id of ['status-email', 'status-email-2']) {
     const el = document.getElementById(id);
-    if (el) el.textContent = email;
+    if (el) el.textContent = email || '—';
   }
 }
+
+// ── Attachments ───────────────────────────────────────────────────────────────
 
 async function refreshAttachments() {
   const attachments = await getAttachments();
@@ -74,11 +137,11 @@ async function refreshAttachments() {
 }
 
 async function encryptAll(attachments) {
-  const btn = document.getElementById('encrypt-btn');
+  const btn      = document.getElementById('encrypt-btn');
   const progress = document.getElementById('encrypt-progress');
-  const bar = document.getElementById('progress-bar');
-  const text = document.getElementById('progress-text');
-  const expiry = parseInt(document.getElementById('expiry').value);
+  const bar      = document.getElementById('progress-bar');
+  const text     = document.getElementById('progress-text');
+  const expiry   = parseInt(document.getElementById('expiry').value);
 
   btn.disabled = true;
   progress.classList.remove('hidden');
@@ -113,7 +176,7 @@ async function insertParamantBlock(uploads) {
   const html = `
     <div style="border: 1px solid #0B3A6A; padding: 16px; margin: 16px 0; font-family: Arial, sans-serif;">
       <div style="font-family: 'Courier New', monospace; font-size: 11px; color: #0B3A6A; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 12px;">
-        🔒 Encrypted attachments via Paramant
+        Encrypted attachments via Paramant
       </div>
       ${uploads.map(u => `
         <div style="margin: 8px 0;">
@@ -138,8 +201,11 @@ async function insertParamantBlock(uploads) {
 
 async function doLogout() {
   await logout();
+  formsWired = false;
   showLogin();
 }
+
+// ── Util ──────────────────────────────────────────────────────────────────────
 
 function switchState(stateId) {
   document.querySelectorAll('.state').forEach(el => el.classList.add('hidden'));

@@ -1,26 +1,22 @@
-const KEY = 'paramant_session';
+const AUTH_KEY = 'paramant_auth';
 
-export function saveSession(email) {
+export function setAuth(data) {
   try {
-    sessionStorage.setItem(KEY, JSON.stringify({ email }));
-  } catch {
-    // sessionStorage not available in some Office contexts
-  }
+    localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+  } catch {}
 }
 
-export function loadSession() {
+export function getAuth() {
   try {
-    const raw = sessionStorage.getItem(KEY);
+    const raw = localStorage.getItem(AUTH_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-export function clearSession() {
+export function clearAuth() {
   try {
-    sessionStorage.removeItem(KEY);
-  } catch {
-    // ignore
-  }
+    localStorage.removeItem(AUTH_KEY);
+  } catch {}
 }

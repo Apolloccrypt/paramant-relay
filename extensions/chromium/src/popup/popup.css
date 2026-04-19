@@ -228,3 +228,63 @@ button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
   background: var(--cobalt);
   color: var(--bone);
 }
+
+/* ── Rolling-out banner ─────────────────────────────────────────────────── */
+
+.banner {
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-mid);
+}
+
+.banner-lime {
+  background: rgba(178, 255, 63, 0.1);
+  border-left: 3px solid var(--lime);
+}
+
+.banner-label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--navy);
+  font-weight: 700;
+  background: var(--lime);
+  padding: 2px 8px;
+  margin-bottom: 6px;
+}
+
+/* ── Mode toggle ────────────────────────────────────────────────────────── */
+
+.mode-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.mode-header h3 {
+  font-size: 13px;
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--navy);
+  margin: 0;
+}
+
+.mode-switch {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cobalt);
+  text-decoration: none;
+}
+
+.mode-switch:hover { text-decoration: underline; }
+
+.hidden { display: none !important; }

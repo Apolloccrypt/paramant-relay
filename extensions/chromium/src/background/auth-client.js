@@ -1,100 +1,172 @@
-// auth-client.js — wraps paramant.app /api/user/* endpoints
-// MOCK MODE: set USE_MOCK = false when Track A PR 5 is live
-// At that point, remove everything inside the `if (USE_MOCK)` blocks.
+const RELAY_BASE  = 'https://relay.paramant.app';
+const ADMIN_BASE  = 'https://paramant.app/api/user';
+const STORAGE_KEY = 'paramant_api_key';
 
-const USE_MOCK = true;
+// ── Capabilities ──────────────────────────────────────────────────────────────
 
-const API_BASE   = 'https://paramant.app/api/user';
-const RELAY_BASE = 'https://paramant.app';
+export async function getCapabilities() {
+  try {
+    const res = await fetch(`${RELAY_BASE}/v2/auth/capabilities`);
+    if (!res.ok) return { api_key: true, user_totp: false };
+    return await res.json();
+  } catch {
+    return { api_key: true, user_totp: false };
+  }
+}
 
-// ── Mock helpers ─────────────────────────────────────────────────────────────
+// ── API key auth ──────────────────────────────────────────────────────────────
 
-function mockSession(email) {
+export async function loginWithApiKey(apikey) {
+  let res;
+  try {
+    res = await fetch(`${RELAY_BASE}/v2/check-key`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': apikey, 'Content-Type': 'application/json' },
+    });
+  } catch {
+    return { success: false, message: 'Network error. Check your connection.' };
+  }
+
+  if (!res.ok) return { success: false, message: 'Invalid API key' };
+
+  const data = await res.json();
+  if (!data.valid) return { success: false, message: 'Invalid API key' };
+
+  const until = Date.now() + 8 * 60 * 60 * 1000; // 8h UX session
+  await chrome.storage.local.set({
+    [STORAGE_KEY]: apikey,
+    auth_mode: 'apikey',
+    auth_email: data.email || null,
+    auth_until: until,
+  });
+
   return {
-    authenticated: true,
-    email,
-    expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+    success: true,
+    mode: 'apikey',
+    email: data.email || null,
+    expires_at: new Date(until).toISOString(),
   };
 }
 
-// ── Auth functions ────────────────────────────────────────────────────────────
+// ── TOTP auth ─────────────────────────────────────────────────────────────────
 
 export async function loginWithTotp(email, totp) {
-  if (USE_MOCK) {
-    // Accept any 6-digit code; reject anything else so the error path is testable
-    if (/^\d{6}$/.test(totp)) {
-      await chrome.storage.local.set({ mockEmail: email });
-      return { success: true, ...mockSession(email) };
-    }
-    return { success: false, error: 'invalid_totp', message: 'Invalid code (mock: use any 6 digits).' };
+  let res;
+  try {
+    res = await fetch(`${ADMIN_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, totp }),
+      credentials: 'include',
+    });
+  } catch {
+    return { success: false, message: 'Network error. Check your connection.' };
   }
-
-  const res = await fetch(`${API_BASE}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, totp }),
-    credentials: 'include',
-  });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    return { success: false, error: err.error, message: err.message ?? 'Login failed.' };
+    return { success: false, message: err.message || 'Invalid email or code.' };
   }
 
   const data = await res.json();
-  return { success: true, email: data.email, expires_at: data.session_expires_at };
+  await chrome.storage.local.set({
+    auth_mode: 'totp',
+    auth_email: data.email,
+    auth_until: new Date(data.session_expires_at).getTime(),
+  });
+
+  return {
+    success: true,
+    mode: 'totp',
+    email: data.email,
+    expires_at: data.session_expires_at,
+  };
 }
+
+// ── Session ───────────────────────────────────────────────────────────────────
 
 export async function verifySession() {
-  if (USE_MOCK) {
-    const { mockEmail } = await chrome.storage.local.get('mockEmail');
-    if (!mockEmail) return { authenticated: false };
-    return mockSession(mockEmail);
-  }
+  const stored = await chrome.storage.local.get([
+    'auth_mode', 'auth_email', 'auth_until', STORAGE_KEY,
+  ]);
 
-  try {
-    const res = await fetch(`${API_BASE}/session/verify`, { credentials: 'include' });
-    if (!res.ok) return { authenticated: false };
-    return await res.json();
-  } catch {
+  if (!stored.auth_mode) return { authenticated: false };
+
+  if (stored.auth_until && Date.now() > stored.auth_until) {
+    await chrome.storage.local.clear();
     return { authenticated: false };
   }
-}
 
-export async function logout() {
-  if (USE_MOCK) {
-    await chrome.storage.local.remove('mockEmail');
-    return { success: true };
-  }
-
-  await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'include' });
-  return { success: true };
-}
-
-export async function uploadFile(fileData, metadata) {
-  if (USE_MOCK) {
-    // Simulate a 600 ms upload delay, return a fake share URL
-    await new Promise(r => setTimeout(r, 600));
-    const id = Math.random().toString(36).slice(2, 10);
+  if (stored.auth_mode === 'apikey') {
     return {
-      success: true,
-      share_url: `https://paramant.app/get/${id}#mockkey`,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      authenticated: true,
+      mode: 'apikey',
+      email: stored.auth_email,
+      expires_at: new Date(stored.auth_until).toISOString(),
     };
   }
 
-  const res = await fetch(`${RELAY_BASE}/v2/inbound`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      payload: arrayBufferToBase64(fileData),
-      metadata,
-      ttl_ms: 24 * 60 * 60 * 1000,
-    }),
+  if (stored.auth_mode === 'totp') {
+    try {
+      const res = await fetch(`${ADMIN_BASE}/session/verify`, { credentials: 'include' });
+      if (!res.ok) {
+        await chrome.storage.local.clear();
+        return { authenticated: false };
+      }
+      return await res.json();
+    } catch {
+      return { authenticated: false };
+    }
+  }
+
+  return { authenticated: false };
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+
+export async function logout() {
+  const { auth_mode } = await chrome.storage.local.get('auth_mode');
+
+  if (auth_mode === 'totp') {
+    try {
+      await fetch(`${ADMIN_BASE}/logout`, { method: 'POST', credentials: 'include' });
+    } catch {}
+  }
+
+  await chrome.storage.local.clear();
+  return { success: true };
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+
+export async function uploadFile(fileData, metadata) {
+  const stored = await chrome.storage.local.get(['auth_mode', STORAGE_KEY]);
+
+  if (!stored.auth_mode) return { success: false, message: 'not_authenticated' };
+
+  const body = JSON.stringify({
+    payload: arrayBufferToBase64(fileData),
+    metadata,
+    ttl_ms: 24 * 60 * 60 * 1000,
   });
 
-  if (!res.ok) return { success: false, error: 'upload_failed' };
+  let res;
+  if (stored.auth_mode === 'apikey') {
+    res = await fetch(`${RELAY_BASE}/v2/inbound`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': stored[STORAGE_KEY] },
+      body,
+    });
+  } else {
+    res = await fetch('https://paramant.app/api/relay/v2/inbound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body,
+    });
+  }
+
+  if (!res.ok) return { success: false, message: 'upload_failed' };
 
   const data = await res.json();
   return { success: true, share_url: data.share_url, expires_at: data.expires_at };

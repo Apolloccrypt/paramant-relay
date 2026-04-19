@@ -25,25 +25,50 @@
 
   <!-- State: not logged in -->
   <div id="state-login" class="state hidden">
-    <p class="lede">Sign in to send encrypted attachments.</p>
+    <p class="lede">Sign in to encrypt attachments.</p>
 
-    <form id="login-form" novalidate>
+    <div id="banner-rolling-out" class="banner banner-lime hidden">
+      <div class="banner-label">rolling out Q2 2026</div>
+      <p>Email + authenticator login is being rolled out to existing users. Use your API key for now.</p>
+    </div>
+
+    <!-- API key form (default) -->
+    <form id="form-apikey" novalidate>
+      <div class="mode-header">
+        <h3>Sign in with API key</h3>
+        <a id="show-totp" class="mode-switch hidden" href="#">Use TOTP instead</a>
+      </div>
+
+      <label for="apikey">API key</label>
+      <input type="password" id="apikey" required autocomplete="off"
+             placeholder="pgp_…" spellcheck="false">
+
+      <button type="submit">Sign in</button>
+      <div id="error-apikey" class="error" role="alert" aria-live="polite"></div>
+    </form>
+
+    <!-- TOTP form (shown only when capability is on) -->
+    <form id="form-totp" class="hidden" novalidate>
+      <div class="mode-header">
+        <h3>Sign in with authenticator</h3>
+        <a id="show-apikey" class="mode-switch" href="#">Use API key instead</a>
+      </div>
+
       <label for="email">Email</label>
-      <input type="email" id="email" name="email" required
-             autocomplete="username" autofocus
+      <input type="email" id="email" required autocomplete="username"
              placeholder="you@example.com">
 
       <label for="totp">6-digit code</label>
-      <input type="text" id="totp" name="totp" required
-             inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+      <input type="text" id="totp" required inputmode="numeric"
+             pattern="[0-9]{6}" maxlength="6"
              autocomplete="one-time-code" placeholder="• • • • • •">
 
-      <button type="submit" id="submit-btn">Sign in</button>
-      <div id="error" class="error" role="alert" aria-live="polite"></div>
+      <button type="submit">Sign in</button>
+      <div id="error-totp" class="error" role="alert" aria-live="polite"></div>
     </form>
 
     <p class="footer-text">
-      No account? <a href="https://paramant.app/request-key" target="_blank" rel="noopener">Get one</a>
+      No account? <a href="https://paramant.app/request-key" target="_blank" rel="noopener">Request a key</a>
     </p>
   </div>
 

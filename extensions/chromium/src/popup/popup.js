@@ -1,27 +1,45 @@
-const elLoading   = document.getElementById('state-loading');
-const elLogin     = document.getElementById('state-login');
-const elLoggedIn  = document.getElementById('state-logged-in');
-const form        = document.getElementById('login-form');
-const errorDiv    = document.getElementById('error');
-const submitBtn   = document.getElementById('submit-btn');
-const statusEmail = document.getElementById('status-email');
+// DOM — states
+const elLoading  = document.getElementById('state-loading');
+const elLogin    = document.getElementById('state-login');
+const elLoggedIn = document.getElementById('state-logged-in');
+
+// DOM — login UI
+const bannerRollingOut = document.getElementById('banner-rolling-out');
+const formApikey       = document.getElementById('form-apikey');
+const formTotp         = document.getElementById('form-totp');
+const showTotpLink     = document.getElementById('show-totp');
+const showApikeyLink   = document.getElementById('show-apikey');
+
+// DOM — logged-in UI
+const statusEmail  = document.getElementById('status-email');
 const sessionTimer = document.getElementById('session-timer');
-const logoutBtn   = document.getElementById('logout-btn');
+const logoutBtn    = document.getElementById('logout-btn');
 
-// ── Session check ─────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-async function checkSession() {
+async function init() {
   showState('loading');
-  const result = await chrome.runtime.sendMessage({ type: 'CHECK_SESSION' });
 
-  if (result.authenticated) {
-    statusEmail.textContent = result.email;
-    sessionTimer.textContent = formatTimeRemaining(result.expires_at);
-    showState('logged-in');
-  } else {
-    showState('login');
+  const auth = await chrome.runtime.sendMessage({ type: 'CHECK_SESSION' });
+  if (auth.authenticated) {
+    showLoggedIn(auth);
+    return;
   }
+
+  const caps = await chrome.runtime.sendMessage({ type: 'GET_CAPABILITIES' });
+
+  if (caps.user_totp) {
+    showTotpLink.classList.remove('hidden');
+    bannerRollingOut.classList.add('hidden');
+  } else {
+    showTotpLink.classList.add('hidden');
+    bannerRollingOut.classList.remove('hidden');
+  }
+
+  showState('login');
 }
+
+// ── State management ──────────────────────────────────────────────────────────
 
 function showState(name) {
   elLoading.classList.toggle('hidden', name !== 'loading');
@@ -29,33 +47,77 @@ function showState(name) {
   elLoggedIn.classList.toggle('hidden', name !== 'logged-in');
 }
 
-// ── Login form ────────────────────────────────────────────────────────────────
+function showLoggedIn(auth) {
+  statusEmail.textContent = auth.email || '—';
+  sessionTimer.textContent = formatTimeRemaining(auth.expires_at);
+  showState('logged-in');
+}
 
-form.addEventListener('submit', async e => {
+function switchToApikey() {
+  formApikey.classList.remove('hidden');
+  formTotp.classList.add('hidden');
+}
+
+function switchToTotp() {
+  formApikey.classList.add('hidden');
+  formTotp.classList.remove('hidden');
+}
+
+// ── Mode switch ───────────────────────────────────────────────────────────────
+
+showTotpLink.addEventListener('click', e => { e.preventDefault(); switchToTotp(); });
+showApikeyLink.addEventListener('click', e => { e.preventDefault(); switchToApikey(); });
+
+// ── API key form ──────────────────────────────────────────────────────────────
+
+formApikey.addEventListener('submit', async e => {
   e.preventDefault();
-  clearError();
-  setSubmitting(true);
+  const apikey   = document.getElementById('apikey').value.trim();
+  const errorDiv = document.getElementById('error-apikey');
+  const btn      = formApikey.querySelector('button[type="submit"]');
 
-  const email = document.getElementById('email').value.trim();
-  const totp  = document.getElementById('totp').value.trim();
+  errorDiv.classList.remove('visible');
+  btn.disabled = true;
 
-  const result = await chrome.runtime.sendMessage({ type: 'LOGIN', email, totp });
+  const result = await chrome.runtime.sendMessage({ type: 'LOGIN_APIKEY', apikey });
 
   if (result.success) {
-    await checkSession();
+    showLoggedIn(result);
   } else {
-    showError(result.message ?? 'Invalid email or code.');
-    document.getElementById('totp').value = '';
-    document.getElementById('totp').focus();
+    errorDiv.textContent = result.message || 'Invalid API key.';
+    errorDiv.classList.add('visible');
+    btn.disabled = false;
   }
+});
 
-  setSubmitting(false);
+// ── TOTP form ─────────────────────────────────────────────────────────────────
+
+formTotp.addEventListener('submit', async e => {
+  e.preventDefault();
+  const email    = document.getElementById('email').value.trim();
+  const totp     = document.getElementById('totp').value.trim();
+  const errorDiv = document.getElementById('error-totp');
+  const btn      = formTotp.querySelector('button[type="submit"]');
+
+  errorDiv.classList.remove('visible');
+  btn.disabled = true;
+
+  const result = await chrome.runtime.sendMessage({ type: 'LOGIN_TOTP', email, totp });
+
+  if (result.success) {
+    showLoggedIn(result);
+  } else {
+    errorDiv.textContent = result.message || 'Invalid email or code.';
+    errorDiv.classList.add('visible');
+    document.getElementById('totp').value = '';
+    btn.disabled = false;
+  }
 });
 
 // Auto-advance when 6 digits entered
 document.getElementById('totp').addEventListener('input', e => {
   if (e.target.value.replace(/\D/g, '').length === 6) {
-    form.requestSubmit?.() ?? form.dispatchEvent(new Event('submit'));
+    formTotp.requestSubmit?.() ?? formTotp.dispatchEvent(new Event('submit'));
   }
 });
 
@@ -63,25 +125,10 @@ document.getElementById('totp').addEventListener('input', e => {
 
 logoutBtn.addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'LOGOUT' });
-  await checkSession();
+  await init();
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function showError(msg) {
-  errorDiv.textContent = msg;
-  errorDiv.classList.add('visible');
-}
-
-function clearError() {
-  errorDiv.textContent = '';
-  errorDiv.classList.remove('visible');
-}
-
-function setSubmitting(busy) {
-  submitBtn.disabled = busy;
-  submitBtn.textContent = busy ? 'Signing in…' : 'Sign in';
-}
 
 function formatTimeRemaining(expiresAt) {
   const ms = new Date(expiresAt) - Date.now();
@@ -90,6 +137,4 @@ function formatTimeRemaining(expiresAt) {
   return mins > 60 ? `${Math.round(mins / 60)}h` : `${mins}m`;
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-
-checkSession();
+init();
