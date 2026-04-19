@@ -149,7 +149,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 h1 { font-size: var(--text-5xl); font-weight: 800; letter-spacing: -.035em; line-height: 0.94; }
 h2 { font-size: var(--text-3xl); letter-spacing: -.02em; }
-h3 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-xl); margin-top: 40px; margin-bottom: 12px; }
 h4 { font-size: var(--text-lg); }
 h5 { font-size: var(--text-md); }
 h6 { font-size: var(--text-base); }
@@ -1453,6 +1453,7 @@ pre code { background: none; padding: 0; }
 /* Text utility modifiers */
 .dim         { color: var(--ink-dim); }
 .mono        { font-family: var(--mono); }
+.dim.mono    { margin-top: 12px; margin-bottom: 40px; }
 .cobalt-text { color: var(--cobalt); font-weight: 600; }
 .strong      { font-weight: 600; color: var(--ink); }
 .warn-text   { color: #C2410C; font-weight: 600; }

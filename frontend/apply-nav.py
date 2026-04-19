@@ -163,7 +163,7 @@ NEW_MOBILE = '''\
   </div>
 </div>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=5">'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=6">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=6">'
 NAV_JS    = '<script src="/nav.js?v=5" defer></script>'
 
