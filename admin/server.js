@@ -1046,6 +1046,103 @@ api.get("/user/billing/history", authUser, async (req, res) => {
   res.json({ history: events });
 });
 
+
+// ─── Telemetry / dashboard endpoints ──────────────────────────────────────────
+const telemetry = require("./lib/telemetry");
+
+api.get("/admin/overview", authMiddleware, async (req, res) => {
+  try {
+    const [activeSessions, recentAudit, planDist, signupsToday] = await Promise.all([
+      telemetry.countActiveSessions(),
+      telemetry.getRecentAuditEvents(10),
+      telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
+      telemetry.countSignupsToday(relayFetch, ADMIN_TOKEN),
+    ]);
+    const today = new Date().toISOString().split("T")[0];
+    const proUpgrades = recentAudit.filter(e =>
+      e.event_type === "plan_changed" &&
+      (e.metadata?.to === "pro" || e.metadata?.to === "enterprise") &&
+      new Date(e.ts).toISOString().startsWith(today)
+    ).length;
+    res.json({
+      stats: { signups_today: signupsToday, active_sessions: activeSessions, pro_upgrades_today: proUpgrades, revenue_mrr: 0 },
+      recent_activity: recentAudit,
+      alerts: [],
+      plan_distribution: planDist,
+    });
+  } catch (err) { console.error("[admin/overview]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+api.get("/admin/users", authMiddleware, async (req, res) => {
+  try {
+    const users = await telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
+    res.json({
+      users,
+      counts: {
+        total: users.length,
+        active: users.filter(u => u.active).length,
+        community: users.filter(u => u.plan === "community").length,
+        pro: users.filter(u => u.plan === "pro").length,
+        enterprise: users.filter(u => u.plan === "enterprise").length,
+      },
+    });
+  } catch (err) { console.error("[admin/users]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+api.get("/admin/audit", authMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const userFilter = req.query.user || null;
+    const eventFilter = req.query.event || null;
+    const sinceMs = req.query.since ? new Date(req.query.since).getTime() : 0;
+    const events = [];
+    for await (const key of redis().scanIterator({ MATCH: "paramant:user:audit:*", COUNT: 100 })) {
+      const userId = key.split(":").pop();
+      if (userFilter && !userId.includes(userFilter)) continue;
+      const entries = await redis().zRange(key, 0, -1).catch(() => []);
+      for (const entry of entries) {
+        try {
+          const ev = JSON.parse(entry);
+          if (sinceMs && ev.ts < sinceMs) continue;
+          if (eventFilter && ev.event_type !== eventFilter) continue;
+          events.push({ user_id: userId, ...ev });
+        } catch {}
+      }
+    }
+    events.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    res.json({ events: events.slice(0, limit), total: events.length });
+  } catch (err) { console.error("[admin/audit]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+api.get("/admin/billing", authMiddleware, async (req, res) => {
+  try {
+    const [planDist, recentAudit] = await Promise.all([
+      telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
+      telemetry.getRecentAuditEvents(200),
+    ]);
+    res.json({
+      stub_mode: true, mrr_eur: 0,
+      total_customers: Object.values(planDist).reduce((a, b) => a + b, 0),
+      churn_this_month: 0,
+      plan_distribution: planDist,
+      recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed").slice(0, 20),
+    });
+  } catch (err) { console.error("[admin/billing]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
+  try {
+    const details = {};
+    await Promise.all(Object.keys(SECTORS).map(async s => {
+      try {
+        const r = await relayFetch(s, "/health", "GET", null, false, ADMIN_TOKEN);
+        details[s] = r.status === 200 ? r.body : { error: "HTTP " + r.status };
+      } catch (e) { details[s] = { error: e.message }; }
+    }));
+    res.json({ sectors: details });
+  } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
 app.use(`${BASE_PATH}/api`, api);
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

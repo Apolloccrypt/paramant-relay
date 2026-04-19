@@ -1,1028 +1,576 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT Admin</title>
+<title>PARAMANT · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg:       #0a0a0a;
-  --bg1:      #111111;
-  --bg2:      #181818;
-  --bg3:      #222222;
-  --border:   #2a2a2a;
-  --border2:  #333333;
-  --text:     #e8e8e8;
-  --muted:    #666;
-  --muted2:   #444;
-  --accent:   #e8e8c0;
-  --green:    #4caf6f;
-  --red:      #e05252;
-  --yellow:   #d4a842;
-  --blue:     #5a8abf;
-  --font:     'SF Mono', 'Fira Code', 'Consolas', monospace;
-}
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: 13px;
-  line-height: 1.5;
-  min-height: 100vh;
-}
-
-/* ── Login ── */
-#login-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  background: var(--bg);
-}
-.login-box {
-  width: 380px;
-  padding: 40px;
-  background: var(--bg1);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-.login-logo {
-  font-size: 11px;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 32px;
-}
-.login-logo span { color: var(--accent); }
-.login-box h2 {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 24px;
-}
-.form-group { margin-bottom: 16px; }
-.sector-checks { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.sector-check { display: flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; padding: 6px 10px; cursor: pointer; transition: border-color .15s; user-select: none; }
-.sector-check:hover { border-color: var(--accent); }
-.sector-check input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; margin: 0; }
-.sector-check span { font-size: 12px; font-family: var(--font); color: var(--text); }
-.form-group label {
-  display: block;
-  font-size: 11px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-input[type=text], input[type=password], input[type=email], select, textarea {
-  width: 100%;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  color: var(--text);
-  font-family: var(--font);
-  font-size: 13px;
-  padding: 8px 12px;
-  outline: none;
-  transition: border-color .15s;
-}
-input:focus, select:focus, textarea:focus {
-  border-color: var(--accent);
-}
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  background: var(--bg2);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background .15s, border-color .15s;
-  text-decoration: none;
-}
-.btn:hover { background: var(--bg3); border-color: var(--border2); }
-.btn-primary {
-  background: var(--accent);
-  color: #0a0a0a;
-  border-color: var(--accent);
-  font-weight: 600;
-}
-.btn-primary:hover { background: #d4d4a0; }
-.btn-danger { border-color: var(--red); color: var(--red); }
-.btn-danger:hover { background: rgba(224,82,82,.1); }
-.btn-sm { padding: 4px 10px; font-size: 11px; }
-.btn-full { width: 100%; justify-content: center; }
-.error-msg {
-  background: rgba(224,82,82,.1);
-  border: 1px solid rgba(224,82,82,.3);
-  border-radius: 4px;
-  color: var(--red);
-  padding: 8px 12px;
-  font-size: 12px;
-  margin-top: 12px;
-  display: none;
-}
-.success-msg {
-  background: rgba(76,175,111,.1);
-  border: 1px solid rgba(76,175,111,.3);
-  border-radius: 4px;
-  color: var(--green);
-  padding: 8px 12px;
-  font-size: 12px;
-  margin-top: 12px;
-  display: none;
-}
-
-/* ── App shell ── */
-#app { display: none; flex-direction: column; min-height: 100vh; }
-header {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 0 24px;
-  height: 48px;
-  background: var(--bg1);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.header-logo {
-  font-size: 11px;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-right: 32px;
-  white-space: nowrap;
-}
-.header-logo span { color: var(--accent); }
-nav { display: flex; gap: 0; flex: 1; }
-.nav-tab {
-  padding: 0 16px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  letter-spacing: .04em;
-  color: var(--muted);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color .15s;
-}
-.nav-tab:hover { color: var(--text); }
-.nav-tab.active { color: var(--text); border-bottom-color: var(--accent); }
-.header-actions { display: flex; align-items: center; gap: 12px; }
-.status-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--green);
-}
-.status-dot.red { background: var(--red); }
-
-main { flex: 1; padding: 24px; overflow-y: auto; }
-
-/* ── Tabs ── */
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-
-/* ── Overview ── */
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
-}
-.sector-card {
-  background: var(--bg1);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 20px;
-  cursor: pointer;
-  transition: border-color .15s;
-}
-.sector-card:hover { border-color: var(--border2); }
-.sector-card.active-sector { border-color: var(--accent); }
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.card-title {
-  font-size: 11px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.card-status {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(76,175,111,.15);
-  color: var(--green);
-  border: 1px solid rgba(76,175,111,.3);
-}
-.card-status.down {
-  background: rgba(224,82,82,.15);
-  color: var(--red);
-  border-color: rgba(224,82,82,.3);
-}
-.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.metric-item { }
-.metric-label {
-  font-size: 10px;
-  color: var(--muted);
-  margin-bottom: 2px;
-  letter-spacing: .04em;
-}
-.metric-value {
-  font-size: 18px;
-  color: var(--text);
-  font-weight: 500;
-}
-.metric-value.highlight { color: var(--accent); }
-.metric-value.red { color: var(--red); }
-
-/* ── Keys table ── */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.section-title {
-  font-size: 12px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.sector-tabs {
-  display: flex;
-  gap: 0;
-  background: var(--bg1);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 3px;
-  margin-bottom: 20px;
-}
-.sector-tab {
-  padding: 4px 14px;
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-  border-radius: 3px;
-  transition: background .12s, color .12s;
-}
-.sector-tab.active {
-  background: var(--bg3);
-  color: var(--text);
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--bg1);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-th {
-  text-align: left;
-  font-size: 10px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 10px 16px;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  font-weight: 400;
-}
-td {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: var(--bg2); }
-.key-value {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: .02em;
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.key-value:hover { color: var(--text); cursor: default; }
-.badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 10px;
-  letter-spacing: .04em;
-}
-.badge-pro { background: rgba(90,138,191,.2); color: var(--blue); border: 1px solid rgba(90,138,191,.3); }
-.badge-enterprise { background: rgba(232,232,192,.15); color: var(--accent); border: 1px solid rgba(232,232,192,.3); }
-.badge-community { background: var(--bg3); color: var(--muted); border: 1px solid var(--border2); }
-.badge-active { background: rgba(76,175,111,.15); color: var(--green); border: 1px solid rgba(76,175,111,.3); }
-.badge-revoked { background: rgba(224,82,82,.1); color: var(--red); border: 1px solid rgba(224,82,82,.2); }
-.actions { display: flex; gap: 6px; }
-.loading { color: var(--muted); font-size: 12px; padding: 24px; text-align: center; }
-.empty-state { color: var(--muted); text-align: center; padding: 40px; }
-
-/* ── Modal ── */
-.modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.7);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-  display: none;
-}
-.modal-overlay.open { display: flex; }
-.modal {
-  background: var(--bg1);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 32px;
-  width: 420px;
-  max-width: 95vw;
-}
-.modal h3 {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 20px;
-  color: var(--text);
-}
-.modal-footer {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 24px;
-}
-.key-result {
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: 4px;
-  padding: 12px;
-  word-break: break-all;
-  font-size: 12px;
-  color: var(--accent);
-  margin-top: 12px;
-  display: none;
-}
-.copy-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#F8FAFC;color:#0B3A6A;font-family:'Inter',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+button,input,select{font-family:inherit;font-size:inherit}
+/* Login */
+.lw{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.lb{width:100%;max-width:340px}
+.l-brand{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#475569;margin-bottom:20px}
+.l-title{font-size:22px;font-weight:600;color:#0B3A6A;margin-bottom:6px}
+.l-sub{font-size:13px;color:#475569;margin-bottom:26px;line-height:1.5}
+.l-lbl{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:6px}
+.l-inp{width:100%;background:#fff;border:1.5px solid rgba(11,58,106,.15);padding:10px 12px;color:#0B3A6A;font-size:13px;outline:none;margin-bottom:12px;font-family:'IBM Plex Mono',monospace;transition:border-color .15s}
+.l-inp:focus{border-color:#1D4ED8}
+.l-totp{font-size:20px;letter-spacing:.2em;margin-bottom:18px}
+.l-btn{width:100%;background:#0B3A6A;color:#F8FAFC;border:none;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;transition:background .15s}
+.l-btn:hover{background:#1D4ED8}
+.l-btn:disabled{opacity:.5;cursor:default}
+.l-err{font-size:12px;color:#dc2626;margin-top:10px;font-family:'IBM Plex Mono',monospace;display:none}
+.l-note{font-size:11px;color:#94a3b8;margin-top:12px;text-align:center;font-family:'IBM Plex Mono',monospace}
+/* Shell */
+.shell{display:none;flex-direction:column;min-height:100vh}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1.5px solid rgba(11,58,106,.08);background:#F8FAFC;position:sticky;top:0;z-index:50}
+.hdr-brand{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;font-weight:700;color:#0B3A6A;text-transform:uppercase;white-space:nowrap}
+.tabs{display:flex;gap:0;overflow-x:auto}
+.tabs button{background:transparent;border:none;border-bottom:2px solid transparent;padding:16px 16px 14px;font-family:'Inter',sans-serif;font-size:13px;color:#475569;cursor:pointer;white-space:nowrap;transition:color .15s}
+.tabs button.on{color:#0B3A6A;border-bottom-color:#1D4ED8;font-weight:600}
+.tabs button:hover:not(.on){color:#0B3A6A}
+.hdr-meta{display:flex;gap:10px;align-items:center;flex-shrink:0}
+.lic{background:rgba(178,255,63,.22);color:#0B3A6A;padding:4px 10px;font-size:11px;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.lo-btn{padding:6px 12px;background:transparent;border:1.5px solid rgba(11,58,106,.2);color:#0B3A6A;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;transition:border-color .15s}
+.lo-btn:hover{border-color:#0B3A6A}
+.main{flex:1;padding:24px;max-width:1400px;width:100%;margin:0 auto}
+.panel{display:none}.panel.on{display:block}
+/* Stat cards */
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.sc{background:#fff;border:1px solid rgba(11,58,106,.08);padding:20px}
+.sc-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#475569;margin-bottom:10px}
+.sc-val{font-size:30px;font-weight:500;color:#0B3A6A;font-family:'IBM Plex Mono',monospace;line-height:1}
+/* Cards */
+.card{background:#fff;border:1px solid rgba(11,58,106,.08);padding:20px;margin-bottom:16px}
+.card-hdr{font-size:12px;font-weight:600;color:#0B3A6A;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
+.card-hdr small{font-size:11px;font-weight:400;color:#475569;text-transform:none;letter-spacing:0;font-family:'Inter',sans-serif}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px}
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#475569;border-bottom:1.5px solid rgba(11,58,106,.08)}
+.tbl td{padding:11px 12px;border-bottom:1px solid rgba(11,58,106,.04);color:#0B3A6A}
+.tbl tr:hover td{background:rgba(29,78,216,.02)}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:12px}
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+.badge.community{background:rgba(11,58,106,.08);color:#0B3A6A}
+.badge.pro{background:rgba(29,78,216,.1);color:#1D4ED8}
+.badge.enterprise{background:rgba(178,255,63,.35);color:#2d5a00;font-weight:700}
+.badge.trial{background:rgba(245,158,11,.1);color:#b45309}
+.chip{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.chip.active{color:#059669}.chip.pending{color:#d97706}.chip.none{color:#94a3b8}.chip.revoked{color:#dc2626}
+/* Filter bar */
+.fb{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.fb input,.fb select{padding:7px 10px;border:1.5px solid rgba(11,58,106,.12);font-size:12px;font-family:'Inter',sans-serif;background:#fff;color:#0B3A6A;outline:none}
+.fb input:focus,.fb select:focus{border-color:#1D4ED8}
+.sp{flex:1}
+.btn{padding:7px 14px;background:#0B3A6A;color:#F8FAFC;border:none;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.btn:hover{background:#1D4ED8}
+.btn.out{background:transparent;border:1.5px solid rgba(11,58,106,.2);color:#0B3A6A}
+.btn.out:hover{border-color:#1D4ED8;color:#1D4ED8;background:transparent}
+/* Relay strip */
+.rs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.ri{padding:10px 12px;background:rgba(5,150,105,.08);border-left:3px solid #059669;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#065f46}
+.ri.offline{background:rgba(220,38,38,.06);border-left-color:#dc2626;color:#991b1b}
+.ri.loading{background:rgba(11,58,106,.04);border-left-color:#94a3b8;color:#475569}
+.ri-name{font-weight:700;margin-bottom:2px}
+.ri-det{font-size:10px;opacity:.8}
+/* Activity */
+.al{font-family:'IBM Plex Mono',monospace;font-size:11px}
+.ai{display:flex;gap:12px;padding:5px 0;border-bottom:1px solid rgba(11,58,106,.04)}
+.ai .t{color:#475569;flex-shrink:0;width:80px}
+.ai .e{color:#1D4ED8;flex-shrink:0;width:160px}
+.ai .u{color:#0B3A6A;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Plan bars */
+.pb{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pb .pl{width:90px;font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#475569}
+.pb .tr{flex:1;height:6px;background:rgba(11,58,106,.06);overflow:hidden}
+.pb .fi{height:100%;background:#1D4ED8;transition:width .5s}
+.pb .cn{width:28px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#475569}
+/* Action menu */
+.amw{position:relative;display:inline-block}
+.amb{background:transparent;border:1px solid rgba(11,58,106,.12);color:#0B3A6A;padding:4px 10px;font-size:11px;font-family:'IBM Plex Mono',monospace;cursor:pointer}
+.amb:hover{background:rgba(11,58,106,.04)}
+.am{display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid rgba(11,58,106,.15);z-index:20;min-width:190px;box-shadow:0 4px 16px rgba(11,58,106,.1)}
+.am.open{display:block}
+.am button{display:block;width:100%;text-align:left;padding:9px 14px;background:transparent;border:none;font-size:13px;color:#0B3A6A;cursor:pointer}
+.am button:hover{background:rgba(29,78,216,.05)}
+.am button.danger{color:#dc2626}
+.am button.danger:hover{background:rgba(220,38,38,.05)}
+.am .sep{height:1px;background:rgba(11,58,106,.06);margin:4px 0}
+/* Banner */
+.banner{padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.5}
+.banner.stub{background:rgba(245,158,11,.08);border-left:3px solid #d97706;color:#92400e}
+.banner.info{background:rgba(29,78,216,.06);border-left:3px solid #1D4ED8;color:#1e3a8a}
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:#0B3A6A;color:#F8FAFC;padding:10px 16px;font-size:12px;font-family:'IBM Plex Mono',monospace;z-index:999;max-width:320px}
+.toast.err{background:#dc2626}
+.toast.ok{background:#059669}
+/* Loading */
+.sp-icon{display:inline-block;width:14px;height:14px;border:2px solid rgba(11,58,106,.12);border-top-color:#1D4ED8;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:32px;text-align:center;color:#94a3b8;font-family:'IBM Plex Mono',monospace;font-size:12px}
+/* Responsive */
+@media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}.tabs{overflow-x:auto}}
+@media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding:0 12px}.main{padding:14px}.hdr-meta .lic{display:none}}
 </style>
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo"><span>PARAMANT</span> · Admin</div>
-    <h2>Sign in</h2>
-    <div class="form-group">
-      <label>Admin Token</label>
-      <input type="password" id="login-token" placeholder="ADMIN_TOKEN or pgp_..." autocomplete="current-password">
-    </div>
-    <div class="form-group">
-      <label>TOTP Code</label>
-      <input type="text" id="login-totp" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
-    </div>
-    <button class="btn btn-primary btn-full" onclick="doLogin()">Sign in</button>
-    <div class="error-msg" id="login-error"></div>
+<!-- LOGIN -->
+<div id="view-login" class="lw">
+  <div class="lb">
+    <div class="l-brand">PARAMANT · Infra</div>
+    <h1 class="l-title">Admin panel</h1>
+    <p class="l-sub">Two-factor authentication required to access the dashboard.</p>
+    <label class="l-lbl">Admin token</label>
+    <input id="l-token" type="password" class="l-inp" placeholder="Enter admin token" autocomplete="current-password">
+    <label class="l-lbl">TOTP code <small style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(Authenticator app)</small></label>
+    <input id="l-totp" type="text" class="l-inp l-totp" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+    <button id="l-btn" class="l-btn" onclick="doLogin()">Sign in</button>
+    <div id="l-err" class="l-err"></div>
+    <div class="l-note">Session expires after 1 hour</div>
   </div>
 </div>
 
-<!-- APP -->
-<div id="app">
-  <header>
-    <div class="header-logo"><span>PARAMANT</span> · Admin</div>
-    <nav>
-      <div class="nav-tab active" data-tab="overview" onclick="switchTab('overview')">Dashboard</div>
-      <div class="nav-tab" data-tab="keys" onclick="switchTab('keys')">API Keys</div>
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="shell">
+  <header class="hdr">
+    <div class="hdr-brand">PARAMANT · Admin</div>
+    <nav class="tabs" id="nav-tabs">
+      <button data-tab="overview" class="on" onclick="switchTab('overview')">Overview</button>
+      <button data-tab="users" onclick="switchTab('users')">Users</button>
+      <button data-tab="audit" onclick="switchTab('audit')">Audit</button>
+      <button data-tab="billing" onclick="switchTab('billing')">Billing</button>
+      <button data-tab="relay" onclick="switchTab('relay')">Relay</button>
     </nav>
-    <div class="header-actions">
-      <div id="license-badge" style="display:none;font-size:11px;font-family:monospace;padding:3px 10px;border-radius:12px;border:1px solid"></div>
-      <div class="status-dot" id="relay-status-dot"></div>
-      <span id="relay-status-text" style="font-size:11px;color:var(--muted)">—</span>
-      <button class="btn btn-sm" onclick="doLogout()">Uitloggen</button>
+    <div class="hdr-meta">
+      <span class="lic">v2.4.5 · Licensed</span>
+      <button class="lo-btn" onclick="doLogout()">Sign out</button>
     </div>
   </header>
-  <!-- Upgrade banner (hidden by default, shown on 402) -->
-  <div id="upgrade-banner" style="display:none;background:#1a0d00;border-bottom:1px solid #8b4513;padding:10px 24px;font-size:13px;color:#f4a460;align-items:center;gap:12px">
-    <span>Community Edition limit reached (5 keys). Add a <code style="background:#2a1a00;padding:1px 5px;border-radius:3px">PLK_KEY=plk_...</code> to your <code style="background:#2a1a00;padding:1px 5px;border-radius:3px">.env</code> to unlock unlimited users.</span>
-    <a href="https://paramant.app/pricing" target="_blank" rel="noopener" style="color:#f4a460;font-weight:600;white-space:nowrap">Get a license →</a>
-    <button onclick="document.getElementById('upgrade-banner').style.display='none'" style="margin-left:auto;background:none;border:none;color:#f4a460;cursor:pointer;font-size:16px">&times;</button>
-  </div>
-
-  <main>
-    <!-- DASHBOARD TAB -->
-    <div class="tab-content active" id="tab-overview">
-      <div class="section-header" style="margin-bottom:16px">
-        <div class="section-title">Relay overview</div>
-        <button class="btn btn-sm" id="btn-reload-all" onclick="reloadAllRelays()" title="Reload users.json on all relays without restart">⟳ Sync keys</button>
-      </div>
-      <div class="overview-grid" id="overview-grid">
-        <div class="loading">Loading stats…</div>
-      </div>
-    </div>
-
-    <!-- KEYS TAB -->
-    <div class="tab-content" id="tab-keys">
-      <div class="section-header">
-        <div class="section-title">API Keys</div>
-        <button class="btn" onclick="openCreateKeyModal()">+ New key</button>
-      </div>
-      <div class="sector-tabs" id="keys-sector-tabs">
-        <div class="sector-tab active" data-sector="all" onclick="selectKeysSector('all')">All</div>
-        <div class="sector-tab" data-sector="health" onclick="selectKeysSector('health')">Health</div>
-        <div class="sector-tab" data-sector="legal" onclick="selectKeysSector('legal')">Legal</div>
-        <div class="sector-tab" data-sector="finance" onclick="selectKeysSector('finance')">Finance</div>
-        <div class="sector-tab" data-sector="iot" onclick="selectKeysSector('iot')">IoT</div>
-      </div>
-      <div id="keys-table-container">
-        <div class="loading">Loading keys…</div>
-      </div>
-    </div>
+  <main class="main">
+    <div id="tab-overview" class="panel on"></div>
+    <div id="tab-users" class="panel"></div>
+    <div id="tab-audit" class="panel"></div>
+    <div id="tab-billing" class="panel"></div>
+    <div id="tab-relay" class="panel"></div>
   </main>
 </div>
 
-<!-- CREATE KEY MODAL -->
-<div class="modal-overlay" id="modal-create-key">
-  <div class="modal">
-    <h3>Create API Key</h3>
-    <div class="form-group">
-      <label>Sectors</label>
-      <div class="sector-checks">
-        <label class="sector-check"><input type="checkbox" id="ck-all" onchange="toggleAllSectors(this)"><span>All</span></label>
-        <label class="sector-check"><input type="checkbox" class="ck-sector" value="health" checked><span>Health</span></label>
-        <label class="sector-check"><input type="checkbox" class="ck-sector" value="legal" checked><span>Legal</span></label>
-        <label class="sector-check"><input type="checkbox" class="ck-sector" value="finance" checked><span>Finance</span></label>
-        <label class="sector-check"><input type="checkbox" class="ck-sector" value="iot" checked><span>IoT</span></label>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Label (customer name)</label>
-      <input type="text" id="new-key-label" placeholder="e.g. City Hospital">
-    </div>
-    <div class="form-group">
-      <label>Plan</label>
-      <select id="new-key-plan">
-        <option value="pro">Pro</option>
-        <option value="enterprise">Enterprise</option>
-        <option value="community">Community</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Welcome email (optional)</label>
-      <input type="email" id="new-key-email" placeholder="customer@example.com">
-    </div>
-    <div class="key-result" id="new-key-result"></div>
-    <div class="copy-hint" id="new-key-hint" style="display:none">Copy the key — this is the only time it will be shown.</div>
-    <div class="error-msg" id="modal-key-error"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-create-key')">Cancel</button>
-      <button class="btn btn-primary" id="btn-create-key" onclick="createKey()">Create</button>
-    </div>
-  </div>
-</div>
-
-<!-- REVOKE CONFIRM MODAL -->
-<div class="modal-overlay" id="modal-revoke">
-  <div class="modal">
-    <h3>Revoke key</h3>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:16px">
-      Are you sure you want to revoke this key? This cannot be undone.
-    </p>
-    <div id="revoke-key-preview" style="font-size:11px;color:var(--red);word-break:break-all;"></div>
-    <div class="error-msg" id="modal-revoke-error"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-revoke')">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmRevoke()">Revoke</button>
-    </div>
-  </div>
-</div>
-
-<!-- WELCOME MAIL MODAL -->
-<div class="modal-overlay" id="modal-welcome">
-  <div class="modal">
-    <h3>Send welcome email</h3>
-    <div class="form-group">
-      <label>Email address</label>
-      <input type="email" id="welcome-email" placeholder="customer@example.com">
-    </div>
-    <div id="welcome-key-info" style="font-size:11px;color:var(--muted);margin-bottom:8px;"></div>
-    <div class="error-msg" id="modal-welcome-error"></div>
-    <div class="success-msg" id="modal-welcome-success"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('modal-welcome')">Close</button>
-      <button class="btn btn-primary" onclick="sendWelcome()">Send</button>
-    </div>
-  </div>
-</div>
-
 <script>
-// Derive base from current path — works at /admin/ and /admin/index.html
-const BASE = window.location.pathname.split('/').slice(0, -1).join('/');
-const API  = `${BASE}/api`;
+/* ── State ───────────────────────────────────────────────────────────────── */
+let SESSION = sessionStorage.getItem('adm_session') || '';
+let LOADED = {};
+let REFRESH = {};
+let openMenu = null;
 
-let session    = localStorage.getItem('paramant-admin-session') || '';
-let currentKeysSector = 'all';
-let pendingRevoke = null;  // { sector, key }
-let pendingWelcome = null; // { sector, key, label, plan }
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmt(ts){if(!ts)return '—';const d=new Date(ts);return d.toLocaleDateString('nl-NL',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
+function toast(msg,type=''){const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3500)}
+function showErr(msg){const e=document.getElementById('l-err');e.textContent=msg;e.style.display='block'}
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function apiFetch(path, opts = {}) {
-  opts.headers = Object.assign({ 'Content-Type': 'application/json', 'X-Session': session }, opts.headers || {});
-  if (opts.body && typeof opts.body === 'object') opts.body = JSON.stringify(opts.body);
-  const r = await fetch(`${API}${path}`, opts);
-  if (r.status === 401) { logout(); return null; }
-  return r.json();
+async function api(path,opts={}){
+  const r=await fetch('/admin/api'+path,{...opts,headers:{'X-Session':SESSION,'Content-Type':'application/json',...(opts.headers||{})}});
+  const ct=r.headers.get('content-type')||'';
+  const data=ct.includes('json')?await r.json().catch(()=>null):null;
+  return{ok:r.ok,status:r.status,data};
 }
 
-async function checkSession() {
-  if (!session) return false;
-  const r = await fetch(`${API}/auth/check`, { headers: { 'X-Session': session } });
-  return r.ok;
+/* ── Auth ────────────────────────────────────────────────────────────────── */
+async function doLogin(){
+  const token=document.getElementById('l-token').value.trim();
+  const totp=document.getElementById('l-totp').value.replace(/\D/g,'');
+  if(!token){showErr('Admin token required');return}
+  if(totp.length!==6){showErr('TOTP must be 6 digits');return}
+  const btn=document.getElementById('l-btn');
+  btn.disabled=true;btn.textContent='Signing in…';
+  document.getElementById('l-err').style.display='none';
+  const r=await fetch('/admin/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,totp})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.session){
+    showErr(d.error||'Login failed — check token and TOTP');
+    btn.disabled=false;btn.textContent='Sign in';return;
+  }
+  SESSION=d.session;
+  sessionStorage.setItem('adm_session',SESSION);
+  document.getElementById('view-login').style.display='none';
+  document.getElementById('view-dashboard').style.display='flex';
+  const hash=location.hash.replace('#','');
+  switchTab(['overview','users','audit','billing','relay'].includes(hash)?hash:'overview');
 }
 
-async function doLogin() {
-  const token = document.getElementById('login-token').value.trim();
-  const totp  = document.getElementById('login-totp').value.trim();
-  const errEl = document.getElementById('login-error');
-  errEl.style.display = 'none';
-  if (!token || !totp) { showError(errEl, 'Please fill in both fields'); return; }
-  const btn = document.querySelector('#login-screen .btn-primary');
-  btn.textContent = 'Signing in…';
-  btn.disabled = true;
-  try {
-    const r = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, totp }),
-    });
-    const d = await r.json();
-    if (!d.ok) { showError(errEl, d.error || 'Sign-in failed'); return; }
-    session = d.session;
-    localStorage.setItem('paramant-admin-session', session);
-    showApp();
-  } catch (e) {
-    showError(errEl, `Verbindingsfout: ${e.message}`);
-  } finally {
-    btn.textContent = 'Sign in';
-    btn.disabled = false;
+async function doLogout(){
+  await api('/auth/logout',{method:'POST'}).catch(()=>{});
+  SESSION='';sessionStorage.removeItem('adm_session');
+  LOADED={};Object.values(REFRESH).forEach(clearInterval);REFRESH={};
+  document.getElementById('view-dashboard').style.display='none';
+  document.getElementById('view-login').style.display='flex';
+  document.getElementById('l-token').value='';
+  document.getElementById('l-totp').value='';
+}
+
+/* ── Tab switching ───────────────────────────────────────────────────────── */
+function switchTab(tab){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  document.getElementById('tab-'+tab).classList.add('on');
+  location.hash='#'+tab;
+  if(!LOADED[tab]){LOADED[tab]=true;loadTab(tab);}
+}
+
+function loadTab(tab){
+  if(tab==='overview')loadOverview();
+  else if(tab==='users')loadUsers();
+  else if(tab==='audit')loadAudit();
+  else if(tab==='billing')loadBilling();
+  else if(tab==='relay')loadRelay();
+}
+
+/* ── Overview ────────────────────────────────────────────────────────────── */
+async function loadOverview(){
+  const el=document.getElementById('tab-overview');
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading…</div>';
+  const r=await api('/admin/overview');
+  if(!r.ok){el.innerHTML='<div class="empty">Error loading overview</div>';return}
+  const d=r.data;
+  const st=d.stats||{};
+  const dist=d.plan_distribution||{};
+  const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
+  el.innerHTML=
+    '<div class="sg">'+
+      statCard('Signups today',st.signups_today??'—')+
+      statCard('Active sessions',st.active_sessions??'—')+
+      statCard('Pro upgrades today',st.pro_upgrades_today??'—')+
+      statCard('MRR (EUR)','€'+((st.revenue_mrr||0)/100).toFixed(0))+
+    '</div>'+
+    (d.alerts&&d.alerts.length?'<div class="card"><div class="card-hdr">Alerts</div>'+d.alerts.map(a=>'<div class="banner info">'+esc(a)+'</div>').join('')+'</div>':'')+
+    '<div class="g2">'+
+      '<div class="card"><div class="card-hdr">Recent activity <small>last 10 events</small></div>'+
+        '<div class="al">'+
+          (d.recent_activity&&d.recent_activity.length?
+            d.recent_activity.map(e=>'<div class="ai"><span class="t">'+fmt(e.ts).split(' ').slice(-1)[0]+'</span><span class="e">'+esc(e.event_type||'—')+'</span><span class="u">'+esc((e.user_id||'').slice(0,20))+'</span></div>').join(''):
+            '<div class="empty">No events yet</div>')+
+        '</div>'+
+      '</div>'+
+      '<div class="card"><div class="card-hdr">Plan distribution</div>'+
+        planBars(dist,total)+
+      '</div>'+
+    '</div>';
+  clearInterval(REFRESH.overview);
+  REFRESH.overview=setInterval(()=>{LOADED.overview=false;loadOverview();},30000);
+}
+
+function statCard(lbl,val){return '<div class="sc"><div class="sc-lbl">'+lbl+'</div><div class="sc-val">'+esc(val)+'</div></div>'}
+
+function planBars(dist,total){
+  return ['community','pro','enterprise','trial'].map(p=>{
+    const n=dist[p]||0;
+    return '<div class="pb"><span class="pl">'+p+'</span><div class="tr"><div class="fi" style="width:'+(n/total*100).toFixed(1)+'%"></div></div><span class="cn">'+n+'</span></div>';
+  }).join('');
+}
+
+/* ── Users ───────────────────────────────────────────────────────────────── */
+let allUsers=[];
+async function loadUsers(){
+  const el=document.getElementById('tab-users');
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading users…</div>';
+  const r=await api('/admin/users');
+  if(!r.ok){el.innerHTML='<div class="empty">Error loading users</div>';return}
+  allUsers=r.data.users||[];
+  const counts=r.data.counts||{};
+  renderUsers(el,allUsers,counts);
+}
+
+function renderUsers(el,users,counts){
+  el.innerHTML=
+    '<div class="card"><div class="card-hdr">Users <small>'+counts.total+' total · '+counts.active+' active</small>'+
+      '<button class="btn" onclick="showNewKeyModal()">+ New key</button>'+
+    '</div>'+
+    '<div class="fb">'+
+      '<input id="u-search" placeholder="Search email or label…" oninput="filterUsers()" style="width:220px">'+
+      '<select id="u-plan" onchange="filterUsers()"><option value="">All plans</option><option>community</option><option>pro</option><option>enterprise</option><option>trial</option></select>'+
+      '<select id="u-totp" onchange="filterUsers()"><option value="">Any TOTP</option><option value="active">Active</option><option value="pending">Pending</option><option value="none">None</option></select>'+
+      '<select id="u-status" onchange="filterUsers()"><option value="">All status</option><option value="active">Active</option><option value="revoked">Revoked</option></select>'+
+    '</div>'+
+    '<div id="u-table-wrap">'+usersTable(users)+'</div>'+
+    '</div>';
+}
+
+function filterUsers(){
+  const q=(document.getElementById('u-search').value||'').toLowerCase();
+  const plan=document.getElementById('u-plan').value;
+  const totp=document.getElementById('u-totp').value;
+  const status=document.getElementById('u-status').value;
+  let filtered=allUsers;
+  if(q)filtered=filtered.filter(u=>(u.email||'').toLowerCase().includes(q)||(u.label||'').toLowerCase().includes(q));
+  if(plan)filtered=filtered.filter(u=>(u.plan||'community')===plan);
+  if(totp)filtered=filtered.filter(u=>u.totp_status===totp);
+  if(status==='active')filtered=filtered.filter(u=>u.active);
+  else if(status==='revoked')filtered=filtered.filter(u=>!u.active);
+  document.getElementById('u-table-wrap').innerHTML=usersTable(filtered);
+}
+
+function usersTable(users){
+  if(!users.length)return '<div class="empty">No users match filters</div>';
+  return '<table class="tbl"><thead><tr><th>Email / Label</th><th>Plan</th><th>TOTP</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>'+
+    users.map((u,i)=>'<tr>'+
+      '<td><div>'+esc(u.email||'—')+'</div>'+
+        (u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
+      '</td>'+
+      '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
+      '<td><span class="chip '+esc(u.totp_status)+'">'+esc(u.totp_status)+'</span></td>'+
+      '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
+      '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
+      '<td><div class="amw"><button class="amb" onclick="toggleMenu(event,\'menu-u-'+i+'\')">···</button>'+
+        '<div class="am" id="menu-u-'+i+'" data-key="'+esc(u.key)+'" data-email="'+esc(u.email||'')+'" data-label="'+esc(u.label||'')+'" data-plan="'+esc(u.plan||'community')+'">'+
+          '<button onclick="uAction(\"welcome\",this)">Resend welcome email</button>'+
+          '<button onclick="uAction(\"setup\",this)">Send TOTP setup link</button>'+
+          '<div class="sep"></div>'+
+          '<button onclick="uAction(\"plan\",this)">Change plan</button>'+
+          '<button onclick="uAction(\"revoke\",this)" class="danger">Revoke key</button>'+
+        '</div>'+
+      '</div></td>'+
+    '</tr>').join('')+'</tbody></table>';
+}
+
+function toggleMenu(e,id){
+  e.stopPropagation();
+  const m=document.getElementById(id);
+  const wasOpen=m.classList.contains('open');
+  if(openMenu)openMenu.classList.remove('open');
+  if(!wasOpen){m.classList.add('open');openMenu=m;}
+  else openMenu=null;
+}
+document.addEventListener('click',()=>{if(openMenu){openMenu.classList.remove('open');openMenu=null;}});
+
+async function uAction(action,btn){
+  const m=btn.closest('.am');
+  const key=m.dataset.key,email=m.dataset.email,label=m.dataset.label,plan=m.dataset.plan;
+  m.classList.remove('open');openMenu=null;
+  if(action==='welcome'){
+    if(!email){toast('No email on record for this key','err');return}
+    if(!confirm('Resend welcome email to '+email+'?'))return;
+    const r=await api('/sectors/health/keys/welcome',{method:'POST',body:JSON.stringify({key,label,plan,email})});
+    toast(r.ok?'Welcome email sent to '+email:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  }else if(action==='setup'){
+    if(!email){toast('No email on record','err');return}
+    if(!confirm('Send new TOTP setup link to '+email+'?\nThis clears existing TOTP state.'))return;
+    const r=await api('/admin/resend-setup',{method:'POST',body:JSON.stringify({user_id:key,email})});
+    if(r.ok&&r.data?.success)toast('Setup email sent to '+email,'ok');
+    else toast('Failed: '+(r.data?.error||'unknown'),'err');
+  }else if(action==='plan'){
+    const np=prompt('New plan for '+esc(email||key)+' (community/pro/enterprise/trial):');
+    if(!np)return;
+    const r=await api('/admin/relay-detail',{method:'GET'});
+    toast('Plan update requires Stripe integration — not yet wired','err');
+  }else if(action==='revoke'){
+    if(!confirm('Revoke key '+key.slice(0,20)+'…?'))return;
+    const r=await api('/keys/all/revoke',{method:'POST',body:JSON.stringify({key})});
+    toast(r.ok?'Key revoked on all sectors':'Revoke failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+    if(r.ok){LOADED.users=false;loadUsers();}
   }
 }
 
-async function doLogout() {
-  await fetch(`${API}/auth/logout`, { method: 'POST', headers: { 'X-Session': session } }).catch(() => {});
-  logout();
+function showNewKeyModal(){
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,58,106,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px';
+  o.innerHTML='<div style="background:#F8FAFC;border:1.5px solid rgba(11,58,106,.12);padding:28px;max-width:480px;width:100%">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:16px">Create new API key</div>'+
+    '<label class="l-lbl">Label</label><input id="nk-l" class="l-inp" placeholder="acme-corp"><br>'+
+    '<label class="l-lbl">Plan</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="enterprise">enterprise</option><option value="trial">trial</option></select><br>'+
+    '<label class="l-lbl">Email (optional)</label><input id="nk-e" class="l-inp" type="email" placeholder="client@example.com"><br>'+
+    '<div style="display:flex;gap:10px;margin-top:8px">'+
+    '<button onclick="doCreateKey()" class="btn" style="flex:1">Create key</button>'+
+    '<button onclick="this.closest(\'[data-modal]\').remove()" class="btn out">Cancel</button>'+
+    '</div><div id="nk-res" style="margin-top:12px;font-size:12px;font-family:\'IBM Plex Mono\',monospace"></div></div>';
+  o.dataset.modal='1';
+  o.addEventListener('click',e=>{if(e.target===o)o.remove();});
+  document.body.appendChild(o);
 }
 
-function logout() {
-  session = '';
-  localStorage.removeItem('paramant-admin-session');
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('login-totp').value = '';
-}
-
-function showApp() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  const btnReload = document.getElementById('btn-reload-all');
-  if (btnReload) { btnReload.textContent = '⟳ Sync keys'; btnReload.disabled = false; }
-  loadOverview();
-  loadKeys(currentKeysSector);
-  loadLicenseStatus();
-  startAutoRefresh();
-}
-
-async function loadLicenseStatus() {
-  const data = await apiFetch('/license-status');
-  if (!data) return;
-  const badge = document.getElementById('license-badge');
-  // Use health sector as representative
-  const rep = Object.values(data.sectors || {}).find(s => s.ok);
-  if (!rep) return;
-  badge.style.display = 'inline-block';
-  if (rep.edition === 'licensed') {
-    badge.style.background = '#0d1f17';
-    badge.style.borderColor = '#2d8a5c';
-    badge.style.color = '#2d8a5c';
-    const exp = rep.license_expires ? ` · expires ${rep.license_expires}` : '';
-    badge.textContent = `Licensed${exp}`;
-  } else {
-    badge.style.background = '#1a1000';
-    badge.style.borderColor = '#8b6914';
-    badge.style.color = '#c8a520';
-    const used = rep.max_keys != null ? `${rep.max_keys}/5 key limit` : 'Community';
-    badge.textContent = `Community · ${used}`;
+async function doCreateKey(){
+  const label=document.getElementById('nk-l').value.trim();
+  const plan=document.getElementById('nk-p').value;
+  const email=document.getElementById('nk-e').value.trim();
+  if(!label){toast('Label required','err');return}
+  const r=await api('/keys/all',{method:'POST',body:JSON.stringify({label,plan,email})});
+  const res=document.getElementById('nk-res');
+  if(r.ok&&r.data?.created?.length){
+    const key=r.data.created[0]?.key||'(see response)';
+    res.innerHTML='<div style="background:#fff;border:1px solid rgba(11,58,106,.12);padding:12px;word-break:break-all;color:#0B3A6A">'+esc(key)+'</div>'+
+      '<div style="color:#059669;margin-top:6px">Key created. Save it — shown once.</div>';
+    LOADED.users=false;
+  }else{
+    res.innerHTML='<div style="color:#dc2626">Failed: '+esc(r.data?.failed?.[0]?.error||r.data?.error||'unknown')+'</div>';
   }
 }
 
-function showUpgradeBanner() {
-  const el = document.getElementById('upgrade-banner');
-  if (el) el.style.display = 'flex';
+/* ── Audit ───────────────────────────────────────────────────────────────── */
+async function loadAudit(){
+  const el=document.getElementById('tab-audit');
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading audit log…</div>';
+  renderAuditShell(el);
+  fetchAudit();
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-
-function switchTab(tab) {
-  document.querySelectorAll('.nav-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === `tab-${tab}`));
+function renderAuditShell(el){
+  el.innerHTML='<div class="card"><div class="card-hdr">Audit log</div>'+
+    '<div class="fb">'+
+      '<select id="a-event"><option value="">All events</option>'+
+        ['signup','login','logout','setup_totp','activate_totp','revoke_session','plan_changed','delete_account'].map(e=>'<option>'+e+'</option>').join('')+
+      '</select>'+
+      '<input id="a-user" placeholder="User key prefix…" style="width:200px">'+
+      '<select id="a-since"><option value="">All time</option><option value="1">Last hour</option><option value="24">Last 24h</option><option value="168">Last 7d</option></select>'+
+      '<div class="sp"></div>'+
+      '<button class="btn out" onclick="exportAuditCSV()">Export CSV</button>'+
+      '<button class="btn" onclick="fetchAudit()">Refresh</button>'+
+    '</div>'+
+    '<div id="a-results"><div class="empty"><span class="sp-icon"></span>Loading…</div></div>'+
+    '</div>';
 }
 
-// ── Overview ──────────────────────────────────────────────────────────────────
-
-async function loadOverview() {
-  const data = await apiFetch('/overview');
-  if (!data) return;
-  const grid = document.getElementById('overview-grid');
-  grid.innerHTML = '';
-
-  let anyDown = false;
-  for (const [sector, info] of Object.entries(data.sectors || {})) {
-    const m = info.metrics || {};
-    const up = info.ok;
-    if (!up) anyDown = true;
-
-    const uptime = m.paramant_uptime_s != null ? fmtUptime(m.paramant_uptime_s) : '—';
-    const requests = m.paramant_requests_total != null ? fmtNum(m.paramant_requests_total) : '—';
-    const burned   = m.paramant_blobs_burned != null ? fmtNum(m.paramant_blobs_burned) : '—';
-    const inFlight = m.paramant_blobs_in_flight != null ? fmtNum(m.paramant_blobs_in_flight) : '—';
-    const errors   = m.paramant_errors_total != null ? fmtNum(m.paramant_errors_total) : '—';
-    const heap     = m.paramant_heap_bytes != null ? fmtBytes(m.paramant_heap_bytes) : '—';
-    const keys     = m.paramant_pubkeys != null ? fmtNum(m.paramant_pubkeys) : '—';
-
-    const card = document.createElement('div');
-    card.className = 'sector-card';
-    card.innerHTML = `
-      <div class="card-header">
-        <div class="card-title">${esc(sector)}</div>
-        <div class="card-status ${up ? '' : 'down'}">${up ? 'online' : 'offline'}</div>
-      </div>
-      <div class="metrics-grid">
-        <div class="metric-item">
-          <div class="metric-label">Requests</div>
-          <div class="metric-value">${requests}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Burns</div>
-          <div class="metric-value highlight">${burned}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">In flight</div>
-          <div class="metric-value">${inFlight}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Pubkeys</div>
-          <div class="metric-value">${keys}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Errors</div>
-          <div class="metric-value ${errors !== '0' && errors !== '—' ? 'red' : ''}">${errors}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Heap</div>
-          <div class="metric-value">${heap}</div>
-        </div>
-        <div class="metric-item" style="grid-column:span 2">
-          <div class="metric-label">Uptime</div>
-          <div class="metric-value" style="font-size:13px">${uptime}</div>
-        </div>
-      </div>`;
-    grid.appendChild(card);
-  }
-
-  const dot  = document.getElementById('relay-status-dot');
-  const txt  = document.getElementById('relay-status-text');
-  dot.className  = `status-dot${anyDown ? ' red' : ''}`;
-  txt.textContent = anyDown ? 'Sector offline' : 'All sectors online';
+async function fetchAudit(){
+  const event=document.getElementById('a-event')?.value||'';
+  const user=document.getElementById('a-user')?.value||'';
+  const hours=parseInt(document.getElementById('a-since')?.value||0);
+  const params=new URLSearchParams();
+  if(event)params.set('event',event);
+  if(user)params.set('user',user);
+  if(hours)params.set('since',new Date(Date.now()-hours*3600000).toISOString());
+  const r=await api('/admin/audit?'+params);
+  const el=document.getElementById('a-results');
+  if(!el)return;
+  if(!r.ok){el.innerHTML='<div class="empty">Error loading audit log</div>';return}
+  const events=r.data.events||[];
+  if(!events.length){el.innerHTML='<div class="empty">No audit events match filters</div>';return}
+  el.innerHTML='<table class="tbl"><thead><tr><th>Timestamp</th><th>Event</th><th>User</th><th>Details</th></tr></thead><tbody>'+
+    events.map(e=>'<tr>'+
+      '<td class="mono" style="font-size:11px;white-space:nowrap">'+esc(e.ts?new Date(e.ts).toISOString().replace('T',' ').slice(0,19):'—')+'</td>'+
+      '<td><span class="chip active">'+esc(e.event_type||'—')+'</span></td>'+
+      '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,20))+'</td>'+
+      '<td><details><summary style="cursor:pointer;font-size:11px;color:#475569">show</summary><pre style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;margin-top:4px;color:#0B3A6A;white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
+    '</tr>').join('')+'</tbody></table>';
 }
 
-// ── Keys ──────────────────────────────────────────────────────────────────────
-
-function selectKeysSector(sector) {
-  currentKeysSector = sector;
-  document.querySelectorAll('.sector-tab').forEach(el => el.classList.toggle('active', el.dataset.sector === sector));
-  loadKeys(sector);
-}
-
-function renderKeysTable(rows, container) {
-  // rows: [{sector, key, label, plan, active, email}]
-  const showSector = rows.some(r => r.sector);
-  container.innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          ${showSector ? '<th>Sector</th>' : ''}
-          <th>Key</th>
-          <th>Label</th>
-          <th>Plan</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.map(k => `
-          <tr>
-            ${showSector ? `<td style="color:var(--muted2);font-size:11px">${esc(k.sector||'')}</td>` : ''}
-            <td><div class="key-value" title="${esc(k.key)}">${esc(k.key.slice(0,20))}…</div></td>
-            <td style="color:var(--muted2);font-size:12px">${esc(k.label || '—')}</td>
-            <td><span class="badge badge-${esc(k.plan)}">${esc(k.plan)}</span></td>
-            <td><span class="badge ${k.active ? 'badge-active' : 'badge-revoked'}">${k.active ? 'active' : 'revoked'}</span></td>
-            <td>
-              <div class="actions">
-                ${k.active ? `<button class="btn btn-sm btn-danger" data-action="revoke" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}">Revoke</button>` : ''}
-                <button class="btn btn-sm" data-action="welcome" data-sector="${esc(k.sector||currentKeysSector)}" data-key="${esc(k.key)}" data-label="${esc(k.label||'')}" data-plan="${esc(k.plan)}">Mail</button>
-              </div>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
-  container.onclick = function(e) {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const {action, sector, key, label, plan} = btn.dataset;
-    if (action === 'revoke') revokeKey(sector, key);
-    else if (action === 'welcome') openWelcomeModal(sector, key, label, plan);
-  };
-}
-
-async function loadKeys(sector) {
-  const container = document.getElementById('keys-table-container');
-  container.innerHTML = '<div class="loading">Loading…</div>';
-
-  if (sector === 'all') {
-    const data = await apiFetch('/keys/all');
-    if (!data || !data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">Failed to load</div>`; return; }
-    // Dedupliceer: één rij per unieke key+label+plan combinatie, maar toon welke sectoren
-    const keyMap = new Map();
-    for (const [sec, keys] of Object.entries(data.sectors || {})) {
-      for (const k of (keys || [])) {
-        if (keyMap.has(k.key)) {
-          keyMap.get(k.key).sectors.push(sec);
-        } else {
-          keyMap.set(k.key, { ...k, sector: 'all', sectors: [sec] });
-        }
-      }
-    }
-    const rows = [...keyMap.values()].map(k => ({
-      ...k,
-      sector: k.sectors.join(', '),
-    }));
-    if (!rows.length) { container.innerHTML = '<div class="empty-state">No keys found</div>'; return; }
-    renderKeysTable(rows, container);
-    return;
-  }
-
-  const data = await apiFetch(`/sectors/${sector}/keys`);
-  if (!data) return;
-  if (!data.ok) { container.innerHTML = `<div class="loading" style="color:var(--red)">${esc(data.error||'Error')}</div>`; return; }
-  const keys = (data.keys || []).map(k => ({ ...k, sector }));
-  if (!keys.length) { container.innerHTML = '<div class="empty-state">No keys for this sector</div>'; return; }
-  renderKeysTable(keys, container);
-}
-
-// ── Create key ────────────────────────────────────────────────────────────────
-
-function getSelectedSectors() {
-  return [...document.querySelectorAll('.ck-sector:checked')].map(el => el.value);
-}
-
-function toggleAllSectors(cb) {
-  document.querySelectorAll('.ck-sector').forEach(el => el.checked = cb.checked);
-}
-
-function syncAllCheckbox() {
-  const all = document.querySelectorAll('.ck-sector');
-  const checked = document.querySelectorAll('.ck-sector:checked');
-  document.getElementById('ck-all').checked = all.length === checked.length;
-}
-
-function openCreateKeyModal() {
-  document.getElementById('new-key-label').value = '';
-  document.getElementById('new-key-email').value = '';
-  document.getElementById('new-key-result').style.display = 'none';
-  document.getElementById('new-key-hint').style.display = 'none';
-  document.getElementById('modal-key-error').style.display = 'none';
-  document.getElementById('btn-create-key').style.display = 'inline-flex';
-  const preselect = currentKeysSector === 'all' ? ['health','legal','finance','iot'] : [currentKeysSector];
-  document.querySelectorAll('.ck-sector').forEach(el => el.checked = preselect.includes(el.value));
-  document.getElementById('ck-all').checked = preselect.length === 4;
-  document.querySelectorAll('.ck-sector').forEach(el => el.addEventListener('change', syncAllCheckbox));
-  openModal('modal-create-key');
-}
-
-async function createKey() {
-  const sectors = getSelectedSectors();
-  const label   = document.getElementById('new-key-label').value.trim();
-  const plan    = document.getElementById('new-key-plan').value;
-  const email   = document.getElementById('new-key-email').value.trim();
-  const errEl   = document.getElementById('modal-key-error');
-  errEl.style.display = 'none';
-
-  if (!sectors.length) { showError(errEl, 'Select at least one sector'); return; }
-
-  const btn = document.getElementById('btn-create-key');
-  btn.textContent = 'Creating…'; btn.disabled = true;
-  try {
-    const resultEl = document.getElementById('new-key-result');
-    let firstKey = null;
-
-    if (sectors.length === 4) {
-      const data = await apiFetch('/keys/all', { method: 'POST', body: { label, plan, email: email || undefined } });
-      if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
-      if (data.upgradeRequired) { showError(errEl, data.failed?.[0]?.error || 'License limit reached'); showUpgradeBanner(); return; }
-      if (!data.created?.length) { showError(errEl, 'Failed to create on sectors'); return; }
-      firstKey = data.created[0]?.key;
-      resultEl.textContent = firstKey;
-      if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
-    } else if (sectors.length === 1) {
-      const data = await apiFetch(`/sectors/${sectors[0]}/keys`, { method: 'POST', body: { label, plan, email: email || undefined } });
-      if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
-      if (!data.ok && data.upgrade_url) { showError(errEl, data.error || 'License limit reached'); showUpgradeBanner(); return; }
-      if (!data.ok) { showError(errEl, data?.error || 'Failed'); return; }
-      firstKey = data.key;
-      resultEl.textContent = data.key;
-    } else {
-      const data = await apiFetch('/keys/sectors', { method: 'POST', body: { sectors, label, plan, email: email || undefined } });
-      if (data === null) { showError(errEl, 'Session expired — please sign in again'); return; }
-      if (data.upgradeRequired) { showError(errEl, data.failed?.[0]?.error || 'License limit reached'); showUpgradeBanner(); return; }
-      if (!data.created?.length) { showError(errEl, 'Failed to create on selected sectors'); return; }
-      firstKey = data.created[0]?.key;
-      resultEl.textContent = firstKey;
-      if (data.failed?.length) resultEl.textContent += `\nFailed: ${data.failed.map(f=>`${f.sector} (${f.error})`).join(', ')}`;
-    }
-
-    resultEl.style.display = 'block';
-    document.getElementById('new-key-hint').style.display = 'block';
-    btn.style.display = 'none';
-
-    if (email && firstKey) {
-      await apiFetch(`/sectors/${sectors[0]}/keys/welcome`, {
-        method: 'POST', body: { email, key: firstKey, plan, label },
-      });
-    }
-    currentKeysSector = sectors.length > 1 ? 'all' : sectors[0];
-    loadKeys(currentKeysSector);
-  } catch (e) {
-    showError(errEl, e.message);
-  } finally {
-    btn.textContent = 'Create'; btn.disabled = false;
-  }
-}
-
-// ── Revoke key ────────────────────────────────────────────────────────────────
-
-function revokeKey(sector, key) {
-  pendingRevoke = { sector, key };
-  document.getElementById('revoke-key-preview').textContent = key;
-  document.getElementById('modal-revoke-error').style.display = 'none';
-  openModal('modal-revoke');
-}
-
-async function confirmRevoke() {
-  if (!pendingRevoke) return;
-  const errEl = document.getElementById('modal-revoke-error');
-  errEl.style.display = 'none';
-  // sector bevat bijv. "health, legal, finance, iot" bij all-view — revoke op alle
-  const sectorStr = pendingRevoke.sector || 'health';
-  const isMulti = sectorStr.includes(',') || sectorStr === 'all';
-  let data;
-  if (isMulti) {
-    data = await apiFetch('/keys/all/revoke', { method: 'POST', body: { key: pendingRevoke.key } });
-  } else {
-    data = await apiFetch(`/sectors/${sectorStr}/keys/revoke`, { method: 'POST', body: { key: pendingRevoke.key } });
-  }
-  if (!data || !data.ok) { showError(errEl, data?.error || 'Failed'); return; }
-  closeModal('modal-revoke');
-  loadKeys(currentKeysSector);
-  pendingRevoke = null;
-}
-
-// ── Welcome mail ──────────────────────────────────────────────────────────────
-
-function openWelcomeModal(sector, key, label, plan) {
-  pendingWelcome = { sector, key, label, plan };
-  document.getElementById('welcome-email').value = '';
-  document.getElementById('welcome-key-info').textContent = `Key: ${key.slice(0,20)}… (${label || 'no label'})`;
-  document.getElementById('modal-welcome-error').style.display = 'none';
-  document.getElementById('modal-welcome-success').style.display = 'none';
-  openModal('modal-welcome');
-}
-
-async function sendWelcome() {
-  if (!pendingWelcome) return;
-  const email = document.getElementById('welcome-email').value.trim();
-  const errEl = document.getElementById('modal-welcome-error');
-  const okEl  = document.getElementById('modal-welcome-success');
-  errEl.style.display = 'none'; okEl.style.display = 'none';
-  if (!email) { showError(errEl, 'Email address required'); return; }
-  const welcomeSector = pendingWelcome.sector.split(',')[0].trim();
-  const data = await apiFetch(`/sectors/${welcomeSector}/keys/welcome`, {
-    method: 'POST',
-    body: { email, key: pendingWelcome.key, plan: pendingWelcome.plan, label: pendingWelcome.label },
+function exportAuditCSV(){
+  const rows=document.querySelectorAll('#a-results tr');
+  if(!rows.length)return;
+  let csv='timestamp,event,user_id,metadata\n';
+  rows.forEach(r=>{
+    const cells=r.querySelectorAll('td');
+    if(cells.length)csv+=[cells[0],cells[1],cells[2],''].map((c,i)=>'"'+(c?.textContent?.trim()||'').replace(/"/g,'""')+'"').join(',')+'\n';
   });
-  if (!data || !data.ok) { showError(errEl, data?.error || 'Failed to send'); return; }
-  okEl.textContent = `Email sent to ${email}`;
-  okEl.style.display = 'block';
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='paramant-audit-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
 }
 
-// ── Reload all relays (zero-downtime key sync) ────────────────────────────────
+/* ── Billing ─────────────────────────────────────────────────────────────── */
+async function loadBilling(){
+  const el=document.getElementById('tab-billing');
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading…</div>';
+  const r=await api('/admin/billing');
+  if(!r.ok){el.innerHTML='<div class="empty">Error loading billing</div>';return}
+  const d=r.data;
+  const dist=d.plan_distribution||{};
+  const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
+  el.innerHTML=
+    '<div class="banner stub">Payment integration pending — all figures reflect stub state. Stripe connection required to show real MRR and churn data.</div>'+
+    '<div class="sg" style="grid-template-columns:repeat(3,1fr)">'+
+      statCard('MRR (EUR)','€'+((d.mrr_eur||0)/100).toFixed(0))+
+      statCard('Total customers',d.total_customers||0)+
+      statCard('Churn this month',d.churn_this_month||0)+
+    '</div>'+
+    '<div class="g2">'+
+      '<div class="card"><div class="card-hdr">Plan distribution</div>'+planBars(dist,total)+'</div>'+
+      '<div class="card"><div class="card-hdr">Recent plan changes <small>'+( d.recent_checkouts?.length||0)+' events</small></div>'+
+        (d.recent_checkouts&&d.recent_checkouts.length?
+          '<table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead><tbody>'+
+          d.recent_checkouts.map(e=>'<tr>'+
+            '<td class="mono" style="font-size:11px">'+esc(e.ts?new Date(e.ts).toISOString().slice(0,10):'—')+'</td>'+
+            '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,16))+'</td>'+
+            '<td>'+esc(e.event_type||'—')+'</td>'+
+          '</tr>').join('')+'</tbody></table>':
+          '<div class="empty">No plan changes recorded yet</div>')+
+      '</div>'+
+    '</div>';
+}
 
-async function reloadAllRelays() {
-  const btn = document.getElementById('btn-reload-all');
-  btn.textContent = '⟳ Syncing…'; btn.disabled = true;
-  try {
-    const data = await apiFetch('/reload-all', { method: 'POST', body: {} });
-    if (!data) {
-      // 401 — session expired, logout() already called by apiFetch. Reset button so it
-      // works correctly after the user logs back in.
-      btn.textContent = '⟳ Sync keys'; btn.disabled = false; return;
+/* ── Relay ───────────────────────────────────────────────────────────────── */
+async function loadRelay(){
+  const el=document.getElementById('tab-relay');
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading relay data…</div>';
+  renderRelayShell(el);
+  fetchRelay();
+  clearInterval(REFRESH.relay);
+  REFRESH.relay=setInterval(fetchRelay,10000);
+}
+
+function renderRelayShell(el){
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#475569">Relay health — auto-refreshes every 10s</div>'+
+      '<button class="btn out" onclick="fetchRelay()">Refresh now</button>'+
+    '</div>'+
+    '<div id="r-strip" class="rs"><div class="ri loading"><div class="ri-name">health</div><div class="ri-det">loading…</div></div><div class="ri loading"><div class="ri-name">legal</div><div class="ri-det">loading…</div></div><div class="ri loading"><div class="ri-name">finance</div><div class="ri-det">loading…</div></div><div class="ri loading"><div class="ri-name">iot</div><div class="ri-det">loading…</div></div></div>'+
+    '<div id="r-cards" class="g2"></div>';
+}
+
+async function fetchRelay(){
+  const r=await api('/admin/relay-detail');
+  if(!r.ok)return;
+  const sectors=r.data.sectors||{};
+  const strip=document.getElementById('r-strip');
+  if(strip)strip.innerHTML=Object.entries(sectors).map(([name,s])=>{
+    const ok=!s.error;
+    return '<div class="ri'+(ok?'':' offline')+'">'+
+      '<div class="ri-name">'+esc(name)+'</div>'+
+      '<div class="ri-det">'+(ok?'v'+esc(s.version||'?')+' · up '+Math.floor((s.uptime_s||0)/3600)+'h':esc(s.error))+'</div>'+
+    '</div>';
+  }).join('');
+  const cards=document.getElementById('r-cards');
+  if(cards)cards.innerHTML=Object.entries(sectors).map(([name,s])=>{
+    if(s.error)return '<div class="card"><div class="card-hdr">'+esc(name)+' <small style="color:#dc2626">offline</small></div><div class="empty">'+esc(s.error)+'</div></div>';
+    const st=s.stats||{};
+    return '<div class="card"><div class="card-hdr">'+esc(name)+' relay<small>v'+esc(s.version||'?')+'</small></div>'+
+      '<table class="tbl"><tbody>'+
+        [['Uptime',Math.floor((s.uptime_s||0)/3600)+'h '+Math.floor(((s.uptime_s||0)%3600)/60)+'m'],
+         ['Protocol',s.protocol||'—'],
+         ['Blobs in flight',s.blobs||0],
+         ['Inbound processed',st.inbound||0],
+         ['Burned',st.burned||0],
+         ['Webhooks sent',st.webhooks_sent||0],
+        ].map(([k,v])=>'<tr><td style="color:#475569;font-size:12px">'+esc(k)+'</td><td class="mono">'+esc(v)+'</td></tr>').join('')+
+      '</tbody></table></div>';
+  }).join('');
+}
+
+/* ── Init ────────────────────────────────────────────────────────────────── */
+document.getElementById('l-totp').addEventListener('input',function(){this.value=this.value.replace(/\D/g,'')});
+document.getElementById('l-token').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-totp').focus()});
+document.getElementById('l-totp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+if(SESSION){
+  api('/auth/check').then(r=>{
+    if(r.ok){
+      document.getElementById('view-login').style.display='none';
+      document.getElementById('view-dashboard').style.display='flex';
+      const hash=location.hash.replace('#','');
+      switchTab(['overview','users','audit','billing','relay'].includes(hash)?hash:'overview');
+    }else{
+      SESSION='';sessionStorage.removeItem('adm_session');
     }
-    const anyFailed = Object.values(data.results || {}).some(r => !r.ok);
-    const counts = Object.entries(data.results || {})
-      .map(([s, r]) => `${s}:${r.ok ? (r.loaded ?? '✓') : '✗'}`).join(' ');
-    if (anyFailed) {
-      btn.textContent = `✗ Partial (${counts})`;
-      setTimeout(() => { btn.textContent = '⟳ Sync keys'; btn.disabled = false; }, 4000);
-    } else {
-      btn.textContent = `✓ Synced (${counts})`;
-      setTimeout(() => { btn.textContent = '⟳ Sync keys'; btn.disabled = false; }, 3000);
-    }
-    loadOverview();
-  } catch(e) {
-    btn.textContent = '✗ Error'; btn.disabled = false;
-  }
+  }).catch(()=>{SESSION='';sessionStorage.removeItem('adm_session');});
 }
-
-// ── Auto refresh ──────────────────────────────────────────────────────────────
-
-let refreshTimer = null;
-function startAutoRefresh() {
-  clearInterval(refreshTimer);
-  refreshTimer = setInterval(() => {
-    if (document.getElementById('tab-overview').classList.contains('active')) {
-      loadOverview();
-    }
-  }, 30_000);
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function openModal(id)  { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-function showError(el, msg) { el.textContent = msg; el.style.display = 'block'; }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function fmtNum(n) {
-  if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000) return (n/1_000).toFixed(1) + 'K';
-  return String(Math.round(n));
-}
-function fmtBytes(b) {
-  if (b >= 1073741824) return (b/1073741824).toFixed(1) + 'GB';
-  if (b >= 1048576)    return (b/1048576).toFixed(1) + 'MB';
-  if (b >= 1024)       return (b/1024).toFixed(0) + 'KB';
-  return b + 'B';
-}
-function fmtUptime(s) {
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}u`;
-  if (h > 0) return `${h}u ${m}m`;
-  return `${m}m`;
-}
-
-// Close modals on overlay click
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeModal(overlay.id);
-  });
-});
-
-// Enter key on login fields
-document.getElementById('login-totp').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-(async () => {
-  if (session && await checkSession()) {
-    showApp();
-  } else {
-    session = '';
-    localStorage.removeItem('paramant-admin-session');
-  }
-})();
 </script>
 </body>
 </html>
