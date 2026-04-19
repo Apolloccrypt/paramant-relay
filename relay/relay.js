@@ -3228,6 +3228,26 @@ session = client.create_session('recipient@example.com')</pre>
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── POST /v2/admin/keys/update-plan (internal) ────────────────────────────
+  if (path === '/v2/admin/keys/update-plan' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const { key, plan } = d;
+      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'licensed', 'enterprise']);
+      if (!key || !VALID_PLANS.has(plan)) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
+      if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      apiKeys.get(key).plan = plan;
+      _mutateUsersJson(ud => {
+        const entry = ud.api_keys.find(k => k.key === key);
+        if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
+        ud.updated = new Date().toISOString();
+      }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
+      log('info', 'plan_updated_via_internal', { key: key.slice(0, 16), plan });
+      res.writeHead(200); return res.end(J({ ok: true, key, plan }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
   if (path === '/v2/admin/send-welcome' && req.method === 'POST') {
     try {

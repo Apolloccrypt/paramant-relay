@@ -4,6 +4,7 @@ const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
 const { initRedis, redis } = require('./lib/redis');
+const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -801,6 +802,201 @@ api.post("/drop/upload", async (req, res) => {
   }
   const anonRes = await relayFetch("health", "/v2/anon-inbound", "POST", req.body, false, "");
   res.status(anonRes.status).json(anonRes.body);
+});
+
+
+// ── Billing ───────────────────────────────────────────────────────────────────
+
+const PLANS = [
+  {
+    id: 'community',
+    name: 'Community',
+    price_monthly_eur: 0,
+    price_yearly_eur: 0,
+    limits: { file_size_mb: 5, link_ttl_hours: 1, reads_per_link: 1, registered_devices: 5 },
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price_monthly_eur: 9,
+    price_yearly_eur: 89,
+    limits: { file_size_mb: 5, link_ttl_hours: 24, reads_per_link: 10, registered_devices: 50 },
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price_monthly_eur: null,
+    price_yearly_eur: null,
+    limits: { file_size_mb: null, link_ttl_hours: 168, reads_per_link: 100, registered_devices: null },
+  },
+];
+
+async function sendBillingConfirmation(email, plan, amount, period) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  const planName = PLANS.find(p => p.id === plan)?.name || plan;
+  const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Paramant <noreply@paramant.app>',
+      to: [email],
+      subject: `Paramant plan upgraded to ${planName}`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Plan upgraded to ${planName}</h2><p style="color:#475569;margin:0 0 16px">Your Paramant plan has been upgraded. Here are the details:</p><table style="width:100%;border-collapse:collapse;margin-bottom:24px"><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px">Plan</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:600;text-align:right">${planName}</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px">Billing period</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:600;text-align:right">${period === 'yearly' ? 'Yearly' : 'Monthly'}</td></tr><tr><td style="padding:10px 0;color:#64748b;font-size:14px">Amount</td><td style="padding:10px 0;font-weight:700;color:#1d4ed8;text-align:right">${amountStr}</td></tr></table><p style="color:#94a3b8;font-size:12px;margin-top:24px">Note: This is a stub confirmation. No real payment was charged. Stripe integration pending.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app</p></div></body></html>`,
+      text: `Your Paramant plan has been upgraded to ${planName} (${period}). Amount: ${amountStr}. Note: stub checkout — no real charge.`,
+    }),
+  });
+}
+
+async function sendCancellationScheduled(email, plan, cancelAt) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  const planName = PLANS.find(p => p.id === plan)?.name || plan;
+  const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Paramant <noreply@paramant.app>',
+      to: [email],
+      subject: `Your Paramant plan cancellation is scheduled`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Cancellation scheduled</h2><p style="color:#475569;margin:0 0 16px">Your ${planName} plan cancellation has been scheduled. Your plan will downgrade to Community on <strong>${cancelDate}</strong>.</p><p style="color:#475569;margin:0 0 16px">You can continue using all ${planName} features until that date.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app</p></div></body></html>`,
+      text: `Your ${planName} plan cancellation is scheduled for ${cancelDate}. You retain access until then.`,
+    }),
+  });
+}
+
+api.get("/user/billing/plans", (req, res) => {
+  res.json({ plans: PLANS });
+});
+
+api.post("/user/billing/checkout", authUser, async (req, res) => {
+  const { plan_id, period } = req.body || {};
+  if (!plan_id || !['monthly', 'yearly'].includes(period)) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+  const plan = PLANS.find(p => p.id === plan_id);
+  if (!plan || plan.id === 'community') return res.status(400).json({ error: 'invalid_plan' });
+  if (plan.price_monthly_eur === null) return res.status(400).json({ error: 'enterprise_contact_sales' });
+
+  const amount = period === 'yearly' ? plan.price_yearly_eur : plan.price_monthly_eur;
+  const token = crypto.randomBytes(20).toString('hex');
+  const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+
+  await redis().set(
+    `paramant:user:checkout:${token}`,
+    JSON.stringify({
+      user_id: req.userSession.user_id,
+      email: req.userSession.email,
+      plan_id,
+      plan_name: plan.name,
+      period,
+      amount_eur: amount,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    }),
+    { EX: 3600 }
+  );
+
+  // PLACEHOLDER: replace this block with stripe.checkout.sessions.create() when integrating Stripe
+  res.json({ checkout_url: `/billing/checkout/${token}`, expires_at: expiresAt });
+});
+
+api.get("/user/billing/checkout/:token", authUser, async (req, res) => {
+  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
+  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
+  const s = JSON.parse(raw);
+  if (s.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
+  res.json({ plan_id: s.plan_id, plan_name: s.plan_name, period: s.period, amount_eur: s.amount_eur, email: s.email, status: s.status });
+});
+
+api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => {
+  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
+  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
+  const session = JSON.parse(raw);
+  if (session.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
+  if (session.status !== 'pending') return res.status(409).json({ error: 'already_processed' });
+
+  // Get current plan for audit log
+  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const currentKey = (keysRes.body?.keys || []).find(k => k.key === session.user_id);
+  const fromPlan = currentKey?.plan || 'community';
+
+  // PLACEHOLDER: replace with stripe.webhooks.constructEvent() verification when integrating Stripe
+  const updateRes = await callRelay("/v2/admin/keys/update-plan", { key: session.user_id, plan: session.plan_id });
+  if (!updateRes.ok) {
+    console.error('[billing] update-plan failed:', updateRes.status);
+    return res.status(502).json({ error: 'plan_update_failed' });
+  }
+
+  // Reload all relay sectors so in-memory maps stay consistent
+  await Promise.allSettled(Object.keys(SECTORS).map(s =>
+    relayFetch(s, "/v2/reload-users", "POST", {}, false, ADMIN_TOKEN)
+  ));
+
+  const now = new Date().toISOString();
+  const nextBilling = session.period === 'yearly'
+    ? new Date(Date.now() + 365 * 86_400_000).toISOString()
+    : new Date(Date.now() + 30 * 86_400_000).toISOString();
+
+  await redis().set(
+    `paramant:user:billing:${session.user_id}`,
+    JSON.stringify({ plan: session.plan_id, period: session.period, amount_eur: session.amount_eur, activated_at: now, next_billing_date: nextBilling })
+  );
+
+  await logAuditEvent(session.user_id, 'plan_changed', {
+    from: fromPlan, to: session.plan_id, period: session.period, amount_eur: session.amount_eur, via: 'stub_checkout',
+  });
+
+  await redis().set(
+    `paramant:user:checkout:${req.params.token}`,
+    JSON.stringify({ ...session, status: 'completed', completed_at: now }),
+    { EX: 3600 }
+  );
+
+  try { await sendBillingConfirmation(session.email, session.plan_id, session.amount_eur, session.period); }
+  catch (err) { console.error('[billing] confirmation email failed:', err.message); }
+
+  res.json({ success: true, new_plan: session.plan_id, effective_from: now });
+});
+
+api.post("/user/billing/cancel", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;
+  const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
+  const billing = billingRaw ? JSON.parse(billingRaw) : null;
+  const cancelAt = billing?.next_billing_date || new Date(Date.now() + 30 * 86_400_000).toISOString();
+  await redis().set(`paramant:user:plan_cancel_at:${user_id}`, cancelAt);
+  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: billing?.plan || 'pro', via: 'user_request' });
+  try { await sendCancellationScheduled(email, billing?.plan || 'pro', cancelAt); }
+  catch (err) { console.error('[billing] cancel email failed:', err.message); }
+  res.json({ scheduled_downgrade_at: cancelAt });
+});
+
+api.get("/user/billing/status", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
+  const billing = billingRaw ? JSON.parse(billingRaw) : null;
+  const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
+  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  res.json({
+    current_plan: currentKey?.plan || 'community',
+    period: billing?.period || null,
+    amount_eur: billing?.amount_eur ?? 0,
+    next_billing_date: billing?.next_billing_date || null,
+    cancellation_scheduled_at: cancelAt || null,
+    stub_notice: 'Payment integration pending. No real charges apply.',
+  });
+});
+
+api.get("/user/billing/history", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const events = await getAuditEvents(user_id, {
+    limit: 10,
+    event_types: ['plan_changed', 'plan_cancellation_scheduled', 'plan_downgraded'],
+  });
+  res.json({ history: events });
 });
 
 app.use(`${BASE_PATH}/api`, api);

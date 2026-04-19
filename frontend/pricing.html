@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing — PARAMANT</title>
 <meta name="description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only, no account. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
-<link rel="stylesheet" href="/design-system.css?v=5">
+<link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
 <style>
 .tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair)}
@@ -253,7 +253,11 @@
           <li class="dim">Email notifications via Resend</li>
           <li class="dim">No IP rate limit</li>
         </ul>
-        <a href="mailto:privacy@paramant.app?subject=Pro+waitlist" class="btn btn-secondary" style="display:block;text-align:center">Get notified &rarr;</a>
+        <a href="#" id="upgrade-pro-monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Upgrade to Pro &rarr;</a>
+        <a href="#" id="upgrade-pro-yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Yearly — €89/yr (save €19) &rarr;</a>
+        <p id="pro-login-note" style="font-size:11px;color:var(--ink-dim);text-align:center;margin-top:8px;display:none">
+          <a href="/auth/login?return=/pricing" style="color:var(--cobalt)">Sign in</a> to upgrade
+        </p>
       </div>
 
       <div class="tier-card">
@@ -433,5 +437,55 @@
 </footer>
 
 <script src="/nav.js?v=5" defer></script>
+<script>
+(function() {
+  async function initUpgrade() {
+    let session = null;
+    try {
+      const r = await fetch('/api/user/session/verify', { credentials: 'include' });
+      if (r.ok) session = await r.json();
+    } catch(e) {}
+
+    function doUpgrade(period) {
+      return async function(e) {
+        e.preventDefault();
+        if (!session || !session.authenticated) {
+          window.location = '/auth/login?return=/pricing';
+          return;
+        }
+        try {
+          const r = await fetch('/api/user/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ plan_id: 'pro', period }),
+          });
+          if (r.ok) {
+            const d = await r.json();
+            window.location = d.checkout_url;
+          } else {
+            alert('Could not start checkout. Please try again.');
+          }
+        } catch(e) {
+          alert('Network error. Please try again.');
+        }
+      };
+    }
+
+    const btnM = document.getElementById('upgrade-pro-monthly');
+    const btnY = document.getElementById('upgrade-pro-yearly');
+    const note = document.getElementById('pro-login-note');
+    if (session && session.authenticated) {
+      if (btnM) btnM.addEventListener('click', doUpgrade('monthly'));
+      if (btnY) btnY.addEventListener('click', doUpgrade('yearly'));
+    } else {
+      if (note) note.style.display = 'block';
+      if (btnM) { btnM.href = '/auth/login?return=/pricing'; btnM.removeAttribute('id'); }
+      if (btnY) { btnY.href = '/auth/login?return=/pricing'; btnY.removeAttribute('id'); }
+    }
+  }
+  initUpgrade();
+})();
+</script>
 </body>
 </html>
