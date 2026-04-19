@@ -25,6 +25,8 @@ const https  = require('https');
 const fs     = require('fs');
 const path   = require('path');
 const url_   = require('url');
+const { createClient } = require('redis');
+const userTotp      = require('./lib/user-totp');
 
 const VERSION    = '2.4.5';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -1595,6 +1597,157 @@ const server = http.createServer(async (req, res) => {
         : 'rolling_out_q2_2026',
       capabilities_version: 1,
     }));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // User TOTP endpoints (internal — X-Internal-Auth only)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  function _internalOk() {
+    const tok = process.env.INTERNAL_AUTH_TOKEN;
+    return tok && req.headers["x-internal-auth"] === tok;
+  }
+  function _internalReject() {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(J({ error: "unauthorized" }));
+  }
+
+  // POST /v2/user/setup-totp
+  if (req.method === "POST" && path === "/v2/user/setup-totp") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, provisional } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const existing = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (existing) {
+        // Idempotent: if provisional (not yet activated), return existing secret
+        const activeVal = await redisClient.get(`paramant:user:totp_active:${user_id}`);
+        if (activeVal === "true") {
+          res.writeHead(409); return res.end(J({ error: "totp_already_configured" }));
+        }
+        const bpRaw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
+        const backup_codes = bpRaw ? JSON.parse(bpRaw) : [];
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(J({ secret: existing, backup_codes }));
+      }
+      const secret = userTotp.generateTotpSecret();
+      await userTotp.storeUserTotpSecret(redisClient, user_id, secret);
+      const activeKey = `paramant:user:totp_active:${user_id}`;
+      if (provisional) {
+        await redisClient.set(activeKey, "false", { EX: 14 * 86400 });
+      } else {
+        await redisClient.set(activeKey, "true");
+      }
+      const backupCodes = userTotp.generateBackupCodes();
+      await userTotp.storeBackupCodes(redisClient, user_id, backupCodes);
+      if (provisional) {
+        await redisClient.set(
+          `paramant:user:backup_codes_plaintext:${user_id}`,
+          JSON.stringify(backupCodes),
+          { EX: 14 * 86400 }
+        );
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ secret, backup_codes: backupCodes }));
+    } catch (err) {
+      console.error("[user/setup-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/verify-totp
+  if (req.method === "POST" && path === "/v2/user/verify-totp") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
+      const result = await verifyTotpGeneric(totp, secret, {
+        algorithm: "sha1", window: 1,
+        replayKey: `paramant:user:replay:${user_id}`,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J(result));
+    } catch (err) {
+      console.error("[user/verify-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/activate-totp
+  if (req.method === "POST" && path === "/v2/user/activate-totp") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
+    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ success: true }));
+  }
+
+  // POST /v2/user/consume-backup
+  if (req.method === "POST" && path === "/v2/user/consume-backup") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
+    const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J(result));
+  }
+
+  // POST /v2/user/regenerate-backup
+  if (req.method === "POST" && path === "/v2/user/regenerate-backup") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    await redisClient.del(`paramant:user:backup_codes:${user_id}`);
+    const codes = userTotp.generateBackupCodes();
+    await userTotp.storeBackupCodes(redisClient, user_id, codes);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ backup_codes: codes }));
+  }
+
+  // POST /v2/user/delete-totp
+  if (req.method === "POST" && path === "/v2/user/delete-totp") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    await userTotp.deleteUserTotp(redisClient, user_id);
+    await redisClient.del(`paramant:user:totp_active:${user_id}`);
+    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ success: true }));
+  }
+
+  // POST /v2/user/get-backup-codes-plaintext
+  if (req.method === "POST" && path === "/v2/user/get-backup-codes-plaintext") {
+    if (!_internalOk()) return _internalReject();
+    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+    const raw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
+    if (!raw) { res.writeHead(404); return res.end(J({ error: "not_available" })); }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(J({ backup_codes: JSON.parse(raw) }));
+  }
+
+  // POST /v2/user/get-totp-provisional — return existing provisional secret if present
+  if (req.method === "POST" && path === "/v2/user/get-totp-provisional") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (!secret) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(J({ exists: false }));
+      }
+      const activeRaw = await redisClient.get(`paramant:user:totp_active:${user_id}`);
+      if (activeRaw === "true") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(J({ exists: false }));
+      }
+      const codesRaw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ exists: true, secret, backup_codes: codesRaw ? JSON.parse(codesRaw) : [] }));
+    } catch (err) {
+      console.error("[user/get-totp-provisional]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────

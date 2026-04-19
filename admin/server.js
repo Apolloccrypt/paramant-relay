@@ -415,6 +415,7 @@ async function callRelay(endpoint, body) {
       "X-Internal-Auth": INTERNAL_TOKEN,
     },
     body: JSON.stringify(body),
+    keepalive: false,
   });
   return res;
 }
@@ -526,7 +527,7 @@ api.post("/user/signup", async (req, res) => {
   res.json({ success: true, message: "setup_email_sent" });
 });
 
-// POST /api/user/setup/:token — retrieve TOTP QR data
+// POST /api/user/setup/:token — retrieve TOTP QR data (idempotent)
 api.post("/user/setup/:token", async (req, res) => {
   const { token } = req.params;
   const raw = await redis().get(`paramant:user:setup_token:${token}`);
@@ -534,10 +535,20 @@ api.post("/user/setup/:token", async (req, res) => {
 
   const { user_id, email } = JSON.parse(raw);
 
-  const relayRes = await callRelay("/v2/user/setup-totp", { user_id, provisional: true });
-  if (!relayRes.ok) return res.status(relayRes.status).json(await relayRes.json().catch(() => ({ error: "relay_error" })));
+  // Idempotency: return existing provisional secret if one was already generated
+  let secret, backup_codes;
+  const provRes = await callRelay("/v2/user/get-totp-provisional", { user_id });
+  if (provRes.ok) {
+    const prov = await provRes.json();
+    if (prov.exists) { secret = prov.secret; backup_codes = prov.backup_codes; }
+  }
 
-  const { secret, backup_codes } = await relayRes.json();
+  if (!secret) {
+    const relayRes = await callRelay("/v2/user/setup-totp", { user_id, provisional: true });
+    if (!relayRes.ok) return res.status(relayRes.status).json(await relayRes.json().catch(() => ({ error: "relay_error" })));
+    ({ secret, backup_codes } = await relayRes.json());
+  }
+
   const issuer = "Paramant";
   const encodedEmail = encodeURIComponent(email);
   const otpauth = `otpauth://totp/${issuer}:${encodedEmail}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;

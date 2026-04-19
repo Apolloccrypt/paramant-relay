@@ -271,6 +271,9 @@ services:
       RELAY_LEGAL:   "http://relay-legal:3000"
       RELAY_IOT:     "http://relay-iot:3000"
       REDIS_URL: "${RELAY_REDIS_URL}"
+      INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
+      SITE_URL: "${SITE_URL:-https://paramant.app}"
+      ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4200/admin/ > /dev/null || exit 1"]
       interval: 30s
