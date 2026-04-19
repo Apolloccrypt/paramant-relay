@@ -68,6 +68,8 @@ NEW_NAV = '''\
       </ul>
     </li>
 
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
       <ul class="nav-dropdown-menu" role="menu">
@@ -146,6 +148,8 @@ NEW_MOBILE = '''\
     </div>
   </div>
 
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
   <div class="nav-mobile-group">
     <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
     <div class="nav-mobile-group-items">
@@ -160,7 +164,7 @@ NEW_MOBILE = '''\
 </div>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=5">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=5">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=6">'
 NAV_JS    = '<script src="/nav.js?v=5" defer></script>'
 
 

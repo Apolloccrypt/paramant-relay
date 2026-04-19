@@ -101,6 +101,8 @@ nav.nav .nav-dropdown-menu {
   list-style: none;
   margin: 0;
   z-index: 400;
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
 }
 nav.nav .nav-dropdown.open .nav-dropdown-menu,
 nav.nav .nav-dropdown:hover .nav-dropdown-menu {
