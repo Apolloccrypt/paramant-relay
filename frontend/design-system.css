@@ -1392,3 +1392,166 @@ pre code { background: none; padding: 0; }
   .hero-actions .btn { text-align: center; }
   .hero-proof { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ═══════════════════════════════════════════════════
+   CONTENT PAGE PRIMITIVES
+   ═══════════════════════════════════════════════════ */
+
+/* Section wrappers */
+.section {
+  padding: var(--space-9) 0;
+  border-top: 1px solid var(--ink-hair);
+}
+.section-lg {
+  padding-top: var(--space-10);
+  padding-bottom: var(--space-9);
+  border-top: none;
+}
+.section-dark {
+  background: var(--navy);
+}
+.section-dark h2 { color: var(--bone); }
+.section-dark p  { color: var(--bone-on-navy-dim); }
+
+/* Eyebrow label above hero heading */
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: var(--space-5);
+}
+.eyebrow .bar {
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  background: var(--cobalt);
+  flex-shrink: 0;
+}
+
+/* Hero heading — scaled for content pages (not full-bleed) */
+.hero-h1 {
+  font-size: clamp(1.75rem, 4.5vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  line-height: 1.08;
+  color: var(--ink);
+  margin-bottom: var(--space-5);
+}
+
+/* Lead paragraph */
+.lede {
+  font-size: var(--text-md);
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+/* Text utility modifiers */
+.dim         { color: var(--ink-dim); }
+.mono        { font-family: var(--mono); }
+.cobalt-text { color: var(--cobalt); font-weight: 600; }
+.strong      { font-weight: 600; color: var(--ink); }
+.warn-text   { color: #C2410C; font-weight: 600; }
+
+/* Two-column layout */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-7);
+  align-items: start;
+}
+
+/* Callout box */
+.callout {
+  background: var(--ink-ghost);
+  border-left: 3px solid var(--cobalt);
+  padding: var(--space-5) var(--space-6);
+}
+.callout h4 {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cobalt);
+  margin-bottom: var(--space-3);
+}
+.callout.warn {
+  border-left-color: #C2410C;
+  background: rgba(194, 65, 12, 0.06);
+}
+.callout.warn h4 { color: #C2410C; }
+
+/* Pull quote */
+.pull {
+  border-left: 3px solid var(--lime);
+  padding: var(--space-4) var(--space-6);
+  margin: var(--space-6) 0;
+  background: var(--ink-ghost);
+}
+.pull h4 {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: var(--space-2);
+}
+.pull p {
+  font-size: var(--text-md);
+  color: var(--ink);
+  line-height: 1.65;
+}
+
+/* Comparison / ownership tables */
+.compare-table,
+.ownership-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  margin-top: var(--space-6);
+}
+.compare-table th,
+.ownership-table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 2px solid var(--ink-hair);
+  white-space: nowrap;
+}
+.compare-table td,
+.ownership-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--ink-hair);
+  color: var(--ink);
+  vertical-align: top;
+  line-height: 1.5;
+}
+.compare-table tr:last-child td,
+.ownership-table tr:last-child td { border-bottom: none; }
+
+/* Table cell states */
+.compare-table td.yes,
+.ownership-table td.yes   { color: #166534; font-weight: 600; }
+.compare-table td.no,
+.ownership-table td.no    { color: #991B1B; font-weight: 600; }
+.compare-table td.partial,
+.ownership-table td.partial { color: #92400E; font-weight: 600; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .two-col { grid-template-columns: 1fr; }
+  .compare-table,
+  .ownership-table { font-size: 12px; }
+  .compare-table th,
+  .ownership-table th,
+  .compare-table td,
+  .ownership-table td { padding: var(--space-2) var(--space-3); }
+}
