@@ -52,6 +52,8 @@ x-relay-env: &relay-env
   # Add your plk_ license key here to unlock unlimited users (Community Edition = max 5)
   PLK_KEY: "${PLK_KEY:-}"
   REDIS_URL: "${RELAY_REDIS_URL}"
+  ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
+  INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
 
 # ── Shared logging ────────────────────────────────────────────────────────────
 x-relay-logging: &relay-logging
