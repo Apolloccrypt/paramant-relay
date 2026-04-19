@@ -3,414 +3,554 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Paramant vs alternatives — post-quantum encrypted file relay comparison</title>
-<meta name="description" content="How Paramant compares to Tresorit, WeTransfer, SFTP, Q*Bird, and NXP on post-quantum encryption, EU jurisdiction, burn-on-read, audit trail, and self-hosting.">
-<style>
-:root{
-  --bg:#0a0f0b;
-  --surface:#111612;
-  --border:#1e2b20;
-  --text:#ededed;
-  --muted:#9a9a9a;
-  --quiet:#6e6e6e;
-  --green:#00cc33;
-  --red:#8a2d2d;
-  --yellow:#7a6a2d;
-  --mono:'JetBrains Mono','Fira Code','Consolas',monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:15px;line-height:1.65}
+<title>Paramant vs alternatives</title>
+<meta name="description" content="How Paramant compares to Zivver, Tresorit, WeTransfer, and SFTP on post-quantum encryption, EU jurisdiction, burn-on-read, and self-hosting.">
 
-nav{position:sticky;top:0;z-index:100;background:rgba(10,15,11,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 40px;height:52px;display:flex;align-items:center;justify-content:space-between}
-.logo-para{color:#e8e8e8}.logo-mant{color:#00ff41}
-.nav-logo{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--text);text-decoration:none}
-.nav-links{list-style:none;display:flex;gap:28px}
-.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono);letter-spacing:.02em;transition:color .15s}
-.nav-links a:hover{color:var(--text)}
-@media(max-width:700px){nav{padding:0 20px}.nav-links{gap:14px}}
-
-.page-wrap{max-width:1040px;margin:0 auto;padding:64px 40px 100px}
-@media(max-width:700px){.page-wrap{padding:40px 16px 80px}}
-
-/* HERO */
-.eyebrow{font-size:11px;font-family:var(--mono);color:var(--quiet);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
-h1{font-size:clamp(26px,5vw,40px);font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-bottom:14px}
-h1 em{font-style:normal;color:var(--green)}
-.hero-sub{font-size:15px;color:var(--muted);max-width:620px;line-height:1.7;margin-bottom:48px}
-
-/* LEGEND */
-.legend{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:24px;font-size:12px;font-family:var(--mono);color:var(--quiet);align-items:center}
-.legend-item{display:flex;align-items:center;gap:6px}
-
-/* TABLE */
-.tbl-scroll{overflow-x:auto;margin-bottom:48px;border-radius:8px;border:1px solid var(--border)}
-table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
-thead tr{background:var(--surface)}
-th{text-align:left;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--quiet);padding:12px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
-th.paramant-col{color:var(--green)}
-td{padding:13px 16px;border-bottom:1px solid var(--border);vertical-align:middle;line-height:1.45}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:rgba(255,255,255,.02)}
-
-/* ROW LABEL */
-td.row-label{font-weight:600;color:var(--text);white-space:nowrap;min-width:160px}
-td.row-sub{font-size:11px;color:var(--quiet);font-weight:400;display:block;margin-top:2px;font-family:var(--mono)}
-
-/* VALUE CELLS */
-.v-yes{color:var(--green);font-weight:700;font-size:15px}
-.v-no{color:var(--red);font-weight:700;font-size:15px}
-.v-partial{color:var(--yellow);font-weight:700;font-size:15px}
-.v-note{display:block;font-size:11px;font-family:var(--mono);color:var(--quiet);margin-top:3px;font-weight:400}
-td.paramant-col{background:rgba(45,138,92,.06);border-left:2px solid rgba(45,138,92,.3);border-right:2px solid rgba(45,138,92,.3)}
-.paramant-col .v-yes{font-size:16px}
-
-/* SECTION HEADING */
-h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
-p.lead{font-size:14px;color:var(--muted);max-width:680px;line-height:1.7;margin-bottom:28px}
-
-/* NOTES GRID */
-.notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:56px}
-.note-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px}
-.note-card h3{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)}
-.note-card p{font-size:12px;color:var(--muted);line-height:1.65}
-.note-card .tag{display:inline-block;font-size:10px;font-family:var(--mono);background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:2px 7px;color:var(--quiet);margin-bottom:8px;letter-spacing:.04em}
-
-/* CTA */
-.cta-strip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
-.cta-strip h3{font-size:15px;font-weight:600;margin-bottom:4px}
-.cta-strip p{font-size:13px;color:var(--muted)}
-.btn-p{display:inline-block;background:var(--green);color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;padding:9px 20px;border-radius:4px;text-decoration:none;transition:opacity .15s}
-.btn-p:hover{opacity:.85}
-.btn-s{display:inline-block;border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:var(--mono);padding:9px 20px;border-radius:4px;text-decoration:none;transition:color .15s,border-color .15s}
-.btn-s:hover{color:var(--text);border-color:var(--text)}
-.btns{display:flex;gap:10px;flex-wrap:wrap}
-
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding:28px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet);text-decoration:none}
-footer a:hover{color:var(--text)}
-</style>
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
 
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="sep">·</span>
+  <span><b>eu/de</b> · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Product &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/parashare">ParaShare</a></li>
-        <li><a href="/drop">ParaDrop</a></li>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="/ct-log">CT Log</a></li>
-        <li><a href="/docs">Docs</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
-        <li><a href="/vs">vs. alternatives</a></li>
-        <li><a href="/press">Press kit</a></li>
-        <li><a href="/changelog">Changelog</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Self-host &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a></li>
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a></li>
-        <li><a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a></li>
-        <li><a href="/docs#self-hosting">Deploy guide</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/install.sh">install.sh</a></li>
-        <li><a href="/install-pi.sh">install-pi.sh</a></li>
-        <li><a href="/install-client.sh">install-client.sh</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/status">Status</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Compliance &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/compliance/nis2">NIS2 (EU 2022/2555)</a></li>
-        <li><a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a></li>
-        <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
-        <li><a href="/dpa">Data Processing Agreement</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/government">Government &amp; public sector</a></li>
-        <li><a href="/hndl">HNDL threat</a></li>
-        <li><a href="/crypto-agility">Crypto agility</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
       </ul>
     </li>
 
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Info &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="mailto:privacy@paramant.app">Contact</a></li>
-        <li><a href="/request-key">Free API key</a></li>
-        <li><a href="/status">Status</a></li>
-        <li><a href="/sla">SLA</a></li>
-        <li><a href="/security">Security</a></li>
-        <li><a href="/license">License</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
       </ul>
     </li>
 
   </ul>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Product</div>
-    <a href="/parashare">ParaShare</a>
-    <a href="/drop">ParaDrop</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/ct-log">CT Log</a>
-    <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
-    <a href="/vs">vs. alternatives</a>
-    <a href="/press">Press kit</a>
-    <a href="/changelog">Changelog</a>
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Self-host</div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-    <a href="/docs#self-hosting">Deploy guide</a>
-    <a href="/install.sh">install.sh</a>
-    <a href="/install-pi.sh">install-pi.sh</a>
-    <a href="/status">Status</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
   </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Compliance</div>
-    <a href="/compliance/nis2">NIS2</a>
-    <a href="/compliance/iec62443">IEC 62443</a>
-    <a href="/compliance/nen7510">NEN 7510</a>
-    <a href="/dpa">Data Processing Agreement</a>
-    <a href="/government">Government</a>
-    <a href="/hndl">HNDL threat</a>
-    <a href="/crypto-agility">Crypto agility</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Info</div>
-    <a href="mailto:privacy@paramant.app">Contact</a>
-    <a href="/request-key">Free API key</a>
-    <a href="/status">Status</a>
-    <a href="/sla">SLA</a>
-    <a href="/security">Security</a>
-    <a href="/license">License</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
   </div>
 </div>
 
-<div class="page-wrap">
+<section class="section section-lg">
+  <div class="container">
+    <div class="eyebrow">
+      <span class="bar"></span>
+      comparison
+    </div>
 
-  <div class="eyebrow">Comparison</div>
-  <h1>Paramant vs <em>alternatives</em></h1>
-  <p class="hero-sub">How Paramant compares to existing file transfer solutions on post-quantum encryption, EU jurisdiction, burn-on-read, audit trail, and self-hosting capability.</p>
+    <h1 class="hero-h1">
+      Paramant vs <em>alternatives.</em>
+    </h1>
 
-  <div class="legend">
-    <span>Legend:</span>
-    <span class="legend-item"><span class="v-yes">✓</span> Yes / supported</span>
-    <span class="legend-item"><span class="v-partial">~</span> Partial / limited</span>
-    <span class="legend-item"><span class="v-no">✗</span> No / not supported</span>
+    <p class="lede" style="max-width:720px">
+      Honest comparison. We list what competitors do well and where they
+      differ from Paramant. This page is updated when competitor facts
+      change.
+    </p>
+
+    <p class="dim mono" style="font-size:11px;margin-top:16px">
+      Last updated: April 2026 · All claims verified against official
+      company documentation, press releases, and independent reviews.
+    </p>
   </div>
+</section>
 
-  <div class="tbl-scroll">
-    <table>
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>Feature comparison.</h2>
+      <div class="tag">specifications<br/>side by side</div>
+    </div>
+
+    <table class="compare-table">
       <thead>
         <tr>
-          <th style="min-width:180px">Feature</th>
-          <th class="paramant-col">Paramant</th>
+          <th>Capability</th>
+          <th>Paramant</th>
+          <th>Zivver</th>
           <th>Tresorit</th>
           <th>WeTransfer</th>
-          <th>SFTP / SCP</th>
-          <th>Q*Bird</th>
-          <th>NXP</th>
+          <th>SFTP</th>
         </tr>
       </thead>
       <tbody>
-
         <tr>
-          <td class="row-label">Post-quantum encryption
-            <span class="row-sub">ML-KEM-768 / equivalent</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">ML-KEM-768 + ECDH P-256 hybrid (FIPS 203)</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">AES-256 only, no PQC</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">TLS only, no E2E</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">RSA / ECDSA, no PQC</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Hardware QKD — network layer, not file-level</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">PQC chip-level; no file relay product</span></td>
+          <td class="strong">Post-quantum encryption (ML-KEM)</td>
+          <td class="yes">ML-KEM-768 (NIST L3)</td>
+          <td class="no">None</td>
+          <td class="partial">Roadmap announced 2025</td>
+          <td class="no">None</td>
+          <td class="no">None (classical only)</td>
         </tr>
-
         <tr>
-          <td class="row-label">EU jurisdiction
-            <span class="row-sub">No US CLOUD Act exposure</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">Hetzner Frankfurt DE — no US sub-processors</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">EU servers available but US-HQ (CLOUD Act risk)</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">US company (Amsterdam offices, US parent)</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">Self-hosted — jurisdiction depends on operator</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">Dutch company, hardware only</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Global — depends on deployment region</span></td>
+          <td class="strong">Client-side encryption</td>
+          <td class="yes">Default</td>
+          <td class="yes">Zero-access encryption</td>
+          <td class="yes">Default</td>
+          <td class="no">TLS + AES at rest</td>
+          <td class="partial">SSH channel encryption</td>
         </tr>
-
         <tr>
-          <td class="row-label">Burn-on-read
-            <span class="row-sub">File destroyed after first download</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">Default — ciphertext in RAM, destroyed on first read</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Storage-based; files persist until manually deleted</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Files persist for 7–365 days</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Files persist on server; manual deletion required</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Network relay, not file storage/transfer</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Chip / crypto primitive — not a file relay</span></td>
+          <td class="strong">Burn on first read</td>
+          <td class="yes">Default, HTTP 410</td>
+          <td class="no">Persistent storage</td>
+          <td class="no">Persistent storage</td>
+          <td class="no">3-day default retention</td>
+          <td class="no">Persistent on disk</td>
         </tr>
-
         <tr>
-          <td class="row-label">Zero persistent storage
-            <span class="row-sub">No bytes written to disk</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">RAM-only by default; optional disk for resilience</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Cloud storage is the product — always persisted</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Files stored in cloud until expiry</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Files written to server disk</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">N/A — not a file relay</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">N/A — not a file relay</span></td>
+          <td class="strong">RAM-only, no disk persistence</td>
+          <td class="yes">Yes</td>
+          <td class="no">Disk-based</td>
+          <td class="no">Cloud storage</td>
+          <td class="no">Cloud storage</td>
+          <td class="no">Disk-based</td>
         </tr>
-
         <tr>
-          <td class="row-label">Tamper-evident audit log
-            <span class="row-sub">Merkle tree / cryptographic proof</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">Merkle CT log — SHA-256 leaf hashes, append-only</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Activity log — mutable, not cryptographic</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Email notification only — no cryptographic proof</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Server logs only — mutable, no delivery proof</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">N/A — network layer QKD</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">N/A — crypto chip</span></td>
+          <td class="strong">Public CT log for transfers</td>
+          <td class="yes">Merkle tree, signed STH</td>
+          <td class="no">Internal logs</td>
+          <td class="no">Internal logs</td>
+          <td class="no">Email notifications</td>
+          <td class="no">Mutable server logs</td>
         </tr>
-
         <tr>
-          <td class="row-label">Self-hostable
-            <span class="row-sub">Full control, your infrastructure</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">Docker Compose — deploy in 60s on any VPS</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">SaaS only — no self-hosted option</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">SaaS only</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">By definition — you run the server</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Hardware appliance — not software-deployable</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Chip integration — not a deployable relay</span></td>
+          <td class="strong">Company HQ jurisdiction</td>
+          <td class="yes">Netherlands</td>
+          <td class="partial">NL (Kiteworks parent, CA US)</td>
+          <td class="yes">Switzerland + EU offices</td>
+          <td class="yes">Netherlands (Bending Spoons, IT)</td>
+          <td class="partial">Depends on operator</td>
         </tr>
-
         <tr>
-          <td class="row-label">Open source
-            <span class="row-sub">Auditable codebase</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">BUSL-1.1 — full source on GitHub</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Proprietary — client SDK only</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Proprietary</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">OpenSSH is open source</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Proprietary hardware / firmware</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Reference designs available; production firmware proprietary</span></td>
+          <td class="strong">Ownership</td>
+          <td class="yes">NL, founder-owned</td>
+          <td class="partial">Kiteworks, San Mateo CA</td>
+          <td class="yes">Swiss Post (state-owned CH)</td>
+          <td class="yes">Bending Spoons, Italy</td>
+          <td class="partial">Open source (OpenSSH)</td>
         </tr>
-
         <tr>
-          <td class="row-label">NIS2 / NEN 7510 ready
-            <span class="row-sub">Compliance documentation</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">NIS2 · NEN 7510 · IEC 62443 · DORA — docs available</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">ISO 27001 certified; NEN 7510 not specifically</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">No specific NIS2/NEN 7510 documentation</span></td>
-          <td><span class="v-no">✗</span><span class="v-note">Protocol only — compliance is operator responsibility</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">IEC 62443 alignment (OT focus)</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Common Criteria certified chips</span></td>
+          <td class="strong">CLOUD Act exposure</td>
+          <td class="yes">None</td>
+          <td class="no">Yes, via parent</td>
+          <td class="yes">None</td>
+          <td class="yes">None via ownership</td>
+          <td class="partial">Depends on operator</td>
         </tr>
-
         <tr>
-          <td class="row-label">Available today
-            <span class="row-sub">Production-ready</span>
-          </td>
-          <td class="paramant-col"><span class="v-yes">✓</span><span class="v-note">5 live relay sectors, public</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">Production SaaS</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">Production SaaS</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">Mature protocol</span></td>
-          <td><span class="v-partial">~</span><span class="v-note">Limited availability — hardware pilots</span></td>
-          <td><span class="v-yes">✓</span><span class="v-note">Chips available; no file relay product</span></td>
+          <td class="strong">Self-hostable</td>
+          <td class="yes">BUSL-1.1 source available</td>
+          <td class="no">SaaS only</td>
+          <td class="no">SaaS only</td>
+          <td class="no">SaaS only</td>
+          <td class="yes">Open source by default</td>
         </tr>
-
         <tr>
-          <td class="row-label">Pricing
-            <span class="row-sub">Entry point</span>
-          </td>
-          <td class="paramant-col"><span style="color:var(--green);font-weight:700">Free</span><span class="v-note">Community Edition — self-hosted, ≤5 users<br>Professional: €149/mo · Enterprise: custom</span></td>
-          <td><span style="color:var(--muted)">€10/user/mo</span><span class="v-note">Business plans from €10/user/mo</span></td>
-          <td><span style="color:var(--muted)">Free / €12/mo</span><span class="v-note">Pro €12/mo — no E2E, no PQC</span></td>
-          <td><span style="color:var(--green);font-weight:700">Free</span><span class="v-note">Self-managed server costs only</span></td>
-          <td><span style="color:var(--muted)">Hardware</span><span class="v-note">Hardware appliance pricing — on request</span></td>
-          <td><span style="color:var(--muted)">Chip licensing</span><span class="v-note">Volume chip licensing — not a relay product</span></td>
+          <td class="strong">Outlook / Gmail integration</td>
+          <td class="no">Not available</td>
+          <td class="yes">Strong native plugin</td>
+          <td class="yes">Plugin available</td>
+          <td class="partial">Limited integration</td>
+          <td class="no">Protocol only</td>
         </tr>
+        <tr>
+          <td class="strong">DLP / human error prevention</td>
+          <td class="no">Not available</td>
+          <td class="yes">ML-based, native</td>
+          <td class="partial">Basic policies</td>
+          <td class="no">Not available</td>
+          <td class="no">Not available</td>
+        </tr>
+        <tr>
+          <td class="strong">Anonymous sending (no account)</td>
+          <td class="yes">ParaSend, 5 MB</td>
+          <td class="no">Account required</td>
+          <td class="no">Account required</td>
+          <td class="yes">Up to 3 GB free</td>
+          <td class="no">Authentication required</td>
+        </tr>
+        <tr>
+          <td class="strong">ISO 27001 certification</td>
+          <td class="partial">Roadmap 2026</td>
+          <td class="yes">Certified</td>
+          <td class="yes">Certified</td>
+          <td class="yes">Certified</td>
+          <td class="no">N/A (protocol)</td>
+        </tr>
+        <tr>
+          <td class="strong">SOC 2 Type II</td>
+          <td class="no">Not yet</td>
+          <td class="yes">Certified</td>
+          <td class="yes">Certified</td>
+          <td class="partial">SOC 2 Type I</td>
+          <td class="no">N/A (protocol)</td>
+        </tr>
+        <tr>
+          <td class="strong">IEC 62443 OT documentation</td>
+          <td class="yes">Sector-specific relay</td>
+          <td class="no">Not positioned</td>
+          <td class="no">Not positioned</td>
+          <td class="no">Not positioned</td>
+          <td class="no">Not positioned</td>
+        </tr>
+      </tbody>
+    </table>
 
+    <div style="margin-top:24px;display:flex;gap:24px;font-family:var(--mono);font-size:11px;color:var(--ink-dim);letter-spacing:0.1em;text-transform:uppercase">
+      <span><strong style="color:#1D4ED8">✓</strong> supported / available</span>
+      <span><strong style="color:rgba(11,58,106,.65)">~</strong> partial / limited</span>
+      <span><strong style="color:rgba(11,58,106,.45)">✗</strong> not available</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2>What each alternative does well.</h2>
+      <div class="tag">honest take<br/>not dismissive</div>
+    </div>
+
+    <p>None of these products are bad. They solve different problems, often well. Here is where each one is genuinely strong and where it differs from Paramant.</p>
+
+    <h3>Zivver</h3>
+    <p>Zivver is the leading secure email product in Dutch healthcare and government. Strong Outlook and Gmail integration, machine learning for data loss prevention, strong admin dashboards. If your primary need is preventing human error in email sending, Zivver is excellent.</p>
+
+    <p>In June 2025, Zivver was acquired by Kiteworks, a California-based company that has raised $610M primarily from US investors. Zivver remains headquartered in Amsterdam, but data handling policies now operate under a US parent company structure. This introduces CLOUD Act considerations that were not present before the acquisition.</p>
+
+    <p class="dim mono" style="font-size:11px">Sources: Kiteworks press release June 18 2025; Zivver company blog; PitchBook Kiteworks profile.</p>
+
+    <h3>Tresorit</h3>
+    <p>Tresorit is a mature zero-knowledge cloud storage and collaboration platform. Independently audited by Ernst and Young and Computest. ISO 27001 and EAL4+ certified. Strong enterprise features including granular permission management and data residency choice across 12 EU and Swiss regions.</p>
+
+    <p>Tresorit has been majority-owned by Swiss Post (Swiss state-owned postal service) since 2021. Under Swiss jurisdiction, not subject to US CLOUD Act. Tresorit operates as cloud storage with persistent files, not as a burn-on-read relay. Post-quantum cryptography is on their announced roadmap but implementation status as of April 2026 is not public.</p>
+
+    <p class="dim mono" style="font-size:11px">Sources: Swiss Post press release July 2021; Tresorit transparency report; Tresorit blog post on PQC November 2025.</p>
+
+    <h3>WeTransfer</h3>
+    <p>WeTransfer is the category-defining file sharing tool for casual and creative use. Free tier allows 3 GB per transfer with 10 transfers per month. Pro and Ultimate tiers offer up to 300 GB transfers and unlimited storage. Excellent for video review workflows, client delivery of media assets, and one-off sends where security is not primary.</p>
+
+    <p>WeTransfer uses TLS in transit and AES-256 at rest, but does not offer end-to-end encryption. WeTransfer holds the decryption keys, meaning the company has technical ability to access file content. Acquired by Italian company Bending Spoons in 2024. Headquartered in Amsterdam with Italian ownership. No CLOUD Act exposure via ownership. Not suitable for regulated sector data that requires zero-knowledge architecture.</p>
+
+    <p class="dim mono" style="font-size:11px">Sources: WeTransfer support documentation; onerep.com 2026 security review; Bending Spoons acquisition announcement.</p>
+
+    <h3>SFTP / SCP</h3>
+    <p>SFTP over SSH is a mature, universally supported protocol for server-to-server file transfer. If you run your own infrastructure and control both ends of the transfer, SFTP works well and is free. Widely available on every Unix system.</p>
+
+    <p>SFTP encrypts the channel, not the file. The server operator has full read access to files after upload. Files persist on disk until manually deleted. Server logs are mutable. No cryptographic proof of delivery. Not post-quantum by default (RSA and ECDSA key exchange). Not a complete solution for regulated file exchange with external parties.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2>When to choose what.</h2>
+      <div class="tag">honest<br/>recommendations</div>
+    </div>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Your primary need</th>
+          <th>Best choice</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="strong">Casual file sharing, photos, videos</td>
+          <td class="cobalt-text">WeTransfer</td>
+          <td>Simplest UX, no account needed, 3 GB free</td>
+        </tr>
+        <tr>
+          <td class="strong">Outlook-integrated secure email</td>
+          <td class="cobalt-text">Zivver</td>
+          <td>Dominant plugin, strong DLP and ML features</td>
+        </tr>
+        <tr>
+          <td class="strong">Enterprise cloud storage with collaboration</td>
+          <td class="cobalt-text">Tresorit</td>
+          <td>Mature product, ISO 27001, 12 data residency regions</td>
+        </tr>
+        <tr>
+          <td class="strong">Server-to-server automated transfer</td>
+          <td class="cobalt-text">SFTP</td>
+          <td>Free, universal, runs on your infrastructure</td>
+        </tr>
+        <tr>
+          <td class="strong">Regulated sector with EU data sovereignty</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>No US owner, no CLOUD Act, post-quantum, RAM-only</td>
+        </tr>
+        <tr>
+          <td class="strong">Industrial OT / SCADA / IEC 62443</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Only provider with OT-specific positioning</td>
+        </tr>
+        <tr>
+          <td class="strong">Post-quantum encryption today</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>ML-KEM-768 Level 3 in production since 2024</td>
+        </tr>
+        <tr>
+          <td class="strong">Files that auto-destroy after receipt</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>Burn-on-read is the default, not an option</td>
+        </tr>
+        <tr>
+          <td class="strong">Self-host option</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>BUSL-1.1, Docker, Raspberry Pi capable</td>
+        </tr>
       </tbody>
     </table>
   </div>
+</section>
 
-  <!-- CONTEXT NOTES -->
-  <h2>Why the alternatives fall short for regulated sectors</h2>
-  <p class="lead">Each alternative solves a different problem. None of them address the full stack required by NEN 7510, NIS2, or IEC 62443 for file-level data in transit.</p>
+<section class="section section-dark">
+  <div class="container">
+    <div class="marker">
+      <div class="num">04</div>
+      <h2 style="color:var(--bone)">Where Paramant is genuinely different.</h2>
+      <div class="tag" style="color:rgba(248,250,252,.72)">architecture<br/>matters</div>
+    </div>
 
-  <div class="notes">
-    <div class="note-card">
-      <div class="tag">Tresorit</div>
-      <h3>Storage, not relay</h3>
-      <p>Tresorit is a cloud storage product with E2E encryption. Files persist until manually deleted — there is no burn-on-read. It is a US-headquartered company, which creates CLOUD Act exposure regardless of EU server location. No post-quantum encryption. No Merkle audit log.</p>
-    </div>
-    <div class="note-card">
-      <div class="tag">WeTransfer</div>
-      <h3>No encryption at all</h3>
-      <p>WeTransfer encrypts the transport (TLS) but has no end-to-end encryption. Files are stored in plaintext on WeTransfer servers. A US company. Files persist for 7–365 days. No audit trail. No PQC. Not compliant with GDPR Art. 32 for sensitive data.</p>
-    </div>
-    <div class="note-card">
-      <div class="tag">SFTP / SCP</div>
-      <h3>Channel encryption only</h3>
-      <p>SFTP encrypts the channel with SSH (RSA/ECDSA), not the file. The server operator has full access to all files. Files are written to disk and persist indefinitely. Server logs are mutable — no cryptographic delivery proof. No PQC support in production deployments. Jurisdiction depends entirely on where you run the server.</p>
-    </div>
-    <div class="note-card">
-      <div class="tag">Q*Bird</div>
-      <h3>Network QKD, not file relay</h3>
-      <p>Q*Bird builds QKD hardware for securing network links — a different problem. QKD requires physical fibre between sites, is not yet at scale, and does not address file-level encryption, burn-on-read, or audit trails. Not generally available; hardware pilots only as of 2026.</p>
-    </div>
-    <div class="note-card">
-      <div class="tag">NXP</div>
-      <h3>Chip-level crypto — not a relay</h3>
-      <p>NXP produces cryptographic hardware (Secure Elements, HSMs, PQC-ready microcontrollers). This is enabling technology for building PQC applications, not a file relay product. NXP chips could be used inside a relay implementation, but NXP itself does not offer a competing service.</p>
+    <p style="color:var(--bone);max-width:720px">Paramant occupies a specific position. It is a post-quantum encrypted file relay with RAM-only storage, burn-on-read delivery, and public cryptographic transparency. It is not a cloud storage product, not an email plugin, and not a DLP platform.</p>
+
+    <p style="color:var(--bone);max-width:720px;margin-top:16px">For organizations that need the combination of EU data sovereignty (without US ownership), post-quantum cryptography (today, not roadmap), zero-knowledge architecture (mathematically, not by policy), and the option to self-host, Paramant is presently the only option in this category.</p>
+
+    <p style="color:var(--bone);max-width:720px;margin-top:16px">For any other use case, one of the alternatives above is likely a better fit. That honesty is the point.</p>
+
+    <div style="margin-top:48px;display:flex;gap:16px;flex-wrap:wrap">
+      <a href="/send" class="btn btn-primary">Try Paramant</a>
+      <a href="/sovereignty" class="btn btn-secondary-inverse">Why jurisdiction matters</a>
+      <a href="/docs" class="btn btn-secondary-inverse">Technical docs</a>
     </div>
   </div>
+</section>
 
-  <div class="cta-strip">
-    <div>
-      <h3>Start with the free Community Edition</h3>
-      <p>Deploy in 60 seconds. Full source code. All encryption features. No account required.</p>
-    </div>
-    <div class="btns">
-      <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" class="btn-p">Get started &rarr;</a>
-      <a href="/docs" class="btn-s">Read the docs</a>
-      <a href="/one-pager" class="btn-s">Download one-pager</a>
-    </div>
-  </div>
-
-</div>
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 
 <footer>
-  <a href="/">PARAMANT</a>
-  <span>Comparison last updated: April 2026</span>
-  <a href="/docs">Docs</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/sovereignty">Jurisdiction</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/quantum-urgency">Quantum urgency</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </footer>
-
-<script src="/nav.js" defer></script>
 </body>
 </html>

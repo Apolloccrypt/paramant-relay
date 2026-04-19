@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The timeline just moved · Paramant</title>
+<meta name="description" content="Google's March 2026 research shows quantum computers may break elliptic curve cryptography with 20x fewer qubits than previously estimated. What this means for data you are sending today.">
+
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="sep">·</span>
+  <span><b>eu/de</b> · ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div>
+
+<section class="section section-lg">
+  <div class="container">
+    <div class="eyebrow">
+      <span class="bar"></span>
+      urgency · post-quantum
+    </div>
+
+    <h1 class="hero-h1">
+      The quantum timeline <em>just moved.</em><br/>
+      Your data hasn't caught up.
+    </h1>
+
+    <p class="lede" style="max-width:720px">
+      On March 31, 2026, Google published research indicating that quantum
+      computers may break elliptic curve cryptography with 20 times fewer
+      qubits than previously estimated. Cloudflare accelerated their
+      post-quantum deadline to 2029 within days. Most organizations are
+      still on the 2035 NIST timeline.
+    </p>
+
+    <p class="dim mono" style="font-size:11px;margin-top:24px">
+      Written April 2026 · Sources verified against Google Research, Quantum
+      Insider, TIME Magazine, Cloudflare public statements
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>What happened in the last 60 days.</h2>
+      <div class="tag">three events<br/>that shift everything</div>
+    </div>
+
+    <h3>March 25, 2026: Google pulls its deadline forward six years</h3>
+    <p>Google publishes a blog post titled "Quantum frontiers may be closer than they appear" by Heather Adkins (VP of Security Engineering) and Sophie Schmieg (Senior Staff Cryptography Engineer). The company accelerates its internal post-quantum migration target from 2035 (NIST guidance) to 2029.</p>
+    <p>This is not a marketing statement. Google's own Quantum AI team produces much of the underlying research on cryptographic resource estimates. When Google moves its deadline, they are moving based on their own threat intelligence.</p>
+
+    <h3>March 31, 2026: The qubit requirement drops by 20x</h3>
+    <p>Google Quantum and AI publish new research demonstrating that breaking elliptic curve cryptography requires 20 times fewer qubits and gates than previously estimated. The paper focuses on ECDSA, the signature scheme behind TLS key exchange, SSH authentication, code signing, and most digital signatures on the internet. Cryptocurrency wallets, which also rely on ECDSA, are prominent in the news coverage, but the finding affects all cryptography built on elliptic curves. That includes the key exchange protecting your email, your banking session, your VPN tunnel, and most file transfer tools.</p>
+    <p>Separately, a Caltech and Oratomic paper uses AI-assisted algorithm design to further reduce qubit requirements using neutral-atom quantum architectures.</p>
+
+    <div class="callout">
+      <h4>a note on terminology</h4>
+      <p>In 2026 the word "crypto" has two meanings. In financial news it refers to cryptocurrency. In security it refers to cryptography, the mathematics of encryption and digital signatures. The Google research is a cryptography finding that has cryptocurrency implications. Paramant is a cryptography product, not a cryptocurrency product. No coins, no wallets, no tokens. This page, and Paramant generally, uses "crypto" only as shorthand for cryptography.</p>
+    </div>
+
+    <h3>April 2026: Industry scrambles</h3>
+    <p>Cloudflare's Bas Westerbaan, one of the most respected voices in applied cryptography, tells TIME magazine: "It's a real shock. We'll need to speed up our efforts considerably." Cloudflare announces its own accelerated 2029 deadline for complete post-quantum migration.</p>
+    <p>CISOs at regulated enterprises begin re-evaluating their post-quantum roadmaps. The conversation shifts from "planning" to "execution," with PQC market projections reaching $2.84 billion by 2030 at a 46.2% CAGR.</p>
+
+    <div class="callout">
+      <h4>primary sources</h4>
+      <p class="mono" style="font-size:11px;line-height:1.6">
+        Google blog post (March 25 2026): blog.google/innovation-and-ai/technology/safety-security/cryptography-migration-timeline<br/>
+        Google ECDLP research (March 31 2026): published via Google Quantum AI<br/>
+        Cloudflare response (April 2026): TIME magazine interview<br/>
+        Quantum Insider analysis: thequantuminsider.com/2026/03/31/q-day-just-got-closer
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2>What this means for data you are sending today.</h2>
+      <div class="tag">practical<br/>implications</div>
+    </div>
+
+    <p>"Harvest now, decrypt later" is no longer a theoretical threat model. It is a budget line at every major intelligence agency.</p>
+
+    <p>Adversaries intercept and archive encrypted traffic today with the explicit plan of decrypting it once quantum capability arrives. What changed in March 2026 is the arrival date.</p>
+
+    <h3>If your data will still matter in 2029</h3>
+    <p>It is at risk today. Medical records, legal documents, financial plans, research, trade secrets, government communications. Anything that has a confidentiality horizon beyond three years.</p>
+
+    <h3>If your encryption uses RSA or classical ECDH</h3>
+    <p>TLS 1.2 and 1.3 without post-quantum extensions, most SFTP, most email encryption, standard HTTPS, all rely on key exchange that quantum computers will break. The underlying AES encryption of the actual content remains safe. But AES is useless if the key that protects it can be recovered retroactively.</p>
+
+    <h3>If your provider's post-quantum roadmap says 2030</h3>
+    <p>It was built before the March 2026 research. The industry is recalibrating. Providers who stay on pre-2026 timelines are implicitly accepting that harvested data from 2026-2030 will be decryptable. That data is what is being harvested right now.</p>
+
+    <div class="pull">
+      <h4>the uncomfortable question</h4>
+      <p>If your file transfer provider does not use post-quantum encryption for key exchange today, what you are transmitting through them can be recorded for retroactive decryption. The strength of their AES is irrelevant. The weakness is in the key exchange.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2>What Paramant did, when.</h2>
+      <div class="tag">timeline<br/>matters here</div>
+    </div>
+
+    <p>Paramant deployed ML-KEM-768 post-quantum key exchange in production on August 2024 following the NIST FIPS 203 finalization. Every ParaShare transfer since that date has been protected with post-quantum hybrid key exchange. Every transfer since March 31, 2026 has benefitted from the same architecture.</p>
+
+    <p>This is not marketing. The ciphertext of authenticated Paramant transfers from the last 18 months is not retroactively decryptable even if the March 2026 research proves correct. The key exchange was post-quantum before the threat was acknowledged.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Event</th>
+          <th>Paramant status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">Aug 2024</td>
+          <td>NIST finalizes FIPS 203 (ML-KEM)</td>
+          <td class="cobalt-text">ML-KEM-768 in production</td>
+        </tr>
+        <tr>
+          <td class="mono">Aug 2024</td>
+          <td>NIST finalizes FIPS 204 (ML-DSA)</td>
+          <td class="cobalt-text">ML-DSA-65 in production for receipts</td>
+        </tr>
+        <tr>
+          <td class="mono">Sep 2022</td>
+          <td>NSA CNSA 2.0 advises PQC migration</td>
+          <td class="cobalt-text">Paramant was already planned with this</td>
+        </tr>
+        <tr>
+          <td class="mono">Mar 25 2026</td>
+          <td>Google accelerates to 2029 deadline</td>
+          <td class="cobalt-text">No change needed, already compliant</td>
+        </tr>
+        <tr>
+          <td class="mono">Mar 31 2026</td>
+          <td>Google publishes 20x qubit reduction</td>
+          <td class="cobalt-text">Hybrid PQ + classical still protects</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The question Paramant asked in 2024 was: "If quantum capability arrives sooner than expected, what decision do we want to have made?" The answer was post-quantum from day one. The March 2026 research validates that decision.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">04</div>
+      <h2>What to do now.</h2>
+      <div class="tag">practical<br/>steps</div>
+    </div>
+
+    <h3>For CISOs and security leaders</h3>
+    <p>Audit your file transfer vendors' post-quantum status. Ask specifically: which algorithms are in production today for key exchange, not roadmap. Any vendor whose production key exchange is RSA or classical ECDH is currently contributing to harvestable traffic.</p>
+
+    <h3>For compliance officers</h3>
+    <p>NIS2 Article 21 requires "appropriate cryptographic measures." As post-quantum standards become available and industry urgency grows, "appropriate" shifts. A provider using classical cryptography in 2027 will be harder to defend in an audit than a provider using post-quantum cryptography in 2026.</p>
+
+    <h3>For developers</h3>
+    <p>Add ML-KEM to your cryptographic agility plan now. If you run your own infrastructure, OpenSSH 10.0 and OpenSSL with crypto-policies PQ modules already support ML-KEM. For TLS, hybrid ML-KEM-768 + X25519 is implemented in Chrome and available in Cloudflare's edge.</p>
+
+    <h3>For organizations sending regulated data</h3>
+    <p>The simplest answer: stop sending regulated data through non-post-quantum channels. Paramant's ParaShare flow is one option. Tresorit's announced PQC roadmap is another when it ships. Running your own post-quantum TLS is a third. The migration is no longer optional.</p>
+
+    <div class="callout warn">
+      <h4>what we are not saying</h4>
+      <p>We are not saying quantum computers will exist in 2029. We are saying that the research now suggests they could exist before 2035, and the cost of being wrong about timing is catastrophic and retroactive. Post-quantum cryptography is insurance against a non-zero probability of an outcome that cannot be undone once it occurs.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-dark">
+  <div class="container">
+    <div class="marker">
+      <div class="num">05</div>
+      <h2 style="color:var(--bone)">The data you send today defines the data that is exposed later.</h2>
+      <div class="tag" style="color:rgba(248,250,252,.72)">decisions<br/>compound</div>
+    </div>
+
+    <p style="color:var(--bone);max-width:720px">Every file transferred with classical encryption in 2026 is a potential entry in an adversary's decryption archive. Every file transferred with post-quantum encryption is safe regardless of when quantum capability arrives.</p>
+
+    <p style="color:var(--bone);max-width:720px;margin-top:16px">The decision of which channel to use for sensitive data is not academic. It determines what will be readable to adversaries in 2030, 2032, 2035. Most organizations will look back on 2026 and wish they had migrated six months sooner.</p>
+
+    <div style="margin-top:48px;display:flex;gap:16px;flex-wrap:wrap">
+      <a href="/parashare" class="btn btn-primary">Start with ParaShare</a>
+      <a href="/hndl" class="btn btn-secondary-inverse">Full HNDL briefing</a>
+      <a href="/security" class="btn btn-secondary-inverse">Technical details</a>
+    </div>
+
+    <p class="dim mono" style="font-size:11px;margin-top:48px;color:rgba(248,250,252,.45)">
+      Paramant uses ML-KEM-768 (NIST FIPS 203 Level 3) hybrid with ECDH P-256 for all authenticated transfers. Operational since August 2024. Not a roadmap, a production system.
+    </p>
+  </div>
+</section>
+
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/sovereignty">Jurisdiction</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/quantum-urgency">Quantum urgency</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

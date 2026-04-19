@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Send a file — PARAMANT</title>
+<meta name="description" content="Send any file securely. No account. Your browser encrypts with AES-256-GCM. The key lives in the link. Burn on first read.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+<style>
+.send-hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:var(--space-8);align-items:start}
+.spec-table{width:100%;border:1px solid var(--ink-hair);margin-top:var(--space-6)}
+.spec-table td{font-family:var(--mono);font-size:var(--text-sm);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--ink-hair);vertical-align:top;line-height:1.5}
+.spec-table td:first-child{color:var(--ink-dim);letter-spacing:.08em;text-transform:uppercase;width:44%}
+.spec-table td:last-child{color:var(--navy);font-weight:700}
+.spec-table tr:last-child td{border-bottom:none}
+.safety-grid{display:grid;grid-template-columns:1fr 2fr;gap:var(--space-8);align-items:start}
+.step{display:none}
+.step.active{display:block}
+.progress-wrap{border:1px solid var(--ink-hair);height:3px;overflow:hidden;margin:var(--space-4) 0 var(--space-2)}
+#pbar{height:100%;background:var(--cobalt);width:0%;transition:width .3s}
+.status-line{font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);letter-spacing:.04em;padding:var(--space-1) 0}
+.status-line.ok{color:var(--cobalt)}
+.status-line.err{color:rgba(185,28,28,1)}
+.field-label{display:block;font-family:var(--mono);font-size:var(--text-sm);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-2)}
+select#ttl-select{width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:var(--space-3) var(--space-4);font-family:var(--mono);font-size:var(--text-sm);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none}
+select#ttl-select:focus{border-color:var(--cobalt)}
+.share-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:var(--space-4);font-family:var(--mono);font-size:var(--text-sm);color:var(--navy);word-break:break-all;line-height:1.7;cursor:pointer;transition:border-color var(--duration-base) var(--ease-sharp);margin:var(--space-4) 0}
+.share-box:hover{border-color:var(--cobalt)}
+.copy-btn{width:100%;padding:var(--space-3);background:transparent;border:1px solid var(--ink-hair);color:var(--ink-dim);font-family:var(--mono);font-size:var(--text-sm);font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all var(--duration-base) var(--ease-sharp);margin-top:var(--space-2)}
+.copy-btn:hover,.copy-btn.copied{border-color:var(--cobalt);color:var(--cobalt)}
+.send-tag{display:inline-block;font-family:var(--mono);font-size:var(--text-sm);padding:var(--space-1) var(--space-3);border:1px solid var(--ink-hair);color:var(--ink-dim);letter-spacing:.06em;text-transform:uppercase;margin-right:var(--space-2);margin-top:var(--space-2)}
+.faq-item{border-top:1px solid var(--ink-hair);padding:var(--space-6) 0}
+.faq-item:last-child{border-bottom:1px solid var(--ink-hair)}
+.faq-a{font-size:var(--text-base);color:var(--ink);line-height:1.75}
+@media(max-width:900px){
+  .send-hero-grid{grid-template-columns:1fr}
+  .safety-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div>
+
+<!-- § 00 HERO -->
+<section style="padding:var(--space-10) 0 var(--space-8)" id="send-top">
+  <div class="container-lg">
+    <div class="send-hero-grid">
+
+      <!-- Left: copy + spec -->
+      <div>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-5)">KEYLESS &middot; ANONYMOUS &middot; 5 MB</p>
+        <h1 style="font-size:clamp(3rem,8vw,8rem);line-height:1.0;letter-spacing:-.04em;margin-bottom:var(--space-5)">Drop a file.<br>Burn it after<br>one read.</h1>
+        <p style="font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:48ch;margin-bottom:var(--space-5)">Your browser encrypts before upload. The key lives in the link, never on the relay. When the receiver opens the link, the file is gone.</p>
+        <table class="spec-table">
+          <tbody>
+            <tr><td>cipher</td><td>aes-256-gcm</td></tr>
+            <tr><td>key source</td><td>browser, 256-bit random</td></tr>
+            <tr><td>key delivery</td><td>url fragment (never sent)</td></tr>
+            <tr><td>storage</td><td>ram-only</td></tr>
+            <tr><td>ttl</td><td>1 hour</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Right: send form -->
+      <div>
+
+        <!-- Step 1: Upload -->
+        <div id="step-upload" class="step active">
+
+          <div class="dropzone" id="drop-zone" style="min-height:380px">
+            <div class="dropzone-num">01</div>
+            <div class="dropzone-main">Drop to send</div>
+            <div class="dropzone-sub">Click or drag &middot; max 5 MB &middot; any file type</div>
+            <div class="dropzone-spec" style="margin-top:var(--space-6)">
+              <div class="dropzone-spec-cell">
+                <span class="dropzone-spec-key">cipher</span>
+                <span class="dropzone-spec-val">aes-256-gcm</span>
+              </div>
+              <div class="dropzone-spec-cell">
+                <span class="dropzone-spec-key">key</span>
+                <span class="dropzone-spec-val">url fragment</span>
+              </div>
+              <div class="dropzone-spec-cell">
+                <span class="dropzone-spec-key">rate</span>
+                <span class="dropzone-spec-val">10 / hr</span>
+              </div>
+              <div class="dropzone-spec-cell">
+                <span class="dropzone-spec-key">ttl</span>
+                <span class="dropzone-spec-val">1 hour</span>
+              </div>
+            </div>
+          </div>
+          <input type="file" id="file-input" style="display:none" onchange="handleFileInput(this.files)">
+
+          <!-- File info shown after selection -->
+          <div id="file-info" style="display:none;align-items:center;gap:var(--space-4);padding:var(--space-4);border:1px solid var(--ink-hair);margin-top:var(--space-4)">
+            <div style="flex:1;min-width:0">
+              <div id="fname" style="font-size:var(--text-sm);font-weight:700;word-break:break-all;line-height:1.4"></div>
+              <div id="fsize" style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-1)"></div>
+            </div>
+            <span onclick="changeFile()" style="font-size:var(--text-xs);color:var(--ink-dim);cursor:pointer;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0">Change</span>
+          </div>
+
+          <!-- Expiry -->
+          <div style="margin-top:var(--space-4)">
+            <label class="field-label" for="ttl-select">Link expires after</label>
+            <select id="ttl-select">
+              <option value="3600000" selected>1 hour</option>
+              <option value="21600000">6 hours</option>
+              <option value="86400000">24 hours</option>
+            </select>
+          </div>
+
+          <!-- Send -->
+          <button class="btn btn-primary" id="btn-send" disabled onclick="sendFile()" style="width:100%;justify-content:center;margin-top:var(--space-4)">Encrypt &amp; get link &rarr;</button>
+
+          <!-- Progress -->
+          <div id="progress-block" style="display:none;margin-top:var(--space-4)">
+            <div class="progress-wrap"><div id="pbar"></div></div>
+            <div class="status-line" id="status-msg"></div>
+          </div>
+
+          <p style="font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-3);letter-spacing:.04em">5 MB limit &middot; no account needed &middot; <a href="/parashare" style="color:var(--cobalt)">need verified transfers?</a></p>
+
+        </div>
+
+        <!-- Step 2: Link ready -->
+        <div id="step-link" class="step">
+
+          <p style="font-family:var(--mono);font-size:var(--text-sm);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-3)">Link ready</p>
+          <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin-bottom:var(--space-5)">Share this link. The file decrypts in the recipient's browser and is deleted from the relay after one download.</p>
+
+          <label class="field-label">One-time download link</label>
+          <div class="share-box" id="magic-link" onclick="copyLink()">—</div>
+          <button class="copy-btn" id="copy-btn" onclick="copyLink()">Copy link</button>
+          <div id="copy-status" class="status-line" style="margin-top:var(--space-2)"></div>
+
+          <div style="margin-top:var(--space-5)">
+            <span class="send-tag">AES-256-GCM</span>
+            <span class="send-tag">Key in URL fragment</span>
+            <span class="send-tag">Burns after one download</span>
+            <span class="send-tag">Relay never sees plaintext</span>
+          </div>
+
+          <button onclick="startOver()" class="btn btn-secondary" style="width:100%;justify-content:center;margin-top:var(--space-6)">Send another file</button>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- § 01 HOW IT WORKS -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="how">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num">01</span>
+      <h2>How it works</h2>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)">Anon flow</span>
+    </div>
+    <div class="how-grid">
+      <div>
+        <div class="how-num">1</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Browser generates the key</strong>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">Web Crypto API produces a 256-bit AES key inside your browser. The relay is never involved in this step.</p>
+      </div>
+      <div>
+        <div class="how-num">2</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">File encrypts locally</strong>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">AES-256-GCM encrypts your file in the browser. The ciphertext is uploaded. Plaintext never leaves your device.</p>
+      </div>
+      <div>
+        <div class="how-num">3</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Key goes in the link</strong>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The key is placed in the URL fragment after the # symbol. Browsers strip the fragment before sending the URL to any server. The relay cannot log what it does not receive.</p>
+      </div>
+      <div>
+        <div class="how-num">4</div>
+        <strong style="display:block;font-size:var(--text-base);margin-bottom:var(--space-3)">Recipient decrypts, relay burns</strong>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The recipient's browser reads the key from the fragment and decrypts locally. The relay overwrites the ciphertext from RAM. Done.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- § 02 WHY THIS IS SAFE -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="why">
+  <div class="container">
+    <div class="safety-grid">
+      <div>
+        <div style="font-family:var(--mono);font-size:clamp(5rem,10vw,10rem);font-weight:700;line-height:0.85;letter-spacing:-.05em;color:var(--cobalt);margin-bottom:var(--space-5)">02</div>
+        <h2 style="font-size:clamp(1.5rem,2.5vw,2rem);letter-spacing:-.02em">Why this is safe without an account.</h2>
+      </div>
+      <div>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75">Your browser generates the encryption key. The key is a 256-bit value produced by Web Crypto, the same primitive used by every HTTPS connection you make.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75;margin-top:var(--space-5)">The key travels in the URL fragment. Browsers never send fragments over the wire to servers, which means Paramant's relay cannot log what it does not receive.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75;margin-top:var(--space-5)">The relay holds the ciphertext in RAM only. When the recipient downloads, the memory is overwritten. No disk write, no backup, no deferred deletion queue.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- § 03 WHEN TO USE SOMETHING ELSE -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="alternatives">
+  <div class="container-md">
+    <div class="sec-head" style="text-align:left">
+      <span class="num">03</span>
+      <h2>When you need more than this.</h2>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)">Alternatives</span>
+    </div>
+    <p style="font-size:var(--text-base);color:var(--ink);line-height:1.75;margin-bottom:var(--space-7)">Anonymous links are the fastest way to send something. For transfers where you need to prove who sent the file, or where the receiver must verify the relay before trusting a key, use ParaShare. For sending between two browsers on the same network with no relay in the middle, use ParaDrop.</p>
+    <div class="cluster" style="--cluster-gap:var(--space-4)">
+      <a href="/parashare" class="btn btn-secondary">Try ParaShare &rarr;</a>
+      <a href="/drop" class="btn btn-secondary">Try ParaDrop &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- § 04 FAQ -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="faq">
+  <div class="container-md">
+    <div class="sec-head" style="text-align:left">
+      <span class="num">04</span>
+      <h2>FAQ</h2>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)">Common questions</span>
+    </div>
+
+    <div class="faq-item">
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">What happens to my file after the recipient downloads it?</h4>
+      <p class="faq-a">The relay zeroes the memory holding the ciphertext and removes the entry from its store. The file is gone from every layer of the stack, including our RAM. There is no deleted files bin, no retention for abuse investigation, no copy retained for any purpose.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">Who has access to the decryption key?</h4>
+      <p class="faq-a">Only the person holding the link. The key lives in the URL fragment after the # symbol. Your browser strips the fragment before sending the URL to any server, including ours. As the sender, only you can reproduce the key, because it was generated in your browser and not persisted anywhere.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">How long is the link valid?</h4>
+      <p class="faq-a">One hour by default, or until the first successful download, whichever comes first. Paid tiers extend this up to 24 hours or 7 days, and allow multiple reads per link. See <a href="/pricing" style="color:var(--cobalt)">pricing</a> for details.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">Can I send files larger than 5 MB?</h4>
+      <p class="faq-a">Not via the anonymous flow. The 5 MB limit applies to all tiers at the managed relay. Enterprise customers running a dedicated relay can configure a higher limit within their RAM budget. If you need to send larger files regularly, <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">contact us</a>.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- § 05 FINAL CTA -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)">
+  <div class="container-md" style="text-align:center">
+    <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-4)">&sect; end &middot; or begin</p>
+    <h2 style="margin-bottom:var(--space-7)">Send one.</h2>
+    <div class="cluster" style="--cluster-gap:var(--space-4);justify-content:center;flex-wrap:wrap">
+      <button onclick="window.scrollTo({top:0,behavior:'smooth'})" class="btn btn-primary">Back to dropzone &rarr;</button>
+      <a href="/security" class="btn btn-secondary">Read the architecture &rarr;</a>
+      <a href="/pricing" class="btn btn-tertiary">See pricing</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">
+          FIPS 203 / 204 &middot; Hetzner DE<br>
+          GDPR &middot; no US CLOUD Act<br>
+          BUSL-1.1 &middot; &copy; 2026 PARAMANT
+        </p>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+<script>
+const RELAY = 'https://health.paramant.app';
+const MAX_BYTES = 5 * 1024 * 1024;
+
+let selectedFile = null;
+
+// ── Drop zone ──
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('click', () => document.getElementById('file-input').click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFileInput(e.dataTransfer.files); });
+
+function handleFileInput(files) {
+  if (!files || !files.length) return;
+  const f = files[0];
+  if (f.size > MAX_BYTES) {
+    alert('Max 5 MB. Your file is ' + (f.size / 1048576).toFixed(1) + ' MB.\nUse ParaShare for larger files.');
+    return;
+  }
+  selectedFile = f;
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fsize').textContent = formatSize(f.size);
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('file-info').style.display = 'flex';
+  document.getElementById('btn-send').disabled = false;
+}
+
+function changeFile() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('progress-block').style.display = 'none';
+}
+
+// ── Main send flow ──
+async function sendFile() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('btn-send');
+  btn.disabled = true;
+  document.getElementById('progress-block').style.display = 'block';
+
+  try {
+    setStatus('Generating encryption key...', 15);
+
+    // 1. Generate AES-256-GCM key + 12-byte IV
+    const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    setStatus('Reading file...', 30);
+
+    // 2. Read file bytes and prepend header: [uint32-LE nameLen][nameBytes][fileBytes]
+    const fileBytes = new Uint8Array(await selectedFile.arrayBuffer());
+    const nameBytes = new TextEncoder().encode(selectedFile.name);
+    const header = new Uint8Array(4);
+    new DataView(header.buffer).setUint32(0, nameBytes.length, true);
+    const plaintext = concatU8(header, nameBytes, fileBytes);
+
+    setStatus('Encrypting...', 50);
+
+    // 3. Encrypt
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plaintext));
+
+    setStatus('Computing hash...', 65);
+
+    // 4. SHA-256 of ciphertext for relay dedup check
+    const hashBuf = await crypto.subtle.digest('SHA-256', ciphertext);
+    const hash = [...new Uint8Array(hashBuf)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    setStatus('Uploading...', 75);
+
+    // 5. Upload to relay
+    const ttl_ms = parseInt(document.getElementById('ttl-select').value);
+    const r = await fetch(RELAY + '/v2/anon-inbound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hash, payload: u8toBase64(ciphertext), ttl_ms }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: 'Upload failed (' + r.status + ')' }));
+      throw new Error(err.error || 'Upload failed');
+    }
+
+    const data = await r.json();
+    if (!data.ok || !data.download_token) throw new Error('Relay returned unexpected response');
+
+    setStatus('Done.', 100, true);
+
+    // 6. Build magic link: fragment = base64url(key[32] || iv[12])
+    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+    const keyIv = new Uint8Array(44);
+    keyIv.set(rawKey, 0);
+    keyIv.set(iv, 32);
+    const fragment = toB64url(keyIv);
+    const magicLink = location.origin + '/get?t=' + data.download_token + '#' + fragment;
+
+    document.getElementById('magic-link').textContent = magicLink;
+    document.getElementById('magic-link').dataset.link = magicLink;
+    showStep('step-link');
+
+  } catch (e) {
+    setStatus('Error: ' + e.message, 0, false, true);
+    btn.disabled = false;
+  }
+}
+
+function copyLink() {
+  const link = document.getElementById('magic-link').dataset.link || '';
+  if (!link) return;
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const status = document.getElementById('copy-status');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    status.textContent = 'Link copied to clipboard';
+    status.className = 'status-line ok';
+    setTimeout(() => {
+      btn.textContent = 'Copy link';
+      btn.classList.remove('copied');
+      status.textContent = '';
+      status.className = 'status-line';
+    }, 3000);
+  }).catch(() => {
+    // Fallback: select the share box text
+    const range = document.createRange();
+    range.selectNode(document.getElementById('magic-link'));
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+}
+
+function startOver() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('progress-block').style.display = 'none';
+  document.getElementById('pbar').style.width = '0%';
+  showStep('step-upload');
+}
+
+// ── Helpers ──
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setStatus(msg, pct, ok = false, err = false) {
+  document.getElementById('pbar').style.width = pct + '%';
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = 'status-line' + (ok ? ' ok' : '') + (err ? ' err' : '');
+}
+
+function formatSize(n) {
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  return n + ' B';
+}
+
+function concatU8(...arrays) {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+function u8toBase64(u8) {
+  let b = '';
+  for (let i = 0; i < u8.length; i += 0x8000) {
+    b += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  }
+  return btoa(b);
+}
+
+function toB64url(u8) {
+  let b = '';
+  for (let i = 0; i < u8.length; i++) b += String.fromCharCode(u8[i]);
+  return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+</script>
+</body>
+</html>

@@ -3,6 +3,8 @@ const express = require('express');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
+const { initRedis, redis } = require('./lib/redis');
+const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -17,8 +19,23 @@ const SECTORS = {
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
 
-const sessions = new Map();
-setInterval(() => { const now = Date.now(); for (const [k, v] of sessions) if (v.expires < now) sessions.delete(k); }, 60_000);
+async function createSession() {
+  const sid = crypto.randomBytes(32).toString('hex');
+  await redis().set(`paramant:admin:session:${sid}`, '1', { EX: 3600 });
+  return sid;
+}
+
+async function validateSession(sid) {
+  if (!sid) return false;
+  const exists = await redis().get(`paramant:admin:session:${sid}`);
+  if (!exists) return false;
+  await redis().expire(`paramant:admin:session:${sid}`, 3600);
+  return true;
+}
+
+async function destroySession(sid) {
+  if (sid) await redis().del(`paramant:admin:session:${sid}`);
+}
 
 // ── Self-service trial key tracking ──────────────────────────────────────────
 const trialEmailTrack = new Map(); // email → { lastAt }
@@ -67,11 +84,17 @@ function checkLoginRateLimit(ip) {
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of loginAttempts) if (now > v.resetAt + 60_000) loginAttempts.delete(k); }, 120_000);
 
-function authMiddleware(req, res, next) {
-  const s = sessions.get((req.headers['x-session'] || '').trim());
-  if (!s || s.expires < Date.now()) return res.status(401).json({ error: 'unauthorized' });
-  req.sessionToken = s.token || ADMIN_TOKEN;
-  next();
+async function authMiddleware(req, res, next) {
+  const sid = (req.headers['x-session'] || '').trim();
+  try {
+    const valid = await validateSession(sid);
+    if (!valid) return res.status(401).json({ error: 'unauthorized' });
+    req.sessionToken = ADMIN_TOKEN;
+    next();
+  } catch (err) {
+    console.error('[auth] middleware error:', err.message);
+    res.status(503).json({ error: 'session_store_unavailable' });
+  }
 }
 
 function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
@@ -145,8 +168,7 @@ api.post('/auth/login', async (req, res) => {
   try {
     const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, ADMIN_TOKEN);
     if (!r.body?.ok) return res.status(401).json({ error: 'Invalid TOTP code' });
-    const sid = crypto.randomBytes(32).toString('hex');
-    sessions.set(sid, { expires: Date.now() + 3_600_000, token: ADMIN_TOKEN });
+    const sid = await createSession();
     return res.json({ ok: true, session: sid, expires_in: 3600 });
   } catch (e) {
     // Fix 10: don't leak internal relay address in error response
@@ -155,7 +177,7 @@ api.post('/auth/login', async (req, res) => {
   }
 });
 
-api.post('/auth/logout', (req, res) => { sessions.delete((req.headers['x-session'] || '').trim()); res.json({ ok: true }); });
+api.post('/auth/logout', async (req, res) => { await destroySession((req.headers['x-session'] || '').trim()); res.json({ ok: true }); });
 api.get('/auth/check', authMiddleware, (req, res) => res.json({ ok: true }));
 
 function sectorRoute(relPath, method) {
@@ -333,8 +355,658 @@ api.post('/request-key', async (req, res) => {
   }
 });
 
+
+// ── User auth constants ───────────────────────────────────────────────────────
+const INTERNAL_TOKEN = process.env.INTERNAL_AUTH_TOKEN || "";
+const SITE_URL       = process.env.SITE_URL            || "https://paramant.app";
+
+function parseCookies(req) {
+  const c = {};
+  (req.headers.cookie || "").split(";").forEach(part => {
+    const [k, ...v] = part.trim().split("=");
+    if (k) c[k.trim()] = decodeURIComponent(v.join("="));
+  });
+  return c;
+}
+
+// Call relay internal endpoint (with X-Internal-Auth)
+async function callRelay(endpoint, body) {
+  const relayUrl = SECTORS.health;
+  const res = await fetch(`${relayUrl}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Internal-Auth": INTERNAL_TOKEN,
+    },
+    body: JSON.stringify(body),
+  });
+  return res;
+}
+
+// Find API key entry by email (queries health relay)
+async function findUserByEmail(email) {
+  const lower = email.toLowerCase();
+  const r = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  if (r.status !== 200) return null;
+  const keys = r.body?.keys || [];
+  return keys.find(k => k.email && k.email.toLowerCase() === lower && k.active !== false) || null;
+}
+
+// Send setup email via Resend
+async function sendSetupEmail(email, setupToken) {
+  const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Paramant <noreply@paramant.app>",
+      to: [email],
+      subject: "Complete your Paramant setup",
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Set up Paramant authenticator</h2><p style="color:#475569;margin:0 0 16px">Click below to set up two-factor authentication for your Paramant account.</p><a href="${setupUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Complete setup</a><p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 14 days. If you did not request this, ignore this email.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
+      text: `Complete your Paramant setup\n\nLink: ${setupUrl}\n\nExpires in 14 days. If you did not request this, ignore this email.`,
+    }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => "")}`);
+}
+
+// ── User session middleware ────────────────────────────────────────────────────
+async function authUser(req, res, next) {
+  const token = parseCookies(req).paramant_user_session;
+  if (!token) return res.status(401).json({ error: "unauthenticated" });
+  try {
+    const raw = await redis().get(`paramant:user:session:${token}`);
+    if (!raw) return res.status(401).json({ error: "session_expired" });
+    await redis().expire(`paramant:user:session:${token}`, 3600);
+    req.userSession = JSON.parse(raw);
+    req.userSessionToken = token;
+    next();
+  } catch (err) {
+    console.error("[authUser]", err.message);
+    res.status(503).json({ error: "session_store_unavailable" });
+  }
+}
+
+function setUserCookie(res, token) {
+  res.setHeader("Set-Cookie",
+    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600`
+  );
+}
+
+function clearUserCookie(res) {
+  res.setHeader("Set-Cookie",
+    "paramant_user_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0"
+  );
+}
+
+// ── Signup flow ───────────────────────────────────────────────────────────────
+
+// POST /api/user/signup
+api.post("/user/signup", async (req, res) => {
+  const { email, label, dpa_accepted } = req.body || {};
+  if (!email || !dpa_accepted) return res.status(400).json({ error: "missing_fields" });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const ipKey = `paramant:signup:ratelimit:${ip}`;
+  const count = await redis().incr(ipKey);
+  if (count === 1) await redis().expire(ipKey, 3600);
+  if (count > 3) return res.status(429).json({ error: "rate_limited" });
+
+  const existing = await findUserByEmail(email);
+  if (existing) return res.status(409).json({ error: "account_exists" });
+
+  // Create API key via admin relay
+  const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
+  const createRes = await relayFetch("health", "/v2/admin/keys", "POST", {
+    key: keyVal,
+    email: email.toLowerCase(),
+    label: label || null,
+    plan: "community",
+    active: true,
+  }, false, ADMIN_TOKEN);
+
+  if (createRes.status !== 200 && createRes.status !== 201) {
+    console.error("[signup] key creation failed:", createRes.status, createRes.body);
+    return res.status(500).json({ error: "key_creation_failed" });
+  }
+
+  const setupToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:setup_token:${setupToken}`,
+    JSON.stringify({ user_id: keyVal, email: email.toLowerCase(), label: label || null }),
+    { EX: 14 * 86400 }
+  );
+
+  try {
+    await sendSetupEmail(email, setupToken);
+  } catch (err) {
+    console.error("[signup] email failed:", err.message);
+    return res.status(500).json({ error: "email_failed", message: "Account created but email failed. Contact privacy@paramant.app." });
+  }
+
+  res.json({ success: true, message: "setup_email_sent" });
+});
+
+// POST /api/user/setup/:token — retrieve TOTP QR data
+api.post("/user/setup/:token", async (req, res) => {
+  const { token } = req.params;
+  const raw = await redis().get(`paramant:user:setup_token:${token}`);
+  if (!raw) return res.status(401).json({ error: "invalid_or_expired_token" });
+
+  const { user_id, email } = JSON.parse(raw);
+
+  const relayRes = await callRelay("/v2/user/setup-totp", { user_id, provisional: true });
+  if (!relayRes.ok) return res.status(relayRes.status).json(await relayRes.json().catch(() => ({ error: "relay_error" })));
+
+  const { secret, backup_codes } = await relayRes.json();
+  const issuer = "Paramant";
+  const encodedEmail = encodeURIComponent(email);
+  const otpauth = `otpauth://totp/${issuer}:${encodedEmail}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
+
+  res.json({ email, otpauth, secret, backup_codes });
+});
+
+// POST /api/user/setup/:token/confirm — verify first code, activate TOTP, issue session
+api.post("/user/setup/:token/confirm", async (req, res) => {
+  const { token } = req.params;
+  const { totp } = req.body || {};
+
+  const raw = await redis().get(`paramant:user:setup_token:${token}`);
+  if (!raw) return res.status(401).json({ error: "invalid_or_expired_token" });
+
+  const { user_id, email } = JSON.parse(raw);
+
+  const verifyRes = await callRelay("/v2/user/verify-totp", { user_id, totp });
+  if (!verifyRes.ok) return res.status(401).json({ error: "invalid_code" });
+  const result = await verifyRes.json();
+  if (!result.valid) return res.status(401).json({ error: "invalid_code" });
+
+  await callRelay("/v2/user/activate-totp", { user_id });
+  await redis().del(`paramant:user:setup_token:${token}`);
+
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:session:${sessionToken}`,
+    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "" }),
+    { EX: 3600 }
+  );
+
+  setUserCookie(res, sessionToken);
+
+  const codesRes = await callRelay("/v2/user/get-backup-codes-plaintext", { user_id });
+  const { backup_codes } = codesRes.ok ? await codesRes.json() : { backup_codes: [] };
+
+  res.json({ success: true, email, backup_codes });
+});
+
+// ── Login flow ────────────────────────────────────────────────────────────────
+
+// POST /api/user/login
+api.post("/user/login", async (req, res) => {
+  const { email, totp } = req.body || {};
+  if (!email || !totp) return res.status(400).json({ error: "missing_fields" });
+
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const ipKey    = `paramant:user:ratelimit:ip:${ip}`;
+  const emailKey = `paramant:user:ratelimit:email:${email.toLowerCase()}`;
+  const ipCount    = await redis().incr(ipKey);    if (ipCount    === 1) await redis().expire(ipKey,    900);
+  const emailCount = await redis().incr(emailKey); if (emailCount === 1) await redis().expire(emailKey, 900);
+  if (ipCount > 5 || emailCount > 10) return res.status(429).json({ error: "rate_limited" });
+
+  const user = await findUserByEmail(email);
+  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+
+  const activeRaw = await redis().get(`paramant:user:totp_active:${user.key}`);
+  if (activeRaw !== "true") return res.status(403).json({ error: "totp_not_configured" });
+
+  const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });
+  if (!verifyRes.ok) return res.status(401).json({ error: "invalid_credentials" });
+  const result = await verifyRes.json();
+  if (!result.valid) return res.status(401).json({ error: "invalid_credentials" });
+
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:session:${sessionToken}`,
+    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "" }),
+    { EX: 3600 }
+  );
+
+  setUserCookie(res, sessionToken);
+
+  res.json({
+    success: true,
+    email: user.email,
+    session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+  });
+});
+
+// POST /api/user/login-with-backup
+api.post("/user/login-with-backup", async (req, res) => {
+  const { email, backup_code } = req.body || {};
+  if (!email || !backup_code) return res.status(400).json({ error: "missing_fields" });
+
+  const user = await findUserByEmail(email);
+  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+
+  const consumeRes = await callRelay("/v2/user/consume-backup", {
+    user_id: user.key,
+    code: backup_code.trim().toUpperCase(),
+  });
+  const result = await consumeRes.json();
+  if (!result.valid) return res.status(401).json({ error: "invalid_credentials" });
+
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:session:${sessionToken}`,
+    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code" }),
+    { EX: 3600 }
+  );
+
+  setUserCookie(res, sessionToken);
+  res.json({ success: true, email: user.email });
+});
+
+// POST /api/user/logout
+api.post("/user/logout", async (req, res) => {
+  const token = parseCookies(req).paramant_user_session;
+  if (token) await redis().del(`paramant:user:session:${token}`);
+  clearUserCookie(res);
+  res.json({ success: true });
+});
+
+// GET /api/user/session/verify
+api.get("/user/session/verify", async (req, res) => {
+  const token = parseCookies(req).paramant_user_session;
+  if (!token) return res.json({ authenticated: false });
+  const raw = await redis().get(`paramant:user:session:${token}`);
+  if (!raw) return res.json({ authenticated: false });
+  await redis().expire(`paramant:user:session:${token}`, 3600);
+  const s = JSON.parse(raw);
+  res.json({
+    authenticated: true,
+    email: s.email,
+    expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+  });
+});
+
+// ── Account management ────────────────────────────────────────────────────────
+
+// GET /api/user/account
+api.get("/user/account", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;
+  const user = await findUserByEmail(email);
+  const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
+
+  const sessions = [];
+  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+    const raw = await redis().get(key);
+    if (!raw) continue;
+    const s = JSON.parse(raw);
+    if (s.user_id !== user_id) continue;
+    const token = key.replace("paramant:user:session:", "");
+    sessions.push({
+      ip_masked: maskIp(s.ip || ""),
+      user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
+      last_seen: new Date(s.created_at).toISOString(),
+      current: token === req.userSessionToken,
+      via: s.via || "totp",
+    });
+  }
+
+  res.json({
+    email,
+    label: user?.label || null,
+    plan: user?.plan || null,
+    api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
+    backup_codes_remaining: backupCount,
+    session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+    sessions,
+  });
+});
+
+function maskIp(ip) {
+  if (!ip) return "—";
+  if (ip.includes(".")) {
+    const p = ip.split(".");
+    return `${p[0]}.${p[1]}.${p[2]}.0`;
+  }
+  return ip.split(":").slice(0, 2).join(":") + "::0";
+}
+
+// GET /api/user/account/key
+api.get("/user/account/key", authUser, async (req, res) => {
+  res.json({ api_key: req.userSession.user_id });
+});
+
+// POST /api/user/account/backup-codes/regenerate
+api.post("/user/account/backup-codes/regenerate", authUser, async (req, res) => {
+  const relayRes = await callRelay("/v2/user/regenerate-backup", { user_id: req.userSession.user_id });
+  if (!relayRes.ok) return res.status(500).json({ error: "regenerate_failed" });
+  res.json(await relayRes.json());
+});
+
+// POST /api/user/account/totp/reset
+api.post("/user/account/totp/reset", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;
+
+  await callRelay("/v2/user/delete-totp", { user_id });
+
+  const setupToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:setup_token:${setupToken}`,
+    JSON.stringify({ user_id, email }),
+    { EX: 14 * 86400 }
+  );
+
+  try {
+    await sendSetupEmail(email, setupToken);
+  } catch (err) {
+    console.error("[totp/reset] email failed:", err.message);
+    return res.status(500).json({ error: "email_failed" });
+  }
+
+  // Invalidate all sessions for this user
+  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+    const raw = await redis().get(key);
+    if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
+  }
+
+  clearUserCookie(res);
+  res.json({ success: true });
+});
+
+// POST /api/user/account/sessions/revoke-others
+api.post("/user/account/sessions/revoke-others", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  let revoked = 0;
+  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+    const raw = await redis().get(key);
+    if (!raw) continue;
+    const s = JSON.parse(raw);
+    const token = key.replace("paramant:user:session:", "");
+    if (s.user_id === user_id && token !== req.userSessionToken) {
+      await redis().del(key);
+      revoked++;
+    }
+  }
+  res.json({ success: true, revoked });
+});
+
+// DELETE /api/user/account
+api.delete("/user/account", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+
+  // Revoke key across all sectors
+  await eachSector(Object.keys(SECTORS), async s => {
+    await relayFetch(s, "/v2/admin/keys/revoke", "POST", { key: user_id }, false, ADMIN_TOKEN);
+  });
+
+  await callRelay("/v2/user/delete-totp", { user_id });
+
+  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+    const raw = await redis().get(key);
+    if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
+  }
+
+  clearUserCookie(res);
+  res.json({ success: true });
+});
+
+// ── Session → API key proxy ───────────────────────────────────────────────────
+api.all("/relay/:sector/*path", authUser, async (req, res) => {
+  const sector = req.params.sector;
+  const relayBase = SECTORS[sector];
+  if (!relayBase) return res.status(404).json({ error: "unknown_sector" });
+
+  const relayPath = "/" + (req.params.path || "");
+  const fetchOpts = {
+    method: req.method,
+    headers: {
+      "X-Api-Key": req.userSession.user_id,
+      "Content-Type": "application/json",
+    },
+  };
+
+  if (["POST", "PUT", "PATCH"].includes(req.method)) {
+    fetchOpts.body = JSON.stringify(req.body);
+  }
+
+  try {
+    const proxyRes = await fetch(`${relayBase}${relayPath}`, fetchOpts);
+    const ct = proxyRes.headers.get("content-type") || "";
+    res.status(proxyRes.status).set("content-type", ct);
+    res.send(ct.includes("application/json") ? await proxyRes.json() : await proxyRes.text());
+  } catch (err) {
+    console.error("[proxy]", err.message);
+    res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// ── Anonymous drop rate limiting ──────────────────────────────────────────────
+api.post("/drop/upload", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "invalid_email" });
+  }
+  const rlKey = `paramant:drop:ratelimit:${email.toLowerCase()}`;
+  const count = await redis().incr(rlKey);
+  if (count === 1) await redis().expire(rlKey, 86400);
+  if (count > 3) {
+    return res.status(429).json({
+      error: "rate_limited",
+      message: "Daily limit reached. Create a free account for unlimited drops.",
+    });
+  }
+  const anonRes = await relayFetch("health", "/v2/anon-inbound", "POST", req.body, false, "");
+  res.status(anonRes.status).json(anonRes.body);
+});
+
+
+// ── Billing ───────────────────────────────────────────────────────────────────
+
+const PLANS = [
+  {
+    id: 'community',
+    name: 'Community',
+    price_monthly_eur: 0,
+    price_yearly_eur: 0,
+    limits: { file_size_mb: 5, link_ttl_hours: 1, reads_per_link: 1, registered_devices: 5 },
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price_monthly_eur: 9,
+    price_yearly_eur: 89,
+    limits: { file_size_mb: 5, link_ttl_hours: 24, reads_per_link: 10, registered_devices: 50 },
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price_monthly_eur: null,
+    price_yearly_eur: null,
+    limits: { file_size_mb: null, link_ttl_hours: 168, reads_per_link: 100, registered_devices: null },
+  },
+];
+
+async function sendBillingConfirmation(email, plan, amount, period) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  const planName = PLANS.find(p => p.id === plan)?.name || plan;
+  const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Paramant <noreply@paramant.app>',
+      to: [email],
+      subject: `Paramant plan upgraded to ${planName}`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Plan upgraded to ${planName}</h2><p style="color:#475569;margin:0 0 16px">Your Paramant plan has been upgraded. Here are the details:</p><table style="width:100%;border-collapse:collapse;margin-bottom:24px"><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px">Plan</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:600;text-align:right">${planName}</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px">Billing period</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:600;text-align:right">${period === 'yearly' ? 'Yearly' : 'Monthly'}</td></tr><tr><td style="padding:10px 0;color:#64748b;font-size:14px">Amount</td><td style="padding:10px 0;font-weight:700;color:#1d4ed8;text-align:right">${amountStr}</td></tr></table><p style="color:#94a3b8;font-size:12px;margin-top:24px">Note: This is a stub confirmation. No real payment was charged. Stripe integration pending.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app</p></div></body></html>`,
+      text: `Your Paramant plan has been upgraded to ${planName} (${period}). Amount: ${amountStr}. Note: stub checkout — no real charge.`,
+    }),
+  });
+}
+
+async function sendCancellationScheduled(email, plan, cancelAt) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  const planName = PLANS.find(p => p.id === plan)?.name || plan;
+  const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Paramant <noreply@paramant.app>',
+      to: [email],
+      subject: `Your Paramant plan cancellation is scheduled`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Cancellation scheduled</h2><p style="color:#475569;margin:0 0 16px">Your ${planName} plan cancellation has been scheduled. Your plan will downgrade to Community on <strong>${cancelDate}</strong>.</p><p style="color:#475569;margin:0 0 16px">You can continue using all ${planName} features until that date.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app</p></div></body></html>`,
+      text: `Your ${planName} plan cancellation is scheduled for ${cancelDate}. You retain access until then.`,
+    }),
+  });
+}
+
+api.get("/user/billing/plans", (req, res) => {
+  res.json({ plans: PLANS });
+});
+
+api.post("/user/billing/checkout", authUser, async (req, res) => {
+  const { plan_id, period } = req.body || {};
+  if (!plan_id || !['monthly', 'yearly'].includes(period)) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+  const plan = PLANS.find(p => p.id === plan_id);
+  if (!plan || plan.id === 'community') return res.status(400).json({ error: 'invalid_plan' });
+  if (plan.price_monthly_eur === null) return res.status(400).json({ error: 'enterprise_contact_sales' });
+
+  const amount = period === 'yearly' ? plan.price_yearly_eur : plan.price_monthly_eur;
+  const token = crypto.randomBytes(20).toString('hex');
+  const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+
+  await redis().set(
+    `paramant:user:checkout:${token}`,
+    JSON.stringify({
+      user_id: req.userSession.user_id,
+      email: req.userSession.email,
+      plan_id,
+      plan_name: plan.name,
+      period,
+      amount_eur: amount,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    }),
+    { EX: 3600 }
+  );
+
+  // PLACEHOLDER: replace this block with stripe.checkout.sessions.create() when integrating Stripe
+  res.json({ checkout_url: `/billing/checkout/${token}`, expires_at: expiresAt });
+});
+
+api.get("/user/billing/checkout/:token", authUser, async (req, res) => {
+  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
+  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
+  const s = JSON.parse(raw);
+  if (s.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
+  res.json({ plan_id: s.plan_id, plan_name: s.plan_name, period: s.period, amount_eur: s.amount_eur, email: s.email, status: s.status });
+});
+
+api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => {
+  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
+  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
+  const session = JSON.parse(raw);
+  if (session.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
+  if (session.status !== 'pending') return res.status(409).json({ error: 'already_processed' });
+
+  // Get current plan for audit log
+  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const currentKey = (keysRes.body?.keys || []).find(k => k.key === session.user_id);
+  const fromPlan = currentKey?.plan || 'community';
+
+  // PLACEHOLDER: replace with stripe.webhooks.constructEvent() verification when integrating Stripe
+  const updateRes = await callRelay("/v2/admin/keys/update-plan", { key: session.user_id, plan: session.plan_id });
+  if (!updateRes.ok) {
+    console.error('[billing] update-plan failed:', updateRes.status);
+    return res.status(502).json({ error: 'plan_update_failed' });
+  }
+
+  // Reload all relay sectors so in-memory maps stay consistent
+  await Promise.allSettled(Object.keys(SECTORS).map(s =>
+    relayFetch(s, "/v2/reload-users", "POST", {}, false, ADMIN_TOKEN)
+  ));
+
+  const now = new Date().toISOString();
+  const nextBilling = session.period === 'yearly'
+    ? new Date(Date.now() + 365 * 86_400_000).toISOString()
+    : new Date(Date.now() + 30 * 86_400_000).toISOString();
+
+  await redis().set(
+    `paramant:user:billing:${session.user_id}`,
+    JSON.stringify({ plan: session.plan_id, period: session.period, amount_eur: session.amount_eur, activated_at: now, next_billing_date: nextBilling })
+  );
+
+  await logAuditEvent(session.user_id, 'plan_changed', {
+    from: fromPlan, to: session.plan_id, period: session.period, amount_eur: session.amount_eur, via: 'stub_checkout',
+  });
+
+  await redis().set(
+    `paramant:user:checkout:${req.params.token}`,
+    JSON.stringify({ ...session, status: 'completed', completed_at: now }),
+    { EX: 3600 }
+  );
+
+  try { await sendBillingConfirmation(session.email, session.plan_id, session.amount_eur, session.period); }
+  catch (err) { console.error('[billing] confirmation email failed:', err.message); }
+
+  res.json({ success: true, new_plan: session.plan_id, effective_from: now });
+});
+
+api.post("/user/billing/cancel", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;
+  const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
+  const billing = billingRaw ? JSON.parse(billingRaw) : null;
+  const cancelAt = billing?.next_billing_date || new Date(Date.now() + 30 * 86_400_000).toISOString();
+  await redis().set(`paramant:user:plan_cancel_at:${user_id}`, cancelAt);
+  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: billing?.plan || 'pro', via: 'user_request' });
+  try { await sendCancellationScheduled(email, billing?.plan || 'pro', cancelAt); }
+  catch (err) { console.error('[billing] cancel email failed:', err.message); }
+  res.json({ scheduled_downgrade_at: cancelAt });
+});
+
+api.get("/user/billing/status", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
+  const billing = billingRaw ? JSON.parse(billingRaw) : null;
+  const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
+  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  res.json({
+    current_plan: currentKey?.plan || 'community',
+    period: billing?.period || null,
+    amount_eur: billing?.amount_eur ?? 0,
+    next_billing_date: billing?.next_billing_date || null,
+    cancellation_scheduled_at: cancelAt || null,
+    stub_notice: 'Payment integration pending. No real charges apply.',
+  });
+});
+
+api.get("/user/billing/history", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const events = await getAuditEvents(user_id, {
+    limit: 10,
+    event_types: ['plan_changed', 'plan_cancellation_scheduled', 'plan_downgraded'],
+  });
+  res.json({ history: events });
+});
+
 app.use(`${BASE_PATH}/api`, api);
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`[PARAMANT-ADMIN] listening on :${PORT}${BASE_PATH || '/'}`));
+(async () => {
+  await initRedis();
+  app.listen(PORT, '0.0.0.0', () => console.log(`[PARAMANT-ADMIN] listening on :${PORT}${BASE_PATH || '/'}`));
+})().catch((err) => {
+  console.error('[boot] startup failed:', err);
+  process.exit(1);
+});

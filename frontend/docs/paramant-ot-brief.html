@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT — Industrial OT Brief</title>
+<style>
+:root {
+  --doc-bg: #f4efe2; --doc-ink: #0a0a0a; --doc-ink-dim: #444; --doc-ink-ghost: #777;
+  --doc-accent: #1a7a3c;
+  --mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+}
+@page { size: A4; margin: 16mm 20mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--mono);
+  font-size: 10pt;
+  color: var(--doc-ink);
+  background: var(--doc-bg);
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 16mm 20mm;
+  line-height: 1.5;
+}
+header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2.5px solid var(--doc-ink);
+  padding-bottom: 10px;
+  margin-bottom: 18px;
+}
+.logo-block h1 { font-size: 18pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+.logo-block p { font-size: 8pt; color: var(--doc-ink-dim); margin-top: 3px; letter-spacing: 0.8px; text-transform: uppercase; }
+.badge-block { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; padding-top: 2px; }
+.badge { font-size: 7pt; font-weight: 700; border: 1.5px solid var(--doc-ink); padding: 2px 6px; letter-spacing: 0.3px; white-space: nowrap; }
+.badge.green { border-color: var(--doc-accent); color: var(--doc-accent); }
+h2 {
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--doc-ink-dim);
+  margin-bottom: 7px;
+  margin-top: 18px;
+  border-bottom: 1px solid rgba(10,10,10,.2);
+  padding-bottom: 3px;
+}
+h3 { font-size: 9.5pt; font-weight: 700; margin: 12px 0 5px; }
+p { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.6; margin-bottom: 6px; }
+ul { padding-left: 14px; margin-bottom: 8px; }
+li { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.55; margin-bottom: 2px; }
+.intro-block {
+  background: rgba(10,10,10,.05);
+  border-left: 3px solid var(--doc-ink);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.intro-block p { font-size: 10pt; font-weight: 600; color: var(--doc-ink); margin-bottom: 4px; }
+.intro-block small { font-size: 9pt; color: var(--doc-ink-dim); line-height: 1.6; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 8px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.prop-list { list-style: none; padding: 0; }
+.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid rgba(10,10,10,.1); display: flex; gap: 6px; }
+.prop-list li::before { content: "✓"; color: var(--doc-accent); font-weight: 700; flex-shrink: 0; }
+.arch-box {
+  background: rgba(10,10,10,.05);
+  border: 1px solid rgba(10,10,10,.2);
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 8.5pt;
+  line-height: 1.7;
+  color: var(--doc-ink);
+  margin: 8px 0;
+}
+code {
+  font-family: var(--mono);
+  font-size: 8.5pt;
+  background: rgba(10,10,10,.07);
+  padding: 1px 5px;
+}
+.code-block {
+  font-family: var(--mono);
+  font-size: 8pt;
+  background: rgba(10,10,10,.05);
+  border: 1px solid rgba(10,10,10,.2);
+  padding: 10px 12px;
+  line-height: 1.65;
+  color: var(--doc-ink);
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9pt; }
+th { background: var(--doc-ink); color: var(--doc-bg); text-align: left; padding: 6px 10px; font-size: 8pt; font-weight: 600; letter-spacing: 0.4px; }
+td { padding: 6px 10px; border-bottom: 1px solid rgba(10,10,10,.1); vertical-align: top; color: var(--doc-ink); }
+tr:nth-child(even) td { background: rgba(10,10,10,.03); }
+.sr-ref { font-family: var(--mono); font-weight: 700; color: var(--doc-accent); white-space: nowrap; }
+.check-col { color: var(--doc-accent); font-weight: 700; text-align: center; }
+.tier-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: rgba(10,10,10,.2); margin: 8px 0; }
+.tier { background: var(--doc-bg); padding: 10px 12px; }
+.tier.hl { background: rgba(26,122,60,.07); }
+.tier-name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.tier-price { font-size: 14pt; font-weight: 900; line-height: 1; margin-bottom: 2px; }
+.tier-price sub { font-size: 8pt; font-weight: 400; color: var(--doc-ink-dim); }
+.tier-desc { font-size: 8pt; color: var(--doc-ink-dim); margin-bottom: 6px; }
+.tier ul { font-size: 8.5pt; padding-left: 12px; color: var(--doc-ink); }
+.perf-note { font-size: 8pt; color: var(--doc-ink-ghost); font-style: italic; margin-top: 4px; }
+footer {
+  margin-top: 22px;
+  padding-top: 10px;
+  border-top: 2px solid var(--doc-ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-l { font-size: 9pt; font-weight: 700; }
+.footer-l span { font-weight: 400; color: var(--doc-ink-dim); font-size: 8pt; display: block; margin-top: 2px; font-family: var(--mono); }
+.footer-r { text-align: right; font-size: 8pt; color: var(--doc-ink-dim); line-height: 1.7; }
+.footer-r a { color: var(--doc-ink); font-weight: 600; text-decoration: none; }
+.page-break { page-break-after: always; padding-bottom: 8px; }
+.print-btn {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--doc-ink); color: var(--doc-bg); border: none;
+  padding: 10px 20px; font-size: 10pt; font-weight: 600; cursor: pointer;
+}
+@media print {
+  .print-btn { display: none; }
+  body { padding: 0; }
+  a { color: var(--doc-ink) !important; text-decoration: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
+
+<!-- PAGE 1 — EXECUTIVE SUMMARY -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT</h1>
+    <p>Ghost Pipe — Industrial OT Brief</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge green">ML-KEM-768</span>
+    <span class="badge green">IEC 62443</span>
+    <span class="badge">Burn-on-read</span>
+    <span class="badge">Self-hosted</span>
+    <span class="badge">ARM64</span>
+  </div>
+</header>
+
+<div class="intro-block">
+  <p>The problem with OT/IT data transfer is architectural, not operational.</p>
+  <small>OT networks cannot connect directly to cloud systems. VPNs create persistent attack surfaces. Legacy protocols (FTP, SMB, OPC-DA) are not quantum-safe. Sensor data in transit is being collected now for future decryption — the Harvest Now, Decrypt Later (HNDL) threat. Ghost Pipe is a quantum-safe data conduit designed for the IEC 62443 zone boundary.</small>
+</div>
+
+<h2>Solution</h2>
+<div class="two-col">
+  <div>
+    <h3>What Ghost Pipe is</h3>
+    <p>A RAM-only relay for the DMZ zone boundary. No VPN. No network reconfiguration. No persistent storage. Sensor data enters encrypted, burns after delivery. The relay is a conduit, not a server.</p>
+    <p>Deployable on a Raspberry Pi 3B+ at the field level, or in your existing DMZ on any Linux server.</p>
+  </div>
+  <div>
+    <h3>What it is not</h3>
+    <p>Not a SCADA historian. Not a VPN replacement for general traffic. Not a cloud service you depend on — the relay runs in your own infrastructure, under your own keys, and operates without external connectivity if needed.</p>
+  </div>
+</div>
+
+<h2>Key Properties</h2>
+<ul class="prop-list">
+  <li>ML-KEM-768 (NIST FIPS 203) — post-quantum key exchange, immune to harvest-now-decrypt-later</li>
+  <li>ML-DSA-65 (NIST FIPS 204) — post-quantum device signatures on every transfer</li>
+  <li>RAM-only relay — zero persistent storage, nothing to breach, nothing to image in a forensic incident</li>
+  <li>IEC 62443 SR 4.1, 4.2, 3.1, 2.8, 5.2 — compliance documentation included and maintained</li>
+  <li>ARM64 native — runs on Raspberry Pi 3B+ at the field level (512 MB RAM minimum)</li>
+  <li>Self-hosted relay in your DMZ — no external dependency, no SaaS relationship required</li>
+  <li>EU/DE jurisdiction — Hetzner Falkenstein, no US CLOUD Act exposure on managed relay</li>
+  <li>Fully open source — BUSL-1.1, audit every line at github.com/Apolloccrypt/paramant-relay</li>
+  <li>CT audit log — Merkle-based tamper-evident log, every transfer cryptographically provable</li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- PAGE 2 — ARCHITECTURE -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT / OT</h1>
+    <p>Architecture &amp; Deployment</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge">Purdue Model</span>
+    <span class="badge">Ghost Pipe v2</span>
+    <span class="badge">April 2026</span>
+  </div>
+</header>
+
+<h2>Purdue Model Placement</h2>
+<div class="arch-box">Level 4  Enterprise IT      ←  Cloud SCADA / historian / ERP
+Level 3  Operations IT      ←  paramant-receiver (Linux daemon or Python)
+         ─────────────────────────────────────────────────────────────────
+Level 3.5  DMZ (conduit)   ←  Ghost Pipe relay  (self-hosted, your server)
+         ─────────────────────────────────────────────────────────────────
+Level 2  Control            ←  paramant-sender (PLC gateway / HMI)
+Level 1  Field devices           PLC / DCS / sensor output → gateway
+Level 0  Physical process</div>
+
+<h2>Data Flow</h2>
+<div class="arch-box">PLC output
+  → paramant-sender (Level 2)
+  → [ML-KEM-768 encrypt client-side]
+  → Ghost Pipe relay (DMZ) — stores ciphertext in RAM only, TTL 10 min default
+  → [burn-on-read]
+  → paramant-receiver (Level 3)
+  → [client-side decrypt]
+  → SCADA historian / cloud</div>
+
+<p>The relay holds only ciphertext, only in RAM, only until delivered. It has no knowledge of sensor values, device identifiers, or process state. A full relay compromise yields zero plaintext.</p>
+
+<h2>Relay Properties</h2>
+<div class="two-col">
+  <div>
+    <ul>
+      <li>Receives only ciphertext — never sees plaintext sensor values</li>
+      <li>RAM-only store — wiped after delivery or TTL expiry</li>
+      <li>ML-DSA-65 signed Signed Tree Head after every Merkle update</li>
+      <li>Inclusion proof per transfer — tamper-detectable by any party</li>
+      <li>Device identity registry — <code>/v2/did/register</code></li>
+    </ul>
+  </div>
+  <div>
+    <ul>
+      <li>WebSocket streaming — low-latency for continuous sensor data</li>
+      <li>NATS.io integration — optional push transport</li>
+      <li>Per-device API keys — revocation supported</li>
+      <li>Air-gap capable — no upstream internet required in self-hosted mode</li>
+      <li>Docker Compose — single <code>docker compose up</code></li>
+    </ul>
+  </div>
+</div>
+
+<h2>Integration Examples</h2>
+<div class="two-col">
+  <div>
+    <h3>Continuous sensor mode</h3>
+    <div class="code-block">paramant-sender \
+  --interval 15 \
+  --device-id plc-line-01 \
+  --key pgp_xxx \
+  sensor-output.json</div>
+    <p>Sends one encrypted packet every 15 seconds. Each burns after the receiver reads it. Interval and TTL configurable.</p>
+  </div>
+  <div>
+    <h3>Firmware distribution</h3>
+    <div class="code-block">paramant-firmware \
+  --sign firmware-v2.1.bin \
+  --device-group factory-01 \
+  --key pgp_xxx \
+  --ttl 86400</div>
+    <p>Signs the firmware binary with ML-DSA-65, distributes to device group. Each device downloads once and the package burns.</p>
+  </div>
+</div>
+
+<h2>Edge Deployment (Raspberry Pi)</h2>
+<div class="code-block">curl -fsSL https://paramant.app/install-pi.sh | bash
+# → Installs relay on ARM64, configures systemd service, generates relay identity</div>
+<p>Minimum hardware: Raspberry Pi 3B+ · 512 MB RAM · 4 GB SD · Ethernet. No display required. Connects to your DMZ network segment.</p>
+
+<div class="page-break"></div>
+
+<!-- PAGE 3 — IEC 62443 COMPLIANCE -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT / OT</h1>
+    <p>IEC 62443 Compliance Matrix</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge green">IEC 62443-3-3</span>
+    <span class="badge green">SL-T 2 default</span>
+    <span class="badge green">SL-T 3 self-hosted</span>
+  </div>
+</header>
+
+<p style="margin-bottom:10px">The table below maps IEC 62443-3-3 System Security Requirements to Ghost Pipe protocol properties. Documentation available at <strong>paramant.app/compliance/iec62443</strong>.</p>
+
+<table>
+  <tr>
+    <th style="width:15%">Requirement</th>
+    <th style="width:28%">Title</th>
+    <th style="width:47%">Ghost Pipe implementation</th>
+    <th style="width:10%">SL-T</th>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 4.1</td>
+    <td>Information confidentiality</td>
+    <td>ML-KEM-768 client-side encryption. Relay never holds plaintext. Fixed-padding blobs — traffic analysis blind, SCADA message sizes not leaked.</td>
+    <td class="check-col">2–3</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 4.2</td>
+    <td>Use control</td>
+    <td>API key per device (<code>pgp_</code> end-user, <code>plk_</code> operator). Device identity registration via <code>/v2/did/register</code>. Key revocation supported. Per-key audit trail.</td>
+    <td class="check-col">2–3</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 3.1</td>
+    <td>Communication integrity</td>
+    <td>ML-DSA-65 (NIST FIPS 204) Signed Tree Head after every Merkle root update. Inclusion proof per transfer — tamper detectable by any party, including independent auditors.</td>
+    <td class="check-col">2–3</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 2.8</td>
+    <td>Auditable events</td>
+    <td>Public Certificate Transparency log at paramant.app/ct. Append-only, tamper-evident, publicly verifiable. Export to SIEM supported (JSON + CSV). Every transfer hash logged.</td>
+    <td class="check-col">2–3</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 5.2</td>
+    <td>Zone boundary protection</td>
+    <td>Self-hosted relay deployed in DMZ. No persistent data crosses zone boundaries. No direct L2↔L3 connection required. Relay operates without external internet in air-gap mode.</td>
+    <td class="check-col">2–3</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 1.1</td>
+    <td>Human user identification</td>
+    <td>Device enrollment via <code>POST /v2/did/register</code> with ECDH public key. DID (Decentralized Identifier) per device. Key rotation and revocation supported.</td>
+    <td class="check-col">2</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 1.2</td>
+    <td>Software process identity</td>
+    <td>Device identity bound to ML-DSA-65 public key. Every transfer signed by the originating device. Identity not forgeable by the relay.</td>
+    <td class="check-col">2</td>
+  </tr>
+  <tr>
+    <td class="sr-ref">SR 2.1</td>
+    <td>Authorisation enforcement</td>
+    <td>Per-key transfer quota and rate limiting. Plan-based access control (free / pro / enterprise). Relay rejects keys that exceed plan limits with HTTP 402/429.</td>
+    <td class="check-col">2</td>
+  </tr>
+</table>
+
+<div class="two-col" style="margin-top:14px">
+  <div>
+    <h3>Security Level Target</h3>
+    <ul>
+      <li><strong>SL-T 2</strong> — default managed relay configuration</li>
+      <li><strong>SL-T 3</strong> — self-hosted relay, air-gapped, no external internet</li>
+      <li>SL-T 3 requires: self-hosted relay + private sector + no external DNS dependency</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Independent audit</h3>
+    <ul>
+      <li>RAPTOR security audit completed April 2026</li>
+      <li>All critical and high findings resolved</li>
+      <li>Full report available on request to qualified prospects</li>
+      <li>Source code: github.com/Apolloccrypt/paramant-relay</li>
+    </ul>
+  </div>
+</div>
+
+<p style="margin-top:10px;font-size:8.5pt;color:var(--doc-ink-dim)"><strong>Note:</strong> Compliance documentation maps Ghost Pipe capabilities to IEC 62443 requirements. It is not a third-party certification. Customers seeking SL-T 3 certification should engage a certified IACS assessment body (e.g., TÜV, DNV) for formal verification.</p>
+
+<div class="page-break"></div>
+
+<!-- PAGE 4 — PERFORMANCE, DEPLOYMENT, PRICING -->
+<header>
+  <div class="logo-block">
+    <h1>PARAMANT / OT</h1>
+    <p>Deployment &amp; Pricing</p>
+  </div>
+  <div class="badge-block">
+    <span class="badge">Hetzner DE</span>
+    <span class="badge">Docker</span>
+    <span class="badge">BUSL-1.1</span>
+  </div>
+</header>
+
+<h2>Performance Reference</h2>
+<table>
+  <tr>
+    <th>Payload</th>
+    <th>Relay (EU/DE managed)</th>
+    <th>Self-hosted LAN</th>
+    <th>Notes</th>
+  </tr>
+  <tr>
+    <td>4 KB sensor packet</td>
+    <td>p50: ~80ms · p95: ~180ms</td>
+    <td>&lt;10ms typical</td>
+    <td>Includes TLS + ML-KEM encapsulation</td>
+  </tr>
+  <tr>
+    <td>64 KB config blob</td>
+    <td>p50: ~140ms · p95: ~320ms</td>
+    <td>&lt;20ms typical</td>
+    <td>Single chunk, base64 encoded</td>
+  </tr>
+  <tr>
+    <td>1 MB firmware chunk</td>
+    <td>p50: ~900ms · p95: ~2.1s</td>
+    <td>&lt;80ms typical</td>
+    <td>5 MB max on free tier</td>
+  </tr>
+  <tr>
+    <td>5 MB max blob</td>
+    <td>p50: ~4.2s · p95: ~9s</td>
+    <td>&lt;400ms typical</td>
+    <td>RAM limit per relay: 512 MB</td>
+  </tr>
+</table>
+<p class="perf-note">Benchmarks: EU sender/receiver pair, Hetzner Falkenstein relay, 100 Mbps uplink. Self-hosted LAN: 1 Gbps local network. Run <code>paramant-benchmark.py</code> to validate in your environment.</p>
+
+<h2>Deployment Options</h2>
+<div class="three-col">
+  <div>
+    <h3>Managed relay</h3>
+    <p>iot.paramant.app — Hetzner DE. Free evaluation: 1000 transfers / 30 days, no daily cap. Pro and Enterprise keys available.</p>
+    <p style="margin-top:6px;font-size:8.5pt;color:var(--doc-ink-dim)">No infrastructure required. Start evaluating in minutes.</p>
+  </div>
+  <div>
+    <h3>Self-hosted (Linux)</h3>
+    <div class="code-block" style="font-size:7.5pt">docker compose up -d
+# or
+curl -fsSL paramant.app/install.sh | bash</div>
+    <p style="font-size:8.5pt;color:var(--doc-ink-dim)">Any Linux server. systemd unit included. Reverse proxy config for nginx/Caddy provided.</p>
+  </div>
+  <div>
+    <h3>Edge (Raspberry Pi)</h3>
+    <div class="code-block" style="font-size:7.5pt">curl -fsSL \
+  paramant.app/install-pi.sh \
+  | bash</div>
+    <p style="font-size:8.5pt;color:var(--doc-ink-dim)">ARM64 native. 512 MB RAM min. Runs headless. Ideal for field-level DMZ segment.</p>
+  </div>
+</div>
+
+<h2>Pricing</h2>
+<div class="tier-row">
+  <div class="tier">
+    <div class="tier-name">Evaluation</div>
+    <div class="tier-price">Free</div>
+    <div class="tier-desc">Managed relay, no CC</div>
+    <ul>
+      <li>1000 transfers / 30 days</li>
+      <li>No daily cap</li>
+      <li>5 MB per transfer</li>
+      <li>1 OT device</li>
+    </ul>
+  </div>
+  <div class="tier hl">
+    <div class="tier-name">Pro</div>
+    <div class="tier-price">€12<sub>/mo</sub></div>
+    <div class="tier-desc">Managed, unlimited</div>
+    <ul>
+      <li>Unlimited transfers</li>
+      <li>50 MB per transfer</li>
+      <li>5 OT devices</li>
+      <li>WebSocket streaming</li>
+    </ul>
+  </div>
+  <div class="tier">
+    <div class="tier-name">Enterprise</div>
+    <div class="tier-price">Custom</div>
+    <div class="tier-desc">Dedicated or on-premise</div>
+    <ul>
+      <li>Dedicated relay</li>
+      <li>Custom SLA / DPA</li>
+      <li>Unlimited devices</li>
+      <li>IEC 62443 compliance docs</li>
+      <li>On-premise / air-gap</li>
+    </ul>
+  </div>
+</div>
+
+<p>Community self-hosted: BUSL-1.1 free forever, up to 5 users. Your server, your jurisdiction, your keys. No license required for evaluation.</p>
+
+<footer>
+  <div class="footer-l">
+    Request evaluation key or enterprise contact.
+    <span>paramant.app/request-key · privacy@paramant.app</span>
+  </div>
+  <div class="footer-r">
+    <a href="https://paramant.app/ot">paramant.app/ot</a><br>
+    <a href="https://paramant.app/compliance/iec62443">paramant.app/compliance/iec62443</a><br>
+    <a href="https://github.com/Apolloccrypt/paramant-relay">github.com/Apolloccrypt/paramant-relay</a>
+  </div>
+</footer>
+
+<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>

@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pattern Library — PARAMANT Design System v3</title>
+<link rel="stylesheet" href="/design-system.css?v=4">
+<link rel="stylesheet" href="/nav.css?v=4">
+<style>
+  /* Pattern-library-only styles — not part of design-system.css */
+
+  .pl-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bone);
+    border-bottom: 1px solid var(--ink-hair);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-7);
+    font-size: var(--text-xs);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    overflow-x: auto;
+  }
+  .pl-bar a {
+    color: var(--ink-dim);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .pl-bar a:hover { color: var(--ink); }
+  .pl-bar .pl-title { color: var(--ink); font-weight: 700; flex-shrink: 0; }
+  .pl-bar .pl-sep { color: var(--ink-hair); flex-shrink: 0; }
+
+  .pl-section {
+    padding-block: var(--space-10);
+    border-bottom: 1px solid var(--ink-hair);
+  }
+  .pl-section:last-child { border-bottom: none; }
+
+  .pl-label {
+    font-size: var(--text-xs);
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: var(--space-3);
+  }
+  .pl-demo {
+    padding: var(--space-6);
+    border: 1px solid var(--ink-ghost);
+    margin-top: var(--space-5);
+  }
+  .pl-demo + .pl-demo {
+    margin-top: var(--space-4);
+  }
+  .pl-demo.pl-invert-demo {
+    background: var(--lime);
+    color: var(--navy);
+    border-color: var(--black-hair);
+  }
+  .pl-demo.pl-doc-demo {
+    background: var(--doc-bg);
+    color: var(--doc-ink);
+    border-color: var(--black-hair);
+  }
+  .pl-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: center;
+  }
+  .pl-col-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+  @media (max-width: 768px) {
+    .pl-col-2 { grid-template-columns: 1fr; }
+    .pl-bar { padding-inline: var(--space-5); }
+    .pl-section { padding-block: var(--space-8); }
+  }
+</style>
+</head>
+<body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
+
+<!-- Sticky nav -->
+<nav class="pl-bar">
+  <span class="pl-title"><span style="font-weight:400">Para</span><strong>MANT</strong> / Pattern Library v3</span>
+  <span class="pl-sep">/</span>
+  <a href="#colors">Colors</a>
+  <a href="#type">Type</a>
+  <a href="#buttons">Buttons</a>
+  <a href="#cards">Cards</a>
+  <a href="#dropzone">Dropzone</a>
+  <a href="#compliance">Compliance</a>
+  <a href="#ctlog">CT&nbsp;Log</a>
+  <a href="#sechead">Sec-Head</a>
+  <a href="#wordmarks">Wordmarks</a>
+  <a href="#status">Status</a>
+  <a href="#hash">Hash</a>
+</nav>
+
+
+<!-- ── INTRO ─────────────────────────────────────────────────────────── -->
+<div class="container" style="padding-top: var(--space-9); padding-bottom: var(--space-8);">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">00</div>
+    <h2>Design System v3</h2>
+    <div class="tag">duochrome brutalist<br>april 2026</div>
+  </div>
+  <p style="max-width: var(--container-md);">
+    Two colors. One font. Two weights. Zero decorations. This page is the
+    auditable reference for every visual element used across the Paramant
+    website, dashboards, and documents. Every component below traces
+    directly to a rule in <code>PARAMANT-DESIGN-SYSTEM.md</code>.
+  </p>
+  <div class="cluster" style="margin-top: var(--space-5);">
+    <span class="status-row"><span class="status-dot" aria-hidden="true"></span>Design system live</span>
+    <span style="font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.08em;">design-system.css v3.0 · commit: see git log</span>
+  </div>
+</div>
+
+
+<!-- ── COLORS ────────────────────────────────────────────────────────── -->
+<section id="colors" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">01</div>
+    <h2>Colors</h2>
+    <div class="tag">two hues only<br>opacity derivatives</div>
+  </div>
+
+  <p class="pl-label">Primary swatches</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:80px; background:var(--bone); border:1px solid var(--ink-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); letter-spacing:.08em;">--black<br>#000000<br>Paramant Black</p>
+    </div>
+    <div>
+      <div style="width:120px; height:80px; background:var(--lime);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); letter-spacing:.08em;">--lime<br>#d4ff00<br>Paramant Lime</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Lime opacity derivatives (on black)</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:64px; background:var(--ink-dim); border:1px solid var(--ink-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--lime-dim<br>var(--ink-dim)<br>secondary text, meta</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--ink-hair); border:1px solid var(--ink-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--lime-hair<br>var(--ink-hair)<br>hairlines, dividers</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--ink-ghost); border:1px solid var(--ink-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--lime-ghost<br>var(--ink-ghost)<br>decorative outlines</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Black opacity derivatives (on lime)</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime); display:flex; align-items:center; justify-content:center;">
+        <div style="width:80px; height:44px; background:var(--black-dim);"></div>
+      </div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--black-dim<br>rgba(0,0,0,.55)<br>secondary text on lime</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime); display:flex; align-items:center; justify-content:center;">
+        <div style="width:80px; height:44px; background:var(--black-hair);"></div>
+      </div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--black-hair<br>rgba(0,0,0,.22)<br>hairlines on lime bg</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--lime); display:flex; align-items:center; justify-content:center;">
+        <div style="width:80px; height:44px; background:var(--black-ghost);"></div>
+      </div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--black-ghost<br>rgba(0,0,0,.18)<br>decorative on lime</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Document mode colors (Template B)</p>
+  <div class="pl-row">
+    <div>
+      <div style="width:120px; height:64px; background:var(--doc-bg); border:1px solid var(--ink-hair);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--doc-bg<br>#f4efe2<br>warm bone bg</p>
+    </div>
+    <div>
+      <div style="width:120px; height:64px; background:var(--doc-ink);"></div>
+      <p style="font-size:var(--text-xs); margin-top:var(--space-2); color:var(--ink-dim); letter-spacing:.06em;">--doc-ink<br>#0a0a0a<br>near-black body text</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── TYPOGRAPHY ─────────────────────────────────────────────────────── -->
+<section id="type" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">02</div>
+    <h2>Typography</h2>
+    <div class="tag">system mono only<br>two weights</div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:var(--space-5);">
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-6xl<br>clamp(120px,18vw,280px)<br>hero metrics</div>
+      <span style="font-size:var(--text-6xl); font-weight:700; letter-spacing:-.06em; line-height:0.85;">99</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-5xl / h1<br>clamp(56px,11vw,176px)<br>page headline</div>
+      <h1 style="font-size:var(--text-5xl);">Encrypted.</h1>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-4xl<br>88px · prices, metrics<br>weight 700 · tabular</div>
+      <span style="font-size:var(--text-4xl); font-weight:700; letter-spacing:-.04em; line-height:1; font-variant-numeric:tabular-nums;">0.00</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-3xl / h2<br>48px · section titles</div>
+      <h2>Every relay logged.</h2>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-2xl / h3<br>32px</div>
+      <h3>ML-KEM-768 + ECDH P-256</h3>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-xl / h4<br>24px</div>
+      <h4>Files never touch disk.</h4>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-lg<br>18px · small wordmarks</div>
+      <span style="font-size:var(--text-lg);">RAM-only storage. Zero bytes written.</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-md<br>16px · emphasis in body</div>
+      <span style="font-size:var(--text-md);">Burn-on-read. One download per token.</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-base<br>14px · body default</div>
+      <span style="font-size:var(--text-base); color:var(--ink-dim);">The relay encrypts your file before transmission. The key never leaves your browser. The relay sees ciphertext only.</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6); border-bottom:1px solid var(--ink-hair); padding-bottom:var(--space-4);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-sm<br>12px · labels, nav</div>
+      <span style="font-size:var(--text-sm); letter-spacing:.04em;">AES-256-GCM · ML-KEM-768 · FIPS 203 · NIST</span>
+    </div>
+
+    <div style="display:flex; align-items:baseline; gap:var(--space-6);">
+      <div style="min-width:200px; font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">--text-xs<br>10px · eyebrows, meta</div>
+      <span style="font-size:var(--text-xs); letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim);">Post-quantum key exchange · verified · FIPS 203</span>
+    </div>
+
+  </div>
+</div>
+</section>
+
+
+<!-- ── BUTTONS ────────────────────────────────────────────────────────── -->
+<section id="buttons" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">03</div>
+    <h2>Buttons</h2>
+    <div class="tag">three variants<br>no radius</div>
+  </div>
+
+  <p class="pl-label">Normal context (black bg)</p>
+  <div class="pl-demo">
+    <div class="pl-row">
+      <a href="#" class="btn btn-primary">Send a file</a>
+      <a href="#" class="btn btn-primary" style="background:transparent; color:var(--ink); border-color:var(--ink);">Primary hover</a>
+      <button class="btn btn-primary" disabled>Primary disabled</button>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-secondary">Self-host in 60s</a>
+      <a href="#" class="btn btn-secondary" style="background:var(--cobalt); color:var(--bone-on-navy);">Secondary hover</a>
+      <button class="btn btn-secondary" disabled>Secondary disabled</button>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-tertiary">Read the architecture</a>
+      <a href="#" class="btn btn-tertiary" style="color:var(--ink); text-decoration-color:var(--ink);">Tertiary hover</a>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Inverted context (lime bg)</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <div class="pl-row">
+      <a href="#" class="btn btn-primary">Send a file</a>
+      <a href="#" class="btn btn-primary" style="background:transparent; color:var(--navy); border-color:var(--navy);">Primary hover</a>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-secondary">Self-host in 60s</a>
+      <a href="#" class="btn btn-secondary" style="background:var(--bone); color:var(--ink);">Secondary hover</a>
+    </div>
+    <div class="pl-row" style="margin-top:var(--space-4);">
+      <a href="#" class="btn btn-tertiary">Read the architecture</a>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── CARDS ─────────────────────────────────────────────────────────── -->
+<section id="cards" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">04</div>
+    <h2>Cards</h2>
+    <div class="tag">1px border<br>zero radius</div>
+  </div>
+
+  <p class="pl-label">Normal context</p>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:var(--space-4);">
+    <div class="card">
+      <p style="font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">01 / send</p>
+      <h4 style="margin-bottom:var(--space-3);">ParaSend</h4>
+      <p style="font-size:var(--text-base); color:var(--ink-dim);">Keyless, anonymous file transfer. No account. Burn-on-read.</p>
+    </div>
+    <div class="card">
+      <p style="font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">02 / share</p>
+      <h4 style="margin-bottom:var(--space-3);">ParaShare</h4>
+      <p style="font-size:var(--text-base); color:var(--ink-dim);">E2E with fingerprint verification. Both parties confirm identity before the link opens.</p>
+    </div>
+    <div class="card">
+      <p style="font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">03 / drop</p>
+      <h4 style="margin-bottom:var(--space-3);">ParaDrop</h4>
+      <p style="font-size:var(--text-base); color:var(--ink-dim);">Peer-to-peer over WebRTC. No server in the data path.</p>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Inverted context</p>
+  <div class="invert" style="padding:var(--space-6);">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:var(--space-4);">
+      <div class="card">
+        <p style="font-size:var(--text-xs); color:var(--black-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">01 / send</p>
+        <h4 style="margin-bottom:var(--space-3);">ParaSend</h4>
+        <p style="font-size:var(--text-base); color:var(--black-dim);">Keyless, anonymous file transfer. No account. Burn-on-read.</p>
+      </div>
+      <div class="card">
+        <p style="font-size:var(--text-xs); color:var(--black-dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:var(--space-3);">02 / share</p>
+        <h4 style="margin-bottom:var(--space-3);">ParaShare</h4>
+        <p style="font-size:var(--text-base); color:var(--black-dim);">E2E with fingerprint verification. Both parties confirm identity before the link opens.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── DROPZONE ───────────────────────────────────────────────────────── -->
+<section id="dropzone" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">05</div>
+    <h2>Dropzone</h2>
+    <div class="tag">2px solid border<br>number label top-left</div>
+  </div>
+
+  <div style="max-width:520px;">
+    <div class="dropzone" role="button" tabindex="0" aria-label="Drop a file here or click to browse">
+      <div class="dropzone-num" aria-hidden="true">01</div>
+      <p class="dropzone-main">Drop a file.</p>
+      <p class="dropzone-sub">or click to browse</p>
+      <div class="dropzone-spec" aria-label="Constraints">
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">max</span>
+          <span class="dropzone-spec-val">5 MB</span>
+        </div>
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">rate</span>
+          <span class="dropzone-spec-val">10 / hr</span>
+        </div>
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">account</span>
+          <span class="dropzone-spec-val">none</span>
+        </div>
+        <div class="dropzone-spec-cell">
+          <span class="dropzone-spec-key">cipher</span>
+          <span class="dropzone-spec-val">aes-256</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Drag-over state (.drag-over)</p>
+  <div style="max-width:520px;">
+    <div class="dropzone drag-over" role="presentation">
+      <div class="dropzone-num" aria-hidden="true">01</div>
+      <p class="dropzone-main">Release to upload.</p>
+      <p class="dropzone-sub">encrypted in browser before upload</p>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── COMPLIANCE STRIP ──────────────────────────────────────────────── -->
+<section id="compliance" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">06</div>
+    <h2>Compliance Strip</h2>
+    <div class="tag">horizontal cells<br>1px vertical rules</div>
+  </div>
+
+  <p class="pl-label">Normal context</p>
+  <div class="compliance-strip">
+    <div class="compliance-strip-cell">NIS2</div>
+    <div class="compliance-strip-cell">IEC 62443</div>
+    <div class="compliance-strip-cell">NEN 7510</div>
+    <div class="compliance-strip-cell">eIDAS</div>
+    <div class="compliance-strip-cell">FIPS 203</div>
+    <div class="compliance-strip-cell">FIPS 204</div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Inverted context</p>
+  <div class="invert" style="padding:var(--space-5);">
+    <div class="compliance-strip">
+      <div class="compliance-strip-cell">NIS2</div>
+      <div class="compliance-strip-cell">IEC 62443</div>
+      <div class="compliance-strip-cell">NEN 7510</div>
+      <div class="compliance-strip-cell">eIDAS</div>
+      <div class="compliance-strip-cell">FIPS 203</div>
+      <div class="compliance-strip-cell">FIPS 204</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── CT LOG FEED ───────────────────────────────────────────────────── -->
+<section id="ctlog" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">07</div>
+    <h2>CT Log Feed</h2>
+    <div class="tag">mono 12px<br>tabular numerals</div>
+  </div>
+
+  <div style="max-width:640px;">
+    <table class="ctlog-feed" role="table" aria-label="Transparency log entries">
+      <thead>
+        <tr>
+          <th scope="col">Idx</th>
+          <th scope="col">Hash</th>
+          <th scope="col">UTC</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>#127</td>
+          <td>e203867a73d8c4fe1b9a2d7c8f4e3b6a...</td>
+          <td>08:52:11</td>
+        </tr>
+        <tr>
+          <td>#126</td>
+          <td>9f1a2c8b4e6d3a7b5c2e9f4a1b8d6c3e...</td>
+          <td>08:38:55</td>
+        </tr>
+        <tr>
+          <td>#125</td>
+          <td>4c7b8e2d1a9f3c6e8b5d2a7c4f1e9b3d...</td>
+          <td>08:12:33</td>
+        </tr>
+        <tr>
+          <td>#124</td>
+          <td>b1d4f7a2c9e6b3d8f5a2c7e4b1d6f9a3...</td>
+          <td>07:51:02</td>
+        </tr>
+        <tr>
+          <td>#123</td>
+          <td>2a7c4e1b9f6d3a8c5e2b7d4f1a9c6e3b...</td>
+          <td>07:28:44</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+
+<!-- ── SECTION HEADERS ───────────────────────────────────────────────── -->
+<section id="sechead" class="pl-section">
+<div class="container">
+  <p class="pl-label" style="margin-bottom:var(--space-6);">Section header — .sec-head</p>
+
+  <p class="pl-label">Normal context</p>
+  <div class="pl-demo">
+    <div class="sec-head">
+      <div class="num" aria-hidden="true">01</div>
+      <h2>How it works.</h2>
+      <div class="tag">four steps<br>nothing stored</div>
+    </div>
+    <p style="font-size:var(--text-base); color:var(--ink-dim);">Section content follows here.</p>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Inverted context</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <div class="sec-head">
+      <div class="num" aria-hidden="true">02</div>
+      <h2>Products.</h2>
+      <div class="tag">three products<br>one relay</div>
+    </div>
+    <p style="font-size:var(--text-base); color:var(--black-dim);">Section content follows here.</p>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Document mode (Template B)</p>
+  <div class="pl-demo pl-doc-demo doc">
+    <div class="sec-head" style="border-bottom-color:var(--doc-ink-dim);">
+      <div class="num" style="color:var(--doc-ink);" aria-hidden="true">01</div>
+      <h2 style="color:var(--doc-ink);">Executive summary.</h2>
+      <div class="tag" style="color:var(--doc-ink-dim);">one page<br>april 2026</div>
+    </div>
+    <p style="font-size:var(--text-base); color:var(--doc-ink-dim);">Document body text follows in warm bone mode.</p>
+  </div>
+</div>
+</section>
+
+
+<!-- ── WORDMARKS ─────────────────────────────────────────────────────── -->
+<section id="wordmarks" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">08</div>
+    <h2>Wordmarks</h2>
+    <div class="tag">para regular<br>suffix bold</div>
+  </div>
+
+  <p class="pl-label">Display sizes</p>
+  <div class="stack" style="--stack-gap: var(--space-5);">
+    <span class="wordmark" style="font-size:var(--text-5xl); letter-spacing:-.04em;">
+      <span class="para">Para</span><span class="suffix">MANT</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">Send</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">Share</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">Drop</span>
+    </span>
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Paramant</span><span class="suffix">OS</span>
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Nav size (bold suffix, same color)</p>
+  <div class="pl-demo">
+    <span class="wordmark" style="font-size:var(--text-md); letter-spacing:.08em;">
+      <span class="para">Para</span><span class="suffix">MANT</span>
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Inverted context</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <span class="wordmark" style="font-size:var(--text-3xl); letter-spacing:-.03em;">
+      <span class="para">Para</span><span class="suffix">MANT</span>
+    </span>
+  </div>
+</div>
+</section>
+
+
+<!-- ── STATUS INDICATOR ──────────────────────────────────────────────── -->
+<section id="status" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">09</div>
+    <h2>Status Indicator</h2>
+    <div class="tag">7px square<br>steps(2) blink</div>
+  </div>
+
+  <p class="pl-label">Three states</p>
+  <div class="stack" style="--stack-gap: var(--space-3);">
+    <span class="status-row">
+      <span class="status-dot" aria-hidden="true"></span>
+      operational
+    </span>
+    <span class="status-row" style="color:var(--ink-dim);">
+      <span class="status-dot" style="animation-duration:0.6s;" aria-hidden="true"></span>
+      degraded
+    </span>
+    <span class="status-row" style="color:var(--ink-ghost);">
+      <span class="status-dot" style="animation:none; opacity:.25;" aria-hidden="true"></span>
+      offline
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-7);">Inverted context</p>
+  <div class="pl-demo pl-invert-demo invert">
+    <span class="status-row">
+      <span class="status-dot" aria-hidden="true"></span>
+      operational
+    </span>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Square shape confirmation (7px, not circle)</p>
+  <div class="pl-demo" style="display:flex; align-items:center; gap:var(--space-4);">
+    <span class="status-dot" style="animation:none;" aria-hidden="true"></span>
+    <span style="font-size:var(--text-xs); color:var(--ink-dim);">7px × 7px · no border-radius · blinks at 1.4s via steps(2)</span>
+  </div>
+</div>
+</section>
+
+
+<!-- ── HASH DECORATION ───────────────────────────────────────────────── -->
+<section id="hash" class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">10</div>
+    <h2>Hash Decoration</h2>
+    <div class="tag">lime-ghost outline<br>never repeat per page</div>
+  </div>
+
+  <p class="pl-label">Full-width, clipped, ghost outline</p>
+  <div class="pl-demo" style="overflow:hidden;">
+    <div class="hash-deco" aria-hidden="true">
+      e203867a73d8c4fe1b9a2d7c8f4e3b6a9d2c5e8f1b4a7c3d9e6f2b5a8d1c4e7
+    </div>
+  </div>
+
+  <p class="pl-label" style="margin-top:var(--space-6);">Usage: appears once per page, CT log sections and security pages only.</p>
+  <p style="font-size:var(--text-base); color:var(--ink-dim); max-width:var(--container-md);">
+    The hash decoration is typographic, not ornamental. It references a real STH or entry hash when available. It communicates the character of the system: mathematical, verifiable, specific.
+  </p>
+</div>
+</section>
+
+
+<!-- ── LAYOUT HELPERS ────────────────────────────────────────────────── -->
+<section class="pl-section">
+<div class="container">
+  <div class="sec-head">
+    <div class="num" aria-hidden="true">11</div>
+    <h2>Layout Helpers</h2>
+    <div class="tag">.stack · .cluster<br>token-driven gaps</div>
+  </div>
+
+  <div class="pl-col-2">
+    <div>
+      <p class="pl-label">.stack (vertical, --stack-gap)</p>
+      <div class="pl-demo">
+        <div class="stack" style="--stack-gap: var(--space-3);">
+          <div style="height:var(--space-5); background:var(--ink-ghost); border:1px solid var(--ink-hair);"></div>
+          <div style="height:var(--space-5); background:var(--ink-ghost); border:1px solid var(--ink-hair);"></div>
+          <div style="height:var(--space-5); background:var(--ink-ghost); border:1px solid var(--ink-hair);"></div>
+        </div>
+        <p style="font-size:var(--text-xs); color:var(--ink-dim); margin-top:var(--space-3);">--stack-gap: var(--space-3)</p>
+      </div>
+    </div>
+    <div>
+      <p class="pl-label">.cluster (horizontal, wrapping, --cluster-gap)</p>
+      <div class="pl-demo">
+        <div class="cluster" style="--cluster-gap: var(--space-3);">
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--ink-hair); font-size:var(--text-xs); letter-spacing:.08em;">NIS2</span>
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--ink-hair); font-size:var(--text-xs); letter-spacing:.08em;">IEC 62443</span>
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--ink-hair); font-size:var(--text-xs); letter-spacing:.08em;">NEN 7510</span>
+          <span style="padding:var(--space-2) var(--space-3); border:1px solid var(--ink-hair); font-size:var(--text-xs); letter-spacing:.08em;">FIPS 203</span>
+        </div>
+        <p style="font-size:var(--text-xs); color:var(--ink-dim); margin-top:var(--space-3);">--cluster-gap: var(--space-3)</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ── FOOTER ─────────────────────────────────────────────────────────── -->
+<footer style="border-top:1px solid var(--ink-hair); padding:var(--space-6) var(--space-7); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-4);">
+  <span class="wordmark" style="font-size:var(--text-sm); letter-spacing:.08em;">
+    <span class="para">Para</span><span class="suffix">MANT</span>
+  </span>
+  <span style="font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em;">Design System v3.0 · April 2026 · PARAMANT-DESIGN-SYSTEM.md</span>
+  <a href="/" style="font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.06em; text-decoration:underline; text-underline-offset:3px;">&larr; Back to site</a>
+</footer>
+
+</body>
+</html>

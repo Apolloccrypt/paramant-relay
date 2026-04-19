@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Receive — PARAMANT</title>
+<meta name="description" content="Secure file waiting for you. Decrypts in your browser. Burns after one download.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
+main{max-width:520px;margin:0 auto;padding:80px 24px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.sub{font-size:13px;color:var(--ink-dim);margin-bottom:32px;line-height:1.7}
+.step{display:none;animation:fadeIn .2s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--bone);border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
+.card-head-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
+.dot{width:6px;height:6px;background:var(--lime);border:1px solid var(--navy)}
+.dot.amber{background:#f59e0b}
+.dot.red{background:rgba(255,80,80,1)}
+.card-body{padding:20px 18px}
+.progress-wrap{background:var(--bone-2);border:1px solid var(--ink-hair);height:3px;overflow:hidden;margin:14px 0 8px}
+.progress-bar{height:100%;background:var(--cobalt);width:0%;transition:width .4s}
+.status-line{font-family:var(--mono);font-size:11px;color:var(--ink-dim);padding:2px 0;line-height:1.7}
+.status-line.ok{color:var(--cobalt)}
+.status-line.err{color:rgba(200,30,30,1)}
+.file-name{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--navy);margin:8px 0 4px;word-break:break-all}
+.file-size{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.burned-icon{font-size:36px;margin-bottom:16px;display:block;text-align:center}
+.burned-msg{font-size:14px;color:var(--ink);text-align:center;line-height:1.7;margin-bottom:8px}
+.burned-sub{font-size:11px;color:var(--ink-dim);text-align:center;line-height:1.7}
+.btn{display:block;width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:16px;text-decoration:none;text-align:center}
+.btn:hover{opacity:.85}
+.btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
+.btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px;margin-top:4px}
+.tag.green{border-color:var(--cobalt);color:var(--cobalt)}
+@media(max-width:640px){main{padding:48px 16px}h1{font-size:19px}}
+</style>
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+</head>
+<body>
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div>
+<main>
+
+<!-- Downloading + decrypting -->
+<div class="step active" id="step-loading">
+  <h1>Secure file incoming</h1>
+  <p class="sub">Downloading encrypted file and decrypting it in your browser. The relay never had the key.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title" id="loading-title">Preparing...</div></div>
+    <div class="card-body">
+      <div class="progress-wrap"><div class="progress-bar" id="pbar"></div></div>
+      <div class="status-line" id="status-msg">Starting...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Done -->
+<div class="step" id="step-done">
+  <h1>File received</h1>
+  <p class="sub">Decrypted in your browser. The relay copy has been permanently destroyed.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Download complete</div></div>
+    <div class="card-body">
+      <div class="file-name" id="done-filename"></div>
+      <div class="file-size" id="done-filesize"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:24px">
+    <span class="tag green">Decrypted locally</span>
+    <span class="tag green">Relay copy burned</span>
+    <span class="tag green">AES-256-GCM</span>
+  </div>
+
+  <a href="/send" class="btn btn-outline">Send a file</a>
+</div>
+
+<!-- Burned / already used -->
+<div class="step" id="step-burned">
+  <span class="burned-icon" style="margin-top:16px">&#x1F525;</span>
+  <p class="burned-msg">This file has already been downloaded and burned.</p>
+  <p class="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
+  <a href="/send" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Send a file</a>
+</div>
+
+<!-- Error -->
+<div class="step" id="step-error">
+  <h1>Something went wrong</h1>
+  <p class="sub">The link may be expired, invalid, or already used.</p>
+  <div class="card">
+    <div class="card-head"><div class="dot red"></div><div class="card-head-title">Error</div></div>
+    <div class="card-body">
+      <div class="status-line err" id="error-msg"></div>
+    </div>
+  </div>
+  <a href="/send" class="btn btn-outline">Send a file</a>
+</div>
+
+</main>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+<script>
+const RELAY = 'https://health.paramant.app';
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setStatus(msg, pct) {
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('status-msg').textContent = msg;
+}
+
+function setTitle(t) {
+  document.getElementById('loading-title').textContent = t;
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  showStep('step-error');
+}
+
+function fromB64url(s) {
+  try {
+    const b64 = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=');
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch { return null; }
+}
+
+function formatSize(n) {
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  return n + ' B';
+}
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('t');
+  const fragment = location.hash.slice(1);
+
+  if (!token || !fragment) {
+    showError('Invalid link — missing download token or encryption key.');
+    return;
+  }
+
+  // Decode key+iv from fragment (44 bytes: first 32 = AES key, next 12 = IV)
+  const keyIv = fromB64url(fragment);
+  if (!keyIv || keyIv.length < 44) {
+    showError('Invalid link — encryption key is malformed or truncated.');
+    return;
+  }
+  const rawKey = keyIv.slice(0, 32);
+  const iv = keyIv.slice(32, 44);
+
+  try {
+    setTitle('Importing key...');
+    setStatus('Importing decryption key...', 10);
+    const aesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+
+    setTitle('Downloading...');
+    setStatus('Downloading encrypted file from relay...', 30);
+
+    const r = await fetch(RELAY + '/v2/dl/' + token + '/get', {
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (r.status === 410 || r.status === 404) {
+      showStep('step-burned');
+      return;
+    }
+    if (!r.ok) {
+      throw new Error('Download failed: HTTP ' + r.status);
+    }
+
+    setTitle('Decrypting...');
+    setStatus('Decrypting with AES-256-GCM...', 65);
+
+    const ciphertext = await r.arrayBuffer();
+    let plaintext;
+    try {
+      plaintext = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ciphertext));
+    } catch {
+      showError('Decryption failed. The link may be corrupted or tampered with.');
+      return;
+    }
+
+    // Parse header: [uint32-LE nameLen][nameBytes][fileBytes]
+    if (plaintext.length < 4) throw new Error('Decrypted payload too short');
+    const nameLen = new DataView(plaintext.buffer).getUint32(0, true);
+    if (plaintext.length < 4 + nameLen) throw new Error('Decrypted payload header corrupt');
+    const filename = new TextDecoder().decode(plaintext.slice(4, 4 + nameLen)) || 'download';
+    const fileData = plaintext.slice(4 + nameLen);
+
+    setStatus('Saving file...', 90);
+
+    // Trigger browser download
+    const blob = new Blob([fileData]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+
+    setStatus('Done.', 100);
+
+    document.getElementById('done-filename').textContent = filename;
+    document.getElementById('done-filesize').textContent = formatSize(fileData.length);
+    showStep('step-done');
+
+  } catch (e) {
+    showError(e.message || 'Unknown error');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

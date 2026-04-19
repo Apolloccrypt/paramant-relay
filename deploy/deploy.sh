@@ -34,11 +34,11 @@ for sector in relay-health relay-legal relay-finance relay-iot; do
   scp relay/relay-${sector#relay-}.js root@$SERVER:$APP_DIR/$sector/relay.js
 done
 
-# 2. Frontend
+# 2. Frontend — rsync entire directory (HTML + CSS + JS + assets)
 echo "--- frontend"
-for f in frontend/*.html; do
-  scp "$f" root@$SERVER:$APP_DIR/app/$(basename "$f")
-done
+rsync -a --exclude='*.bak' \
+  -e "ssh -i ~/.ssh/claude_deploy" \
+  frontend/ root@$SERVER:$APP_DIR/app/
 
 # 3. Nginx config
 echo "--- nginx"

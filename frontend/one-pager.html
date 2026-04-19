@@ -3,455 +3,972 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PARAMANT — Post-Quantum Encrypted File Relay</title>
+<title>Paramant one-pager · Post-quantum encrypted file relay</title>
+<meta name="description" content="One-page summary of Paramant: post-quantum encrypted file relay with RAM-only storage, burn-on-read, and EU sovereignty. No US owner, no CLOUD Act exposure.">
+
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
 <style>
-  @page { size: A4; margin: 18mm 20mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10.5pt;
-    color: #111;
-    background: #fff;
-    max-width: 210mm;
-    margin: 0 auto;
-    padding: 18mm 20mm;
+  /* Print overrides. Screen rendering uses the v4 system. */
+  @media print {
+    .meta-bar, .nav, nav, .no-print { display: none !important; }
+    body { background: white !important; }
+    .section-cobalt, .section-navy { margin: 0 !important; page-break-before: always; }
+    .marker { padding: 48px 0 24px !important; }
+    .marker .num { font-size: 72px !important; }
+    .op-section { padding: 40px 0 !important; }
+    .onepager-hero { padding: 40px 0 24px !important; }
+    .onepager-hero h1 { font-size: 56px !important; }
+    @page { margin: 1.2cm; size: A4; }
   }
 
-  /* Header */
-  header {
+  /* Hero */
+  .onepager-hero { padding: 64px 0 32px; }
+  .onepager-hero h1 {
+    font-family: var(--sans);
+    font-size: clamp(48px, 7vw, 88px);
+    font-weight: 800;
+    line-height: 0.94;
+    letter-spacing: -0.035em;
+    color: var(--navy);
+    margin-bottom: 32px;
+    max-width: 14ch;
+  }
+  .onepager-hero h1 em {
+    font-style: italic;
+    color: var(--cobalt);
+    position: relative;
+    display: inline-block;
+  }
+  .onepager-hero h1 em::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 4%;
+    height: 22%;
+    background: var(--lime);
+    z-index: -1;
+  }
+  .onepager-hero p.lede {
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+    max-width: 60ch;
+  }
+  .onepager-top {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    border-bottom: 2.5px solid #111;
-    padding-bottom: 10px;
-    margin-bottom: 18px;
-  }
-  .logo-block h1 {
-    font-size: 22pt;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    line-height: 1;
-  }
-  .logo-block p {
-    font-size: 9pt;
-    color: #555;
-    margin-top: 2px;
-    letter-spacing: 0.5px;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
+    color: var(--cobalt);
+    margin-bottom: 32px;
   }
-  .badge-block {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-  .badge {
-    font-size: 7.5pt;
-    font-weight: 700;
-    border: 1.5px solid #111;
-    border-radius: 3px;
-    padding: 2px 7px;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
+  .onepager-top::before {
+    content: "";
+    width: 28px;
+    height: 2px;
+    background: var(--lime);
   }
 
-  /* Section headings */
-  h2 {
-    font-size: 8pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: #555;
-    margin-bottom: 6px;
-    margin-top: 18px;
-    border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 3px;
+  /* One-pager sections (denser than normal site sections) */
+  .op-section {
+    padding: 48px 0;
+    border-top: 1px solid var(--ink-hair);
+  }
+  .op-section .marker {
+    padding: 0 0 32px;
+    margin-bottom: 32px;
+  }
+  .op-section .marker .num {
+    font-size: clamp(48px, 7vw, 88px);
+  }
+  .op-section .marker h2 {
+    font-size: clamp(24px, 3vw, 36px);
   }
 
-  /* Problem */
-  .problem-block {
-    background: #f5f5f5;
-    border-left: 4px solid #111;
-    padding: 10px 14px;
-    margin-top: 18px;
-    margin-bottom: 0;
-  }
-  .problem-block p {
-    font-size: 13pt;
-    font-weight: 700;
-    line-height: 1.3;
-    color: #111;
-  }
-  .problem-block small {
-    display: block;
-    margin-top: 5px;
-    font-size: 9pt;
-    color: #555;
-    font-weight: 400;
-  }
-
-  /* Solution */
-  .solution-list {
-    list-style: none;
+  /* Feature grids using hairline dividers (v4 pattern from .products) */
+  .op-grid-3 {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 0;
+    gap: 1px;
+    background: var(--ink-hair);
+    border: 1px solid var(--ink-hair);
   }
-  .solution-list li {
-    background: #fff;
-    border: 1.5px solid #ddd;
-    border-radius: 4px;
-    padding: 10px 12px;
+  .op-grid-3 > div {
+    background: var(--bone);
+    padding: 24px 24px;
   }
-  .solution-list li strong {
-    display: block;
-    font-size: 9.5pt;
-    font-weight: 700;
-    margin-bottom: 3px;
-  }
-  .solution-list li span {
-    font-size: 8.5pt;
-    color: #555;
-    line-height: 1.4;
+  @media (max-width: 900px) {
+    .op-grid-3 { grid-template-columns: 1fr; }
   }
 
-  /* Use cases */
-  .usecases {
+  .op-grid-2 {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--ink-hair);
+    border: 1px solid var(--ink-hair);
   }
-  .uc {
-    border: 1.5px solid #ddd;
-    border-radius: 4px;
-    padding: 9px 10px;
+  .op-grid-2 > div {
+    background: var(--bone);
+    padding: 24px 28px;
   }
-  .uc strong {
-    display: block;
-    font-size: 8.5pt;
-    font-weight: 700;
-    margin-bottom: 2px;
-  }
-  .uc span {
-    font-size: 8pt;
-    color: #555;
-    line-height: 1.35;
-  }
-  .uc .tag {
-    display: inline-block;
-    font-size: 6.5pt;
-    font-weight: 700;
-    background: #f0f0f0;
-    border-radius: 2px;
-    padding: 1px 5px;
-    margin-bottom: 4px;
-    letter-spacing: 0.3px;
+  @media (max-width: 900px) {
+    .op-grid-2 { grid-template-columns: 1fr; }
   }
 
-  /* Specs + Compliance side by side */
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+  .op-cell-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--cobalt);
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+  .op-cell h4 {
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .op-cell p {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 0;
   }
 
-  /* Tech specs table */
-  table {
+  /* Specs table */
+  .op-specs {
     width: 100%;
     border-collapse: collapse;
-    font-size: 9pt;
+    font-size: 13px;
   }
-  td {
-    padding: 4px 0;
-    vertical-align: top;
-    border-bottom: 1px solid #ebebeb;
-    line-height: 1.4;
+  .op-specs tr {
+    border-bottom: 1px solid var(--ink-hair);
   }
-  td:first-child {
-    font-weight: 600;
-    color: #333;
-    width: 46%;
-    padding-right: 8px;
-  }
-  tr:last-child td {
+  .op-specs tr:last-child {
     border-bottom: none;
   }
+  .op-specs td {
+    padding: 11px 0;
+    vertical-align: top;
+  }
+  .op-specs td:first-child {
+    font-family: var(--sans);
+    font-weight: 600;
+    color: var(--navy);
+    width: 42%;
+    padding-right: 20px;
+  }
+  .op-specs td:last-child {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
 
-  /* Compliance pills */
-  .compliance-grid {
+  /* Compliance rows */
+  .op-compliance {
+    border-top: 1px solid rgba(248,250,252,.18);
+  }
+  .op-compliance .row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
+    grid-template-columns: 140px 1fr;
+    gap: 24px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(248,250,252,.18);
+    font-size: 13px;
   }
-  .comp-item {
-    border: 1.5px solid #ddd;
-    border-radius: 3px;
-    padding: 6px 8px;
+  .op-compliance .row:last-child {
+    border-bottom: none;
   }
-  .comp-item strong {
-    display: block;
-    font-size: 9pt;
+  .op-compliance .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--lime);
     font-weight: 700;
   }
-  .comp-item span {
-    font-size: 7.5pt;
-    color: #666;
-    line-height: 1.3;
+  .op-compliance .text {
+    color: var(--bone);
+    line-height: 1.5;
   }
 
-  /* Pricing */
-  .pricing {
+  /* Comparison table */
+  .op-compare {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin-top: 8px;
+  }
+  .op-compare th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--ink-ghost);
+    color: var(--navy);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    border-bottom: 2px solid var(--navy);
+  }
+  .op-compare td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--ink-hair);
+    color: var(--ink);
+  }
+  .op-compare td:first-child {
+    font-weight: 600;
+    color: var(--navy);
+    font-family: var(--sans);
+  }
+  .op-compare .hl-cell {
+    color: var(--cobalt);
+    font-weight: 600;
+  }
+  .op-compare tr.paramant-row {
+    background: rgba(29, 78, 216, 0.04);
+  }
+  .op-compare tr.paramant-row td:first-child {
+    color: var(--cobalt);
+  }
+
+  /* Urgency block — navy with lime accent */
+  .op-urgency {
+    background: var(--navy);
+    color: var(--bone);
+    padding: 32px 36px;
+    margin: 40px 0;
+    position: relative;
+  }
+  .op-urgency::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 48px;
+    height: 4px;
+    background: var(--lime);
+  }
+  .op-urgency .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--lime);
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .op-urgency p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--bone);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  /* Tiers */
+  .op-tiers {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 1px;
+    background: var(--ink-hair);
+    border: 1px solid var(--ink-hair);
   }
-  .tier {
-    border: 1.5px solid #ddd;
-    border-radius: 4px;
-    padding: 10px 12px;
+  @media (max-width: 900px) {
+    .op-tiers { grid-template-columns: 1fr; }
   }
-  .tier.highlight {
-    border-color: #111;
-    background: #fafafa;
-  }
-  .tier .tier-name {
-    font-size: 9pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .tier .price {
-    font-size: 16pt;
-    font-weight: 800;
-    margin: 4px 0 2px;
-    line-height: 1;
-  }
-  .tier .price sub {
-    font-size: 8pt;
-    font-weight: 400;
-    color: #888;
-  }
-  .tier .tier-desc {
-    font-size: 8pt;
-    color: #555;
-    line-height: 1.4;
-  }
-  .tier ul {
-    margin-top: 6px;
-    padding-left: 12px;
-    font-size: 8pt;
-    color: #444;
-    line-height: 1.55;
-  }
-
-  /* Footer / CTA */
-  footer {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 2px solid #111;
+  .op-tier {
+    background: var(--bone);
+    padding: 28px 24px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 12px;
   }
-  .cta-left {
-    font-size: 11pt;
+  .op-tier-name {
+    font-family: var(--sans);
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.02em;
+  }
+  .op-tier-price {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cobalt);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     font-weight: 700;
   }
-  .cta-left span {
-    font-weight: 400;
-    color: #555;
-    font-size: 9pt;
-    display: block;
-    margin-top: 2px;
-  }
-  .cta-right {
-    text-align: right;
-    font-size: 8.5pt;
-    color: #555;
-    line-height: 1.6;
-  }
-  .cta-right a {
-    color: #111;
-    font-weight: 600;
-    text-decoration: none;
+  .op-tier p {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 0;
   }
 
-  /* Print button — hidden when printing */
-  .print-btn {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #111;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 10px 20px;
-    font-size: 10pt;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  /* Install block */
+  .op-install {
+    background: var(--navy);
+    color: var(--bone);
+    padding: 24px 28px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.9;
+    margin: 32px 0 0;
+    border-left: 4px solid var(--lime);
   }
-  @media print {
-    .print-btn { display: none; }
-    body { padding: 0; }
+  .op-install .prompt {
+    color: rgba(178, 255, 63, 0.65);
+    margin-right: 8px;
+  }
+
+  /* Footer strip */
+  .op-foot {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 2px solid var(--navy);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 32px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.05em;
+    line-height: 1.8;
+  }
+  .op-foot a {
+    color: var(--cobalt);
+  }
+  .op-foot .right { text-align: right; }
+  .op-foot .center { text-align: center; }
+  @media (max-width: 700px) {
+    .op-foot { grid-template-columns: 1fr; }
+    .op-foot .right, .op-foot .center { text-align: left; }
+  }
+
+  .op-sources {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    letter-spacing: 0.03em;
+    line-height: 1.55;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ink-hair);
+  }
+
+  /* Screen-only controls */
+  .op-controls {
+    display: flex;
+    gap: 12px;
+    margin: 48px 0 0;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .op-controls button,
+  .op-controls a {
+    padding: 14px 24px;
+    background: var(--navy);
+    color: var(--bone);
+    border: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 700;
+    transition: background 0.15s;
+  }
+  .op-controls button:hover,
+  .op-controls a:hover {
+    background: var(--cobalt);
+  }
+  .op-controls a.secondary {
+    background: transparent;
+    color: var(--cobalt);
+    border: 1.5px solid var(--cobalt);
+  }
+  .op-controls a.secondary:hover {
+    background: var(--cobalt);
+    color: var(--bone);
   }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-  <div class="logo-block">
-    <h1>PARAMANT</h1>
-    <p>Post-Quantum Encrypted File Relay</p>
-  </div>
-  <div class="badge-block">
-    <span class="badge">ML-KEM-768</span>
-    <span class="badge">Burn-on-read</span>
-    <span class="badge">EU hosted</span>
-    <span class="badge">NIS2 ready</span>
-  </div>
-</header>
-
-<!-- PROBLEM -->
-<div class="problem-block">
-  <p>Sensitive files in transit are your biggest audit risk.</p>
-  <small>Email attachments linger in inboxes, cloud shares remain accessible long after a deal closes, and legacy transfer tools have no post-quantum protection. One breach exposes patient records, legal strategy, or industrial controls — and triggers mandatory reporting under NIS2, DORA, and NEN 7510.</small>
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="sep">·</span>
+  <span><b>eu/de</b> · ram only</span>
 </div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
-<!-- SOLUTION -->
-<h2>Solution</h2>
-<ul class="solution-list">
-  <li>
-    <strong>Post-quantum by default</strong>
-    <span>ML-KEM-768 + ECDH P-256 hybrid key exchange. Files are unreadable even by a future quantum adversary.</span>
-  </li>
-  <li>
-    <strong>Burn-on-read</strong>
-    <span>Each file is destroyed immediately after the first authorised download. No residual copies, no shared drives, no data leakage.</span>
-  </li>
-  <li>
-    <strong>EU jurisdiction, your keys</strong>
-    <span>Servers on Hetzner DE. End-to-end encryption means we never hold plaintext. Tamper-evident CT log for every transfer.</span>
-  </li>
-</ul>
+  <ul class="nav-links">
 
-<!-- USE CASES -->
-<h2>Use Cases</h2>
-<div class="usecases">
-  <div class="uc">
-    <span class="tag">Healthcare</span>
-    <strong>Patient data &amp; imaging</strong>
-    <span>DICOM, EPD exports, and lab results — compliant with NEN 7510 and AVG. One-time links, logged in the CT chain.</span>
-  </div>
-  <div class="uc">
-    <span class="tag">Legal</span>
-    <strong>Contracts &amp; discovery</strong>
-    <span>Send due-diligence packages under eIDAS-compliant identity. Files vanish after counsel opens them.</span>
-  </div>
-  <div class="uc">
-    <span class="tag">Finance</span>
-    <strong>Reports &amp; SWIFT documents</strong>
-    <span>DORA-ready audit trail. Every transfer timestamped and included in an immutable Merkle log.</span>
-  </div>
-  <div class="uc">
-    <span class="tag">Industrial IoT</span>
-    <strong>Firmware &amp; config push</strong>
-    <span>IEC 62443-aligned. Signed device identity, Ghost Pipe streaming for bandwidth-constrained edges.</span>
-  </div>
-</div>
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
 
-<!-- SPECS + COMPLIANCE -->
-<div class="two-col">
-  <div>
-    <h2>Technical Specifications</h2>
-    <table>
-      <tr><td>Key exchange</td><td>ML-KEM-768 + ECDH P-256 hybrid (FIPS 203 draft)</td></tr>
-      <tr><td>Symmetric cipher</td><td>AES-256-GCM with per-file random IV</td></tr>
-      <tr><td>Integrity</td><td>Merkle CT log, SHA-256 leaf hashes</td></tr>
-      <tr><td>Relay identity</td><td>ML-DSA-65 self-signed certificate</td></tr>
-      <tr><td>Transport</td><td>TLS 1.3, optional WebSocket streaming</td></tr>
-      <tr><td>File size</td><td>Up to 5 MB (padded to hide true size)</td></tr>
-      <tr><td>Infrastructure</td><td>Hetzner Falkenstein DE, no US sub-processors</td></tr>
-      <tr><td>License</td><td>BUSL-1.1 CE (≤5 users free), Pro key for unlimited</td></tr>
-    </table>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
-  <div>
-    <h2>Compliance</h2>
-    <div class="compliance-grid">
-      <div class="comp-item">
-        <strong>NIS2</strong>
-        <span>Incident reporting, audit logging, and post-quantum transport satisfy NIS2 Annex I &amp; II obligations.</span>
-      </div>
-      <div class="comp-item">
-        <strong>NEN 7510</strong>
-        <span>Healthcare information security standard met via end-to-end encryption, burn-on-read, and access logging.</span>
-      </div>
-      <div class="comp-item">
-        <strong>DORA</strong>
-        <span>Immutable CT log and resilient multi-relay architecture support DORA ICT risk management requirements.</span>
-      </div>
-      <div class="comp-item">
-        <strong>IEC 62443</strong>
-        <span>Signed device identities, segmented relay sectors, and encrypted OT/IoT payloads align with IEC 62443-3-3.</span>
-      </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
     </div>
   </div>
 </div>
 
-<!-- PRICING -->
-<h2>Pricing</h2>
-<div class="pricing">
-  <div class="tier">
-    <div class="tier-name">Community</div>
-    <div class="price">Free</div>
-    <div class="tier-desc">Self-hosted, open source</div>
-    <ul>
-      <li>Up to 5 users</li>
-      <li>All encryption features</li>
-      <li>CT log included</li>
-      <li>Community support</li>
-    </ul>
+<!-- HERO -->
+<section class="onepager-hero">
+  <div class="container">
+    <div class="onepager-top">
+      <span>post-quantum · eu sovereign · zero-knowledge</span>
+    </div>
+
+    <h1>
+      Encrypted file transport.<br/>
+      <em>RAM-only.</em> Burn on read.
+    </h1>
+
+    <p class="lede">
+      Paramant is a post-quantum encrypted file relay operated from the Netherlands with infrastructure in Germany. No US owner, no CLOUD Act exposure. Files are encrypted client-side, held only in RAM, and destroyed on first read. ML-KEM-768 and ML-DSA-65 (NIST FIPS 203/204, Level 3) for authenticated transfers.
+    </p>
   </div>
-  <div class="tier highlight">
-    <div class="tier-name">Professional</div>
-    <div class="price">€149<sub>/mo</sub></div>
-    <div class="tier-desc">Managed or self-hosted</div>
-    <ul>
-      <li>Unlimited users</li>
-      <li>Pro license key (<code>plk_</code>)</li>
-      <li>SLA + email support</li>
-      <li>Compliance export</li>
-    </ul>
-  </div>
-  <div class="tier">
-    <div class="tier-name">Enterprise</div>
-    <div class="price">Custom</div>
-    <div class="tier-desc">On-premise or private cloud</div>
-    <ul>
-      <li>Air-gapped deployment</li>
-      <li>Custom sectors &amp; identity</li>
-      <li>MSA + DPA included</li>
-      <li>Dedicated onboarding</li>
-    </ul>
+</section>
+
+<!-- URGENCY -->
+<div class="container">
+  <div class="op-urgency">
+    <div class="tag">why this matters now</div>
+    <p>On March 25, 2026, Google accelerated its post-quantum migration deadline from 2035 to 2029. Six days later, Google published research showing elliptic curve cryptography, the mathematical foundation under TLS, SSH, and most digital signatures, can be broken with twenty times fewer qubits than previously estimated. This is a cryptography finding, not a cryptocurrency story, though coin wallets are part of the fallout. Adversaries are archiving encrypted traffic today for retroactive decryption. Data sent with classical encryption in 2026 enters that archive. Data sent with post-quantum encryption does not.</p>
   </div>
 </div>
 
-<!-- FOOTER / CTA -->
-<footer>
-  <div class="cta-left">
-    Start free today — deploy in under 5 minutes.
-    <span>Docker image: <code>docker pull mtty001/relay:latest</code></span>
+<!-- 01 WHAT -->
+<section class="op-section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>What Paramant does differently.</h2>
+      <div class="tag">architecture<br/>and ownership</div>
+    </div>
+
+    <div class="op-grid-3">
+      <div class="op-cell">
+        <div class="op-cell-label">cryptography</div>
+        <h4>Post-quantum by default</h4>
+        <p>ML-KEM-768 and ECDH P-256 hybrid key exchange. NIST Level 3 security category. ML-DSA-65 signed receipts for verified transfers.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">storage</div>
+        <h4>RAM-only, burn on read</h4>
+        <p>Ciphertext exists in server memory only. Never written to disk. Destroyed on first successful download. HTTP 410 on any retry.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">jurisdiction</div>
+        <h4>EU sovereignty</h4>
+        <p>Dutch entity, founder-owned. Hetzner Nuremberg infrastructure. No US parent, no US subsidiary, no CLOUD Act exposure.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">proof</div>
+        <h4>Public CT log</h4>
+        <p>Every transfer hashed into a Merkle tree. Tamper-evident, externally auditable. SHA-256 leaf hashes, signed STH every thirty seconds.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">architecture</div>
+        <h4>Zero-knowledge</h4>
+        <p>Encryption keys are client-side only. Relay receives ciphertext, cannot decrypt. Architecturally, not by policy.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">deployment</div>
+        <h4>Self-hostable</h4>
+        <p>BUSL-1.1 source available. Deploy on Raspberry Pi, Docker, or any Linux VM. Free Community Edition for up to five users.</p>
+      </div>
+    </div>
   </div>
-  <div class="cta-right">
-    <a href="https://paramant.app">paramant.app</a><br>
-    <a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
-    <a href="https://github.com/Apolloccrypt/paramant-relay">github.com/Apolloccrypt/paramant-relay</a>
+</section>
+
+<!-- 02 SECTORS -->
+<section class="op-section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2>Sector fit.</h2>
+      <div class="tag">regulated<br/>use cases</div>
+    </div>
+
+    <div class="op-grid-2">
+      <div class="op-cell">
+        <div class="op-cell-label">healthcare · NEN 7510</div>
+        <h4>DICOM, EPD, lab results</h4>
+        <p>Burn-on-read prevents residual patient data. EU jurisdiction removes the CLOUD Act tension with NEN 7510 access requirements. Dedicated health.paramant.app sector.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">legal · privilege</div>
+        <h4>Due diligence, notarial docs</h4>
+        <p>Attorney-client privilege protected by EU jurisdiction and post-quantum cryptography. Files vanish after recipient opens. Professional obligations preserved.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">finance · DORA</div>
+        <h4>Reports, SWIFT, M&amp;A</h4>
+        <p>Immutable Merkle log supports DORA ICT risk documentation. Jurisdictional stability eliminates supply chain risk from ownership changes. Dedicated finance sector.</p>
+      </div>
+      <div class="op-cell">
+        <div class="op-cell-label">industrial OT · IEC 62443</div>
+        <h4>Firmware, config, sensors</h4>
+        <p>Signed firmware push, PLC configuration, SCADA data relay. Software alternative to hardware data diodes for mid-tier OT. Raspberry Pi deployable.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 SPECS -->
+<section class="op-section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2>Technical specifications.</h2>
+      <div class="tag">verifiable<br/>not marketing</div>
+    </div>
+
+    <table class="op-specs">
+      <tr>
+        <td>Key exchange</td>
+        <td>ML-KEM-768 + ECDH P-256 hybrid (NIST FIPS 203, August 2024)</td>
+      </tr>
+      <tr>
+        <td>Symmetric cipher</td>
+        <td>AES-256-GCM with per-transfer random IV</td>
+      </tr>
+      <tr>
+        <td>Digital signatures</td>
+        <td>ML-DSA-65 (NIST FIPS 204) for receipts and relay identity</td>
+      </tr>
+      <tr>
+        <td>Audit trail</td>
+        <td>Merkle Certificate Transparency log, SHA-256 leaves</td>
+      </tr>
+      <tr>
+        <td>Transport</td>
+        <td>TLS 1.3, HTTPS, no custom wire protocols</td>
+      </tr>
+      <tr>
+        <td>Storage model</td>
+        <td>RAM only, zero disk persistence, burn on first read</td>
+      </tr>
+      <tr>
+        <td>File size (anonymous)</td>
+        <td>5 MB padded · up to 500 MB via chunking (Q2 2026)</td>
+      </tr>
+      <tr>
+        <td>File size (authenticated)</td>
+        <td>Up to 50 MB on dedicated deployments</td>
+      </tr>
+      <tr>
+        <td>Infrastructure</td>
+        <td>Hetzner Nuremberg DE, no US sub-processors</td>
+      </tr>
+      <tr>
+        <td>Source license</td>
+        <td>BUSL-1.1 (Community Edition free, ≤5 users)</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- 04 COMPLIANCE (cobalt) -->
+<section class="section-cobalt" style="padding: 64px 0; margin: 48px 0">
+  <div class="container">
+    <div class="marker">
+      <div class="num">04</div>
+      <h2>Regulatory alignment.</h2>
+      <div class="tag">documented<br/>mappings</div>
+    </div>
+
+    <div class="op-compliance">
+      <div class="row">
+        <div class="label">NIS2</div>
+        <div class="text">Article 21 cryptographic controls. Post-quantum transport, auditable CT log, EU ownership stability for supply chain accountability.</div>
+      </div>
+      <div class="row">
+        <div class="label">NEN 7510</div>
+        <div class="text">Dutch healthcare standard. End-to-end encryption, burn-on-read, no data at rest. Full mapping documented.</div>
+      </div>
+      <div class="row">
+        <div class="label">DORA</div>
+        <div class="text">ICT risk for financial entities. Immutable log, resilient multi-relay architecture, jurisdictional stability.</div>
+      </div>
+      <div class="row">
+        <div class="label">IEC 62443</div>
+        <div class="text">Industrial zones-and-conduits. SR 4.1, SR 5.1, SR 3.1 addressed. Dedicated iot.paramant.app sector.</div>
+      </div>
+      <div class="row">
+        <div class="label">GDPR</div>
+        <div class="text">Dutch data processor. Article 28 DPA available. Sub-processor transparency. No US transfer.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 COMPARE -->
+<section class="op-section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">05</div>
+      <h2>How Paramant compares.</h2>
+      <div class="tag">as of<br/>april 2026</div>
+    </div>
+
+    <table class="op-compare">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Jurisdiction</th>
+          <th>Post-quantum</th>
+          <th>Burn-on-read</th>
+          <th>CLOUD Act</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="paramant-row">
+          <td>Paramant</td>
+          <td>Netherlands, founder-owned</td>
+          <td class="hl-cell">ML-KEM-768</td>
+          <td class="hl-cell">Default</td>
+          <td class="hl-cell">None</td>
+        </tr>
+        <tr>
+          <td>Zivver</td>
+          <td>NL (Kiteworks, San Mateo CA)</td>
+          <td>No</td>
+          <td>No</td>
+          <td>Yes, via parent</td>
+        </tr>
+        <tr>
+          <td>WeTransfer</td>
+          <td>NL (Bending Spoons, Italy)</td>
+          <td>No</td>
+          <td>No</td>
+          <td>None</td>
+        </tr>
+        <tr>
+          <td>Tresorit</td>
+          <td>Switzerland (Swiss Post)</td>
+          <td>Roadmap 2025+</td>
+          <td>No</td>
+          <td>None</td>
+        </tr>
+        <tr>
+          <td>Dropbox, Google, Box</td>
+          <td>United States</td>
+          <td>Partial</td>
+          <td>No</td>
+          <td>Full exposure</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="op-sources">Sources: company press releases, SEC filings, PitchBook company profiles, Swiss Post corporate communications. Ownership structures verified April 2026. Full comparison and methodology at paramant.app/vs.</p>
+  </div>
+</section>
+
+<!-- 06 DEPLOY -->
+<section class="op-section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">06</div>
+      <h2>Deployment options.</h2>
+      <div class="tag">free start<br/>enterprise ready</div>
+    </div>
+
+    <div class="op-tiers">
+      <div class="op-tier">
+        <div class="op-tier-name">Community Edition</div>
+        <div class="op-tier-price">Free · ≤5 users</div>
+        <p>BUSL-1.1 source available. Self-hosted on Docker or Raspberry Pi. All cryptographic features included. No account, no telemetry.</p>
+      </div>
+      <div class="op-tier">
+        <div class="op-tier-name">Professional</div>
+        <div class="op-tier-price">Coming 2026</div>
+        <p>Managed service on paramant.app. Send history, webhooks, email notifications, extended expiry, higher rate limits.</p>
+      </div>
+      <div class="op-tier">
+        <div class="op-tier-name">Enterprise</div>
+        <div class="op-tier-price">Custom</div>
+        <p>Dedicated relay instance, SLA, DPA, on-premise or EU-hosted private cloud. IEC 62443 / NIS2 / NEN 7510 documentation bundled.</p>
+      </div>
+    </div>
+
+    <div class="op-install">
+      <div>
+        <span class="prompt">$</span>curl -fsSL https://paramant.app/install.sh | bash
+      </div>
+      <div>
+        <span class="prompt">$</span>docker pull mtty001/relay:latest
+      </div>
+    </div>
+
+    <div class="op-controls no-print">
+      <button onclick="window.print()">Print or save as PDF</button>
+      <a href="/vs" class="secondary">Full comparison</a>
+      <a href="/sovereignty" class="secondary">Jurisdiction deep-dive</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<div class="container">
+  <div class="op-foot">
+    <div>
+      <strong style="color:var(--navy)">paramant.app</strong><br/>
+      <a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br/>
+      Harderwijk, Netherlands
+    </div>
+    <div class="center">
+      ML-KEM-768 · FIPS 203/204<br/>
+      Hetzner DE · No CLOUD Act<br/>
+      BUSL-1.1 · © 2026
+    </div>
+    <div class="right">
+      <a href="https://github.com/Apolloccrypt/paramant-relay">github.com/Apolloccrypt</a><br/>
+      <a href="https://hub.docker.com/r/mtty001/relay">hub.docker.com/mtty001</a><br/>
+      Build 2.4.5 · April 2026
+    </div>
+  </div>
+</div>
+
+<div style="height: 80px"></div>
+
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/sovereignty">Jurisdiction</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/quantum-urgency">Quantum urgency</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
   </div>
 </footer>
-
-<button class="print-btn" onclick="window.print()">Print / Save PDF</button>
-
 </body>
 </html>

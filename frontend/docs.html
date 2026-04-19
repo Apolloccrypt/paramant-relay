@@ -7,178 +7,227 @@
 <meta name="description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0c0c0c;color:#ededed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-nav{display:flex;align-items:center;padding:0 40px;height:52px;border-bottom:1px solid #1a1a1a;position:sticky;top:0;background:rgba(12,12,12,.97);backdrop-filter:blur(8px);z-index:100;gap:24px}
-nav .logo{font-family:'SF Mono','Fira Code',monospace;font-size:13px;font-weight:700;letter-spacing:.08em}
-.nav-links{display:flex;gap:20px;font-size:13px;color:#888}
-.nav-links a:hover{color:#ededed}
-nav .back{margin-left:auto;font-size:12px;color:#505050;border:1px solid #1c1c1c;padding:5px 12px;border-radius:4px}
-nav .back:hover{color:#aaa;border-color:#383838}
+a{color:var(--ink);text-decoration:none}
 .layout{display:flex;min-height:calc(100vh - 52px)}
-.sidebar{width:224px;flex-shrink:0;padding:28px 16px 40px;border-right:1px solid #141414;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
-.sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
-.sidebar h3{font-size:10px;color:#404040;letter-spacing:.1em;text-transform:uppercase;margin:22px 0 6px;padding-left:8px;font-family:'SF Mono','Fira Code',monospace}
+.sidebar{width:224px;flex-shrink:0;padding:28px 16px 40px;border-right:1px solid var(--ink-hair);position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
+.sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:var(--ink-hair)}
+.sidebar h3{font-size:10px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin:22px 0 6px;padding-left:8px;font-family:var(--mono)}
 .sidebar h3:first-child{margin-top:0}
-.sidebar a{display:block;font-size:12px;color:#565656;padding:3px 8px;line-height:1.8;border-radius:3px;transition:color .1s,background .1s}
-.sidebar a:hover{color:#bbb;background:#111}
-.sidebar a.active{color:#ededed;background:#141414}
+.sidebar a{display:block;font-size:12px;color:var(--ink-dim);padding:3px 8px;line-height:1.8;transition:color .1s,background .1s}
+.sidebar a:hover{color:var(--ink);background:var(--ink-ghost)}
+.sidebar a.active{color:var(--ink);background:var(--ink-hair)}
 .content{flex:1;padding:52px 72px 80px;max-width:840px}
 .content h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.subtitle{font-size:14px;color:#666;margin-bottom:52px;line-height:1.8}
-.content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin:56px 0 18px;padding-top:56px;border-top:1px solid #141414}
+.subtitle{font-size:14px;color:var(--ink-dim);margin-bottom:52px;line-height:1.8}
+.content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin:56px 0 18px;padding-top:56px;border-top:1px solid var(--ink-hair)}
 .content h2:first-of-type{border-top:none;padding-top:0;margin-top:0}
-.content h3{font-size:13px;font-weight:600;color:#ccc;margin:28px 0 10px}
-.content p{font-size:13px;color:#767676;line-height:1.85;margin-bottom:14px}
-.content p strong{color:#999}
+.content h3{font-size:13px;font-weight:600;color:var(--ink);margin:28px 0 10px}
+.content p{font-size:13px;color:var(--ink-dim);line-height:1.85;margin-bottom:14px}
+.content p strong{color:var(--cobalt)}
 .content ul{margin:10px 0 18px 0;padding-left:0;list-style:none}
-.content ul li{font-size:13px;color:#767676;padding:3px 0 3px 16px;position:relative}
-.content ul li::before{content:'·';position:absolute;left:4px;color:#404040}
-code{background:#111;border:1px solid #1e1e1e;padding:2px 7px;border-radius:3px;font-size:12px;color:#aaa;font-family:'SF Mono','Fira Code',monospace}
-pre{background:#0f0f0f;border:1px solid #1c1c1c;border-radius:6px;padding:20px 24px;margin:14px 0 22px;overflow-x:auto;font-size:12px;color:#8a8a8a;line-height:1.9;font-family:'SF Mono','Fira Code',monospace}
-pre .cm{color:#404040}.pre .kw{color:#aaa}.pre .st{color:#7a7a7a}
-.cb{background:#0e0e0e;border:1px solid #1c1c1c;border-radius:6px;overflow:hidden;margin:14px 0 22px}
-.cb-header{padding:8px 16px;border-bottom:1px solid #161616;display:flex;align-items:center;gap:6px}
-.cb-dots{display:flex;gap:5px}.cb-dot{width:7px;height:7px;border-radius:50%;background:#1e1e1e}
-.cb-lang{margin-left:auto;font-size:10px;color:#3a3a3a;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.06em}
-.cb pre{margin:0;border:none;border-radius:0;background:transparent;padding:18px 24px}
+.content ul li{font-size:13px;color:var(--ink-dim);padding:3px 0 3px 16px;position:relative}
+.content ul li::before{content:'·';position:absolute;left:4px;color:var(--ink-dim)}
+code{background:var(--black-hair);border:1px solid var(--ink-hair);padding:2px 7px;font-size:12px;color:var(--ink);font-family:var(--mono)}
+pre{background:var(--black-hair);border:1px solid var(--ink-hair);padding:20px 24px;margin:14px 0 22px;overflow-x:auto;font-size:12px;color:var(--ink-dim);line-height:1.9;font-family:var(--mono)}
+pre .cm{color:var(--ink-dim)}.pre .kw{color:var(--cobalt)}.pre .st{color:var(--ink-dim)}
+.cb{background:var(--black-hair);border:1px solid var(--ink-hair);overflow:hidden;margin:14px 0 22px}
+.cb-header{padding:8px 16px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:6px}
+.cb-dots{display:flex;gap:5px}.cb-dot{width:7px;height:7px;background:var(--ink-hair)}
+.cb-lang{margin-left:auto;font-size:10px;color:var(--ink-dim);font-family:var(--mono);letter-spacing:.06em}
+.cb pre{margin:0;border:none;background:transparent;padding:18px 24px}
 table{width:100%;border-collapse:collapse;margin:14px 0 26px;font-size:12px}
-th{text-align:left;font-size:10px;color:#404040;letter-spacing:.1em;text-transform:uppercase;padding:9px 14px;border-bottom:1px solid #141414;font-family:'SF Mono','Fira Code',monospace}
-td{padding:9px 14px;border-bottom:1px solid #0e0e0e;color:#767676;vertical-align:top;line-height:1.75}
-td:first-child{font-family:'SF Mono','Fira Code',monospace;color:#999;white-space:nowrap}
+th{text-align:left;font-size:10px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;padding:9px 14px;border-bottom:1px solid var(--ink-hair);font-family:var(--mono)}
+td{padding:9px 14px;border-bottom:1px solid var(--ink-hair);color:var(--ink-dim);vertical-align:top;line-height:1.75}
+td:first-child{font-family:var(--mono);color:var(--ink);white-space:nowrap}
 tr:last-child td{border-bottom:none}
-.method{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.04em}
-.get{background:#111;color:#00cc33;border:1px solid #242424}
-.post{background:#0a0a1a;color:#3a3a7a;border:1px solid #181830}
-.badge{display:inline-block;padding:2px 8px;border:1px solid #1c1c1c;border-radius:3px;font-size:11px;color:#545454;margin-right:4px;font-family:'SF Mono','Fira Code',monospace}
-.callout{border:1px solid #1e2a1e;background:#0c130c;border-radius:6px;padding:14px 18px;margin:16px 0 22px}
-.callout.warn{border-color:#2a1e0c;background:#13100a}
-.callout p{margin:0;color:#5a7a5a;font-size:12.5px;line-height:1.75}
-.callout.warn p{color:#7a6a3a}
+.method{display:inline-block;padding:2px 8px;font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:.04em}
+.get{background:var(--ink-ghost);color:var(--ink);border:1px solid var(--ink-hair)}
+.post{background:var(--black-hair);color:var(--ink-dim);border:1px solid var(--ink-hair)}
+.badge{display:inline-block;padding:2px 8px;border:1px solid var(--ink-hair);font-size:11px;color:var(--ink-dim);margin-right:4px;font-family:var(--mono)}
+.callout{border:1px solid var(--ink-hair);background:var(--ink-ghost);padding:14px 18px;margin:16px 0 22px}
+.callout.warn{border-color:var(--ink-hair);background:var(--ink-ghost)}
+.callout p{margin:0;color:var(--ink);font-size:12.5px;line-height:1.75}
+.callout.warn p{color:var(--ink-dim)}
 .step-row{display:flex;gap:16px;align-items:flex-start;margin:8px 0}
-.step-num{width:20px;height:20px;border-radius:50%;background:#141414;border:1px solid #1e1e1e;font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:#505050;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-num{width:20px;height:20px;background:var(--black-hair);border:1px solid var(--ink-hair);font-size:10px;font-family:var(--mono);color:var(--ink-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 .step-body{flex:1}
 .step-body p{margin-bottom:8px}
-.faq-item{border-bottom:1px solid #111;padding:18px 0}
+.faq-item{border-bottom:1px solid var(--ink-hair);padding:18px 0}
 .faq-item:last-child{border-bottom:none}
-.faq-q{font-size:13px;font-weight:500;color:#ccc;margin-bottom:8px}
-.faq-a{font-size:13px;color:#888;line-height:1.8}
-.sector-badge{display:inline-block;font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:#00cc33;background:#0c160c;border:1px solid #1a2e1a;border-radius:3px;padding:2px 7px;margin-right:6px}
-@media(max-width:900px){nav{padding:0 20px}.sidebar{display:none}.content{padding:32px 24px 60px}}
+.faq-q{font-size:13px;font-weight:500;color:var(--ink);margin-bottom:8px}
+.faq-a{font-size:13px;color:var(--ink-dim);line-height:1.8}
+.sector-badge{display:inline-block;font-size:10px;font-family:var(--mono);color:var(--ink);background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:2px 7px;margin-right:6px}
+@media(max-width:900px){.sidebar{display:none}.content{padding:32px 24px 60px}}
 </style>
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
 </head>
 
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Product &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/parashare">ParaShare</a></li>
-        <li><a href="/drop">ParaDrop</a></li>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="/ct-log">CT Log</a></li>
-        <li><a href="/docs">Docs</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
-        <li><a href="/vs">vs. alternatives</a></li>
-        <li><a href="/press">Press kit</a></li>
-        <li><a href="/changelog">Changelog</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Self-host &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a></li>
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a></li>
-        <li><a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a></li>
-        <li><a href="/docs#self-hosting">Deploy guide</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/install.sh">install.sh</a></li>
-        <li><a href="/install-pi.sh">install-pi.sh</a></li>
-        <li><a href="/install-client.sh">install-client.sh</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/status">Status</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Compliance &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/compliance/nis2">NIS2 (EU 2022/2555)</a></li>
-        <li><a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a></li>
-        <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
-        <li><a href="/dpa">Data Processing Agreement</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/government">Government &amp; public sector</a></li>
-        <li><a href="/hndl">HNDL threat</a></li>
-        <li><a href="/crypto-agility">Crypto agility</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
       </ul>
     </li>
 
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Info &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="mailto:privacy@paramant.app">Contact</a></li>
-        <li><a href="/request-key">Free API key</a></li>
-        <li><a href="/status">Status</a></li>
-        <li><a href="/sla">SLA</a></li>
-        <li><a href="/security">Security</a></li>
-        <li><a href="/license">License</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
       </ul>
     </li>
 
   </ul>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Product</div>
-    <a href="/parashare">ParaShare</a>
-    <a href="/drop">ParaDrop</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/ct-log">CT Log</a>
-    <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
-    <a href="/vs">vs. alternatives</a>
-    <a href="/press">Press kit</a>
-    <a href="/changelog">Changelog</a>
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Self-host</div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-    <a href="/docs#self-hosting">Deploy guide</a>
-    <a href="/install.sh">install.sh</a>
-    <a href="/install-pi.sh">install-pi.sh</a>
-    <a href="/status">Status</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
   </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Compliance</div>
-    <a href="/compliance/nis2">NIS2</a>
-    <a href="/compliance/iec62443">IEC 62443</a>
-    <a href="/compliance/nen7510">NEN 7510</a>
-    <a href="/dpa">Data Processing Agreement</a>
-    <a href="/government">Government</a>
-    <a href="/hndl">HNDL threat</a>
-    <a href="/crypto-agility">Crypto agility</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Info</div>
-    <a href="mailto:privacy@paramant.app">Contact</a>
-    <a href="/request-key">Free API key</a>
-    <a href="/status">Status</a>
-    <a href="/sla">SLA</a>
-    <a href="/security">Security</a>
-    <a href="/license">License</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
   </div>
 </div>
 
@@ -229,22 +278,22 @@ tr:last-child td{border-bottom:none}
 
   <div class="content">
     <h1>Documentation</h1>
-    <p class="subtitle">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v2.4.5. The relay is untrusted by design — it never holds a decryption key. <a href="/request-key" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">Get a free API key →</a></p>
+    <p class="subtitle">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v2.4.5. The relay is untrusted by design — it never holds a decryption key. <a href="/request-key" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Get a free API key →</a></p>
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Quick start</h2>
-    <p>Send your first encrypted file in under 5 minutes. No account required — <a href="/request-key" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">get a free <code>pgp_</code> key here</a> (30-second form, key arrives by email).</p>
+    <p>Send your first encrypted file in under 5 minutes. No account required — <a href="/request-key" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">get a free <code>pgp_</code> key here</a> (30-second form, key arrives by email).</p>
 
-    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:#666;font-size:13px">Install the Python SDK (requires Python 3.9+, cryptography library)</p></div></div>
+    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Install the Python SDK (requires Python 3.9+, cryptography library)</p></div></div>
     <pre>pip install cryptography</pre>
 
-    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:#666;font-size:13px">Download the sender and receiver scripts</p></div></div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Download the sender and receiver scripts</p></div></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px">
-      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
-      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
+      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
+      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
     </div>
 
-    <div class="step-row"><div class="step-num">3</div><div class="step-body"><p style="color:#666;font-size:13px">Send a file — encrypted before it leaves your device</p></div></div>
+    <div class="step-row"><div class="step-num">3</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Send a file — encrypted before it leaves your device</p></div></div>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
       <pre><span class="cm"># Terminal 1 — sender</span>
@@ -288,9 +337,9 @@ GET /v2/check-key?k=pgp_your_key_here</pre>
     <p>The Python scripts handle ML-KEM-768 encryption, 5MB padding, chunking, retries, and DID authentication. No SDK package required — just <code>pip install cryptography</code>.</p>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px">
-      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
-      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
-      <a href="/dl/scripts/paramant_sdk.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#ccc;background:#111;border:1px solid #1e1e1e;border-radius:4px;padding:7px 14px;text-decoration:none">↓ paramant_sdk.py</a>
+      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
+      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
+      <a href="/dl/scripts/paramant_sdk.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant_sdk.py</a>
     </div>
 
     <h3>Sender — common options</h3>
@@ -344,7 +393,7 @@ python3 paramant-sender.py --key pgp_xxx --device mri-001 --sector health scan.d
 
 <span class="cm"># HL7 FHIR referral</span>
 paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg</pre></div>
-    <p><a href="/compliance/nen7510" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">NEN 7510 compliance page →</a></p>
+    <p><a href="/compliance/nen7510" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">NEN 7510 compliance page →</a></p>
 
     <h3><span class="sector-badge">legal</span>Legal &amp; Notary — eIDAS, KNB</h3>
     <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log provides tamper-evident proof of delivery without storing content.</p>
@@ -363,7 +412,7 @@ python3 paramant-sender.py --heartbeat 15 --device plc-factory-01 --sector iot
 
 <span class="cm"># Firmware update to IoT fleet</span>
 paramant-firmware update-v2.1.bin --sign --device-group bodycams.txt</pre></div>
-    <p><a href="/compliance/iec62443" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">IEC 62443 compliance page →</a></p>
+    <p><a href="/compliance/iec62443" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">IEC 62443 compliance page →</a></p>
 
     <h3><span class="sector-badge">finance</span>Finance — NIS2, DORA, ISO 20022</h3>
     <p>ISO 20022 payment file relay with per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code> — EU jurisdiction, no US Cloud Act, no metadata retention.</p>
@@ -468,7 +517,7 @@ ws.onmessage = e => {
     <p>Community Edition is free forever for up to 5 users. One <code>docker compose up</code> starts 6 containers: five sector relays and an admin panel.</p>
 
     <div class="callout">
-      <p><strong style="color:#7a9a7a">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
+      <p><strong style="color:var(--cobalt)">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
     </div>
 
     <div class="cb">
@@ -576,7 +625,7 @@ docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>
     <div class="callout warn">
-      <p><strong style="color:#9a8a4a">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code> — do not delete this volume or the relay will lose its registered identity.</p>
+      <p><strong style="color:var(--ink-dim)">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code> — do not delete this volume or the relay will lose its registered identity.</p>
     </div>
 
     <!-- ── paramant-client .deb ─────────────────────────────────── -->
@@ -611,50 +660,50 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
 
     <!-- ── ParamantOS CLI tools ───────────────────────────────────── -->
     <h2 id="paramant-os-tools">ParamantOS — 41 operator tools</h2>
-    <p><a href="https://github.com/Apolloccrypt/ParamantOS" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">ParamantOS</a> is a hardened Linux distribution (NixOS + Mint editions) for relay operators. All 38 tools are pre-installed.</p>
+    <p><a href="https://github.com/Apolloccrypt/ParamantOS" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">ParamantOS</a> is a hardened Linux distribution (NixOS + Mint editions) for relay operators. All 38 tools are pre-installed.</p>
     <table>
       <tr><th>Category</th><th>Command</th><th>What it does</th></tr>
-      <tr><td rowspan="5" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Setup &amp; diagnostics</td><td>paramant-setup</td><td>First-boot wizard — password, relay URL, API key</td></tr>
+      <tr><td rowspan="5" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Setup &amp; diagnostics</td><td>paramant-setup</td><td>First-boot wizard — password, relay URL, API key</td></tr>
       <tr><td>paramant-help</td><td>Full command reference</td></tr>
       <tr><td>paramant-info</td><td>System overview — OS, relay version, uptime</td></tr>
       <tr><td>paramant-doctor</td><td>Automated health check for relay + security</td></tr>
       <tr><td>paramant-install</td><td>Interactive disk installer</td></tr>
-      <tr><td rowspan="7" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Relay control</td><td>paramant-status</td><td>Relay health, version, edition, uptime</td></tr>
+      <tr><td rowspan="7" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Relay control</td><td>paramant-status</td><td>Relay health, version, edition, uptime</td></tr>
       <tr><td>paramant-relay-setup</td><td>Clone relay repo + configure .env + start Docker</td></tr>
       <tr><td>paramant-relay-ctl</td><td>Privileged relay service control (start/stop/reload)</td></tr>
       <tr><td>paramant-restart</td><td>Restart the relay</td></tr>
       <tr><td>paramant-dashboard</td><td>Live TUI dashboard — stats, connections, throughput</td></tr>
       <tr><td>paramant-logs</td><td>Live relay log stream</td></tr>
       <tr><td>paramant-update</td><td>Check for relay updates and show upgrade path</td></tr>
-      <tr><td rowspan="7" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Sector tools</td><td>paramant-referral</td><td>Healthcare referral — NEN 7510, HL7 FHIR, DICOM</td></tr>
+      <tr><td rowspan="7" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Sector tools</td><td>paramant-referral</td><td>Healthcare referral — NEN 7510, HL7 FHIR, DICOM</td></tr>
       <tr><td>paramant-notary</td><td>Legal document transport — eIDAS, KNB notary</td></tr>
       <tr><td>paramant-legal</td><td>Court document relay (replaces Zivver/e-Court)</td></tr>
       <tr><td>paramant-payslip</td><td>HR payslip distribution — GDPR compliant bulk send</td></tr>
       <tr><td>paramant-firmware</td><td>IoT/body cam firmware updates — IEC 62443</td></tr>
       <tr><td>paramant-cra</td><td>Software supply chain relay — EU CRA 2027, SBOM</td></tr>
       <tr><td>paramant-ticket</td><td>One-time transit ticket issuer and verifier</td></tr>
-      <tr><td rowspan="3" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">CT log &amp; verification</td><td>paramant-verify-sth</td><td>Verify ML-DSA-65 signed tree head against relay</td></tr>
+      <tr><td rowspan="3" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">CT log &amp; verification</td><td>paramant-verify-sth</td><td>Verify ML-DSA-65 signed tree head against relay</td></tr>
       <tr><td>paramant-receipt</td><td>View or verify a delivery receipt</td></tr>
       <tr><td>paramant-verify-peers</td><td>Cross-check STH consistency across all peer relays</td></tr>
-      <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Key management</td><td>paramant-keys</td><td>List all API keys</td></tr>
+      <tr><td rowspan="4" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Key management</td><td>paramant-keys</td><td>List all API keys</td></tr>
       <tr><td>paramant-key-add</td><td>Add a new API key</td></tr>
       <tr><td>paramant-key-revoke</td><td>Revoke an API key</td></tr>
       <tr><td>paramant-license</td><td>Show license status and upgrade path</td></tr>
-      <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Network</td><td>paramant-ip</td><td>IP addresses, interfaces, relay accessibility</td></tr>
+      <tr><td rowspan="4" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Network</td><td>paramant-ip</td><td>IP addresses, interfaces, relay accessibility</td></tr>
       <tr><td>paramant-ports</td><td>Firewall rules and listening ports</td></tr>
       <tr><td>paramant-wifi</td><td>Interactive WiFi manager</td></tr>
       <tr><td>paramant-scan</td><td>Discover paramant relay nodes via registry</td></tr>
-      <tr><td rowspan="4" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Security</td><td>security-status</td><td>All security layers at a glance</td></tr>
+      <tr><td rowspan="4" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Security</td><td>security-status</td><td>All security layers at a glance</td></tr>
       <tr><td>paramant-security</td><td>Firewall, SSH, kernel hardening status</td></tr>
       <tr><td>paramant-verify</td><td>Out-of-band TOFU fingerprint verification</td></tr>
       <tr><td>paramant-hybrid-check</td><td>Verify relay hybrid post-quantum mode support</td></tr>
-      <tr><td rowspan="5" style="color:#888;font-size:11px;vertical-align:top;padding-top:12px">Backup &amp; data</td><td>paramant-backup</td><td>Backup relay keys and CT log</td></tr>
+      <tr><td rowspan="5" style="color:var(--ink-dim);font-size:11px;vertical-align:top;padding-top:12px">Backup &amp; data</td><td>paramant-backup</td><td>Backup relay keys and CT log</td></tr>
       <tr><td>paramant-restore</td><td>Restore from backup</td></tr>
       <tr><td>paramant-export</td><td>Export audit log to USB drive</td></tr>
       <tr><td>paramant-data-ctl</td><td>Privileged relay data-dir management</td></tr>
       <tr><td>paramant-cron</td><td>Manage systemd timers for relay maintenance</td></tr>
     </table>
-    <p>Download ParamantOS: <a href="https://github.com/Apolloccrypt/ParamantOS/releases" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">NixOS edition (v2.4.5)</a> · <a href="https://github.com/Apolloccrypt/ParamantOS/releases/tag/v1.0-mint" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">Mint edition (v1.0-β)</a></p>
+    <p>Download ParamantOS: <a href="https://github.com/Apolloccrypt/ParamantOS/releases" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">NixOS edition (v2.4.5)</a> · <a href="https://github.com/Apolloccrypt/ParamantOS/releases/tag/v1.0-mint" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Mint edition (v1.0-β)</a></p>
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Crypto stack</h2>
@@ -676,8 +725,8 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
     <p>The CT log persists cryptographic hashes (Merkle leaf hashes, tree hashes, device hashes) to disk — never payload content. Even a complete disk image of the relay server reveals no file contents.</p>
     <p>Two-step burn: first the blob is zeroed in-place, then the Map entry is deleted. This prevents a brief window where a partial read could occur.</p>
 
-    <h2 id="padding">5MB fixed padding</h2>
-    <p>All blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. An observer on the network cannot determine the size, type, or content of the transferred file. All transfers look identical at the network layer — effective DPI masking for classified data flows.</p>
+    <h2 id="padding">5 MB fixed padding (ParaShare)</h2>
+    <p>ParaShare authenticated blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. An observer on the network cannot determine the size, type, or content of the transferred file — effective DPI masking for classified data flows. Anonymous blobs retain their actual encrypted size up to 5 MB.</p>
 
     <h2 id="ct-log">Certificate Transparency log</h2>
     <p>Every transfer hash and device registration is appended to a public Merkle tree. The root hash changes with every write and is publicly verifiable. Anyone can prove a transfer occurred without learning what was transferred.</p>
@@ -690,7 +739,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
       "device_hash": "ce56ff...", "ts": "2026-04-14T19:07:57Z" }
   ]
 }</span></pre>
-    <p>Live CT log: <a href="/ct-log" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">paramant.app/ct-log →</a></p>
+    <p>Live CT log: <a href="/ct-log" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/ct-log →</a></p>
 
     <!-- ── Identity & Teams ─────────────────────────────────────── -->
     <h2 id="did">W3C Decentralized Identity</h2>
@@ -729,10 +778,10 @@ python3 scripts/paramant-admin.py sync</pre>
     <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Sectors are routing domains — they provide traffic isolation and sector-specific compliance documentation. The crypto stack and API surface are identical.</p>
     <table>
       <tr><th>Sector</th><th>URL</th><th>Primary use</th><th>Compliance</th></tr>
-      <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td><a href="/compliance/nen7510" style="color:#5a7a5a">NEN 7510</a>, GDPR</td></tr>
+      <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td><a href="/compliance/nen7510" style="color:var(--cobalt)">NEN 7510</a>, GDPR</td></tr>
       <tr><td><span class="sector-badge">legal</span></td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>AVG, eIDAS</td></tr>
-      <tr><td><span class="sector-badge">finance</span></td><td>finance.paramant.app</td><td>ISO 20022, compliance data</td><td><a href="/compliance/nis2" style="color:#5a7a5a">NIS2</a>, DORA</td></tr>
-      <tr><td><span class="sector-badge">iot</span></td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td><a href="/compliance/iec62443" style="color:#5a7a5a">IEC 62443</a></td></tr>
+      <tr><td><span class="sector-badge">finance</span></td><td>finance.paramant.app</td><td>ISO 20022, compliance data</td><td><a href="/compliance/nis2" style="color:var(--cobalt)">NIS2</a>, DORA</td></tr>
+      <tr><td><span class="sector-badge">iot</span></td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td><a href="/compliance/iec62443" style="color:var(--cobalt)">IEC 62443</a></td></tr>
     </table>
 
     <!-- ── Security ─────────────────────────────────────────────── -->
@@ -742,13 +791,13 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><th>What a compromised relay can do</th><th>What it cannot do</th></tr>
       <tr><td>Deny or delay service</td><td>Read file contents (no decryption key)</td></tr>
       <tr><td>Learn transfer timing and frequency</td><td>Substitute a registered ML-KEM public key (CT log prevents rollback)</td></tr>
-      <tr><td>Observe blob sizes (all fixed 5 MB)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
+      <tr><td>Observe ParaShare blob sizes (all fixed 5 MB) or anonymous blob sizes (variable, up to 5 MB)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
       <tr><td>Block a specific device hash</td><td>Decrypt any stored ciphertext</td></tr>
     </table>
     <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not sufficient — both must be broken simultaneously.</p>
 
     <div class="callout">
-      <p><strong style="color:#7a9a7a">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata — not plaintext.</p>
+      <p><strong style="color:var(--cobalt)">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata — not plaintext.</p>
     </div>
 
     <h3>Jurisdiction</h3>
@@ -761,7 +810,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><td>Apr 2026</td><td>R. Zwarts (independent)</td><td>6 total (3H · 3M)</td><td>All resolved — 0db3ef0</td></tr>
       <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>All resolved — 0db3ef0</td></tr>
     </table>
-    <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">SECURITY.md</a>. To report a vulnerability: <a href="mailto:privacy@paramant.app" style="color:#6a9a6a">privacy@paramant.app</a>.</p>
+    <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">SECURITY.md</a>. To report a vulnerability: <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
 
     <!-- ── Compliance ───────────────────────────────────────────── -->
     <h2 id="compliance-nis2">Compliance — NIS2 / DORA</h2>
@@ -774,7 +823,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <li>Zero-downtime key revocation — immediate incident response capability</li>
     </ul>
     <p><strong>DORA (EU 2022/2554)</strong> applies to financial entities. The finance.paramant.app sector is designed with DORA in mind: per-transaction Merkle proof, no US Cloud Act jurisdiction, ISO 20022 compatible.</p>
-    <p><a href="/compliance/nis2" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">View full NIS2 compliance documentation →</a></p>
+    <p><a href="/compliance/nis2" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full NIS2 compliance documentation →</a></p>
 
     <h2 id="compliance-nen7510">NEN 7510 (Healthcare)</h2>
     <p>NEN 7510 is the Dutch standard for information security in healthcare. The health.paramant.app sector is designed for NEN 7510 compliance:</p>
@@ -785,7 +834,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <li>Key-based access control — per-user API keys with revocation</li>
       <li>Hetzner DE — EU GDPR jurisdiction, suitable for patient data routing</li>
     </ul>
-    <p><a href="/compliance/nen7510" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">View full NEN 7510 compliance documentation →</a></p>
+    <p><a href="/compliance/nen7510" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full NEN 7510 compliance documentation →</a></p>
 
     <h2 id="compliance-iec62443">IEC 62443 (Industrial / OT)</h2>
     <p>IEC 62443 is the international standard for operational technology security. The iot.paramant.app sector supports IEC 62443 deployments:</p>
@@ -796,7 +845,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <li>Network segmentation — OT side connects outbound only; IT side receives inbound only</li>
       <li>ML-DSA-65 device signatures — cryptographic device authentication</li>
     </ul>
-    <p><a href="/compliance/iec62443" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">View full IEC 62443 compliance documentation →</a></p>
+    <p><a href="/compliance/iec62443" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full IEC 62443 compliance documentation →</a></p>
 
     <!-- ── FAQ ──────────────────────────────────────────────────── -->
     <h2 id="faq">Frequently asked questions</h2>
@@ -833,7 +882,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">Is the source code auditable?</div>
-      <div class="faq-a">Yes. The full relay source is at <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:#6a9a6a">github.com/Apolloccrypt/paramant-relay</a> under BUSL-1.1. Three independent security audits were conducted in April 2026 — all findings are publicly documented in SECURITY.md. The relay binary checksum is verified on startup and logged to the CT log.</div>
+      <div class="faq-a">Yes. The full relay source is at <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:var(--cobalt)">github.com/Apolloccrypt/paramant-relay</a> under BUSL-1.1. Three independent security audits were conducted in April 2026 — all findings are publicly documented in SECURITY.md. The relay binary checksum is verified on startup and logged to the CT log.</div>
     </div>
 
     <div class="faq-item">
@@ -843,7 +892,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How do I get a pgp_ API key?</div>
-      <div class="faq-a"><a href="/request-key" style="color:#6a9a6a;text-decoration:underline;text-decoration-color:#2a4a2a">paramant.app/request-key</a> — 30-second form, key arrives by email. Trial keys allow 10 uploads/day, 1-hour TTL, 30-day expiry. No account, no credit card required.</div>
+      <div class="faq-a"><a href="/request-key" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/request-key</a> — 30-second form, key arrives by email. Trial keys allow 10 uploads/day, 1-hour TTL, 30-day expiry. No account, no credit card required.</div>
     </div>
 
   </div>
@@ -858,6 +907,70 @@ window.addEventListener('scroll', () => {
   links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
 }, { passive: true });
 </script>
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
 </body>
 </html>

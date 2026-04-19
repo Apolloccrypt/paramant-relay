@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<style>
+  body { background: var(--bone); }
+  .checkout-wrap { max-width: 480px; margin: var(--space-10) auto; padding: 0 var(--space-5); }
+  .checkout-header { margin-bottom: var(--space-7); }
+  .checkout-header a { font-family: var(--mono); font-size: var(--text-xs); color: var(--cobalt); text-decoration: none; letter-spacing: .1em; text-transform: uppercase; }
+  .checkout-card { background: #fff; border: 1.5px solid var(--ink-hair); padding: var(--space-7); }
+  .checkout-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--ink-hair); }
+  .checkout-row:last-of-type { border-bottom: none; }
+  .checkout-label { font-size: var(--text-sm); color: var(--ink-dim); }
+  .checkout-val { font-weight: 700; color: var(--navy); }
+  .checkout-total { font-size: var(--text-lg); color: var(--cobalt); font-weight: 800; }
+  .checkout-actions { display: flex; gap: var(--space-3); margin-top: var(--space-6); }
+  .checkout-actions .btn { flex: 1; text-align: center; }
+  #state-loading { text-align: center; padding: var(--space-8); color: var(--ink-dim); }
+  #state-error { display: none; }
+  #state-checkout { display: none; }
+  .plan-badge { display: inline-block; background: var(--cobalt); color: #fff; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; padding: 3px 8px; }
+</style>
+</head>
+<body>
+
+<div class="checkout-wrap">
+  <div class="checkout-header">
+    <a href="/pricing">&larr; Back to pricing</a>
+    <h1 style="margin-top:var(--space-4);font-size:var(--text-xl)">Confirm upgrade</h1>
+  </div>
+
+  <div id="state-loading">Loading checkout…</div>
+
+  <div id="state-error" class="stub-banner" style="display:none">
+    <strong>Checkout not found.</strong> This link may have expired (links last 1 hour).
+    <a href="/pricing" style="display:block;margin-top:8px">Return to pricing</a>
+  </div>
+
+  <div id="state-checkout">
+    <div class="stub-banner" style="margin-bottom:var(--space-5)">
+      <strong>⚠ STUB CHECKOUT — no real payment processed.</strong>
+      <br>This is a placeholder. When Stripe is integrated this screen becomes the Stripe Checkout redirect. Clicking Confirm activates the plan immediately with no charge.
+    </div>
+
+    <div class="checkout-card">
+      <div style="margin-bottom:var(--space-5)">
+        <span class="plan-badge" id="plan-badge">Pro</span>
+      </div>
+      <div class="checkout-row">
+        <span class="checkout-label">Plan</span>
+        <span class="checkout-val" id="plan-name">—</span>
+      </div>
+      <div class="checkout-row">
+        <span class="checkout-label">Billing period</span>
+        <span class="checkout-val" id="plan-period">—</span>
+      </div>
+      <div class="checkout-row">
+        <span class="checkout-label">Account</span>
+        <span class="checkout-val" id="plan-email" style="font-family:var(--mono);font-size:var(--text-sm)">—</span>
+      </div>
+      <div class="checkout-row">
+        <span class="checkout-label">Total</span>
+        <span class="checkout-total" id="plan-amount">€0</span>
+      </div>
+    </div>
+
+    <p style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.6">
+      After confirming: your plan activates immediately, a confirmation email is sent, and your API key is upgraded. Cancel any time from your account page.
+    </p>
+
+    <div class="checkout-actions">
+      <a href="/pricing" class="btn btn-secondary">Cancel</a>
+      <button id="confirm-btn" class="btn btn-primary">Confirm upgrade</button>
+    </div>
+    <div id="confirm-error" style="color:#dc2626;font-size:var(--text-sm);margin-top:var(--space-3);display:none"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const token = location.pathname.split('/billing/checkout/')[1];
+  if (!token) { document.getElementById('state-loading').style.display = 'none'; document.getElementById('state-error').style.display = 'block'; return; }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/user/billing/checkout/' + token, { credentials: 'include' });
+      if (!res.ok) { showError(); return; }
+      const d = await res.json();
+      document.getElementById('plan-badge').textContent = d.plan_name;
+      document.getElementById('plan-name').textContent = d.plan_name;
+      document.getElementById('plan-period').textContent = d.period === 'yearly' ? 'Yearly' : 'Monthly';
+      document.getElementById('plan-email').textContent = d.email;
+      document.getElementById('plan-amount').textContent = d.amount_eur === 0 ? 'Free' : ('€' + d.amount_eur + (d.period === 'yearly' ? '/yr' : '/mo'));
+      document.getElementById('state-loading').style.display = 'none';
+      document.getElementById('state-checkout').style.display = 'block';
+    } catch(e) { showError(); }
+  }
+
+  function showError() {
+    document.getElementById('state-loading').style.display = 'none';
+    document.getElementById('state-error').style.display = 'block';
+  }
+
+  document.getElementById('confirm-btn').addEventListener('click', async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Processing…';
+    document.getElementById('confirm-error').style.display = 'none';
+    try {
+      const res = await fetch('/api/user/billing/checkout/' + token + '/confirm', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        window.location = '/account';
+      } else {
+        const d = await res.json();
+        document.getElementById('confirm-error').textContent = d.error || 'Confirm failed. Try again.';
+        document.getElementById('confirm-error').style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Confirm upgrade';
+      }
+    } catch(e) {
+      document.getElementById('confirm-error').textContent = 'Network error. Try again.';
+      document.getElementById('confirm-error').style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Confirm upgrade';
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

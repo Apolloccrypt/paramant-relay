@@ -5,158 +5,219 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Press Kit — PARAMANT</title>
 <meta name="description" content="PARAMANT press kit — post-quantum encrypted file relay. Blurbs, key facts, brand assets, and press contact.">
-<link rel="icon" href="/icon-192.png">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0c0c0c;--surface:#181818;--border:#242424;--text:#ededed;--muted:#aaa;--quiet:#6e6e6e;--green:#00cc33;--green-bg:#181818;--green-dim:#242424;--mono:'Courier New',Courier,monospace}
-html{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.65;min-height:100vh}
-a{color:var(--green);text-decoration:none}
+:root{
+  --lime-dim:var(--ink-dim);--lime-hair:var(--ink-hair);--lime-ghost:var(--ink-ghost);
+  --mono:ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace
+}
+html{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.65;min-height:100vh}
+a{color:var(--ink);text-decoration:none}
 a:hover{text-decoration:underline}
 main{max-width:860px;margin:0 auto;padding:60px 24px 100px}
 h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
-h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green);font-family:var(--mono);border-bottom:1px solid var(--border);padding-bottom:10px;margin:48px 0 20px}
-h3{font-size:14px;font-weight:600;color:var(--muted);margin-bottom:8px}
-p{color:var(--muted);margin-bottom:12px;line-height:1.7}
-.subtitle{color:var(--quiet);font-size:14px;margin-bottom:40px;font-family:var(--mono)}
-.blurb{background:var(--green-bg);border-left:3px solid var(--green);padding:16px 20px;border-radius:0 6px 6px 0;margin:0 0 16px}
-.blurb strong{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--green);display:block;margin-bottom:8px}
-.blurb p{margin:0;color:var(--text);font-size:14px;line-height:1.75}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-bottom:16px}
+h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);font-family:var(--mono);border-bottom:1px solid var(--ink-hair);padding-bottom:10px;margin:48px 0 20px}
+h3{font-size:14px;font-weight:600;color:var(--ink-dim);margin-bottom:8px}
+p{color:var(--ink-dim);margin-bottom:12px;line-height:1.7}
+.subtitle{color:var(--ink-dim);font-size:14px;margin-bottom:40px;font-family:var(--mono)}
+.blurb{background:var(--ink-ghost);border-left:3px solid var(--lime);padding:16px 20px;margin:0 0 16px}
+.blurb strong{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:8px}
+.blurb p{margin:0;color:var(--ink);font-size:14px;line-height:1.75}
+.card{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:16px}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:.4rem 1.5rem}
-.facts dt{color:var(--quiet);white-space:nowrap;font-family:var(--mono);font-size:12px}
-.facts dd{margin:0;color:var(--text);font-size:13px}
+.facts dt{color:var(--ink-dim);white-space:nowrap;font-family:var(--mono);font-size:12px}
+.facts dd{margin:0;color:var(--ink);font-size:13px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .bullet-list{list-style:none;padding:0;margin-bottom:16px}
-.bullet-list li{padding:.35rem 0 .35rem 1.4rem;position:relative;color:var(--muted);font-size:14px;line-height:1.7}
-.bullet-list li::before{content:"▸";color:var(--green);position:absolute;left:0}
+.bullet-list li{padding:.35rem 0 .35rem 1.4rem;position:relative;color:var(--ink-dim);font-size:14px;line-height:1.7}
+.bullet-list li::before{content:"▸";color:var(--ink);position:absolute;left:0}
 .download-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-.dl-btn{background:var(--green-bg);border:1px solid var(--green-dim);color:var(--green);padding:.5rem 1rem;border-radius:4px;text-decoration:none;font-size:13px;font-family:var(--mono);transition:background .15s}
-.dl-btn:hover{background:var(--green);color:#0c0c0c;text-decoration:none}
-.contact{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px}
-.contact p{margin-bottom:8px;color:var(--muted);font-size:14px}
-.contact strong{color:var(--text)}
+.dl-btn{background:var(--ink-ghost);border:1px solid var(--ink-hair);color:var(--ink);padding:.5rem 1rem;text-decoration:none;font-size:13px;font-family:var(--mono);transition:background .15s}
+.dl-btn:hover{background:var(--cobalt);color:var(--bone-on-navy);text-decoration:none}
+.contact{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:20px 24px}
+.contact p{margin-bottom:8px;color:var(--ink-dim);font-size:14px}
+.contact strong{color:var(--cobalt)}
 table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
-td,th{border:1px solid var(--border);padding:.55rem .9rem;text-align:left}
-th{background:var(--surface);color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
-td{color:var(--text)}
-footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--quiet);font-family:var(--mono)}
-footer a{color:var(--quiet)}
-footer a:hover{color:var(--green)}
+td,th{border:1px solid var(--ink-hair);padding:.55rem .9rem;text-align:left}
+th{background:rgba(178,255,63,.06);color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
+td{color:var(--cobalt)}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
-<link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
 </head>
 <body>
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Product &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/parashare">ParaShare</a></li>
-        <li><a href="/drop">ParaDrop</a></li>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="/ct-log">CT Log</a></li>
-        <li><a href="/docs">Docs</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/#pricing">Pricing</a></li>
-        <li><a href="/vs">vs. alternatives</a></li>
-        <li><a href="/press">Press kit</a></li>
-        <li><a href="/changelog">Changelog</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Self-host &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a></li>
-        <li><a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a></li>
-        <li><a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a></li>
-        <li><a href="/docs#self-hosting">Deploy guide</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/install.sh">install.sh</a></li>
-        <li><a href="/install-pi.sh">install-pi.sh</a></li>
-        <li><a href="/install-client.sh">install-client.sh</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/status">Status</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Compliance &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="/compliance/nis2">NIS2 (EU 2022/2555)</a></li>
-        <li><a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a></li>
-        <li><a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a></li>
-        <li><a href="/dpa">Data Processing Agreement</a></li>
-        <li class="nav-dropdown-divider"></li>
-        <li><a href="/government">Government &amp; public sector</a></li>
-        <li><a href="/hndl">HNDL threat</a></li>
-        <li><a href="/crypto-agility">Crypto agility</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
       </ul>
     </li>
 
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger">Info &#9662;</button>
-      <ul class="nav-dropdown-menu">
-        <li><a href="mailto:privacy@paramant.app">Contact</a></li>
-        <li><a href="/request-key">Free API key</a></li>
-        <li><a href="/status">Status</a></li>
-        <li><a href="/sla">SLA</a></li>
-        <li><a href="/security">Security</a></li>
-        <li><a href="/license">License</a></li>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
       </ul>
     </li>
 
   </ul>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Product</div>
-    <a href="/parashare">ParaShare</a>
-    <a href="/drop">ParaDrop</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/ct-log">CT Log</a>
-    <a href="/docs">Docs</a>
-    <a href="/#pricing">Pricing</a>
-    <a href="/vs">vs. alternatives</a>
-    <a href="/press">Press kit</a>
-    <a href="/changelog">Changelog</a>
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Self-host</div>
-    <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-    <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-    <a href="/docs#self-hosting">Deploy guide</a>
-    <a href="/install.sh">install.sh</a>
-    <a href="/install-pi.sh">install-pi.sh</a>
-    <a href="/status">Status</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
   </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Compliance</div>
-    <a href="/compliance/nis2">NIS2</a>
-    <a href="/compliance/iec62443">IEC 62443</a>
-    <a href="/compliance/nen7510">NEN 7510</a>
-    <a href="/dpa">Data Processing Agreement</a>
-    <a href="/government">Government</a>
-    <a href="/hndl">HNDL threat</a>
-    <a href="/crypto-agility">Crypto agility</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
   </div>
+
   <div class="nav-mobile-group">
-    <div class="nav-mobile-label">Info</div>
-    <a href="mailto:privacy@paramant.app">Contact</a>
-    <a href="/request-key">Free API key</a>
-    <a href="/status">Status</a>
-    <a href="/sla">SLA</a>
-    <a href="/security">Security</a>
-    <a href="/license">License</a>
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
   </div>
 </div>
 
@@ -215,13 +276,13 @@ footer a:hover{color:var(--green)}
 
   <h2>Logo &amp; brand assets</h2>
 
-  <p style="color:var(--muted)">Use PARAMANT brand assets only in editorial/press contexts. Do not modify the logo or use it to imply endorsement without written permission.</p>
+  <p style="color:var(--ink-dim)">Use PARAMANT brand assets only in editorial/press contexts. Do not modify the logo or use it to imply endorsement without written permission.</p>
 
   <div class="download-row">
     <a href="/icon-512.png" download class="dl-btn">Logo PNG (512&times;512)</a>
     <a href="/icon-192.png" download class="dl-btn">Logo PNG (192&times;192)</a>
   </div>
-  <p style="color:var(--quiet);font-size:12px;margin-top:12px;font-family:var(--mono)">SVG available on request: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+  <p style="color:var(--ink-dim);font-size:12px;margin-top:12px;font-family:var(--mono)">SVG available on request: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
 
   <h2>Screenshots &amp; product images</h2>
 
@@ -260,10 +321,70 @@ footer a:hover{color:var(--green)}
 </main>
 
 <footer>
-  PARAMANT &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act &middot; BUSL-1.1<br>
-  <a href="/">Home</a> &middot; <a href="/docs">Docs</a> &middot; <a href="/status">Status</a> &middot; <a href="/pricing">Pricing</a>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </footer>
 
-<script src="/nav.js" defer></script>
+<script src="/nav.js?v=5" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

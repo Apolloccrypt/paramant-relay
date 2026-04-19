@@ -20,3 +20,8 @@
 # Documentation example PSS (pre-shared secret demo string)
 19b13732281f02e2f63835d3c4a3d37f69a5261f:docs/security.md:generic-api-key:268
 19b13732281f02e2f63835d3c4a3d37f69a5261f:docs/security.md:generic-api-key:274
+
+# OT guide docs/api.md — placeholder keys plk_your_key in DID examples
+docs/api.md:curl-auth-header:379
+docs/api.md:curl-auth-header:431
+docs/api.md:curl-auth-header:453

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT Ghost Pipe — OT Edition</title>
+<style>
+:root {
+  --doc-bg: #f4efe2; --doc-ink: #0a0a0a; --doc-ink-dim: #555; --doc-ink-ghost: #888;
+  --doc-accent: #1a6b42; --doc-accent-bg: #f0f9f4; --doc-accent-border: #b8dfc9;
+  --mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+}
+@media print {
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .no-print { display: none; }
+  a { color: inherit; text-decoration: none; }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--doc-bg); color: var(--doc-ink);
+  font-family: var(--mono);
+  font-size: 11px; line-height: 1.5;
+  max-width: 210mm; margin: 0 auto; padding: 20mm 18mm;
+}
+
+/* Print button (screen only) */
+.print-btn {
+  display: block; margin-bottom: 24px; padding: 8px 16px; background: var(--doc-ink);
+  color: var(--doc-bg); font-size: 12px; border: none; cursor: pointer; font-family: var(--mono);
+}
+@media print { .print-btn { display: none; } }
+
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--doc-ink); }
+.logo { font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.logo span { color: var(--doc-accent); }
+.header-right { text-align: right; font-size: 10px; color: var(--doc-ink-ghost); font-family: var(--mono); line-height: 1.8; }
+
+/* Tagline */
+.tagline { font-size: 22px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; margin-bottom: 6px; }
+.tagline-sub { font-size: 12px; color: var(--doc-ink-dim); margin-bottom: 20px; }
+
+/* Problem/solution columns */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.col-box { padding: 14px 16px; }
+.col-box.problem { background: #fff8f8; border: 1px solid #f0c0c0; }
+.col-box.solution { background: var(--doc-accent-bg); border: 1px solid var(--doc-accent-border); }
+.col-label { font-size: 9px; font-family: var(--mono); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 8px; }
+.col-box.problem .col-label { color: #c0392b; }
+.col-box.solution .col-label { color: var(--doc-accent); }
+.col-box ul { padding-left: 14px; color: var(--doc-ink-dim); }
+.col-box ul li { margin-bottom: 4px; line-height: 1.55; }
+
+/* Architecture */
+.arch { background: rgba(10,10,10,.05); border: 1px solid rgba(10,10,10,.15); padding: 12px 14px; margin-bottom: 18px; }
+.arch-label { font-size: 9px; font-family: var(--mono); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--doc-ink-ghost); margin-bottom: 8px; }
+.arch pre { font-family: var(--mono); font-size: 10px; line-height: 1.65; color: var(--doc-ink-dim); }
+.arch pre .hl { color: var(--doc-accent); font-weight: 700; }
+
+/* Props grid */
+.props-label { font-size: 9px; font-family: var(--mono); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--doc-ink-ghost); margin-bottom: 10px; }
+.props { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid rgba(10,10,10,.15); overflow: hidden; margin-bottom: 18px; }
+.prop { padding: 8px 12px; border-bottom: 1px solid rgba(10,10,10,.15); display: flex; gap: 8px; }
+.prop:nth-child(odd) { border-right: 1px solid rgba(10,10,10,.15); }
+.prop:nth-last-child(-n+2) { border-bottom: none; }
+.prop-key { font-family: var(--mono); font-size: 9px; color: var(--doc-accent); font-weight: 600; min-width: 90px; }
+.prop-val { font-size: 10px; color: var(--doc-ink-dim); line-height: 1.4; }
+
+/* Check list */
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 18px; }
+.check-item { display: flex; gap: 6px; font-size: 11px; align-items: baseline; }
+.check-item::before { content: '✓'; color: var(--doc-accent); font-weight: 700; flex-shrink: 0; }
+
+/* SR table */
+.sr-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 10px; }
+.sr-table th { text-align: left; padding: 5px 8px; background: rgba(10,10,10,.05); border: 1px solid rgba(10,10,10,.15); font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--doc-ink-ghost); }
+.sr-table td { padding: 5px 8px; border: 1px solid rgba(10,10,10,.15); color: var(--doc-ink-dim); vertical-align: top; }
+.sr-table td:first-child { font-family: var(--mono); font-size: 9px; color: var(--doc-accent); white-space: nowrap; font-weight: 600; }
+
+/* Latency */
+.perf-row { display: flex; gap: 10px; margin-bottom: 18px; }
+.perf-box { flex: 1; background: rgba(10,10,10,.05); border: 1px solid rgba(10,10,10,.15); padding: 10px 12px; text-align: center; }
+.perf-size { font-size: 9px; font-family: var(--mono); color: var(--doc-ink-ghost); margin-bottom: 6px; }
+.perf-stat { font-size: 16px; font-weight: 700; color: var(--doc-ink); letter-spacing: -.02em; }
+.perf-label { font-size: 9px; color: var(--doc-ink-dim); margin-top: 2px; }
+.perf-note { font-size: 10px; color: var(--doc-ink-dim); }
+
+/* Pricing */
+.pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.plan { border: 1px solid rgba(10,10,10,.2); padding: 10px 12px; }
+.plan.featured { border-color: var(--doc-accent); background: var(--doc-accent-bg); }
+.plan-name { font-family: var(--mono); font-size: 10px; font-weight: 700; margin-bottom: 4px; }
+.plan.featured .plan-name { color: var(--doc-accent); }
+.plan-price { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+.plan-desc { font-size: 10px; color: var(--doc-ink-dim); line-height: 1.4; }
+
+/* Footer */
+.footer { border-top: 1px solid rgba(10,10,10,.2); padding-top: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+.footer-left { font-size: 10px; color: var(--doc-ink-dim); line-height: 1.8; }
+.footer-right { font-family: var(--mono); font-size: 10px; color: var(--doc-ink-ghost); text-align: right; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="meta-bar">
+  <span><b>build</b> 2.4.5</span>
+  <span class="sep">·</span>
+  <span><b>keyex</b> ml-kem-768</span>
+  <span class="sep">·</span>
+  <span><b>fips</b> 203/204</span>
+  <span class="right">STH —</span>
+</div>
+
+
+<button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="logo">Para<span>MANT</span></div>
+    <div style="font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:2px">GHOST PIPE &middot; OT EDITION</div>
+  </div>
+  <div class="header-right">
+    iot.paramant.app<br>
+    IEC 62443 &middot; NIS2<br>
+    FIPS 203/204<br>
+    Hetzner DE
+  </div>
+</div>
+
+<!-- Tagline -->
+<div class="tagline">Quantum-safe data transport<br>for IEC 62443 conduits.</div>
+<div class="tagline-sub">No VPN. No network changes. Deploys on a Raspberry Pi. Data is destroyed after delivery.</div>
+
+<!-- Problem / Solution -->
+<div class="two-col">
+  <div class="col-box problem">
+    <div class="col-label">The problem</div>
+    <ul>
+      <li>OT zones cannot connect directly to IT/cloud</li>
+      <li>VPNs create persistent, auditable attack surfaces</li>
+      <li>File shares leave data at rest after delivery</li>
+      <li>Legacy protocols (FTP, SMB) are not quantum-safe</li>
+      <li>Traffic size reveals firmware push intent to DPI</li>
+    </ul>
+  </div>
+  <div class="col-box solution">
+    <div class="col-label">Ghost Pipe solves this</div>
+    <ul>
+      <li>Quantum-safe data diode for the OT/IT boundary</li>
+      <li>No persistent connection between zones</li>
+      <li>Burn-on-read: data destroyed after first download</li>
+      <li>ML-KEM-768 + ML-DSA-65 (NIST FIPS 203/204)</li>
+      <li>Fixed 5 MB padding: every transfer looks identical</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Architecture -->
+<div class="arch">
+  <div class="arch-label">Architecture — Purdue Model placement</div>
+  <pre>Level 3   SCADA / historian  →  paramant-receiver → data historian / cloud
+Level 3.5 Industrial DMZ      →  <span class="hl">Ghost Pipe relay  (RAM-only, cannot decrypt)</span>
+Level 2   Control / DCS       →  paramant-sender --interval 15 --device-id plc-A1
+Level 1   PLCs / sensors      →  generate sensor data</pre>
+</div>
+
+<!-- Key properties -->
+<div class="props-label">Security properties</div>
+<div class="props">
+  <div class="prop"><span class="prop-key">Key exchange</span><span class="prop-val">ML-KEM-768 + ECDH P-256 hybrid (NIST FIPS 203)</span></div>
+  <div class="prop"><span class="prop-key">Symmetric cipher</span><span class="prop-val">AES-256-GCM with per-transfer random IV</span></div>
+  <div class="prop"><span class="prop-key">Traffic analysis</span><span class="prop-val">Fixed 5 MB padding — all transfers look identical</span></div>
+  <div class="prop"><span class="prop-key">Burn-on-read</span><span class="prop-val">Destroyed after first authorised download</span></div>
+  <div class="prop"><span class="prop-key">Relay identity</span><span class="prop-val">ML-DSA-65 (FIPS 204) post-quantum signature</span></div>
+  <div class="prop"><span class="prop-key">Audit trail</span><span class="prop-val">Merkle CT log, tamper-evident, public</span></div>
+  <div class="prop"><span class="prop-key">Device identity</span><span class="prop-val">DID enrollment: <code>did:paramant:</code> in CT log</span></div>
+  <div class="prop"><span class="prop-key">Infrastructure</span><span class="prop-val">Hetzner DE. No US CLOUD Act. Self-hostable.</span></div>
+</div>
+
+<!-- IEC 62443 table -->
+<table class="sr-table">
+  <thead>
+    <tr><th>IEC 62443 requirement</th><th>How Ghost Pipe addresses it</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>SR 4.1 — Confidentiality</td><td>ML-KEM-768 client-side encryption. Relay never holds plaintext. No data at rest.</td></tr>
+    <tr><td>SR 4.2 — Use control</td><td>API key per device. Hash-addressed retrieval. Burn-on-read enforcement.</td></tr>
+    <tr><td>SR 3.1 — Integrity</td><td>AES-256-GCM AEAD on every payload. ML-DSA-65 signed relay identity.</td></tr>
+    <tr><td>SR 1.1 — Device identity</td><td>DID enrollment via /v2/did/register. CT log timestamped.</td></tr>
+    <tr><td>SR 2.8 — Audit log</td><td>Every transfer in public Merkle CT log with RSS archiving.</td></tr>
+    <tr><td>SR 5.1 / 62443-3-2 — Zones</td><td>Dedicated iot.paramant.app sector. Self-hostable in your DMZ.</td></tr>
+  </tbody>
+</table>
+
+<!-- Performance -->
+<div class="props-label">Performance — managed relay (Hetzner DE)</div>
+<div class="perf-row">
+  <div class="perf-box">
+    <div class="perf-size">4 KB sensor packet</div>
+    <div class="perf-stat">p50</div>
+    <div class="perf-label">run benchmark</div>
+  </div>
+  <div class="perf-box">
+    <div class="perf-size">4 KB sensor packet</div>
+    <div class="perf-stat">p95</div>
+    <div class="perf-label">run benchmark</div>
+  </div>
+  <div class="perf-box">
+    <div class="perf-size">Self-hosted LAN</div>
+    <div class="perf-stat">&lt;10ms</div>
+    <div class="perf-label">p50 typical</div>
+  </div>
+  <div class="perf-box">
+    <div class="perf-size">Continuous mode</div>
+    <div class="perf-stat">--interval</div>
+    <div class="perf-label">down to 1 second</div>
+  </div>
+</div>
+<div class="perf-note" style="margin-top:-14px;margin-bottom:18px">Run <code>python3 scripts/paramant-benchmark.py --relay https://iot.paramant.app --key pgp_xxx --count 50 --size 4096</code> to get site-specific numbers.</div>
+
+<!-- Pricing -->
+<div class="pricing">
+  <div class="plan">
+    <div class="plan-name">Community</div>
+    <div class="plan-price">Free</div>
+    <div class="plan-desc">Up to 5 devices. Full source code. Self-host or use managed relay. Forever free under BUSL-1.1.</div>
+  </div>
+  <div class="plan featured">
+    <div class="plan-name">Enterprise</div>
+    <div class="plan-price">Custom SLA</div>
+    <div class="plan-desc">Unlimited devices. Dedicated relay. On-site deployment. OT/ICS support. Custom retention.</div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <div class="footer-left">
+    paramant.app/ot &nbsp;&middot;&nbsp; paramant.app/request-key<br>
+    paramant.app/compliance/iec62443<br>
+    privacy@paramant.app
+  </div>
+  <div class="footer-right">
+    BUSL-1.1 &middot; &copy; 2026 PARAMANT<br>
+    Hetzner Falkenstein DE<br>
+    No US sub-processors
+  </div>
+</div>
+
+</body>
+</html>
