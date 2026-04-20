@@ -294,7 +294,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
         <input type="checkbox" id="da-notify" checked>
         <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deletion confirmation email</label>
       </div>
-      <div class="mc" style="margin-top:10px"><label>Type DELETE to confirm</label><input type="text" id="da-confirm" placeholder="DELETE" autocomplete="off"></div>
+      <div class="mc" style="margin-top:10px"><label>Type DELETE to confirm</label><input type="text" id="da-confirm" placeholder="DELETE" autocomplete="off" oninput="document.getElementById('da-btn').disabled=this.value!=='DELETE'"></div>
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-delete')">Cancel</button>
