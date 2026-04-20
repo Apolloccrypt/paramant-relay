@@ -132,6 +132,34 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 /* Responsive */
 @media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}.tabs{overflow-x:auto}}
 @media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding:0 12px}.main{padding:14px}.hdr-meta .lic{display:none}}
+
+/* Action menu group labels */
+.ag-lbl{display:block;padding:4px 14px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;pointer-events:none;user-select:none}
+.am button:disabled{opacity:.35;cursor:default}
+/* Toast animation */
+.toast{opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:translateY(0)}
+/* Modal overlay */
+.mo{display:none;position:fixed;inset:0;background:rgba(11,58,106,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
+.mo[open],.mo.vis{display:flex}
+.mb{background:#fff;width:100%;max-width:540px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mh{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid rgba(11,58,106,.1);gap:8px}
+.mt{flex:1;font-weight:600;font-size:15px;color:#0B3A6A}
+.mh button.close-mo{border:none;background:transparent;font-size:20px;cursor:pointer;padding:0 4px;color:#64748b;line-height:1}
+.mbody{padding:18px;overflow-y:auto;flex:1}
+.mc{margin-bottom:14px}
+.mc label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:500}
+.mc select,.mc input[type=text]{width:100%;padding:7px 10px;border:1.5px solid rgba(11,58,106,.2);font-size:13px;font-family:'IBM Plex Mono',monospace;color:#0B3A6A;background:#fff;outline:none}
+.mc select:focus,.mc input[type=text]:focus{border-color:#1D4ED8}
+.mfoot{padding:12px 18px;border-top:1px solid rgba(11,58,106,.1);display:flex;justify-content:flex-end;gap:8px}
+/* Email preview tabs */
+.ep-tabs{display:flex;gap:0;border-bottom:1px solid rgba(11,58,106,.1);margin-bottom:14px}
+.ep-tab{padding:7px 14px;border:none;background:transparent;font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ep-tab.on{color:#1D4ED8;border-bottom-color:#1D4ED8}
+.ep-subj{font-size:12px;color:#475569;margin-bottom:10px;font-family:'IBM Plex Mono',monospace}
+.ep-content{font-size:12px;line-height:1.6;max-height:320px;overflow-y:auto}
+.ep-content pre{white-space:pre-wrap;word-break:break-word;font-family:'IBM Plex Mono',monospace}
+.ep-content iframe{width:100%;border:none;height:340px}
 </style>
 </head>
 <body>
@@ -178,6 +206,107 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
     <div id="tab-relay" class="panel" role="tabpanel" aria-labelledby="tabBtn-relay" tabindex="0" aria-hidden="true"></div>
   </main>
 </div>
+
+<!-- Modals -->
+<div id="mo-email" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-email-title">
+  <div class="mb">
+    <div class="mh">
+      <span id="mo-email-title" class="mt">Email preview</span>
+      <button class="close-mo" onclick="closeModal('mo-email')" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody">
+      <div class="ep-tabs">
+        <button class="ep-tab on" onclick="epTab('html')" id="ep-tab-html">HTML</button>
+        <button class="ep-tab" onclick="epTab('text')" id="ep-tab-text">Plain text</button>
+      </div>
+      <div id="ep-subj" class="ep-subj"></div>
+      <div id="ep-body" class="ep-content"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mo-email')">Cancel</button>
+      <button class="btn pri" id="ep-send-btn" onclick="doSendEmail()">Send email</button>
+    </div>
+  </div>
+</div>
+
+<div id="mo-plan" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-plan-title">
+  <div class="mb">
+    <div class="mh">
+      <span id="mo-plan-title" class="mt">Change plan</span>
+      <button class="close-mo" onclick="closeModal('mo-plan')" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody">
+      <div class="mc"><label>Key</label><div id="mp-key" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></div></div>
+      <div class="mc">
+        <label for="mp-plan-sel">New plan</label>
+        <select id="mp-plan-sel">
+          <option value="community">community</option>
+          <option value="pro">pro</option>
+          <option value="enterprise">enterprise</option>
+        </select>
+      </div>
+      <div class="mc"><label>Note (optional)</label><input type="text" id="mp-note" placeholder="reason for change"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mo-plan')">Cancel</button>
+      <button class="btn pri" onclick="doChangePlan()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="mo-disable" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-disable-title">
+  <div class="mb">
+    <div class="mh">
+      <span id="mo-disable-title" class="mt">Disable key</span>
+      <button class="close-mo" onclick="closeModal('mo-disable')" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:13px;color:#475569;margin:0 0 12px">Disabling this key will immediately block all API access. The key can be re-enabled manually.</p>
+      <div class="mc"><label>Key</label><div id="md-key" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></div></div>
+      <div class="mc"><label>Reason (optional)</label><input type="text" id="md-reason" placeholder="e.g. abuse, non-payment"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mo-disable')">Cancel</button>
+      <button class="btn danger" onclick="doDisableKey()">Disable key</button>
+    </div>
+  </div>
+</div>
+
+<div id="mo-delete" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-delete-title">
+  <div class="mb">
+    <div class="mh">
+      <span id="mo-delete-title" class="mt">Delete account</span>
+      <button class="close-mo" onclick="closeModal('mo-delete')" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:13px;color:#dc2626;font-weight:600;margin:0 0 10px">This action is irreversible.</p>
+      <p style="font-size:13px;color:#475569;margin:0 0 12px">All user data, sessions, and API keys will be permanently deleted.</p>
+      <div class="mc"><label>Key</label><div id="mda-key" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></div></div>
+      <div class="mc"><label>Reason</label><input type="text" id="mda-reason" placeholder="required"></div>
+      <div class="mc"><label>Type DELETE to confirm</label><input type="text" id="mda-confirm" placeholder="DELETE"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mo-delete')">Cancel</button>
+      <button class="btn danger" onclick="doDeleteAccount()">Delete account</button>
+    </div>
+  </div>
+</div>
+
+<div id="mo-details" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-details-title">
+  <div class="mb">
+    <div class="mh">
+      <span id="mo-details-title" class="mt">User details</span>
+      <button class="close-mo" onclick="closeModal('mo-details')" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody" id="mo-details-body">
+      <div class="sp-icon"></div> Loading…
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mo-details')">Close</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 /* ── State ───────────────────────────────────────────────────────────────── */
