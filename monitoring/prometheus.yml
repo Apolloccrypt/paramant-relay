@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'paramant-admin'
+    static_configs:
+      - targets: ['localhost:4200']
+    metrics_path: '/metrics'
+
+  - job_name: 'paramant-relay-main'
+    static_configs:
+      - targets: ['localhost:3000']
+    metrics_path: '/metrics'
+
+  - job_name: 'paramant-relay-health'
+    static_configs:
+      - targets: ['localhost:3001']
+    metrics_path: '/metrics'
+
+  - job_name: 'paramant-relay-finance'
+    static_configs:
+      - targets: ['localhost:3002']
+    metrics_path: '/metrics'
+
+  - job_name: 'paramant-relay-legal'
+    static_configs:
+      - targets: ['localhost:3003']
+    metrics_path: '/metrics'
+
+  - job_name: 'paramant-relay-iot'
+    static_configs:
+      - targets: ['localhost:3004']
+    metrics_path: '/metrics'
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 30s

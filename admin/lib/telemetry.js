@@ -8,6 +8,14 @@ async function countActiveSessions() {
 }
 
 async function getRecentAuditEvents(limit = 20) {
+  // O(log n): read from global ZSET if available, fall back to SCAN
+  const globalRaw = await redis().zRange('paramant:audit:global', -Math.max(limit, 20), -1).catch(() => null);
+  if (globalRaw && globalRaw.length > 0) {
+    const events = globalRaw.map(r => { try { return JSON.parse(r); } catch { return null; } }).filter(Boolean);
+    events.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    return events.slice(0, limit);
+  }
+  // Fallback: SCAN (first run before any events written to global ZSET)
   const events = [];
   for await (const key of redis().scanIterator({ MATCH: 'paramant:user:audit:*', COUNT: 100 })) {
     const userId = key.split(':').pop();
@@ -32,11 +40,16 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
     let totp_status = 'none';
     if (totpActive === 'true') totp_status = 'active';
     else if (totpSecret) totp_status = 'pending';
+    const created = k.created
+      ? (typeof k.created === 'number' ? new Date(k.created).toISOString() : k.created)
+      : null;
     return {
-      key: k.key, email: k.email || null, label: k.label || null,
+      key: k.key.slice(0, 8) + '...' + k.key.slice(-4), // masked
+      key_id: k.key, // internal id for actions (not exposed in list response)
+      email: k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
       active: k.active !== false, revoked_at: k.revoked_at || null,
-      created: k.created || null, totp_status,
+      created, totp_status,
     };
   }));
   return users.filter(Boolean);

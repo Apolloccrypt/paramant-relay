@@ -6,14 +6,18 @@ const MAX_ENTRIES = 1000;
 
 async function logAuditEvent(user_id, event_type, metadata = {}) {
   const ts = Date.now();
-  const entry = JSON.stringify({ event_type, metadata, ts });
-  const key = AUDIT_KEY(user_id);
+  const entry = JSON.stringify({ user_id, event_type, metadata, ts });
+  const userKey = AUDIT_KEY(user_id);
   const r = redis();
-  await r.zAdd(key, { score: ts, value: entry });
-  const count = await r.zCard(key);
-  if (count > MAX_ENTRIES) {
-    await r.zRemRangeByRank(key, 0, count - MAX_ENTRIES - 1);
-  }
+  await Promise.all([
+    r.zAdd(userKey, { score: ts, value: entry }),
+    r.zAdd('paramant:audit:global', { score: ts, value: entry }),
+  ]);
+  // Trim per-user to 1000, global to 10000
+  await Promise.all([
+    r.zRemRangeByRank(userKey, 0, -1001),
+    r.zRemRangeByRank('paramant:audit:global', 0, -10001),
+  ]);
 }
 
 async function getAuditEvents(user_id, { limit = 50, event_types = null } = {}) {

@@ -284,6 +284,9 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
     return { status: r.status, ok: r.status === 200 };
   });
   const anyRevoked = Object.values(results).some(r => r.ok);
+  if (anyRevoked) {
+    try { await logAuditEvent(key, 'admin_key_revoked', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+  }
   res.status(anyRevoked ? 200 : 502).json({ ok: anyRevoked, results });
 });
 
@@ -320,6 +323,7 @@ api.post('/admin/resend-setup', async (req, res) => {
     await sendSetupEmail(email, setupToken);
     const expiresAt = Date.now() + 14 * 86400 * 1000;
     const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
+    try { await logAuditEvent(user_id, 'admin_setup_resent', { email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     console.log(`[admin/resend-setup] sent to ${email}`);
     res.json({ success: true, email, expires_at: expiresAt, setup_url: setupUrl });
   } catch (err) {
@@ -525,12 +529,15 @@ api.post("/user/signup", async (req, res) => {
 
   // Create API key via admin relay
   const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
+  const createdAt = new Date().toISOString();
   const createRes = await relayFetch("health", "/v2/admin/keys", "POST", {
     key: keyVal,
     email: email.toLowerCase(),
     label: label || null,
     plan: "community",
     active: true,
+    created: createdAt,
+    created_at_ts: Date.now(),
   }, false, ADMIN_TOKEN);
 
   if (createRes.status !== 200 && createRes.status !== 201) {
@@ -544,6 +551,10 @@ api.post("/user/signup", async (req, res) => {
     JSON.stringify({ user_id: keyVal, email: email.toLowerCase(), label: label || null }),
     { EX: 14 * 86400 }
   );
+  await redis().set(
+    `paramant:user:meta:${keyVal}`,
+    JSON.stringify({ email: email.toLowerCase(), created_at: createdAt })
+  ).catch(() => {});
 
   try {
     await sendSetupEmail(email, setupToken);
@@ -718,7 +729,7 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
   await redis().set(
     `paramant:user:reset_confirm:${confirmToken}`,
     JSON.stringify({ user_id: user.key, email: norm, requested_at: requestedAt, masked_ip: maskedIp }),
-    { EX: 900 } // 15 minutes
+    { EX: 3600 } // 60 minutes
   );
 
   try { await logAuditEvent(user.key, "totp_reset_requested", { ip, ua: (req.get("user-agent") || "").slice(0, 200) }); } catch {}
@@ -1198,18 +1209,65 @@ api.get("/admin/overview", authMiddleware, async (req, res) => {
 
 api.get("/admin/users", authMiddleware, async (req, res) => {
   try {
-    const users = await telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
+    const allUsers = await telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
+
+    // Filters
+    const statusFilter = req.query.status || "";
+    const planFilter   = req.query.plan   || "";
+    let filtered = allUsers;
+    if (statusFilter === "active")  filtered = filtered.filter(u => u.active);
+    if (statusFilter === "revoked") filtered = filtered.filter(u => !u.active);
+    if (planFilter) filtered = filtered.filter(u => (u.plan || "community") === planFilter);
+
+    // Sort
+    filtered.sort((a, b) => {
+      const ta = a.created ? new Date(a.created).getTime() : 0;
+      const tb = b.created ? new Date(b.created).getTime() : 0;
+      return tb - ta;
+    });
+
+    // Pagination
+    const page     = Math.max(1, parseInt(req.query.page)      || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(req.query.page_size) || 50));
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage   = Math.min(page, totalPages);
+    const start = (safePage - 1) * pageSize;
+    const users = filtered.slice(start, start + pageSize);
+
     res.json({
       users,
       counts: {
-        total: users.length,
-        active: users.filter(u => u.active).length,
-        community: users.filter(u => u.plan === "community").length,
-        pro: users.filter(u => u.plan === "pro").length,
-        enterprise: users.filter(u => u.plan === "enterprise").length,
+        total: allUsers.length,
+        active: allUsers.filter(u => u.active).length,
+        community: allUsers.filter(u => u.plan === "community").length,
+        pro: allUsers.filter(u => u.plan === "pro").length,
+        enterprise: allUsers.filter(u => u.plan === "enterprise").length,
+      },
+      pagination: {
+        page: safePage,
+        page_size: pageSize,
+        total_items: totalItems,
+        total_pages: totalPages,
+        has_next: safePage < totalPages,
+        has_prev: safePage > 1,
       },
     });
   } catch (err) { console.error("[admin/users]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+// GET /admin/user-detail/:key — full key returned with audit log (YELLOW-1)
+api.get("/admin/user-detail/:key", authMiddleware, async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!key || !key.startsWith("pgp_")) return res.status(400).json({ error: "invalid_key" });
+    const allUsers = await telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
+    const user = allUsers.find(u => u.key === key);
+    if (!user) return res.status(404).json({ error: "not_found" });
+    const events = await getAuditEvents(key, { limit: 20 });
+    try { await logAuditEvent(key, 'admin_key_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ...user, key: key, key_id: key, audit_events: events });
+  } catch (err) { console.error("[admin/user-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
 api.get("/admin/audit", authMiddleware, async (req, res) => {
