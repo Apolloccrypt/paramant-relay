@@ -1064,9 +1064,6 @@ async function initGlobe() {
     .showAtmosphere(true)
     .atmosphereColor('#B2FF3F')
     .atmosphereAltitude(0.18)
-    // Tile engine — ESRI World Imagery (satellite, infinite zoom quality)
-    .globeTileEngineUrl((x, y, z) =>
-      `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`)
     // HTML dots — crisp DOM elements, no pixelation at any zoom
     .htmlElementsData([
       { lat: userLat,      lng: userLng,      label: 'Your Node',          type: 'user'  },
