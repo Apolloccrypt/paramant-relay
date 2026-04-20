@@ -423,6 +423,8 @@ async function callRelay(endpoint, body) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Admin-Token": ADMIN_TOKEN,
+      "Authorization": `Bearer ${ADMIN_TOKEN}`,
       "X-Internal-Auth": INTERNAL_TOKEN,
     },
     body: JSON.stringify(body),
