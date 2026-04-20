@@ -316,6 +316,24 @@
   </div>
 </section>
 
+<!-- § 02 UNDER THE HOOD — CRYPTO STRIP -->
+<style>.crypto-strip-inner{display:grid;grid-template-columns:auto 1fr;gap:var(--space-7);align-items:center}@media(max-width:900px){.crypto-strip-inner{grid-template-columns:1fr;gap:var(--space-4)}}</style>
+<section class="crypto-strip" aria-labelledby="crypto-strip-title" style="padding:var(--space-5) 0;border-top:1px solid var(--ink-hair);background:var(--navy)">
+  <div class="container">
+    <div class="crypto-strip-inner">
+      <div class="section-marker" style="display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap">
+        <span class="section-num" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--cobalt);letter-spacing:.1em">02</span>
+        <h2 id="crypto-strip-title" style="font-size:var(--text-xl);font-weight:700;color:var(--bone);margin:0;line-height:1.1">Under the hood.</h2>
+        <span class="section-label" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.08em">CRYPTO</span>
+      </div>
+      <div class="crypto-strip-content">
+        <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.65;margin:0 0 var(--space-3) 0"><strong style="color:var(--bone)">AES-256-GCM</strong> for anonymous one-off sends. <strong style="color:var(--bone)">ML-KEM-768 + ECDH P-256</strong> hybrid for verified end-to-end. All math happens client-side. The relay sees ciphertext only.</p>
+        <a href="/security" class="crypto-strip-link" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--cobalt);letter-spacing:.06em;text-decoration:none">Full cryptography spec →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- § 03 VERIFIABLE — CT LOG -->
 <section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="ct">
   <div class="container">
