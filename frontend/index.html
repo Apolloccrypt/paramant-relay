@@ -460,23 +460,43 @@
 </section>
 
 <!-- § 02 UNDER THE HOOD — CRYPTO STRIP -->
-<style>.crypto-strip-inner{display:grid;grid-template-columns:auto 1fr;gap:var(--space-7);align-items:center}@media(max-width:900px){.crypto-strip-inner{grid-template-columns:1fr;gap:var(--space-4)}}</style>
-<section class="crypto-strip" aria-labelledby="crypto-strip-title" style="padding:var(--space-5) 0;border-top:1px solid var(--ink-hair);background:var(--navy)">
-  <div class="container">
-    <div class="crypto-strip-inner">
-      <div class="section-marker" style="display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap">
-        <span class="section-num" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.1em">02</span>
-        <h2 id="crypto-strip-title" style="font-size:var(--text-xl);font-weight:700;color:var(--bone);margin:0;line-height:1.1">Under the hood.</h2>
-        <span class="section-label" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.08em">CRYPTO</span>
+<style>
+.crypto-strip{background:#0B3A6A;padding:64px 24px}
+.crypto-strip-inner{max-width:1200px;margin:0 auto}
+.crypto-sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:40px;flex-wrap:wrap}
+.crypto-sec-num{background:#B2FF3F;color:#0B3A6A;padding:2px 14px;font-family:var(--mono);font-size:clamp(3rem,7vw,7rem);font-weight:700;line-height:1;display:inline-block}
+.crypto-sec-title{font-size:clamp(1.8rem,4vw,3.5rem);font-weight:600;color:#F8FAFC;margin:0;line-height:1.1}
+.crypto-row{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:32px}
+.crypto-item{border-left:3px solid #B2FF3F;padding-left:20px}
+.crypto-item-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:#B2FF3F;text-transform:uppercase;margin-bottom:8px}
+.crypto-item-tag{display:inline-block;background:#B2FF3F;color:#0B3A6A;padding:3px 10px;font-family:var(--mono);font-size:13px;font-weight:600;margin-bottom:10px}
+.crypto-item p{color:#F8FAFC;font-size:var(--text-sm);line-height:1.6;margin:0;opacity:.85}
+.crypto-strip-link{color:#B2FF3F;font-family:var(--mono);font-size:var(--text-xs);text-decoration:none;letter-spacing:.06em}
+.crypto-strip-link:hover{color:#fff;text-decoration:underline;text-decoration-color:#B2FF3F}
+@media(max-width:700px){.crypto-row{grid-template-columns:1fr;gap:24px}.crypto-sec-head{flex-direction:column;align-items:flex-start;gap:8px}}
+</style>
+<section class="crypto-strip" id="crypto" aria-labelledby="crypto-strip-title">
+  <div class="crypto-strip-inner">
+    <div class="crypto-sec-head">
+      <span class="crypto-sec-num">02</span>
+      <h2 id="crypto-strip-title" class="crypto-sec-title">Under the hood.</h2>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);color:#B2FF3F;letter-spacing:.12em;text-transform:uppercase;align-self:center">Cryptography</span>
+    </div>
+    <div class="crypto-row">
+      <div class="crypto-item">
+        <span class="crypto-item-label">Anonymous one-off</span>
+        <span class="crypto-item-tag">AES-256-GCM</span>
+        <p>Browser-generated key in URL fragment — never sent to relay. Prove-by-design that we cannot decrypt what we relay.</p>
       </div>
-      <div class="crypto-strip-content">
-        <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.65;margin:0 0 var(--space-3) 0"><strong>AES-256-GCM</strong> for anonymous one-off sends. <strong>ML-KEM-768 + ECDH P-256</strong> hybrid for verified end-to-end. All math happens client-side. The relay sees ciphertext only.</p>
-        <a href="/security" class="crypto-strip-link" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--cobalt);letter-spacing:.06em;text-decoration:none">Full cryptography spec →</a>
+      <div class="crypto-item">
+        <span class="crypto-item-label">Verified end-to-end</span>
+        <span class="crypto-item-tag">ML-KEM-768 + ECDH P-256</span>
+        <p>Post-quantum hybrid key exchange. FIPS 203. ML-DSA-65 signed receipts (FIPS 204). All math client-side.</p>
       </div>
     </div>
+    <a href="/security" class="crypto-strip-link">Full cryptography spec →</a>
   </div>
 </section>
-
 <!-- § 03 VERIFIABLE — CT LOG -->
 <section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="ct">
   <div class="container">

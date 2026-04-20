@@ -2363,3 +2363,93 @@ pre code { background: none; padding: 0; }
 @media (max-width: 900px) {
   .pick-grid { grid-template-columns: 1fr; }
 }
+
+
+/* ═══════════════════════════════════════════════
+   LIME HOVER ACCENTS + PAGE HERO UTILITIES
+   ═══════════════════════════════════════════════ */
+
+/* Text link lime underline on hover */
+a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hover {
+  text-decoration-color: #B2FF3F;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+/* Secondary button: lime on hover */
+.btn-secondary:hover {
+  background: #B2FF3F !important;
+  color: #0B3A6A !important;
+  border-color: #B2FF3F !important;
+}
+
+/* Tertiary button: lime on hover */
+.btn-tertiary:hover {
+  color: #0B3A6A !important;
+  text-decoration-color: #B2FF3F !important;
+}
+
+/* Product picker cards: lime border on hover */
+.pick-card:hover {
+  border-color: #B2FF3F !important;
+}
+.pick-card-featured:hover {
+  border-color: #B2FF3F !important;
+}
+
+/* Pricing cards: lime border on hover */
+.pricing-card:hover {
+  border-color: #B2FF3F !important;
+  outline: 2px solid #B2FF3F;
+}
+
+/* ─── PAGE HERO — reusable gradient band ─────────────────── */
+/* lime-hover-accents (sentinel) */
+.page-hero {
+  background: linear-gradient(180deg, #F0F4F8 0%, rgba(11,58,106,0.04) 100%);
+  border-top: 1px solid rgba(11,58,106,0.08);
+  border-bottom: 1px solid rgba(11,58,106,0.08);
+  padding: 48px 24px;
+  margin-bottom: 0;
+}
+.page-hero-inner {
+  max-width: 860px;
+  margin: 0 auto;
+}
+.page-hero .eyebrow {
+  display: inline-block;
+  background: #B2FF3F;
+  color: #0B3A6A;
+  padding: 2px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.page-hero h1 {
+  margin: 0 0 12px;
+  color: #0B3A6A;
+}
+.page-hero .lede {
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+  max-width: 640px;
+}
+
+/* ─── DARK BAND — reusable navy section ──────────────────── */
+.dark-band {
+  background: #0B3A6A;
+  color: #F8FAFC;
+  padding: 48px 24px;
+  margin: 48px 0;
+}
+.dark-band h2, .dark-band h3 { color: #F8FAFC; }
+.dark-band a { color: #B2FF3F; }
+.dark-band code, .dark-band .tag {
+  background: #B2FF3F;
+  color: #0B3A6A;
+  padding: 2px 8px;
+}

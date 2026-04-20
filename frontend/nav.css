@@ -149,8 +149,10 @@ nav.nav .nav-dropdown-menu li a {
 }
 nav.nav .nav-dropdown-menu li a:hover,
 nav.nav .nav-dropdown-menu li a:focus {
-  color: var(--cobalt);
-  background: var(--ink-ghost);
+  color: #0B3A6A;
+  background: rgba(178,255,63,0.15);
+  border-left: 2px solid #B2FF3F;
+  padding-left: calc(var(--space-5) - 2px);
   outline: none;
 }
 
@@ -395,7 +397,7 @@ body.nav-locked { overflow: hidden; }
   letter-spacing: 0;
   font-weight: 400;
 }
-.nav-product-item:hover .npi-title { color: var(--cobalt); }
+.nav-product-item:hover .npi-title { color: #0B3A6A; }
 
 /* Plain-link "buttons" — Compare and Pricing */
 nav.nav .nav-link-btn {
