@@ -462,13 +462,11 @@ open https://relay.paramant.app/ct/
 
 ## Pricing
 
-| Tier | Price | Users | Features |
-|------|-------|-------|---------|
-| Community | Free | Up to 5 | Full source, all sectors, self-hosted, no key required |
-| Professional | €149/mo | Up to 50 | Webhooks, 24h retention, email support, `plk_` license |
-| Enterprise | Custom | Unlimited | Dedicated relay, SLA 99.9%, compliance docs, TOTP MFA |
+Tiers, limits, and current prices are maintained on the website:
 
-[Full pricing →](https://paramant.app/#pricing) · [Get a free API key →](https://paramant.app/request-key)
+**https://paramant.app/pricing**
+
+API key signup: https://paramant.app/signup
 
 ---
 
