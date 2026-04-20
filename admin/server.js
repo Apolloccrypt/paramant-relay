@@ -348,6 +348,7 @@ api.post('/reload-all', authMiddleware, async (req, res) => {
     const r = await relayFetch(s, '/v2/reload-users', 'POST', {}, false, req.sessionToken);
     return r.body;
   });
+  try { await logAuditEvent('admin', 'admin_relay_reload_all', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
   res.json({ ok: Object.values(results).every(r => r.ok), results });
 });
 

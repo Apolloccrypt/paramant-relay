@@ -33,20 +33,24 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
   const keys = r.body?.keys || [];
   const users = await Promise.all(keys.map(async k => {
     if (!k?.key) return null;
-    const [totpActive, totpSecret] = await Promise.all([
+    const [totpActive, totpSecret, metaRaw] = await Promise.all([
       redis().get(`paramant:user:totp_active:${k.key}`).catch(() => null),
       redis().get(`paramant:user:totp:${k.key}`).catch(() => null),
+      redis().get(`paramant:user:meta:${k.key}`).catch(() => null),
     ]);
+    let meta = {};
+    try { if (metaRaw) meta = JSON.parse(metaRaw); } catch {}
     let totp_status = 'none';
     if (totpActive === 'true') totp_status = 'active';
     else if (totpSecret) totp_status = 'pending';
-    const created = k.created
-      ? (typeof k.created === 'number' ? new Date(k.created).toISOString() : k.created)
+    const createdRaw = meta.created_at || k.created || null;
+    const created = createdRaw
+      ? (typeof createdRaw === 'number' ? new Date(createdRaw).toISOString() : createdRaw)
       : null;
     return {
       key: k.key.slice(0, 8) + '...' + k.key.slice(-4), // masked
       key_id: k.key, // internal id for actions (not exposed in list response)
-      email: k.email || null, label: k.label || null,
+      email: meta.email || k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
       active: k.active !== false, revoked_at: k.revoked_at || null,
       created, totp_status,

@@ -116,12 +116,27 @@ button,input,select{font-family:inherit;font-size:inherit}
 .sp-icon{display:inline-block;width:14px;height:14px;border:2px solid rgba(11,58,106,.12);border-top-color:#1D4ED8;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty{padding:32px;text-align:center;color:#94a3b8;font-family:'IBM Plex Mono',monospace;font-size:12px}
+/* Accessibility */
+.skip-link{position:absolute;top:-40px;left:0;background:#0B3A6A;color:#F8FAFC;padding:8px 12px;text-decoration:none;z-index:200;font-size:13px}
+.skip-link:focus{top:0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+*:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}
+/* Pagination */
+.pag{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid rgba(11,58,106,.06);margin-top:4px}
+.pag button{padding:5px 12px;border:1.5px solid rgba(11,58,106,.15);background:#fff;color:#0B3A6A;cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace}
+.pag button:hover:not(:disabled){border-color:#1D4ED8;color:#1D4ED8}
+.pag button:disabled{opacity:.4;cursor:default}
+.pag select{padding:5px 8px;border:1.5px solid rgba(11,58,106,.15);background:#fff;color:#0B3A6A;font-size:12px;font-family:'IBM Plex Mono',monospace}
+.pag-info{font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569;flex:1;text-align:center}
 /* Responsive */
 @media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}.tabs{overflow-x:auto}}
 @media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding:0 12px}.main{padding:14px}.hdr-meta .lic{display:none}}
 </style>
 </head>
 <body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div aria-live="polite" aria-atomic="true" id="sr-live" class="sr-only"></div>
 
 <!-- LOGIN -->
 <div id="view-login" class="lw">
@@ -129,9 +144,9 @@ button,input,select{font-family:inherit;font-size:inherit}
     <div class="l-brand">PARAMANT · Infra</div>
     <h1 class="l-title">Admin panel</h1>
     <p class="l-sub">Two-factor authentication required to access the dashboard.</p>
-    <label class="l-lbl">Admin token</label>
+    <label class="l-lbl" for="l-token">Admin token</label>
     <input id="l-token" type="password" class="l-inp" placeholder="Enter admin token" autocomplete="current-password">
-    <label class="l-lbl">TOTP code <small style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(Authenticator app)</small></label>
+    <label class="l-lbl" for="l-totp">TOTP code <small style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(Authenticator app)</small></label>
     <input id="l-totp" type="text" class="l-inp l-totp" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
     <button id="l-btn" class="l-btn" onclick="doLogin()">Sign in</button>
     <div id="l-err" class="l-err"></div>
@@ -141,26 +156,26 @@ button,input,select{font-family:inherit;font-size:inherit}
 
 <!-- DASHBOARD -->
 <div id="view-dashboard" class="shell">
-  <header class="hdr">
+  <header class="hdr" role="banner">
     <div class="hdr-brand">PARAMANT · Admin</div>
-    <nav class="tabs" id="nav-tabs">
-      <button data-tab="overview" class="on" onclick="switchTab('overview')">Overview</button>
-      <button data-tab="users" onclick="switchTab('users')">Users</button>
-      <button data-tab="audit" onclick="switchTab('audit')">Audit</button>
-      <button data-tab="billing" onclick="switchTab('billing')">Billing</button>
-      <button data-tab="relay" onclick="switchTab('relay')">Relay</button>
+    <nav class="tabs" id="nav-tabs" role="navigation" aria-label="Admin sections">
+      <button role="tab" aria-selected="true" aria-controls="tab-overview" id="tabBtn-overview" tabindex="0" data-tab="overview" class="on" onclick="switchTab('overview')">Overview</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-users" id="tabBtn-users" tabindex="-1" data-tab="users" onclick="switchTab('users')">Users</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-audit" id="tabBtn-audit" tabindex="-1" data-tab="audit" onclick="switchTab('audit')">Audit</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-billing" id="tabBtn-billing" tabindex="-1" data-tab="billing" onclick="switchTab('billing')">Billing</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-relay" id="tabBtn-relay" tabindex="-1" data-tab="relay" onclick="switchTab('relay')">Relay</button>
     </nav>
     <div class="hdr-meta">
       <span class="lic">v2.4.5 · Licensed</span>
       <button class="lo-btn" onclick="doLogout()">Sign out</button>
     </div>
   </header>
-  <main class="main">
-    <div id="tab-overview" class="panel on"></div>
-    <div id="tab-users" class="panel"></div>
-    <div id="tab-audit" class="panel"></div>
-    <div id="tab-billing" class="panel"></div>
-    <div id="tab-relay" class="panel"></div>
+  <main class="main" role="main" id="main-content">
+    <div id="tab-overview" class="panel on" role="tabpanel" aria-labelledby="tabBtn-overview" tabindex="0"></div>
+    <div id="tab-users" class="panel" role="tabpanel" aria-labelledby="tabBtn-users" tabindex="0" aria-hidden="true"></div>
+    <div id="tab-audit" class="panel" role="tabpanel" aria-labelledby="tabBtn-audit" tabindex="0" aria-hidden="true"></div>
+    <div id="tab-billing" class="panel" role="tabpanel" aria-labelledby="tabBtn-billing" tabindex="0" aria-hidden="true"></div>
+    <div id="tab-relay" class="panel" role="tabpanel" aria-labelledby="tabBtn-relay" tabindex="0" aria-hidden="true"></div>
   </main>
 </div>
 
@@ -219,12 +234,22 @@ async function doLogout(){
 
 /* ── Tab switching ───────────────────────────────────────────────────────── */
 function switchTab(tab){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
-  document.getElementById('tab-'+tab).classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>{p.classList.remove('on');p.setAttribute('aria-hidden','true');});
+  document.querySelectorAll('.tabs button').forEach(b=>{
+    const active=b.dataset.tab===tab;
+    b.classList.toggle('on',active);
+    b.setAttribute('aria-selected',active?'true':'false');
+    b.setAttribute('tabindex',active?'0':'-1');
+  });
+  const panel=document.getElementById('tab-'+tab);
+  panel.classList.add('on');
+  panel.removeAttribute('aria-hidden');
   location.hash='#'+tab;
+  srAnnounce('Loading '+tab+' tab');
   if(!LOADED[tab]){LOADED[tab]=true;loadTab(tab);}
 }
+
+function srAnnounce(msg){const el=document.getElementById('sr-live');if(el)el.textContent=msg;}
 
 function loadTab(tab){
   if(tab==='overview')loadOverview();
@@ -278,29 +303,45 @@ function planBars(dist,total){
 }
 
 /* ── Users ───────────────────────────────────────────────────────────────── */
-let allUsers=[];
-async function loadUsers(){
+let allUsers=[],userPagination={page:1,page_size:50,total_items:0,total_pages:1,has_next:false,has_prev:false};
+async function loadUsers(page,pageSize){
   const el=document.getElementById('tab-users');
+  if(page!==undefined)userPagination.page=page;
+  if(pageSize!==undefined)userPagination.page_size=pageSize;
   el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading users…</div>';
-  const r=await api('/admin/users');
+  const r=await api('/admin/users?page='+userPagination.page+'&page_size='+userPagination.page_size);
   if(!r.ok){el.innerHTML='<div class="empty">Error loading users</div>';return}
   allUsers=r.data.users||[];
   const counts=r.data.counts||{};
+  if(r.data.pagination)Object.assign(userPagination,r.data.pagination);
   renderUsers(el,allUsers,counts);
 }
 
 function renderUsers(el,users,counts){
+  const pg=userPagination;
   el.innerHTML=
-    '<div class="card"><div class="card-hdr">Users <small>'+counts.total+' total · '+counts.active+' active</small>'+
+    '<div class="card"><div class="card-hdr">Users <small>'+counts.total+' total · '+counts.active+' active · page '+pg.page+'/'+pg.total_pages+'</small>'+
       '<button class="btn" onclick="showNewKeyModal()">+ New key</button>'+
     '</div>'+
     '<div class="fb">'+
+      '<label for="u-search" class="sr-only">Search users</label>'+
       '<input id="u-search" placeholder="Search email or label…" oninput="filterUsers()" style="width:220px">'+
-      '<select id="u-plan" onchange="filterUsers()"><option value="">All plans</option><option>community</option><option>pro</option><option>enterprise</option><option>trial</option></select>'+
-      '<select id="u-totp" onchange="filterUsers()"><option value="">Any TOTP</option><option value="active">Active</option><option value="pending">Pending</option><option value="none">None</option></select>'+
-      '<select id="u-status" onchange="filterUsers()"><option value="">All status</option><option value="active">Active</option><option value="revoked">Revoked</option></select>'+
+      '<select id="u-plan" aria-label="Filter by plan" onchange="filterUsers()"><option value="">All plans</option><option>community</option><option>pro</option><option>enterprise</option><option>trial</option></select>'+
+      '<select id="u-totp" aria-label="Filter by TOTP" onchange="filterUsers()"><option value="">Any TOTP</option><option value="active">Active</option><option value="pending">Pending</option><option value="none">None</option></select>'+
+      '<select id="u-status" aria-label="Filter by status" onchange="filterUsers()"><option value="">All status</option><option value="active">Active</option><option value="revoked">Revoked</option></select>'+
     '</div>'+
     '<div id="u-table-wrap">'+usersTable(users)+'</div>'+
+    '<div class="pag" aria-label="Pagination">'+
+      '<button onclick="loadUsers('+pg.page+'-1)" '+(pg.has_prev?'':'disabled')+' aria-label="Previous page">&#8592; Prev</button>'+
+      '<span class="pag-info">Page '+pg.page+' of '+pg.total_pages+' ('+pg.total_items+' users)</span>'+
+      '<button onclick="loadUsers('+pg.page+'+1)" '+(pg.has_next?'':'disabled')+' aria-label="Next page">Next &#8594;</button>'+
+      '<select aria-label="Rows per page" onchange="loadUsers(1,parseInt(this.value))">'+
+        '<option value="25" '+(pg.page_size==25?'selected':'')+'>25/page</option>'+
+        '<option value="50" '+(pg.page_size==50?'selected':'')+'>50/page</option>'+
+        '<option value="100" '+(pg.page_size==100?'selected':'')+'>100/page</option>'+
+        '<option value="200" '+(pg.page_size==200?'selected':'')+'>200/page</option>'+
+      '</select>'+
+    '</div>'+
     '</div>';
 }
 
@@ -320,7 +361,7 @@ function filterUsers(){
 
 function usersTable(users){
   if(!users.length)return '<div class="empty">No users match filters</div>';
-  return '<table class="tbl"><thead><tr><th>Email / Label</th><th>Plan</th><th>TOTP</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>'+
+  return '<table class="tbl" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users with plan, TOTP status, and actions</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
     users.map((u,i)=>'<tr>'+
       '<td><div>'+esc(u.email||'—')+'</div>'+
         (u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
@@ -330,12 +371,14 @@ function usersTable(users){
       '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
       '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
       '<td><div class="amw"><button class="amb" onclick="toggleMenu(event,\'menu-u-'+i+'\')">···</button>'+
-        '<div class="am" id="menu-u-'+i+'" data-key="'+esc(u.key)+'" data-email="'+esc(u.email||'')+'" data-label="'+esc(u.label||'')+'" data-plan="'+esc(u.plan||'community')+'">'+
-          '<button onclick="uAction(\"welcome\",this)">Resend welcome email</button>'+
-          '<button onclick="uAction(\"setup\",this)">Send TOTP setup link</button>'+
+        '<div class="am" role="menu" id="menu-u-'+i+'" data-key="'+esc(u.key)+'" data-email="'+esc(u.email||'')+'" data-label="'+esc(u.label||'')+'" data-plan="'+esc(u.plan||'community')+'">'+
+          '<button role="menuitem" tabindex="-1" onclick="uAction(\"welcome\",this)">Resend welcome email</button>'+
+          '<button role="menuitem" tabindex="-1" onclick="uAction(\"setup\",this)">Send TOTP setup link</button>'+
           '<div class="sep"></div>'+
-          '<button onclick="uAction(\"plan\",this)">Change plan</button>'+
-          '<button onclick="uAction(\"revoke\",this)" class="danger">Revoke key</button>'+
+          '<button role="menuitem" tabindex="-1" onclick="uAction(\"plan\",this)">Change plan</button>'+
+          '<button role="menuitem" tabindex="-1" onclick="uAction(\"reset-totp\",this)">Reset TOTP (send setup email)</button>'+
+          '<div class="sep"></div>'+
+          '<button role="menuitem" tabindex="-1" onclick="uAction(\"revoke\",this)" class="danger">Revoke key</button>'+
         '</div>'+
       '</div></td>'+
     '</tr>').join('')+'</tbody></table>';
@@ -343,13 +386,44 @@ function usersTable(users){
 
 function toggleMenu(e,id){
   e.stopPropagation();
+  const btn=e.currentTarget||e.target;
   const m=document.getElementById(id);
   const wasOpen=m.classList.contains('open');
-  if(openMenu)openMenu.classList.remove('open');
-  if(!wasOpen){m.classList.add('open');openMenu=m;}
-  else openMenu=null;
+  if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');}
+  if(!wasOpen){
+    m.classList.add('open');openMenu=m;
+    btn.setAttribute('aria-expanded','true');
+    const first=m.querySelector('[role=menuitem]');if(first)first.focus();
+  } else {openMenu=null;btn.setAttribute('aria-expanded','false');}
 }
-document.addEventListener('click',()=>{if(openMenu){openMenu.classList.remove('open');openMenu=null;}});
+document.addEventListener('click',()=>{if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');openMenu=null;}});
+document.addEventListener('keydown',e=>{
+  // Tab arrow key navigation
+  if(['Tab','ArrowLeft','ArrowRight','Home','End'].includes(e.key)){
+    const focused=document.activeElement;
+    if(focused&&focused.getAttribute('role')==='tab'){
+      const tabs=Array.from(document.querySelectorAll('[role=tab]'));
+      const idx=tabs.indexOf(focused);
+      if(e.key==='ArrowRight'||e.key==='Tab'){if(idx<tabs.length-1){e.preventDefault();tabs[idx+1].focus();tabs[idx+1].click();}}
+      if(e.key==='ArrowLeft'){if(idx>0){e.preventDefault();tabs[idx-1].focus();tabs[idx-1].click();}}
+      if(e.key==='Home'){e.preventDefault();tabs[0].focus();tabs[0].click();}
+      if(e.key==='End'){e.preventDefault();tabs[tabs.length-1].focus();tabs[tabs.length-1].click();}
+    }
+  }
+  // Escape closes open menu
+  if(e.key==='Escape'&&openMenu){
+    const btn=openMenu.previousElementSibling;
+    openMenu.classList.remove('open');openMenu=null;
+    if(btn){btn.setAttribute('aria-expanded','false');btn.focus();}
+  }
+  // Menu item arrow navigation
+  if((e.key==='ArrowDown'||e.key==='ArrowUp')&&openMenu){
+    const items=Array.from(openMenu.querySelectorAll('[role=menuitem]'));
+    const ci=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();items[(ci+1)%items.length].focus();}
+    if(e.key==='ArrowUp'){e.preventDefault();items[(ci-1+items.length)%items.length].focus();}
+  }
+});
 
 async function uAction(action,btn){
   const m=btn.closest('.am');
@@ -371,6 +445,12 @@ async function uAction(action,btn){
     if(!np)return;
     const r=await api('/admin/relay-detail',{method:'GET'});
     toast('Plan update requires Stripe integration — not yet wired','err');
+  }else if(action==='reset-totp'){
+    if(!email){toast('No email on record','err');return}
+    if(!confirm('Reset TOTP for '+email+'?\n\nThis clears their authenticator state and sends a new setup email.'))return;
+    const r=await api('/admin/resend-setup',{method:'POST',body:JSON.stringify({user_id:key,email})});
+    if(r.ok&&r.data?.success)toast('Setup email sent to '+email,'ok');
+    else toast('Failed: '+(r.data?.error||'unknown'),'err');
   }else if(action==='revoke'){
     if(!confirm('Revoke key '+key.slice(0,20)+'…?'))return;
     const r=await api('/keys/all/revoke',{method:'POST',body:JSON.stringify({key})});
@@ -484,14 +564,7 @@ async function loadBilling(){
   const dist=d.plan_distribution||{};
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
   el.innerHTML=
-    '<div class="banner stub">Payment integration pending — all figures reflect stub state. Stripe connection required to show real MRR and churn data.</div>'+
-    '<div class="sg" style="grid-template-columns:repeat(3,1fr)">'+
-      statCard('MRR (EUR)','€'+((d.mrr_eur||0)/100).toFixed(0))+
-      statCard('Total customers',d.total_customers||0)+
-      statCard('Churn this month',d.churn_this_month||0)+
-    '</div>'+
-    '<div class="g2">'+
-      '<div class="card"><div class="card-hdr">Plan distribution</div>'+planBars(dist,total)+'</div>'+
+    '<div class="banner stub" role="status"><strong>Beta billing</strong> &mdash; Payment processing (Stripe) is in integration. Customers are manually invoiced. Data shown is stub only.'+'</div>'+
       '<div class="card"><div class="card-hdr">Recent plan changes <small>'+( d.recent_checkouts?.length||0)+' events</small></div>'+
         (d.recent_checkouts&&d.recent_checkouts.length?
           '<table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead><tbody>'+
