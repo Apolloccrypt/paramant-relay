@@ -160,6 +160,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .ep-content{font-size:12px;line-height:1.6;max-height:320px;overflow-y:auto}
 .ep-content pre{white-space:pre-wrap;word-break:break-word;font-family:'IBM Plex Mono',monospace}
 .ep-content iframe{width:100%;border:none;height:340px}
+
+/* TOTP required badges */
+.chip.required-missing{background:rgba(220,38,38,.08);color:#dc2626;font-weight:600}
+.chip.required-ok{background:rgba(29,78,216,.08);color:#1D4ED8}
 </style>
 </head>
 <body>
@@ -314,6 +318,21 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-details')">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="mo-force-totp" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-force-totp-title">
+  <div class="mb">
+    <div class="mh">
+      <span id="mo-force-totp-title" class="mt">Require TOTP</span>
+      <button class="close-mo" onclick="closeModal('mo-force-totp')" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody" id="mo-force-totp-body"></div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mo-force-totp')">Cancel</button>
+      <button class="btn pri" id="ft-btn" onclick="doForceTotpRequirement()">Require TOTP</button>
     </div>
   </div>
 </div>
@@ -509,12 +528,12 @@ function usersTable(users){
         '<td><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
         '</td>'+
         '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
-        '<td><span class="chip '+esc(u.totp_status)+'">'+esc(u.totp_status)+'</span></td>'+
+        '<td>'+totpBadge(u)+'</td>'+
         '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
         '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
         '<td><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" onclick="toggleMenu(event,\'m'+i+'\')">···</button>'+
-          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'">'+
+          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'details\',this)">View details</button>'+
             '<div class="ag-lbl">Email</div>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'welcome\',this)"'+(hasE?'':' disabled')+'>Send welcome</button>'+
@@ -523,7 +542,11 @@ function usersTable(users){
             '<div class="ag-lbl">Account</div>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'plan\',this)">Change plan</button>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'revoke-sessions\',this)">Revoke sessions</button>'+
-            '<div class="ag-lbl danger">Destructive</div>'+
+            '<div class="ag-lbl">Security</div>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'force-totp\',this)">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
+'<div class="ag-lbl">Security</div>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'force-totp\',this)">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
+'<div class="ag-lbl danger">Destructive</div>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'disable\',this)" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'delete\',this)" class="danger">Delete account</button>'+
           '</div>'+
@@ -579,6 +602,8 @@ function uAction(action,btn){
   if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');openMenu=null;}
   switch(action){
     case 'details': openUserDetailsModal(key); break;
+    case 'force-totp': openForceTotpModal(key,email,m.dataset.totpReq==='true'); break;
+    case 'force-totp': openForceTotpModal(key,email,m.dataset.totpReq==='true'); break;
     case 'welcome': openEmailPreviewModal('welcome',key,email); break;
     case 'setup':   openEmailPreviewModal('setup',key,email); break;
     case 'reset-totp': openEmailPreviewModal('reset-confirm',key,email); break;
@@ -884,6 +909,39 @@ if(SESSION){
       SESSION='';sessionStorage.removeItem('adm_session');
     }
   }).catch(()=>{SESSION='';sessionStorage.removeItem('adm_session');});
+}
+
+function totpBadge(u){
+  const req=u.totp_required,st=u.totp_status;
+  if(req&&st!=='active')return '<span class="chip required-missing">⚠ required</span>';
+  if(req&&st==='active')return '<span class="chip required-ok">🔒 active</span>';
+  return '<span class="chip '+esc(st)+'">'+esc(st)+'</span>';
+}
+function openForceTotpModal(key,email,currentlyRequired){
+  _ms.forceTotp={key,email,removing:currentlyRequired};
+  document.getElementById('mo-force-totp-title').textContent=(currentlyRequired?'Remove TOTP requirement':'Require TOTP')+(email?' — '+email:'');
+  document.getElementById('mo-force-totp-body').innerHTML=currentlyRequired
+    ?'<p style="font-size:13px;color:#475569;margin:0">Remove the TOTP requirement. The user can log in without TOTP, or keep using their existing authenticator.</p>'
+    :'<p style="font-size:13px;color:#475569;margin:0 0 10px">Forces this user to set up TOTP before their next login.</p><ul style="font-size:13px;color:#475569;margin:0 0 14px;padding-left:18px"><li>Active sessions will be revoked immediately</li><li>A setup email will be sent automatically</li><li>Login is blocked until setup is complete</li></ul><div class="mc"><label>Reason (optional, for audit log)</label><input type="text" id="ft-reason" placeholder="e.g. policy enforcement"></div>';
+  const btn=document.getElementById('ft-btn');
+  btn.textContent=currentlyRequired?'Remove requirement':'Require TOTP';
+  btn.className='btn '+(currentlyRequired?'':'pri');
+  btn.disabled=false;
+  openModal('mo-force-totp');
+  if(!currentlyRequired)setTimeout(()=>document.getElementById('ft-reason')?.focus(),50);
+}
+async function doForceTotpRequirement(){
+  const{key,removing}=_ms.forceTotp||{};if(!key)return;
+  const required=!removing;
+  const reason=required?(document.getElementById('ft-reason')?.value.trim()||''):'';
+  const btn=document.getElementById('ft-btn');btn.disabled=true;
+  const r=await api('/admin/force-totp',{method:'POST',body:JSON.stringify({key,required,reason:reason||undefined})});
+  closeModal('mo-force-totp');btn.disabled=false;
+  if(r.ok){
+    const d=r.data;
+    const msg=required?'TOTP required. Sessions revoked: '+(d.sessions_revoked||0)+(d.setup_email_sent?'. Setup email sent.':'.'):'TOTP requirement removed.';
+    toast(msg,'ok');LOADED.users=false;setTimeout(loadUsers,500);
+  } else { toast('Failed: '+(r.data?.error||'unknown'),'err'); }
 }
 </script>
 </body>

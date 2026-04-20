@@ -634,7 +634,21 @@ api.post("/user/login", async (req, res) => {
   if (!user) return res.status(401).json({ error: "invalid_credentials" });
 
   const activeRaw = await redis().get(`paramant:user:totp_active:${user.key}`);
-  if (activeRaw !== "true") return res.status(403).json({ error: "totp_not_configured" });
+  if (activeRaw !== "true") {
+    const metaRaw = await redis().get(`paramant:user:meta:${user.key}`).catch(() => null);
+    let um = {}; try { if (metaRaw) um = JSON.parse(metaRaw); } catch {}
+    if (um.totp_required) {
+      if (um.email || user.email) {
+        const setupToken = (await import('crypto')).randomBytes ? require('crypto').randomBytes(32).toString('hex') : '';
+        if (setupToken) {
+          await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: user.key, email: um.email || user.email }), { EX: 14 * 86400 });
+          sendSetupEmail(um.email || user.email, setupToken).catch(e => console.error('[login/totp_required] email:', e.message));
+        }
+      }
+      return res.status(403).json({ error: "totp_setup_required", message: "Your administrator requires TOTP. Check your email for a setup link." });
+    }
+    return res.status(403).json({ error: "totp_not_configured" });
+  }
 
   const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });
   if (!verifyRes.ok) return res.status(401).json({ error: "invalid_credentials" });
@@ -1314,6 +1328,52 @@ api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
   } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
+
+// ── POST /admin/force-totp ───────────────────────────────────────────────────────
+api.post('/admin/force-totp', authMiddleware, async (req, res) => {
+  const { key, required, reason } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (typeof required !== 'boolean') return res.status(400).json({ error: 'required_must_be_boolean' });
+  if (!await checkAdminRl('force_totp', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const metaRaw = await redis().get(`paramant:user:meta:${key}`).catch(() => null);
+    let userMeta = {};
+    try { if (metaRaw) userMeta = JSON.parse(metaRaw); } catch {}
+    const before = !!userMeta.totp_required;
+    if (required) {
+      userMeta.totp_required = true;
+      userMeta.totp_required_at = Date.now();
+      userMeta.totp_required_by = 'admin';
+    } else {
+      userMeta.totp_required = false;
+      delete userMeta.totp_required_at;
+      delete userMeta.totp_required_by;
+    }
+    await redis().set(`paramant:user:meta:${key}`, JSON.stringify(userMeta));
+
+    let sessions_revoked = 0;
+    let setup_email_sent = false;
+    if (required) {
+      const totpActive = await redis().get(`paramant:user:totp_active:${key}`).catch(() => null);
+      if (totpActive !== 'true') {
+        for await (const rkey of redis().scanIterator({ MATCH: `paramant:user:session:*`, COUNT: 100 })) {
+          const raw = await redis().get(rkey).catch(() => null);
+          if (raw) { try { const ss = JSON.parse(raw); if (ss.user_id === key) { await redis().del(rkey); sessions_revoked++; } } catch {} }
+        }
+        if (userMeta.email) {
+          try {
+            const setupToken = require('crypto').randomBytes(32).toString('hex');
+            await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: key, email: userMeta.email }), { EX: 14 * 86400 });
+            await sendSetupEmail(userMeta.email, setupToken);
+            setup_email_sent = true;
+          } catch (e) { console.error('[admin/force-totp] setup email:', e.message); }
+        }
+      }
+    }
+    try { await logAuditEvent(key, 'admin_totp_required_toggled', { before, after: required, reason: reason || null, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, totp_required: required, user_email: userMeta.email || null, sessions_revoked, setup_email_sent });
+  } catch (err) { console.error('[admin/force-totp]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
 
 // ── Admin helpers ─────────────────────────────────────────────────────────────
 async function getAdminKeyMeta(key_id) {

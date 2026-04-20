@@ -56,6 +56,8 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       plan: k.plan || 'community', sectors: k.sectors || [],
       active: k.active !== false, revoked_at: k.revoked_at || null,
       created, totp_status,
+      totp_required: meta.totp_required === true,
+      totp_required_at: meta.totp_required_at || null,
     };
   }));
   return users.filter(Boolean);
