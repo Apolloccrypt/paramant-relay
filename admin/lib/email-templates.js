@@ -422,6 +422,65 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
   return { ...wrap(text, html, { refId: 'verify-' + token.slice(0, 8) }), subject: 'Verify your Paramant account' };
 }
 
+// ── BACKUP CODES RESET NOTIFICATION ─────────────────────────────────────────
+function backupCodesResetEmail({ email, requestedAt }) {
+  const dateStr = formatTS(requestedAt);
+  const preheader = 'Your Paramant backup codes have been reset. Action required.';
+
+  const text = [
+    'Security notification: Paramant backup codes reset',
+    '',
+    `This is a security notification for ${email}.`,
+    '',
+    'During an internal security audit we identified that backup codes were retained',
+    'in a format that did not meet our zero-knowledge standard. We have fixed the issue',
+    'and invalidated the affected backup codes as a precaution.',
+    '',
+    'Your TOTP authenticator continues to work normally.',
+    'Only your offline backup codes were affected.',
+    '',
+    'Action required:',
+    '  Sign in to your account and generate a new set of backup codes.',
+    '  Store them in your password manager.',
+    '',
+    `Detected: ${dateStr}`,
+    'No evidence of external access. This notification is precautionary.',
+    '',
+    'Questions: privacy@paramant.app',
+    '',
+    '— Paramant',
+  ].join('\n');
+
+  const html = htmlShell(preheader, `
+    <div style="background:#FEF2F2;border:1px solid #FECACA;padding:16px;border-radius:4px;margin:0 0 24px 0;">
+      <p style="margin:0;font-size:13px;font-weight:600;color:#991B1B;">Security notification</p>
+    </div>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Backup codes reset</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">
+      During an internal security audit, we identified that your backup codes were retained in a format that did not meet our zero-knowledge standard.
+      We fixed the issue and invalidated the affected codes as a precaution.
+    </p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">
+      <strong>Your TOTP authenticator continues to work normally.</strong> Only your offline backup codes were affected.
+    </p>
+    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:16px;margin:0 0 24px 0;border-radius:4px;">
+      <p style="margin:0 0 8px 0;font-weight:600;color:#0B3A6A;">Action required</p>
+      <p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sign in to your account and generate a new set of backup codes. Store them in your password manager.</p>
+    </div>
+    <div style="text-align:center;margin:0 0 24px 0;">
+      <a href="${BASE_URL}/account" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;">Go to account</a>
+    </div>
+    <div style="border-top:1px solid rgba(11,58,106,0.08);padding-top:16px;margin-top:8px;">
+      <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
+        Detected ${formatTS(requestedAt)}. No evidence of external access — this is precautionary.
+        Questions: <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>
+      </p>
+    </div>
+  `);
+
+  return { ...wrap(text, html, { refId: 'backup-reset-' + requestedAt }), subject: 'Paramant backup codes reset — action required' };
+}
+
 // ── SEND HELPER ───────────────────────────────────────────────────────────────
 async function sendEmail(to, templateResult) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -442,6 +501,7 @@ async function sendEmail(to, templateResult) {
 }
 
 module.exports = {
+  backupCodesResetEmail,
   setupEmail,
   signupVerificationEmail,
   resetConfirmationEmail,

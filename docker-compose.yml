@@ -213,7 +213,7 @@ services:
   # ── Admin panel ──────────────────────────────────────────────────────────────
   # ── Redis (relay-internal, not exposed to host) ──────────────────────────────
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.8-alpine
     container_name: paramant-relay-redis
     restart: unless-stopped
     command: >

@@ -1625,10 +1625,9 @@ const server = http.createServer(async (req, res) => {
         if (activeVal === "true") {
           res.writeHead(409); return res.end(J({ error: "totp_already_configured" }));
         }
-        const bpRaw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
-        const backup_codes = bpRaw ? JSON.parse(bpRaw) : [];
+        // Backup codes are one-time: shown at first setup, not re-retrievable
         res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(J({ secret: existing, backup_codes }));
+        return res.end(J({ secret: existing, backup_codes: [] }));
       }
       const secret = userTotp.generateTotpSecret();
       await userTotp.storeUserTotpSecret(redisClient, user_id, secret);
@@ -1640,13 +1639,7 @@ const server = http.createServer(async (req, res) => {
       }
       const backupCodes = userTotp.generateBackupCodes();
       await userTotp.storeBackupCodes(redisClient, user_id, backupCodes);
-      if (provisional) {
-        await redisClient.set(
-          `paramant:user:backup_codes_plaintext:${user_id}`,
-          JSON.stringify(backupCodes),
-          { EX: 14 * 86400 }
-        );
-      }
+      // Backup codes returned once in the response; not stored in plaintext
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ secret, backup_codes: backupCodes }));
     } catch (err) {
@@ -1716,15 +1709,7 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ success: true }));
   }
 
-  // POST /v2/user/get-backup-codes-plaintext
-  if (req.method === "POST" && path === "/v2/user/get-backup-codes-plaintext") {
-    if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    const raw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
-    if (!raw) { res.writeHead(404); return res.end(J({ error: "not_available" })); }
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ backup_codes: JSON.parse(raw) }));
-  }
+
 
   // POST /v2/user/get-totp-provisional — return existing provisional secret if present
   if (req.method === "POST" && path === "/v2/user/get-totp-provisional") {
@@ -1741,9 +1726,8 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         return res.end(J({ exists: false }));
       }
-      const codesRaw = await redisClient.get(`paramant:user:backup_codes_plaintext:${user_id}`);
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(J({ exists: true, secret, backup_codes: codesRaw ? JSON.parse(codesRaw) : [] }));
+      return res.end(J({ exists: true, secret, backup_codes: [] }));
     } catch (err) {
       console.error("[user/get-totp-provisional]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
