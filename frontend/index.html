@@ -205,8 +205,8 @@
 <!-- § 00 HERO -->
 <section style="padding:var(--space-10) 0 var(--space-8)">
   <div class="container">
-    <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-5)">post-quantum &middot; eu sovereign &middot; zero-knowledge</p>
-    <h1>Encrypted file transport.<br><em>RAM-only.</em> Burn on read.</h1>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-5)">post-quantum <span style="color:#B2FF3F;font-weight:700;margin:0 3px">&middot;</span> eu sovereign <span style="color:#B2FF3F;font-weight:700;margin:0 3px">&middot;</span> zero-knowledge</p>
+    <h1>Encrypted file transport.<br><em class="lime-hi">RAM-only.</em> Burn on read.</h1>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:560px;margin-top:var(--space-5);margin-bottom:var(--space-7)">
       Paramant is a post-quantum encrypted file relay.
       ML-KEM-768 and ML-DSA-65, NIST Level 3. Operated
@@ -284,7 +284,7 @@
       </a>
 
       <a href="/parashare" class="pick-card pick-card-featured">
-        <p class="pick-label">Verified end-to-end</p>
+        <p class="pick-label" style="background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block">Verified end-to-end</p>
         <h3 class="pick-title">ParaShare</h3>
         <p class="pick-tagline">Proof of who sent what.</p>
         <p class="pick-desc">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS&nbsp;204). Fingerprint verification before send. For when the audit trail matters.</p>
@@ -461,7 +461,7 @@
 
       <div class="pricing-card">
         <div class="pricing-tier">Enterprise</div>
-        <div class="pricing-price">Custom</div>
+        <div class="pricing-price"><span style="background:#B2FF3F;color:#0B3A6A;padding:2px 14px;display:inline-block">Custom</span></div>
         <div class="pricing-note">Dedicated relay &middot; SLA &middot; compliance</div>
         <p>Dedicated infrastructure, compliance, and support.</p>
         <ul class="pricing-features">
@@ -498,9 +498,9 @@
       Source-available under BUSL-1.1. Free for up to 5 users. Works on a Raspberry Pi. If the managed service ever closes, every self-hosted relay keeps running indefinitely.
     </p>
     <div class="cluster" style="--cluster-gap:var(--space-4);justify-content:center;flex-direction:column;align-items:center">
-      <code style="background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">curl -fsSL https://paramant.app/install.sh | bash</code>
+      <code style="background:var(--ink-ghost);border:1px solid #B2FF3F;padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">curl -fsSL https://paramant.app/install.sh | bash</code>
       <span style="color:var(--ink-dim);font-family:var(--mono);font-size:var(--text-sm)">or</span>
-      <code style="background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">docker compose up -d</code>
+      <code style="background:var(--ink-ghost);border:1px solid #B2FF3F;padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">docker compose up -d</code>
     </div>
     <div style="margin-top:var(--space-6)">
       <a href="/docs#self-hosting" class="btn btn-secondary">Full deploy guide &rarr;</a>
@@ -518,19 +518,19 @@
     </div>
     <div class="grid3">
       <div class="card" style="padding:var(--space-5)">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:12px">/drop</div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block;margin-bottom:12px">/drop</div>
         <h3 style="margin:0 0 10px;font-size:var(--text-base)">Send a file now</h3>
         <p style="margin:0 0 20px;font-size:var(--text-sm);color:var(--ink-dim)">Upload a file, get a share link. Email required for rate limiting, no account needed. Up to 3 per day.</p>
         <a href="/drop" class="btn btn-outline" style="display:inline-block;padding:10px 20px;font-size:var(--text-sm)">Go to /drop</a>
       </div>
       <div class="card" style="padding:var(--space-5)">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:12px">/signup</div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block;margin-bottom:12px">/signup</div>
         <h3 style="margin:0 0 10px;font-size:var(--text-base)">Create an account</h3>
         <p style="margin:0 0 20px;font-size:var(--text-sm);color:var(--ink-dim)">Email + authenticator app login. Unlimited drops. API key included for automation. No password ever.</p>
         <a href="/signup" class="btn btn-primary" style="display:inline-block;padding:10px 20px;font-size:var(--text-sm)">Create free account</a>
       </div>
       <div class="card" style="padding:var(--space-5)">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:12px">/request-key</div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block;margin-bottom:12px">/request-key</div>
         <h3 style="margin:0 0 10px;font-size:var(--text-base)">Developer API key</h3>
         <p style="margin:0 0 20px;font-size:var(--text-sm);color:var(--ink-dim)">For scripts, SDKs, and IoT devices. API key by email. No authenticator setup, no session login.</p>
         <a href="/request-key" class="btn btn-outline" style="display:inline-block;padding:10px 20px;font-size:var(--text-sm)">Get API key</a>
@@ -614,6 +614,12 @@
   </div>
 </footer>
 
+<style>
+/* Lime accent system — index.html */
+.lime-hi{background:#B2FF3F;color:#0B3A6A;padding:0 5px;display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;font-style:inherit}
+.num{background:#B2FF3F !important;color:#0B3A6A !important;padding:2px 14px !important;display:inline-block !important}
+.how-num{background:#B2FF3F !important;color:#0B3A6A !important;border:none !important}
+</style>
 <script src="ct-stats.js" defer></script>
 <script src="/nav.js?v=5" defer></script>
 <script src="/js/nav-auth.js" defer></script>
