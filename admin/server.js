@@ -135,6 +135,11 @@ async function eachSector(list, fn) {
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err)
+    return res.status(400).json({ error: 'invalid_json', message: 'Request body must be valid JSON' });
+  next(err);
+});
 app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -1600,6 +1605,12 @@ app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'p
 
 (async () => {
   await initRedis();
+  app.use((err, req, res, next) => {
+    console.error('[unhandled error]', err.message);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'internal_error' });
+  });
+
   app.listen(PORT, '0.0.0.0', () => console.log(`[PARAMANT-ADMIN] listening on :${PORT}${BASE_PATH || '/'}`));
 })().catch((err) => {
   console.error('[boot] startup failed:', err);
