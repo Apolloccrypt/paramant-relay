@@ -416,11 +416,56 @@
   </div>
 </section>
 
+<!-- INFRASTRUCTURE DEPENDENCIES -->
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">06</div>
+      <h2>Infrastructure dependencies: current state and roadmap.</h2>
+      <div class="tag">honest about<br/>the gaps</div>
+    </div>
+
+    <p>Paramant's application infrastructure is fully EU-based and EU-owned:</p>
+    <ul>
+      <li><strong>Application servers</strong>: Hetzner (Nuremberg, Germany &amp; Helsinki, Finland)</li>
+      <li><strong>Email delivery</strong>: Resend (EU data processing agreement)</li>
+      <li><strong>SIEM/logging</strong>: Wazuh on dedicated EU infrastructure</li>
+    </ul>
+
+    <p>Two dependencies at the DNS and CDN layer currently sit outside this boundary:</p>
+
+    <h3>DNS and CDN: Cloudflare (current, being replaced)</h3>
+    <p>paramant.app currently uses Cloudflare for DNS hosting and static asset delivery. Cloudflare is a US company incorporated in Delaware, subject to US jurisdiction including the CLOUD Act and FISA 702.</p>
+
+    <p>The practical impact is bounded by architecture: all file content is encrypted client-side with ML-KEM-768 before any network transit. Cloudflare terminates TLS but receives only ciphertext — it cannot read file contents, encryption keys, or recipient identities. What is theoretically observable at the Cloudflare edge: source IP addresses, request timing, request volume, and HTTP headers (not body content).</p>
+
+    <p>For most threat models this is acceptable. For high-sensitivity use cases (legal, government, healthcare under strict NEN 7510 interpretation) where even metadata exposure is a concern, this is a gap we are closing.</p>
+
+    <h3>Migration to Bunny.net (Q2 2026)</h3>
+    <p>Paramant is migrating DNS and CDN infrastructure to <strong>Bunny.net</strong>, a Slovenian company (EU jurisdiction, GDPR-native, not subject to CLOUD Act) with 119 edge PoPs and comparable latency to Cloudflare.</p>
+
+    <p>The migration is phased to avoid downtime:</p>
+    <ul>
+      <li><strong>Phase 1 (Q2 early)</strong>: DNS-only migration from Cloudflare to Bunny DNS — nameserver change at registrar, zero downtime if TTLs managed correctly</li>
+      <li><strong>Phase 2 (Q2 mid)</strong>: Static asset CDN via Bunny Pull Zone — parallel paths during transition</li>
+      <li><strong>Phase 3 (Q2 late)</strong>: Full reverse proxy via Bunny with WAF, replacing Cloudflare DDoS protection</li>
+    </ul>
+
+    <p>Full migration plan including rollback procedures is documented in the <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/migration-bunny.md" target="_blank" rel="noopener">repository (docs/migration-bunny.md)</a>.</p>
+
+    <div class="callout">
+      <h4>why we document this</h4>
+      <p>Claiming full EU sovereignty while running DNS on a US company is a contradiction. This section exists because <strong>transparency about current limitations is more useful than aspirational claims</strong>. The gap is bounded, the mitigation is architectural, and the migration is planned. That is an honest position.</p>
+      <p class="dim mono" style="font-size:11px;margin-top:8px">This section was added following community feedback (GitHub Issue #20, raised by Stensel8).</p>
+    </div>
+  </div>
+</section>
+
 <!-- CLOSING -->
 <section class="section section-dark">
   <div class="container">
     <div class="marker">
-      <div class="num">06</div>
+      <div class="num">07</div>
       <h2 style="color:var(--bone)">The bet Paramant is making.</h2>
       <div class="tag" style="color:rgba(248,250,252,.72)">for the<br/>long term</div>
     </div>
