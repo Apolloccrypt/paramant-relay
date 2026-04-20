@@ -544,8 +544,6 @@ function usersTable(users){
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'revoke-sessions\',this)">Revoke sessions</button>'+
             '<div class="ag-lbl">Security</div>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'force-totp\',this)">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
-'<div class="ag-lbl">Security</div>'+
-            '<button role="menuitem" tabindex="-1" onclick="uAction(\'force-totp\',this)">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
 '<div class="ag-lbl danger">Destructive</div>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'disable\',this)" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'delete\',this)" class="danger">Delete account</button>'+
@@ -602,7 +600,6 @@ function uAction(action,btn){
   if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');openMenu=null;}
   switch(action){
     case 'details': openUserDetailsModal(key); break;
-    case 'force-totp': openForceTotpModal(key,email,m.dataset.totpReq==='true'); break;
     case 'force-totp': openForceTotpModal(key,email,m.dataset.totpReq==='true'); break;
     case 'welcome': openEmailPreviewModal('welcome',key,email); break;
     case 'setup':   openEmailPreviewModal('setup',key,email); break;
