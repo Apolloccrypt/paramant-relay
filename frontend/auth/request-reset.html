@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reset authenticator — Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+</nav>
+
+<main class="page-main">
+<section class="form-section">
+  <h1 class="form-title">Reset authenticator</h1>
+  <p class="form-subtitle">Enter your account email. If we find a matching account, we will send you a link to set up a new authenticator.</p>
+
+  <form id="reset-form" class="form-card">
+    <label for="email">Email address</label>
+    <input type="email" id="email" name="email" required autocomplete="username" autofocus>
+
+    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">
+      Send reset link
+    </button>
+
+    <div id="error" class="error"></div>
+    <div id="success" class="success" style="display:none"></div>
+  </form>
+
+  <p class="footer-text mt-4">
+    Back to <a href="/auth/login">sign in</a>
+  </p>
+</section>
+</main>
+
+<script src="/nav.js?v=5" defer></script>
+<script>
+(function() {
+  const form = document.getElementById('reset-form');
+  const errorDiv = document.getElementById('error');
+  const successDiv = document.getElementById('success');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    errorDiv.classList.remove('visible');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+
+    const email = document.getElementById('email').value.trim();
+
+    try {
+      const res = await fetch('/api/user/auth/request-totp-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        form.style.display = 'none';
+        successDiv.style.display = 'block';
+        successDiv.innerHTML = '<p>If an account exists for <strong>' + email + '</strong>, a setup link has been sent. Check your inbox (and spam folder).</p><p style="margin-top:8px">The link is valid for 14 days.</p>';
+      } else {
+        errorDiv.textContent = 'Request failed. Try again or contact privacy@paramant.app.';
+        errorDiv.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send reset link';
+      }
+    } catch (err) {
+      errorDiv.textContent = 'Network error.';
+      errorDiv.classList.add('visible');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send reset link';
+    }
+  });
+})();
+</script>
+</body>
+</html>

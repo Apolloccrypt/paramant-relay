@@ -430,8 +430,13 @@ async function findUserByEmail(email) {
 }
 
 // Send setup email via Resend
-async function sendSetupEmail(email, setupToken) {
+async function sendSetupEmail(email, setupToken, isReset = false) {
   const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
+  const subject = isReset ? "Reset your Paramant authenticator" : "Complete your Paramant setup";
+  const heading = isReset ? "Set up new Paramant authenticator" : "Set up Paramant authenticator";
+  const resetNote = isReset
+    ? `<p style="color:#b45309;font-size:13px;margin:0 0 16px;background:#fffbeb;border:1px solid #fde68a;padding:10px 14px;border-radius:4px">If you have a previous Paramant entry in your authenticator app, delete it first &mdash; the old entry no longer works.</p>`
+    : "";
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -441,9 +446,9 @@ async function sendSetupEmail(email, setupToken) {
     body: JSON.stringify({
       from: "Paramant <noreply@paramant.app>",
       to: [email],
-      subject: "Complete your Paramant setup",
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Set up Paramant authenticator</h2><p style="color:#475569;margin:0 0 16px">Click below to set up two-factor authentication for your Paramant account.</p><a href="${setupUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Complete setup</a><p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 14 days. If you did not request this, ignore this email.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
-      text: `Complete your Paramant setup\n\nLink: ${setupUrl}\n\nExpires in 14 days. If you did not request this, ignore this email.`,
+      subject,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">${heading}</h2>${resetNote}<p style="color:#475569;margin:0 0 16px">Click below to set up two-factor authentication for your Paramant account.</p><a href="${setupUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Complete setup</a><p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 14 days. If you did not request this, ignore this email.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
+      text: `${subject}\n\nLink: ${setupUrl}\n\nExpires in 14 days.${isReset ? " If you had a previous authenticator entry for Paramant, delete it first — it no longer works." : ""} If you did not request this, ignore this email.`,
     }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => "")}`);
@@ -654,6 +659,53 @@ api.post("/user/login-with-backup", async (req, res) => {
 
   setUserCookie(res, sessionToken);
   res.json({ success: true, email: user.email });
+});
+
+
+// POST /api/user/auth/request-totp-reset (public — for locked-out users)
+api.post("/user/auth/request-totp-reset", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: "missing_email" });
+  const norm = email.toLowerCase().trim();
+
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const ipKey    = `paramant:totp-reset-req:ip:${ip}`;
+  const emailKey = `paramant:totp-reset-req:email:${norm}`;
+  const [ipCnt, emailCnt] = await Promise.all([redis().incr(ipKey), redis().incr(emailKey)]);
+  await Promise.all([
+    ipCnt    === 1 ? redis().expire(ipKey,    3600) : Promise.resolve(),
+    emailCnt === 1 ? redis().expire(emailKey, 3600) : Promise.resolve(),
+  ]);
+
+  if (ipCnt <= 5 && emailCnt <= 3) {
+    const user = await findUserByEmail(norm).catch(() => null);
+    if (user) {
+      try {
+        await Promise.all([
+          redis().del(`paramant:user:totp:${user.key}`),
+          redis().del(`paramant:user:totp_active:${user.key}`),
+          redis().del(`paramant:user:backup_codes:${user.key}`),
+          redis().del(`paramant:user:backup_codes_plaintext:${user.key}`),
+        ]);
+        for await (const k of redis().scanIterator({ MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
+          const raw = await redis().get(k);
+          if (raw) { try { const d = JSON.parse(raw); if (d.user_id === user.key) await redis().del(k); } catch {} }
+        }
+        const setupToken = crypto.randomBytes(32).toString("hex");
+        await redis().set(
+          `paramant:user:setup_token:${setupToken}`,
+          JSON.stringify({ user_id: user.key, email: norm }),
+          { EX: 14 * 86400 }
+        );
+        await sendSetupEmail(norm, setupToken, true);
+        console.log(`[totp-reset-req] sent to ${norm}`);
+      } catch (err) {
+        console.error("[totp-reset-req] failed:", err.message);
+      }
+    }
+  }
+
+  res.json({ sent: true }); // always 200 to prevent email enumeration
 });
 
 // POST /api/user/logout

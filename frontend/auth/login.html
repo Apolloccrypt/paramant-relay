@@ -196,6 +196,7 @@
 
   <p class="footer-text mt-4">
     Lost your authenticator? <a href="/auth/backup">Use a backup code</a><br>
+    No backup codes? <a href="/auth/request-reset">Request a reset email</a><br>
     Don&rsquo;t have an account? <a href="/signup">Create one</a>
   </p>
 </section>
@@ -237,7 +238,7 @@
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = 'TOTP not configured for this account. <a href="/signup">Create a new account</a>.';
+        errorDiv.innerHTML = 'No authenticator linked to this account. <a href="/auth/request-reset">Request a setup link</a> or <a href="/signup">create an account</a>.';
         errorDiv.classList.add('visible');
       } else if (res.status === 429) {
         errorDiv.textContent = 'Too many attempts. Try again in 15 minutes.';

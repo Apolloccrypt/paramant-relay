@@ -335,6 +335,8 @@ function usersTable(users){
           '<button onclick="uAction(\"setup\",this)">Send TOTP setup link</button>'+
           '<div class="sep"></div>'+
           '<button onclick="uAction(\"plan\",this)">Change plan</button>'+
+          '<button onclick="uAction(\"reset-totp\",this)">Reset TOTP (send setup email)</button>'+
+          '<div class="sep"></div>'+
           '<button onclick="uAction(\"revoke\",this)" class="danger">Revoke key</button>'+
         '</div>'+
       '</div></td>'+
@@ -371,6 +373,12 @@ async function uAction(action,btn){
     if(!np)return;
     const r=await api('/admin/relay-detail',{method:'GET'});
     toast('Plan update requires Stripe integration — not yet wired','err');
+  }else if(action==='reset-totp'){
+    if(!email){toast('No email on record','err');return}
+    if(!confirm('Reset TOTP for '+email+'?\n\nThis clears their authenticator state and sends a new setup email.'))return;
+    const r=await api('/admin/resend-setup',{method:'POST',body:JSON.stringify({user_id:key,email})});
+    if(r.ok&&r.data?.success)toast('Setup email sent to '+email,'ok');
+    else toast('Failed: '+(r.data?.error||'unknown'),'err');
   }else if(action==='revoke'){
     if(!confirm('Revoke key '+key.slice(0,20)+'…?'))return;
     const r=await api('/keys/all/revoke',{method:'POST',body:JSON.stringify({key})});
