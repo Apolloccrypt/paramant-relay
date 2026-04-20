@@ -396,3 +396,18 @@ body.nav-locked { overflow: hidden; }
   font-weight: 400;
 }
 .nav-product-item:hover .npi-title { color: var(--cobalt); }
+
+/* Plain-link "buttons" — Compare and Pricing */
+nav.nav .nav-link-btn {
+  border: 1px solid var(--ink-hair);
+  border-radius: 2px;
+  padding: 0 var(--space-3);
+  transition: color var(--duration-base) var(--ease-sharp),
+              border-color var(--duration-base) var(--ease-sharp),
+              background var(--duration-base) var(--ease-sharp);
+}
+nav.nav .nav-link-btn:hover {
+  color: var(--cobalt);
+  border-color: var(--cobalt);
+  background: var(--ink-ghost);
+}
