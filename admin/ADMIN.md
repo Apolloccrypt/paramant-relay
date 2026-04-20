@@ -46,6 +46,8 @@ Each row in the Users tab has a `···` menu with grouped actions:
 |--------|-------------|------------|
 | Change plan | Updates plan on all sector relays + optional email notification | 20/admin/24h |
 | Revoke sessions | Deletes all active user sessions from Redis | — |
+| **Require TOTP** | Forces TOTP setup before next login; revokes active sessions immediately | 20/admin/24h |
+| **Remove TOTP requirement** | Removes forced-TOTP flag (user can still log in normally) | 20/admin/24h |
 
 ### Destructive
 | Action | What it does | Rate limit |
@@ -78,6 +80,8 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 |--------|------|------|-------------|
 | `POST` | `/admin/send-welcome` | `{ key }` | Send welcome email |
 | `POST` | `/admin/reset-totp` | `{ key }` | Send TOTP reset email |
+| `POST` | `/admin/force-totp` | `{ key, required: bool, reason? }` | Require or remove TOTP for user |
+| `POST` | `/admin/resend-setup` | `{ key }` | Resend TOTP setup link |
 | `POST` | `/admin/change-plan` | `{ key, new_plan, notify }` | Change plan (`community`/`pro`/`enterprise`/`trial`) |
 | `POST` | `/admin/revoke-sessions` | `{ key }` | Revoke all sessions |
 | `POST` | `/admin/disable-key` | `{ key, reason, notify }` | Disable API key |
@@ -105,14 +109,15 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 
 Located in `admin/lib/email-templates.js`. All emails go via Resend (`RESEND_API_KEY`) from `Paramant <hello@paramant.app>`.
 
-| Function | Trigger |
-|----------|---------|
-| `setupEmail` | New account created |
-| `welcomeEmail` | Manual send from admin panel |
-| `resetConfirmationEmail` | TOTP reset flow |
-| `billingConfirmationEmail` | Plan change (admin or Stripe) |
-| `billingCancellationEmail` | Subscription cancelled |
-| `accountDeletionEmail` | Account deleted by admin |
+| Function | Subject | Trigger |
+|----------|---------|---------|
+| `setupEmail` | "Complete your Paramant account setup" / "Set up your new Paramant authenticator" | New account created or TOTP reset confirmed |
+| `resetConfirmationEmail` | "Did you request a TOTP reset? — Paramant" | Two-stage TOTP reset step 1 |
+| `welcomeEmail` | "Your Paramant API key is ready" | Manual send from admin panel |
+| `billingConfirmationEmail` | "Paramant plan upgraded to {plan}" | Plan upgrade (admin or Stripe) |
+| `billingCancellationEmail` | "Your Paramant plan cancellation is scheduled" | Subscription cancelled |
+
+> `dropNotificationEmail` and `accountDeletionEmail` are defined in the module but not yet wired to a UI action.
 
 ---
 
@@ -122,6 +127,8 @@ Located in `admin/lib/email-templates.js`. All emails go via Resend (`RESEND_API
 |--------|-------|-------|
 | Send welcome | per user key | 10 |
 | Send TOTP reset | per user key | 5 |
+| Require/remove TOTP | global (admin) | 20 |
+| Resend setup link | per user key | 10 |
 | Change plan | global (admin) | 20 |
 | Disable key | global (admin) | 10 |
 | Delete account | global (admin) | 50 |

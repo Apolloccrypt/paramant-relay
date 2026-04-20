@@ -23,6 +23,60 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.9.0-beta] - 2026-04-20  <!-- session 4 additions -->
+
+### Added
+- Centralized email template module (`admin/lib/email-templates.js`) with
+  5 enterprise-grade transactional emails: setup (new + reset variant),
+  reset confirmation, welcome/API key, billing confirmation, billing
+  cancellation. Dual plain-text + HTML body on all. Preheader, masked IP
+  footer, List-Unsubscribe header.
+- Per-user Force TOTP enforcement — admin can require TOTP setup before
+  next login; active sessions revoked immediately on enable
+- Two-stage TOTP reset flow: request email → confirmation email (1h TTL)
+  → TOTP cleared only after user clicks confirmation link
+- Email enumeration protection: request-totp-reset always returns 200
+  regardless of whether email exists in system
+- Rich per-user email action menu with preview-before-send flow
+- Pagination on Users list (page, page_size, status, plan filters);
+  admin.html loadUsers passes params + renders Prev/Next controls
+- Audit logging on all mutating admin endpoints (resend-setup, revoke-all-keys)
+- Global audit ZSET (`paramant:audit:global`) for O(log n) recent-events
+- `email` and `created` fields persisted on all new user records; backfilled
+  on 27 existing accounts
+- API key masking in users list (first 8 + last 4 chars); full key only in
+  user-detail endpoint (audited access)
+- Clean JSON error responses on malformed admin input (no HTML stack traces)
+- WCAG AA accessibility on admin panel: skip link, aria-live region,
+  role=tab/tabpanel/menu, roving tabindex, scope=col, focus-visible CSS
+- Admin panel comprehensive documentation (`admin/ADMIN.md`)
+- Prometheus config (`monitoring/prometheus.yml`) + monitoring setup guide
+  (`docs/monitoring-setup.md`)
+
+### Changed
+- From-address on all transactional emails: `noreply@` → `hello@paramant.app`
+- Reply-To set on all transactional sends
+- TOTP reset confirmation link TTL: 15 minutes → 60 minutes
+- `delete_account` admin rate limit: 3/day → 50/day
+- User list now filtered/paginated server-side instead of client-side
+
+### Fixed
+- Admin panel showing `—` instead of `0` for empty stat cards
+- Relay dashboard showing 0h uptime — endpoint now merges /metrics + /health
+- Delete-account causing "Error loading users" on next refresh
+- Send ADMIN_TOKEN headers on all internal `callRelay()` calls (was missing,
+  causing all relay admin calls to return 401)
+- Correct modal element IDs to match JS function references
+- Enable Delete button only when user has typed `DELETE` in confirmation field
+- Blobs field mismatch between relay response and frontend expectation
+
+### Security
+- TOTP reset flow: two-stage confirmation prevents abuse via known email
+  addresses; attacker needs inbox access to complete reset
+- Rate limits on reset flow: 5/email/24h + 10/IP/1h
+- Error responses return JSON, never HTML stack traces (no internal paths
+  or server info leaked on malformed requests)
+
 ## [0.9.0-beta] - 2026-04-19
 
 ### Added

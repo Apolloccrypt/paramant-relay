@@ -107,6 +107,21 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
 ---
 
+### 2026-04-20 — Admin panel hardening + email security
+
+**Scope:** TOTP reset flow abuse protection, error response hardening,
+rate limit verification, email template security review.
+
+| Area | Finding | Status |
+|------|---------|--------|
+| TOTP reset | Two-stage confirmation prevents enumeration + abuse | Implemented |
+| Error responses | JSON-only on all endpoints; no HTML stack traces | Verified |
+| Rate limits | All mutating endpoints rate-limited and audited | Verified |
+| Email security | From-address, reply-to, List-Unsubscribe, masked IPs | Implemented |
+| Integration tests | 24/24 passing after enterprise sprint | Passing |
+
+---
+
 ### 2026-04-19 — Automated internal audit (6 layers + load test)
 
 **Scope:** Static code analysis, authentication flows, network and infrastructure, active penetration testing, cryptographic implementation review, business logic, load testing.

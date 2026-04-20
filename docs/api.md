@@ -751,3 +751,23 @@ They are not accessible from the public internet.
 | 409 | `email_already_registered` | Signup attempted for an email that already has an account |
 | 429 | `rate_limited` | Too many requests from this IP or email address |
 | 500 | `internal` | Unexpected server error; check relay logs |
+
+### POST /admin/api/admin/force-totp
+
+Require or remove TOTP for a specific user.
+
+**Body:**
+```json
+{ "key": "pgp_...", "required": true, "reason": "compliance policy" }
+```
+
+**Effect when `required: true`:**
+- `paramant:user:totp_required:{key}` set in Redis
+- All active user sessions revoked
+- Setup email sent automatically
+- Login blocked until TOTP active
+
+**Rate limit:** 20/admin/24h
+**Audit event:** `admin_totp_required_toggled`
+
+---
