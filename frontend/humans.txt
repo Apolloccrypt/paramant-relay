@@ -1,0 +1,23 @@
+/* TEAM */
+
+Founder & engineer: Mick Beer
+Location: Harderwijk, Netherlands
+Contact: hello [at] paramant.app
+
+/* THANKS */
+
+Security research: See acknowledgements at paramant.app/security
+
+/* SITE */
+
+Last update: 2026-04-20
+Standards: HTML5, CSS3
+Components: Node.js, Redis, Express, Nginx
+Cryptography: ML-KEM-768 (NIST PQC), AES-256-GCM, Argon2id, TOTP
+Hosting: Hetzner (Germany)
+
+/* NOTES */
+
+Paramant is post-quantum encrypted file transport.
+One person, one company, no investors.
+EU jurisdiction. No US parent. No tracking.

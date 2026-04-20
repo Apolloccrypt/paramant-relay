@@ -510,21 +510,28 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <hr class="divider">
 
-  <h2>Responsible disclosure</h2>
+  <h2 id="responsible-disclosure">Responsible disclosure</h2>
   <div class="card">
-    <p style="margin-bottom:16px">We take vulnerability reports seriously. If you find a security issue, please do not open a public GitHub issue.</p>
-    <p style="margin-bottom:0">
-      <strong>Email:</strong>
-      <a href="mailto:privacy@paramant.app" style="font-size:var(--text-sm)">privacy@paramant.app</a>
-    </p>
+    <p style="margin-bottom:16px">Report to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> &mdash; encrypted with our <a href="/.well-known/openpgp-key.asc">PGP key</a> if the details are sensitive. Do not open a public GitHub issue before coordinating.</p>
     <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--ink-hair)">
       <div style="font-size:var(--text-base);line-height:1.8">
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:140px;display:inline-block">Acknowledgement</span>Within 48 hours</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:140px;display:inline-block">Status update</span>Within 7 days</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:140px;display:inline-block">Disclosure window</span>90 days (coordinated)</div>
-        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:140px;display:inline-block">Scope</span>relay.js, SDK, frontend, ParamantOS, CT log</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Acknowledgement</span>Within 48 hours</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Initial assessment</span>Within 5 working days</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Status updates</span>Every 7 days until resolved</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Disclosure window</span>90 days (coordinated)</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Credit</span><a href="/security/acknowledgements">Acknowledgements page</a> (with permission)</div>
+        <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Safe harbor</span>No legal action against good-faith researchers</div>
       </div>
     </div>
+  </div>
+  <div class="card" style="margin-top:0;border-top:none">
+    <h3>What we ask</h3>
+    <p style="margin-bottom:8px;font-size:var(--text-sm)">Do not publicly disclose before we have had a reasonable chance to fix. Do not access or modify data that does not belong to you. Do not run automated scans at volume that impacts service availability. Report to us first, not to third parties.</p>
+    <h3 style="margin-top:20px">Scope</h3>
+    <p style="margin-bottom:4px;font-size:var(--text-sm)"><strong>In scope:</strong> paramant.app, *.paramant.app, browser extensions published by us, API endpoints at <a href="/docs#api">docs/api</a>.</p>
+    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Out of scope:</strong> social engineering, physical attacks, denial of service, third-party services (Resend, Hetzner, Cloudflare).</p>
+    <h3 style="margin-top:20px">Rewards</h3>
+    <p style="margin-bottom:0;font-size:var(--text-sm)">No monetary bounty at this time. Credit on our <a href="/security/acknowledgements">acknowledgements page</a>, and priority access to new features.</p>
   </div>
 
   <hr class="divider">

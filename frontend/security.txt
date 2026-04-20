@@ -1,0 +1,26 @@
+# Paramant — Security Contact
+# RFC 9116 — see https://securitytxt.org
+
+Contact: mailto:privacy@paramant.app
+Contact: https://paramant.app/security
+
+# Expires 1 year from now (must be updated annually per RFC 9116)
+Expires: 2027-04-19T23:59:59.000Z
+
+# Preferred languages for reports
+Preferred-Languages: en, nl
+
+# Encryption key for sensitive reports
+Encryption: https://paramant.app/.well-known/openpgp-key.asc
+
+# Canonical URL (RFC 9116 requires this)
+Canonical: https://paramant.app/.well-known/security.txt
+
+# Security policy (what we expect from researchers)
+Policy: https://paramant.app/security#responsible-disclosure
+
+# Acknowledgements page (hall of fame)
+Acknowledgments: https://paramant.app/security/acknowledgements
+
+# Hiring notice
+Hiring: https://paramant.app/careers
