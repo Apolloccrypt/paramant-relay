@@ -1302,6 +1302,225 @@ api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
   } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
+
+// ── Admin helpers ─────────────────────────────────────────────────────────────
+async function getAdminKeyMeta(key_id) {
+  const [keysRes, metaRaw] = await Promise.all([
+    relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN),
+    redis().get(`paramant:user:meta:${key_id}`).catch(() => null),
+  ]);
+  const k = (keysRes.body?.keys || []).find(k => k.key === key_id) || {};
+  let meta = {};
+  try { if (metaRaw) meta = JSON.parse(metaRaw); } catch {}
+  return {
+    email: meta.email || k.email || null,
+    plan: k.plan || 'community',
+    label: k.label || null,
+    active: k.active !== false,
+    sectors: k.sectors || [],
+  };
+}
+
+async function checkAdminRl(scope, id, limit) {
+  const key = `paramant:ratelimit:admin_${scope}:${id}`;
+  const cnt = parseInt(await redis().get(key).catch(() => '0') || '0');
+  if (cnt >= limit) return false;
+  await redis().multi().incr(key).expire(key, 86400).exec().catch(() => {});
+  return true;
+}
+
+// ── POST /admin/send-welcome ───────────────────────────────────────────────────
+api.post('/admin/send-welcome', authMiddleware, async (req, res) => {
+  const { key } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    if (!meta.email) return res.status(422).json({ error: 'no_email', message: 'No email on record for this key' });
+    if (req.query.preview === '1') {
+      const tpl = emailTemplates.welcomeEmail({ apiKey: key, plan: meta.plan, label: meta.label, sectors: meta.sectors });
+      return res.json({ ...tpl, recipient: meta.email });
+    }
+    if (!await checkAdminRl('welcome', key, 10)) return res.status(429).json({ error: 'rate_limited' });
+    await emailTemplates.sendEmail(meta.email, emailTemplates.welcomeEmail({ apiKey: key, plan: meta.plan, label: meta.label, sectors: meta.sectors }));
+    try { await logAuditEvent(key, 'admin_welcome_sent', { email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, email: meta.email });
+  } catch (err) { console.error('[admin/send-welcome]', err.message); res.status(500).json({ error: 'send_failed', message: err.message }); }
+});
+
+// ── POST /admin/reset-totp ────────────────────────────────────────────────────
+api.post('/admin/reset-totp', authMiddleware, async (req, res) => {
+  const { key, mode = 'request' } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (!['request', 'direct'].includes(mode)) return res.status(400).json({ error: 'invalid_mode' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    if (!meta.email) return res.status(422).json({ error: 'no_email' });
+    if (!await checkAdminRl('reset_totp', key, 5)) return res.status(429).json({ error: 'rate_limited' });
+    if (mode === 'direct') {
+      await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
+      const setupToken = crypto.randomBytes(32).toString('hex');
+      await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: key, email: meta.email }), { EX: 14 * 86_400 });
+      await emailTemplates.sendEmail(meta.email, emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: req.headers['x-real-ip'], isReset: true }));
+      try { await logAuditEvent(key, 'admin_totp_reset_initiated', { mode: 'direct', email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+      res.json({ ok: true, mode: 'direct', email: meta.email });
+    } else {
+      const confirmToken = crypto.randomBytes(32).toString('hex');
+      await redis().set(`paramant:user:reset_confirm:${confirmToken}`, JSON.stringify({ user_id: key, email: meta.email, admin_initiated: true }), { EX: 3600 });
+      await emailTemplates.sendEmail(meta.email, emailTemplates.resetConfirmationEmail({ confirmToken, requestedAt: Date.now(), requestIP: req.headers['x-real-ip'] }));
+      try { await logAuditEvent(key, 'admin_totp_reset_initiated', { mode: 'request', email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+      res.json({ ok: true, mode: 'request', email: meta.email });
+    }
+  } catch (err) { console.error('[admin/reset-totp]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/change-plan ───────────────────────────────────────────────────
+api.post('/admin/change-plan', authMiddleware, async (req, res) => {
+  const { key, new_plan, notify = true } = req.body || {};
+  const VALID = ['community', 'pro', 'enterprise', 'trial'];
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (!VALID.includes(new_plan)) return res.status(400).json({ error: 'invalid_plan', valid: VALID });
+  if (!await checkAdminRl('change_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    const updateRes = await callRelay('/v2/admin/keys/update-plan', { key, plan: new_plan });
+    if (!updateRes.ok) return res.status(502).json({ error: 'relay_error' });
+    await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
+    if (notify && meta.email) {
+      const planName = new_plan.charAt(0).toUpperCase() + new_plan.slice(1);
+      emailTemplates.sendEmail(meta.email, emailTemplates.billingConfirmationEmail({ planName, period: 'admin', amountStr: 'admin-provisioned', stub: true })).catch(e => console.error('[admin/change-plan] email:', e.message));
+    }
+    try { await logAuditEvent(key, 'admin_plan_changed', { from: meta.plan, to: new_plan, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, from: meta.plan, to: new_plan, email_sent: !!(notify && meta.email) });
+  } catch (err) { console.error('[admin/change-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/revoke-sessions ───────────────────────────────────────────────
+api.post('/admin/revoke-sessions', authMiddleware, async (req, res) => {
+  const { key } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  try {
+    let count = 0;
+    for await (const rkey of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 100 })) {
+      const raw = await redis().get(rkey).catch(() => null);
+      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) { await redis().del(rkey); count++; } } catch {} }
+    }
+    try { await logAuditEvent(key, 'admin_sessions_revoked', { count, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, revoked: count });
+  } catch (err) { console.error('[admin/revoke-sessions]', err.message); res.status(500).json({ error: 'internal' }); }
+});
+
+// ── POST /admin/disable-key ───────────────────────────────────────────────────
+api.post('/admin/disable-key', authMiddleware, async (req, res) => {
+  const { key, reason = 'not specified', notify = false } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (!await checkAdminRl('disable_key', 'admin', 10)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
+    if (notify && meta.email) {
+      const planName = meta.plan.charAt(0).toUpperCase() + meta.plan.slice(1);
+      emailTemplates.sendEmail(meta.email, emailTemplates.billingCancellationEmail({ planName, cancelDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
+    }
+    try { await logAuditEvent(key, 'admin_key_disabled', { reason, notify: !!(notify && meta.email), admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, reason, email_sent: !!(notify && meta.email) });
+  } catch (err) { console.error('[admin/disable-key]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/delete-account ────────────────────────────────────────────────
+api.post('/admin/delete-account', authMiddleware, async (req, res) => {
+  const { key, confirm, reason, notify = true } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (confirm !== 'DELETE') return res.status(400).json({ error: 'confirm_required', message: "Body must include confirm: 'DELETE'" });
+  if (!await checkAdminRl('delete_account', 'admin', 3)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
+    await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
+    for await (const rkey of redis().scanIterator({ MATCH: `paramant:user:session:*`, COUNT: 100 })) {
+      const raw = await redis().get(rkey).catch(() => null);
+      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) await redis().del(rkey); } catch {} }
+    }
+    for (const pattern of [`paramant:user:meta:${key}`, `paramant:user:totp:${key}`, `paramant:user:totp_active:${key}`, `paramant:user:billing:${key}`]) {
+      await redis().del(pattern).catch(() => {});
+    }
+    const deletedAt = Date.now();
+    if (notify && meta.email) {
+      emailTemplates.sendEmail(meta.email, emailTemplates.accountDeletionEmail({ email: meta.email, deletedAt, reason: reason || 'admin action' })).catch(e => console.error('[admin/delete-account] email:', e.message));
+    }
+    try { await logAuditEvent('admin', 'admin_account_deleted', { key_prefix: key.slice(0, 16), email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, deleted_at: new Date(deletedAt).toISOString(), email_sent: !!(notify && meta.email) });
+  } catch (err) { console.error('[admin/delete-account]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── GET /admin/user-details/:key (rich version) ───────────────────────────────
+api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
+  const { key } = req.params;
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  try {
+    const [keysRes, metaRaw, billingRaw, auditEvents] = await Promise.all([
+      relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN),
+      redis().get(`paramant:user:meta:${key}`).catch(() => null),
+      redis().get(`paramant:user:billing:${key}`).catch(() => null),
+      getAuditEvents(key, { limit: 20 }),
+    ]);
+    const k = (keysRes.body?.keys || []).find(k => k.key === key);
+    if (!k) return res.status(404).json({ error: 'not_found' });
+    let meta = {}; try { if (metaRaw) meta = JSON.parse(metaRaw); } catch {}
+    let billing = null; try { if (billingRaw) billing = JSON.parse(billingRaw); } catch {}
+    let sessionCount = 0;
+    for await (const rkey of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 100 })) {
+      const raw = await redis().get(rkey).catch(() => null);
+      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) sessionCount++; } catch {} }
+    }
+    const [totpActive, totpSecret] = await Promise.all([
+      redis().get(`paramant:user:totp_active:${key}`).catch(() => null),
+      redis().get(`paramant:user:totp:${key}`).catch(() => null),
+    ]);
+    let totp_status = 'none';
+    if (totpActive === 'true') totp_status = 'active';
+    else if (totpSecret) totp_status = 'pending';
+    try { await logAuditEvent(key, 'admin_user_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({
+      key_id: key,
+      key_masked: key.slice(0, 8) + '...' + key.slice(-4),
+      email: meta.email || k.email || null,
+      label: k.label || null,
+      plan: k.plan || 'community',
+      sectors: k.sectors || [],
+      active: k.active !== false,
+      revoked_at: k.revoked_at || null,
+      created: meta.created_at || k.created || null,
+      totp_status,
+      active_sessions: sessionCount,
+      billing: billing || { plan: k.plan || 'community', stub: true },
+      audit_events: auditEvents,
+    });
+  } catch (err) { console.error('[admin/user-details]', err.message); res.status(500).json({ error: 'internal' }); }
+});
+
+// ── POST /admin/preview-email ─────────────────────────────────────────────────
+api.post('/admin/preview-email', authMiddleware, async (req, res) => {
+  const { type, key, options = {} } = req.body || {};
+  const VALID = ['welcome', 'setup', 'reset-confirm', 'billing', 'cancellation', 'deletion'];
+  if (!VALID.includes(type)) return res.status(400).json({ error: 'invalid_type', valid: VALID });
+  try {
+    let meta = { email: 'preview@example.com', label: 'preview', plan: 'pro', sectors: [], active: true };
+    if (key?.startsWith('pgp_')) {
+      try { const m = await getAdminKeyMeta(key); if (m) Object.assign(meta, m); } catch {}
+    }
+    const email = options.email || meta.email || 'preview@example.com';
+    let tpl;
+    const fakeToken = 'preview' + crypto.randomBytes(8).toString('hex');
+    if (type === 'welcome') tpl = emailTemplates.welcomeEmail({ apiKey: key || 'pgp_preview00000000', plan: meta.plan, label: meta.label, sectors: meta.sectors });
+    else if (type === 'setup') tpl = emailTemplates.setupEmail({ token: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0', isReset: options.isReset || false });
+    else if (type === 'reset-confirm') tpl = emailTemplates.resetConfirmationEmail({ confirmToken: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0' });
+    else if (type === 'billing') { const planName = (options.plan || meta.plan || 'pro'); tpl = emailTemplates.billingConfirmationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), period: 'monthly', amountStr: '€9/mo', stub: true }); }
+    else if (type === 'cancellation') { const planName = meta.plan || 'pro'; tpl = emailTemplates.billingCancellationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), cancelDate: new Date(Date.now()+30*86_400_000).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) }); }
+    else if (type === 'deletion') tpl = emailTemplates.accountDeletionEmail({ email, deletedAt: Date.now(), reason: options.reason || 'preview' });
+    res.json({ ...tpl, recipient: email });
+  } catch (err) { console.error('[admin/preview-email]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
 app.use(`${BASE_PATH}/api`, api);
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

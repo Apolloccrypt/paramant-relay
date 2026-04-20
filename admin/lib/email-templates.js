@@ -256,7 +256,7 @@ https://paramant.app`;
 // ── 4. BILLING CONFIRMATION ───────────────────────────────────────────────────
 function billingConfirmationEmail({ planName, period, amountStr, stub = true }) {
   const preheader = `Your Paramant plan is now ${planName}.`;
-  const periodLabel = period === 'yearly' ? 'Yearly' : 'Monthly';
+  const periodLabel = period === 'yearly' ? 'Yearly' : period === 'monthly' ? 'Monthly' : 'Admin-provisioned';
 
   const text = `Hi,
 
@@ -264,10 +264,7 @@ Your Paramant plan has been upgraded.
 
 Plan:    ${planName}
 Billing: ${periodLabel}
-Amount:  ${amountStr}
-
-You now have access to ${planName} tier features. See the full comparison
-at https://paramant.app/pricing.
+Amount:  ${amountStr || 'N/A'}
 ${stub ? '\nNote: payment processing is in beta. This confirmation reflects the\nplan change on your account. Formal invoicing follows when Stripe\nintegration goes live.\n' : ''}
 Questions about billing? Reply to this email.
 
@@ -280,9 +277,8 @@ https://paramant.app`;
     <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
       <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Plan</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${planName}</span></td></tr>
       <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Billing</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${periodLabel}</td></tr>
-      <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Amount</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;">${amountStr}</td></tr>
+      <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Amount</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;">${amountStr || 'N/A'}</td></tr>
     </table>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">You now have access to ${planName} tier features. See the full comparison at <a href="https://paramant.app/pricing" style="color:#1D4ED8;">paramant.app/pricing</a>.</p>
     ${stub ? '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#92400E;font-size:13px;"><strong>Beta note:</strong> payment processing is not yet live. This confirmation reflects the plan change on your account. Formal invoicing follows when Stripe integration goes live.</p></div>' : ''}
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions about billing? Reply to this email.</p>
   `);
@@ -337,12 +333,77 @@ https://paramant.app`;
   };
 }
 
+// ── 6. ACCOUNT DELETION ───────────────────────────────────────────────────────
+function accountDeletionEmail({ email, deletedAt, reason }) {
+  const preheader = 'Your Paramant account has been deleted.';
+  const dateStr = formatTS(typeof deletedAt === 'number' ? deletedAt : Date.parse(deletedAt));
+
+  const text = `Hi,
+
+Your Paramant account (${email}) was deleted on ${dateStr}.
+
+What this means:
+- API key no longer works
+- Active sessions terminated
+- Personal data removed from our systems
+- Audit logs retained for 90 days per compliance policy
+- Files already relayed are not affected (end-to-end encrypted)
+
+Reason: ${reason || 'not specified'}
+
+If this was a mistake or you want to return later, sign up again
+at https://paramant.app/signup with a new account.
+
+Paramant
+https://paramant.app`;
+
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deleted</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${email}) was deleted on <strong>${dateStr}</strong>.</p>
+    <h2 style="margin:24px 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What this means</h2>
+    <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
+      <li>API key no longer works</li>
+      <li>Active sessions terminated</li>
+      <li>Personal data removed from our systems</li>
+      <li>Audit logs retained for 90 days per compliance policy</li>
+      <li>Files already relayed are not affected (end-to-end encrypted)</li>
+    </ul>
+    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:12px 16px;margin:0 0 24px 0;">
+      <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason || 'not specified'}</p>
+    </div>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to return later, <a href="https://paramant.app/signup" style="color:#1D4ED8;">sign up again</a> with a new account.</p>
+  `);
+
+  return { ...wrap(text, html, { refId: 'deletion-' + Date.now() }), subject: 'Your Paramant account has been deleted' };
+}
+
+// ── SEND HELPER ───────────────────────────────────────────────────────────────
+async function sendEmail(to, templateResult) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY not set');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: templateResult.from || FROM_ADDR,
+      to: [to],
+      subject: templateResult.subject,
+      html: templateResult.html,
+      text: templateResult.text,
+      headers: templateResult.headers || {},
+    }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+}
+
 module.exports = {
   setupEmail,
   resetConfirmationEmail,
   welcomeEmail,
   billingConfirmationEmail,
   billingCancellationEmail,
+  accountDeletionEmail,
+  sendEmail,
   FROM_ADDR,
   BASE_URL,
 };

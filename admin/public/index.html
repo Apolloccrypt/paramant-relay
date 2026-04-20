@@ -189,7 +189,7 @@ let openMenu = null;
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmt(ts){if(!ts)return '—';const d=new Date(ts);return d.toLocaleDateString('nl-NL',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
-function toast(msg,type=''){const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3500)}
+function toast(msg,type=''){const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;el.setAttribute('role','status');document.body.appendChild(el);requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),250);},3200);}
 function showErr(msg){const e=document.getElementById('l-err');e.textContent=msg;e.style.display='block'}
 
 async function api(path,opts={}){
@@ -361,27 +361,35 @@ function filterUsers(){
 
 function usersTable(users){
   if(!users.length)return '<div class="empty">No users match filters</div>';
-  return '<table class="tbl" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users with plan, TOTP status, and actions</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
-    users.map((u,i)=>'<tr>'+
-      '<td><div>'+esc(u.email||'—')+'</div>'+
-        (u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
-      '</td>'+
-      '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
-      '<td><span class="chip '+esc(u.totp_status)+'">'+esc(u.totp_status)+'</span></td>'+
-      '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
-      '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
-      '<td><div class="amw"><button class="amb" onclick="toggleMenu(event,\'menu-u-'+i+'\')">···</button>'+
-        '<div class="am" role="menu" id="menu-u-'+i+'" data-key="'+esc(u.key)+'" data-email="'+esc(u.email||'')+'" data-label="'+esc(u.label||'')+'" data-plan="'+esc(u.plan||'community')+'">'+
-          '<button role="menuitem" tabindex="-1" onclick="uAction(\"welcome\",this)">Resend welcome email</button>'+
-          '<button role="menuitem" tabindex="-1" onclick="uAction(\"setup\",this)">Send TOTP setup link</button>'+
-          '<div class="sep"></div>'+
-          '<button role="menuitem" tabindex="-1" onclick="uAction(\"plan\",this)">Change plan</button>'+
-          '<button role="menuitem" tabindex="-1" onclick="uAction(\"reset-totp\",this)">Reset TOTP (send setup email)</button>'+
-          '<div class="sep"></div>'+
-          '<button role="menuitem" tabindex="-1" onclick="uAction(\"revoke\",this)" class="danger">Revoke key</button>'+
-        '</div>'+
-      '</div></td>'+
-    '</tr>').join('')+'</tbody></table>';
+  return '<table class="tbl" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
+    users.map((u,i)=>{
+      const ki=esc(u.key_id||u.key),em=esc(u.email||''),pl=esc(u.plan||'community');
+      const hasE=!!u.email,hasTotp=hasE&&u.totp_status!=='none',isRevoked=!u.active;
+      return '<tr>'+
+        '<td><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
+        '</td>'+
+        '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
+        '<td><span class="chip '+esc(u.totp_status)+'">'+esc(u.totp_status)+'</span></td>'+
+        '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
+        '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
+        '<td><div class="amw">'+
+          '<button class="amb" aria-haspopup="menu" aria-expanded="false" onclick="toggleMenu(event,\'m'+i+'\')">···</button>'+
+          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'">'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'details\',this)">View details</button>'+
+            '<div class="ag-lbl">Email</div>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'welcome\',this)"'+(hasE?'':' disabled')+'>Send welcome</button>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'setup\',this)"'+(hasE?'':' disabled')+'>Send TOTP setup link</button>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'reset-totp\',this)"'+(hasTotp?'':' disabled')+'>Send TOTP reset</button>'+
+            '<div class="ag-lbl">Account</div>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'plan\',this)">Change plan</button>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'revoke-sessions\',this)">Revoke sessions</button>'+
+            '<div class="ag-lbl danger">Destructive</div>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'disable\',this)" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
+            '<button role="menuitem" tabindex="-1" onclick="uAction(\'delete\',this)" class="danger">Delete account</button>'+
+          '</div>'+
+        '</div></td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
 }
 
 function toggleMenu(e,id){
@@ -425,40 +433,26 @@ document.addEventListener('keydown',e=>{
   }
 });
 
-async function uAction(action,btn){
+function uAction(action,btn){
   const m=btn.closest('.am');
-  const key=m.dataset.key,email=m.dataset.email,label=m.dataset.label,plan=m.dataset.plan;
-  m.classList.remove('open');openMenu=null;
-  if(action==='welcome'){
-    if(!email){toast('No email on record for this key','err');return}
-    if(!confirm('Resend welcome email to '+email+'?'))return;
-    const r=await api('/sectors/health/keys/welcome',{method:'POST',body:JSON.stringify({key,label,plan,email})});
-    toast(r.ok?'Welcome email sent to '+email:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
-  }else if(action==='setup'){
-    if(!email){toast('No email on record','err');return}
-    if(!confirm('Send new TOTP setup link to '+email+'?\nThis clears existing TOTP state.'))return;
-    const r=await api('/admin/resend-setup',{method:'POST',body:JSON.stringify({user_id:key,email})});
-    if(r.ok&&r.data?.success)toast('Setup email sent to '+email,'ok');
-    else toast('Failed: '+(r.data?.error||'unknown'),'err');
-  }else if(action==='plan'){
-    const np=prompt('New plan for '+esc(email||key)+' (community/pro/enterprise/trial):');
-    if(!np)return;
-    const r=await api('/admin/relay-detail',{method:'GET'});
-    toast('Plan update requires Stripe integration — not yet wired','err');
-  }else if(action==='reset-totp'){
-    if(!email){toast('No email on record','err');return}
-    if(!confirm('Reset TOTP for '+email+'?\n\nThis clears their authenticator state and sends a new setup email.'))return;
-    const r=await api('/admin/resend-setup',{method:'POST',body:JSON.stringify({user_id:key,email})});
-    if(r.ok&&r.data?.success)toast('Setup email sent to '+email,'ok');
-    else toast('Failed: '+(r.data?.error||'unknown'),'err');
-  }else if(action==='revoke'){
-    if(!confirm('Revoke key '+key.slice(0,20)+'…?'))return;
-    const r=await api('/keys/all/revoke',{method:'POST',body:JSON.stringify({key})});
-    toast(r.ok?'Key revoked on all sectors':'Revoke failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
-    if(r.ok){LOADED.users=false;loadUsers();}
+  const key=m.dataset.key,email=m.dataset.email,plan=m.dataset.plan;
+  if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');openMenu=null;}
+  switch(action){
+    case 'details': openUserDetailsModal(key); break;
+    case 'welcome': openEmailPreviewModal('welcome',key,email); break;
+    case 'setup':   openEmailPreviewModal('setup',key,email); break;
+    case 'reset-totp': openEmailPreviewModal('reset-confirm',key,email); break;
+    case 'plan':    openChangePlanModal(key,email,plan); break;
+    case 'revoke-sessions':
+      if(!confirm('Revoke all sessions for '+(email||key.slice(0,20)+'…')+'?'))return;
+      api('/admin/revoke-sessions',{method:'POST',body:JSON.stringify({key})}).then(r=>{
+        toast(r.ok?'Sessions revoked ('+(r.data?.revoked||0)+')':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+      });
+      break;
+    case 'disable': openDisableKeyModal(key,email); break;
+    case 'delete':  openDeleteAccountModal(key,email); break;
   }
 }
-
 function showNewKeyModal(){
   const o=document.createElement('div');
   o.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,58,106,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px';
@@ -625,6 +619,113 @@ async function fetchRelay(){
         ].map(([k,v])=>'<tr><td style="color:#475569;font-size:12px">'+esc(k)+'</td><td class="mono">'+esc(v)+'</td></tr>').join('')+
       '</tbody></table></div>';
   }).join('');
+}
+
+/* ── Modal helpers ───────────────────────────────────────────────────────── */
+let _ms={};
+function closeModal(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+function openModal(id){const el=document.getElementById(id);if(el)el.style.display='flex';}
+function epTab(tab,btn){
+  document.querySelectorAll('.ep-tab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  const t=document.getElementById('ep-text'),h=document.getElementById('ep-html');
+  if(tab==='text'){t.style.display='';h.style.display='none';}else{t.style.display='none';h.style.display='';}
+}
+async function openEmailPreviewModal(type,key,email){
+  const epMap={'welcome':'/admin/send-welcome','setup':'/admin/resend-setup','reset-confirm':'/admin/reset-totp'};
+  _ms.email={type,key,email,ep:epMap[type]};
+  document.getElementById('mo-email-title').textContent='Preview: '+type+(email?' → '+email:'');
+  document.getElementById('ep-subj').textContent='Loading…';
+  document.getElementById('ep-text').textContent='';
+  document.getElementById('ep-html').removeAttribute('srcdoc');
+  document.getElementById('ep-send-btn').disabled=true;
+  openModal('mo-email');
+  const r=await api('/admin/preview-email',{method:'POST',body:JSON.stringify({type,key})});
+  if(!r.ok){document.getElementById('ep-subj').textContent='Preview failed: '+(r.data?.error||'unknown');return;}
+  const d=r.data;
+  document.getElementById('ep-subj').textContent=d.subject||'';
+  document.getElementById('ep-text').textContent=d.text||'';
+  document.getElementById('ep-html').srcdoc=d.html||'';
+  document.getElementById('ep-send-btn').disabled=false;
+  document.getElementById('ep-send-btn').onclick=doSendEmail;
+}
+async function doSendEmail(){
+  const {type,key,email,ep}=_ms.email||{};if(!ep)return;
+  document.getElementById('ep-send-btn').disabled=true;document.getElementById('ep-send-btn').textContent='Sending…';
+  const body={key};
+  if(type==='reset-confirm')body.mode='request';
+  if(type==='setup'){body.user_id=key;body.email=email;}
+  const r=await api(ep,{method:'POST',body:JSON.stringify(body)});
+  closeModal('mo-email');document.getElementById('ep-send-btn').textContent='Send email →';
+  toast(r.ok?'Email sent':'Send failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+}
+function openChangePlanModal(key,email,currentPlan){
+  _ms.plan={key,email};
+  document.getElementById('cp-current').textContent=currentPlan||'community';
+  document.getElementById('cp-plan').value=currentPlan||'community';
+  openModal('mo-plan');setTimeout(()=>document.getElementById('cp-plan').focus(),50);
+}
+async function doChangePlan(){
+  const {key}=_ms.plan||{};if(!key)return;
+  const new_plan=document.getElementById('cp-plan').value;
+  const notify=document.getElementById('cp-notify').checked;
+  document.getElementById('cp-btn').disabled=true;
+  const r=await api('/admin/change-plan',{method:'POST',body:JSON.stringify({key,new_plan,notify})});
+  closeModal('mo-plan');document.getElementById('cp-btn').disabled=false;
+  toast(r.ok?'Plan → '+new_plan:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  if(r.ok){LOADED.users=false;loadUsers();}
+}
+function openDisableKeyModal(key,email){
+  _ms.disable={key,email};
+  document.getElementById('dk-reason').value='';document.getElementById('dk-notify').checked=false;
+  openModal('mo-disable');setTimeout(()=>document.getElementById('dk-reason').focus(),50);
+}
+async function doDisableKey(){
+  const {key}=_ms.disable||{};if(!key)return;
+  const reason=document.getElementById('dk-reason').value.trim()||'not specified';
+  const notify=document.getElementById('dk-notify').checked;
+  document.getElementById('dk-btn').disabled=true;
+  const r=await api('/admin/disable-key',{method:'POST',body:JSON.stringify({key,reason,notify})});
+  closeModal('mo-disable');document.getElementById('dk-btn').disabled=false;
+  toast(r.ok?'Key disabled':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  if(r.ok){LOADED.users=false;loadUsers();}
+}
+function openDeleteAccountModal(key,email){
+  _ms.del={key,email};
+  document.getElementById('da-confirm').value='';document.getElementById('da-btn').disabled=true;
+  document.getElementById('da-notify').checked=true;
+  document.getElementById('da-target').textContent=email||key.slice(0,20)+'…';
+  openModal('mo-delete');setTimeout(()=>document.getElementById('da-confirm').focus(),50);
+}
+async function doDeleteAccount(){
+  const {key}=_ms.del||{};if(!key)return;
+  if(document.getElementById('da-confirm').value!=='DELETE')return;
+  const notify=document.getElementById('da-notify').checked;
+  document.getElementById('da-btn').disabled=true;
+  const r=await api('/admin/delete-account',{method:'POST',body:JSON.stringify({key,confirm:'DELETE',notify})});
+  closeModal('mo-delete');
+  toast(r.ok?'Account deleted':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  if(r.ok){LOADED.users=false;loadUsers();}
+}
+async function openUserDetailsModal(key){
+  openModal('mo-details');
+  document.getElementById('mo-details-body').innerHTML='<div class="empty"><span class="sp-icon"></span>Loading…</div>';
+  const r=await api('/admin/user-details/'+key);
+  if(!r.ok){document.getElementById('mo-details-body').innerHTML='<div class="empty">Error: '+(r.data?.error||'unknown')+'</div>';return;}
+  const d=r.data;
+  document.getElementById('mo-details-body').innerHTML=
+    '<div class="g2" style="margin-bottom:16px">'+
+      '<div><div class="sc-lbl">Email</div><div class="mono" style="font-size:12px">'+(d.email||'—')+'</div></div>'+
+      '<div><div class="sc-lbl">Plan</div><span class="badge '+(d.plan||'community')+'">'+(d.plan||'community')+'</span></div>'+
+      '<div><div class="sc-lbl">TOTP</div><span class="chip '+(d.totp_status||'none')+'">'+(d.totp_status||'none')+'</span></div>'+
+      '<div><div class="sc-lbl">Sessions</div><div class="sc-val" style="font-size:20px">'+(d.active_sessions||0)+'</div></div>'+
+      '<div><div class="sc-lbl">Status</div><span class="chip '+(d.active?'active':'revoked')+'">'+(d.active?'active':'revoked')+'</span></div>'+
+      '<div><div class="sc-lbl">Created</div><div class="mono" style="font-size:11px">'+(d.created?d.created.split('T')[0]:'—')+'</div></div>'+
+    '</div>'+
+    '<div class="card-hdr" style="margin-bottom:8px">Recent audit</div>'+
+    '<div class="al">'+(d.audit_events&&d.audit_events.length?
+      d.audit_events.slice(0,10).map(e=>'<div class="ai"><span class="t" style="font-size:10px">'+(e.ts?new Date(e.ts).toISOString().slice(11,19):'—')+'</span><span class="e" style="font-size:11px">'+esc(e.event_type||'—')+'</span></div>').join(''):
+      '<div class="empty" style="padding:12px">No events</div>')+
+    '</div>';
 }
 
 /* ── Init ────────────────────────────────────────────────────────────────── */
