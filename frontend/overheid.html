@@ -7,95 +7,127 @@
 <meta name="description" content="71% of Dutch government organisations have no post-quantum plan (Court of Audit, Feb 2026). NIS2 requires documented cryptographic controls by end of 2026. Paramant is open source, self-hostable, and deployable in days."
 <meta property="og:title" content="PARAMANT — Post-Quantum File Transfer for Government">
 <meta property="og:description" content="71% of Dutch government organisations have no post-quantum plan (Court of Audit, Feb 2026). NIS2 requires documented cryptographic controls by end of 2026. Paramant is open source, self-hostable, and ">
-<meta property="og:url" content="https://paramant.app/government">
+<meta property="og:url" content="https://paramant.app/overheid">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PARAMANT — Post-Quantum File Transfer for Government">
 <meta name="twitter:description" content="71% of Dutch government organisations have no post-quantum plan (Court of Audit, Feb 2026). NIS2 requires documented cryptographic controls by end of 2026. Paramant is open source, self-hostable, and ">
-<link rel="canonical" href="https://paramant.app/government">>
-<link rel="stylesheet" href="/design-system.css?v=6">
-<link rel="stylesheet" href="/nav.css?v=7">
+<link rel="canonical" href="https://paramant.app/overheid">>
 <style>
-a{color:var(--ink);text-decoration:none}
-a:hover{opacity:.7}
-code{font-size:var(--text-xs);padding:1px 5px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0c;--surface:#181818;--border:#242424;--border-soft:#1a1a1a;
+  --text:#ededed;--muted:#aaa;--quiet:#6e6e6e;
+  --green:#2d8a5c;--green-dim:#1a3d28;--green-bg:#0d1a12;
+  --orange:#c47a30;--orange-dim:#3d2a0d;--orange-bg:#1a1205;
+  --red:#c43030;--red-dim:#3d0d0d;--red-bg:#140808;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'SF Mono','Fira Code','Cascadia Code',monospace
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(12,12,12,.9);backdrop-filter:blur(8px);z-index:100}
+.nav-logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--text);text-decoration:none}
+.nav-links{display:flex;gap:20px;list-style:none;align-items:center}
+.nav-links a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{font-size:12px;font-weight:500;color:var(--bg);background:var(--text);padding:7px 16px;border-radius:4px;text-decoration:none}
+.nav-burger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;line-height:1;padding:4px 6px;margin-left:8px}
 
 /* urgency banner */
-.urgency-bar{background:rgba(29,78,216,.08);border-bottom:1px solid rgba(29,78,216,.25);padding:10px 48px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--cobalt)}
-.urgency-bar strong{color:var(--navy)}
-.urgency-bar a{color:var(--cobalt);text-decoration:underline;text-decoration-color:rgba(29,78,216,.4);margin-left:auto;font-size:11px;white-space:nowrap}
+.urgency-bar{background:var(--red-bg);border-bottom:1px solid var(--red-dim);padding:10px 48px;display:flex;align-items:center;gap:12px;font-size:12px;color:#e09090}
+.urgency-bar strong{color:#e87878}
+.urgency-bar a{color:#e09090;text-decoration:underline;text-decoration-color:#7a3030;margin-left:auto;font-family:var(--mono);font-size:11px;white-space:nowrap}
+.urgency-bar a:hover{color:#e87878}
 
 /* hero */
-.hero{padding:64px 48px 56px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
-.hero-tag{font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px}
-.hero h1{font-size:32px;font-weight:600;letter-spacing:-.03em;line-height:1.2;margin-bottom:14px}
-.hero h1 em{font-style:normal;color:var(--cobalt)}
-.hero .subtitle{font-size:16px;color:var(--ink-dim);max-width:640px;line-height:1.7;margin-bottom:28px}
+.hero{padding:64px 48px 56px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--border)}
+.hero-tag{font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--quiet);margin-bottom:16px}
+.hero h1{font-size:32px;font-weight:600;letter-spacing:-.03em;line-height:1.2;color:var(--text);margin-bottom:14px}
+.hero h1 em{font-style:normal;color:var(--green)}
+.hero .subtitle{font-size:16px;color:var(--muted);max-width:640px;line-height:1.7;margin-bottom:28px}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color:var(--bone-on-navy);background:var(--cobalt);padding:9px 20px}
-.btn-primary:hover{opacity:.88}
-.btn-sec{display:inline-block;font-size:13px;text-decoration:none;color:var(--ink);border:1px solid var(--ink-hair);padding:9px 20px}
-.btn-sec:hover{border-color:var(--cobalt)}
+.btn-primary{display:inline-block;font-size:13px;font-weight:500;text-decoration:none;color:var(--bg);background:var(--text);padding:9px 20px;border-radius:4px}
+.btn-primary:hover{opacity:.85}
+.btn-sec{display:inline-block;font-size:13px;font-weight:400;text-decoration:none;color:var(--text);border:1px solid var(--border);padding:9px 20px;border-radius:4px}
+.btn-sec:hover{border-color:var(--muted)}
 .hero-stat{display:flex;gap:32px;margin-top:36px;flex-wrap:wrap}
-.stat-num{font-size:28px;font-weight:600;color:var(--ink);letter-spacing:-.03em}
-.stat-label{font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.stat{font-family:var(--mono)}
+.stat-num{font-size:28px;font-weight:600;color:var(--green);letter-spacing:-.03em}
+.stat-label{font-size:11px;color:var(--quiet);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
 
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
 
 /* callout */
-.callout{background:rgba(178,255,63,.08);border:1px solid var(--ink-hair);padding:20px 24px;margin:48px 0 0}
-.callout-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:8px}
-.callout h3{font-size:15px;font-weight:600;margin-bottom:8px}
-.callout p{font-size:13px;color:var(--ink-dim);line-height:1.65}
-.callout a{color:var(--cobalt)}
+.callout{background:var(--orange-bg);border:1px solid var(--orange-dim);border-radius:6px;padding:20px 24px;margin:48px 0 0}
+.callout-label{font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--orange);margin-bottom:8px}
+.callout h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px}
+.callout p{font-size:13px;color:#c8a878;line-height:1.65}
+.callout a{color:var(--orange);text-decoration:none}
+.callout a:hover{text-decoration:underline}
 
 /* sections */
 section{margin-top:56px}
-section h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
-section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
+section h2{font-size:20px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin-bottom:6px}
+section .section-sub{font-size:13px;color:var(--quiet);margin-bottom:28px}
 
 /* feature grid */
 .feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-.feature-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:20px 22px}
-.feature-card h4{font-size:13px;font-weight:600;margin-bottom:6px}
-.feature-card p{font-size:12px;color:var(--ink-dim);line-height:1.6}
+.feature-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 22px}
+.feature-card h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+.feature-card p{font-size:12px;color:var(--muted);line-height:1.6}
+.feature-card code{font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--green);padding:1px 5px;border-radius:3px}
 
 /* compliance table */
 .req-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
-.req-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(178,255,63,.06)}
-.req-table td{padding:10px 14px;border-bottom:1px solid var(--ink-ghost);vertical-align:top;color:var(--ink-dim)}
-.req-table td:first-child{font-size:11px;color:var(--ink);font-weight:600;white-space:nowrap}
+.req-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--quiet);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--mono)}
+.req-table td{padding:10px 14px;border-bottom:1px solid var(--border-soft);vertical-align:top;color:var(--muted)}
+.req-table td:first-child{font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600;white-space:nowrap}
 .req-table tr:last-child td{border-bottom:none}
-.check{color:var(--cobalt)}
-.partial{color:var(--cobalt)}
+.check{color:var(--green)}
+.partial{color:var(--orange)}
 
 /* steps */
 .steps{display:flex;flex-direction:column;gap:14px;margin-top:20px}
 .step{display:flex;gap:16px;align-items:flex-start}
-.step-num{font-size:11px;font-weight:600;color:var(--ink);border:1px solid var(--ink-hair);width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
-.step-body h4{font-size:13px;font-weight:600;margin-bottom:3px}
-.step-body p{font-size:12px;color:var(--ink-dim);line-height:1.6}
+.step-num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--green);background:var(--green-bg);border:1px solid var(--green-dim);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-body h4{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.step-body p{font-size:12px;color:var(--muted);line-height:1.6}
+.step-body code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:1px 5px;border-radius:3px;color:var(--muted)}
 
 /* pills */
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
-.pill{font-size:11px;color:var(--ink);padding:3px 10px;border:1px solid var(--ink-hair)}
-.pill.amber{color:var(--cobalt);border-color:rgba(29,78,216,.3)}
+.pill{font-size:11px;font-family:var(--mono);background:var(--green-bg);color:var(--green);padding:3px 10px;border-radius:3px;border:1px solid var(--green-dim)}
+.pill.amber{background:var(--orange-bg);color:var(--orange);border-color:var(--orange-dim)}
 
 /* jurisdiction */
-.jurisdiction{background:var(--bone-2);border:1px solid var(--ink-hair);padding:22px 26px;margin-top:28px}
-.jurisdiction h4{font-size:14px;font-weight:600;margin-bottom:6px}
-.jurisdiction p{font-size:12px;color:var(--ink-dim);line-height:1.6}
+.jurisdiction{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px 26px;margin-top:28px}
+.jurisdiction h4{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+.jurisdiction p{font-size:12px;color:var(--muted);line-height:1.6}
+.jurisdiction strong{color:var(--text)}
 
 /* CTA */
-.cta{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:28px 32px;margin-top:48px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:24px}
-.cta h3{font-size:16px;font-weight:600;margin-bottom:8px}
-.cta p{font-size:13px;color:var(--ink-dim);line-height:1.6}
+.cta{background:var(--green-bg);border:1px solid var(--green-dim);border-radius:6px;padding:28px 32px;margin-top:48px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:24px}
+.cta h3{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px}
+.cta p{font-size:13px;color:#a8d5b5;line-height:1.6}
 .cta .cta-actions{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-.cta-meta{font-size:11px;color:var(--ink-dim);line-height:2;text-align:right}
+.cta-meta{font-size:11px;font-family:var(--mono);color:var(--quiet);line-height:2;text-align:right}
 .cta-meta span{display:block}
 
+/* footer */
+footer{border-top:1px solid var(--border);padding:48px 48px 40px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:32px}
+.footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:12px;color:var(--quiet);text-decoration:none}
+.footer-links a:hover{color:var(--muted)}
+.footer-meta{font-size:11px;color:var(--quiet);font-family:var(--mono);text-align:right;line-height:1.8}
+
 @media(max-width:768px){
+  nav{padding:0 16px}
+  .nav-links{display:none}
+  .nav-burger{display:flex;align-items:center}
+  .nav-open .nav-links{display:flex!important;flex-direction:column;position:absolute;top:56px;left:0;right:0;background:rgba(12,12,12,.97);border-bottom:1px solid var(--border);padding:20px 16px;gap:20px;z-index:99}
   .urgency-bar{padding:10px 16px;flex-wrap:wrap}
   .hero{padding-left:20px;padding-right:20px}
   main{padding-left:20px;padding-right:20px}
@@ -104,103 +136,39 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
   .cta{flex-direction:column}
   .cta-meta{text-align:left}
   .hero-stat{gap:20px}
+  footer{flex-direction:column;align-items:flex-start;padding:32px 20px}
+  .footer-meta{text-align:left}
 }
 </style>
+<link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 2.4.5</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / ml-kem-768</span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
 <nav class="nav">
-  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
-
+  <a href="/" class="nav-logo">PARAMANT</a>
   <ul class="nav-links">
-
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      <button class="nav-dropdown-trigger">Products &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/parashare">ParaShare</a></li>
+        <li><a href="/drop">ParaDrop</a></li>
+        <li><a href="/ct-log">CT Log</a></li>
+        <li><a href="/status">Status</a></li>
       </ul>
     </li>
-
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      <button class="nav-dropdown-trigger">Resources &#9662;</button>
+      <ul class="nav-dropdown-menu">
+        <li><a href="/docs">Docs</a></li>
+        <li><a href="/security">Security</a></li>
+        <li><a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
       </ul>
     </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/#selfhost" class="nav-link">Self-host</a></li>
   </ul>
-
-  <div class="nav-auth" id="nav-auth">
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
-  </div>
-
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <a href="/parashare" class="nav-cta">Try it &rarr;</a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
 </nav>
@@ -384,7 +352,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
         <h4>Data Processing Agreement (GDPR Art. 28)</h4>
         <p>
           A model agreement under GDPR Article 28 is
-          <a href="/dpa">available here</a>.
+          <a href="/verwerkersovereenkomst" style="color:var(--green)">available here</a>.
           When self-hosting on your own server, the processing relationship is
           eliminated &mdash; you are both controller and processor.
         </p>
@@ -488,7 +456,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
         <div class="step-num">1</div>
         <div class="step-body">
           <h4>Request a free API key</h4>
-          <p>Go to <a href="/request-key">paramant.app/request-key</a>.
+          <p>Go to <a href="/request-key" style="color:var(--green)">paramant.app/request-key</a>.
           No credit card. No account. You receive a <code>pgp_</code> key for end-user access
           or a <code>plk_</code> key to unlock your self-hosted relay beyond 5 users.</p>
         </div>
@@ -515,7 +483,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
         <div class="step-num">4</div>
         <div class="step-body">
           <h4>Data Processing Agreement (managed relay only)</h4>
-          <p>If using the Paramant-managed relay, sign the <a href="/dpa">Data Processing Agreement</a>
+          <p>If using the Paramant-managed relay, sign the <a href="/verwerkersovereenkomst" style="color:var(--green)">Data Processing Agreement</a>
           (GDPR Art. 28). When self-hosting, no DPA is required &mdash; you control all infrastructure.</p>
         </div>
       </div>
@@ -528,11 +496,11 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
       <h3>Paramant Community Edition is free.</h3>
       <p>
         Self-host in under two minutes. No credit card. No account required.<br>
-        Questions: <a href="mailto:privacy@paramant.app?subject=Government%20-%20PQC">privacy@paramant.app</a>
+        Questions: <a href="mailto:privacy@paramant.app?subject=Government%20-%20PQC" style="color:#a8d5b5">privacy@paramant.app</a>
       </p>
       <div class="cta-actions" style="margin-top:14px">
         <a href="/request-key" class="btn-primary">Request free API key &rarr;</a>
-        <a href="/dpa" class="btn-sec" style="font-size:12px;text-decoration:none">Data Processing Agreement (GDPR Art. 28)</a>
+        <a href="/verwerkersovereenkomst" class="btn-sec" style="font-size:12px">Data Processing Agreement (GDPR Art. 28)</a>
       </div>
     </div>
     <div class="cta-meta">
@@ -546,70 +514,56 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
 </main>
 
 <footer>
-  <div class="container-lg">
-    <div class="footer-grid">
-      <div>
-        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+  <div>
+    <a href="/" class="footer-logo" style="text-decoration:none;color:inherit;display:block;margin-bottom:8px">PARAMANT</a>
+    <div style="font-size:11px;color:var(--quiet);font-family:var(--mono)">Post-quantum encrypted file relay</div>
+  </div>
+  <div style="display:flex;gap:48px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Product</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/parashare">ParaShare</a>
+        <a href="/drop">ParaDrop</a>
+        <a href="/ct-log">CT Log</a>
+        <a href="/docs">Docs</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/vs">vs. alternatives</a>
       </div>
-      <div>
-        <div class="footer-col-label">Product</div>
-        <div class="footer-links">
-          <a href="/send">Send a file</a>
-          <a href="/parashare">ParaShare</a>
-          <a href="/drop">ParaDrop</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/docs">Docs</a>
-          <a href="/pricing">Pricing</a>
-          <a href="/vs">vs. alternatives</a>
-          <a href="/changelog">Changelog</a>
-        </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Self-host</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+        <a href="/status">Status</a>
       </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="/status">Status</a>
-        </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Compliance</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+        <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+        <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+        <a href="/verwerkersovereenkomst">Verwerkersovereenkomst (GDPR Art. 28)</a>
+        <a href="/hndl">HNDL threat</a>
+        <a href="/security">Security</a>
       </div>
-      <div>
-        <div class="footer-col-label">Compliance</div>
-        <div class="footer-links">
-          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-          <a href="/compliance/iec62443">IEC 62443</a>
-          <a href="/compliance/nen7510">NEN 7510</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/government">Government</a>
-          <a href="/ot">OT guide</a>
-          <a href="/hndl">HNDL threat</a>
-          <a href="/crypto-agility">Crypto agility</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Company</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/request-key">Free API key</a>
-          <a href="/status">Status</a>
-          <a href="/sla">SLA</a>
-          <a href="/security">Security</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
-        </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--quiet);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">Company</div>
+      <div class="footer-links" style="flex-direction:column;gap:10px">
+        <a href="mailto:privacy@paramant.app">Contact</a>
+        <a href="/request-key">Free API key</a>
+        <a href="/sla">SLA</a>
+        <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/LICENSE" target="_blank">License</a>
       </div>
     </div>
   </div>
+  <div class="footer-meta">ML-KEM-768 &middot; NIST FIPS 203/204<br>Hetzner DE &middot; GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</div>
 </footer>
 
-<script src="/nav.js?v=7" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script>document.querySelectorAll('.nav-links a').forEach(function(a){a.addEventListener('click',function(){var n=a.closest('nav');if(n){n.classList.remove('nav-open');var b=n.querySelector('.nav-burger');if(b)b.textContent='&#9776;';}});});</script>
+<script src="/nav.js" defer></script>
 </body>
 </html>

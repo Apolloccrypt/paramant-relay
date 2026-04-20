@@ -1,10 +1,10 @@
-// PARAMANT nav v2 — desktop dropdowns + mobile accordion
+// PARAMANT nav v3 — desktop dropdowns + mobile accordion + lime accents
 (function () {
   'use strict';
 
   var hamburger = document.getElementById('nav-hamburger');
   var mobile    = document.getElementById('nav-mobile');
-  var closeBtn  = document.getElementById('nav-mobile-close');
+  var closeBtn  = document.querySelector('.nav-mobile-close');
 
   // ── Helpers ───────────────────────────────────────────
   function lockScroll()   { document.body.classList.add('nav-locked'); }
@@ -38,25 +38,21 @@
     var menu = dd.querySelector('.nav-dropdown-menu');
     if (!trig || !menu) return;
 
-    // Click trigger: toggle
     trig.addEventListener('click', function (e) {
       e.stopPropagation();
       dd.classList.contains('open') ? closeDropdown(dd) : openDropdown(dd);
     });
 
-    // Hover open
     dd.addEventListener('mouseenter', function () {
       clearTimeout(hoverLeaveTimers.get(dd));
       openDropdown(dd);
     });
 
-    // Hover close with short delay so moving into menu doesn't flicker
     dd.addEventListener('mouseleave', function () {
       var t = setTimeout(function () { closeDropdown(dd); }, 150);
       hoverLeaveTimers.set(dd, t);
     });
 
-    // Keyboard: trigger
     trig.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         closeDropdown(dd);
@@ -80,7 +76,6 @@
       }
     });
 
-    // Keyboard: within menu items
     menu.addEventListener('keydown', function (e) {
       var items = Array.from(menu.querySelectorAll('a'));
       var idx   = items.indexOf(document.activeElement);
@@ -101,10 +96,8 @@
     });
   });
 
-  // Click outside closes all dropdowns
   document.addEventListener('click', function () { closeAllDropdowns(); });
 
-  // Global Escape
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       closeAllDropdowns();
@@ -112,15 +105,13 @@
     }
   });
 
-  // ── Active page indicator ─────────────────────────────
+  // ── Active page indicator — desktop ───────────────────
   var path = window.location.pathname;
 
-  // Standalone links (e.g. Pricing)
   document.querySelectorAll('nav.nav .nav-link').forEach(function (link) {
     if (link.getAttribute('href') === path) link.classList.add('active');
   });
 
-  // Dropdown items — mark parent trigger
   document.querySelectorAll('nav.nav .nav-dropdown-menu a').forEach(function (link) {
     var href = link.getAttribute('href') || '';
     if (href && href !== '/' && path.startsWith(href)) {
@@ -144,6 +135,7 @@
     if (spans[0]) spans[0].style.transform = 'translateY(7px) rotate(45deg)';
     if (spans[1]) spans[1].style.opacity   = '0';
     if (spans[2]) spans[2].style.transform = 'translateY(-7px) rotate(-45deg)';
+    if (closeBtn) closeBtn.focus();
   }
 
   function closeMobileMenu() {
@@ -153,6 +145,7 @@
     unlockScroll();
     var spans = hamburger.querySelectorAll('span');
     spans.forEach(function (s) { s.removeAttribute('style'); });
+    hamburger.focus();
   }
 
   hamburger.addEventListener('click', function (e) {
@@ -162,12 +155,10 @@
 
   if (closeBtn) closeBtn.addEventListener('click', closeMobileMenu);
 
-  // Close on link tap
   mobile.querySelectorAll('a').forEach(function (a) {
     a.addEventListener('click', closeMobileMenu);
   });
 
-  // Close on outside click
   document.addEventListener('click', function (e) {
     if (
       mobile.classList.contains('open') &&
@@ -184,7 +175,6 @@
       var group  = btn.closest('.nav-mobile-group');
       var isOpen = group.classList.contains('open');
 
-      // Collapse all groups
       mobile.querySelectorAll('.nav-mobile-group').forEach(function (g) {
         g.classList.remove('open');
         var b = g.querySelector('.nav-mobile-group-btn');
@@ -196,5 +186,21 @@
         btn.setAttribute('aria-expanded', 'true');
       }
     });
+  });
+
+  // ── Active page indicator — mobile ────────────────────
+  mobile.querySelectorAll('a').forEach(function (a) {
+    if (a.getAttribute('href') === path) {
+      a.setAttribute('aria-current', 'page');
+      var parentGroup = a.closest('.nav-mobile-group');
+      if (parentGroup) {
+        parentGroup.classList.add('open');
+        var btn = parentGroup.querySelector('.nav-mobile-group-btn');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
+    }
+  });
+  mobile.querySelectorAll('.nav-mobile-standalone').forEach(function (a) {
+    if (a.getAttribute('href') === path) a.setAttribute('aria-current', 'page');
   });
 })();

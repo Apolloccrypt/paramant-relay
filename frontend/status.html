@@ -21,7 +21,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=6">
-<link rel="stylesheet" href="/nav.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=7">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.6;min-height:100vh}
@@ -169,12 +169,19 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-header">
-    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+    <a href="/" class="nav-logo">
+      <span class="logo-para">Para</span><span class="logo-mant">MANT</span>
+    </a>
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/>
+      </svg>
+    </button>
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
+    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-products">Products</button>
+    <div class="nav-mobile-group-items" id="mobile-group-products">
       <a href="/send">Send a file</a>
       <a href="/parashare">ParaShare</a>
       <a href="/drop">ParaDrop</a>
@@ -185,8 +192,8 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
+    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-developers">Developers</button>
+    <div class="nav-mobile-group-items" id="mobile-group-developers">
       <a href="/docs">Docs</a>
       <a href="/docs#api">API reference</a>
       <a href="/ct-log">CT Log</a>
@@ -197,8 +204,8 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
+    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-selfhost">Self-host</button>
+    <div class="nav-mobile-group-items" id="mobile-group-selfhost">
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
@@ -209,8 +216,8 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
+    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-compliance">Compliance</button>
+    <div class="nav-mobile-group-items" id="mobile-group-compliance">
       <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
       <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
       <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
@@ -228,8 +235,8 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   <a href="/vs" class="nav-mobile-standalone">Compare</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
+    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-about">About</button>
+    <div class="nav-mobile-group-items" id="mobile-group-about">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
       <a href="/sla">SLA</a>
@@ -237,6 +244,17 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
       <a href="/press">Press kit</a>
       <a href="mailto:privacy@paramant.app">Contact</a>
     </div>
+  </div>
+
+  <div class="nav-mobile-cta">
+    <a href="/auth/login" class="btn btn-ghost-dark">Sign in</a>
+    <a href="/signup" class="btn btn-lime">Create account</a>
+  </div>
+
+  <div class="nav-mobile-meta">
+    <span>build 2.4.5</span>
+    <span class="meta-sep">&middot;</span>
+    <span>RAM only</span>
   </div>
 </div>
 
@@ -465,7 +483,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   setInterval(checkAll, 30000);
 }());
 </script>
-<script src="/nav.js?v=5" defer></script>
+<script src="/nav.js?v=7" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 </body>
 </html>
