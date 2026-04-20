@@ -2453,3 +2453,9 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
   color: #0B3A6A;
   padding: 2px 8px;
 }
+
+/* ── SECTION TINT — subtle off-white background for visual rhythm ── */
+/* visual-reset-v3 (sentinel) */
+.section-tint {
+  background: #F8FAFC;
+}

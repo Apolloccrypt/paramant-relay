@@ -28,54 +28,7 @@
 <link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=7">
 <style>
-/* iter2: step numbers — compact lime badge */
-.how-num {
-  font-size: 13px !important;
-  font-family: 'IBM Plex Mono', monospace !important;
-  font-weight: 700 !important;
-  color: #0B3A6A !important;
-  background: #B2FF3F !important;
-  padding: 0 10px !important;
-  display: inline-block !important;
-  line-height: 1.55 !important;
-  letter-spacing: .04em !important;
-  margin-bottom: var(--space-3) !important;
-}
-/* iter2: section numbers — lime badge universally */
-.sec-head .num, .marker .num {
-  background: #B2FF3F;
-  color: #0B3A6A !important;
-  padding: 0 12px;
-  display: inline-block;
-  line-height: 1.35;
-}
-/* iter2: exception — cobalt section 03.5, use white on cobalt */
-#auth .sec-head .num {
-  background: transparent !important;
-  color: #ffffff !important;
-  padding: 0 !important;
-}
-/* iter2: section 02 crypto strip — section-num badge on navy */
-.crypto-strip .section-num {
-  background: #B2FF3F !important;
-  color: #0B3A6A !important;
-  padding: 0 12px !important;
-  display: inline-block !important;
-  line-height: 1.35 !important;
-}
-/* iter2: crypto-strip strong = lime highlight on navy */
-.crypto-strip-content strong {
-  background: #B2FF3F;
-  color: #0B3A6A;
-  padding: 0 5px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-weight: 600;
-}
-/* iter2: CRYPTO label = lime on navy */
-.crypto-strip .section-label {
-  color: #B2FF3F !important;
-}
-/* iter2: deploy grid */
+/* ── DEPLOY CARDS ─────────────────────────────── */
 .deploy-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -142,10 +95,11 @@
   position: relative;
 }
 .deploy-specs li::before {
-  content: '▸ ';
+  content: '·';
   position: absolute;
   left: 0;
-  color: #1D4ED8;
+  color: #0B3A6A;
+  font-weight: 700;
 }
 .deploy-cta {
   font-family: 'IBM Plex Mono', monospace;
@@ -825,8 +779,6 @@
 /* Lime accent system — index.html */
 .lime-hi{background:#B2FF3F;color:#0B3A6A;padding:2px 5px;display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;font-style:inherit}
 #main-content h1{line-height:1.2}
-.num{background:#B2FF3F !important;color:#0B3A6A !important;padding:2px 14px !important;display:inline-block !important}
-.how-num{background:#B2FF3F !important;color:#0B3A6A !important;border:none !important}
 </style>
 <script src="ct-stats.js" defer></script>
 <script src="/nav.js?v=7" defer></script>
