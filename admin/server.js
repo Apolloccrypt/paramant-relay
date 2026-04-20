@@ -1443,7 +1443,7 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
   const { key, confirm, reason, notify = true } = req.body || {};
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   if (confirm !== 'DELETE') return res.status(400).json({ error: 'confirm_required', message: "Body must include confirm: 'DELETE'" });
-  if (!await checkAdminRl('delete_account', 'admin', 3)) return res.status(429).json({ error: 'rate_limited' });
+  if (!await checkAdminRl('delete_account', 'admin', 50)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
