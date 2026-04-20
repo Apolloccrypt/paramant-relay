@@ -311,35 +311,8 @@
 
     </div>
   </div>
-</section>
 
-<!-- § 02 TWO TRUST MODES -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="modes">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num" style="font-size:clamp(3rem,7vw,7rem)">02</span>
-      <h2>Two modes. Pick your trust model.</h2>
-      <span class="tag">Architecture</span>
-    </div>
-    <div class="modes-grid">
-
-      <div class="card">
-        <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-4)">Anonymous</p>
-        <h3 style="font-size:var(--text-lg);margin-bottom:var(--space-4)">AES-256-GCM</h3>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65;margin-bottom:var(--space-3)">Browser-generated key lives only in the URL fragment, never sent to the relay. Prove-by-design that we cannot decrypt what we relay.</p>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65;margin-bottom:var(--space-6)">Ideal for one-off sends that need zero setup. No registration. No key exchange.</p>
-        <a href="/send" class="btn btn-secondary">Send a file &rarr;</a>
-      </div>
-
-      <div class="card">
-        <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-4)">Verified end-to-end</p>
-        <h3 style="font-size:var(--text-lg);margin-bottom:var(--space-4)">ML-KEM-768 Hybrid</h3>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65;margin-bottom:var(--space-3)">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS 204). Fingerprint verification before send.</p>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65;margin-bottom:var(--space-6)">For when the audit trail matters. The receiver can prove who sent what.</p>
-        <a href="/parashare" class="btn btn-secondary">Try ParaShare &rarr;</a>
-      </div>
-
-    </div>
+    <p style=\"margin-top:var(--space-6);font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);text-align:center;letter-spacing:.04em\">Cryptography architecture — <a href=\"/security\" style=\"color:var(--cobalt)\">security details →</a></p>
   </div>
 </section>
 
