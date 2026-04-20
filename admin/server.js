@@ -1,5 +1,6 @@
 'use strict';
 const express = require('express');
+const emailTemplates = require('./lib/email-templates');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
@@ -441,45 +442,29 @@ async function findUserByEmail(email) {
 
 // Send setup email via Resend
 async function sendSetupEmail(email, setupToken, isReset = false) {
-  const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
-  const subject = isReset ? "Reset your Paramant authenticator" : "Complete your Paramant setup";
-  const heading = isReset ? "Set up new Paramant authenticator" : "Set up Paramant authenticator";
-  const resetNote = isReset
-    ? `<p style="color:#b45309;font-size:13px;margin:0 0 16px;background:#fffbeb;border:1px solid #fde68a;padding:10px 14px;border-radius:4px">If you have a previous Paramant entry in your authenticator app, delete it first &mdash; the old entry no longer works.</p>`
-    : "";
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "Paramant <noreply@paramant.app>",
-      to: [email],
-      subject,
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">${heading}</h2>${resetNote}<p style="color:#475569;margin:0 0 16px">Click below to set up two-factor authentication for your Paramant account.</p><a href="${setupUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Complete setup</a><p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 14 days. If you did not request this, ignore this email.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
-      text: `${subject}\n\nLink: ${setupUrl}\n\nExpires in 14 days.${isReset ? " If you had a previous authenticator entry for Paramant, delete it first — it no longer works." : ""} If you did not request this, ignore this email.`,
-    }),
+  const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY not set');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => "")}`);
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
 }
 
 
 // Send TOTP reset confirmation email (step 1 of two-stage flow)
 async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt) {
-  const confirmUrl = `${SITE_URL}/auth/reset-confirm/${confirmToken}`;
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: "Paramant <noreply@paramant.app>",
-      to: [email],
-      subject: "Did you request a TOTP reset? — Paramant",
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Confirm authenticator reset</h2><p style="color:#475569;margin:0 0 16px">Someone requested a reset of your Paramant authenticator. If this was you, click below to confirm. You will then receive a second email with a new setup link.</p><a href="${confirmUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Confirm reset</a><p style="color:#94a3b8;font-size:12px;margin-top:24px"><b>This link expires in 15 minutes.</b></p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:12px;margin:0 0 8px">Request details:</p><p style="color:#94a3b8;font-size:12px;margin:0">Time: ${requestedAt}<br>IP: ${maskedIp}</p><p style="color:#94a3b8;font-size:12px;margin-top:16px">If you did not request this, ignore this email. Your current authenticator will keep working.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
-      text: `Confirm authenticator reset\n\nSomeone requested a reset of your Paramant authenticator.\n\nIf this was you, click the link below to confirm. You will then receive a second email with a new setup link.\n\nConfirm: ${confirmUrl}\n\nThis link expires in 15 minutes.\n\nRequest details:\nTime: ${requestedAt}\nIP: ${maskedIp}\n\nIf you did not request this, ignore this email. Your current authenticator will keep working.`,
-    }),
+  const msg = emailTemplates.resetConfirmationEmail({ confirmToken, requestedAt, requestIP: maskedIp });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY not set');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => "")}`);
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
 }
 
 // ── User session middleware ────────────────────────────────────────────────────
@@ -1018,17 +1003,13 @@ async function sendBillingConfirmation(email, plan, amount, period) {
   if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
-  await fetch('https://api.resend.com/emails', {
+  const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, stub: true });
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'Paramant <noreply@paramant.app>',
-      to: [email],
-      subject: `Paramant plan upgraded to ${planName}`,
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Plan upgraded to ${planName}</h2><p style="color:#475569;margin:0 0 16px">Your Paramant plan has been upgraded. Here are the details:</p><table style="width:100%;border-collapse:collapse;margin-bottom:24px"><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px">Plan</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:600;text-align:right">${planName}</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px">Billing period</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:600;text-align:right">${period === 'yearly' ? 'Yearly' : 'Monthly'}</td></tr><tr><td style="padding:10px 0;color:#64748b;font-size:14px">Amount</td><td style="padding:10px 0;font-weight:700;color:#1d4ed8;text-align:right">${amountStr}</td></tr></table><p style="color:#94a3b8;font-size:12px;margin-top:24px">Note: This is a stub confirmation. No real payment was charged. Stripe integration pending.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app</p></div></body></html>`,
-      text: `Your Paramant plan has been upgraded to ${planName} (${period}). Amount: ${amountStr}. Note: stub checkout — no real charge.`,
-    }),
+    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html }),
   });
+  if (!res.ok) console.error('[billing] Resend error:', res.status, await res.text().catch(() => ''));
 }
 
 async function sendCancellationScheduled(email, plan, cancelAt) {
@@ -1036,17 +1017,13 @@ async function sendCancellationScheduled(email, plan, cancelAt) {
   if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  await fetch('https://api.resend.com/emails', {
+  const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'Paramant <noreply@paramant.app>',
-      to: [email],
-      subject: `Your Paramant plan cancellation is scheduled`,
-      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Cancellation scheduled</h2><p style="color:#475569;margin:0 0 16px">Your ${planName} plan cancellation has been scheduled. Your plan will downgrade to Community on <strong>${cancelDate}</strong>.</p><p style="color:#475569;margin:0 0 16px">You can continue using all ${planName} features until that date.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app</p></div></body></html>`,
-      text: `Your ${planName} plan cancellation is scheduled for ${cancelDate}. You retain access until then.`,
-    }),
+    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html }),
   });
+  if (!res.ok) console.error('[billing] Resend cancel error:', res.status, await res.text().catch(() => ''));
 }
 
 api.get("/user/billing/plans", (req, res) => {
