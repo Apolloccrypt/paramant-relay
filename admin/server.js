@@ -589,9 +589,14 @@ api.post("/user/signup", async (req, res) => {
   if (emailCount === 1) await redis().expire(emailKey, 86400);
   if (emailCount > 3) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
 
-  // 5. Already has an active account?
+  // 5. Already has an active account? — silent success to prevent enumeration
   const existing = await findUserByEmail(norm);
-  if (existing) return res.status(409).json({ error: "account_exists" });
+  if (existing) {
+    // Don't reveal whether email is registered — log silently and return same shape
+    console.log(`[signup] duplicate signup attempt for existing account: ${norm} from ${ip}`);
+    // Still send a "we sent you an email" response to prevent user enumeration
+    return res.json({ success: true, message: "verification_email_sent" });
+  }
 
   // 6. Store pending signup in Redis (24h TTL), send verification email
   const verifyToken = crypto.randomBytes(32).toString("hex");
