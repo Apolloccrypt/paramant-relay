@@ -462,6 +462,19 @@ async function sendSetupEmail(email, setupToken, isReset = false) {
 }
 
 
+// Send signup email-verification link
+async function sendVerificationEmail(email, token, requestIP) {
+  const msg = emailTemplates.signupVerificationEmail({ email, token, requestedAt: Date.now(), requestIP });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY not set');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+}
+
 // Send TOTP reset confirmation email (step 1 of two-stage flow)
 async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt) {
   const msg = emailTemplates.resetConfirmationEmail({ confirmToken, requestedAt, requestIP: maskedIp });
@@ -516,31 +529,118 @@ api.get('/captcha/challenge', async (req, res) => {
   }
 });
 
-// POST /api/user/signup
+// Disposable / reserved domain denylist
+const BLOCKED_DOMAINS = new Set([
+  'localhost', 'example.com', 'example.org', 'example.net',
+  'test.com', 'test.local', 'test.invalid',
+  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net',
+  'guerrillamail.org', 'guerrillamail.de', 'guerrillamail.info',
+  'sharklasers.com', 'guerrillamailblock.com', 'grr.la',
+  'spam4.me', 'yopmail.com', 'yopmail.fr', 'cool.fr.nf',
+  'jetable.fr.nf', 'nospam.ze.tc', 'nomail.xl.cx',
+  'mega.zik.dj', 'speed.1s.fr', 'courriel.fr.nf',
+  'moncourrier.fr.nf', 'monemail.fr.nf', 'monmail.fr.nf',
+  'trashmail.at', 'trashmail.com', 'trashmail.io',
+  'trashmail.me', 'trashmail.net', 'trashmail.org',
+  'dispostable.com', 'fakeinbox.com', 'maildrop.cc',
+  'discard.email', 'tempr.email', 'temp-mail.org',
+]);
+// Also block reserved TLDs
+const BLOCKED_TLDS = ['.local', '.test', '.invalid', '.example', '.localhost'];
+
+function isBlockedEmail(email) {
+  const lower = email.toLowerCase();
+  const atIdx = lower.lastIndexOf('@');
+  if (atIdx < 0) return true;
+  const domain = lower.slice(atIdx + 1);
+  if (BLOCKED_DOMAINS.has(domain)) return true;
+  for (const tld of BLOCKED_TLDS) {
+    if (domain.endsWith(tld)) return true;
+  }
+  return false;
+}
+
+// POST /api/user/signup — stage 1: issue verification email, do NOT create account yet
 api.post("/user/signup", async (req, res) => {
   const { email, label, dpa_accepted, challenge_id, nonce } = req.body || {};
-  if (!email || !dpa_accepted) return res.status(400).json({ error: "missing_fields" });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
 
-  // PoW verification — prevents automated signups
+  // 1. PoW first — before any email lookup (prevents oracle abuse)
   const proof = await pow.verifyChallenge(challenge_id, nonce);
   if (!proof.valid) return res.status(403).json({ error: 'captcha_failed', reason: proof.reason });
 
-  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
-  const ipKey = `paramant:signup:ratelimit:${ip}`;
-  const count = await redis().incr(ipKey);
-  if (count === 1) await redis().expire(ipKey, 3600);
-  if (count > 3) return res.status(429).json({ error: "rate_limited" });
+  // 2. Basic field validation
+  if (!email || !dpa_accepted) return res.status(400).json({ error: "missing_fields" });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+  if (isBlockedEmail(email)) return res.status(422).json({ error: "invalid_email", reason: "domain_not_allowed" });
 
-  const existing = await findUserByEmail(email);
+  const norm = email.toLowerCase().trim();
+
+  // 3. Per-IP rate limit (3 per hour)
+  const ipKey = `paramant:signup:ratelimit:ip:${ip}`;
+  const ipCount = await redis().incr(ipKey);
+  if (ipCount === 1) await redis().expire(ipKey, 3600);
+  if (ipCount > 3) return res.status(429).json({ error: "rate_limited" });
+
+  // 4. Per-email rate limit (3 verification emails per 24h, hashed for privacy)
+  const emailHash = crypto.createHash('sha256').update(norm).digest('hex');
+  const emailKey = `paramant:signup:ratelimit:email:${emailHash}`;
+  const emailCount = await redis().incr(emailKey);
+  if (emailCount === 1) await redis().expire(emailKey, 86400);
+  if (emailCount > 3) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
+
+  // 5. Already has an active account?
+  const existing = await findUserByEmail(norm);
   if (existing) return res.status(409).json({ error: "account_exists" });
 
-  // Create API key via admin relay
+  // 6. Store pending signup in Redis (24h TTL), send verification email
+  const verifyToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:signup:pending:${verifyToken}`,
+    JSON.stringify({ email: norm, label: label || null, ip, requested_at: Date.now() }),
+    { EX: 86400 }
+  );
+
+  try {
+    await sendVerificationEmail(norm, verifyToken, ip);
+  } catch (err) {
+    console.error("[signup] verification email failed:", err.message);
+    await redis().del(`paramant:signup:pending:${verifyToken}`).catch(() => {});
+    return res.status(500).json({ error: "email_failed", message: "Could not send verification email. Please try again." });
+  }
+
+  console.log(`[signup] pending signup for ${norm} from ${ip}`);
+  res.json({ success: true, message: "verification_email_sent" });
+});
+
+// GET /api/user/signup/verify/:token — stage 2: create account after email click
+api.get("/user/signup/verify/:token", async (req, res) => {
+  const { token } = req.params;
+  if (!token || !/^[0-9a-f]{64}$/.test(token)) {
+    return res.redirect('/signup?error=invalid_token');
+  }
+
+  const raw = await redis().get(`paramant:signup:pending:${token}`);
+  if (!raw) return res.redirect('/signup?error=expired_token');
+
+  let pending;
+  try { pending = JSON.parse(raw); } catch { return res.redirect('/signup?error=invalid_token'); }
+
+  // Consume immediately (one-shot)
+  await redis().del(`paramant:signup:pending:${token}`);
+
+  const { email, label } = pending;
+
+  // Check again — race guard
+  const existing = await findUserByEmail(email);
+  if (existing) return res.redirect('/signup?error=account_exists');
+
+  // Create the account
   const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
   const createdAt = new Date().toISOString();
   const createRes = await relayFetch("health", "/v2/admin/keys", "POST", {
     key: keyVal,
-    email: email.toLowerCase(),
+    email,
     label: label || null,
     plan: "community",
     active: true,
@@ -549,29 +649,30 @@ api.post("/user/signup", async (req, res) => {
   }, false, ADMIN_TOKEN);
 
   if (createRes.status !== 200 && createRes.status !== 201) {
-    console.error("[signup] key creation failed:", createRes.status, createRes.body);
-    return res.status(500).json({ error: "key_creation_failed" });
+    console.error("[signup/verify] key creation failed:", createRes.status, createRes.body);
+    return res.redirect('/signup?error=server_error');
   }
 
   const setupToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id: keyVal, email: email.toLowerCase(), label: label || null }),
+    JSON.stringify({ user_id: keyVal, email, label: label || null }),
     { EX: 14 * 86400 }
   );
   await redis().set(
     `paramant:user:meta:${keyVal}`,
-    JSON.stringify({ email: email.toLowerCase(), created_at: createdAt })
+    JSON.stringify({ email, created_at: createdAt })
   ).catch(() => {});
 
   try {
     await sendSetupEmail(email, setupToken);
   } catch (err) {
-    console.error("[signup] email failed:", err.message);
-    return res.status(500).json({ error: "email_failed", message: "Account created but email failed. Contact privacy@paramant.app." });
+    console.error("[signup/verify] setup email failed:", err.message);
+    // Account exists, don't undo — they can contact support
   }
 
-  res.json({ success: true, message: "setup_email_sent" });
+  console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
+  res.redirect('/signup/verified');
 });
 
 // POST /api/user/setup/:token — retrieve TOTP QR data (idempotent)

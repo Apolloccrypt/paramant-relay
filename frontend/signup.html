@@ -359,16 +359,20 @@
       });
 
       if (res.ok) {
-        successDiv.innerHTML = '<strong>Check your email.</strong> We sent a setup link to ' +
-          email + '. The link expires in 14 days.';
+        successDiv.innerHTML = '<strong>Check your inbox.</strong> We sent a verification link to ' +
+          email + '. Click it to activate your account. The link expires in 24 hours.';
         successDiv.classList.add('visible');
         form.style.display = 'none';
       } else {
         const err = await res.json().catch(() => ({}));
-        if (res.status === 409) {
+        if (res.status === 403) {
+          errorDiv.textContent = 'Verification failed. Please refresh and try again.';
+        } else if (res.status === 409) {
           errorDiv.innerHTML = 'An account with this email already exists. <a href="/auth/login">Sign in</a>.';
+        } else if (res.status === 422) {
+          errorDiv.textContent = 'This email domain is not accepted. Please use a real email address.';
         } else if (res.status === 429) {
-          errorDiv.textContent = 'Too many signup attempts. Please try again in an hour.';
+          errorDiv.textContent = 'Too many attempts. Please try again later.';
         } else {
           errorDiv.textContent = err.message || 'Something went wrong. Please try again.';
         }

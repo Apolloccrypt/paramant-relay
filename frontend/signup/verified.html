@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email verified — Paramant</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/nav.js?v=5" defer></script>
+  <style>
+    .verified-card {
+      max-width: 480px;
+      margin: 80px auto;
+      padding: 40px;
+      background: #fff;
+      border: 1px solid rgba(11,58,106,0.12);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .verified-icon {
+      width: 56px;
+      height: 56px;
+      background: #DCFCE7;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+    }
+    .verified-icon svg { color: #16A34A; }
+    h1 { font-size: 22px; font-weight: 600; color: #0B3A6A; margin: 0 0 12px; }
+    p { color: #475569; line-height: 1.6; margin: 0 0 24px; }
+    .cta { display: inline-block; background: #1D4ED8; color: #fff; padding: 12px 28px;
+           border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; }
+    .cta:hover { background: #1E40AF; }
+    .note { font-size: 13px; color: #94A3B8; margin: 20px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="verified-card">
+    <div class="verified-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h1>Email verified</h1>
+    <p>Your account is active. Check your inbox for a setup email — it contains your TOTP setup link.</p>
+    <a href="/auth/login" class="cta">Sign in</a>
+    <p class="note">Didn't receive the setup email? Check your spam folder or <a href="/signup">sign up again</a>.</p>
+  </div>
+</body>
+</html>

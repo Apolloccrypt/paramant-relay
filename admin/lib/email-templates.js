@@ -377,6 +377,51 @@ https://paramant.app`;
   return { ...wrap(text, html, { refId: 'deletion-' + Date.now() }), subject: 'Your Paramant account has been deleted' };
 }
 
+// ── SIGNUP VERIFICATION EMAIL ────────────────────────────────────────────────
+function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
+  const url = `${BASE_URL}/api/user/signup/verify/${token}`;
+  const dateStr = formatTS(requestedAt);
+  const maskedIp = maskIP(requestIP);
+
+  const preheader = 'Confirm your email to activate your Paramant account.';
+  const text = [
+    'Verify your Paramant account',
+    '',
+    `You requested an account for ${email}.`,
+    `Click the link below to verify your email and activate your account:`,
+    '',
+    url,
+    '',
+    'This link expires in 24 hours. If you did not request this, you can safely ignore this email.',
+    '',
+    `Requested: ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}`,
+    '',
+    '— Paramant',
+  ].join('\n');
+
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Verify your email</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      You requested a Paramant account for <strong>${email}</strong>. Click the button below to confirm your email address and activate your account.
+    </p>
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Verify email &amp; activate account</a>
+    </div>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748B;">
+      Or copy this link into your browser:<br>
+      <a href="${url}" style="color:#1D4ED8;word-break:break-all;">${url}</a>
+    </p>
+    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
+      <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
+        This link expires in <strong>24 hours</strong>. If you did not request a Paramant account, ignore this email — no account will be created.
+        <br>Requested ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}.
+      </p>
+    </div>
+  `);
+
+  return { ...wrap(text, html, { refId: 'verify-' + token.slice(0, 8) }), subject: 'Verify your Paramant account' };
+}
+
 // ── SEND HELPER ───────────────────────────────────────────────────────────────
 async function sendEmail(to, templateResult) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -398,6 +443,7 @@ async function sendEmail(to, templateResult) {
 
 module.exports = {
   setupEmail,
+  signupVerificationEmail,
   resetConfirmationEmail,
   welcomeEmail,
   billingConfirmationEmail,
