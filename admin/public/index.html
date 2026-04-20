@@ -346,7 +346,7 @@ let REFRESH = {};
 let openMenu = null;
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmt(ts){if(!ts)return '—';const d=new Date(ts);return d.toLocaleDateString('nl-NL',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
 function toast(msg,type=''){const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;el.setAttribute('role','status');document.body.appendChild(el);requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),250);},3200);}
 function showErr(msg){const e=document.getElementById('l-err');e.textContent=msg;e.style.display='block'}
