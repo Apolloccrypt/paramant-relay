@@ -27,6 +27,139 @@
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="stylesheet" href="/design-system.css?v=6">
 <link rel="stylesheet" href="/nav.css?v=6">
+<style>
+/* iter2: step numbers — compact lime badge */
+.how-num {
+  font-size: 13px !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-weight: 700 !important;
+  color: #0B3A6A !important;
+  background: #B2FF3F !important;
+  padding: 0 10px !important;
+  display: inline-block !important;
+  line-height: 1.55 !important;
+  letter-spacing: .04em !important;
+  margin-bottom: var(--space-3) !important;
+}
+/* iter2: section numbers — lime badge universally */
+.sec-head .num, .marker .num {
+  background: #B2FF3F;
+  color: #0B3A6A !important;
+  padding: 0 12px;
+  display: inline-block;
+  line-height: 1.35;
+}
+/* iter2: exception — cobalt section 03.5, use white on cobalt */
+#auth .sec-head .num {
+  background: transparent !important;
+  color: #ffffff !important;
+  padding: 0 !important;
+}
+/* iter2: section 02 crypto strip — section-num badge on navy */
+.crypto-strip .section-num {
+  background: #B2FF3F !important;
+  color: #0B3A6A !important;
+  padding: 0 12px !important;
+  display: inline-block !important;
+  line-height: 1.35 !important;
+}
+/* iter2: crypto-strip strong = lime highlight on navy */
+.crypto-strip-content strong {
+  background: #B2FF3F;
+  color: #0B3A6A;
+  padding: 0 5px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+}
+/* iter2: CRYPTO label = lime on navy */
+.crypto-strip .section-label {
+  color: #B2FF3F !important;
+}
+/* iter2: deploy grid */
+.deploy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.deploy-card {
+  border: 1px solid rgba(11,58,106,0.12);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+.deploy-card.featured {
+  border-color: #1D4ED8;
+  border-width: 2px;
+}
+.deploy-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+.deploy-card.featured .deploy-label {
+  background: #B2FF3F;
+  color: #0B3A6A;
+  padding: 2px 8px;
+  display: inline-block;
+  align-self: flex-start;
+}
+.deploy-card h3 {
+  font-size: 26px;
+  font-weight: 600;
+  color: #0B3A6A;
+  margin: 0 0 6px 0;
+}
+.deploy-tagline {
+  font-size: 15px;
+  color: #1D4ED8;
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+}
+.deploy-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+  margin: 0 0 18px 0;
+  flex-grow: 1;
+}
+.deploy-specs {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 22px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.deploy-specs li {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: #475569;
+  padding-left: 16px;
+  position: relative;
+}
+.deploy-specs li::before {
+  content: 'B8';
+  position: absolute;
+  left: 0;
+  color: #B2FF3F;
+}
+.deploy-cta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: #1D4ED8;
+  text-decoration: none;
+  letter-spacing: .02em;
+  align-self: flex-start;
+}
+.deploy-cta:hover { text-decoration: underline; }
+@media (max-width: 900px) {
+  .deploy-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -332,12 +465,12 @@
   <div class="container">
     <div class="crypto-strip-inner">
       <div class="section-marker" style="display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap">
-        <span class="section-num" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--cobalt);letter-spacing:.1em">02</span>
+        <span class="section-num" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.1em">02</span>
         <h2 id="crypto-strip-title" style="font-size:var(--text-xl);font-weight:700;color:var(--bone);margin:0;line-height:1.1">Under the hood.</h2>
-        <span class="section-label" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.08em">CRYPTO</span>
+        <span class="section-label" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.08em">CRYPTO</span>
       </div>
       <div class="crypto-strip-content">
-        <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.65;margin:0 0 var(--space-3) 0"><strong style="color:var(--bone)">AES-256-GCM</strong> for anonymous one-off sends. <strong style="color:var(--bone)">ML-KEM-768 + ECDH P-256</strong> hybrid for verified end-to-end. All math happens client-side. The relay sees ciphertext only.</p>
+        <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.65;margin:0 0 var(--space-3) 0"><strong>AES-256-GCM</strong> for anonymous one-off sends. <strong>ML-KEM-768 + ECDH P-256</strong> hybrid for verified end-to-end. All math happens client-side. The relay sees ciphertext only.</p>
         <a href="/security" class="crypto-strip-link" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--cobalt);letter-spacing:.06em;text-decoration:none">Full cryptography spec →</a>
       </div>
     </div>
@@ -536,33 +669,51 @@
   </div>
 </section>
 
-<!-- § 06 THREE WAYS TO START -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="start">
+<!-- § 06 THREE WAYS TO DEPLOY -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="deploy" aria-labelledby="deploy-title">
   <div class="container">
     <div class="sec-head">
       <span class="num">06</span>
-      <h2>Three ways to start.</h2>
-      <span class="tag">pick your path</span>
+      <h2 id="deploy-title">Three ways to deploy.</h2>
+      <span class="tag">PICK YOUR PATH</span>
     </div>
-    <div class="grid3">
-      <div class="card" style="padding:var(--space-5)">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block;margin-bottom:12px">/drop</div>
-        <h3 style="margin:0 0 10px;font-size:var(--text-base)">Send a file now</h3>
-        <p style="margin:0 0 20px;font-size:var(--text-sm);color:var(--ink-dim)">Upload a file, get a share link. Email required for rate limiting, no account needed. Up to 3 per day.</p>
-        <a href="/drop" class="btn btn-outline" style="display:inline-block;padding:10px 20px;font-size:var(--text-sm)">Go to /drop</a>
-      </div>
-      <div class="card" style="padding:var(--space-5)">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block;margin-bottom:12px">/signup</div>
-        <h3 style="margin:0 0 10px;font-size:var(--text-base)">Create an account</h3>
-        <p style="margin:0 0 20px;font-size:var(--text-sm);color:var(--ink-dim)">Email + authenticator app login. Unlimited drops. API key included for automation. No password ever.</p>
-        <a href="/signup" class="btn btn-primary" style="display:inline-block;padding:10px 20px;font-size:var(--text-sm)">Create free account</a>
-      </div>
-      <div class="card" style="padding:var(--space-5)">
-        <div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block;margin-bottom:12px">/request-key</div>
-        <h3 style="margin:0 0 10px;font-size:var(--text-base)">Developer API key</h3>
-        <p style="margin:0 0 20px;font-size:var(--text-sm);color:var(--ink-dim)">For scripts, SDKs, and IoT devices. API key by email. No authenticator setup, no session login.</p>
-        <a href="/request-key" class="btn btn-outline" style="display:inline-block;padding:10px 20px;font-size:var(--text-sm)">Get API key</a>
-      </div>
+    <div class="deploy-grid">
+      <article class="deploy-card">
+        <div class="deploy-label">HOSTED</div>
+        <h3>paramant.app</h3>
+        <p class="deploy-tagline">Create account, use web UI, done.</p>
+        <p class="deploy-body">The fastest path. We run the relay in Germany, you send files in 30 seconds. Free Community tier covers casual use.</p>
+        <ul class="deploy-specs">
+          <li>EU-hosted &middot; Hetzner DE</li>
+          <li>Free Community plan</li>
+          <li>No setup required</li>
+        </ul>
+        <a href="/signup" class="deploy-cta">Create account &rarr;</a>
+      </article>
+      <article class="deploy-card featured">
+        <div class="deploy-label">SELF-HOST</div>
+        <h3>Your server</h3>
+        <p class="deploy-tagline">BUSL source. Docker compose. Done.</p>
+        <p class="deploy-body">Full source under BUSL-1.1. Run on your own hardware, Raspberry Pi upwards. Free for up to 5 users indefinitely.</p>
+        <ul class="deploy-specs">
+          <li>BUSL-1.1 license</li>
+          <li>docker compose up -d</li>
+          <li>Raspberry Pi supported</li>
+        </ul>
+        <a href="/docs#self-hosting" class="deploy-cta">Self-host guide &rarr;</a>
+      </article>
+      <article class="deploy-card">
+        <div class="deploy-label">ENTERPRISE</div>
+        <h3>Your infrastructure</h3>
+        <p class="deploy-tagline">Dedicated relay with SLA.</p>
+        <p class="deploy-body">For regulated sectors needing single-tenant deployment, compliance docs, and formal SLA. NIS2, DORA, HIPAA ready.</p>
+        <ul class="deploy-specs">
+          <li>Dedicated relay</li>
+          <li>99.9% SLA</li>
+          <li>Compliance paperwork</li>
+        </ul>
+        <a href="/pricing" class="deploy-cta">See enterprise plan &rarr;</a>
+      </article>
     </div>
   </div>
 </section>
