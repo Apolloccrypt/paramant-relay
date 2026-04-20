@@ -411,3 +411,20 @@ nav.nav .nav-link-btn:hover {
   border-color: var(--cobalt);
   background: var(--ink-ghost);
 }
+
+/* Skip to content (WCAG 2.4.1) */
+.skip-link {
+  position: absolute;
+  top: -48px;
+  left: 0;
+  background: var(--navy, #0B3A6A);
+  color: #F8FAFC;
+  padding: 10px 18px;
+  z-index: 10000;
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: .04em;
+  transition: top .1s;
+}
+.skip-link:focus { top: 0; outline: 2px solid #B2FF3F; outline-offset: 2px; }

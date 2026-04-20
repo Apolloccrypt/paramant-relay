@@ -4,7 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Documentation</title>
-<meta name="description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
+<meta name="description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2."
+<meta property="og:title" content="PARAMANT — Documentation">
+<meta property="og:description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
+<meta property="og:url" content="https://paramant.app/docs">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PARAMANT — Documentation">
+<meta name="twitter:description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
+<link rel="canonical" href="https://paramant.app/docs">>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 a{color:var(--ink);text-decoration:none}
@@ -76,7 +85,7 @@ tr:last-child td{border-bottom:none}
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
         <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
@@ -88,7 +97,7 @@ tr:last-child td{border-bottom:none}
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
         <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
@@ -100,7 +109,7 @@ tr:last-child td{border-bottom:none}
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
@@ -112,7 +121,7 @@ tr:last-child td{border-bottom:none}
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
         <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
@@ -136,7 +145,7 @@ tr:last-child td{border-bottom:none}
     <li><a href="/vs" class="nav-link">Compare</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/status" role="menuitem">Status</a></li>
         <li role="none"><a href="/security" role="menuitem">Security</a></li>
@@ -164,7 +173,7 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
     <div class="nav-mobile-group-items">
       <a href="/send">Send a file</a>
       <a href="/parashare">ParaShare</a>
@@ -176,7 +185,7 @@ tr:last-child td{border-bottom:none}
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
     <div class="nav-mobile-group-items">
       <a href="/docs">Docs</a>
       <a href="/docs#api">API reference</a>
@@ -188,7 +197,7 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
@@ -200,7 +209,7 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
     <div class="nav-mobile-group-items">
       <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
       <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
@@ -219,7 +228,7 @@ tr:last-child td{border-bottom:none}
   <a href="/vs" class="nav-mobile-standalone">Compare</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
     <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
@@ -553,7 +562,7 @@ curl http://localhost:3000/health
     <h3>Key .env variables</h3>
     <table>
       <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
-      <tr><td>ADMIN_TOKEN</td><td>Yes</td><td>Admin panel token (min 32 chars, hex)</td></tr>
+      <tr><td>ADMIN_TOKEN</td><td>Yes</td><td>Admin panel password (min 32 chars, hex)</td></tr>
       <tr><td>TOTP_SECRET</td><td>Recommended</td><td>Base32 TOTP secret — enables MFA on admin login</td></tr>
       <tr><td>PLK_KEY</td><td>No</td><td>License key — unlocks &gt;5 users (Community = free, max 5)</td></tr>
       <tr><td>RESEND_API_KEY</td><td>No</td><td>Email provider key (for key delivery notifications)</td></tr>

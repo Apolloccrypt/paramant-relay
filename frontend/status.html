@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>System Status — PARAMANT</title>
-<meta name="description" content="Real-time status of all PARAMANT relay sectors.">
+<meta name="description" content="Real-time status of all PARAMANT relay sectors."
+<meta property="og:title" content="System Status — PARAMANT">
+<meta property="og:description" content="Real-time status of all PARAMANT relay sectors.">
+<meta property="og:url" content="https://paramant.app/status">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="System Status — PARAMANT">
+<meta name="twitter:description" content="Real-time status of all PARAMANT relay sectors.">
+<link rel="canonical" href="https://paramant.app/status">>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -62,6 +71,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
 </style>
 </head>
 <body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <div class="meta-bar">
   <span class="">build 2.4.5</span>
   <span class="sep">·</span>
@@ -75,7 +85,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
         <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
@@ -87,7 +97,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
         <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
@@ -99,7 +109,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
@@ -111,7 +121,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
         <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
@@ -135,7 +145,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
     <li><a href="/vs" class="nav-link">Compare</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/status" role="menuitem">Status</a></li>
         <li role="none"><a href="/security" role="menuitem">Security</a></li>
@@ -163,7 +173,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
     <div class="nav-mobile-group-items">
       <a href="/send">Send a file</a>
       <a href="/parashare">ParaShare</a>
@@ -175,7 +185,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
     <div class="nav-mobile-group-items">
       <a href="/docs">Docs</a>
       <a href="/docs#api">API reference</a>
@@ -187,7 +197,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
@@ -199,7 +209,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
     <div class="nav-mobile-group-items">
       <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
       <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
@@ -218,7 +228,7 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
   <a href="/vs" class="nav-mobile-standalone">Compare</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
     <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
