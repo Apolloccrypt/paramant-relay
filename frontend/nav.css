@@ -417,16 +417,19 @@ nav.nav .nav-link-btn:hover {
 /* Skip to content (WCAG 2.4.1) */
 .skip-link {
   position: absolute;
-  top: -48px;
+  top: -200px;
   left: 0;
   background: var(--navy, #0B3A6A);
   color: #F8FAFC;
-  padding: 10px 18px;
+  padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
   font-family: var(--mono);
   font-size: var(--text-xs);
   letter-spacing: .04em;
-  transition: top .1s;
+  border: 2px solid #B2FF3F;
+  transition: top 120ms ease;
 }
-.skip-link:focus { top: 0; outline: 2px solid #B2FF3F; outline-offset: 2px; }
+.skip-link:focus,
+.skip-link:focus-visible { top: 0; outline: none; }
+.skip-link:focus:hover { background: #1D4ED8; }
