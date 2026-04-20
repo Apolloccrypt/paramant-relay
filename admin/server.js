@@ -1449,6 +1449,7 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
     if (notify && meta.email) {
       emailTemplates.sendEmail(meta.email, emailTemplates.accountDeletionEmail({ email: meta.email, deletedAt, reason: reason || 'admin action' })).catch(e => console.error('[admin/delete-account] email:', e.message));
     }
+    await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
     try { await logAuditEvent('admin', 'admin_account_deleted', { key_prefix: key.slice(0, 16), email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, deleted_at: new Date(deletedAt).toISOString(), email_sent: !!(notify && meta.email) });
   } catch (err) { console.error('[admin/delete-account]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }

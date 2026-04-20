@@ -29,7 +29,9 @@ async function getRecentAuditEvents(limit = 20) {
 }
 
 async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
-  const r = await relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN);
+  let r;
+  try { r = await relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN); }
+  catch (e) { console.error('[telemetry] relay unavailable:', e.message); return []; }
   const keys = r.body?.keys || [];
   const users = await Promise.all(keys.map(async k => {
     if (!k?.key) return null;

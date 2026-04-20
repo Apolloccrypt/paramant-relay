@@ -844,7 +844,7 @@ async function doDeleteAccount(){
   const r=await api('/admin/delete-account',{method:'POST',body:JSON.stringify({key,confirm:'DELETE',notify})});
   closeModal('mo-delete');
   toast(r.ok?'Account deleted':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
-  if(r.ok){LOADED.users=false;loadUsers();}
+  if(r.ok){LOADED.users=false;setTimeout(loadUsers,800);}
 }
 async function openUserDetailsModal(key){
   openModal('mo-details');
