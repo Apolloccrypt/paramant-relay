@@ -295,6 +295,11 @@ api.post('/admin/resend-setup', async (req, res) => {
     return res.status(401).json({ error: 'unauthorized' });
   const { user_id, email } = req.body || {};
   if (!user_id || !email) return res.status(400).json({ error: 'missing_fields' });
+  // Rate limit: max 10 admin resends per user per 24h
+  const adminRlKey = `paramant:ratelimit:admin_resend:${user_id}`;
+  const adminRlCnt = await redis().incr(adminRlKey);
+  if (adminRlCnt === 1) await redis().expire(adminRlKey, 86400);
+  if (adminRlCnt > 10) return res.status(429).json({ error: 'rate_limited', admin_message: 'Max 10 resends per user per 24h' });
   try {
     await Promise.all([
       redis().del(`paramant:user:totp:${user_id}`),
@@ -449,6 +454,24 @@ async function sendSetupEmail(email, setupToken, isReset = false) {
       subject,
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">${heading}</h2>${resetNote}<p style="color:#475569;margin:0 0 16px">Click below to set up two-factor authentication for your Paramant account.</p><a href="${setupUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Complete setup</a><p style="color:#94a3b8;font-size:12px;margin-top:24px">Link expires in 14 days. If you did not request this, ignore this email.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
       text: `${subject}\n\nLink: ${setupUrl}\n\nExpires in 14 days.${isReset ? " If you had a previous authenticator entry for Paramant, delete it first — it no longer works." : ""} If you did not request this, ignore this email.`,
+    }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => "")}`);
+}
+
+
+// Send TOTP reset confirmation email (step 1 of two-stage flow)
+async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt) {
+  const confirmUrl = `${SITE_URL}/auth/reset-confirm/${confirmToken}`;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "Paramant <noreply@paramant.app>",
+      to: [email],
+      subject: "Did you request a TOTP reset? — Paramant",
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc"><div style="max-width:540px;margin:40px auto;padding:40px;background:#fff;border:1px solid #e2e8f0;font-family:system-ui,sans-serif"><h2 style="color:#0b3a6a;margin:0 0 20px;font-size:18px">Confirm authenticator reset</h2><p style="color:#475569;margin:0 0 16px">Someone requested a reset of your Paramant authenticator. If this was you, click below to confirm. You will then receive a second email with a new setup link.</p><a href="${confirmUrl}" style="display:inline-block;background:#0b3a6a;color:#fff;padding:12px 24px;text-decoration:none;font-family:monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700">Confirm reset</a><p style="color:#94a3b8;font-size:12px;margin-top:24px"><b>This link expires in 15 minutes.</b></p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:12px;margin:0 0 8px">Request details:</p><p style="color:#94a3b8;font-size:12px;margin:0">Time: ${requestedAt}<br>IP: ${maskedIp}</p><p style="color:#94a3b8;font-size:12px;margin-top:16px">If you did not request this, ignore this email. Your current authenticator will keep working.</p><hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="color:#94a3b8;font-size:11px;margin:0">Paramant &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR</p></div></body></html>`,
+      text: `Confirm authenticator reset\n\nSomeone requested a reset of your Paramant authenticator.\n\nIf this was you, click the link below to confirm. You will then receive a second email with a new setup link.\n\nConfirm: ${confirmUrl}\n\nThis link expires in 15 minutes.\n\nRequest details:\nTime: ${requestedAt}\nIP: ${maskedIp}\n\nIf you did not request this, ignore this email. Your current authenticator will keep working.`,
     }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => "")}`);
@@ -662,50 +685,98 @@ api.post("/user/login-with-backup", async (req, res) => {
 });
 
 
-// POST /api/user/auth/request-totp-reset (public — for locked-out users)
+// POST /api/user/auth/request-totp-reset (public — two-stage: sends confirmation first)
 api.post("/user/auth/request-totp-reset", async (req, res) => {
   const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: "missing_email" });
+  if (!email || typeof email !== "string") return res.status(400).json({ error: "invalid_request" });
   const norm = email.toLowerCase().trim();
 
+  // Rate limit: max 5/24h per email (hashed for privacy), 10/hr per IP
+  const emailHash = crypto.createHash("sha256").update(norm).digest("hex").slice(0, 16);
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
-  const ipKey    = `paramant:totp-reset-req:ip:${ip}`;
-  const emailKey = `paramant:totp-reset-req:email:${norm}`;
-  const [ipCnt, emailCnt] = await Promise.all([redis().incr(ipKey), redis().incr(emailKey)]);
+  const emailRlKey = `paramant:ratelimit:totp_reset:${emailHash}`;
+  const ipRlKey    = `paramant:ratelimit:totp_reset_ip:${ip}`;
+  const [emailCnt, ipCnt] = await Promise.all([redis().incr(emailRlKey), redis().incr(ipRlKey)]);
   await Promise.all([
-    ipCnt    === 1 ? redis().expire(ipKey,    3600) : Promise.resolve(),
-    emailCnt === 1 ? redis().expire(emailKey, 3600) : Promise.resolve(),
+    emailCnt === 1 ? redis().expire(emailRlKey, 86400) : Promise.resolve(),
+    ipCnt    === 1 ? redis().expire(ipRlKey,    3600)  : Promise.resolve(),
   ]);
-
-  if (ipCnt <= 5 && emailCnt <= 3) {
-    const user = await findUserByEmail(norm).catch(() => null);
-    if (user) {
-      try {
-        await Promise.all([
-          redis().del(`paramant:user:totp:${user.key}`),
-          redis().del(`paramant:user:totp_active:${user.key}`),
-          redis().del(`paramant:user:backup_codes:${user.key}`),
-          redis().del(`paramant:user:backup_codes_plaintext:${user.key}`),
-        ]);
-        for await (const k of redis().scanIterator({ MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
-          const raw = await redis().get(k);
-          if (raw) { try { const d = JSON.parse(raw); if (d.user_id === user.key) await redis().del(k); } catch {} }
-        }
-        const setupToken = crypto.randomBytes(32).toString("hex");
-        await redis().set(
-          `paramant:user:setup_token:${setupToken}`,
-          JSON.stringify({ user_id: user.key, email: norm }),
-          { EX: 14 * 86400 }
-        );
-        await sendSetupEmail(norm, setupToken, true);
-        console.log(`[totp-reset-req] sent to ${norm}`);
-      } catch (err) {
-        console.error("[totp-reset-req] failed:", err.message);
-      }
-    }
+  if (emailCnt > 5 || ipCnt > 10) {
+    console.warn(`[totp-reset-req] rate limited: emailHash=${emailHash} ip=${ip}`);
+    return res.status(429).json({ error: "too_many_requests", retry_after: 86400 });
   }
 
-  res.json({ sent: true }); // always 200 to prevent email enumeration
+  const alwaysOk = { success: true, message: "If an account exists for this email, a confirmation email has been sent." };
+
+  const user = await findUserByEmail(norm).catch(() => null);
+  if (!user) return res.json(alwaysOk); // no enumeration
+
+  // Generate short-lived confirmation token — does NOT touch TOTP state yet
+  const confirmToken = crypto.randomBytes(32).toString("hex");
+  const requestedAt  = Date.now();
+  const maskedIp = ip.includes(".") ? ip.split(".").slice(0,2).join(".") + ".x.x" : ip.split(":").slice(0,2).join(":") + "::x";
+  await redis().set(
+    `paramant:user:reset_confirm:${confirmToken}`,
+    JSON.stringify({ user_id: user.key, email: norm, requested_at: requestedAt, masked_ip: maskedIp }),
+    { EX: 900 } // 15 minutes
+  );
+
+  try { await logAuditEvent(user.key, "totp_reset_requested", { ip, ua: (req.get("user-agent") || "").slice(0, 200) }); } catch {}
+
+  try {
+    await sendResetConfirmEmail(norm, confirmToken, maskedIp, new Date(requestedAt).toISOString());
+    console.log(`[totp-reset-req] confirmation email sent to ${norm}`);
+  } catch (err) {
+    console.error("[totp-reset-req] email failed:", err.message);
+  }
+
+  res.json(alwaysOk);
+});
+
+// POST /api/user/auth/reset-confirm — second stage: user clicked confirmation link
+api.post("/user/auth/reset-confirm", async (req, res) => {
+  const { token } = req.body || {};
+  if (!token || typeof token !== "string") return res.status(400).json({ error: "invalid_request" });
+
+  const raw = await redis().get(`paramant:user:reset_confirm:${token}`);
+  if (!raw) return res.status(401).json({ error: "invalid_or_expired_token" });
+
+  const data = JSON.parse(raw);
+  const { user_id, email, requested_at } = data;
+
+  // Consume confirmation token — one-time use
+  await redis().del(`paramant:user:reset_confirm:${token}`);
+
+  // NOW clear TOTP state
+  await Promise.all([
+    redis().del(`paramant:user:totp:${user_id}`),
+    redis().del(`paramant:user:totp_active:${user_id}`),
+    redis().del(`paramant:user:backup_codes:${user_id}`),
+    redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
+  ]);
+  for await (const k of redis().scanIterator({ MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
+    const r = await redis().get(k);
+    if (r) { try { const d = JSON.parse(r); if (d.user_id === user_id) await redis().del(k); } catch {} }
+  }
+
+  const setupToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:setup_token:${setupToken}`,
+    JSON.stringify({ user_id, email }),
+    { EX: 14 * 86400 }
+  );
+
+  try { await logAuditEvent(user_id, "totp_reset_confirmed", { age_sec: Math.floor((Date.now() - requested_at) / 1000), ip: req.headers["x-real-ip"] || "unknown" }); } catch {}
+
+  try {
+    await sendSetupEmail(email, setupToken, true);
+  } catch (err) {
+    console.error("[reset-confirm] setup email failed:", err.message);
+    return res.status(500).json({ error: "email_failed" });
+  }
+
+  console.log(`[reset-confirm] TOTP reset completed for ${email}`);
+  res.json({ success: true, message: "Setup email sent. Check your inbox." });
 });
 
 // POST /api/user/logout

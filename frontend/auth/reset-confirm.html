@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirm authenticator reset — Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/nav.css?v=6">
+<style>
+  .warning-box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin: 16px 0;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+</nav>
+
+<main class="page-main">
+<section class="form-section">
+  <h1 class="form-title">Confirm authenticator reset</h1>
+
+  <div id="initial-view">
+    <p class="form-subtitle">Click below to confirm the reset of your Paramant authenticator. After confirming, you will receive a second email with a new setup link.</p>
+
+    <div class="warning-box">
+      Only click this if you requested the reset yourself. If you did not request it, close this page — your account stays unchanged.
+    </div>
+
+    <button id="confirm-btn" class="btn btn-primary mt-3">
+      Yes, reset my authenticator
+    </button>
+
+    <div id="error" class="error mt-3"></div>
+  </div>
+
+  <div id="success-view" style="display:none">
+    <p class="form-subtitle" style="color:#059669">Reset confirmed. A setup email is on its way.</p>
+    <p>Check your inbox for an email from Paramant with a setup link. Click the link to scan a new QR code and enroll your authenticator.</p>
+    <p style="margin-top:8px">If you had a previous Paramant entry in your authenticator app, delete it first — it no longer works.</p>
+    <p class="footer-text mt-4"><a href="/auth/login">Return to sign in</a></p>
+  </div>
+
+  <div id="expired-view" style="display:none">
+    <p class="form-subtitle" style="color:#dc2626">This confirmation link has expired.</p>
+    <p>Confirmation links are valid for 15 minutes. Please request a new reset.</p>
+    <p class="footer-text mt-4">
+      <a href="/auth/request-reset">Request a new reset link</a>
+    </p>
+  </div>
+</section>
+</main>
+
+<script src="/nav.js?v=5" defer></script>
+<script>
+(function() {
+  const token = window.location.pathname.split('/').pop();
+  const confirmBtn = document.getElementById('confirm-btn');
+  const errorDiv = document.getElementById('error');
+
+  if (!token || token === 'reset-confirm') {
+    document.getElementById('initial-view').innerHTML =
+      '<p class="form-subtitle" style="color:#dc2626">Invalid link. Please request a new reset.</p>' +
+      '<p class="footer-text mt-4"><a href="/auth/request-reset">Request a reset link</a></p>';
+    return;
+  }
+
+  confirmBtn.addEventListener('click', async function() {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Processing...';
+    errorDiv.classList.remove('visible');
+
+    try {
+      const res = await fetch('/api/user/auth/reset-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+        credentials: 'include',
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        document.getElementById('initial-view').style.display = 'none';
+        document.getElementById('success-view').style.display = '';
+      } else if (res.status === 401) {
+        document.getElementById('initial-view').style.display = 'none';
+        document.getElementById('expired-view').style.display = '';
+      } else {
+        errorDiv.textContent = 'Error: ' + (data.error || 'unknown error. Try again.');
+        errorDiv.classList.add('visible');
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Yes, reset my authenticator';
+      }
+    } catch (err) {
+      errorDiv.textContent = 'Network error. Please try again.';
+      errorDiv.classList.add('visible');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Yes, reset my authenticator';
+    }
+  });
+})();
+</script>
+</body>
+</html>
