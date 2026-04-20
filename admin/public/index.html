@@ -216,15 +216,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
     </div>
     <div class="mbody">
       <div class="ep-tabs">
-        <button class="ep-tab on" onclick="epTab('html')" id="ep-tab-html">HTML</button>
-        <button class="ep-tab" onclick="epTab('text')" id="ep-tab-text">Plain text</button>
+        <button class="ep-tab on" onclick="epTab('html',this)" id="ep-tab-html">HTML</button>
+        <button class="ep-tab" onclick="epTab('text',this)" id="ep-tab-text">Plain text</button>
       </div>
       <div id="ep-subj" class="ep-subj"></div>
-      <div id="ep-body" class="ep-content"></div>
+      <div class="ep-content">
+        <pre id="ep-text" style="display:none"></pre>
+        <iframe id="ep-html" style="width:100%;border:none;height:340px"></iframe>
+      </div>
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-email')">Cancel</button>
-      <button class="btn pri" id="ep-send-btn" onclick="doSendEmail()">Send email</button>
+      <button class="btn pri" id="ep-send-btn" onclick="doSendEmail()">Send email &rarr;</button>
     </div>
   </div>
 </div>
@@ -236,20 +239,23 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
       <button class="close-mo" onclick="closeModal('mo-plan')" aria-label="Close">&times;</button>
     </div>
     <div class="mbody">
-      <div class="mc"><label>Key</label><div id="mp-key" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></div></div>
+      <div class="mc"><label>Current plan</label><span id="cp-current" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></span></div>
       <div class="mc">
-        <label for="mp-plan-sel">New plan</label>
-        <select id="mp-plan-sel">
+        <label for="cp-plan">New plan</label>
+        <select id="cp-plan">
           <option value="community">community</option>
           <option value="pro">pro</option>
           <option value="enterprise">enterprise</option>
         </select>
       </div>
-      <div class="mc"><label>Note (optional)</label><input type="text" id="mp-note" placeholder="reason for change"></div>
+      <div class="mc" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="cp-notify" checked>
+        <label for="cp-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
+      </div>
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-plan')">Cancel</button>
-      <button class="btn pri" onclick="doChangePlan()">Save</button>
+      <button class="btn pri" id="cp-btn" onclick="doChangePlan()">Save</button>
     </div>
   </div>
 </div>
@@ -261,13 +267,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
       <button class="close-mo" onclick="closeModal('mo-disable')" aria-label="Close">&times;</button>
     </div>
     <div class="mbody">
-      <p style="font-size:13px;color:#475569;margin:0 0 12px">Disabling this key will immediately block all API access. The key can be re-enabled manually.</p>
-      <div class="mc"><label>Key</label><div id="md-key" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></div></div>
-      <div class="mc"><label>Reason (optional)</label><input type="text" id="md-reason" placeholder="e.g. abuse, non-payment"></div>
+      <p style="font-size:13px;color:#475569;margin:0 0 12px">Disabling this key will immediately block all API access. It can be re-enabled manually.</p>
+      <div class="mc"><label>Reason (optional)</label><input type="text" id="dk-reason" placeholder="e.g. abuse, non-payment"></div>
+      <div class="mc" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="dk-notify">
+        <label for="dk-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
+      </div>
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-disable')">Cancel</button>
-      <button class="btn danger" onclick="doDisableKey()">Disable key</button>
+      <button class="btn danger" id="dk-btn" onclick="doDisableKey()">Disable key</button>
     </div>
   </div>
 </div>
@@ -280,14 +289,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
     </div>
     <div class="mbody">
       <p style="font-size:13px;color:#dc2626;font-weight:600;margin:0 0 10px">This action is irreversible.</p>
-      <p style="font-size:13px;color:#475569;margin:0 0 12px">All user data, sessions, and API keys will be permanently deleted.</p>
-      <div class="mc"><label>Key</label><div id="mda-key" style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#475569"></div></div>
-      <div class="mc"><label>Reason</label><input type="text" id="mda-reason" placeholder="required"></div>
-      <div class="mc"><label>Type DELETE to confirm</label><input type="text" id="mda-confirm" placeholder="DELETE"></div>
+      <p style="font-size:13px;color:#475569;margin:0 0 12px">Account: <span id="da-target" style="font-family:'IBM Plex Mono',monospace"></span></p>
+      <div class="mc" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="da-notify" checked>
+        <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deletion confirmation email</label>
+      </div>
+      <div class="mc" style="margin-top:10px"><label>Type DELETE to confirm</label><input type="text" id="da-confirm" placeholder="DELETE" autocomplete="off"></div>
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-delete')">Cancel</button>
-      <button class="btn danger" onclick="doDeleteAccount()">Delete account</button>
+      <button class="btn danger" id="da-btn" onclick="doDeleteAccount()">Delete account</button>
     </div>
   </div>
 </div>
@@ -299,7 +310,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
       <button class="close-mo" onclick="closeModal('mo-details')" aria-label="Close">&times;</button>
     </div>
     <div class="mbody" id="mo-details-body">
-      <div class="sp-icon"></div> Loading…
+      <div class="empty"><span class="sp-icon"></span>Loading…</div>
     </div>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mo-details')">Close</button>
