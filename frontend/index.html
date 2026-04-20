@@ -125,14 +125,24 @@
     <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
 
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/send">Send a file</a>
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
+  <div class="nav-mobile-products">
+    <div class="nav-mobile-products-label">Products</div>
+    <a href="/send" class="nmpl">
+      <span class="nmpl-title">Send a file</span>
+      <span class="nmpl-sub">Drop, share link, done. No account.</span>
+    </a>
+    <a href="/parashare" class="nmpl nmpl-featured">
+      <span class="nmpl-title">ParaShare</span>
+      <span class="nmpl-sub">Verified end-to-end with audit trail.</span>
+    </a>
+    <a href="/drop" class="nmpl">
+      <span class="nmpl-title">ParaDrop</span>
+      <span class="nmpl-sub">AirDrop alternative, any platform.</span>
+    </a>
+    <a href="/dashboard" class="nmpl">
+      <span class="nmpl-title">Dashboard</span>
+      <span class="nmpl-sub">Manage your account.</span>
+    </a>
   </div>
 
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
@@ -251,11 +261,64 @@
   </div>
 </section>
 
-<!-- § 01.5 TWO TRUST MODES -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="modes">
+<!-- § 01.5 THREE PRODUCTS -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="pick">
   <div class="container">
     <div class="sec-head">
       <span class="num" style="font-size:clamp(3rem,7vw,7rem)">01.5</span>
+      <h2>Three ways to share. Pick what fits.</h2>
+      <span class="tag">Products</span>
+    </div>
+    <div class="pick-grid">
+
+      <a href="/send" class="pick-card">
+        <p class="pick-label">Anonymous one-off</p>
+        <h3 class="pick-title">Send a file</h3>
+        <p class="pick-tagline">Drop, share link, done. No account.</p>
+        <p class="pick-desc">Browser-generated key in URL fragment &mdash; never sent to the relay. Prove-by-design that we cannot decrypt what we relay. Ideal for one-off sends with zero setup.</p>
+        <ul class="pick-specs">
+          <li>AES-256-GCM</li>
+          <li>No signup</li>
+          <li>One-shot burn link</li>
+        </ul>
+        <span class="pick-cta">Send a file &rarr;</span>
+      </a>
+
+      <a href="/parashare" class="pick-card pick-card-featured">
+        <p class="pick-label">Verified end-to-end</p>
+        <h3 class="pick-title">ParaShare</h3>
+        <p class="pick-tagline">Proof of who sent what.</p>
+        <p class="pick-desc">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS&nbsp;204). Fingerprint verification before send. For when the audit trail matters.</p>
+        <ul class="pick-specs">
+          <li>ML-KEM-768 + ECDH P-256</li>
+          <li>Account required</li>
+          <li>Signed receipts (FIPS 204)</li>
+        </ul>
+        <span class="pick-cta">Try ParaShare &rarr;</span>
+      </a>
+
+      <a href="/drop" class="pick-card">
+        <p class="pick-label">Device to device</p>
+        <h3 class="pick-title">ParaDrop</h3>
+        <p class="pick-tagline">AirDrop alternative, any platform.</p>
+        <p class="pick-desc">Short-lived QR code or 6-digit pairing between any two devices. Works across iOS, Android, Windows, Linux. No relay storage, no cloud, no account needed.</p>
+        <ul class="pick-specs">
+          <li>QR or 6-digit code</li>
+          <li>Cross-platform</li>
+          <li>No cloud storage</li>
+        </ul>
+        <span class="pick-cta">Use ParaDrop &rarr;</span>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- § 02 TWO TRUST MODES -->
+<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="modes">
+  <div class="container">
+    <div class="sec-head">
+      <span class="num" style="font-size:clamp(3rem,7vw,7rem)">02</span>
       <h2>Two modes. Pick your trust model.</h2>
       <span class="tag">Architecture</span>
     </div>
@@ -276,41 +339,6 @@
         <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65;margin-bottom:var(--space-6)">For when the audit trail matters. The receiver can prove who sent what.</p>
         <a href="/parashare" class="btn btn-secondary">Try ParaShare &rarr;</a>
       </div>
-
-    </div>
-  </div>
-</section>
-
-<!-- § 02 PRODUCTS -->
-<section class="section-cobalt" style="padding:var(--space-9) 0" id="products">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num">02</span>
-      <h2>Products</h2>
-      <span class="tag">Three tools</span>
-    </div>
-    <div class="products-grid">
-
-      <a href="/send" class="product-card">
-        <p class="product-eyebrow">ParaSend</p>
-        <h3>Send a file</h3>
-        <p>AES-256-GCM. Key in URL fragment. Drop a file, get a burn link. 5 MB, up to 1 hour.</p>
-        <span class="product-card-link">Try now &rarr;</span>
-      </a>
-
-      <a href="/parashare" class="product-card">
-        <p class="product-eyebrow">ParaShare</p>
-        <h3>Verified transfer</h3>
-        <p>ML-KEM-768 hybrid with fingerprint verification. Post-quantum key exchange. Proof-of-delivery.</p>
-        <span class="product-card-link">Try free &rarr;</span>
-      </a>
-
-      <a href="/drop" class="product-card">
-        <p class="product-eyebrow">ParaDrop</p>
-        <h3>Local transfer</h3>
-        <p>Browser to browser via WebRTC. No relay storage. No Apple. No cloud. Burn-on-read.</p>
-        <span class="product-card-link">Try now &rarr;</span>
-      </a>
 
     </div>
   </div>
