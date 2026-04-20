@@ -2,5 +2,7 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
+Disallow: /.well-known/
+Disallow: /auth/
 
 Sitemap: https://paramant.app/sitemap.xml
