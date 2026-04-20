@@ -1296,8 +1296,18 @@ api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
     const details = {};
     await Promise.all(Object.keys(SECTORS).map(async s => {
       try {
-        const r = await relayFetch(s, "/health", "GET", null, false, ADMIN_TOKEN);
-        details[s] = r.status === 200 ? r.body : { error: "HTTP " + r.status };
+        const [hRes, mRes] = await Promise.all([
+          relayFetch(s, "/health", "GET", null, false, ADMIN_TOKEN),
+          relayFetch(s, "/metrics", "GET", null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
+        ]);
+        if (hRes.status !== 200) { details[s] = { error: "HTTP " + hRes.status }; return; }
+        const d = { ...hRes.body };
+        // extract uptime_s from prometheus metrics
+        const uptimeMatch = (mRes.text || '').match(/paramant_uptime_s\{[^}]*\}\s+([\d.]+)/);
+        if (uptimeMatch) d.uptime_s = parseFloat(uptimeMatch[1]);
+        // normalize blobs field name for frontend
+        if (d.blobs_in_flight !== undefined && d.blobs === undefined) d.blobs = d.blobs_in_flight;
+        details[s] = d;
       } catch (e) { details[s] = { error: e.message }; }
     }));
     res.json({ sectors: details });
