@@ -411,9 +411,9 @@ async function loadOverview(){
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
   el.innerHTML=
     '<div class="sg">'+
-      statCard('Signups today',st.signups_today??'—')+
-      statCard('Active sessions',st.active_sessions??'—')+
-      statCard('Pro upgrades today',st.pro_upgrades_today??'—')+
+      statCard('Signups today',st.signups_today??0)+
+      statCard('Active sessions',st.active_sessions??0)+
+      statCard('Pro upgrades today',st.pro_upgrades_today??0)+
       statCard('MRR (EUR)','€'+((st.revenue_mrr||0)/100).toFixed(0))+
     '</div>'+
     (d.alerts&&d.alerts.length?'<div class="card"><div class="card-hdr">Alerts</div>'+d.alerts.map(a=>'<div class="banner info">'+esc(a)+'</div>').join('')+'</div>':'')+
