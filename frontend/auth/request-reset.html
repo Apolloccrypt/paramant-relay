@@ -40,6 +40,7 @@
 </section>
 </main>
 
+<script src="/js/pow-captcha.js"></script>
 <script src="/nav.js?v=5" defer></script>
 <script>
 (function() {
@@ -57,10 +58,23 @@
     const email = document.getElementById('email').value.trim();
 
     try {
+      // Solve PoW challenge
+      let proof;
+      try {
+        submitBtn.textContent = 'Verifying…';
+        proof = await ParamantCaptcha.getCaptchaProof();
+      } catch (_) {
+        errorDiv.textContent = 'Verification failed. Please try again.';
+        errorDiv.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send reset link';
+        return;
+      }
+
       const res = await fetch('/api/user/auth/request-totp-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, challenge_id: proof.challenge_id, nonce: proof.nonce }),
         credentials: 'include',
       });
 

@@ -235,7 +235,15 @@
     <div class="tag">one field<br>to start</div>
   </div>
 
-  <form id="signup-form" class="form-card" novalidate>
+  <div id="already-signed-in" hidden style="margin:24px 0;padding:16px;background:rgba(178,255,63,0.1);border-left:3px solid #B2FF3F;">
+  <p style="margin:0;">
+    You are already signed in as <strong id="already-email"></strong>.
+    <a href="/account" style="color:#1D4ED8;font-weight:600;">Go to your account</a>
+    or <button type="button" id="already-signout" style="background:none;border:none;color:#991b1b;font-weight:600;cursor:pointer;text-decoration:underline;">sign out first</button>.
+  </p>
+</div>
+
+<form id="signup-form" class="form-card" novalidate>
     <label for="email">Email address</label>
     <input type="email" id="email" name="email" required autocomplete="email"
            placeholder="you@example.com">
@@ -300,6 +308,7 @@
 
 </main>
 
+<script src="/js/pow-captcha.js"></script>
 <script src="/nav.js?v=5" defer></script>
 <script>
 (function() {
@@ -328,10 +337,25 @@
     }
 
     try {
+      // Solve PoW challenge (invisible to user, ~1-2s)
+      let proof;
+      try {
+        submitBtn.textContent = 'Verifying…';
+        proof = await ParamantCaptcha.getCaptchaProof(n => {
+          submitBtn.textContent = 'Verifying… (' + (n / 1000).toFixed(0) + 'k)';
+        });
+      } catch (_) {
+        errorDiv.textContent = 'Verification failed. Please try again.';
+        errorDiv.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send setup email';
+        return;
+      }
+
       const res = await fetch('/api/user/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, label, dpa_accepted: true }),
+        body: JSON.stringify({ email, label, dpa_accepted: true, challenge_id: proof.challenge_id, nonce: proof.nonce }),
       });
 
       if (res.ok) {
@@ -362,5 +386,23 @@
 })();
 </script>
 
+<script>
+(async function() {
+  try {
+    var res = await fetch("/api/user/session/verify", {credentials:"include"});
+    var d = await res.json();
+    if (d.authenticated) {
+      document.getElementById("already-email").textContent = d.email;
+      document.getElementById("already-signed-in").hidden = false;
+      var sf = document.getElementById("signup-form");
+      if (sf) { sf.style.opacity = "0.4"; sf.style.pointerEvents = "none"; }
+      document.getElementById("already-signout").addEventListener("click", async function() {
+        await fetch("/api/user/logout", {method:"POST",credentials:"include"});
+        location.reload();
+      });
+    }
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>

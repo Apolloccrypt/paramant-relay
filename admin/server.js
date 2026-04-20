@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const emailTemplates = require('./lib/email-templates');
+const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
@@ -505,11 +506,25 @@ function clearUserCookie(res) {
 
 // ── Signup flow ───────────────────────────────────────────────────────────────
 
+
+// GET /api/captcha/challenge
+api.get('/captcha/challenge', async (req, res) => {
+  try {
+    res.json(await pow.issueChallenge());
+  } catch (e) {
+    res.status(500).json({ error: 'challenge_failed' });
+  }
+});
+
 // POST /api/user/signup
 api.post("/user/signup", async (req, res) => {
-  const { email, label, dpa_accepted } = req.body || {};
+  const { email, label, dpa_accepted, challenge_id, nonce } = req.body || {};
   if (!email || !dpa_accepted) return res.status(400).json({ error: "missing_fields" });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+
+  // PoW verification — prevents automated signups
+  const proof = await pow.verifyChallenge(challenge_id, nonce);
+  if (!proof.valid) return res.status(403).json({ error: 'captcha_failed', reason: proof.reason });
 
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
   const ipKey = `paramant:signup:ratelimit:${ip}`;
@@ -705,9 +720,13 @@ api.post("/user/login-with-backup", async (req, res) => {
 
 // POST /api/user/auth/request-totp-reset (public — two-stage: sends confirmation first)
 api.post("/user/auth/request-totp-reset", async (req, res) => {
-  const { email } = req.body || {};
+  const { email, challenge_id, nonce } = req.body || {};
   if (!email || typeof email !== "string") return res.status(400).json({ error: "invalid_request" });
   const norm = email.toLowerCase().trim();
+
+  // PoW verification — prevents automated reset flooding
+  const proof = await pow.verifyChallenge(challenge_id, nonce);
+  if (!proof.valid) return res.status(403).json({ error: 'captcha_failed', reason: proof.reason });
 
   // Rate limit: max 5/24h per email (hashed for privacy), 10/hr per IP
   const emailHash = crypto.createHash("sha256").update(norm).digest("hex").slice(0, 16);
