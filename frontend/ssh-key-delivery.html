@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARAMANT - SSH key delivery, post-quantum</title>
+<meta name="description" content="OpenSSH 10.0 encrypts your session with ML-KEM. Paramant encrypts the delivery of the key itself, with burn-on-read delivery and ML-DSA-65 signed receipts.">
+<meta property="og:title" content="PARAMANT - SSH key delivery, post-quantum">
+<meta property="og:description" content="Post-quantum SSH bootstrap: deliver authorized_keys and keypairs through ML-KEM-768 encrypted, burn-on-read channels with cryptographic receipts.">
+<meta property="og:url" content="https://paramant.app/ssh-key-delivery">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://paramant.app/ssh-key-delivery">
+<link rel="stylesheet" href="/design-system.css?v=15">
+<link rel="stylesheet" href="/nav.css?v=9">
+<style>
+a{color:var(--ink);text-decoration:none}
+a:hover{opacity:.7}
+code{font-size:var(--text-xs);padding:2px 6px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
+
+.hero{padding:64px 48px 52px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
+.hero-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:16px}
+.hero h1{font-size:32px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-bottom:18px}
+.hero h1 em{font-style:italic;color:var(--cobalt);position:relative;display:inline}
+.hero h1 em::after{content:"";position:absolute;left:0;right:0;bottom:4%;height:22%;background:var(--lime);z-index:-1;pointer-events:none}
+.hero .lead{font-size:15px;color:var(--ink-dim);max-width:660px;line-height:1.75}
+
+main{max-width:860px;margin:0 auto;padding:0 48px 80px}
+
+section{margin-top:52px}
+section h2{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--ink-hair)}
+section h3{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:32px 0 10px;color:var(--ink)}
+section p{font-size:14px;color:var(--ink-dim);line-height:1.8;max-width:720px}
+section p+p{margin-top:14px}
+.sec-eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:8px;display:block}
+
+.step-list{margin-top:20px;display:flex;flex-direction:column;gap:0}
+.step-row{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--bone-on-navy-hair)}
+.step-row:last-child{border-bottom:none}
+.step-num{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--lime);min-width:28px;padding-top:2px;flex-shrink:0}
+.step-body{font-size:14px;color:var(--bone-on-navy-dim);line-height:1.75}
+.step-body strong{color:var(--bone-on-navy)}
+.workflow-block{background:var(--navy);padding:28px 32px;margin-top:24px}
+.workflow-note{font-size:13px;color:var(--bone-on-navy-dim);margin-top:20px;font-style:italic}
+
+.aside{background:rgba(178,255,63,.08);border:1px solid var(--ink-hair);padding:20px 24px;margin-top:28px}
+.aside .label{font-size:10px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.aside p{font-size:13px;color:var(--ink-dim);line-height:1.7;max-width:none}
+
+.cta{padding:36px 40px;margin-top:52px;text-align:center}
+.cta h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)}
+.cta .cta-sub{font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:24px}
+.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color:#0B3A6A;background:var(--lime);padding:10px 22px;margin-right:10px}
+.btn-primary:hover{opacity:.88}
+.btn-sec{display:inline-block;font-size:13px;text-decoration:none;color:var(--bone-on-navy);border:1px solid var(--bone-on-navy-hair);padding:10px 22px}
+.btn-sec:hover{border-color:var(--lime)}
+.cta-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:20px}
+
+@media(max-width:640px){
+  .hero,main{padding-left:20px;padding-right:20px}
+  .hero{padding-top:40px}
+  .hero h1{font-size:24px}
+  .cta{padding:28px 20px}
+}
+</style>
+<style>
+.nav-help{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-family:IBM Plex Mono,monospace;font-size:12px;letter-spacing:0.1em;color:#475569;text-decoration:none;border:1px solid #E2E8F0;transition:all 140ms ease;margin-right:12px}
+.nav-help::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid #64748b;border-radius:50%;font-size:11px;font-weight:700;color:#64748b;font-family:Inter,sans-serif;line-height:1}
+.nav-help:hover{color:#0B3A6A;border-color:#B2FF3F;background:rgba(178,255,63,0.08)}
+.nav-help:hover::before{border-color:#0B3A6A;color:#0B3A6A;background:#B2FF3F}
+.nav-help:focus-visible{outline:2px solid #B2FF3F;outline-offset:2px}
+.nav-help-mobile{display:block;padding:12px 20px;font-family:IBM Plex Mono,monospace;font-size:13px;letter-spacing:0.08em;color:#475569;text-decoration:none;border-bottom:1px solid #e2e8f0}
+.nav-help-mobile:hover{color:#0B3A6A;background:rgba(178,255,63,0.08)}
+@media(max-width:900px){.nav-help{display:none}}
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<div class="meta-bar">
+  <span>build 2.4.5</span>
+  <span class="sep">&middot;</span>
+  <span>aes-256-gcm / ml-kem-768</span>
+  <span class="sep">&middot;</span>
+  <span>eu/de &middot; ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Send menu" aria-haspopup="true" aria-expanded="false">SEND</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/parashare" role="menuitem" class="nav-product-item"><span class="npi-title">ParaShare</span><span class="npi-sub">Verified transfers with signed receipts</span></a></li>
+        <li role="none"><a href="/drop" role="menuitem" class="nav-product-item"><span class="npi-title">ParaDrop</span><span class="npi-sub">Device to device, AirDrop alternative</span></a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Build menu" aria-haspopup="true" aria-expanded="false">BUILD</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Docs &amp; API</li>
+        <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Documentation</span><span class="npi-sub">API reference, protocol spec, install guides</span></a></li>
+        <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root &mdash; verifiable transfer history</span></a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem" class="nav-product-item"><span class="npi-title">GitHub</span><span class="npi-sub">Source code, issues, community</span></a></li>
+        <li class="nav-subheader" role="presentation">Self-host</li>
+        <li role="none"><a href="/install.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install.sh</span><span class="npi-sub">Automated Linux server installer</span></a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-pi.sh</span><span class="npi-sub">Raspberry Pi optimised installer</span></a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-client.sh</span><span class="npi-sub">CLI client installer</span></a></li>
+        <li role="none"><a href="/download" role="menuitem" class="nav-product-item"><span class="npi-title">ParamantOS</span><span class="npi-sub">Hardened ISO for air-gapped deploys</span></a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem" class="nav-product-item"><span class="npi-title">Releases</span><span class="npi-sub">Versioned binaries and SBOMs</span></a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">COMPLIANCE</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive &mdash; essential entities</span></a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem" class="nav-product-item"><span class="npi-title">IEC 62443 (Industrial IoT)</span><span class="npi-sub">Industrial control systems compliance</span></a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem" class="nav-product-item"><span class="npi-title">NEN 7510 (Dutch Healthcare)</span><span class="npi-sub">Dutch health data protection standard</span></a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem" class="nav-product-item"><span class="npi-title">Jurisdiction</span><span class="npi-sub">EU ownership, CLOUD Act analysis, migration roadmap</span></a></li>
+        <li role="none"><a href="/government" role="menuitem" class="nav-product-item"><span class="npi-title">Government &amp; public sector</span><span class="npi-sub">Public procurement and NIS2 guidance</span></a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem" class="nav-product-item"><span class="npi-title">OT guide</span><span class="npi-sub">Operational technology integration guide</span></a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem" class="nav-product-item"><span class="npi-title">OT vs data diodes</span><span class="npi-sub">When a data diode is the better choice</span></a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem" class="nav-product-item"><span class="npi-title">HNDL threat</span><span class="npi-sub">Harvest Now Decrypt Later &mdash; the immediate risk</span></a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem" class="nav-product-item"><span class="npi-title">Quantum urgency</span><span class="npi-sub">Why migrate before Q-Day</span></a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem" class="nav-product-item"><span class="npi-title">Crypto agility</span><span class="npi-sub">Migrating away from classical algorithms</span></a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA &mdash; sign and download</span></a></li>
+        <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Use cases menu" aria-haspopup="true" aria-expanded="false">USE CASES</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">DevOps</li>
+        <li role="none"><a href="/ssh-key-delivery" role="menuitem" class="nav-product-item"><span class="npi-title">SSH key delivery</span><span class="npi-sub">Post-quantum SSH bootstrap</span></a></li>
+      </ul>
+    </li>
+
+    <li style="margin-left:auto"><a href="/architecture" class="nav-link nav-link-btn">HOW IT WORKS</a></li>
+    <li><a href="/pricing" class="nav-link nav-link-btn">PRICING</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">ABOUT</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem" class="nav-product-item"><span class="npi-title">Status</span><span class="npi-sub">Live relay health and uptime metrics</span></a></li>
+        <li role="none"><a href="/security" role="menuitem" class="nav-product-item"><span class="npi-title">Security</span><span class="npi-sub">Pentest reports and vulnerability disclosure</span></a></li>
+        <li role="none"><a href="/vs" role="menuitem" class="nav-product-item"><span class="npi-title">Compare</span><span class="npi-sub">Paramant vs WeTransfer, Signal, Wire</span></a></li>
+        <li role="none"><a href="/changelog" role="menuitem" class="nav-product-item"><span class="npi-title">Changelog</span><span class="npi-sub">Release notes and version history</span></a></li>
+        <li role="none"><a href="/license" role="menuitem" class="nav-product-item"><span class="npi-title">License</span><span class="npi-sub">BUSL-1.1 source-available terms</span></a></li>
+        <li role="none"><a href="/press" role="menuitem" class="nav-product-item"><span class="npi-title">Press kit</span><span class="npi-sub">Logos, brand assets, media contacts</span></a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem" class="nav-product-item"><span class="npi-title">Contact</span><span class="npi-sub">privacy@paramant.app</span></a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/></svg>
+    </button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Use cases</button>
+    <div class="nav-mobile-group-items">
+      <a href="/ssh-key-delivery">SSH key delivery</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div><div class="nav-mobile-meta">
+    <span>build 2.4.5</span>
+    <span class="meta-sep">&middot;</span>
+    <span>RAM only</span>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-label">POST-QUANTUM &middot; SSH BOOTSTRAP</div>
+  <h1>SSH key delivery, <em>post-quantum.</em></h1>
+  <p class="lead">OpenSSH 10.0 already encrypts your session with ML-KEM. Paramant encrypts the delivery of the key itself.</p>
+</div>
+
+<main id="main-content">
+
+  <section>
+    <span class="sec-eyebrow">The problem</span>
+    <h2>The gap.</h2>
+    <p>OpenSSH has supported hybrid post-quantum key exchange since version 10.0, released April 2025. Every modern server, every recent macOS, every updated Linux distribution now negotiates SSH sessions using ML-KEM-768 combined with X25519. The session traffic is safe against harvest-now-decrypt-later attacks.</p>
+    <p>The initial keypair, however, still has to travel from one machine to another before the first SSH connection can happen. That delivery happens over email, Slack, a password manager, a shared drive, or a USB stick. Every one of those channels stores the key. Every one of those channels can be breached. The post-quantum SSH session is only as strong as the channel that delivered its key.</p>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">The fix</span>
+    <h2>What Paramant adds.</h2>
+    <p>ParaShare encrypts the key delivery with the same ML-KEM-768 hybrid KEM that OpenSSH uses for the session. The encrypted blob lives in RAM on the Paramant relay until the recipient picks it up, then is wiped. A signed receipt (ML-DSA-65, FIPS 204) proves cryptographically which key was delivered, to whom, and when.</p>
+    <p>The sender never stores the key in email, Slack, or a shared drive. The recipient never sees it in a channel that keeps logs. The relay itself cannot decrypt what it holds. After pickup, the key exists only in the two places it was always supposed to be: the sender's secure store, and the recipient's SSH agent.</p>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">Workflow</span>
+    <h2>How it looks in practice.</h2>
+    <div class="workflow-block">
+      <div class="step-list">
+        <div class="step-row">
+          <div class="step-num">01</div>
+          <div class="step-body"><strong>Generate.</strong> Recipient runs <code style="background:rgba(248,250,252,.1);border-color:rgba(248,250,252,.2);color:var(--bone-on-navy)">ssh-keygen -t ed25519</code> on their new machine. Public key goes to sender.</div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">02</div>
+          <div class="step-body"><strong>Pack.</strong> Sender places the authorized_keys entry or keybundle into ParaShare. Relay encrypts with recipient's ML-KEM public key.</div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">03</div>
+          <div class="step-body"><strong>Deliver.</strong> Recipient receives a one-time link. Browser decrypts locally. Key lands in ~/.ssh/ directly.</div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">04</div>
+          <div class="step-body"><strong>Verify.</strong> ML-DSA-65 receipt proves the key arrived intact, from the expected sender, without modification.</div>
+        </div>
+      </div>
+      <p class="workflow-note">No plaintext ever touches the relay. No intermediate channel keeps a copy.</p>
+    </div>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">Fit</span>
+    <h2>Where this matters most.</h2>
+    <p><strong>Onboarding developers and operators.</strong> New team members need SSH access to staging, production, or customer servers. The current default (Slack or email) leaves the key in two logged channels forever. ParaShare leaves it in neither.</p>
+    <p><strong>Bootstrapping OT and air-gapped devices.</strong> Industrial control systems, medical equipment, and isolated datacenters need initial configuration delivery through a channel that does not imply ongoing remote access. One-way, burn-on-read, signed delivery matches the operational model.</p>
+    <p><strong>Rotating keys across a fleet.</strong> When a key is compromised or an operator leaves, the replacement has to reach every device. Paramant makes the rotation step auditable with per-device signed receipts, without broadcasting the new key through a channel that retains it.</p>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">Threat model</span>
+    <h2>A different threat model than SSH itself.</h2>
+    <p>SSH is designed for interactive sessions. Paramant is designed for one-shot file delivery. The two threat models overlap where people use SSH for file transfer it was never optimized for. The architectural difference is not about which protocol is stronger, but about which attack surface each one exposes.</p>
+
+    <h3>Control plane and data plane.</h3>
+    <p>SSH terminal emulators share a single channel for control messages and user data. The terminal PTY carries both the bytes the user types and escape sequences that reconfigure the terminal itself. This coupling is efficient but creates a class of vulnerability where seemingly passive output (a text file, a log, a login banner) can drive the terminal into unexpected states. The iTerm2 disclosure of April 2026, where DCS 2000p and OSC 135 sequences in a readme file could trigger local code execution, is one example of this class.</p>
+    <p>Paramant separates the two channels entirely. Protocol control (ML-KEM handshake, fingerprint verification, ML-DSA-65 signature validation) runs on one path. Encrypted payload delivery runs on another. Neither path interprets escape sequences, neither path executes helper scripts injected via user data, and neither path inherits trust from a long-lived session. A malicious payload sitting in Paramant's relay cannot reconfigure the client that picks it up, because the client does not parse the payload through any protocol-sensitive surface.</p>
+
+    <div style="margin:32px 0;text-align:center">
+      <svg role="img" width="100%" viewBox="0 0 680 390" xmlns="http://www.w3.org/2000/svg" style="max-width:680px;display:inline-block">
+        <title>Control plane vs data plane: SSH vs Paramant</title>
+        <desc>Left side shows Classic SSH plus scp: a single PTY channel carries commands, file bytes, escape sequences, and conductor traffic between client and server. Right side shows Paramant: two separate narrow channels connect client to relay -- one cobalt channel for control (ML-KEM, ML-DSA, verify) and one lime channel for payload (ciphertext only).</desc>
+
+        <!-- column divider -->
+        <line x1="340" y1="8" x2="340" y2="380" style="stroke:#E2E8F0;stroke-width:1"/>
+
+        <!-- LEFT: Classic SSH + scp -->
+        <text x="170" y="18" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:600;fill:#0B3A6A;letter-spacing:0.05em">CLASSIC SSH + SCP</text>
+
+        <!-- client box -->
+        <rect x="25" y="26" width="290" height="40" rx="8" style="fill:#F8FAFC;stroke:#0B3A6A;stroke-width:1.5"/>
+        <text x="170" y="52" text-anchor="middle" style="font-family:Inter,sans-serif;font-size:13px;font-weight:600;fill:#0B3A6A">Client</text>
+
+        <!-- PTY pipe (amber) -->
+        <rect x="60" y="78" width="220" height="208" rx="6" style="fill:#FEF3E2;stroke:#B45309;stroke-width:1.5"/>
+        <text x="170" y="103" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:700;fill:#78350F">PTY</text>
+        <text x="170" y="126" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#92400E">commands</text>
+        <text x="170" y="148" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#92400E">file bytes</text>
+        <text x="170" y="170" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#92400E">escape seq.</text>
+        <text x="170" y="192" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#92400E">conductor</text>
+
+        <!-- connectors left -->
+        <line x1="170" y1="66" x2="170" y2="78" style="stroke:#B45309;stroke-width:1;stroke-dasharray:3,2"/>
+        <line x1="170" y1="286" x2="170" y2="300" style="stroke:#B45309;stroke-width:1;stroke-dasharray:3,2"/>
+
+        <!-- server box -->
+        <rect x="25" y="300" width="290" height="40" rx="8" style="fill:#F8FAFC;stroke:#0B3A6A;stroke-width:1.5"/>
+        <text x="170" y="326" text-anchor="middle" style="font-family:Inter,sans-serif;font-size:13px;font-weight:600;fill:#0B3A6A">Remote server</text>
+
+        <!-- left caption -->
+        <text x="170" y="366" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:11px;fill:#475569">One channel. Mixed traffic.</text>
+
+        <!-- RIGHT: Paramant -->
+        <text x="510" y="18" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:600;fill:#0B3A6A;letter-spacing:0.05em">PARAMANT</text>
+
+        <!-- client box right -->
+        <rect x="365" y="26" width="290" height="40" rx="8" style="fill:#F8FAFC;stroke:#0B3A6A;stroke-width:1.5"/>
+        <text x="510" y="52" text-anchor="middle" style="font-family:Inter,sans-serif;font-size:13px;font-weight:600;fill:#0B3A6A">Client</text>
+
+        <!-- control channel (cobalt) -->
+        <rect x="375" y="78" width="126" height="208" rx="6" style="fill:#1D4ED8;stroke:none"/>
+        <text x="438" y="108" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#FFFFFF">control</text>
+        <text x="438" y="130" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#FFFFFF">ML-KEM</text>
+        <text x="438" y="152" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#FFFFFF">ML-DSA</text>
+        <text x="438" y="174" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#FFFFFF">verify</text>
+
+        <!-- payload channel (lime) -->
+        <rect x="515" y="78" width="130" height="208" rx="6" style="fill:#B2FF3F;stroke:none"/>
+        <text x="580" y="115" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#0B3A6A">payload</text>
+        <text x="580" y="137" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#0B3A6A">ciphertext</text>
+        <text x="580" y="159" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:10px;fill:#0B3A6A">only</text>
+
+        <!-- connectors right -->
+        <line x1="438" y1="66" x2="438" y2="78" style="stroke:#1D4ED8;stroke-width:1;stroke-dasharray:3,2"/>
+        <line x1="580" y1="66" x2="580" y2="78" style="stroke:#8BAE00;stroke-width:1;stroke-dasharray:3,2"/>
+        <line x1="438" y1="286" x2="438" y2="300" style="stroke:#1D4ED8;stroke-width:1;stroke-dasharray:3,2"/>
+        <line x1="580" y1="286" x2="580" y2="300" style="stroke:#8BAE00;stroke-width:1;stroke-dasharray:3,2"/>
+
+        <!-- relay box -->
+        <rect x="365" y="300" width="290" height="40" rx="8" style="fill:#F8FAFC;stroke:#0B3A6A;stroke-width:1.5"/>
+        <text x="510" y="326" text-anchor="middle" style="font-family:Inter,sans-serif;font-size:13px;font-weight:600;fill:#0B3A6A">Paramant relay</text>
+
+        <!-- right caption -->
+        <text x="510" y="366" text-anchor="middle" style="font-family:IBM Plex Mono,monospace;font-size:11px;fill:#475569">Two channels. No shared surface.</text>
+      </svg>
+    </div>
+
+    <h3>What this means concretely.</h3>
+    <p><em>When you scp a config file and cat it on your Mac.</em> The file crosses an SSH channel, lands on disk, and gets read by your terminal. Every one of those steps carries the original bytes, including any escape sequences hidden in them. When you deliver the same file through ParaShare, the browser decrypts the payload outside the terminal's parsing surface. If you then cat the file in iTerm2, you have chosen to pipe it through the terminal, and the same risk applies as if you had downloaded it from anywhere else. Paramant does not remove that choice. It does remove the delivery channel as an attack vector.</p>
+    <p>When a MOTD on a transit server gets modified. SSH to a compromised jump host, the MOTD renders on your local terminal, attack surface is open. ParaShare has no equivalent pathway because there is no interactive session, no banner, no server-controlled text rendered in a privileged emulator. The relay holds a ciphertext blob. The blob cannot impersonate a conductor protocol because Paramant does not have a conductor protocol.</p>
+    <p>When you rotate a key across a fleet. SCP-based rotation pushes the key through each device's SSH session. Every one of those sessions is a live, trusted channel with a large attack surface. Paramant pushes a signed, encrypted artifact to each device's pickup endpoint. The artifact is verified against the sender's public key before it lands. Compromising the relay does not let an attacker substitute keys, because the signature would not verify against the expected sender.</p>
+
+    <h3>Honest limits of this claim.</h3>
+    <p>Paramant does not patch bugs in your terminal, your SSH client, your shell, or your operating system. It does not protect against malware that is already on the endpoint. It does not change the attack surface of an active SSH session you open in parallel. What it does is remove file delivery and key delivery from the list of workflows that share an attack surface with your interactive session. That is a real reduction in risk, but it is a specific reduction, not a total solution.</p>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">Honest scope</span>
+    <h2>What Paramant is not.</h2>
+    <p>Paramant is not an SSH replacement. It is not a jumphost, a bastion, or a tunnel. The SSH protocol has 25 years of hardening and, as of version 10.0, post-quantum key exchange by default. Paramant handles the step before SSH begins: delivering the key that makes the first connection possible. Once the key is in place, standard OpenSSH does the work it has always done.</p>
+  </section>
+
+</main>
+
+<div style="background:var(--cobalt);padding:52px 48px;text-align:center">
+  <h2 style="font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)">Try ParaShare for key delivery.</h2>
+  <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">Burn-on-read delivery. ML-KEM-768 encryption. ML-DSA-65 signed receipts. Free for individual use.</p>
+  <a href="/signup" class="btn-primary">Create free account &rarr;</a>
+  <a href="/docs" class="btn-sec">Read the ParaShare docs &rarr;</a>
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:24px">OpenSSH 10.0 &middot; ML-KEM-768 &middot; RFC 9142</p>
+</div>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+          <a href="/ssh-key-delivery">SSH key delivery</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/signup">Create account</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=9" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+</body>
+</html>
