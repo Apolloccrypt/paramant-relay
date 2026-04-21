@@ -20,7 +20,7 @@
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-main{max-width:640px;margin:0 auto;padding:64px 24px;position:relative;z-index:10}
+main{max-width:640px;margin:0 auto;padding:32px 24px;position:relative;z-index:10}
 h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .sub{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:40px;line-height:1.7}
 .hero-block{border:1px solid var(--ink-hair);padding:24px 28px;margin-bottom:40px}
@@ -392,15 +392,18 @@ select:focus{border-color:var(--cobalt)}
     <span>RAM only</span>
   </div>
 </div>
+<section class="page-hero">
+<div class="page-hero-inner">
+  <span class="eyebrow">PARASHARE</span>
+  <h1>Encrypted file relay</h1>
+  <p class="lede">End-to-end encrypted file transfer. The receiver's browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees plaintext.</p>
+</div>
+</section>
+
 <main id="main-content" style="position:relative;z-index:10">
 
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
-  <div class="hero-block">
-    <h1>Secure file transfer</h1>
-    <p class="sub" style="margin-bottom:0">The receiver gets a unique link. Their browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees the key.</p>
-  </div>
-
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>
     <div class="card-body">
