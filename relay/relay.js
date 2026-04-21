@@ -761,11 +761,11 @@ function base32Decode(s) {
   return Buffer.from(output);
 }
 
-function totpCode(secret, counter) {
+function totpCode(secret, counter, algorithm = 'sha256') {
   const key = base32Decode(secret);
   const buf = Buffer.alloc(8);
   buf.writeBigUInt64BE(BigInt(counter));
-  const mac = crypto.createHmac('sha256', key).update(buf).digest();
+  const mac = crypto.createHmac(algorithm, key).update(buf).digest();
   const offset = mac[mac.length - 1] & 0xf;
   const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
   zeroBuffer(key); zeroBuffer(mac);
@@ -800,7 +800,7 @@ function verifyTotp(token) {
   return matched;
 }
 async function verifyTotpGeneric(token, secret, opts = {}) {
-  const { window = 1, replayKey } = opts;
+  const { window = 1, replayKey, algorithm = 'sha256' } = opts;
   const tokenBuf = Buffer.from(String(token || ''), 'utf8');
   if (tokenBuf.length !== 6) return { valid: false };
   const counter = Math.floor(Date.now() / 1000 / 30);
@@ -808,7 +808,7 @@ async function verifyTotpGeneric(token, secret, opts = {}) {
   let matchedSlot = null;
   for (let i = -window; i <= window; i++) {
     const c = counter + i;
-    const expected = totpCode(secret, c);
+    const expected = totpCode(secret, c, algorithm);
     const expectedBuf = Buffer.from(expected, 'utf8');
     const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
     if (eq) { matched = true; matchedSlot = c; }
@@ -1712,7 +1712,7 @@ const server = http.createServer(async (req, res) => {
       const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
-        algorithm: "sha1", window: 1,
+        algorithm: "sha256", window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
       res.writeHead(200, { "Content-Type": "application/json" });

@@ -2678,3 +2678,38 @@ a.skip-link:focus-visible,
   border-color: var(--lime);
   transform: translateY(-2px);
 }
+
+/* § compat-notice — SHA-256 authenticator compatibility banner ────────────── */
+.compat-notice {
+  background: #fff;
+  border-left: 3px solid var(--cobalt);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 0 0 32px 0;
+  font-family: 'Inter', sans-serif;
+}
+.compat-notice__title {
+  font-weight: 600;
+  color: var(--navy);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.compat-notice__body {
+  color: var(--ink-dim);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 10px 0;
+}
+.compat-notice__link {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cobalt);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 120ms ease;
+}
+.compat-notice__link:hover {
+  border-bottom-color: var(--lime);
+}

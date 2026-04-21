@@ -668,7 +668,7 @@ api.post("/user/setup/:token", async (req, res) => {
 
   const issuer = "Paramant";
   const encodedEmail = encodeURIComponent(email);
-  const otpauth = `otpauth://totp/${issuer}:${encodedEmail}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
+  const otpauth = `otpauth://totp/${issuer}:${encodedEmail}?secret=${secret}&issuer=${issuer}&algorithm=SHA256&digits=6&period=30`;
 
   res.json({ email, otpauth, secret, backup_codes });
 });

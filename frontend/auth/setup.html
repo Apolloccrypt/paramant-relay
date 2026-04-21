@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=6">
+<link rel="stylesheet" href="/design-system.css?v=7">
 <link rel="stylesheet" href="/nav.css?v=6">
 <script src="/js/qrcode.min.js"></script>
 </head>
@@ -219,6 +219,12 @@
 
 <!-- Active setup -->
 <section id="state-active" class="section hidden">
+<div class="compat-notice" role="note">
+  <div class="compat-notice__title">Use a SHA-256 compatible authenticator.</div>
+  <p class="compat-notice__body">Paramant uses SHA-256 TOTP for stronger cryptographic guarantees. Google Authenticator, Microsoft Authenticator, and iCloud Keychain will not work. Supported apps: Authy, 1Password, Aegis, Raivo, Bitwarden, Ente Auth, 2FAS.</p>
+  <a class="compat-notice__link" href="/help/authenticator-apps">Why we don't support SHA-1 &rarr;</a>
+</div>
+
   <div class="marker">
     <div class="num">01</div>
     <h2>Scan with your authenticator.</h2>
@@ -241,7 +247,7 @@
 
       <div class="info-row">
         <div class="info-label">Algorithm</div>
-        <div class="info-value">SHA-1 &middot; 6 digits &middot; 30 seconds</div>
+        <div class="info-value">SHA-256 &middot; 6 digits &middot; 30 seconds</div>
       </div>
 
       <div class="info-row">
