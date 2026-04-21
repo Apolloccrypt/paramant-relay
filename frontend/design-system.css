@@ -2679,37 +2679,55 @@ a.skip-link:focus-visible,
   transform: translateY(-2px);
 }
 
-/* § compat-notice — SHA-256 authenticator compatibility banner ────────────── */
-.compat-notice {
-  background: #fff;
-  border-left: 3px solid var(--cobalt);
-  border-radius: 0 8px 8px 0;
-  padding: 14px 18px;
-  margin: 0 0 32px 0;
+/* § app-warning — SHA-256 authenticator hard blocker ───────────────────────── */
+.app-warning {
+  background: #FEF2F2;
+  border: 2px solid #DC2626;
+  padding: 20px 24px;
+  margin: 0 0 36px 0;
   font-family: 'Inter', sans-serif;
 }
-.compat-notice__title {
-  font-weight: 600;
-  color: var(--navy);
+.app-warning__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #B91C1C;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+.app-warning__body {
   font-size: 14px;
-  margin-bottom: 6px;
+  color: #7F1D1D;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
 }
-.compat-notice__body {
-  color: var(--ink-dim);
+.app-warning__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  margin-bottom: 16px;
+}
+@media (max-width: 560px) {
+  .app-warning__grid { grid-template-columns: 1fr; }
+}
+.app-warning__no,
+.app-warning__yes {
   font-size: 13px;
-  line-height: 1.55;
-  margin: 0 0 10px 0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
-.compat-notice__link {
+.app-warning__no  { color: #B91C1C; }
+.app-warning__yes { color: #166534; }
+.app-warning__no::before  { content: "✕"; font-size: 12px; }
+.app-warning__yes::before { content: "✓"; font-size: 12px; }
+.app-warning__link {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--cobalt);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 120ms ease;
+  letter-spacing: 0.06em;
+  color: #B91C1C;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
-.compat-notice__link:hover {
-  border-bottom-color: var(--lime);
-}
+.app-warning__link:hover { color: #7F1D1D; }

@@ -219,10 +219,22 @@
 
 <!-- Active setup -->
 <section id="state-active" class="section hidden">
-<div class="compat-notice" role="note">
-  <div class="compat-notice__title">Use a SHA-256 compatible authenticator.</div>
-  <p class="compat-notice__body">Paramant uses SHA-256 TOTP for stronger cryptographic guarantees. Google Authenticator, Microsoft Authenticator, and iCloud Keychain will not work. Supported apps: Authy, 1Password, Aegis, Raivo, Bitwarden, Ente Auth, 2FAS.</p>
-  <a class="compat-notice__link" href="/help/authenticator-apps">Why we don't support SHA-1 &rarr;</a>
+<div class="app-warning" role="alert">
+  <div class="app-warning__title">Google Authenticator, Microsoft Authenticator, and iCloud Keychain will NOT work.</div>
+  <p class="app-warning__body">Paramant uses SHA-256 TOTP. These apps only support SHA-1. If you scan this QR with them, every code you enter will fail at login &mdash; even when the code looks correct.</p>
+  <div class="app-warning__grid">
+    <div class="app-warning__no">Google Authenticator</div>
+    <div class="app-warning__yes">Authy</div>
+    <div class="app-warning__no">Microsoft Authenticator</div>
+    <div class="app-warning__yes">1Password</div>
+    <div class="app-warning__no">iCloud Keychain</div>
+    <div class="app-warning__yes">Aegis (Android)</div>
+    <div></div>
+    <div class="app-warning__yes">Raivo (iOS)</div>
+    <div></div>
+    <div class="app-warning__yes">Bitwarden &middot; Ente Auth &middot; 2FAS</div>
+  </div>
+  <a class="app-warning__link" href="/help/authenticator-apps">Why we use SHA-256 &rarr;</a>
 </div>
 
   <div class="marker">
