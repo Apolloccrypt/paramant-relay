@@ -198,6 +198,14 @@
   .nav-help { display: none; }
 }
 </style>
+<style id="products-dual-grid-css">
+@media (max-width: 800px) {
+  .section-inner > div[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+}
+</style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -492,61 +500,6 @@
 </section>
 
 <!-- § 01.5 THREE PRODUCTS -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="pick">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num" style="font-size:clamp(3rem,7vw,7rem)">01.5</span>
-      <h2>Three ways to share. Pick what fits.</h2>
-      <span class="tag">Products</span>
-    </div>
-    <div class="pick-grid">
-
-      <a href="/send" class="pick-card">
-        <p class="pick-label">Anonymous one-off</p>
-        <h3 class="pick-title">Send a file</h3>
-        <p class="pick-tagline">Drop, share link, done. No account.</p>
-        <p class="pick-desc">Browser-generated key in URL fragment &mdash; never sent to the relay. Prove-by-design that we cannot decrypt what we relay. Ideal for one-off sends with zero setup.</p>
-        <ul class="pick-specs">
-          <li>AES-256-GCM</li>
-          <li>No signup</li>
-          <li>One-shot burn link</li>
-        </ul>
-        <span class="pick-cta">Send a file &rarr;</span>
-      </a>
-
-      <a href="/parashare" class="pick-card pick-card-featured">
-        <p class="pick-label" style="background:#B2FF3F;color:#0B3A6A;padding:2px 8px;display:inline-block">Verified end-to-end</p>
-        <h3 class="pick-title">ParaShare</h3>
-        <p class="pick-tagline">Proof of who sent what.</p>
-        <p class="pick-desc">ML-KEM-768 + ECDH P-256 hybrid key exchange via Rust/WASM. ML-DSA-65 signed receipts (FIPS&nbsp;204). Fingerprint verification before send. For when the audit trail matters.</p>
-        <ul class="pick-specs">
-          <li>ML-KEM-768 + ECDH P-256</li>
-          <li>Account required</li>
-          <li>Signed receipts (FIPS 204)</li>
-        </ul>
-        <span class="pick-cta">Try ParaShare &rarr;</span>
-      </a>
-
-      <a href="/drop" class="pick-card">
-        <p class="pick-label">Device to device</p>
-        <h3 class="pick-title">ParaDrop</h3>
-        <p class="pick-tagline">AirDrop alternative, any platform.</p>
-        <p class="pick-desc">Short-lived QR code or 6-digit pairing between any two devices. Works across iOS, Android, Windows, Linux. No relay storage, no cloud, no account needed.</p>
-        <ul class="pick-specs">
-          <li>QR or 6-digit code</li>
-          <li>Cross-platform</li>
-          <li>No cloud storage</li>
-        </ul>
-        <span class="pick-cta">Use ParaDrop &rarr;</span>
-      </a>
-
-    </div>
-  </div>
-
-    <p style=\"margin-top:var(--space-6);font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);text-align:center;letter-spacing:.04em\">Cryptography architecture — <a href=\"/security\" style=\"color:var(--cobalt)\">security details →</a></p>
-  </div>
-</section>
-
 <!-- § 02 UNDER THE HOOD — CRYPTO STRIP -->
 <style>
 .crypto-strip{background:#0B3A6A;padding:64px 24px}
@@ -778,53 +731,86 @@
 </section>
 
 <!-- § 06 THREE WAYS TO DEPLOY -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="deploy" aria-labelledby="deploy-title">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num">06</span>
-      <h2 id="deploy-title">Three ways to deploy.</h2>
-      <span class="tag">PICK YOUR PATH</span>
+<section class="section section--light">
+    <div class="section-inner" style="max-width:1200px;">
+      
+      <header style="display:flex;align-items:baseline;gap:16px;margin-bottom:48px;">
+        <span style="font-size:72px;font-weight:700;color:#1D4ED8;font-family:Inter,sans-serif;letter-spacing:-0.04em;line-height:1;">06</span>
+        <div style="flex:1;">
+          <h2 style="font-size:36px;color:#0B3A6A;margin:0;letter-spacing:-0.01em;line-height:1.1;">Every Paramant product.</h2>
+        </div>
+        <span style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:0.15em;color:#64748b;text-transform:uppercase;">OVERVIEW</span>
+      </header>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">
+        
+        <div>
+          <h3 style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:0.15em;color:#64748b;text-transform:uppercase;margin:0 0 20px 0;padding-bottom:12px;border-bottom:1px solid #E2E8F0;">
+            FOR SENDERS
+          </h3>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <a href="/send" style="display:block;padding:20px;background:#ffffff;border:1px solid #E2E8F0;text-decoration:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">Send a file</h4>
+                <span style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#64748b;letter-spacing:0.1em;">ANONYMOUS</span>
+              </div>
+              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">Drop a file, share link, burns after one read. No account, no trace.</p>
+              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">send a file →</span>
+            </a>
+            <a href="/parashare" style="display:block;padding:20px;background:#ffffff;border:1px solid #E2E8F0;text-decoration:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">ParaShare</h4>
+                <span style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#64748b;letter-spacing:0.1em;">VERIFIED</span>
+              </div>
+              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">ML-KEM-768 hybrid with ML-DSA-65 signed receipts. Proof of who sent what.</p>
+              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">try ParaShare →</span>
+            </a>
+            <a href="/drop" style="display:block;padding:20px;background:#ffffff;border:1px solid #E2E8F0;text-decoration:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">ParaDrop</h4>
+                <span style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#64748b;letter-spacing:0.1em;">DEVICE-TO-DEVICE</span>
+              </div>
+              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">AirDrop alternative across iOS, Android, Windows, Linux. QR or 6-digit code.</p>
+              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">use ParaDrop →</span>
+            </a>
+          </div>
+        </div>
+        
+        <div>
+          <h3 style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:0.15em;color:#64748b;text-transform:uppercase;margin:0 0 20px 0;padding-bottom:12px;border-bottom:1px solid #E2E8F0;">
+            FOR BUILDERS
+          </h3>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <a href="/signup" style="display:block;padding:20px;background:#ffffff;border:1px solid #E2E8F0;text-decoration:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">paramant.app</h4>
+                <span style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#64748b;letter-spacing:0.1em;">HOSTED</span>
+              </div>
+              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">Create an account on our relay. 30 seconds to your first send. EU-hosted.</p>
+              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">create account →</span>
+            </a>
+            <a href="/docs" style="display:block;padding:20px;background:#ffffff;border:1px solid #E2E8F0;text-decoration:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">Your server</h4>
+                <span style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#64748b;letter-spacing:0.1em;">SELF-HOST</span>
+              </div>
+              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">BUSL-1.1 source. Docker compose. Free up to 5 users. Raspberry Pi supported.</p>
+              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">deploy guide →</span>
+            </a>
+            <a href="/pricing#enterprise" style="display:block;padding:20px;background:#ffffff;border:1px solid #E2E8F0;text-decoration:none;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">Your infrastructure</h4>
+                <span style="font-family:IBM Plex Mono,monospace;font-size:10px;color:#64748b;letter-spacing:0.1em;">ENTERPRISE</span>
+              </div>
+              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">Dedicated relay with SLA. Compliance docs, single-tenant. NIS2, IEC 62443, NEN 7510.</p>
+              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">see enterprise plan →</span>
+            </a>
+          </div>
+        </div>
+        
+      </div>
     </div>
-    <div class="deploy-grid">
-      <article class="deploy-card">
-        <div class="deploy-label">HOSTED</div>
-        <h3>paramant.app</h3>
-        <p class="deploy-tagline">Create account, use web UI, done.</p>
-        <p class="deploy-body">The fastest path. We run the relay in Germany, you send files in 30 seconds. Free Community tier covers casual use.</p>
-        <ul class="deploy-specs">
-          <li>EU-hosted &middot; Hetzner DE</li>
-          <li>Free Community plan</li>
-          <li>No setup required</li>
-        </ul>
-        <a href="/signup" class="deploy-cta">Create account &rarr;</a>
-      </article>
-      <article class="deploy-card featured">
-        <div class="deploy-label">SELF-HOST</div>
-        <h3>Your server</h3>
-        <p class="deploy-tagline">BUSL source. Docker compose. Done.</p>
-        <p class="deploy-body">Full source under BUSL-1.1. Run on your own hardware, Raspberry Pi upwards. Free for up to 5 users indefinitely.</p>
-        <ul class="deploy-specs">
-          <li>BUSL-1.1 license</li>
-          <li>docker compose up -d</li>
-          <li>Raspberry Pi supported</li>
-        </ul>
-        <a href="/docs#self-hosting" class="deploy-cta">Self-host guide &rarr;</a>
-      </article>
-      <article class="deploy-card">
-        <div class="deploy-label">ENTERPRISE</div>
-        <h3>Your infrastructure</h3>
-        <p class="deploy-tagline">Dedicated relay with SLA.</p>
-        <p class="deploy-body">For regulated sectors needing single-tenant deployment, compliance docs, and formal SLA. NIS2, DORA, HIPAA ready.</p>
-        <ul class="deploy-specs">
-          <li>Dedicated relay</li>
-          <li>99.9% SLA</li>
-          <li>Compliance paperwork</li>
-        </ul>
-        <a href="/pricing" class="deploy-cta">See enterprise plan &rarr;</a>
-      </article>
-    </div>
-  </div>
-</section>
+  </section>
 
 <!-- FOOTER -->
 <footer>
