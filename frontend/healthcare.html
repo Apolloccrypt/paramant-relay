@@ -4,130 +4,80 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Service Level Agreement — PARAMANT</title>
-<meta name="description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
-<meta property="og:title" content="Service Level Agreement — PARAMANT">
-<meta property="og:description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
-<meta property="og:url" content="https://paramant.app/sla">
+<title>PARAMANT - Healthcare data delivery, NEN 7510</title>
+<meta name="description" content="NEN 7510-compliant patient data transfer with ML-KEM-768 encryption, burn-on-read delivery, and ML-DSA-65 signed receipts. EU/DE hosting, no US CLOUD Act.">
+<meta property="og:title" content="PARAMANT - Healthcare data delivery, NEN 7510 compliant">
+<meta property="og:description" content="Deliver patient records, lab results, and imaging studies over ML-KEM-768 encrypted, burn-on-read channels with NEN 7510-compliant audit trails.">
+<meta property="og:url" content="https://paramant.app/healthcare">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Service Level Agreement — PARAMANT">
-<meta name="twitter:description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
-<link rel="canonical" href="https://paramant.app/sla">
-
-<link rel="stylesheet" href="/design-system.css?v=14">
+<link rel="canonical" href="https://paramant.app/healthcare">
+<link rel="stylesheet" href="/design-system.css?v=15">
 <link rel="stylesheet" href="/nav.css?v=9">
-  <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --black:var(--navy);;
-  --mono:ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace
+<style>
+a{color:var(--ink);text-decoration:none}
+a:hover{opacity:.7}
+code{font-size:var(--text-xs);padding:2px 6px;border:1px solid var(--ink-ghost);color:var(--ink-dim)}
+
+.hero{padding:64px 48px 52px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
+.hero-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:16px}
+.hero h1{font-size:32px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-bottom:18px}
+.hero h1 em{font-style:italic;color:var(--cobalt);position:relative;display:inline}
+.hero h1 em::after{content:"";position:absolute;left:0;right:0;bottom:4%;height:22%;background:var(--lime);z-index:-1;pointer-events:none}
+.hero .lead{font-size:15px;color:var(--ink-dim);max-width:660px;line-height:1.75}
+
+main{max-width:860px;margin:0 auto;padding:0 48px 80px}
+
+section{margin-top:52px}
+section h2{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--ink-hair)}
+section h3{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:32px 0 10px;color:var(--ink)}
+section p{font-size:14px;color:var(--ink-dim);line-height:1.8;max-width:720px}
+section p+p{margin-top:14px}
+.sec-eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:8px;display:block}
+
+.step-list{margin-top:20px;display:flex;flex-direction:column;gap:0}
+.step-row{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--bone-on-navy-hair)}
+.step-row:last-child{border-bottom:none}
+.step-num{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--lime);min-width:28px;padding-top:2px;flex-shrink:0}
+.step-body{font-size:14px;color:var(--bone-on-navy-dim);line-height:1.75}
+.step-body strong{color:var(--bone-on-navy)}
+.workflow-block{background:var(--navy);padding:28px 32px;margin-top:24px}
+
+.compliance-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
+.compliance-table th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);padding:8px 12px;border-bottom:2px solid var(--ink-hair)}
+.compliance-table td{padding:10px 12px;border-bottom:1px solid var(--ink-hair);vertical-align:top;line-height:1.6;color:var(--ink-dim)}
+.compliance-table td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
+
+.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color:#0B3A6A;background:var(--lime);padding:10px 22px;margin-right:10px}
+.btn-primary:hover{opacity:.88}
+.btn-sec{display:inline-block;font-size:13px;text-decoration:none;color:var(--bone-on-navy);border:1px solid var(--bone-on-navy-hair);padding:10px 22px}
+.btn-sec:hover{border-color:var(--lime)}
+
+@media(max-width:640px){
+  .hero,main{padding-left:20px;padding-right:20px}
+  .hero{padding-top:40px}
+  .hero h1{font-size:24px}
 }
-html{scroll-behavior:smooth}
-body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
-.wrap{max-width:720px;margin:0 auto;padding:80px 48px 120px}
-.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;font-family:var(--mono)}
-h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--ink);margin-bottom:10px}
-.sub{font-size:15px;color:var(--ink-dim);margin-bottom:56px;line-height:1.7}
-h2{font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--ink);margin-bottom:12px;margin-top:52px}
-h2:first-of-type{margin-top:0}
-p{color:var(--ink-dim);margin-bottom:16px;line-height:1.8}
-.sla-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:40px}
-.sla-cell{background:var(--bone);padding:24px 20px}
-.sla-cell.head{background:var(--ink-ghost)}
-.tier{font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
-.uptime{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--cobalt)}
-.uptime-sub{font-size:12px;color:var(--ink-dim);margin-top:4px}
-table{width:100%;border-collapse:collapse;margin-bottom:40px;font-size:13px}
-th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);font-weight:500}
-td{padding:12px 16px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost)}
-tr:last-child td{border-bottom:none}
-td:first-child{color:var(--ink);font-weight:500}
-.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:var(--mono);letter-spacing:.04em}
-.badge-comm{background:var(--ink-ghost);color:var(--ink-dim)}
-.badge-pro{background:var(--ink-ghost);color:var(--ink-dim)}
-.badge-ent{background:var(--ink-ghost);color:var(--cobalt)}
-.note-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:32px;font-size:13px;color:var(--ink-dim);line-height:1.7}
-.note-box strong{color:var(--cobalt)}
-a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-hair)}
-a:hover{opacity:.8}
-.toc{display:flex;flex-direction:column;gap:6px;margin-bottom:52px}
-.toc a{font-size:13px;text-decoration:none;color:var(--ink-dim)}
-.toc a:hover{color:var(--cobalt)}
-@media(max-width:640px){.wrap{padding:48px 24px 80px}.sla-grid{grid-template-columns:1fr}}
 </style>
 <style>
-.nav-help {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  color: #475569;
-  text-decoration: none;
-  border: 1px solid #E2E8F0;
-  transition: all 140ms ease;
-  margin-right: 12px;
-}
-.nav-help::before {
-  content: "?";
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid #64748b;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  font-family: Inter, sans-serif;
-  line-height: 1;
-}
-.nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
-}
-.nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
-}
-.nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
-  outline-offset: 2px;
-}
-.nav-help-mobile {
-  display: block;
-  padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: #475569;
-  text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
-}
-.nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
-}
-@media (max-width: 900px) {
-  .nav-help { display: none; }
-}
+.nav-help{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-family:IBM Plex Mono,monospace;font-size:12px;letter-spacing:0.1em;color:#475569;text-decoration:none;border:1px solid #E2E8F0;transition:all 140ms ease;margin-right:12px}
+.nav-help::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid #64748b;border-radius:50%;font-size:11px;font-weight:700;color:#64748b;font-family:Inter,sans-serif;line-height:1}
+.nav-help:hover{color:#0B3A6A;border-color:#B2FF3F;background:rgba(178,255,63,0.08)}
+.nav-help:hover::before{border-color:#0B3A6A;color:#0B3A6A;background:#B2FF3F}
+.nav-help:focus-visible{outline:2px solid #B2FF3F;outline-offset:2px}
+@media(max-width:900px){.nav-help{display:none}}
 </style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
+
 <div class="meta-bar">
-  <span class="">build 2.4.5</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / ml-kem-768</span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
+  <span>build 2.4.5</span>
+  <span class="sep">&middot;</span>
+  <span>aes-256-gcm / ml-kem-768</span>
+  <span class="sep">&middot;</span>
+  <span>eu/de &middot; ram only</span>
 </div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
@@ -147,7 +97,7 @@ a:hover{opacity:.8}
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Docs &amp; API</li>
         <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Documentation</span><span class="npi-sub">API reference, protocol spec, install guides</span></a></li>
-        <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root — verifiable transfer history</span></a></li>
+        <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root &mdash; verifiable transfer history</span></a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem" class="nav-product-item"><span class="npi-title">GitHub</span><span class="npi-sub">Source code, issues, community</span></a></li>
         <li class="nav-subheader" role="presentation">Self-host</li>
         <li role="none"><a href="/install.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install.sh</span><span class="npi-sub">Automated Linux server installer</span></a></li>
@@ -162,7 +112,7 @@ a:hover{opacity:.8}
       <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">COMPLIANCE</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive — essential entities</span></a></li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive &mdash; essential entities</span></a></li>
         <li role="none"><a href="/compliance/iec62443" role="menuitem" class="nav-product-item"><span class="npi-title">IEC 62443 (Industrial IoT)</span><span class="npi-sub">Industrial control systems compliance</span></a></li>
         <li role="none"><a href="/compliance/nen7510" role="menuitem" class="nav-product-item"><span class="npi-title">NEN 7510 (Dutch Healthcare)</span><span class="npi-sub">Dutch health data protection standard</span></a></li>
         <li class="nav-subheader" role="presentation">Sovereignty</li>
@@ -172,15 +122,14 @@ a:hover{opacity:.8}
         <li role="none"><a href="/ot" role="menuitem" class="nav-product-item"><span class="npi-title">OT guide</span><span class="npi-sub">Operational technology integration guide</span></a></li>
         <li role="none"><a href="/ot-vs-data-diodes" role="menuitem" class="nav-product-item"><span class="npi-title">OT vs data diodes</span><span class="npi-sub">When a data diode is the better choice</span></a></li>
         <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem" class="nav-product-item"><span class="npi-title">HNDL threat</span><span class="npi-sub">Harvest Now Decrypt Later — the immediate risk</span></a></li>
+        <li role="none"><a href="/hndl" role="menuitem" class="nav-product-item"><span class="npi-title">HNDL threat</span><span class="npi-sub">Harvest Now Decrypt Later &mdash; the immediate risk</span></a></li>
         <li role="none"><a href="/quantum-urgency" role="menuitem" class="nav-product-item"><span class="npi-title">Quantum urgency</span><span class="npi-sub">Why migrate before Q-Day</span></a></li>
         <li role="none"><a href="/crypto-agility" role="menuitem" class="nav-product-item"><span class="npi-title">Crypto agility</span><span class="npi-sub">Migrating away from classical algorithms</span></a></li>
         <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA — sign and download</span></a></li>
+        <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA &mdash; sign and download</span></a></li>
         <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
       </ul>
     </li>
-
 
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger" aria-label="Open Use cases menu" aria-haspopup="true" aria-expanded="false">USE CASES</button>
@@ -227,19 +176,15 @@ a:hover{opacity:.8}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-header">
-    <a href="/" class="nav-logo">
-      <span class="logo-para">Para</span><span class="logo-mant">MANT</span>
-    </a>
+    <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
     <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/>
-      </svg>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/></svg>
     </button>
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-products">Products</button>
-    <div class="nav-mobile-group-items" id="mobile-group-products">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
       <a href="/send">Send a file</a>
       <a href="/parashare">ParaShare</a>
       <a href="/drop">ParaDrop</a>
@@ -250,8 +195,8 @@ a:hover{opacity:.8}
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-developers">Developers</button>
-    <div class="nav-mobile-group-items" id="mobile-group-developers">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
       <a href="/docs">Docs</a>
       <a href="/docs#api">API reference</a>
       <a href="/ct-log">CT Log</a>
@@ -262,20 +207,8 @@ a:hover{opacity:.8}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-selfhost">Self-host</button>
-    <div class="nav-mobile-group-items" id="mobile-group-selfhost">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="/install-client.sh">install-client.sh</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-compliance">Compliance</button>
-    <div class="nav-mobile-group-items" id="mobile-group-compliance">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
       <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
       <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
       <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
@@ -305,8 +238,8 @@ a:hover{opacity:.8}
   <a href="/vs" class="nav-mobile-standalone">Compare</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-about">About</button>
-    <div class="nav-mobile-group-items" id="mobile-group-about">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
       <a href="/sla">SLA</a>
@@ -321,140 +254,73 @@ a:hover{opacity:.8}
   </div>
 </div>
 
-<div class="wrap">
-  <div class="eyebrow">Legal &mdash; effective 1 January 2025</div>
-  <h1>Service Level Agreement</h1>
-  <p class="sub">Uptime commitments, downtime credits, and support response times for all PARAMANT relay plans.</p>
+<div class="hero">
+  <div class="hero-label">REGULATED &middot; NEN 7510 &middot; GDPR</div>
+  <h1>Healthcare data delivery, <em>NEN 7510 compliant.</em></h1>
+  <p class="lead">Patient records, lab results, imaging studies. NEN 7510 requires encrypted transit with access logging. Every email, every shared drive, every USB is a compliance event waiting to happen.</p>
+</div>
 
-  <div class="toc">
-    <a href="#uptime">1. Uptime commitments</a>
-    <a href="#credits">2. Downtime credits</a>
-    <a href="#support">3. Support tiers</a>
-    <a href="#exclusions">4. Exclusions</a>
-    <a href="#measurement">5. Measurement methodology</a>
-    <a href="#changes">6. SLA changes</a>
-    <a href="#contact">7. Contact</a>
-  </div>
+<main id="main-content">
 
-  <!-- 1. Uptime -->
-  <h2 id="uptime">1. Uptime commitments</h2>
-  <p>Monthly uptime percentage is calculated as: <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">(total minutes &minus; downtime minutes) / total minutes &times; 100</code></p>
+  <section>
+    <span class="sec-eyebrow">The problem</span>
+    <h2>The gap in clinical data exchange.</h2>
+    <p>Dutch healthcare organizations routinely exchange patient data between systems that don't interoperate. HL7/FHIR covers in-system messaging; it doesn't cover the file that needs to travel from radiology to a referring specialist outside the hospital network. That file travels by email, by WeTransfer, by USB. Each of those channels stores a copy. NEN 7510-1 Article 14.1.1 requires confidential transmission; Article 15.1.3 requires a traceable access log. Most ad-hoc channels satisfy neither.</p>
+    <p>GDPR adds a second layer: a breach on any of those intermediate channels is a reportable incident to the AP. Healthcare organizations carry the highest-per-record breach cost of any sector precisely because the data is both sensitive and legally regulated. The exposure from a single misdirected email with a patient file is a reportable GDPR breach, a NEN 7510 non-conformance, and a reputational event.</p>
+  </section>
 
-  <div class="sla-grid">
-    <div class="sla-cell head">
-      <div class="tier">Community</div>
-      <div class="uptime">99.5%</div>
-      <div class="uptime-sub">~3.6 h/month max downtime</div>
+  <section>
+    <span class="sec-eyebrow">What Paramant adds</span>
+    <h2>End-to-end encryption with a compliant audit trail.</h2>
+    <p>ParaShare encrypts the patient file with ML-KEM-768 + AES-256-GCM before it touches the relay. The relay holds only an opaque ciphertext. The recipient's browser decrypts locally. After pickup, the relay wipes the ciphertext from RAM. A signed receipt (ML-DSA-65, FIPS 204) records which file was delivered, to which recipient, and at which time. That receipt is the NEN 7510 Article 15.1.3 access log.</p>
+    <p>The relay runs on Hetzner DE. EU jurisdiction, no US CLOUD Act exposure, no data leaving the EEA. A pre-signed GDPR Data Processing Agreement is available on Business and Enterprise plans.</p>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">Workflow</span>
+    <h2>How a secure transfer works.</h2>
+    <div class="workflow-block">
+      <div class="step-list">
+        <div class="step-row"><div class="step-num">01</div><div class="step-body"><strong>Clinician or admin</strong> uploads the patient file via ParaShare (web or CLI)</div></div>
+        <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant encrypts end-to-end</strong> — only the recipient can decrypt; relay sees only ciphertext</div></div>
+        <div class="step-row"><div class="step-num">03</div><div class="step-body"><strong>Recipient receives</strong> a one-time delivery link via the channel of your choice (email, secure message)</div></div>
+        <div class="step-row"><div class="step-num">04</div><div class="step-body"><strong>After download</strong>, the ciphertext is wiped from relay RAM — no retention, no copy</div></div>
+        <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>Both parties receive</strong> an ML-DSA-65 signed receipt logged to the Paramant CT log</div></div>
+      </div>
     </div>
-    <div class="sla-cell head">
-      <div class="tier">Enterprise</div>
-      <div class="uptime">99.95%</div>
-      <div class="uptime-sub">~22 min/month max downtime</div>
-    </div>
-  </div>
+  </section>
 
-  <p>Uptime is measured per calendar month across the primary relay endpoint assigned to your plan. All five sector relays (health, legal, finance, IoT, relay) are covered.</p>
+  <section>
+    <span class="sec-eyebrow">Compliance</span>
+    <h2>NEN 7510 and GDPR mapping.</h2>
+    <table class="compliance-table">
+      <thead>
+        <tr><th>Requirement</th><th>Paramant control</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>NEN 7510-1 Art.&nbsp;14.1.1 &mdash; Encrypted transit</td><td>ML-KEM-768 + AES-256-GCM end-to-end; relay cannot decrypt</td></tr>
+        <tr><td>NEN 7510-1 Art.&nbsp;14.1.4 &mdash; Access control</td><td>Burn-on-read: one authorised download, then the ciphertext is gone</td></tr>
+        <tr><td>NEN 7510-1 Art.&nbsp;15.1.3 &mdash; Audit trail</td><td>ML-DSA-65 signed receipt: file hash, recipient, timestamp, CT log entry</td></tr>
+        <tr><td>NEN 7510-2 Art.&nbsp;12.3 &mdash; Data minimisation</td><td>RAM-only relay; no persistent storage of patient data</td></tr>
+        <tr><td>GDPR Art.&nbsp;32 &mdash; Technical measures</td><td>FIPS 203/204 encryption, EU/DE hosting, no US CLOUD Act</td></tr>
+        <tr><td>GDPR Art.&nbsp;28 &mdash; Processor agreement</td><td>Pre-signed DPA available on Business and Enterprise plans</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:16px">See also: <a href="/compliance/nen7510" style="color:var(--cobalt)">full NEN 7510 compliance guide</a> and <a href="/dpa" style="color:var(--cobalt)">Data Processing Agreement</a>.</p>
+  </section>
 
-  <!-- 2. Credits -->
-  <h2 id="credits">2. Downtime credits</h2>
-  <p>If PARAMANT fails to meet the monthly uptime commitment, you may request a service credit. Credits are applied to the next billing cycle and are the sole remedy for downtime.</p>
+</main>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Monthly uptime</th>
-        <th>Community credit</th>
-        <th>Enterprise credit</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>99.5% &ndash; 99.9%</td>
-        <td>&mdash;</td>
-        <td>5%</td>
-      </tr>
-      <tr>
-        <td>99.0% &ndash; 99.5%</td>
-        <td>&mdash;</td>
-        <td>15%</td>
-      </tr>
-      <tr>
-        <td>95.0% &ndash; 99.0%</td>
-        <td>&mdash;</td>
-        <td>30%</td>
-      </tr>
-      <tr>
-        <td>Below 95.0%</td>
-        <td>&mdash;</td>
-        <td>50%</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="note-box"><strong>How to claim:</strong> Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with subject "SLA credit request" within 30 days of the end of the affected calendar month. Include your API key label and a description of the outage. Credits are not automatically issued.</div>
-
-  <!-- 3. Support -->
-  <h2 id="support">3. Support tiers</h2>
-  <p>Initial response times are best-effort targets during business hours (09:00–17:00 CET, Mon–Fri).</p>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Tier</th>
-        <th>Channel</th>
-        <th>Initial response</th>
-        <th>Scope</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="badge badge-comm">Community</span></td>
-        <td>GitHub Issues</td>
-        <td>Best effort</td>
-        <td>Bug reports, documentation questions</td>
-      </tr>
-      <tr>
-        <td><span class="badge badge-ent">Enterprise</span></td>
-        <td>Email + dedicated channel</td>
-        <td>4 business hours</td>
-        <td>Priority escalation, compliance docs, DPO contact, custom contracts</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- 4. Exclusions -->
-  <h2 id="exclusions">4. Exclusions</h2>
-  <p>The following are not counted as downtime for SLA purposes:</p>
-  <ul style="color:var(--ink-dim);padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
-    <li>Scheduled maintenance windows, announced at least 48 hours in advance via <a href="https://github.com/Apolloccrypt/paramant-relay/releases">GitHub Releases</a></li>
-    <li>Downtime caused by client-side network failures, DNS misconfiguration, or TLS certificate errors on the client</li>
-    <li>Force majeure events (natural disasters, acts of war, upstream provider outages outside our control)</li>
-    <li>Downtime caused by your own configuration errors, abuse, or violation of the BUSL-1.1 license terms</li>
-    <li>Degraded performance that does not result in complete unavailability of the relay API endpoints</li>
-    <li>Community plan: no credit entitlement regardless of downtime duration</li>
-  </ul>
-
-  <!-- 5. Measurement -->
-  <h2 id="measurement">5. Measurement methodology</h2>
-  <p>PARAMANT measures availability using automated HTTP health checks against <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on each relay sector endpoint, from multiple EU locations, every 60 seconds. An endpoint is considered unavailable when three consecutive checks fail with a non-2xx response or a TCP timeout.</p>
-  <p>Historical uptime data is published in the Certificate Transparency log and available at <a href="/ct-log">/ct-log</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
-
-  <!-- 6. Changes -->
-  <h2 id="changes">6. SLA changes</h2>
-  <p>PARAMANT may update this SLA with 30 days' written notice. Continued use of the service after the effective date constitutes acceptance of the revised SLA. Material reductions to uptime commitments entitle existing paying customers to terminate their subscription and receive a pro-rated refund for the remaining term.</p>
-
-  <!-- 7. Contact -->
-  <h2 id="contact">7. Contact</h2>
-  <p>For SLA credits, support escalations, or enterprise contract inquiries:</p>
-  <p><a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
-  PARAMANT &mdash; Hetzner DE (FSN1)<br>
-  EU/DE jurisdiction &middot; GDPR Art. 28 compliant &middot; No US CLOUD Act exposure</p>
-
-  <div class="note-box" style="margin-top:40px"><strong>Self-hosting:</strong> This SLA applies exclusively to the managed PARAMANT relay service at <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 5px">*.paramant.app</code>. Self-hosted deployments are governed by the BUSL-1.1 license and carry no uptime warranty. See <a href="/docs/self-hosting">self-hosting documentation</a> for HA configuration guidance.</div>
+<div style="background:var(--cobalt);padding:52px 48px;text-align:center">
+  <h2 style="font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)">Ready for your first compliant transfer?</h2>
+  <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">Business and Enterprise plans include a pre-signed NEN 7510 DPA. Start free, upgrade when your compliance officer asks.</p>
+  <a href="/signup" class="btn-primary">Create free account &rarr;</a>
+  <a href="/compliance/nen7510" class="btn-sec">NEN 7510 compliance guide &rarr;</a>
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:24px">ML-KEM-768 &middot; NEN 7510 &middot; GDPR Art. 32 &middot; EU/DE</p>
 </div>
 
 <footer>
-  <div class="container-lg" id="main-content" tabindex="-1">
+  <div class="container-lg">
     <div class="footer-grid">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
