@@ -26,7 +26,7 @@
 <meta property="og:image:height" content="630">
 
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<link rel="stylesheet" href="/design-system.css?v=10">
+<link rel="stylesheet" href="/design-system.css?v=11">
 <link rel="stylesheet" href="/nav.css?v=9">
 <style>
 /* ── DEPLOY CARDS ─────────────────────────────── */
@@ -113,6 +113,27 @@
 .deploy-cta:hover { text-decoration: underline; }
 @media (max-width: 900px) {
   .deploy-grid { grid-template-columns: 1fr; }
+}
+.hero-col-secondary-link {
+  display: inline-block;
+  margin: 8px 0 20px 0;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  color: #64748b;
+  text-decoration: none;
+  border-bottom: 1px dashed #94A3B8;
+  padding-bottom: 2px;
+  transition: all 140ms ease;
+}
+.hero-col-secondary-link:hover {
+  color: #1D4ED8;
+  border-bottom-color: #B2FF3F;
+  border-bottom-style: solid;
+}
+.hero-col-secondary-link:focus-visible {
+  outline: 2px solid #B2FF3F;
+  outline-offset: 2px;
+  color: #0B3A6A;
 }
 </style>
 </head>
@@ -319,18 +340,19 @@
     <div class="hero-split-grid">
 
       <article class="hero-col hero-col--send">
-        <div class="hero-col-label">SEND</div>
-        <h2 class="hero-col-title">Move a file securely, once, without a trace.</h2>
-        <p class="hero-col-lede">
-          Journalists sending tips. Lawyers exchanging discovery. Doctors sharing scans. Anyone who needs to send something that should not live on anyone&rsquo;s server.
-        </p>
-        <a href="/send" class="btn btn-lime hero-col-cta">Send a file &rarr;</a>
-        <ul class="hero-col-specs">
-          <li>No account needed</li>
-          <li>Burns after one read</li>
-          <li>AES-256-GCM in-browser</li>
-        </ul>
-      </article>
+          <div class="hero-col-label">SEND</div>
+          <h2 class="hero-col-title">Move a file securely.</h2>
+          <p class="hero-col-lede">
+            A free account tracks your sends, keeps them longer, and lets you send more per month. Or drop one file anonymously in 30 seconds.
+          </p>
+          <a href="/signup" class="btn btn-lime hero-col-cta">Create free account →</a>
+          <a href="/send" class="hero-col-secondary-link">Or skip account — send anonymously →</a>
+          <ul class="hero-col-specs">
+            <li>No password — TOTP only</li>
+            <li>Burns after read, or on timer</li>
+            <li>AES-256-GCM in-browser</li>
+          </ul>
+        </article>
 
       <div class="hero-split-divider" aria-hidden="true"></div>
 
@@ -592,7 +614,7 @@
     </div>
     <div class="cta-row">
       <a href="/security" class="btn btn-secondary">Auth security details &rarr;</a>
-      <a href="/request-key" class="btn btn-secondary">Get a free API key &rarr;</a>
+      <a href="/signup" class="btn btn-secondary">Get a free API key &rarr;</a>
     </div>
   </div>
 </section>
@@ -802,7 +824,7 @@
         <div class="footer-col-label">Company</div>
         <div class="footer-links">
           <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/request-key">Free API key</a>
+          <a href="/signup">Create account</a>
           <a href="/status">Status</a>
           <a href="/sla">SLA</a>
           <a href="/security">Security</a>
