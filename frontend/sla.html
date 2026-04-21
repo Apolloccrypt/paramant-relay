@@ -16,7 +16,7 @@
 <meta name="twitter:description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
 <link rel="canonical" href="https://paramant.app/sla">
 
-<link rel="stylesheet" href="/design-system.css?v=10">
+<link rel="stylesheet" href="/design-system.css?v=13">
 <link rel="stylesheet" href="/nav.css?v=9">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -56,6 +56,68 @@ a:hover{opacity:.8}
 .toc a{font-size:13px;text-decoration:none;color:var(--ink-dim)}
 .toc a:hover{color:var(--cobalt)}
 @media(max-width:640px){.wrap{padding:48px 24px 80px}.sla-grid{grid-template-columns:1fr}}
+</style>
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: #475569;
+  text-decoration: none;
+  border: 1px solid #E2E8F0;
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #64748b;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: #0B3A6A;
+  border-color: #B2FF3F;
+  background: rgba(178, 255, 63, 0.08);
+}
+.nav-help:hover::before {
+  border-color: #0B3A6A;
+  color: #0B3A6A;
+  background: #B2FF3F;
+}
+.nav-help:focus-visible {
+  outline: 2px solid #B2FF3F;
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-decoration: none;
+  border-bottom: 1px solid #e2e8f0;
+}
+.nav-help-mobile:hover {
+  color: #0B3A6A;
+  background: rgba(178, 255, 63, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
 </style>
 </head>
 <body>
@@ -139,6 +201,7 @@ a:hover{opacity:.8}
   </ul>
 
   <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -227,6 +290,7 @@ a:hover{opacity:.8}
   </div>
 
   <div class="nav-mobile-cta">
+    <a href="/help" class="nav-help-mobile nav-mobile-standalone">HELP</a>
     <a href="/auth/login" class="btn btn-ghost-dark">Sign in</a>
     <a href="/signup" class="btn btn-lime">Create account</a>
   </div>
