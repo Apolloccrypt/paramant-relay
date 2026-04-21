@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture — PARAMANT</title>
+<meta name="description" content="How Paramant works: browser-side encryption, RAM-only relay, burn-on-read, URL fragment key delivery. Shown, not told.">
+<meta property="og:title" content="Architecture — PARAMANT">
+<meta property="og:description" content="How Paramant works: browser-side encryption, RAM-only relay, burn-on-read, URL fragment key delivery. Shown, not told.">
+<meta property="og:url" content="https://paramant.app/architecture">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Architecture — PARAMANT">
+<meta name="twitter:description" content="How Paramant works: browser-side encryption, RAM-only relay, burn-on-read, URL fragment key delivery. Shown, not told.">
+<link rel="canonical" href="https://paramant.app/architecture">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+
+<link rel="stylesheet" href="/design-system.css?v=8">
+<link rel="stylesheet" href="/nav.css?v=7">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+/* ── typography ── */
+body{font-family:Inter,system-ui,-apple-system,sans-serif}
+
+/* ── layout primitives ── */
+.arch-section{padding:80px 0}
+.arch-section--navy{background:#0B3A6A;color:#F8FAFC}
+.arch-section--tint{background:#EFF6FF}
+.arch-inner{max-width:900px;margin:0 auto;padding:0 48px}
+
+/* ── eyebrow pill ── */
+.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:4px 12px;margin-bottom:20px}
+
+/* ── hero ── */
+.page-hero{padding:100px 0 80px;border-bottom:1px solid var(--ink-hair,#e2e8f0)}
+.page-hero-inner{max-width:900px;margin:0 auto;padding:0 48px}
+.page-hero h1{font-size:42px;font-weight:700;letter-spacing:-.03em;margin-bottom:16px;line-height:1.1}
+.lede{font-size:18px;color:#475569;line-height:1.7;max-width:600px}
+.lede a{color:#1D4ED8;text-decoration:none}
+.lede a:hover{opacity:.7}
+
+/* ── section headings ── */
+.section-num{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px}
+.section-num--dark{color:#94a3b8}
+.section-title{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
+.section-desc{font-size:16px;line-height:1.75;color:#475569;max-width:640px;margin-bottom:40px}
+.arch-section--navy .section-desc{color:#cbd5e1}
+.arch-section--navy .section-title{color:#F8FAFC}
+
+/* ── diagram box ── */
+.arch-diagram{background:#fff;border:1px solid #e2e8f0;padding:40px;margin:32px 0;overflow-x:auto}
+
+/* ── takeaway callout ── */
+.arch-takeaway{border-left:3px solid #B2FF3F;padding:16px 20px;background:#f0fdf4;margin-top:32px}
+.arch-takeaway--navy{border-left:3px solid #B2FF3F;padding:16px 20px;background:rgba(178,255,63,.07);margin-top:32px}
+.arch-takeaway p{font-size:14px;color:#374151;line-height:1.7;margin:0}
+.arch-takeaway--navy p{color:#cbd5e1}
+.arch-takeaway strong{color:#0B3A6A}
+.arch-takeaway--navy strong{color:#B2FF3F}
+
+/* ── compare grid ── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
+.compare-col{padding:28px 32px;border:1px solid rgba(255,255,255,.12)}
+.compare-col--bad{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
+.compare-col--good{background:rgba(178,255,63,.08);border-color:rgba(178,255,63,.3)}
+.compare-col h3{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+.compare-col--bad h3{color:#f87171}
+.compare-col--good h3{color:#B2FF3F}
+.compare-col ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.compare-col li{font-size:14px;line-height:1.5;padding-left:22px;position:relative;color:#cbd5e1}
+.compare-col li::before{position:absolute;left:0;font-weight:700}
+.compare-col--bad li::before{content:"✗";color:#f87171}
+.compare-col--good li::before{content:"✓";color:#B2FF3F}
+
+/* ── URL anatomy ── */
+.url-anatomy{margin:36px 0;position:relative}
+.url-display{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6;word-break:break-all;background:#fff;border:1px solid #e2e8f0;padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
+.url-part{display:inline}
+.url-sent{color:#1D4ED8}
+.url-not-sent{background:#B2FF3F;color:#0B3A6A;padding:2px 4px}
+.url-labels{display:flex;flex-wrap:wrap;gap:32px;margin-top:24px}
+.url-label-item{display:flex;flex-direction:column;gap:4px}
+.url-label-dot{width:10px;height:10px;display:inline-block;margin-right:6px;vertical-align:middle}
+.url-label-dot--blue{background:#1D4ED8}
+.url-label-dot--lime{background:#B2FF3F}
+.url-label-text{font-size:13px;color:#475569;line-height:1.6}
+.url-label-text strong{color:#0B3A6A;display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+
+/* ── lifecycle grid ── */
+.lifecycle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:32px 0}
+.lifecycle-state{padding:24px;border:1px solid #e2e8f0;background:#fff;position:relative}
+.lifecycle-state--active{border-color:#B2FF3F;border-width:2px}
+.lifecycle-state--gone{opacity:.5}
+.lifecycle-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;margin-bottom:12px}
+.lifecycle-state--active .lifecycle-num{color:#B2FF3F}
+.lifecycle-heading{font-size:15px;font-weight:700;color:#0B3A6A;margin-bottom:10px}
+.lifecycle-body{font-size:13px;color:#475569;line-height:1.6}
+.lifecycle-gone-icon{position:absolute;top:16px;right:16px;width:20px;height:20px;color:#ef4444}
+
+/* ── modes table ── */
+.modes-table{width:100%;border-collapse:collapse;margin-top:32px}
+.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;border-bottom:2px solid #e2e8f0}
+.modes-table th:not(:first-child){text-align:center}
+.modes-table td{padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.modes-table td:first-child{color:#0B3A6A;font-weight:600}
+.modes-table td:not(:first-child){text-align:center;color:#475569}
+.modes-table tr:last-child td{border-bottom:none}
+.modes-table .mode-head{font-size:13px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.04em}
+.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:#eff6ff;color:#1D4ED8}
+.modes-table .mode-badge--lime{background:#f0fdf4;color:#166534}
+
+/* ── going deeper ── */
+.going-deeper{text-align:center;padding:64px 48px}
+.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;color:#0B3A6A}
+.going-deeper p{font-size:16px;color:#475569;margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
+.btn-arch{display:inline-block;background:#0B3A6A;color:#F8FAFC;text-decoration:none;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.02em;transition:opacity .15s}
+.btn-arch:hover{opacity:.85}
+
+/* ── SVG helpers ── */
+.diagram-label{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+
+footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-links{display:flex;gap:20px;flex-wrap:wrap}
+.footer-links a{font-size:var(--text-xs,12px);color:var(--cobalt,#1D4ED8)}
+.footer-meta{font-size:var(--text-xs,12px);color:var(--ink-dim,#64748b)}
+
+@media(max-width:900px){
+  .arch-inner,.page-hero-inner{padding:0 24px}
+  .page-hero{padding:72px 0 56px}
+  .arch-section{padding:56px 0}
+  .page-hero h1{font-size:32px}
+  .compare-grid,.lifecycle-grid{grid-template-columns:1fr}
+  .url-display{font-size:13px}
+  footer{padding:32px 20px;flex-direction:column}
+}
+@media(max-width:640px){
+  .arch-inner,.page-hero-inner{padding:0 20px}
+  .page-hero h1{font-size:26px}
+  .arch-diagram{padding:20px}
+  .going-deeper{padding:48px 20px}
+}
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<div class="meta-bar">
+  <span class="">build 2.4.5</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/architecture" role="menuitem">Architecture</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <a href="/" class="nav-logo">
+      <span class="logo-para">Para</span><span class="logo-mant">MANT</span>
+    </a>
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-products">Products</button>
+    <div class="nav-mobile-group-items" id="mobile-group-products">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-developers">Developers</button>
+    <div class="nav-mobile-group-items" id="mobile-group-developers">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-selfhost">Self-host</button>
+    <div class="nav-mobile-group-items" id="mobile-group-selfhost">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-compliance">Compliance</button>
+    <div class="nav-mobile-group-items" id="mobile-group-compliance">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-about">About</button>
+    <div class="nav-mobile-group-items" id="mobile-group-about">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/architecture">Architecture</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-cta">
+    <a href="/auth/login" class="btn btn-ghost-dark">Sign in</a>
+    <a href="/signup" class="btn btn-lime">Create account</a>
+  </div>
+
+  <div class="nav-mobile-meta">
+    <span>build 2.4.5</span>
+    <span class="meta-sep">&middot;</span>
+    <span>RAM only</span>
+  </div>
+</div>
+
+<main id="main-content">
+
+<!-- ── HERO ── -->
+<section class="page-hero">
+  <div class="page-hero-inner">
+    <span class="eyebrow">ARCHITECTURE</span>
+    <h1>How Paramant works.<br>Shown, not told.</h1>
+    <p class="lede">A plain-language walkthrough of every step: how your file is encrypted, how it travels, why the relay cannot read it, and what happens when the link is opened. For the cryptographic specification, see <a href="/security">the security page</a>.</p>
+  </div>
+</section>
+
+<!-- ── SECTION 01: THE FLOW ── -->
+<section class="arch-section">
+  <div class="arch-inner">
+    <div class="section-num">01</div>
+    <h2 class="section-title">The flow</h2>
+    <p class="section-desc">Four stages. The key never leaves the browsers. The relay only ever sees ciphertext it cannot read.</p>
+
+    <div class="arch-diagram" role="img" aria-label="Four-stage transfer diagram: browser encrypts, relay stores ciphertext in RAM, recipient browser decrypts, then ciphertext is erased">
+      <svg viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:480px">
+        <!-- Stage boxes -->
+        <!-- 1: YOUR BROWSER -->
+        <rect x="0" y="40" width="180" height="140" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="90" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#0B3A6A">YOUR BROWSER</text>
+        <rect x="20" y="76" width="140" height="28" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+        <text x="90" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#1D4ED8">file.pdf</text>
+        <text x="90" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">AES-256-GCM</text>
+        <text x="90" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">encrypt in browser</text>
+        <rect x="20" y="144" width="140" height="24" rx="2" fill="#0B3A6A"/>
+        <text x="90" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B2FF3F">🔑 key generated</text>
+
+        <!-- Arrow 1→2 -->
+        <line x1="183" y1="110" x2="227" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="205" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">ciphertext</text>
+
+        <!-- 2: PARAMANT RELAY -->
+        <rect x="230" y="40" width="180" height="140" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="320" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#0B3A6A">PARAMANT RELAY</text>
+        <rect x="250" y="76" width="140" height="52" rx="2" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
+        <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#dc2626">████████████</text>
+        <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#dc2626">opaque ciphertext</text>
+        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">RAM only — no disk write</text>
+        <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">no key, no plaintext</text>
+
+        <!-- Arrow 2→3 -->
+        <line x1="413" y1="110" x2="457" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="435" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">ciphertext</text>
+
+        <!-- 3: RECIPIENT BROWSER -->
+        <rect x="460" y="40" width="180" height="140" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="550" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#0B3A6A">RECIPIENT BROWSER</text>
+        <rect x="480" y="76" width="140" height="28" rx="2" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+        <text x="550" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" fill="#166534">file.pdf ✓</text>
+        <text x="550" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">key from link #fragment</text>
+        <text x="550" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">decrypt locally</text>
+        <rect x="480" y="144" width="140" height="24" rx="2" fill="#0B3A6A"/>
+        <text x="550" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#B2FF3F">flagged for erasure</text>
+
+        <!-- Arrow 3→4 -->
+        <line x1="643" y1="110" x2="687" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="665" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">burn</text>
+
+        <!-- 4: GONE -->
+        <rect x="690" y="40" width="170" height="140" rx="2" fill="#fff1f2" stroke="#fecdd3" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="775" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" fill="#dc2626">GONE</text>
+        <text x="775" y="95" text-anchor="middle" font-size="28" fill="#dc2626">⌫</text>
+        <text x="775" y="126" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#dc2626">erased from RAM</text>
+        <text x="775" y="142" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#dc2626">410 Gone</text>
+        <text x="775" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#dc2626">no recovery</text>
+
+        <!-- Arrowhead marker -->
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="arch-takeaway">
+      <p><strong>The key only exists in browsers.</strong> The relay receives ciphertext, holds it in RAM, and forwards it. It has no key and cannot read the file. A fully compromised relay sees nothing useful.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── SECTION 02: WHAT WE SEE ── -->
+<section class="arch-section arch-section--navy">
+  <div class="arch-inner">
+    <div class="section-num">02</div>
+    <h2 class="section-title">What we see</h2>
+    <p class="section-desc">Most cloud services store your file, index it, preview it. Paramant's relay sits in the middle and sees almost nothing. Here is the difference.</p>
+
+    <div class="compare-grid">
+      <div class="compare-col compare-col--bad">
+        <h3>Typical cloud storage</h3>
+        <ul>
+          <li>Readable file contents (stored in plaintext or decryptable by the provider)</li>
+          <li>Filename and metadata logged</li>
+          <li>Preview thumbnail generated server-side</li>
+          <li>Written to disk — survives restarts, subpoenas, breaches</li>
+          <li>Access logs tied to content</li>
+          <li>Subject to legal disclosure orders</li>
+        </ul>
+      </div>
+      <div class="compare-col compare-col--good">
+        <h3>Paramant relay</h3>
+        <ul>
+          <li>Ciphertext only — we cannot read it</li>
+          <li>No filename, no metadata</li>
+          <li>No preview possible — opaque bytes</li>
+          <li>RAM only — relay restart destroys everything</li>
+          <li>Nothing to disclose — we hold no plaintext</li>
+          <li>GDPR jurisdiction, no US CLOUD Act</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="arch-takeaway--navy">
+      <p><strong>Legal disclosure is structurally impossible.</strong> We cannot hand over what we do not have. A court order served to the relay returns: encrypted bytes, no key, no plaintext, no filename.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── SECTION 03: THE # IN THE LINK ── -->
+<section class="arch-section">
+  <div class="arch-inner">
+    <div class="section-num">03</div>
+    <h2 class="section-title">The # in the link</h2>
+    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half — the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:#eff6ff;padding:2px 6px;color:#1D4ED8">#</code> — never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
+
+    <div class="url-anatomy">
+      <div class="url-display">
+        <span class="url-part url-sent">https://paramant.app/r/a8f3c92d</span><span class="url-part url-not-sent">#key=ZmFrZS1rZXk-Nzg5MA</span>
+      </div>
+      <div class="url-labels" style="margin-top:24px">
+        <div class="url-label-item">
+          <div>
+            <span class="url-label-dot url-label-dot--blue"></span>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1D4ED8">Sent to relay</strong>
+          </div>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The path <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> identifies which blob to retrieve. The relay sees this and serves the matching ciphertext.</p>
+        </div>
+        <div class="url-label-item">
+          <div>
+            <span class="url-label-dot url-label-dot--lime"></span>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#166534">Never leaves the browser</strong>
+          </div>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never transmitted to any server — including ours.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="arch-takeaway">
+      <p><strong>This is a browser standard, not a trust promise.</strong> RFC 3986 specifies that URL fragments are client-only. Even if Paramant wanted to log the key, the browser would never send it. The relay structurally cannot intercept it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── SECTION 04: BURN ON READ ── -->
+<section class="arch-section arch-section--tint">
+  <div class="arch-inner">
+    <div class="section-num">04</div>
+    <h2 class="section-title">Burn on read</h2>
+    <p class="section-desc">The ciphertext exists exactly once, for exactly one opening. Once the recipient downloads it, the relay zeroes the memory slot. There is no second copy to retrieve.</p>
+
+    <div class="lifecycle-grid">
+      <div class="lifecycle-state">
+        <div class="lifecycle-num">State 01</div>
+        <div class="lifecycle-heading">Link sent</div>
+        <div class="lifecycle-body">Ciphertext is held in relay RAM. The decryption key lives only in the URL fragment on the sender's clipboard. The relay is waiting.</div>
+      </div>
+      <div class="lifecycle-state lifecycle-state--active">
+        <div class="lifecycle-num">State 02 — active</div>
+        <div class="lifecycle-heading">Link opened</div>
+        <div class="lifecycle-body">Recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. File appears in the browser.</div>
+      </div>
+      <div class="lifecycle-state lifecycle-state--gone">
+        <svg class="lifecycle-gone-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="10" r="9" stroke="#ef4444" stroke-width="1.5"/>
+          <path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="#ef4444" stroke-width="1.75"/>
+        </svg>
+        <div class="lifecycle-num">State 03 — gone</div>
+        <div class="lifecycle-heading">Erased</div>
+        <div class="lifecycle-body">Memory slot zeroed. Any subsequent request for that ID returns HTTP 410 Gone. No recovery, no retry, no copy anywhere on disk.</div>
+      </div>
+    </div>
+
+    <div class="arch-takeaway">
+      <p><strong>If you forward a link that still works, you forwarded the secret.</strong> Burn-on-read is a single-use guarantee. Once the link is opened, it is gone — for the recipient and for anyone who intercepts a copy of the URL.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── SECTION 05: VERIFIABLE HISTORY ── -->
+<section class="arch-section">
+  <div class="arch-inner">
+    <div class="section-num">05</div>
+    <h2 class="section-title">Verifiable history</h2>
+    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root — which is publicly visible and tamper-evident.</p>
+
+    <div class="arch-diagram" role="img" aria-label="Merkle tree diagram showing root hash derived from four leaf events">
+      <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
+        <!-- ROOT -->
+        <rect x="265" y="10" width="150" height="44" rx="2" fill="#B2FF3F"/>
+        <text x="340" y="30" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.06em" fill="#0B3A6A">MERKLE ROOT</text>
+        <text x="340" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#0B3A6A">SHA3-256 fingerprint</text>
+
+        <!-- Mid-level lines -->
+        <line x1="290" y1="54" x2="175" y2="110" stroke="#cbd5e1" stroke-width="1.5"/>
+        <line x1="390" y1="54" x2="505" y2="110" stroke="#cbd5e1" stroke-width="1.5"/>
+
+        <!-- Mid-level nodes -->
+        <rect x="105" y="110" width="140" height="38" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="175" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#475569">hash(A + B)</text>
+        <text x="175" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">transfers 1–2</text>
+
+        <rect x="435" y="110" width="140" height="38" rx="2" fill="#F8FAFC" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="505" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#475569">hash(C + D)</text>
+        <text x="505" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#94a3b8">transfers 3–4</text>
+
+        <!-- Leaf lines -->
+        <line x1="145" y1="148" x2="75" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
+        <line x1="205" y1="148" x2="265" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
+        <line x1="475" y1="148" x2="415" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
+        <line x1="545" y1="148" x2="605" y2="196" stroke="#cbd5e1" stroke-width="1.5"/>
+
+        <!-- Leaf nodes -->
+        <rect x="25" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+        <text x="75" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT A</text>
+        <text x="75" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 1</text>
+        <text x="75" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+
+        <rect x="215" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+        <text x="265" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT B</text>
+        <text x="265" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 2</text>
+        <text x="265" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+
+        <rect x="365" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+        <text x="415" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT C</text>
+        <text x="415" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 3</text>
+        <text x="415" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+
+        <rect x="555" y="196" width="100" height="48" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+        <text x="605" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" fill="#1D4ED8">EVENT D</text>
+        <text x="605" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" fill="#64748b">transfer 4</text>
+        <text x="605" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" fill="#94a3b8">timestamp + hash</text>
+      </svg>
+    </div>
+
+    <div class="arch-takeaway">
+      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event — even by one byte — and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── SECTION 06: WHERE IT RUNS ── -->
+<section class="arch-section arch-section--navy">
+  <div class="arch-inner">
+    <div class="section-num">06</div>
+    <h2 class="section-title">Where it runs</h2>
+    <p class="section-desc">One jurisdiction. One data center. No CDN caching your files. No US entity in the chain.</p>
+
+    <div style="text-align:center;margin:40px 0 32px">
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
+
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Nuremberg, Germany">
+        <!-- Concentric circles -->
+        <circle cx="180" cy="140" r="130" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+        <circle cx="180" cy="140" r="100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <circle cx="180" cy="140" r="72" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+        <circle cx="180" cy="140" r="46" fill="none" stroke="rgba(178,255,63,0.2)" stroke-width="1"/>
+        <circle cx="180" cy="140" r="22" fill="none" stroke="rgba(178,255,63,0.35)" stroke-width="1.5"/>
+        <!-- Center dot -->
+        <circle cx="180" cy="140" r="5" fill="#B2FF3F"/>
+        <!-- Cross-hairs -->
+        <line x1="180" y1="110" x2="180" y2="118" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
+        <line x1="180" y1="162" x2="180" y2="170" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
+        <line x1="150" y1="140" x2="158" y2="140" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
+        <line x1="202" y1="140" x2="210" y2="140" stroke="rgba(178,255,63,0.5)" stroke-width="1"/>
+        <!-- Coordinates label -->
+        <text x="196" y="128" font-family="'IBM Plex Mono',monospace" font-size="8" fill="rgba(178,255,63,0.7)">49.45°N 11.08°E</text>
+      </svg>
+
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(178,255,63,0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
+      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">Jurisdiction</div>
+        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">EU / Germany<br><span style="font-size:12px;color:#94a3b8">GDPR · DSGVO</span></div>
+      </div>
+      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">US Cloud Act</div>
+        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">Not applicable<br><span style="font-size:12px;color:#94a3b8">no US entity</span></div>
+      </div>
+      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">Storage</div>
+        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">RAM only<br><span style="font-size:12px;color:#94a3b8">no disk, no CDN</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SECTION 07: TWO MODES ── -->
+<section class="arch-section">
+  <div class="arch-inner">
+    <div class="section-num">07</div>
+    <h2 class="section-title">Two modes</h2>
+    <p class="section-desc">Paramant has two transfer modes. Anonymous one-shot sending requires no account. Verified ParaShare adds identity, post-quantum key exchange, and cryptographic proof of origin.</p>
+
+    <table class="modes-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th><span class="mode-badge">Anonymous<br>Send a file</span></th>
+          <th><span class="mode-badge mode-badge--lime">Verified<br>ParaShare</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Account needed</td>
+          <td>No</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Encryption</td>
+          <td>AES-256-GCM, browser-generated key in URL fragment</td>
+          <td>Hybrid ML-KEM-768 + ECDH P-256, then AES-256-GCM</td>
+        </tr>
+        <tr>
+          <td>Sender signature</td>
+          <td>None</td>
+          <td>ML-DSA-65 — mathematically tied to sender identity</td>
+        </tr>
+        <tr>
+          <td>Reads allowed</td>
+          <td>One — burned on first open</td>
+          <td>One — burned on first open</td>
+        </tr>
+        <tr>
+          <td>Proof of origin</td>
+          <td>None</td>
+          <td>Yes — CT log entry, verifiable by recipient</td>
+        </tr>
+        <tr>
+          <td>Post-quantum safe</td>
+          <td>No (classical AES key exchange)</td>
+          <td>Yes — ML-KEM-768 defeats HNDL attacks</td>
+        </tr>
+        <tr>
+          <td>Good for</td>
+          <td>Quick one-off shares, no signup friction</td>
+          <td>Legal, healthcare, financial, compliance workflows</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── GOING DEEPER ── -->
+<section class="arch-section arch-section--tint">
+  <div class="going-deeper">
+    <span class="eyebrow" style="display:block;text-align:center;margin-bottom:20px">GOING DEEPER</span>
+    <h2>Want the cryptographic specification?</h2>
+    <p>The security page covers every algorithm, the independent audit results, key verification layers, authentication model, and responsible disclosure. Written for cryptographers and security engineers.</p>
+    <a href="/security" class="btn-arch">Read the security spec &rarr;</a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/request-key">Free API key</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/architecture">Architecture</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=7" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+</body>
+</html>
