@@ -403,30 +403,8 @@ select:focus{border-color:var(--cobalt)}
 </div>
 <main id="main-content" style="position:relative;z-index:10">
 
-<!-- Path chooser -->
-<div id="step-choose" style="max-width:640px;margin:0 auto;padding:64px 24px 0">
-  <div class="hero-block">
-    <h1>Send a file</h1>
-    <p class="sub" style="margin-bottom:0">Choose how you want to send.</p>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-    <a href="/send" style="display:block;background:var(--bone);border:1px solid var(--ink-hair);padding:20px 18px;text-decoration:none;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cobalt)'" onmouseout="this.style.borderColor=''">
-      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px">Zero friction</div>
-      <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Send anonymously</div>
-      <div style="font-size:12px;color:var(--ink-dim);line-height:1.6">Drop a file. Get a burn link. No key, no account.</div>
-      <div style="font-size:11px;color:var(--cobalt);margin-top:12px">Go to /send &rarr;</div>
-    </a>
-    <button onclick="document.getElementById('step-choose').style.display='none';document.getElementById('step-setup').classList.add('active')" style="display:block;background:var(--bone);border:1px solid var(--ink-hair);padding:20px 18px;text-align:left;cursor:pointer;font-family:var(--mono);width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cobalt)'" onmouseout="this.style.borderColor=''">
-      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px">Verified E2E</div>
-      <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Send with ParaShare</div>
-      <div style="font-size:12px;color:var(--ink-dim);line-height:1.6">ML-KEM-768 key exchange. Recipient verifies relay identity.</div>
-      <div style="font-size:11px;color:var(--cobalt);margin-top:12px">Use ParaShare &rarr;</div>
-    </button>
-  </div>
-</div>
-
 <!-- STEP 1: Setup -->
-<div class="step" id="step-setup">
+<div class="step active" id="step-setup">
   <div class="hero-block">
     <h1>Secure file transfer</h1>
     <p class="sub" style="margin-bottom:0">The receiver gets a unique link. Their browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees the key.</p>
