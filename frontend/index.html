@@ -26,8 +26,8 @@
 <meta property="og:image:height" content="630">
 
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<link rel="stylesheet" href="/design-system.css?v=8">
-<link rel="stylesheet" href="/nav.css?v=7">
+<link rel="stylesheet" href="/design-system.css?v=10">
+<link rel="stylesheet" href="/nav.css?v=9">
 <style>
 /* ── DEPLOY CARDS ─────────────────────────────── */
 .deploy-grid {
@@ -136,31 +136,22 @@
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Send menu" aria-haspopup="true" aria-expanded="false">SEND</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/send" role="menuitem" class="nav-product-item"><span class="npi-title">Send a file</span><span class="npi-sub">Drop, share link, done. No account.</span></a></li>
-        <li role="none"><a href="/parashare" role="menuitem" class="nav-product-item"><span class="npi-title">ParaShare</span><span class="npi-sub">Verified end-to-end with audit trail.</span></a></li>
-        <li role="none"><a href="/drop" role="menuitem" class="nav-product-item"><span class="npi-title">ParaDrop</span><span class="npi-sub">AirDrop alternative, any platform.</span></a></li>
-        <li role="none"><a href="/dashboard" role="menuitem" class="nav-product-item"><span class="npi-title">Dashboard</span><span class="npi-sub">Account, API key, usage</span></a></li>
+        <li role="none"><a href="/send" role="menuitem" class="nav-product-item"><span class="npi-title">Send a file</span><span class="npi-sub">Anonymous, no account, burn-on-read</span></a></li>
+        <li role="none"><a href="/parashare" role="menuitem" class="nav-product-item"><span class="npi-title">ParaShare</span><span class="npi-sub">Verified transfers with signed receipts</span></a></li>
+        <li role="none"><a href="/drop" role="menuitem" class="nav-product-item"><span class="npi-title">ParaDrop</span><span class="npi-sub">Device to device, AirDrop alternative</span></a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Build menu" aria-haspopup="true" aria-expanded="false">BUILD</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Docs</span><span class="npi-sub">Integration guides, auth, relay protocol</span></a></li>
-        <li role="none"><a href="/docs#api" role="menuitem" class="nav-product-item"><span class="npi-title">API reference</span><span class="npi-sub">REST endpoints, request/response schemas</span></a></li>
+        <li class="nav-subheader" role="presentation">Docs &amp; API</li>
+        <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Documentation</span><span class="npi-sub">API reference, protocol spec, install guides</span></a></li>
         <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root — verifiable transfer history</span></a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem" class="nav-product-item"><span class="npi-title">GitHub</span><span class="npi-sub">Source code, issues, community</span></a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem" class="nav-product-item"><span class="npi-title">Docker Hub</span><span class="npi-sub">Pre-built relay container images</span></a></li>
-        <li role="none"><a href="/changelog" role="menuitem" class="nav-product-item"><span class="npi-title">Changelog</span><span class="npi-sub">Release notes and version history</span></a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem" class="nav-product-item"><span class="npi-title">Deploy guide</span><span class="npi-sub">Run your own relay in under 10 minutes</span></a></li>
+        <li class="nav-subheader" role="presentation">Self-host</li>
         <li role="none"><a href="/install.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install.sh</span><span class="npi-sub">Automated Linux server installer</span></a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-pi.sh</span><span class="npi-sub">Raspberry Pi optimised installer</span></a></li>
         <li role="none"><a href="/install-client.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-client.sh</span><span class="npi-sub">CLI client installer</span></a></li>
@@ -170,7 +161,7 @@
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">COMPLIANCE</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
         <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive — essential entities</span></a></li>
@@ -188,23 +179,25 @@
         <li role="none"><a href="/crypto-agility" role="menuitem" class="nav-product-item"><span class="npi-title">Crypto agility</span><span class="npi-sub">Migrating away from classical algorithms</span></a></li>
         <li class="nav-subheader" role="presentation">Legal</li>
         <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA — sign and download</span></a></li>
+        <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
       </ul>
     </li>
 
+    <li style="margin-left:auto"><a href="/architecture" class="nav-link nav-link-btn">HOW IT WORKS</a></li>
+    <li><a href="/pricing" class="nav-link nav-link-btn">PRICING</a></li>
+
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
+      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">ABOUT</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/status" role="menuitem" class="nav-product-item"><span class="npi-title">Status</span><span class="npi-sub">Live relay health and uptime metrics</span></a></li>
         <li role="none"><a href="/security" role="menuitem" class="nav-product-item"><span class="npi-title">Security</span><span class="npi-sub">Pentest reports and vulnerability disclosure</span></a></li>
-        <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
+        <li role="none"><a href="/vs" role="menuitem" class="nav-product-item"><span class="npi-title">Compare</span><span class="npi-sub">Paramant vs WeTransfer, Signal, Wire</span></a></li>
+        <li role="none"><a href="/changelog" role="menuitem" class="nav-product-item"><span class="npi-title">Changelog</span><span class="npi-sub">Release notes and version history</span></a></li>
         <li role="none"><a href="/license" role="menuitem" class="nav-product-item"><span class="npi-title">License</span><span class="npi-sub">BUSL-1.1 source-available terms</span></a></li>
         <li role="none"><a href="/press" role="menuitem" class="nav-product-item"><span class="npi-title">Press kit</span><span class="npi-sub">Logos, brand assets, media contacts</span></a></li>
         <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem" class="nav-product-item"><span class="npi-title">Contact</span><span class="npi-sub">privacy@paramant.app</span></a></li>
       </ul>
     </li>
-
-    <li style="margin-left:auto"><a href="/vs" class="nav-link nav-link-btn">Compare</a></li>
-    <li><a href="/pricing" class="nav-link nav-link-btn">Pricing</a></li>
 
   </ul>
 
@@ -309,27 +302,73 @@
 </div>
 
 <!-- § 00 HERO -->
-<section style="padding:var(--space-10) 0 var(--space-8)" id="main-content" tabindex="-1">
-  <div class="container">
-    <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-5)">post-quantum <span style="color:#B2FF3F;font-weight:700;margin:0 3px">&middot;</span> eu sovereign <span style="color:#B2FF3F;font-weight:700;margin:0 3px">&middot;</span> zero-knowledge</p>
-    <h1>Encrypted file transport.<br><em class="lime-hi">RAM-only.</em> Burn on read.</h1>
-    <p style="font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:560px;margin-top:var(--space-5);margin-bottom:var(--space-7)">
-      Paramant is a post-quantum encrypted file relay.
-      ML-KEM-768 and ML-DSA-65, NIST Level 3. Operated
-      from the Netherlands, infrastructure in Germany.
-      No US owner, no CLOUD Act exposure. Your data
-      lives in RAM only, destroyed on first read.
-    </p>
-    <div class="hero-actions">
-      <a href="/send" class="btn btn-primary">Send a file</a>
-      <a href="/sovereignty" class="btn btn-secondary">Why jurisdiction matters</a>
+<section class="section section--light hero-split" id="main-content" tabindex="-1" aria-label="Two ways to use Paramant">
+  <div class="section-inner">
+
+    <header class="hero-split-header">
+      <div class="hero-split-eyebrow">
+        <span>POST-QUANTUM</span>
+        <span class="eyebrow-dot">&middot;</span>
+        <span>EU SOVEREIGN</span>
+        <span class="eyebrow-dot">&middot;</span>
+        <span>ZERO-KNOWLEDGE</span>
+      </div>
+      <h1 class="hero-split-title">Encrypted file transport.<br>Two ways to use it.</h1>
+    </header>
+
+    <div class="hero-split-grid">
+
+      <article class="hero-col hero-col--send">
+        <div class="hero-col-label">SEND</div>
+        <h2 class="hero-col-title">Move a file securely, once, without a trace.</h2>
+        <p class="hero-col-lede">
+          Journalists sending tips. Lawyers exchanging discovery. Doctors sharing scans. Anyone who needs to send something that should not live on anyone&rsquo;s server.
+        </p>
+        <a href="/send" class="btn btn-lime hero-col-cta">Send a file &rarr;</a>
+        <ul class="hero-col-specs">
+          <li>No account needed</li>
+          <li>Burns after one read</li>
+          <li>AES-256-GCM in-browser</li>
+        </ul>
+      </article>
+
+      <div class="hero-split-divider" aria-hidden="true"></div>
+
+      <article class="hero-col hero-col--build">
+        <div class="hero-col-label">BUILD</div>
+        <h2 class="hero-col-title">Run the relay yourself, or build on the API.</h2>
+        <p class="hero-col-lede">
+          Self-hosters on Raspberry Pi. OT teams deploying sector-isolated relays. Blockchain nodes needing ciphertext passthrough. Developers integrating encrypted transfer into their own products.
+        </p>
+        <a href="/docs" class="btn btn-lime hero-col-cta">Read the docs &rarr;</a>
+        <ul class="hero-col-specs">
+          <li>BUSL-1.1 source</li>
+          <li>docker compose up -d</li>
+          <li>NIS2, IEC&nbsp;62443, NEN&nbsp;7510</li>
+        </ul>
+      </article>
+
     </div>
-    <div class="hero-proof">
-      <div>ML-KEM-768 &middot; FIPS 203</div>
-      <div>RAM-only &middot; burn on read</div>
-      <div>Hetzner DE &middot; EU-Central</div>
-      <div>BUSL-1.1 &middot; self-hostable</div>
+
+    <div class="hero-trust-strip" aria-label="Technical foundation shared by both sides">
+      <span class="trust-item">
+        <span class="trust-label">CRYPTO</span>
+        <span class="trust-value">ML-KEM-768 + ECDH P-256</span>
+      </span>
+      <span class="trust-item">
+        <span class="trust-label">JURISDICTION</span>
+        <span class="trust-value">Hetzner Germany, EU only</span>
+      </span>
+      <span class="trust-item">
+        <span class="trust-label">OWNERSHIP</span>
+        <span class="trust-value">No US parent, no CLOUD Act</span>
+      </span>
+      <span class="trust-item">
+        <span class="trust-label">STORAGE</span>
+        <span class="trust-value">RAM only, no disk writes</span>
+      </span>
     </div>
+
   </div>
 </section>
 
@@ -782,7 +821,7 @@
 #main-content h1{line-height:1.2}
 </style>
 <script src="/ct-stats.js" defer></script>
-<script src="/nav.js?v=7" defer></script>
+<script src="/nav.js?v=9" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 <script>
 (function(){
