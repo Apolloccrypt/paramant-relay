@@ -2643,3 +2643,38 @@ a.skip-link:focus-visible,
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
+
+/* § 05 product grid — light-theme column differentiation ───────────────── */
+.eyebrow--senders  { color: var(--cobalt); }
+.eyebrow--builders { color: var(--navy); }
+
+.product-tag--lime {
+  background: var(--lime);
+  color: var(--navy);
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.product-tag--cobalt {
+  background: var(--cobalt);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.product-card-light {
+  border: 1px solid #E2E8F0;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+.product-card-light:hover {
+  border-color: var(--lime);
+  transform: translateY(-2px);
+}
