@@ -937,6 +937,7 @@ api.get("/user/account", authUser, async (req, res) => {
     email,
     label: user?.label || null,
     plan: user?.plan || null,
+    created_at: user?.created_at || null,
     api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
     backup_codes_remaining: backupCount,
     session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),

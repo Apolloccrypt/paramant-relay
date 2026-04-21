@@ -460,7 +460,7 @@
       document.getElementById('api-key').textContent = data.api_key_masked;
       document.getElementById('plan').textContent = data.plan;
       document.getElementById('label').textContent = data.label || '—';
-      document.getElementById('created').textContent = new Date(data.created_at).toLocaleDateString();
+      document.getElementById('created').textContent = data.created_at ? new Date(data.created_at).toLocaleDateString() : 'Unknown';
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
 
       const sessionsList = document.getElementById('sessions-list');
