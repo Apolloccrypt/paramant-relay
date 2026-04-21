@@ -39,6 +39,7 @@ async function destroySession(sid) {
   if (sid) await redis().del(`paramant:admin:session:${sid}`);
 }
 
+// @deprecated 2026-04-21 — /request-key trial flow retired. /signup now handles all key issuance.
 // ── Self-service trial key tracking ──────────────────────────────────────────
 const trialEmailTrack = new Map(); // email → { lastAt }
 const trialIpTrack    = new Map(); // ip → { count, resetAt }
@@ -359,54 +360,17 @@ api.post('/reload-all', authMiddleware, async (req, res) => {
   res.json({ ok: Object.values(results).every(r => r.ok), results });
 });
 
-// ── Self-service trial key request (public, no auth) ──────────────────────
-api.post('/request-key', async (req, res) => {
-  const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
-  if (!checkTrialIpLimit(ip)) return res.status(429).json({ error: 'Too many requests — try again in a minute' });
-
-  const { email, name, usecase, website } = req.body || {};
-  if (website) return res.status(400).json({ error: 'Bad request' });
-  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email is required' });
-  const norm = email.toLowerCase().trim();
-  if (!/^[^@\s]{1,64}@[^@\s]{1,253}\.[^@\s]{2,}$/.test(norm)) return res.status(400).json({ error: 'Enter a valid email address' });
-
-  const now = Date.now();
-  const prev = trialEmailTrack.get(norm);
-  if (prev && now - prev.lastAt < 7 * 86_400_000) {
-    const nextOk = new Date(prev.lastAt + 7 * 86_400_000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-    return res.status(429).json({ error: `A key was already sent to this address. Next request allowed after ${nextOk}.` });
-  }
-
-  const key = 'pgp_' + crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(now + 30 * 86_400_000).toISOString().slice(0, 10);
-  const keyBody = { key, plan: 'trial', label: `trial:${norm}${usecase ? ':' + usecase : ''}`, max_uploads: 10, expires_at: expiresAt, active: true };
-
-  try {
-    await eachSector(Object.keys(SECTORS), async s => {
-      const r = await relayFetch(s, '/v2/admin/keys', 'POST', keyBody, false, ADMIN_TOKEN);
-      if (r.status !== 200 && r.status !== 201) console.warn(`[trial] sector ${s} returned ${r.status}`);
-    });
-    const firstName = (typeof name === 'string' ? name.trim() : '').split(/\s+/)[0] || '';
-    const sent = await sendTrialEmail(norm, firstName, key);
-    if (!sent) return res.status(503).json({ error: 'Email delivery unavailable — contact privacy@paramant.app' });
-    trialEmailTrack.set(norm, { lastAt: now });
-    const adminApiKey = process.env.RESEND_API_KEY;
-    if (adminApiKey) fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${adminApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'PARAMANT <noreply@paramant.app>',
-        to: ['privacy@paramant.app'],
-        subject: `[PARAMANT] New trial key — ${norm}`,
-        html: `<p><b>Email:</b> ${norm}</p><p><b>Name:</b> ${name || '—'}</p><p><b>Use case:</b> ${usecase || '—'}</p><p><b>Key prefix:</b> ${key.slice(0, 12)}…</p><p><b>Expires:</b> ${expiresAt}</p>`,
-      }),
-    }).catch(e => console.warn('[trial] admin notify failed:', e.message));
-    return res.json({ ok: true, key, email: norm, message: `Key sent to ${norm}` });
-  } catch (e) {
-    console.error('[trial] error:', e.message);
-    return res.status(500).json({ error: 'Could not issue key — contact privacy@paramant.app' });
-  }
-});
+// ── Self-service trial key request — DEPRECATED 2026-04-21 ──────────────────
+// Trial-key-by-email flow retired. /signup + TOTP is the single acquisition path.
+// Historical trial keys remain valid until their natural 30-day expiry.
+api.post('/request-key', (req, res) => {
+  res.status(410).json({
+    error: 'endpoint_deprecated',
+    message: 'The /request-key trial flow has been retired. Create a free account at paramant.app/signup to receive your API key with TOTP protection.',
+    migration_path: 'https://paramant.app/signup',
+    deprecation_date: '2026-04-21',
+    existing_keys_note: 'Trial keys issued before this date remain valid until their original 30-day expiry.'
+  }););
 
 
 // ── User auth constants ───────────────────────────────────────────────────────

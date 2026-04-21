@@ -1163,6 +1163,27 @@ function checkMfaRateLimit(ip) {
   b.count++; mfaRateLimits.set(ip, b); return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) if (now > v.resetAt + 60000) mfaRateLimits.delete(k); }, 120_000);
+// Per-IP rate limit for /v2/check-key (max 30/min) — prevents API key brute-force
+const checkKeyRateLimits = new Map();
+function checkKeyRateOk(ip) {
+  const now = Date.now();
+  const b = checkKeyRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
+  if (b.count >= 30) return false;
+  b.count++; checkKeyRateLimits.set(ip, b); return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of checkKeyRateLimits) if (now > v.resetAt + 60000) checkKeyRateLimits.delete(k); }, 120_000);
+
+// Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
+const statusRateLimits = new Map();
+function statusRateOk(ip) {
+  const now = Date.now();
+  const b = statusRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
+  if (b.count >= 60) return false;
+  b.count++; statusRateLimits.set(ip, b); return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of statusRateLimits) if (now > v.resetAt + 60000) statusRateLimits.delete(k); }, 120_000);
 const pubkeys    = new Map();  // device:key → {ecdh_pub, kyber_pub, dsa_pub, ts}
 const webhooks   = new Map();  // device:key → [{url, secret}]
 const auditChain = new Map();  // key → Merkle chain [{ts,event,hash,bytes,device,prev_hash,chain_hash}]
@@ -1307,7 +1328,7 @@ function loadUsers() {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     (d.api_keys || []).forEach(k => {
       if (k.active) apiKeys.set(k.key, {
-        plan: k.plan, label: k.label||'', active: true, dsa_pub: k.dsa_pub||'',
+        plan: k.plan, label: k.label||'', email: k.email||'', active: true, dsa_pub: k.dsa_pub||'',
         daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
@@ -1736,6 +1757,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
   if (path === '/v2/check-key') {
+    if (!checkKeyRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
     const kd = apiKeys.get(apiKey);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ valid: !!(kd?.active), plan: kd?.plan || null }));
@@ -2918,6 +2940,7 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/status/:hash ─────────────────────────────────────────────────────
   const stm = path.match(/^\/v2\/status\/([a-f0-9]{64})$/);
   if (stm && req.method === 'GET') {
+    if (!statusRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
     const e = blobStore.get(stm[1]);
     if (!e) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ available: false })); }
     if (e.apiKey && e.apiKey !== apiKey) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Forbidden' })); }
@@ -3127,7 +3150,7 @@ session = client.create_session('recipient@example.com')</pre>
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
-      key: k, plan: v.plan, label: v.label, active: v.active, over_limit: v.over_limit || false
+      key: k, plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
