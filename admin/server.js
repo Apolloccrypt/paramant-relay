@@ -370,8 +370,8 @@ api.post('/request-key', (req, res) => {
     migration_path: 'https://paramant.app/signup',
     deprecation_date: '2026-04-21',
     existing_keys_note: 'Trial keys issued before this date remain valid until their original 30-day expiry.'
-  }););
-
+  });
+});
 
 // ── User auth constants ───────────────────────────────────────────────────────
 const INTERNAL_TOKEN = process.env.INTERNAL_AUTH_TOKEN || "";
