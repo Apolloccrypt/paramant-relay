@@ -3,7 +3,8 @@
   if (!container) return;
 
   function renderLoggedOut() {
-    container.innerHTML = '<a href="/auth/login" class="nav-signin">Sign in</a>' +
+    container.innerHTML = '<a href="/help" class="nav-help">HELP</a>' +
+      '<a href="/auth/login" class="nav-signin">Sign in</a>' +
       '<a href="/signup" class="nav-cta">Create account</a>';
   }
 
