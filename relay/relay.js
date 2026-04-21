@@ -43,6 +43,16 @@ let argon2Lib = null;
 try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
 let bip39Lib  = null;
 try { bip39Lib  = require('bip39');  } catch(e) { /* npm install bip39  */ }
+// Redis client for user TOTP endpoints
+const RELAY_REDIS_URL = process.env.REDIS_URL || '';
+let redisClient = null;
+if (RELAY_REDIS_URL) {
+  redisClient = createClient({ url: RELAY_REDIS_URL });
+  redisClient.on('error', (err) => console.error('[relay/redis] error:', err.message));
+  redisClient.connect()
+    .then(() => console.log('[relay/redis] connected'))
+    .catch(e => console.error('[relay/redis] connect failed:', e.message));
+}
 const PORT       = parseInt(process.env.PORT       || '4000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
@@ -789,6 +799,30 @@ function verifyTotp(token) {
   }
   return matched;
 }
+async function verifyTotpGeneric(token, secret, opts = {}) {
+  const { window = 1, replayKey } = opts;
+  const tokenBuf = Buffer.from(String(token || ''), 'utf8');
+  if (tokenBuf.length !== 6) return { valid: false };
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  let matched = false;
+  let matchedSlot = null;
+  for (let i = -window; i <= window; i++) {
+    const c = counter + i;
+    const expected = totpCode(secret, c);
+    const expectedBuf = Buffer.from(expected, 'utf8');
+    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
+    if (eq) { matched = true; matchedSlot = c; }
+  }
+  if (!matched) return { valid: false };
+  if (replayKey && redisClient) {
+    const slot = String(matchedSlot);
+    const existing = await redisClient.get(replayKey).catch(() => null);
+    if (existing === slot) return { valid: false };
+    await redisClient.set(replayKey, slot, { EX: 90 }).catch(() => {});
+  }
+  return { valid: true };
+}
+
 
 // ── Download tokens — one-time public download links
 const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
