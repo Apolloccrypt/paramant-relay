@@ -27,7 +27,11 @@
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
+.page-hero--navy{background:var(--navy);border-color:transparent}
+.page-hero--navy .eyebrow{background:var(--lime);color:var(--navy)}
+.page-hero--navy h1{color:var(--bone)}
+.page-hero--navy .lede{color:rgba(248,250,252,.8)}
+main{max-width:780px;margin:0 auto;padding:48px 48px 120px}
 h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
 h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:56px}
@@ -302,15 +306,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 </div>
 
-<main id="main-content">
-
-  <section class="page-hero">
-  <div class="page-hero-inner">
-    <span class="eyebrow">DEFENSE IN DEPTH</span>
-    <h1>Security</h1>
-    <p class="lede">We treat security as infrastructure, not a feature. Every component is designed assuming the relay is compromised. This page documents how, what was audited, and how to report issues.</p>
-  </div>
+<section class="page-hero page-hero--navy">
+<div class="page-hero-inner">
+  <span class="eyebrow">DEFENSE IN DEPTH</span>
+  <h1>Security</h1>
+  <p class="lede">We treat security as infrastructure, not a feature. Every component is designed assuming the relay is compromised. This page documents how, what was audited, and how to report issues.</p>
+</div>
 </section>
+
+<main id="main-content">
 
   <h3>Core principle</h3>
   <div class="card">
