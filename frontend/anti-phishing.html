@@ -1,18 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang=en>
 <head>
-<meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta charset=UTF-8>
+<style id=critical-css>html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT - Healthcare data delivery, NEN 7510</title>
-<meta name="description" content="NEN 7510-compliant patient data transfer with ML-KEM-768 encryption, burn-on-read delivery, and ML-DSA-65 signed receipts. EU/DE hosting, no US CLOUD Act.">
-<meta property="og:title" content="PARAMANT - Healthcare data delivery, NEN 7510 compliant">
-<meta property="og:description" content="Deliver patient records, lab results, and imaging studies over ML-KEM-768 encrypted, burn-on-read channels with NEN 7510-compliant audit trails.">
-<meta property="og:url" content="https://paramant.app/healthcare">
+<title>Anti-phishing — PARAMANT</title>
+<meta name="description" content="Mass phishing campaigns rely on one link reaching thousands of victims. Burn-on-read makes that pattern structurally impossible.">
+<meta property="og:title" content="Anti-phishing — PARAMANT">
+<meta property="og:description" content="Mass phishing campaigns rely on one link reaching thousands of victims. Burn-on-read makes that pattern structurally impossible. The first recipient opens the file. Everyone else sees HTTP 410.">
+<meta property="og:url" content="https://paramant.app/anti-phishing">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="canonical" href="https://paramant.app/healthcare">
+<link rel="canonical" href="https://paramant.app/anti-phishing">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=15">
 <link rel="stylesheet" href="/nav.css?v=9">
 <style>
@@ -23,12 +29,9 @@ code{font-size:var(--text-xs);padding:2px 6px;border:1px solid var(--ink-ghost);
 .hero{padding:64px 48px 52px;max-width:860px;margin:0 auto;border-bottom:1px solid var(--ink-hair)}
 .hero-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:16px}
 .hero h1{font-size:32px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-bottom:18px}
-.hero h1 em{font-style:italic;color:var(--cobalt);position:relative;display:inline}
-.hero h1 em::after{content:"";position:absolute;left:0;right:0;bottom:4%;height:22%;background:var(--lime);z-index:-1;pointer-events:none}
 .hero .lead{font-size:15px;color:var(--ink-dim);max-width:660px;line-height:1.75}
 
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
-
 section{margin-top:52px}
 section h2{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--ink-hair)}
 section h3{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:32px 0 10px;color:var(--ink)}
@@ -36,18 +39,21 @@ section p{font-size:14px;color:var(--ink-dim);line-height:1.8;max-width:720px}
 section p+p{margin-top:14px}
 .sec-eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:8px;display:block}
 
-.step-list{margin-top:20px;display:flex;flex-direction:column;gap:0}
-.step-row{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--bone-on-navy-hair)}
-.step-row:last-child{border-bottom:none}
-.step-num{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--lime);min-width:28px;padding-top:2px;flex-shrink:0}
-.step-body{font-size:14px;color:var(--bone-on-navy-dim);line-height:1.75}
-.step-body strong{color:var(--bone-on-navy)}
-.workflow-block{background:var(--navy);padding:28px 32px;margin-top:24px}
+.scenario{margin-top:32px;padding:24px;border:1px solid var(--ink-hair)}
+.scenario-hd{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.scenario-letter{font-family:"IBM Plex Mono",monospace;font-size:18px;font-weight:700;color:var(--lime);background:var(--navy);width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.scenario h3{margin:0;font-size:15px;font-weight:600;color:var(--ink)}
+.verdict{margin-top:14px;padding:14px 16px;background:rgba(178,255,63,.08);border:1px solid rgba(178,255,63,.3);font-size:13px;color:var(--ink-dim);line-height:1.7}
+.verdict strong{color:var(--navy)}
 
-.compliance-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
-.compliance-table th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);padding:8px 12px;border-bottom:2px solid var(--ink-hair)}
-.compliance-table td{padding:10px 12px;border-bottom:1px solid var(--ink-hair);vertical-align:top;line-height:1.6;color:var(--ink-dim)}
-.compliance-table td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
+.table-wrap{overflow-x:auto;margin-top:20px}
+.cmp-table{width:100%;border-collapse:collapse;font-size:13px}
+.cmp-table th{text-align:left;padding:10px 14px;color:var(--ink-dim);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid var(--ink-hair)}
+.cmp-table td{padding:12px 14px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost);vertical-align:top}
+.cmp-table td:first-child{color:var(--ink);font-weight:500}
+.cmp-table tr.highlight td{background:rgba(178,255,63,.06)}
+.cmp-table tr.highlight td:first-child{color:var(--navy)}
+.cmp-table tr:last-child td{border-bottom:none}
 
 .btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color:#0B3A6A;background:var(--lime);padding:10px 22px;margin-right:10px}
 .btn-primary:hover{opacity:.88}
@@ -62,10 +68,12 @@ section p+p{margin-top:14px}
 </style>
 <style>
 .nav-help{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-family:IBM Plex Mono,monospace;font-size:12px;letter-spacing:0.1em;color:#475569;text-decoration:none;border:1px solid #E2E8F0;transition:all 140ms ease;margin-right:12px}
-.nav-help::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid #64748b;border-radius:50%;font-size:11px;font-weight:700;color:#64748b;font-family:Inter,sans-serif;line-height:1}
+.nav-help::before{content:?;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid #64748b;border-radius:50%;font-size:11px;font-weight:700;color:#64748b;font-family:Inter,sans-serif;line-height:1}
 .nav-help:hover{color:#0B3A6A;border-color:#B2FF3F;background:rgba(178,255,63,0.08)}
 .nav-help:hover::before{border-color:#0B3A6A;color:#0B3A6A;background:#B2FF3F}
 .nav-help:focus-visible{outline:2px solid #B2FF3F;outline-offset:2px}
+.nav-help-mobile{display:block;padding:12px 20px;font-family:IBM Plex Mono,monospace;font-size:13px;letter-spacing:0.08em;color:#475569;text-decoration:none;border-bottom:1px solid #e2e8f0}
+.nav-help-mobile:hover{color:#0B3A6A;background:rgba(178,255,63,0.08)}
 @media(max-width:900px){.nav-help{display:none}}
 </style>
 </head>
@@ -245,81 +253,143 @@ section p+p{margin-top:14px}
     <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
+      <a href="/vs">Compare</a>
+      <a href="/changelog">Changelog</a>
       <a href="/license">License</a>
       <a href="/press">Press kit</a>
       <a href="mailto:privacy@paramant.app">Contact</a>
     </div>
-  </div><div class="nav-mobile-meta">
+  </div>
+
+  <div class="nav-mobile-meta">
     <span>build 2.4.5</span>
     <span class="meta-sep">&middot;</span>
     <span>RAM only</span>
   </div>
+  <a href="/help" class="nav-help-mobile">? Help</a>
 </div>
 
 <div class="hero">
-  <div class="hero-label">REGULATED &middot; NEN 7510 &middot; GDPR</div>
-  <h1>Healthcare data delivery, <em>NEN 7510 compliant.</em></h1>
-  <p class="lead">Patient records, lab results, imaging studies. NEN 7510 requires encrypted transit with access logging. Every email, every shared drive, every USB is a compliance event waiting to happen.</p>
+  <div class="hero-label">USE CASE &mdash; SECURITY</div>
+  <h1>Breaking the mass-phishing pattern.</h1>
+  <p class="lead">Mass phishing campaigns rely on one link reaching thousands of victims. Burn-on-read makes that pattern structurally impossible. The first recipient opens the file. Everyone else sees HTTP 410.</p>
 </div>
 
 <main id="main-content">
 
   <section>
-    <span class="sec-eyebrow">The problem</span>
-    <h2>The gap in clinical data exchange.</h2>
-    <p>Dutch healthcare organizations routinely exchange patient data between systems that don't interoperate. HL7/FHIR covers in-system messaging; it doesn't cover the file that needs to travel from radiology to a referring specialist outside the hospital network. That file travels by email, by WeTransfer, by USB. Each of those channels stores a copy. NEN 7510-1 Article 14.1.1 requires confidential transmission; Article 15.1.3 requires a traceable access log. Most ad-hoc channels satisfy neither.</p>
-    <p>GDPR adds a second layer: a breach on any of those intermediate channels is a reportable incident to the AP. Healthcare organizations carry the highest-per-record breach cost of any sector precisely because the data is both sensitive and legally regulated. The exposure from a single misdirected email with a patient file is a reportable GDPR breach, a NEN 7510 non-conformance, and a reputational event.</p>
+    <span class="sec-eyebrow">01 &mdash; the attack pattern</span>
+    <h2>Trusted-domain phishing.</h2>
+    <p>Attackers send mail with links to legitimate fileshare platforms. SharePoint. OneDrive. WeTransfer. Dropbox. DocuSign. The domain is real. The file behind it is not.</p>
+    <p>The victim sees a domain they trust. Clicks. Is asked to sign in, or downloads what looks like a document. Credentials are stolen, or malware is delivered, or OAuth permissions are granted to a malicious app.</p>
+    <p>This is the pattern that killed Firefox Send in 2020. Legitimate infrastructure, abused for mass distribution. Mozilla took the service offline, then layoffs removed the team that could have fixed it. The pattern still works today, just on other platforms.</p>
   </section>
 
   <section>
-    <span class="sec-eyebrow">What Paramant adds</span>
-    <h2>End-to-end encryption with a compliant audit trail.</h2>
-    <p>ParaShare encrypts the patient file with ML-KEM-768 + AES-256-GCM before it touches the relay. The relay holds only an opaque ciphertext. The recipient's browser decrypts locally. After pickup, the relay wipes the ciphertext from RAM. A signed receipt (ML-DSA-65, FIPS 204) records which file was delivered, to which recipient, and at which time. That receipt is the NEN 7510 Article 15.1.3 access log.</p>
-    <p>The relay runs on Hetzner DE. EU jurisdiction, no US CLOUD Act exposure, no data leaving the EEA. A pre-signed GDPR Data Processing Agreement is available on Business and Enterprise plans.</p>
+    <span class="sec-eyebrow">02 &mdash; what paramant breaks</span>
+    <h2>Mass distribution, structurally.</h2>
+    <p>An attacker shares a single Paramant link with 10,000 targets. The first target opens it. The file is read from RAM, served once, and deleted. The remaining 9,999 targets see HTTP 410 Gone.</p>
+    <p>There is no retry. There is no re-download. There is no caching layer that preserved the file. The file existed in one relay&rsquo;s RAM for a few seconds and is now mathematically unreachable.</p>
+    <p>Mass phishing campaigns structurally cannot work on Paramant. The economics of the attack collapse at scale.</p>
   </section>
 
   <section>
-    <span class="sec-eyebrow">Workflow</span>
-    <h2>How a secure transfer works.</h2>
-    <div class="workflow-block">
-      <div class="step-list">
-        <div class="step-row"><div class="step-num">01</div><div class="step-body"><strong>Clinician or admin</strong> uploads the patient file via ParaShare (web or CLI)</div></div>
-        <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant encrypts end-to-end</strong> — only the recipient can decrypt; relay sees only ciphertext</div></div>
-        <div class="step-row"><div class="step-num">03</div><div class="step-body"><strong>Recipient receives</strong> a one-time delivery link via the channel of your choice (email, secure message)</div></div>
-        <div class="step-row"><div class="step-num">04</div><div class="step-body"><strong>After download</strong>, the ciphertext is wiped from relay RAM — no retention, no copy</div></div>
-        <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>Both parties receive</strong> an ML-DSA-65 signed receipt logged to the Paramant CT log</div></div>
+    <span class="sec-eyebrow">03 &mdash; honest limitations</span>
+    <h2>What Paramant does not solve.</h2>
+    <p>Paramant is delivery infrastructure, not endpoint security.</p>
+    <p>If a recipient trusts a sender who turns out to be malicious, the file still arrives. If the sender&rsquo;s device is compromised and the attacker uses their API key, the file is signed as legitimate. If the recipient&rsquo;s machine has no antivirus, a malicious payload still executes locally.</p>
+    <p>Paramant solves the transport layer. Endpoint protection stays with the recipient&rsquo;s tooling. We make one class of attack impossible. We do not claim to make all classes impossible.</p>
+    <p>Anyone who claims their product prevents phishing entirely is selling you something.</p>
+  </section>
+
+  <section>
+    <span class="sec-eyebrow">04 &mdash; three scenarios</span>
+    <h2>How the attacks fail.</h2>
+
+    <div class="scenario">
+      <div class="scenario-hd">
+        <div class="scenario-letter">A</div>
+        <h3>Credential phishing via fake login UI</h3>
       </div>
+      <p>Attacker sends a mail pretending to be from a fileshare service, linking to a spoofed login page. Victim enters credentials on the fake page. Attacker now has access to the victim&rsquo;s real account.</p>
+      <div class="verdict"><strong>On Paramant:</strong> this attack has no surface. Paramant has no password. No login form. No &ldquo;Sign in with Paramant&rdquo; button. There is nothing for the attacker to spoof.</div>
+    </div>
+
+    <div class="scenario">
+      <div class="scenario-hd">
+        <div class="scenario-letter">B</div>
+        <h3>Malware mass distribution</h3>
+      </div>
+      <p>Attacker uploads a malicious payload disguised as an invoice, shares one link with 10,000 targets over two weeks. Victims trust the domain, download, execute.</p>
+      <div class="verdict"><strong>On Paramant:</strong> the first victim triggers the burn. The file is delivered once and destroyed. Victims 2 through 10,000 see HTTP 410. The attacker has to upload a new file for every single target, which defeats the economics of mass campaigns.</div>
+    </div>
+
+    <div class="scenario">
+      <div class="scenario-hd">
+        <div class="scenario-letter">C</div>
+        <h3>Sender spoofing</h3>
+      </div>
+      <p>Attacker poses as a trusted colleague or supplier, sends a file expecting the victim to open it without verification.</p>
+      <div class="verdict"><strong>On Paramant:</strong> every transfer is signed with ML-DSA-65 and logged in a public Merkle tree. The recipient can cryptographically verify the file came from the claimed sender. The verification is not automatic &mdash; it requires the recipient to check. But the proof exists and cannot be forged.</div>
     </div>
   </section>
 
   <section>
-    <span class="sec-eyebrow">Compliance</span>
-    <h2>NEN 7510 and GDPR mapping.</h2>
-    <table class="compliance-table">
-      <thead>
-        <tr><th>Requirement</th><th>Paramant control</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>NEN 7510-1 Art.&nbsp;14.1.1 &mdash; Encrypted transit</td><td>ML-KEM-768 + AES-256-GCM end-to-end; relay cannot decrypt</td></tr>
-        <tr><td>NEN 7510-1 Art.&nbsp;14.1.4 &mdash; Access control</td><td>Burn-on-read: one authorised download, then the ciphertext is gone</td></tr>
-        <tr><td>NEN 7510-1 Art.&nbsp;15.1.3 &mdash; Audit trail</td><td>ML-DSA-65 signed receipt: file hash, recipient, timestamp, CT log entry</td></tr>
-        <tr><td>NEN 7510-2 Art.&nbsp;12.3 &mdash; Data minimisation</td><td>RAM-only relay; no persistent storage of patient data</td></tr>
-        <tr><td>GDPR Art.&nbsp;32 &mdash; Technical measures</td><td>FIPS 203/204 encryption, EU/DE hosting, no US CLOUD Act</td></tr>
-        <tr><td>GDPR Art.&nbsp;28 &mdash; Processor agreement</td><td>Pre-signed DPA available on Business and Enterprise plans</td></tr>
-      </tbody>
-    </table>
-    <p style="margin-top:16px">See also: <a href="/compliance/nen7510" style="color:var(--cobalt)">full NEN 7510 compliance guide</a> and <a href="/dpa" style="color:var(--cobalt)">Data Processing Agreement</a>.</p>
+    <span class="sec-eyebrow">05 &mdash; comparison</span>
+    <h2>How platforms handle mass phishing abuse.</h2>
+    <div class="table-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Mass distribution possible</th>
+            <th>Login UI spoofable</th>
+            <th>Cryptographic sender proof</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SharePoint / OneDrive</td>
+            <td>Yes &mdash; shared links persist</td>
+            <td>Yes &mdash; Microsoft login widely imitated</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>WeTransfer</td>
+            <td>Yes &mdash; 7-day retention by default</td>
+            <td>Yes &mdash; email-based auth</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Dropbox</td>
+            <td>Yes &mdash; persistent shared links</td>
+            <td>Yes &mdash; Dropbox login imitated</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Firefox Send (RIP)</td>
+            <td>Was yes &mdash; cause of shutdown</td>
+            <td>No &mdash; no login</td>
+            <td>No</td>
+          </tr>
+          <tr class="highlight">
+            <td><strong>Paramant</strong></td>
+            <td>No &mdash; HTTP 410 after first read</td>
+            <td>No &mdash; no login UI exists</td>
+            <td>Yes &mdash; ML-DSA-65 + public CT log</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
 </main>
 
 <div style="background:var(--cobalt);padding:52px 48px;text-align:center">
-  <h2 style="font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)">Ready for your first compliant transfer?</h2>
-  <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">Business and Enterprise plans include a pre-signed NEN 7510 DPA. Start free, upgrade when your compliance officer asks.</p>
-  <a href="/signup" class="btn-primary">Create free account &rarr;</a>
-  <a href="/compliance/nen7510" class="btn-sec">NEN 7510 compliance guide &rarr;</a>
-  <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:24px">ML-KEM-768 &middot; NEN 7510 &middot; GDPR Art. 32 &middot; EU/DE</p>
+  <h2 style="font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)">See burn-on-read in action.</h2>
+  <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">Send a file. Get a link. Open the link. Refresh. Watch it return HTTP 410. That is the phishing mitigation, end to end.</p>
+  <a href="/parashare" class="btn-primary">Send a test file &rarr;</a>
+  <a href="/architecture" class="btn-sec">How it works &rarr;</a>
 </div>
 
 <footer>
