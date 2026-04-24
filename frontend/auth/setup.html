@@ -422,10 +422,15 @@
     }
 
     const data = await res.json();
-    backupCodes = data.backup_codes;
+    // Keep init-phase codes if confirm response returned nothing — the backend currently calls
+    // a get-backup-codes-plaintext helper that doesn't retain plaintext, so confirm typically returns an empty array.
+    // The codes from the initial /api/user/setup/:token response are the real ones.
+    if (Array.isArray(data.backup_codes) && data.backup_codes.length > 0) {
+      backupCodes = data.backup_codes;
+    }
 
-    // Defensive: if backend returned an empty array (e.g. mid-flow revocation, scanner preload, or idempotent re-fetch),
-    // the TOTP part is configured but backup codes are unrecoverable. Do not silently show an empty success screen.
+    // Defensive last-resort: if we STILL have no codes (neither init nor confirm produced them),
+    // surface a real error instead of a silent empty success screen.
     if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
       errorDiv.innerHTML = 'Your TOTP is set up, but your backup codes could not be generated. This is usually temporary. Please contact <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with subject <code>Setup incomplete</code> and we will regenerate them.';
       errorDiv.classList.add('visible');
