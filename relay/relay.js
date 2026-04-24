@@ -1596,6 +1596,7 @@ const server = http.createServer(async (req, res) => {
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
   const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
+  const clientIp = getClientIp(req);
 
   // Community Edition limit: block keys that exceed the 5-key cap
   // /v2/check-key is exempt — it must always return the real key status so
