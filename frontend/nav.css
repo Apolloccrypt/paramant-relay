@@ -228,16 +228,15 @@ nav.nav .nav-hamburger span {
 }
 .nav-mobile.open { display: flex; }
 
-/* Header row (close button) */
+/* Header row (close button only — sticky nav above already shows the logo) */
 .nav-mobile-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: var(--space-3) var(--space-5);
   border-bottom: 1px solid var(--ink-hair);
   flex-shrink: 0;
 }
-.nav-mobile-header .nav-logo { font-size: 15px; }
 .nav-mobile-close {
   background: none;
   border: 1px solid var(--ink-hair);

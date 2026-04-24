@@ -290,6 +290,19 @@ h1 em::after {
 .meta-bar b         { color: var(--ink); }
 .meta-bar .sep      { color: var(--ink-dim); }
 .meta-bar .right    { margin-left: auto; color: var(--ink-dim); }
+.meta-bar a.meta-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--ink-hair);
+  text-underline-offset: 2px;
+  transition: color var(--duration-base) var(--ease-sharp),
+              text-decoration-color var(--duration-base) var(--ease-sharp);
+}
+.meta-bar a.meta-link:hover,
+.meta-bar a.meta-link:focus-visible {
+  color: var(--cobalt);
+  text-decoration-color: var(--cobalt);
+}
 /* v3 compat */
 .meta-bar-sep       { color: var(--ink-dim); }
 .meta-bar-val       { color: var(--ink); }

@@ -28,7 +28,7 @@ const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
 
-const VERSION    = '2.4.5';
+const VERSION    = '2.5.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
