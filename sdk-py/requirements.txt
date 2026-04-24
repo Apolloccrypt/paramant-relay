@@ -4,7 +4,7 @@
 #
 #    pip-compile --output-file=requirements.txt pyproject.toml
 #
-certifi==2026.2.25
+certifi==2026.4.22
     # via requests
 cffi==2.0.0
     # via cryptography
