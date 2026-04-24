@@ -54,6 +54,7 @@ x-relay-env: &relay-env
   REDIS_URL: "${RELAY_REDIS_URL}"
   ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
   INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
+  PARAMANT_WIRE_VERSION: "${PARAMANT_WIRE_VERSION:-1}"
 
 # ── Shared logging ────────────────────────────────────────────────────────────
 x-relay-logging: &relay-logging
