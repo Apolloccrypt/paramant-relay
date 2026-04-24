@@ -26,6 +26,7 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY relay.js ./
 COPY lib/ ./lib/
+COPY crypto/ ./crypto/
 
 # Non-root user — relay never needs root after install
 RUN addgroup -S relay && adduser -S relay -G relay \
