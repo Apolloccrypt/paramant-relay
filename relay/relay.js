@@ -75,12 +75,63 @@ const TRIAL_KEYS_FILE     = process.env.TRIAL_KEYS_FILE     || '/data/trial-keys
 // registry.getKEM/getSig so algorithms can be swapped without touching handlers.
 const registry = require('./crypto/registry');
 require('./crypto/bootstrap').bootstrap();
+const wireFormat = require('./crypto/wire-format');
+const cryptoErrors = require('./crypto/errors');
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
 // (PQHB magic + version + kem_id + sig_id + flags). Inbound decoding accepts
 // both v0 and v1 unconditionally — this flag only controls what we produce.
+// NOTE: this relay is opaque to the encrypted blob — the sender already
+// assembles the wire format client-side and we store the result verbatim.
+// So WIRE_VERSION has no direct effect on what we emit on /v2/outbound; it
+// exists for forward compatibility with variants of this relay that would
+// re-wrap blobs in transit. Inbound validation (see peekInboundBlob below)
+// runs unconditionally — any blob carrying the v1 magic bytes is parsed
+// and rejected if its algorithm IDs are not in the registry.
 const WIRE_VERSION = process.env.PARAMANT_WIRE_VERSION === '1' ? 1 : 0;
+
+// Inspects the first bytes of a just-uploaded blob. If it carries the v1
+// magic, decodes it to validate structure + algorithm support. Throws a
+// CryptoError on malformed v1 blobs (caller maps to HTTP 415 / 400 via
+// mapCryptoErrorToHttp). Returns null for v0 blobs — they pass through.
+function peekInboundBlob(blob) {
+  if (!wireFormat.isV1(blob)) return null;
+  return wireFormat.decode(blob);
+}
+
+// Maps a CryptoError thrown from wireFormat.decode to the HTTP response the
+// spec in docs/wire-format-v1.md requires. UnsupportedAlgorithm / InvalidVersion
+// → 415 (server does not support this algorithm / version). All other
+// CryptoErrors (InvalidMagic is filtered upstream by isV1, so what is left
+// is MalformedBlob + InvalidFlags) → 400 (blob is v1 but structurally bad).
+function mapCryptoErrorToHttp(err) {
+  if (err instanceof cryptoErrors.UnsupportedAlgorithm) {
+    return {
+      status: 415,
+      body: {
+        error: 'unsupported_algorithm',
+        kind: err.kind,
+        id: err.id,
+        supported: registry.listSupported(),
+      },
+    };
+  }
+  if (err instanceof cryptoErrors.InvalidVersion) {
+    return {
+      status: 415,
+      body: {
+        error: 'unsupported_wire_version',
+        version: err.version,
+        supported: err.supported,
+      },
+    };
+  }
+  if (err instanceof cryptoErrors.CryptoError) {
+    return { status: 400, body: { error: 'malformed_wire_v1', detail: err.message } };
+  }
+  return null;
+}
 // `mlDsa` is retained as an availability probe used by `if (!mlDsa)` guards
 // throughout this file. It holds the registry-resolved impl when present, or
 // null when ML-DSA-65 could not be loaded (e.g. @noble/post-quantum missing).
@@ -2624,6 +2675,16 @@ session = client.create_session('recipient@example.com')</pre>
       if (blobStore.has(hash))           { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
       const blob = Buffer.from(payload, 'base64');
       if (blob.length > ANON_MAX)        { res.writeHead(413); return res.end(J({ error: 'Max 5MB on anonymous uploads' })); }
+      try { peekInboundBlob(blob); }
+      catch(e) {
+        const mapped = mapCryptoErrorToHttp(e);
+        if (mapped) {
+          log('warn', 'anon_inbound_wire_v1_reject', { status: mapped.status, err: e.code || e.name });
+          res.writeHead(mapped.status, { 'Content-Type': 'application/json' });
+          return res.end(J(mapped.body));
+        }
+        throw e;
+      }
       let safeEncMeta = null;
       if (enc_meta !== undefined && enc_meta !== null) {
         const em = String(enc_meta);
@@ -2809,6 +2870,17 @@ session = client.create_session('recipient@example.com')</pre>
       const blob = Buffer.from(payload, 'base64');
       const planMaxSize = MAX_BLOB;
       if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
+
+      try { peekInboundBlob(blob); }
+      catch(e) {
+        const mapped = mapCryptoErrorToHttp(e);
+        if (mapped) {
+          log('warn', 'inbound_wire_v1_reject', { status: mapped.status, err: e.code || e.name });
+          res.writeHead(mapped.status, { 'Content-Type': 'application/json' });
+          return res.end(J(mapped.body));
+        }
+        throw e;
+      }
 
       // ML-DSA handtekening verificatie (optioneel maar gelogd)
       let sigResult = { valid: false, reason: 'not provided' };
@@ -3390,6 +3462,16 @@ python3 paramant-receiver.py \\
       if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash al in gebruik' })); }
       const blob = Buffer.from(payload, 'base64');
       if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(MAX_BLOB/1048576)}MB` })); }
+      try { peekInboundBlob(blob); }
+      catch(e) {
+        const mapped = mapCryptoErrorToHttp(e);
+        if (mapped) {
+          log('warn', 'drop_create_wire_v1_reject', { status: mapped.status, err: e.code || e.name });
+          res.writeHead(mapped.status, { 'Content-Type': 'application/json' });
+          return res.end(J(mapped.body));
+        }
+        throw e;
+      }
       const _planDropTtl = { free: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
       const ttl = Math.min(parseInt(ttl_ms || 3_600_000) || 3_600_000, _planDropTtl[keyData?.plan || 'pro']);
       // Argon2id password protection

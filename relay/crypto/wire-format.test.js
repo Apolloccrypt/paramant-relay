@@ -5,7 +5,8 @@ const {
   InvalidMagic,
   InvalidVersion,
   MalformedBlob,
-  InvalidFlags
+  InvalidFlags,
+  UnsupportedAlgorithm
 } = require("./errors");
 const {
   registerKEM,
@@ -96,7 +97,7 @@ test("decode rejects unsupported KEM id", () => {
   const input = sampleInput();
   const blob = encode(input);
   blob.writeUInt16BE(0xDEAD, 5);
-  assert.throws(() => decode(blob), MalformedBlob);
+  assert.throws(() => decode(blob), UnsupportedAlgorithm);
 });
 
 test("decode rejects unsupported sig id", () => {
@@ -104,7 +105,7 @@ test("decode rejects unsupported sig id", () => {
   const input = sampleInput();
   const blob = encode(input);
   blob.writeUInt16BE(0xDEAD, 7);
-  assert.throws(() => decode(blob), MalformedBlob);
+  assert.throws(() => decode(blob), UnsupportedAlgorithm);
 });
 
 test("decode rejects truncated blob at header", () => {

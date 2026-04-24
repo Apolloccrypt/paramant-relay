@@ -2,7 +2,8 @@ const {
   InvalidMagic,
   InvalidVersion,
   MalformedBlob,
-  InvalidFlags
+  InvalidFlags,
+  UnsupportedAlgorithm
 } = require("./errors");
 const { hasKEM, hasSig } = require("./registry");
 
@@ -75,8 +76,8 @@ function decode(blob) {
   const flags = blob.readUInt8(9);
 
   if (flags !== 0x00) throw new InvalidFlags(flags);
-  if (!hasKEM(kemId)) throw new MalformedBlob(`KEM id 0x${kemId.toString(16).padStart(4, "0")} not registered`);
-  if (!hasSig(sigId)) throw new MalformedBlob(`Sig id 0x${sigId.toString(16).padStart(4, "0")} not registered`);
+  if (!hasKEM(kemId)) throw new UnsupportedAlgorithm("KEM", kemId);
+  if (!hasSig(sigId)) throw new UnsupportedAlgorithm("SIG", sigId);
 
   let offset = HEADER_FIXED_SIZE;
 
@@ -143,10 +144,17 @@ function buildAAD({ kemId, sigId, flags = 0x00, chunkIndex = 0 }) {
   return buf;
 }
 
+function isV1(blob) {
+  return Buffer.isBuffer(blob)
+    && blob.length >= 4
+    && blob.compare(MAGIC, 0, 4, 0, 4) === 0;
+}
+
 module.exports = {
   encode,
   decode,
   buildAAD,
+  isV1,
   MAGIC,
   VERSION_V1,
   SUPPORTED_VERSIONS,
