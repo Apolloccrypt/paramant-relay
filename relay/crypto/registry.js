@@ -45,14 +45,18 @@ function hasKEM(id) { return KEM_REGISTRY.has(id); }
 function hasSig(id) { return id === 0x0000 || SIG_REGISTRY.has(id); }
 
 function listSupported() {
-  const kem = [...KEM_REGISTRY.entries()].map(([id, impl]) => ({
-    id, name: impl.name, loaded: true
-  }));
+  const kem = [...KEM_REGISTRY.entries()].map(([id, impl]) => {
+    const entry = { id, name: impl.name, loaded: true };
+    if (impl.performance_hint) entry.performance_hint = impl.performance_hint;
+    return entry;
+  });
   const sig = [
     { id: 0x0000, name: "none", loaded: true },
-    ...[...SIG_REGISTRY.entries()].map(([id, impl]) => ({
-      id, name: impl.name, loaded: true
-    }))
+    ...[...SIG_REGISTRY.entries()].map(([id, impl]) => {
+      const entry = { id, name: impl.name, loaded: true };
+      if (impl.performance_hint) entry.performance_hint = impl.performance_hint;
+      return entry;
+    })
   ];
   return { wire_version: 1, kem, sig };
 }
