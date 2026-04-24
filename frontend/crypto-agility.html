@@ -5,14 +5,14 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Crypto Agility</title>
-<meta name="description" content="Crypto agility: the ability to swap cryptographic algorithms without redesigning your system. PARAMANT's hybrid approach keeps you safe today and upgradable tomorrow.">
-<meta property="og:description" content="Crypto agility: the ability to swap cryptographic algorithms without redesigning your system. PARAMANT's hybrid approach keeps you safe today and upgradable tomorrow.">
+<meta name="description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
+<meta property="og:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
 <meta property="og:url" content="https://paramant.app/crypto-agility">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PARAMANT — Crypto Agility">
-<meta name="twitter:description" content="Crypto agility: the ability to swap cryptographic algorithms without redesigning your system. PARAMANT's hybrid approach keeps you safe today and upgradable tomorrow.">
+<meta name="twitter:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
 <link rel="canonical" href="https://paramant.app/crypto-agility">
 <link rel="stylesheet" href="/design-system.css?v=14">
 <link rel="stylesheet" href="/nav.css?v=9">
@@ -350,175 +350,219 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 
 <div class="hero">
   <div class="hero-tag">Security architecture</div>
-  <h1>Crypto agility —<br><em>swap algorithms without rebuilding</em></h1>
+  <h1>Crypto agility —<br><em>algorithms you can swap without rebuilding</em></h1>
   <p class="subtitle">
     The history of cryptography is a history of algorithms being broken.
-    DES, MD5, SHA-1, RSA-512, RSA-1024 — all considered safe, all eventually deprecated.
-    Crypto-agile systems survive algorithm breaks. Monolithic systems don't.
+    Paramant is built so that the next one does not break Paramant.
+    The relay supports the full NIST post-quantum standard suite today.
   </p>
 </div>
 
 <main id="main-content">
 
-  <div class="summary">
-    <p>
-      <strong>PARAMANT's hybrid approach</strong> gives you crypto agility by design:
-      ML-KEM-768 + ECDH P-256 in parallel. If either algorithm is compromised,
-      the other protects you. When the next NIST standard arrives,
-      swapping one primitive doesn't break the system.
-    </p>
-  </div>
-
-  <!-- ── Algorithm landscape ── -->
+  <!-- ── 01 What crypto agility actually means ── -->
   <section>
-    <h2>The algorithm landscape today</h2>
-    <p class="section-sub">Which algorithms are safe now, and which have a known expiry date.</p>
-    <table class="algo-table">
-      <thead>
-        <tr>
-          <th>Algorithm</th>
-          <th>Type</th>
-          <th>Classical status</th>
-          <th>Quantum status</th>
-          <th>PARAMANT uses</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>ML-KEM-768</td>
-          <td>KEM (FIPS 203)</td>
-          <td class="safe">Safe</td>
-          <td class="safe">Safe — lattice-based</td>
-          <td class="safe">✓ primary KEM</td>
-        </tr>
-        <tr>
-          <td>ECDH P-256</td>
-          <td>Key exchange</td>
-          <td class="safe">Safe</td>
-          <td class="unsafe">Broken by Shor's algorithm</td>
-          <td class="hybrid">✓ hybrid (belt-and-suspenders)</td>
-        </tr>
-        <tr>
-          <td>AES-256-GCM</td>
-          <td>Symmetric cipher</td>
-          <td class="safe">Safe</td>
-          <td class="safe">Safe — Grover halves key space, 256-bit survives</td>
-          <td class="safe">✓ symmetric encryption</td>
-        </tr>
-        <tr>
-          <td>ML-DSA-65</td>
-          <td>Signature (FIPS 204)</td>
-          <td class="safe">Safe</td>
-          <td class="safe">Safe — lattice-based</td>
-          <td class="safe">✓ relay attestation</td>
-        </tr>
-        <tr>
-          <td>ECDSA P-256</td>
-          <td>Signature</td>
-          <td class="safe">Safe</td>
-          <td class="unsafe">Broken by Shor's algorithm</td>
-          <td class="hybrid">✓ hybrid fallback only</td>
-        </tr>
-        <tr>
-          <td>RSA-2048/4096</td>
-          <td>KEM / signature</td>
-          <td class="safe">Safe</td>
-          <td class="unsafe">Broken by Shor's algorithm</td>
-          <td class="unsafe">✗ not used</td>
-        </tr>
-        <tr>
-          <td>SHA-256 / SHA-3</td>
-          <td>Hash</td>
-          <td class="safe">Safe</td>
-          <td class="safe">Safe — Grover provides no practical speedup at 256-bit</td>
-          <td class="safe">✓ CT log, HMAC</td>
-        </tr>
-      </tbody>
-    </table>
+    <h2>01 — What crypto agility actually means</h2>
+    <p class="section-sub">Identifiers in the header, not algorithms in the code path.</p>
+    <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
+      Each blob carries a header identifying the algorithms that produced it:
+      a 2-byte <code>KEM_ID</code> and a 2-byte <code>SIG_ID</code>, integrity-bound
+      via GCM AAD. Clients choose. The relay validates. Both sides negotiate via
+      the capabilities endpoint — no hidden defaults, no protocol guessing.
+    </p>
   </section>
 
-  <!-- ── Hybrid mode ── -->
+  <!-- ── 02 Wire format v1 ── -->
   <section>
-    <h2>Three operating modes</h2>
-    <p class="section-sub">Configure per relay or per sender — no code changes required.</p>
-    <div class="mode-grid">
-      <div class="mode-card active">
-        <div class="mode-badge">Default — recommended</div>
-        <h4>Hybrid PQC</h4>
-        <p>ML-KEM-768 + ECDH P-256 combined. Both must be broken to expose plaintext.
-        <code>RELAY_MODE=ghost_pipe</code></p>
-      </div>
-      <div class="mode-card">
-        <div class="mode-badge">Transition mode</div>
-        <h4>Classical + PQC layer</h4>
-        <p>Adds ML-KEM on top of existing TLS/SSH infrastructure without replacing it.
-        Use during phased migration — interoperable with legacy systems.</p>
-      </div>
-      <div class="mode-card">
-        <div class="mode-badge">Future — post-migration</div>
-        <h4>Pure PQC</h4>
-        <p>ML-KEM-768 only, classical layer dropped. Deploy once all endpoints
-        have completed migration. Maximum efficiency, minimal attack surface.</p>
-      </div>
+    <h2>02 — The wire format (v1)</h2>
+    <p class="section-sub">A 10-byte fixed header, length-prefixed variable fields after.</p>
+    <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:'IBM Plex Mono',ui-monospace,monospace">MAGIC    4 bytes   PQHB
+VERSION  1 byte    0x01
+KEM_ID   2 bytes   uint16 BE
+SIG_ID   2 bytes   uint16 BE (0x0000 = anonymous)
+FLAGS    1 byte    reserved for future features</pre>
+    <p style="font-size:13px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
+      Length-prefixed variable fields follow: KEM ciphertext, sender public key,
+      optional signature, AES-256-GCM nonce + ciphertext, padding block.
+      Full spec:
+      <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/wire-format-v1.md" style="color:var(--cobalt);text-decoration:underline">docs/wire-format-v1.md</a>.
+    </p>
+  </section>
+
+  <!-- ── 03 Who produces, who validates ── -->
+  <section>
+    <h2>03 — Who produces, who validates</h2>
+    <p class="section-sub">The relay never touches the byte layout.</p>
+    <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
+      Clients produce v1 blobs with their chosen KEM and SIG IDs. The relay
+      validates the header and rejects unsupported combinations with HTTP 415.
+      The relay stores verbatim, serves byte-for-byte. That is what preserves
+      zero knowledge — the relay never touches the byte layout. The recipient
+      client decodes using the algorithms declared in the header.
+    </p>
+  </section>
+
+  <!-- ── 04 What is loaded today ── -->
+  <section>
+    <h2>04 — What is loaded today</h2>
+    <p class="section-sub">3 KEMs plus 18 signatures, covering FIPS 203, 204, 205, and 206.</p>
+
+    <h3 style="font-size:13px;font-weight:600;margin-top:26px;margin-bottom:6px;color:var(--ink)">KEM registry (FIPS 203, ML-KEM)</h3>
+    <table class="algo-table">
+      <thead>
+        <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0x0001</td><td>ML-KEM-512</td><td>1</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0002</td><td>ML-KEM-768</td><td>3</td><td class="safe">loaded (default)</td></tr>
+        <tr><td>0x0003</td><td>ML-KEM-1024</td><td>5</td><td class="safe">loaded</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">ML-DSA signatures (FIPS 204)</h3>
+    <table class="algo-table">
+      <thead>
+        <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0x0000</td><td>none</td><td>anonymous</td><td class="safe">valid (no signature)</td></tr>
+        <tr><td>0x0001</td><td>ML-DSA-44</td><td>cat 2</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0002</td><td>ML-DSA-65</td><td>cat 3</td><td class="safe">loaded (default)</td></tr>
+        <tr><td>0x0003</td><td>ML-DSA-87</td><td>cat 5</td><td class="safe">loaded</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">Falcon signatures (FIPS 206)</h3>
+    <table class="algo-table">
+      <thead>
+        <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0x0100</td><td>Falcon-512</td><td>cat 1</td><td class="safe">loaded (compact, fast)</td></tr>
+        <tr><td>0x0101</td><td>Falcon-1024</td><td>cat 5</td><td class="safe">loaded (compact, fast)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">SLH-DSA signatures (FIPS 205, stateless hash-based)</h3>
+    <table class="algo-table">
+      <thead>
+        <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0x0200</td><td>SLH-DSA-SHA2-128s</td><td>cat 1</td><td class="safe">loaded · slow signing</td></tr>
+        <tr><td>0x0201</td><td>SLH-DSA-SHA2-128f</td><td>cat 1</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0202</td><td>SLH-DSA-SHA2-192s</td><td>cat 3</td><td class="safe">loaded · slow signing</td></tr>
+        <tr><td>0x0203</td><td>SLH-DSA-SHA2-192f</td><td>cat 3</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0204</td><td>SLH-DSA-SHA2-256s</td><td>cat 5</td><td class="safe">loaded · slow signing</td></tr>
+        <tr><td>0x0205</td><td>SLH-DSA-SHA2-256f</td><td>cat 5</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0206</td><td>SLH-DSA-SHAKE-128s</td><td>cat 1</td><td class="safe">loaded · slow signing</td></tr>
+        <tr><td>0x0207</td><td>SLH-DSA-SHAKE-128f</td><td>cat 1</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0208</td><td>SLH-DSA-SHAKE-192s</td><td>cat 3</td><td class="safe">loaded · slow signing</td></tr>
+        <tr><td>0x0209</td><td>SLH-DSA-SHAKE-192f</td><td>cat 3</td><td class="safe">loaded</td></tr>
+        <tr><td>0x020A</td><td>SLH-DSA-SHAKE-256s</td><td>cat 5</td><td class="safe">loaded · slow signing</td></tr>
+        <tr><td>0x020B</td><td>SLH-DSA-SHAKE-256f</td><td>cat 5</td><td class="safe">loaded</td></tr>
+      </tbody>
+    </table>
+
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:16px;line-height:1.7">
+      Slow signing variants have smaller signatures (~8 to 30 KB) but multi-second
+      sign operations. Fast variants sign in under a second with larger signatures
+      (17 to 50 KB). Choose based on whether your workload cares more about
+      bandwidth or latency.
+    </p>
+
+    <div class="summary" style="margin-top:24px">
+      <p><strong>Total</strong>: 3 KEMs plus 18 signatures loaded in production.</p>
     </div>
   </section>
 
-  <!-- ── Agility path ── -->
+  <!-- ── 05 See for yourself ── -->
   <section>
-    <h2>How algorithm swapping works in practice</h2>
-    <p class="section-sub">PARAMANT is designed to survive the next algorithm deprecation.</p>
+    <h2>05 — See for yourself</h2>
+    <p class="section-sub">The live capabilities endpoint is the source of truth.</p>
+    <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Excerpt (full response lists all 21 entries):</p>
+    <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:'IBM Plex Mono',ui-monospace,monospace">{
+  "wire_version": 1,
+  "kem": [
+    { "id": 1, "name": "ML-KEM-512",  "loaded": true },
+    { "id": 2, "name": "ML-KEM-768",  "loaded": true },
+    { "id": 3, "name": "ML-KEM-1024", "loaded": true }
+  ],
+  "sig": [
+    { "id": 0,   "name": "none",              "loaded": true },
+    { "id": 2,   "name": "ML-DSA-65",         "loaded": true },
+    { "id": 256, "name": "Falcon-512",        "loaded": true },
+    { "id": 512, "name": "SLH-DSA-SHA2-128s", "loaded": true, "performance_hint": "slow_signing" },
+    ...
+  ]
+}</pre>
+    <p style="font-size:13px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
+      What the relay advertises is what it accepts. Blobs with an unadvertised
+      algorithm ID are rejected with HTTP 415 UnsupportedAlgorithm before
+      any bytes are stored.
+    </p>
+  </section>
+
+  <!-- ── 06 Adding an algorithm ── -->
+  <section>
+    <h2>06 — Adding an algorithm</h2>
+    <p class="section-sub">Three steps. No schema changes, no in-flight blobs affected.</p>
     <div class="agility-row">
       <div class="ar-step">
         <div class="ar-num">Step 1</div>
-        <h4>NIST publishes new standard</h4>
-        <p>E.g., ML-KEM-1024 replaces ML-KEM-768 due to new cryptanalysis.</p>
+        <h4>Write the impl</h4>
+        <p>A small file that wraps the library. See <code>relay/crypto/impls/</code>
+        in the repo for examples.</p>
       </div>
       <div class="ar-step">
         <div class="ar-num">Step 2</div>
-        <h4>Relay update</h4>
-        <p>One environment variable change. No schema migrations, no key regeneration required.
-        The wire format has a version byte for exactly this purpose.</p>
+        <h4>Register at an ID</h4>
+        <p>One line in <code>relay/crypto/bootstrap.js</code>:
+        <code>registerSig(0x0300, myImpl)</code>.</p>
       </div>
       <div class="ar-step">
         <div class="ar-num">Step 3</div>
-        <h4>Hybrid period</h4>
-        <p>Old and new clients coexist during transition. Relay negotiates version.
-        Zero-downtime migration — no coordinated cutover needed.</p>
-      </div>
-      <div class="ar-step">
-        <div class="ar-num">Step 4</div>
-        <h4>Old algorithm retired</h4>
-        <p>After all clients have updated, the old primitive is removed from the allowed set.
-        No data was ever at risk — hybrid protected the transition window.</p>
+        <h4>Deploy</h4>
+        <p>Existing blobs decode unchanged. Clients opt into the new algorithm
+        via <code>/v2/capabilities</code>.</p>
       </div>
     </div>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:14px">
+      Full reference:
+      <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/wire-format-v1.md" style="color:var(--cobalt);text-decoration:underline">github.com/Apolloccrypt/paramant-relay/blob/main/docs/wire-format-v1.md</a>.
+    </p>
   </section>
 
-  <!-- ── Wire format ── -->
+  <!-- ── 07 What is not yet built ── -->
   <section>
-    <h2>Wire format — versioned by design</h2>
-    <p class="section-sub">Every encrypted blob carries a version byte. No flag days.</p>
-    <pre style="background:var(--navy);border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.8"><span style="color:var(--lime)">PQHB</span> <span style="color:rgba(178,255,63,.7)">VER</span> <span style="color:rgba(248,250,252,.88)">u32be(ctKemLen)</span> <span style="color:rgba(248,250,252,.88)">ctKem</span> <span style="color:rgba(248,250,252,.88)">u32be(senderPubLen)</span> <span style="color:rgba(248,250,252,.88)">senderPub</span> <span style="color:rgba(178,255,63,.55)">nonce(12)</span> <span style="color:rgba(178,255,63,.55)">u32be(ctLen)</span> <span style="color:rgba(178,255,63,.55)">ct</span> <span style="color:rgba(248,250,252,.4)">+ 5MB padding</span>
-<span style="color:rgba(248,250,252,.4)">│     │    │                                              │              │</span>
-<span style="color:rgba(248,250,252,.4)">│     │    └─ ML-KEM-768 ciphertext                       └─ AES-256-GCM │</span>
-<span style="color:rgba(248,250,252,.4)">│     └─ version byte (0x02 = current)                                   │</span>
-<span style="color:rgba(248,250,252,.4)">└─ magic bytes                                          5MB fixed padding ┘</span>
-<span style="color:rgba(248,250,252,.4)">                                                        (DPI size masking)</span></pre>
-    <p style="font-size:12px;color:var(--ink-dim);margin-top:12px">
-      The <code>VER</code> byte allows the relay and SDK to support multiple wire formats simultaneously.
-      Incrementing the version enables algorithm migration without breaking in-flight blobs.
-      GCM AAD binds <code>[VER, chunk_index]</code> to the ciphertext — version byte is integrity-protected.
+    <h2>07 — What is not yet built</h2>
+    <p class="section-sub">Honest delta between the header format and what ships.</p>
+    <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
+      The <code>FLAGS</code> byte reserves space for options not currently shipping:
+    </p>
+    <ul style="font-size:13px;color:var(--ink-dim);line-height:1.85;padding-left:22px;margin-top:8px">
+      <li>Hybrid KEMs (combining two KEMs in one blob for defence in depth)</li>
+      <li>Multi-recipient blobs</li>
+      <li>Compressed payloads</li>
+      <li>Forward secrecy via ephemeral per-session keys</li>
+    </ul>
+    <p style="font-size:13px;color:var(--ink-dim);line-height:1.75;margin-top:14px">
+      These are architected-for but not wired up. When they ship, the
+      <code>FLAGS</code> bits get set and the wire format version stays at 1.
     </p>
   </section>
 
   <div class="cta">
-    <h3>Start with hybrid PQC today</h3>
+    <h3>Verify the registry yourself</h3>
     <p>
-      Deploy a self-hosted relay in minutes. It runs ML-KEM-768 + ECDH P-256 hybrid
-      by default — no configuration required. Community Edition is free for up to 5 API keys.
+      The capabilities endpoint is live and unauthenticated. It lists every
+      algorithm ID the relay accepts, plus performance hints for the slow-signing
+      SLH-DSA variants. The wire format spec on GitHub documents the header
+      layout in full.
     </p>
-    <a href="/signup" class="btn-primary">Create account →</a>
-    <a href="/docs" class="btn-sec">Technical docs</a>
+    <a href="/v2/capabilities" class="btn-primary">/v2/capabilities</a>
+    <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/wire-format-v1.md" class="btn-sec">Wire format v1 spec</a>
   </div>
 
 </main>
