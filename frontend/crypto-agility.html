@@ -386,11 +386,21 @@ FLAGS    1 byte    reserved for future features</pre>
     <h2>03 — Who produces, who validates</h2>
     <p class="section-sub">The relay never touches the byte layout.</p>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
-      Clients produce v1 blobs with their chosen KEM and SIG IDs. The relay
-      validates the header and rejects unsupported combinations with HTTP 415.
-      The relay stores verbatim, serves byte-for-byte. That is what preserves
-      zero knowledge — the relay never touches the byte layout. The recipient
-      client decodes using the algorithms declared in the header.
+      A v1-capable client produces a blob with its chosen KEM and SIG IDs.
+      The relay validates the header and rejects unsupported combinations
+      with HTTP 415. The relay stores verbatim, serves byte-for-byte. That
+      is what preserves zero knowledge — the relay never touches the byte
+      layout. The recipient client decodes using the algorithms declared in
+      the header.
+    </p>
+    <p style="font-size:13px;color:var(--ink-dim);line-height:1.7;margin-top:12px">
+      Not every client surface produces v1 today. Section 06 below lists
+      the exact state of each official client. The two SDKs (sdk-py 3.0.0,
+      sdk-js 3.0.0) emit v1 with real ML-KEM and ML-DSA. The webapp WASM
+      bridge still emits a pre-v1 hybrid layout, and two extensions
+      currently fall back to a server-side path while their client-side
+      crypto is finished. Migration status is tracked openly rather than
+      glossed over.
     </p>
   </section>
 
@@ -496,9 +506,94 @@ FLAGS    1 byte    reserved for future features</pre>
     </p>
   </section>
 
-  <!-- ── 06 Adding an algorithm ── -->
+  <!-- ── 06 Client implementations ── -->
   <section>
-    <h2>06 — Adding an algorithm</h2>
+    <h2>06 — Client implementations</h2>
+    <p class="section-sub">Per-client status. Verified from source, not assumed.</p>
+    <p style="font-size:13px;color:var(--ink-dim);line-height:1.75;margin-top:6px">
+      The relay accepts wire format v1 from any client that produces it.
+      The table below is the honest state of each official client surface
+      we ship today.
+    </p>
+    <table class="algo-table" style="margin-top:18px">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Default KEM</th>
+          <th>Default SIG</th>
+          <th>Wire format</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>sdk-py 3.0.0</td>
+          <td>ML-KEM-768</td>
+          <td>ML-DSA-65</td>
+          <td>v1</td>
+          <td class="safe">live</td>
+        </tr>
+        <tr>
+          <td>sdk-js 3.0.0</td>
+          <td>ML-KEM-768</td>
+          <td>ML-DSA-65</td>
+          <td>v1</td>
+          <td class="safe">live</td>
+        </tr>
+        <tr>
+          <td>ParaShare (webapp)</td>
+          <td>ML-KEM-768 + ECDH P-256</td>
+          <td>—</td>
+          <td>pre-v1 hybrid</td>
+          <td>migrating to v1</td>
+        </tr>
+        <tr>
+          <td>ParaDrop (webapp)</td>
+          <td>ML-KEM-768 + ECDH P-256</td>
+          <td>—</td>
+          <td>pre-v1 hybrid</td>
+          <td>migrating to v1</td>
+        </tr>
+        <tr>
+          <td>Send (anonymous link)</td>
+          <td>—</td>
+          <td>—</td>
+          <td>AES-256-GCM, key in URL fragment</td>
+          <td>anonymous flow by design</td>
+        </tr>
+        <tr>
+          <td>Chromium extension</td>
+          <td>—</td>
+          <td>—</td>
+          <td>server-side path (relay encrypts)</td>
+          <td>client-side crypto in progress</td>
+        </tr>
+        <tr>
+          <td>Outlook add-in</td>
+          <td>—</td>
+          <td>—</td>
+          <td>server-side path (relay encrypts)</td>
+          <td>client-side crypto in progress</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
+      Pre-v1 hybrid: the WebApp WASM bridge already runs ML-KEM-768 + ECDH
+      P-256 + AES-256-GCM client-side, but its blob layout pre-dates the
+      v1 header above. Migration to v1 lets the same WASM negotiate
+      KEM / SIG IDs through <code>/v2/capabilities</code>.
+    </p>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:6px;line-height:1.7">
+      Server-side path: the extension authenticates and uploads, and the
+      relay performs encryption with a per-blob key. This is weaker than
+      end-to-end and is being replaced. Until the migration lands, do not
+      treat extension uploads as zero-knowledge.
+    </p>
+  </section>
+
+  <!-- ── 07 Adding an algorithm ── -->
+  <section>
+    <h2>07 — Adding an algorithm</h2>
     <p class="section-sub">Three steps. No schema changes, no in-flight blobs affected.</p>
     <div class="agility-row">
       <div class="ar-step">
@@ -526,9 +621,9 @@ FLAGS    1 byte    reserved for future features</pre>
     </p>
   </section>
 
-  <!-- ── 07 What is not yet built ── -->
+  <!-- ── 08 What is not yet built ── -->
   <section>
-    <h2>07 — What is not yet built</h2>
+    <h2>08 — What is not yet built</h2>
     <p class="section-sub">Honest delta between the header format and what ships.</p>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
       The <code>FLAGS</code> byte reserves space for options not currently shipping:

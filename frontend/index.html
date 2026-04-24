@@ -459,7 +459,7 @@
     <div class="hero-trust-strip" aria-label="Technical foundation shared by both sides">
       <span class="trust-item">
         <span class="trust-label">CRYPTO</span>
-        <span class="trust-value">ML-KEM-768 + ECDH P-256</span>
+        <span class="trust-value">3 KEMs + 18 sigs · NIST FIPS 203/204/205/206</span>
       </span>
       <span class="trust-item">
         <span class="trust-label">JURISDICTION</span>
@@ -547,6 +547,7 @@
         <p>Post-quantum hybrid key exchange. FIPS 203. ML-DSA-65 signed receipts (FIPS 204). All math client-side.</p>
       </div>
     </div>
+    <p style="color:#F8FAFC;opacity:.75;font-size:var(--text-sm);line-height:1.7;margin-top:24px;max-width:60ch">The relay loads 3 KEMs and 18 signatures from FIPS 203, 204, 205, and 206. Clients pick, the relay validates against the live registry, unsupported algorithms get HTTP 415. The official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) produce wire format v1 today; the WebApp tools and extensions are migrating in stages — see <a href="/crypto-agility#06" style="color:#B2FF3F;text-decoration:underline">crypto-agility § 06</a> for per-client status.</p>
     <a href="/security" class="crypto-strip-link">Full cryptography spec →</a>
   </div>
 </section>

@@ -344,12 +344,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy — it is a cryptographic guarantee.</p>
   </div>
 
+  <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where the zero-knowledge guarantee holds today</div>
+    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0), the WebApp tools (ParaShare, ParaDrop), and the anonymous <code>/send</code> link flow — every one of those encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
+  </div>
+
   <p style="font-size:var(--text-sm);color:var(--ink-dim)">For the full audit history, patch timeline, and cryptographic architecture, see the <a href="/architecture">architecture page</a>.</p>
 
   <hr class="divider">
 
   <h2>Cryptography</h2>
-  <p>All algorithms are from NIST post-quantum standards (FIPS 203/204) or established symmetric primitives. Nothing custom. No proprietary key exchange.</p>
+  <p>All algorithms are from NIST post-quantum standards (FIPS 203, 204, 205, 206) or established symmetric primitives. Nothing custom. No proprietary key exchange. The relay loads 3 KEMs and 18 signatures; clients choose, the relay validates, and the live registry is at <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. See <a href="/crypto-agility">crypto agility</a> for the wire format and full algorithm table.</p>
 
   <table class="table" style="margin-top:20px">
     <thead>

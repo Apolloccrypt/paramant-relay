@@ -769,6 +769,71 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   </div>
 </section>
 
+<!-- ── SECTION 08: COMPONENTS ── -->
+<section class="arch-section">
+  <div class="arch-inner">
+    <div class="section-num">08</div>
+    <h2 class="section-title">Components</h2>
+    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare, ParaDrop, anonymous send). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+
+    <table class="modes-table">
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>What it does</th>
+          <th>Crypto today</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Relay</strong></td>
+          <td>Node.js, Hetzner Nuremberg. Validates inbound v1 blobs, advertises 3 KEMs and 18 signatures via <code>/v2/capabilities</code>, rejects unsupported algorithm IDs with HTTP 415.</td>
+          <td>Wire format v1. Full NIST suite (FIPS 203, 204, 205, 206) loaded.</td>
+        </tr>
+        <tr>
+          <td><strong>sdk-py 3.0.0</strong></td>
+          <td>Python SDK. Default ML-KEM-768 + ML-DSA-65. Negotiates via the capabilities endpoint.</td>
+          <td>Real post-quantum (pqcrypto). Produces v1 blobs.</td>
+        </tr>
+        <tr>
+          <td><strong>sdk-js 3.0.0</strong></td>
+          <td>JavaScript / Node SDK. Same defaults and negotiation as the Python SDK.</td>
+          <td>Real post-quantum (@noble/post-quantum). Produces v1 blobs.</td>
+        </tr>
+        <tr>
+          <td><strong>ParaShare (webapp)</strong></td>
+          <td>Verified, authenticated transfers from the browser.</td>
+          <td>Hybrid ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, client-side. Pre-v1 blob layout. Migration to v1 in progress.</td>
+        </tr>
+        <tr>
+          <td><strong>ParaDrop (webapp)</strong></td>
+          <td>Device-to-device transfer over the relay, browser-to-browser.</td>
+          <td>Same WASM bridge as ParaShare. Pre-v1 layout. Migration to v1 in progress.</td>
+        </tr>
+        <tr>
+          <td><strong>Send (anonymous)</strong></td>
+          <td>One-shot link, no account. Used by the <code>/send</code> page.</td>
+          <td>AES-256-GCM, browser-generated key delivered in the URL fragment. Anonymous flow by design — not a v1 candidate.</td>
+        </tr>
+        <tr>
+          <td><strong>Chromium extension</strong></td>
+          <td>Right-click upload from any tab.</td>
+          <td>Currently uses a server-side encryption path: the relay performs encryption with a per-blob key. Client-side ML-KEM crypto is staged in the codebase but not yet wired up.</td>
+        </tr>
+        <tr>
+          <td><strong>Outlook add-in</strong></td>
+          <td>Encrypts attachments inside Outlook before send.</td>
+          <td>Uploads attachment bytes to the relay, which performs encryption server-side. Migration to client-side hybrid crypto is in progress.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="arch-takeaway">
+      <p><strong>The relay never sees plaintext for SDK and WebApp transfers.</strong> The two extensions currently take a server-side path while their client-side crypto is finished — that is called out openly here rather than papered over. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+    </div>
+  </div>
+</section>
+
 <!-- ── GOING DEEPER ── -->
 <section class="arch-section arch-section--tint">
   <div class="going-deeper">
