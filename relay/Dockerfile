@@ -1,7 +1,8 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
 # Build tools (python3, make, g++) are required only to compile argon2 native
 # bindings. They are NOT present in the final runtime image.
-FROM node:22-alpine3.21 AS build
+# Pinned by digest — tag node:22-alpine3.21 resolved 2026-04-24
+FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885 AS build
 
 RUN apk add --no-cache python3 make g++
 
@@ -11,7 +12,7 @@ RUN npm install --omit=dev && npm cache clean --force
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 # Lean image: no build tools, no npm, no compilers — only the relay and its deps.
-FROM node:22-alpine3.21
+FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885
 
 LABEL org.opencontainers.image.title="paramant-relay" \
       org.opencontainers.image.version="2.4.5" \

@@ -213,15 +213,22 @@ services:
   # ── Admin panel ──────────────────────────────────────────────────────────────
   # ── Redis (relay-internal, not exposed to host) ──────────────────────────────
   redis:
-    image: redis:7.4.8-alpine
+    # Pinned by digest — tag 7.4.8-alpine resolved 2026-04-24
+    image: redis:7.4.8-alpine@sha256:7aec734b2bb298a1d769fd8729f13b8514a41bf90fcdd1f38ec52267fbaa8ee6
     container_name: paramant-relay-redis
     restart: unless-stopped
     command: >
       redis-server
       --requirepass ${REDIS_PASSWORD}
       --appendonly yes
+    user: "redis"
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
     deploy:
       resources:
         limits:

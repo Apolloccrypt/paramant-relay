@@ -1,4 +1,5 @@
-FROM node:22-alpine3.21
+# Pinned by digest — tag node:22-alpine3.21 resolved 2026-04-24
+FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885
 
 LABEL org.opencontainers.image.title="paramant-admin" \
       org.opencontainers.image.version="1.0.0" \
