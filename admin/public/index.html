@@ -293,7 +293,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
     </div>
     <div class="mbody">
       <p style="font-size:13px;color:#dc2626;font-weight:600;margin:0 0 10px">This action is irreversible.</p>
-      <p style="font-size:13px;color:#475569;margin:0 0 12px">Account: <span id="da-target" style="font-family:'IBM Plex Mono',monospace"></span></p>
+      <div id="da-recent-warn" style="display:none;background:#FEF2F2;border-left:3px solid #DC2626;padding:10px 12px;margin:0 0 12px;font-size:12px;color:#991B1B;border-radius:3px"><strong>Heads up:</strong> this account is less than 24 hours old. Are you sure it isn't a real tester?</div>
+      <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,.08);padding:12px 14px;margin:0 0 12px;border-radius:3px">
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:12px">
+          <div style="color:#64748B">Email</div><div id="da-email" style="font-weight:600;color:#0B3A6A;word-break:break-all">—</div>
+          <div style="color:#64748B">Label</div><div id="da-label" style="color:#334155">—</div>
+          <div style="color:#64748B">Plan</div><div><span id="da-plan" class="badge community">—</span></div>
+          <div style="color:#64748B">Created</div><div id="da-created" class="mono" style="font-size:11px;color:#475569">—</div>
+          <div style="color:#64748B">Key</div><div id="da-target" class="mono" style="font-size:11px;color:#475569;word-break:break-all">—</div>
+        </div>
+      </div>
       <div class="mc" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="da-notify" checked>
         <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deletion confirmation email</label>
@@ -533,7 +542,7 @@ function usersTable(users){
         '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
         '<td><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" onclick="toggleMenu(event,\'m'+i+'\')">···</button>'+
-          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
+          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'details\',this)">View details</button>'+
             '<div class="ag-lbl">Email</div>'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'welcome\',this)"'+(hasE?'':' disabled')+'>Send welcome</button>'+
@@ -855,8 +864,28 @@ function openDeleteAccountModal(key,email){
   _ms.del={key,email};
   document.getElementById('da-confirm').value='';document.getElementById('da-btn').disabled=true;
   document.getElementById('da-notify').checked=true;
-  document.getElementById('da-target').textContent=email||key.slice(0,20)+'…';
+  document.getElementById('da-target').textContent=key;
+  // Enriched context from the triggering menu's dataset (set by the row template)
+  var _mm = document.querySelector('.am[data-key="'+key.replace(/"/g,'')+'"]');
+  var _dLabel = _mm && _mm.dataset.label || '';
+  var _dPlan = _mm && _mm.dataset.plan || 'community';
+  var _dCreated = _mm && _mm.dataset.created || '';
+  document.getElementById('da-email').textContent = email || '(no email on file)';
+  document.getElementById('da-label').textContent = _dLabel || '(no label)';
+  var _planEl = document.getElementById('da-plan');
+  _planEl.textContent = _dPlan; _planEl.className = 'badge '+_dPlan;
+  document.getElementById('da-created').textContent = _dCreated ? (_dCreated.split('T')[0]+' ('+ _relTime(_dCreated) +')') : '—';
+  var _recent = _dCreated && (Date.now() - new Date(_dCreated).getTime()) < 24*3600*1000;
+  document.getElementById('da-recent-warn').style.display = _recent ? 'block' : 'none';
   openModal('mo-delete');setTimeout(()=>document.getElementById('da-confirm').focus(),50);
+}
+function _relTime(iso){
+  if(!iso) return '';
+  var ms = Date.now() - new Date(iso).getTime();
+  if(ms < 60000) return 'just now';
+  if(ms < 3600000) return Math.round(ms/60000)+' min ago';
+  if(ms < 86400000) return Math.round(ms/3600000)+' h ago';
+  return Math.round(ms/86400000)+' d ago';
 }
 async function doDeleteAccount(){
   const {key}=_ms.del||{};if(!key)return;

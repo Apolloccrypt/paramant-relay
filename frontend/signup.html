@@ -543,8 +543,8 @@
   if (!banner || !title || !msg) return;
   var map = {
     expired_token: {
-      t: 'This verification link has already been used',
-      m: 'Your account is most likely already active. Check your inbox for a <strong>second</strong> email with the subject <code>Complete your Paramant account setup</code> &mdash; that one contains your TOTP setup link. The 6-digit codes come from a SHA-256 authenticator app (Raivo on iOS, Aegis on Android, 1Password, Bitwarden, Authy, Ente Auth, 2FAS) after you scan the QR code. <strong>Google Authenticator and Microsoft Authenticator do NOT work with Paramant</strong> — they only support SHA-1.'
+      t: 'Your account is already active',
+      m: 'You\'ve already verified this email. <a href="/auth/login" style="background:#1D4ED8;color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-weight:600;display:inline-block;margin:6px 0">Sign in &rarr;</a> <br><span style="color:#78350F;font-size:13px">Need to finish authenticator setup? Look for the email <code>Complete your Paramant account setup</code> in your inbox. Use a SHA-256 app like Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth, or 2FAS &mdash; <strong>not</strong> Google or Microsoft Authenticator.</span>'
     },
     invalid_token: {
       t: 'Verification link not recognised',

@@ -513,12 +513,40 @@
     }
   }
 
+  function _copyText(text) {
+    // Try modern Clipboard API first; fall back to execCommand for Safari+VPN combos
+    // that throw NotAllowedError even on user-initiated clicks.
+    try {
+      return navigator.clipboard.writeText(text).then(function(){ return true; }, function(){ return _copyTextFallback(text); });
+    } catch (e) { return Promise.resolve(_copyTextFallback(text)); }
+  }
+  function _copyTextFallback(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
   document.getElementById('copy-key').addEventListener('click', async function() {
+    var btn = this;
     const res = await fetch('/api/user/account/key', { credentials: 'include' });
-    if (res.ok) {
-      const data = await res.json();
-      navigator.clipboard.writeText(data.api_key);
+    if (!res.ok) { btn.textContent = 'Failed'; setTimeout(function(){ btn.textContent = 'Copy'; }, 2000); return; }
+    const data = await res.json();
+    const original = btn.textContent;
+    const ok = await Promise.resolve(_copyText(data.api_key));
+    if (ok) {
+      btn.textContent = 'Copied!';
+    } else {
+      // Last-resort path for Safari/WebKit with VPN extensions that block writes entirely.
+      // Show the key so the user can select + ⌘-C manually.
+      document.getElementById('api-key').textContent = data.api_key;
+      btn.textContent = 'Shown — ⌘-C';
     }
+    setTimeout(function(){ btn.textContent = original; }, 2500);
   });
 
   document.getElementById('show-key').addEventListener('click', async function() {

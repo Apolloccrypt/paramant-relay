@@ -197,7 +197,7 @@
   <div class="marker">
     <div class="num">&#8594;</div>
     <h2>Ready to set up.</h2>
-    <div class="tag">click to<br>continue</div>
+    <div class="tag">starts<br>here</div>
   </div>
   <p class="lede" style="margin-top:16px">
     Click the button below to generate your QR code and begin setup.
@@ -423,6 +423,14 @@
 
     const data = await res.json();
     backupCodes = data.backup_codes;
+
+    // Defensive: if backend returned an empty array (e.g. mid-flow revocation, scanner preload, or idempotent re-fetch),
+    // the TOTP part is configured but backup codes are unrecoverable. Do not silently show an empty success screen.
+    if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
+      errorDiv.innerHTML = 'Your TOTP is set up, but your backup codes could not be generated. This is usually temporary. Please contact <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with subject <code>Setup incomplete</code> and we will regenerate them.';
+      errorDiv.classList.add('visible');
+      return;
+    }
 
     const grid = document.getElementById('backup-codes');
     grid.innerHTML = '';

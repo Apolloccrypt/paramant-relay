@@ -540,18 +540,18 @@ api.post("/user/signup", async (req, res) => {
 
   const norm = email.toLowerCase().trim();
 
-  // 3. Per-IP rate limit (3 per hour)
+  // 3. Per-IP rate limit (10 per hour)
   const ipKey = `paramant:signup:ratelimit:ip:${ip}`;
   const ipCount = await redis().incr(ipKey);
   if (ipCount === 1) await redis().expire(ipKey, 3600);
-  if (ipCount > 3) return res.status(429).json({ error: "rate_limited" });
+  if (ipCount > 10) return res.status(429).json({ error: "rate_limited" });
 
-  // 4. Per-email rate limit (3 verification emails per 24h, hashed for privacy)
+  // 4. Per-email rate limit (10 verification emails per 24h, hashed for privacy)
   const emailHash = crypto.createHash('sha256').update(norm).digest('hex');
   const emailKey = `paramant:signup:ratelimit:email:${emailHash}`;
   const emailCount = await redis().incr(emailKey);
   if (emailCount === 1) await redis().expire(emailKey, 86400);
-  if (emailCount > 3) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
+  if (emailCount > 10) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
 
   // 5. Already has an active account? — silent success to prevent enumeration
   const existing = await findUserByEmail(norm);
@@ -646,7 +646,7 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   }
 
   // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
-  await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 3600 }).catch(() => {});
+  await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 30 * 86400 }).catch(() => {});
 
   console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
   res.redirect('/signup/verified');
