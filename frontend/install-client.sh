@@ -126,7 +126,7 @@ ${G}${BOLD}  Installation complete.${E}
     paramant-help
 
   ${D}Get a free API key:${E}
-    https://paramant.app/request-key
+    https://paramant.app/signup
 
   ${D}Docs:${E}
     https://paramant.app/docs
