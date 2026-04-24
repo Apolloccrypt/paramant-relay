@@ -590,7 +590,12 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   }
 
   const raw = await redis().get(`paramant:signup:pending:${token}`);
-  if (!raw) return res.redirect('/signup?error=expired_token');
+  if (!raw) {
+    // Re-click on already-consumed token: if we verified this one recently, just send them back to /signup/verified.
+    const consumed = await redis().get(`paramant:signup:consumed:${token}`);
+    if (consumed) return res.redirect('/signup/verified');
+    return res.redirect('/signup?error=expired_token');
+  }
 
   let pending;
   try { pending = JSON.parse(raw); } catch { return res.redirect('/signup?error=invalid_token'); }
@@ -639,6 +644,9 @@ api.get("/user/signup/verify/:token", async (req, res) => {
     console.error("[signup/verify] setup email failed:", err.message);
     // Account exists, don't undo — they can contact support
   }
+
+  // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
+  await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 3600 }).catch(() => {});
 
   console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
   res.redirect('/signup/verified');

@@ -84,6 +84,20 @@
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
+
+/* signup error banner (shown when verify-link already used / expired / etc) */
+.err-banner {
+  background: #FEF3C7;
+  border-left: 3px solid #D97706;
+  padding: 18px 22px;
+  margin: 0 0 32px 0;
+  border-radius: 4px;
+}
+.err-banner strong { color: #92400E; display: block; margin-bottom: 6px; font-size: 15px; }
+.err-banner p { color: #78350F; margin: 0; font-size: 14px; line-height: 1.55; }
+.err-banner code { background: #fff; padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #0B3A6A; }
+.err-banner a { color: #92400E; text-decoration: underline; font-weight: 600; }
+
 </style>
 </head>
 <body>
@@ -277,6 +291,12 @@
   </div></div>
 
 <main id="main-content" class="container-lg">
+
+
+<div id="signup-error-banner" class="err-banner" role="alert" hidden>
+  <strong id="signup-error-title"></strong>
+  <p id="signup-error-msg"></p>
+</div>
 
 <section class="section-lg">
   <div class="eyebrow"><span class="bar"></span>create account</div>
@@ -512,5 +532,40 @@
   } catch (e) {}
 })();
 </script>
+<script>
+(function(){
+  var p = new URLSearchParams(location.search);
+  var err = p.get('error');
+  if (!err) return;
+  var banner = document.getElementById('signup-error-banner');
+  var title  = document.getElementById('signup-error-title');
+  var msg    = document.getElementById('signup-error-msg');
+  if (!banner || !title || !msg) return;
+  var map = {
+    expired_token: {
+      t: 'This verification link has already been used',
+      m: 'Your account is most likely already active. Check your inbox for a <strong>second</strong> email with the subject <code>Complete your Paramant account setup</code> &mdash; that one contains your TOTP setup link. The 6-digit codes come from a SHA-256 authenticator app (Raivo on iOS, Aegis on Android, 1Password, Bitwarden, Authy, Ente Auth, 2FAS) after you scan the QR code. <strong>Google Authenticator and Microsoft Authenticator do NOT work with Paramant</strong> — they only support SHA-1.'
+    },
+    invalid_token: {
+      t: 'Verification link not recognised',
+      m: 'The link you clicked is malformed. If you followed it from an email, try copy-pasting the full URL into the browser. Otherwise, sign up again below with the same email.'
+    },
+    account_exists: {
+      t: 'An account already exists for this email',
+      m: 'Go to <a href="/auth/login">Sign in</a> to log in, or <a href="/auth/request-reset">request a new setup link</a> if you no longer have access to your authenticator app.'
+    },
+    server_error: {
+      t: 'Something went wrong on our side',
+      m: 'Please try again in a few minutes, or email <a href="mailto:hello@paramant.app">hello@paramant.app</a> if it keeps failing.'
+    }
+  };
+  var e = map[err] || { t: 'Unknown error', m: 'Please try signing up again below.' };
+  title.textContent = e.t;
+  msg.innerHTML = e.m;
+  banner.hidden = false;
+  banner.scrollIntoView({behavior:'smooth', block:'start'});
+})();
+</script>
+
 </body>
 </html>

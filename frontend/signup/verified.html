@@ -3,50 +3,113 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Email verified — Paramant</title>
+  <title>Email verified &mdash; check your inbox &mdash; Paramant</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/nav.js?v=10" defer></script>
   <style>
-    .verified-card {
-      max-width: 480px;
-      margin: 80px auto;
-      padding: 40px;
-      background: #fff;
-      border: 1px solid rgba(11,58,106,0.12);
-      border-radius: 8px;
-      text-align: center;
+    body { background: #F8FAFC; }
+    .vwrap { max-width: 620px; margin: 48px auto; padding: 0 20px; }
+    .vcheck {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #DCFCE7; color: #15803D;
+      padding: 6px 14px; border-radius: 100px;
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 24px;
     }
-    .verified-icon {
-      width: 56px;
-      height: 56px;
-      background: #DCFCE7;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 24px;
+    .vcheck svg { width: 14px; height: 14px; }
+    .vtitle {
+      font-size: 30px; font-weight: 600; color: #0B3A6A;
+      margin: 0 0 16px; line-height: 1.2;
     }
-    .verified-icon svg { color: #16A34A; }
-    h1 { font-size: 22px; font-weight: 600; color: #0B3A6A; margin: 0 0 12px; }
-    p { color: #475569; line-height: 1.6; margin: 0 0 24px; }
-    .cta { display: inline-block; background: #1D4ED8; color: #fff; padding: 12px 28px;
-           border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; }
-    .cta:hover { background: #1E40AF; }
-    .note { font-size: 13px; color: #94A3B8; margin: 20px 0 0; }
+    .vlead {
+      color: #475569; line-height: 1.6;
+      margin: 0 0 32px; font-size: 16px;
+    }
+    .next-box {
+      background: #EFF6FF; border: 1px solid #BFDBFE;
+      border-radius: 10px; padding: 28px; margin: 0 0 32px;
+    }
+    .next-num {
+      display: inline-flex; width: 32px; height: 32px;
+      border-radius: 50%; background: #1D4ED8; color: #fff;
+      align-items: center; justify-content: center;
+      font-weight: 700; font-size: 15px; margin-bottom: 14px;
+    }
+    .next-title {
+      font-size: 18px; font-weight: 600; color: #0B3A6A;
+      margin: 0 0 12px;
+    }
+    .next-msg {
+      color: #334155; line-height: 1.6;
+      margin: 0 0 14px; font-size: 15px;
+    }
+    .next-subject {
+      display: inline-block; background: #fff;
+      border: 1px solid #CBD5E1; border-radius: 5px;
+      padding: 8px 14px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 13px; color: #0B3A6A;
+      word-break: break-word;
+    }
+    .faq {
+      margin-top: 36px; padding-top: 28px;
+      border-top: 1px solid rgba(11,58,106,0.1);
+    }
+    .faq h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
+              color: #64748B; font-weight: 600; margin: 0 0 16px; }
+    .faq details { margin-bottom: 10px;
+                   border: 1px solid rgba(11,58,106,0.08);
+                   border-radius: 6px; padding: 14px 18px; background: #fff; }
+    .faq summary { cursor: pointer; font-weight: 600; color: #0B3A6A;
+                   font-size: 14px; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: '+'; float: right; color: #94A3B8;
+                          font-weight: 400; font-size: 18px; line-height: 1; }
+    .faq details[open] summary::after { content: '&minus;'; }
+    .faq p { color: #475569; line-height: 1.6;
+             margin: 10px 0 0; font-size: 14px; }
+    .faq code { background: #F1F5F9; padding: 2px 6px; border-radius: 3px;
+                font-size: 13px; color: #0B3A6A; }
+    .faq a { color: #1D4ED8; text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="verified-card">
-    <div class="verified-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
-           fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>
-    </div>
-    <h1>Email verified</h1>
-    <p>Your account is active. Check your inbox for a setup email — it contains your TOTP setup link.</p>
-    <a href="/auth/login" class="cta">Sign in</a>
-    <p class="note">Didn't receive the setup email? Check your spam folder or <a href="/signup">sign up again</a>.</p>
+<main class="vwrap">
+  <div class="vcheck" aria-label="Email verified">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    Email verified
   </div>
+
+  <h1 class="vtitle">One more step. Check your inbox for a second email.</h1>
+
+  <p class="vlead">Your email is confirmed and your Paramant account is created. To finish, you still need to connect an authenticator app &mdash; Paramant doesn't use passwords.</p>
+
+  <div class="next-box">
+    <div class="next-num">2</div>
+    <div class="next-title">Open the second email we just sent you</div>
+    <p class="next-msg">Look for an email with the subject:</p>
+    <p class="next-subject">Complete your Paramant account setup</p>
+    <p class="next-msg" style="margin-top:16px;">Open it and click the setup link. You'll see a QR code. Scan it with an app that supports SHA-256 TOTP: <strong>Raivo</strong> (iOS, open source), <strong>Aegis</strong> (Android, open source), <strong>1Password</strong>, <strong>Bitwarden</strong>, <strong>Authy</strong>, <strong>Ente Auth</strong>, or <strong>2FAS</strong>. Paramant uses SHA-256 &mdash; <strong>Google Authenticator, Microsoft Authenticator, and iCloud Keychain do NOT work</strong> because they only support SHA-1. The 6-digit login codes come from your chosen app, not from email.</p>
+  </div>
+
+  <div class="faq">
+    <h2>Frequently asked</h2>
+    <details>
+      <summary>I don't see the second email</summary>
+      <p>Give it a minute &mdash; delivery can take up to 60 seconds. Check your spam / junk folder. The sender is <code>noreply@paramant.app</code>. Still nothing? <a href="/auth/request-reset">Request a new setup link</a> using the same email address.</p>
+    </details>
+    <details>
+      <summary>Where's the 6-digit code in the email?</summary>
+      <p>It isn't in the email. Paramant uses <strong>SHA-256 TOTP</strong>. Codes are generated by a compatible authenticator app on your phone after you scan the QR code in the setup email. Recommended: <strong>Raivo</strong> (iOS) or <strong>Aegis</strong> (Android) &mdash; both open source. Also works: 1Password, Bitwarden, Authy, Ente Auth, 2FAS. <strong>Do not use</strong> Google Authenticator, Microsoft Authenticator, or iCloud Keychain &mdash; they only support SHA-1 and will generate codes the server rejects. <a href="/help/authenticator-apps">Full list &amp; why SHA-256.</a></p>
+    </details>
+    <details>
+      <summary>I already completed the setup</summary>
+      <p>Then you're done. <a href="/auth/login">Sign in</a> with your email and the 6-digit code from your authenticator app.</p>
+    </details>
+  </div>
+</main>
 </body>
 </html>
