@@ -69,13 +69,20 @@ const RELAY_PRIMARY_URL   = process.env.RELAY_PRIMARY_URL   || null; // e.g. htt
 const RELAY_IDENTITY_FILE = process.env.RELAY_IDENTITY_FILE || '/data/relay-identity.json';
 const TRIAL_KEYS_FILE     = process.env.TRIAL_KEYS_FILE     || '/data/trial-keys.jsonl';
 
-// Probeer @noble/post-quantum te laden voor ML-DSA
+// ── Crypto agility registry (wire format v1) ─────────────────────────────────
+// bootstrap() registers ML-KEM-768 (id 0x0002) and ML-DSA-65 (id 0x0002) once
+// at module load. Every crypto call site in this file goes through
+// registry.getKEM/getSig so algorithms can be swapped without touching handlers.
+const registry = require('./crypto/registry');
+require('./crypto/bootstrap').bootstrap();
+// `mlDsa` is retained as an availability probe used by `if (!mlDsa)` guards
+// throughout this file. It holds the registry-resolved impl when present, or
+// null when ML-DSA-65 could not be loaded (e.g. @noble/post-quantum missing).
 let mlDsa = null;
 try {
-  const { ml_dsa65: mlDsaLib } = require('@noble/post-quantum/ml-dsa.js');
-  mlDsa = mlDsaLib || null;
-  if (mlDsa) log('info', 'ml_dsa_loaded', { alg: 'ML-DSA-65 NIST FIPS 204' });
-} catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'npm install @noble/post-quantum' }); }
+  mlDsa = registry.getSig(0x0002);
+  if (mlDsa) log('info', 'ml_dsa_loaded', { alg: mlDsa.name });
+} catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'npm install @noble/post-quantum', err: e.message }); }
 
 const ALLOWED = {
   ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
@@ -84,13 +91,14 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/ct','/ct/feed','/v2/auth','/v2/user'],
+               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/ct','/ct/feed','/v2/auth','/v2/user'],
+               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
+               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user'],
   full:       null,
 };
 
@@ -347,7 +355,7 @@ function loadOrCreateRelayIdentity() {
     if (e.code !== 'ENOENT') log('warn', 'relay_identity_load_failed', { err: e.message, file: RELAY_IDENTITY_FILE });
     // Generate new keypair
     try {
-      const kp = mlDsa.keygen();
+      const kp = registry.getSig(0x0002).generateKeyPair();
       const sk = Buffer.from(kp.secretKey);
       const pk = Buffer.from(kp.publicKey);
       const pk_hash = crypto.createHash('sha3-256').update(pk).digest('hex');
@@ -550,7 +558,7 @@ function produceSth(tree_size, sha3_root) {
   const canonical  = JSON.stringify(Object.fromEntries(sortedKeys.map(k => [k, payload[k]])));
   let signature;
   try {
-    signature = Buffer.from(mlDsa.sign(Buffer.from(canonical, 'utf8'), relayIdentity.sk)).toString('base64');
+    signature = Buffer.from(registry.getSig(0x0002).sign(Buffer.from(canonical, 'utf8'), relayIdentity.sk)).toString('base64');
   } catch (e) {
     log('warn', 'sth_sign_failed', { err: e.message });
     return null;
@@ -1305,7 +1313,7 @@ function verifyDsaSignature(payload, signature, pubKeyHex) {
     const pub = Buffer.from(pubKeyHex, 'hex');
     const sig = Buffer.from(signature, 'hex');
     const msg = Buffer.from(payload);
-    const valid = mlDsa.verify(sig, msg, pub);
+    const valid = registry.getSig(0x0002).verify(sig, msg, pub);
     return { valid, alg: 'ML-DSA-65' };
   } catch(e) {
     return { valid: false, reason: e.message };
@@ -1640,6 +1648,15 @@ const server = http.createServer(async (req, res) => {
       active_keys: [...apiKeys.values()].filter(k => k.active !== false).length };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(adminOk ? full : base));
+  }
+
+  // ── GET /v2/capabilities — public, no auth ─────────────────────────────────
+  // Advertises the wire format version and list of loaded crypto algorithms.
+  // Built dynamically from the registry so this endpoint stays correct as
+  // algorithms are added or removed. See docs/wire-format-v1.md.
+  if (req.method === 'GET' && path === '/v2/capabilities') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J(registry.listSupported()));
   }
 
   // ── GET /v2/auth/capabilities — public, no auth ─────────────────────────────
@@ -2118,7 +2135,7 @@ session = client.create_session('recipient@example.com')</pre>
     // API in @noble/post-quantum: verify(signature, message, publicKey)
     const msg = Buffer.from(rUrl + '|' + rSector + '|' + rVersion + '|' + timestamp, 'utf8');
     let verified = false;
-    try { verified = mlDsa.verify(sigBytes, msg, pkBytes); } catch {}
+    try { verified = registry.getSig(0x0002).verify(sigBytes, msg, pkBytes); } catch {}
     if (!verified) {
       log('warn', 'relay_register_bad_sig', { url: rUrl, sector: rSector });
       res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -2191,7 +2208,7 @@ session = client.create_session('recipient@example.com')</pre>
     const payload = { relay_id, sha3_root, timestamp, tree_size, version: version || 1 };
     const canonical = JSON.stringify(Object.fromEntries(Object.keys(payload).sort().map(k => [k, payload[k]])));
     let verified = false;
-    try { verified = mlDsa.verify(sigBytes, Buffer.from(canonical, 'utf8'), pkBytes); } catch {}
+    try { verified = registry.getSig(0x0002).verify(sigBytes, Buffer.from(canonical, 'utf8'), pkBytes); } catch {}
     if (!verified) {
       log('warn', 'sth_ingest_bad_sig', { relay_id: String(relay_id).slice(0, 32), pk_hash: computedPkHash.slice(0, 16) });
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -2953,7 +2970,7 @@ session = client.create_session('recipient@example.com')</pre>
       if (mlDsa && relayIdentity) {
         try {
           const canonical = canonicalJSON(receiptPayload);
-          signature = Buffer.from(mlDsa.sign(Buffer.from(canonical, 'utf8'), relayIdentity.sk)).toString('base64');
+          signature = Buffer.from(registry.getSig(0x0002).sign(Buffer.from(canonical, 'utf8'), relayIdentity.sk)).toString('base64');
         } catch(e) { log('warn', 'receipt_sign_failed', { err: e.message }); }
       }
       const receipt = { ...receiptPayload, signature };
@@ -3484,7 +3501,7 @@ python3 paramant-receiver.py \\
       const canonical = canonicalJSON(receiptWithoutSig);
       let sigValid = false;
       try {
-        sigValid = mlDsa.verify(Buffer.from(signature, 'base64'), Buffer.from(canonical, 'utf8'), relayIdentity.pk);
+        sigValid = registry.getSig(0x0002).verify(Buffer.from(signature, 'base64'), Buffer.from(canonical, 'utf8'), relayIdentity.pk);
       } catch(e) { sigValid = false; }
       if (!sigValid) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -3517,7 +3534,7 @@ python3 paramant-receiver.py \\
         const sthCanonical = canonicalJSON(sthPayload);
         let sthValid = false;
         try {
-          sthValid = mlDsa.verify(Buffer.from(sthSig, 'base64'), Buffer.from(sthCanonical, 'utf8'), relayIdentity.pk);
+          sthValid = registry.getSig(0x0002).verify(Buffer.from(sthSig, 'base64'), Buffer.from(sthCanonical, 'utf8'), relayIdentity.pk);
         } catch(e) { sthValid = false; }
         if (!sthValid) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -3719,7 +3736,7 @@ async function registerSelf() {
   const msg = Buffer.from(RELAY_SELF_URL + '|' + SECTOR + '|' + VERSION + '|' + timestamp, 'utf8');
   // API in @noble/post-quantum: sign(message, secretKey)
   let sig;
-  try { sig = Buffer.from(mlDsa.sign(msg, relayIdentity.sk)); } catch (e) {
+  try { sig = Buffer.from(registry.getSig(0x0002).sign(msg, relayIdentity.sk)); } catch (e) {
     log('warn', 'relay_self_register_sign_failed', { err: e.message }); return;
   }
   const body = JSON.stringify({
