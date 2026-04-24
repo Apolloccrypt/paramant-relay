@@ -75,6 +75,12 @@ const TRIAL_KEYS_FILE     = process.env.TRIAL_KEYS_FILE     || '/data/trial-keys
 // registry.getKEM/getSig so algorithms can be swapped without touching handlers.
 const registry = require('./crypto/registry');
 require('./crypto/bootstrap').bootstrap();
+
+// Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
+// setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
+// (PQHB magic + version + kem_id + sig_id + flags). Inbound decoding accepts
+// both v0 and v1 unconditionally — this flag only controls what we produce.
+const WIRE_VERSION = process.env.PARAMANT_WIRE_VERSION === '1' ? 1 : 0;
 // `mlDsa` is retained as an availability probe used by `if (!mlDsa)` guards
 // throughout this file. It holds the registry-resolved impl when present, or
 // null when ML-DSA-65 could not be loaded (e.g. @noble/post-quantum missing).
