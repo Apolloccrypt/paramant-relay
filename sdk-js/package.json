@@ -1,7 +1,7 @@
 {
   "name": "paramant-sdk",
-  "version": "2.4.5",
-  "description": "JavaScript SDK for PARAMANT Ghost Pipe — zero-plaintext post-quantum file transport",
+  "version": "3.0.0",
+  "description": "JavaScript SDK for Paramant — real post-quantum (ML-KEM-768 + ML-DSA-65) zero-plaintext file transport, wire-format v1",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
@@ -11,22 +11,36 @@
       "import": "./index.js",
       "require": "./index.js",
       "types": "./index.d.ts"
+    },
+    "./wire-format": {
+      "import": "./src/wire-format.js",
+      "require": "./src/wire-format.js"
+    },
+    "./capabilities": {
+      "import": "./src/capabilities.js",
+      "require": "./src/capabilities.js"
     }
   },
   "files": [
     "index.js",
     "index.d.ts",
-    "README.md"
+    "src/",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "paramant",
     "ghost-pipe",
     "encryption",
     "post-quantum",
-    "file-transfer",
-    "zero-knowledge",
+    "pqhb",
+    "wire-format-v1",
     "ml-kem",
-    "kyber"
+    "ml-kem-768",
+    "ml-dsa",
+    "ml-dsa-65",
+    "file-transfer",
+    "zero-knowledge"
   ],
   "license": "BUSL-1.1",
   "homepage": "https://paramant.app",
@@ -41,11 +55,14 @@
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@noble/post-quantum": "^0.6.1"
+  },
   "devDependencies": {
     "typescript": "^5.4"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/"
   }
 }
