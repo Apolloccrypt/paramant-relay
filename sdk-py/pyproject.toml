@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paramant-sdk"
-version = "2.4.5"
-description = "Python SDK for PARAMANT Ghost Pipe — zero-plaintext post-quantum file transport"
+version = "3.0.0"
+description = "Python SDK for PARAMANT — post-quantum file transport (ML-KEM-768 + ML-DSA-65, wire format v1)"
 readme = "README.md"
 license = "BUSL-1.1"
 requires-python = ">=3.10"
-keywords = ["paramant", "ghost-pipe", "encryption", "post-quantum", "file-transfer", "zero-knowledge"]
+keywords = ["paramant", "post-quantum", "ml-kem", "ml-dsa", "fips203", "fips204", "encryption", "file-transfer"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -22,8 +22,9 @@ classifiers = [
     "Topic :: Communications :: File Sharing",
 ]
 dependencies = [
-    "requests>=2.33",
+    "pqcrypto>=0.4,<1.0",
     "cryptography>=43.0.1",
+    "requests>=2.33",
     "websockets>=12",
 ]
 
@@ -46,7 +47,7 @@ paramant-sdk = "paramant_sdk:_cli_main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["paramant_sdk*"]
+include = ["paramant*", "paramant_sdk*"]
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
