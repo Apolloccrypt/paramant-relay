@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" role="img" aria-label="Paramant authentication flows">
+  <style>
+    .bone { fill: #F8FAFC; }
+    .navy { fill: #0B3A6A; }
+    .cobalt { fill: #1D4ED8; }
+    .lime { fill: #B2FF3F; }
+    .ink-hair { fill: #E2E8F0; }
+    .ink-mid { fill: #475569; }
+    .title { font: 700 16px -apple-system, sans-serif; fill: #0B3A6A; }
+    .subtitle { font: 400 12px -apple-system, sans-serif; fill: #475569; }
+    .label { font: 700 10px 'IBM Plex Mono', monospace; fill: #0B3A6A; letter-spacing: 0.12em; }
+    .mono-small { font: 400 10px 'IBM Plex Mono', monospace; fill: #475569; }
+    .mono-tiny { font: 400 9px 'IBM Plex Mono', monospace; fill: #94A3B8; }
+    .lane-bg { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+    .arrow { fill: none; stroke: #1D4ED8; stroke-width: 1.5; marker-end: url(#arrow); }
+    .arrow-reply { fill: none; stroke: #B2FF3F; stroke-width: 1.5; stroke-dasharray: 4 3; marker-end: url(#arrow-lime); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1D4ED8"/>
+    </marker>
+    <marker id="arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B2FF3F"/>
+    </marker>
+  </defs>
+  <text x="40" y="36" class="title">PARAMANT AUTHENTICATION FLOWS</text>
+  <text x="40" y="56" class="subtitle">Different user types, different paths — same security guarantees.</text>
+  <line x1="40" y1="70" x2="860" y2="70" stroke="#B2FF3F" stroke-width="3"/>
+  <rect x="40" y="100" width="820" height="120" class="lane-bg"/>
+  <rect x="40" y="100" width="6" height="120" class="navy"/>
+  <text x="60" y="128" class="label">IOT / AUTOMATION / CLI</text>
+  <text x="60" y="148" class="mono-small">Server-to-server. No human. No TOTP possible or needed.</text>
+  <g transform="translate(60, 170)">
+    <rect x="0" y="0" width="140" height="40" fill="#0B3A6A"/>
+    <text x="70" y="24" text-anchor="middle" class="mono-small" fill="#F8FAFC">IoT Device / Script</text>
+    <path d="M 140 20 L 210 20" class="arrow"/>
+    <text x="175" y="14" text-anchor="middle" class="mono-tiny">X-Api-Key header</text>
+    <rect x="210" y="0" width="140" height="40" fill="#1D4ED8"/>
+    <text x="280" y="24" text-anchor="middle" class="mono-small" fill="#F8FAFC">Paramant Relay</text>
+    <path d="M 350 20 L 420 20" class="arrow-reply"/>
+    <text x="385" y="14" text-anchor="middle" class="mono-tiny">encrypted blob</text>
+    <rect x="420" y="0" width="140" height="40" fill="#0B3A6A"/>
+    <text x="490" y="24" text-anchor="middle" class="mono-small" fill="#F8FAFC">Shareable link</text>
+    <text x="620" y="24" class="mono-small">&#x2713; Works headless</text>
+    <text x="620" y="38" class="mono-small">&#x2713; No session, no TOTP</text>
+  </g>
+  <rect x="40" y="240" width="820" height="140" class="lane-bg"/>
+  <rect x="40" y="240" width="6" height="140" class="cobalt"/>
+  <text x="60" y="268" class="label">HUMAN BROWSER USER</text>
+  <text x="60" y="288" class="mono-small">paramant.app web UI. Email + authenticator app code. 1-hour session.</text>
+  <g transform="translate(60, 310)">
+    <rect x="0" y="0" width="140" height="50" fill="#0B3A6A"/>
+    <text x="70" y="22" text-anchor="middle" class="mono-small" fill="#F8FAFC">User Browser</text>
+    <text x="70" y="38" text-anchor="middle" class="mono-tiny" fill="#B2FF3F">email + 6-digit TOTP</text>
+    <path d="M 140 25 L 210 25" class="arrow"/>
+    <rect x="210" y="0" width="140" height="50" fill="#1D4ED8"/>
+    <text x="280" y="22" text-anchor="middle" class="mono-small" fill="#F8FAFC">Admin Service</text>
+    <text x="280" y="38" text-anchor="middle" class="mono-tiny" fill="#B2FF3F">verify TOTP &#x2192; session</text>
+    <path d="M 350 25 L 420 25" class="arrow"/>
+    <text x="385" y="19" text-anchor="middle" class="mono-tiny">proxy w/ API key</text>
+    <rect x="420" y="0" width="140" height="50" fill="#1D4ED8"/>
+    <text x="490" y="22" text-anchor="middle" class="mono-small" fill="#F8FAFC">Paramant Relay</text>
+    <text x="490" y="38" text-anchor="middle" class="mono-tiny" fill="#B2FF3F">X-Api-Key (internal)</text>
+    <path d="M 560 25 L 630 25" class="arrow-reply"/>
+    <rect x="630" y="0" width="140" height="50" fill="#0B3A6A"/>
+    <text x="700" y="22" text-anchor="middle" class="mono-small" fill="#F8FAFC">Shareable link</text>
+    <text x="700" y="38" text-anchor="middle" class="mono-tiny" fill="#B2FF3F">session cookie active</text>
+  </g>
+  <rect x="40" y="400" width="820" height="120" class="lane-bg"/>
+  <rect x="40" y="400" width="6" height="120" fill="#B2FF3F"/>
+  <text x="60" y="428" class="label">GMAIL / OUTLOOK EXTENSION</text>
+  <text x="60" y="448" class="mono-small">Same auth as browser. Attachment &#x2192; Paramant link in one click.</text>
+  <g transform="translate(60, 470)">
+    <rect x="0" y="0" width="140" height="40" fill="#0B3A6A"/>
+    <text x="70" y="24" text-anchor="middle" class="mono-small" fill="#F8FAFC">Gmail compose</text>
+    <path d="M 140 20 L 210 20" class="arrow"/>
+    <text x="175" y="14" text-anchor="middle" class="mono-tiny">attach via Paramant</text>
+    <rect x="210" y="0" width="140" height="40" fill="#B2FF3F"/>
+    <text x="280" y="24" text-anchor="middle" class="mono-small" fill="#0B3A6A">Paramant Extension</text>
+    <path d="M 350 20 L 420 20" class="arrow"/>
+    <text x="385" y="14" text-anchor="middle" class="mono-tiny">same session as web UI</text>
+    <rect x="420" y="0" width="140" height="40" fill="#1D4ED8"/>
+    <text x="490" y="24" text-anchor="middle" class="mono-small" fill="#F8FAFC">Paramant Relay</text>
+    <path d="M 560 20 L 630 20" class="arrow-reply"/>
+    <rect x="630" y="0" width="140" height="40" fill="#0B3A6A"/>
+    <text x="700" y="24" text-anchor="middle" class="mono-small" fill="#F8FAFC">Link in email body</text>
+  </g>
+</svg>

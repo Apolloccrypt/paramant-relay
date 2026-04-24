@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-label="Paramant system architecture">
+  <style>
+    .title { font: 700 16px -apple-system, sans-serif; fill: #0B3A6A; }
+    .subtitle { font: 400 12px -apple-system, sans-serif; fill: #475569; }
+    .box-label { font: 700 11px -apple-system, sans-serif; fill: #F8FAFC; }
+    .box-detail { font: 400 10px 'IBM Plex Mono', monospace; fill: #F8FAFC; opacity: 0.85; }
+    .lane-label { font: 700 11px 'IBM Plex Mono', monospace; fill: #0B3A6A; letter-spacing: 0.12em; }
+    .conn-label { font: 400 9px 'IBM Plex Mono', monospace; fill: #94A3B8; }
+    .arrow-primary { fill: none; stroke: #1D4ED8; stroke-width: 1.5; marker-end: url(#a-primary); }
+    .arrow-internal { fill: none; stroke: #B2FF3F; stroke-width: 1.5; stroke-dasharray: 3 2; marker-end: url(#a-internal); }
+  </style>
+  <defs>
+    <marker id="a-primary" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1D4ED8"/>
+    </marker>
+    <marker id="a-internal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B2FF3F"/>
+    </marker>
+  </defs>
+  <text x="40" y="36" class="title">PARAMANT SYSTEM ARCHITECTURE</text>
+  <text x="40" y="56" class="subtitle">Post-quantum encrypted file relay with Redis-backed auth.</text>
+  <line x1="40" y1="70" x2="860" y2="70" stroke="#B2FF3F" stroke-width="3"/>
+  <text x="40" y="110" class="lane-label">CLIENTS</text>
+  <rect x="40" y="130" width="180" height="70" fill="#0B3A6A"/>
+  <text x="55" y="152" class="box-label">Browser</text>
+  <text x="55" y="168" class="box-detail">paramant.app web UI</text>
+  <text x="55" y="182" class="box-detail">Session cookie + TOTP</text>
+  <text x="55" y="196" class="box-detail">Chromium extensions</text>
+  <rect x="240" y="130" width="180" height="70" fill="#0B3A6A"/>
+  <text x="255" y="152" class="box-label">CLI / SDK / Plugins</text>
+  <text x="255" y="168" class="box-detail">X-Api-Key header</text>
+  <text x="255" y="182" class="box-detail">No TOTP, no session</text>
+  <text x="255" y="196" class="box-detail">Unchanged from v1</text>
+  <rect x="440" y="130" width="180" height="70" fill="#0B3A6A"/>
+  <text x="455" y="152" class="box-label">IoT / SCADA</text>
+  <text x="455" y="168" class="box-detail">X-Api-Key header</text>
+  <text x="455" y="182" class="box-detail">Raspberry Pi / embedded</text>
+  <text x="455" y="196" class="box-detail">Unchanged from v1</text>
+  <rect x="640" y="130" width="180" height="70" fill="#0B3A6A"/>
+  <text x="655" y="152" class="box-label">Admin (you)</text>
+  <text x="655" y="168" class="box-detail">Admin token + TOTP</text>
+  <text x="655" y="182" class="box-detail">X-Session header</text>
+  <text x="655" y="196" class="box-detail">1-hour Redis session</text>
+  <path d="M 130 200 L 130 260" class="arrow-primary"/>
+  <text x="135" y="230" class="conn-label">HTTPS</text>
+  <path d="M 330 200 L 330 260" class="arrow-primary"/>
+  <text x="335" y="230" class="conn-label">HTTPS</text>
+  <path d="M 530 200 L 530 260" class="arrow-primary"/>
+  <text x="535" y="230" class="conn-label">HTTPS</text>
+  <path d="M 730 200 L 730 260" class="arrow-primary"/>
+  <text x="735" y="230" class="conn-label">HTTPS</text>
+  <text x="40" y="245" class="lane-label">SERVICES (paramant.app)</text>
+  <rect x="70" y="260" width="220" height="100" fill="#1D4ED8"/>
+  <text x="85" y="282" class="box-label">Admin Service :4200</text>
+  <text x="85" y="300" class="box-detail">Express 5 + Redis</text>
+  <text x="85" y="314" class="box-detail">/api/auth/login (admin)</text>
+  <text x="85" y="328" class="box-detail">/api/user/login (user)</text>
+  <text x="85" y="342" class="box-detail">/api/user/setup/*</text>
+  <text x="85" y="354" class="box-detail">Session &#x2192; proxy to relay</text>
+  <rect x="310" y="260" width="220" height="100" fill="#1D4ED8"/>
+  <text x="325" y="282" class="box-label">Paramant Relay :3000</text>
+  <text x="325" y="300" class="box-detail">paramant-relay-health</text>
+  <text x="325" y="314" class="box-detail">/v2/inbound (upload)</text>
+  <text x="325" y="328" class="box-detail">/v2/outbound/:t (download)</text>
+  <text x="325" y="342" class="box-detail">/v2/*/verify-totp</text>
+  <text x="325" y="354" class="box-detail">RAM-only storage</text>
+  <rect x="550" y="260" width="220" height="100" fill="#1D4ED8" opacity="0.7"/>
+  <text x="565" y="282" class="box-label">Sector Relays</text>
+  <text x="565" y="300" class="box-detail">iot.paramant.app</text>
+  <text x="565" y="314" class="box-detail">health.paramant.app</text>
+  <text x="565" y="328" class="box-detail">finance.paramant.app</text>
+  <text x="565" y="342" class="box-detail">legal.paramant.app</text>
+  <text x="565" y="354" class="box-detail">Segregated per use case</text>
+  <path d="M 290 310 L 310 310" class="arrow-internal"/>
+  <text x="300" y="305" text-anchor="middle" class="conn-label">internal auth</text>
+  <path d="M 530 310 L 550 310" class="arrow-internal"/>
+  <text x="40" y="420" class="lane-label">STATE</text>
+  <rect x="70" y="440" width="220" height="120" fill="#0F172A"/>
+  <text x="85" y="462" class="box-label">Redis :6379 (localhost)</text>
+  <text x="85" y="480" class="box-detail">paramant:admin:* (separate)</text>
+  <text x="85" y="494" class="box-detail">paramant:user:* (separate)</text>
+  <text x="85" y="508" class="box-detail">Sessions (TTL 3600s)</text>
+  <text x="85" y="522" class="box-detail">TOTP secrets (encrypted)</text>
+  <text x="85" y="536" class="box-detail">Backup codes (hashed)</text>
+  <text x="85" y="550" class="box-detail">Rate limits, replay protection</text>
+  <rect x="310" y="440" width="220" height="120" fill="#0F172A"/>
+  <text x="325" y="462" class="box-label">Docker Volume</text>
+  <text x="325" y="480" class="box-detail">users.json (read-only)</text>
+  <text x="325" y="494" class="box-detail">trial-keys.jsonl (append)</text>
+  <text x="325" y="508" class="box-detail">Static config</text>
+  <rect x="550" y="440" width="220" height="120" fill="#0F172A"/>
+  <text x="565" y="462" class="box-label">Ephemeral (RAM)</text>
+  <text x="565" y="480" class="box-detail">File blobs in memory</text>
+  <text x="565" y="494" class="box-detail">Burned after read</text>
+  <text x="565" y="508" class="box-detail">Never touches disk</text>
+  <text x="565" y="522" class="box-detail">Default TTL 24h</text>
+  <path d="M 180 360 L 180 440" class="arrow-primary"/>
+  <text x="185" y="405" class="conn-label">read/write</text>
+  <path d="M 420 360 L 420 440" class="arrow-primary"/>
+  <text x="425" y="405" class="conn-label">read/write</text>
+  <path d="M 660 360 L 660 440" class="arrow-primary"/>
+  <text x="665" y="405" class="conn-label">in-memory</text>
+</svg>

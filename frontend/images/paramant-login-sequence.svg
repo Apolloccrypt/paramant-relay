@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="User TOTP login sequence">
+  <style>
+    .title { font: 700 16px -apple-system, sans-serif; fill: #0B3A6A; }
+    .subtitle { font: 400 12px -apple-system, sans-serif; fill: #475569; }
+    .actor-label { font: 700 11px 'IBM Plex Mono', monospace; fill: #F8FAFC; }
+    .step-num { font: 700 14px -apple-system, sans-serif; fill: #1D4ED8; }
+    .step-text { font: 400 12px -apple-system, sans-serif; fill: #0F172A; }
+    .step-detail { font: 400 10px 'IBM Plex Mono', monospace; fill: #475569; }
+    .arrow-seq { fill: none; stroke: #1D4ED8; stroke-width: 1.5; marker-end: url(#a-seq); }
+    .arrow-resp { fill: none; stroke: #B2FF3F; stroke-width: 1.5; stroke-dasharray: 3 2; marker-end: url(#a-resp); }
+    .lifeline { fill: none; stroke: #E2E8F0; stroke-width: 1; stroke-dasharray: 2 3; }
+  </style>
+  <defs>
+    <marker id="a-seq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1D4ED8"/>
+    </marker>
+    <marker id="a-resp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B2FF3F"/>
+    </marker>
+  </defs>
+  <text x="40" y="36" class="title">USER LOGIN SEQUENCE</text>
+  <text x="40" y="56" class="subtitle">From email entry to authenticated session. Total ~2 seconds.</text>
+  <line x1="40" y1="70" x2="860" y2="70" stroke="#B2FF3F" stroke-width="3"/>
+  <rect x="80" y="100" width="140" height="40" fill="#0B3A6A"/>
+  <text x="150" y="125" text-anchor="middle" class="actor-label">User Browser</text>
+  <rect x="280" y="100" width="140" height="40" fill="#0B3A6A"/>
+  <text x="350" y="125" text-anchor="middle" class="actor-label">Admin Service</text>
+  <rect x="480" y="100" width="140" height="40" fill="#0B3A6A"/>
+  <text x="550" y="125" text-anchor="middle" class="actor-label">Relay</text>
+  <rect x="680" y="100" width="140" height="40" fill="#0F172A"/>
+  <text x="750" y="125" text-anchor="middle" class="actor-label">Redis</text>
+  <line x1="150" y1="140" x2="150" y2="540" class="lifeline"/>
+  <line x1="350" y1="140" x2="350" y2="540" class="lifeline"/>
+  <line x1="550" y1="140" x2="550" y2="540" class="lifeline"/>
+  <line x1="750" y1="140" x2="750" y2="540" class="lifeline"/>
+  <text x="40" y="180" class="step-num">1</text>
+  <path d="M 150 185 L 350 185" class="arrow-seq"/>
+  <text x="250" y="180" text-anchor="middle" class="step-detail">POST /api/user/login &#x7B; email, totp &#x7D;</text>
+  <text x="40" y="220" class="step-num">2</text>
+  <text x="360" y="215" class="step-text">Validate input, rate limit check</text>
+  <text x="360" y="230" class="step-detail">email format, TOTP format 6-digit</text>
+  <path d="M 350 260 L 750 260" class="arrow-seq"/>
+  <text x="550" y="255" text-anchor="middle" class="step-detail">GET paramant:user:totp:&#x7B;user_id&#x7D;</text>
+  <path d="M 750 280 L 350 280" class="arrow-resp"/>
+  <text x="550" y="295" text-anchor="middle" class="step-detail">encrypted secret (AES-256-GCM)</text>
+  <text x="40" y="330" class="step-num">3</text>
+  <path d="M 350 335 L 550 335" class="arrow-seq"/>
+  <text x="450" y="330" text-anchor="middle" class="step-detail">POST /v2/user/verify-totp</text>
+  <text x="560" y="355" class="step-text">Decrypt, verify TOTP</text>
+  <text x="560" y="370" class="step-detail">HMAC-SHA1, &#xB1;1 window</text>
+  <text x="560" y="385" class="step-detail">Redis replay check</text>
+  <path d="M 550 405 L 350 405" class="arrow-resp"/>
+  <text x="450" y="400" text-anchor="middle" class="step-detail">&#x7B; valid: true &#x7D;</text>
+  <text x="40" y="440" class="step-num">4</text>
+  <path d="M 350 445 L 750 445" class="arrow-seq"/>
+  <text x="550" y="440" text-anchor="middle" class="step-detail">SET paramant:user:session:&#x7B;token&#x7D; EX 3600</text>
+  <text x="40" y="490" class="step-num">5</text>
+  <path d="M 350 495 L 150 495" class="arrow-resp"/>
+  <text x="250" y="490" text-anchor="middle" class="step-detail">Set-Cookie: paramant_user_session=...; HttpOnly; Secure</text>
+  <text x="250" y="510" text-anchor="middle" class="step-detail">Response: &#x7B; success, expires_at &#x7D;</text>
+  <text x="150" y="535" text-anchor="middle" class="step-text" style="font-weight: 700; fill: #B2FF3F;">&#x2713; Authenticated</text>
+</svg>

@@ -25,3 +25,20 @@
 docs/api.md:curl-auth-header:379
 docs/api.md:curl-auth-header:431
 docs/api.md:curl-auth-header:453
+
+# Documentation placeholders imported 2026-04-24 from server-side
+# (paramant.app/docs/* and /help/*): all are curl examples with
+# literal 'pgp_your_key' / 'Bearer YOUR_API_KEY' / demo PSS strings
+# 'flu-vaccine-2026' and 'correct-horse-battery-staple'. Not secrets.
+frontend/docs/security.md:generic-api-key:309
+frontend/docs/security.md:generic-api-key:315
+frontend/docs/api.md:curl-auth-header:29
+frontend/docs/api.md:curl-auth-header:67
+frontend/docs/api.md:curl-auth-header:135
+frontend/docs/api.md:curl-auth-header:147
+frontend/docs/api.md:curl-auth-header:355
+frontend/docs/api.md:curl-auth-header:365
+frontend/docs/api.md:curl-auth-header:379
+frontend/docs/api.md:curl-auth-header:431
+frontend/docs/api.md:curl-auth-header:453
+frontend/help/iot-integration.html:curl-auth-header:323

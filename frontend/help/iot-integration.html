@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IoT &amp; embedded devices — PARAMANT Help</title>
+<meta name="description" content="Using the Paramant API on constrained devices — Pi Zero, ESP32, OT gateways. Static API key, no TOTP required.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
+.breadcrumb{font-size:var(--text-xs);color:var(--ink-dim);margin-bottom:32px}
+.breadcrumb a{color:var(--cobalt);text-decoration:none}
+.breadcrumb a:hover{opacity:.7}
+.breadcrumb span{margin:0 8px;color:var(--ink-ghost)}
+h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
+.lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
+h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:48px}
+h3{font-size:var(--text-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
+p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
+p strong{color:var(--ink)}
+a{color:var(--cobalt);text-decoration:none}
+a:hover{opacity:.7}
+em{color:var(--cobalt)}
+.code-block{background:var(--ink);color:var(--bone);padding:14px 18px;font-family:var(--mono,ui-monospace);font-size:var(--text-sm);line-height:1.6;margin:16px 0;word-break:break-all;white-space:pre-wrap}
+.tip{border-left:3px solid var(--cobalt);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
+.tip p{margin:0;font-size:var(--text-sm)}
+.warn{border-left:3px solid var(--lime);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
+.warn p{margin:0;font-size:var(--text-sm)}
+.device-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0}
+.device-card{border:1px solid var(--ink-hair);padding:16px 18px}
+.device-card h4{font-size:var(--text-sm);font-weight:600;color:var(--ink);margin-bottom:6px}
+.device-card p{font-size:var(--text-xs);margin:0;line-height:1.5}
+.divider{border:none;border-top:1px solid var(--ink-hair);margin:48px 0}
+.troubleshoot-item{margin-bottom:24px}
+.troubleshoot-item .q{font-size:var(--text-sm);font-weight:600;color:var(--ink);margin-bottom:6px}
+.troubleshoot-item .a{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7}
+.next-steps{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+.next-step-card{border:1px solid var(--ink-hair);padding:18px 20px;text-decoration:none;color:inherit;display:block}
+.next-step-card:hover{border-color:var(--cobalt);opacity:1}
+.next-step-card h3{font-size:var(--text-sm);font-weight:600;color:var(--ink);margin:0 0 4px;text-transform:none;letter-spacing:0}
+.next-step-card p{font-size:var(--text-xs);color:var(--ink-dim);margin:0;line-height:1.5}
+footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-links{display:flex;gap:20px;flex-wrap:wrap}
+.footer-links a{font-size:var(--text-xs);color:var(--cobalt)}
+.footer-meta{font-size:var(--text-xs);color:var(--ink-dim)}
+@media(max-width:640px){
+  main{padding:48px 20px 80px}
+  h1{font-size:26px}
+  .device-grid{grid-template-columns:1fr}
+  .next-steps{grid-template-columns:1fr}
+  footer{padding:32px 20px;flex-direction:column}
+}
+</style>
+<link rel="stylesheet" href="/design-system.css?v=14">
+<link rel="stylesheet" href="/nav.css?v=9">
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: #475569;
+  text-decoration: none;
+  border: 1px solid #E2E8F0;
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #64748b;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: #0B3A6A;
+  border-color: #B2FF3F;
+  background: rgba(178, 255, 63, 0.08);
+}
+.nav-help:hover::before {
+  border-color: #0B3A6A;
+  color: #0B3A6A;
+  background: #B2FF3F;
+}
+.nav-help:focus-visible {
+  outline: 2px solid #B2FF3F;
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-decoration: none;
+  border-bottom: 1px solid #e2e8f0;
+}
+.nav-help-mobile:hover {
+  color: #0B3A6A;
+  background: rgba(178, 255, 63, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="meta-bar">
+  <span>build 2.4.5</span>
+  <span class="sep">·</span>
+  <span>aes-256-gcm / ml-kem-768</span>
+  <span class="sep">·</span>
+  <span>eu/de · ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Send menu" aria-haspopup="true" aria-expanded="false">SEND</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/parashare" role="menuitem" class="nav-product-item"><span class="npi-title">ParaShare</span><span class="npi-sub">Verified transfers with signed receipts</span></a></li>
+        <li role="none"><a href="/drop" role="menuitem" class="nav-product-item"><span class="npi-title">ParaDrop</span><span class="npi-sub">Device to device, AirDrop alternative</span></a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Build menu" aria-haspopup="true" aria-expanded="false">BUILD</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Docs &amp; API</li>
+        <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Documentation</span><span class="npi-sub">API reference, protocol spec, install guides</span></a></li>
+        <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root — verifiable transfer history</span></a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem" class="nav-product-item"><span class="npi-title">GitHub</span><span class="npi-sub">Source code, issues, community</span></a></li>
+        <li class="nav-subheader" role="presentation">Self-host</li>
+        <li role="none"><a href="/install.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install.sh</span><span class="npi-sub">Automated Linux server installer</span></a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-pi.sh</span><span class="npi-sub">Raspberry Pi optimised installer</span></a></li>
+        <li role="none"><a href="/install-client.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-client.sh</span><span class="npi-sub">CLI client installer</span></a></li>
+        <li role="none"><a href="/download" role="menuitem" class="nav-product-item"><span class="npi-title">ParamantOS</span><span class="npi-sub">Hardened ISO for air-gapped deploys</span></a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem" class="nav-product-item"><span class="npi-title">Releases</span><span class="npi-sub">Versioned binaries and SBOMs</span></a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">COMPLIANCE</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive — essential entities</span></a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem" class="nav-product-item"><span class="npi-title">IEC 62443 (Industrial IoT)</span><span class="npi-sub">Industrial control systems compliance</span></a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem" class="nav-product-item"><span class="npi-title">NEN 7510 (Dutch Healthcare)</span><span class="npi-sub">Dutch health data protection standard</span></a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem" class="nav-product-item"><span class="npi-title">Jurisdiction</span><span class="npi-sub">EU ownership, CLOUD Act analysis, migration roadmap</span></a></li>
+        <li role="none"><a href="/government" role="menuitem" class="nav-product-item"><span class="npi-title">Government &amp; public sector</span><span class="npi-sub">Public procurement and NIS2 guidance</span></a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem" class="nav-product-item"><span class="npi-title">OT guide</span><span class="npi-sub">Operational technology integration guide</span></a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem" class="nav-product-item"><span class="npi-title">OT vs data diodes</span><span class="npi-sub">When a data diode is the better choice</span></a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem" class="nav-product-item"><span class="npi-title">HNDL threat</span><span class="npi-sub">Harvest Now Decrypt Later — the immediate risk</span></a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem" class="nav-product-item"><span class="npi-title">Quantum urgency</span><span class="npi-sub">Why migrate before Q-Day</span></a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem" class="nav-product-item"><span class="npi-title">Crypto agility</span><span class="npi-sub">Migrating away from classical algorithms</span></a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA — sign and download</span></a></li>
+        <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
+      </ul>
+    </li>
+
+    <li style="margin-left:auto"><a href="/architecture" class="nav-link nav-link-btn">HOW IT WORKS</a></li>
+    <li><a href="/pricing" class="nav-link nav-link-btn">PRICING</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">ABOUT</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem" class="nav-product-item"><span class="npi-title">Status</span><span class="npi-sub">Live relay health and uptime metrics</span></a></li>
+        <li role="none"><a href="/security" role="menuitem" class="nav-product-item"><span class="npi-title">Security</span><span class="npi-sub">Pentest reports and vulnerability disclosure</span></a></li>
+        <li role="none"><a href="/vs" role="menuitem" class="nav-product-item"><span class="npi-title">Compare</span><span class="npi-sub">Paramant vs WeTransfer, Signal, Wire</span></a></li>
+        <li role="none"><a href="/changelog" role="menuitem" class="nav-product-item"><span class="npi-title">Changelog</span><span class="npi-sub">Release notes and version history</span></a></li>
+        <li role="none"><a href="/license" role="menuitem" class="nav-product-item"><span class="npi-title">License</span><span class="npi-sub">BUSL-1.1 source-available terms</span></a></li>
+        <li role="none"><a href="/press" role="menuitem" class="nav-product-item"><span class="npi-title">Press kit</span><span class="npi-sub">Logos, brand assets, media contacts</span></a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem" class="nav-product-item"><span class="npi-title">Contact</span><span class="npi-sub">privacy@paramant.app</span></a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <div class="nav-mobile-header">
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
+      <a href="/send">Send a file</a>
+      <a href="/parashare">ParaShare</a>
+      <a href="/drop">ParaDrop</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </div>
+
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs">Docs</a>
+      <a href="/docs#api">API reference</a>
+      <a href="/ct-log">CT Log</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
+      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
+      <a href="/changelog">Changelog</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
+      <a href="/docs#self-hosting">Deploy guide</a>
+      <a href="/install.sh">install.sh</a>
+      <a href="/install-pi.sh">install-pi.sh</a>
+      <a href="/install-client.sh">install-client.sh</a>
+      <a href="/download">ParamantOS</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
+    </div>
+  </div>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
+      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
+      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
+      <a href="/sovereignty">Jurisdiction</a>
+      <a href="/government">Government &amp; public sector</a>
+      <a href="/ot">OT guide</a>
+      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
+      <a href="/hndl">HNDL threat</a>
+      <a href="/quantum-urgency">Quantum urgency</a>
+      <a href="/crypto-agility">Crypto agility</a>
+      <a href="/dpa">Data Processing Agreement</a>
+    </div>
+  </div>
+
+  <a href="/vs" class="nav-mobile-standalone">Compare</a>
+
+  <div class="nav-mobile-group">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
+      <a href="/status">Status</a>
+      <a href="/security">Security</a>
+      <a href="/sla">SLA</a>
+      <a href="/license">License</a>
+      <a href="/press">Press kit</a>
+      <a href="mailto:privacy@paramant.app">Contact</a>
+    </div>
+  </div>
+</div><main>
+
+  <div class="breadcrumb">
+    <a href="/help">Help</a>
+    <span>/</span>
+    IoT &amp; embedded devices
+  </div>
+
+  <h1>Paramant on <em>IoT</em> and embedded devices.</h1>
+
+  <p class="lead">IoT devices, PLCs, OT gateways, and single-board computers can send files through Paramant using only a static API key. No TOTP, no interactive login, no browser required.</p>
+
+  <h2>How machine authentication works</h2>
+
+  <p>Every API call to Paramant authenticates with an <code>Authorization</code> header containing your API key. The key is a 64-character hex string that identifies your account. For machine clients, this is sufficient — there is no TOTP prompt outside of the web dashboard login flow.</p>
+
+  <div class="tip"><p>Generate a <strong>dedicated API key</strong> for each device or device class so you can revoke individual keys without affecting other integrations. Dashboard &rarr; API keys &rarr; <strong>Generate new key</strong>.</p></div>
+
+  <h2>Supported device profiles</h2>
+
+  <div class="device-grid">
+    <div class="device-card">
+      <h4>Raspberry Pi Zero / Zero 2</h4>
+      <p>Full Linux stack. Use the Python SDK or curl directly. TLS 1.3 works out of the box.</p>
+    </div>
+    <div class="device-card">
+      <h4>ESP32 / ESP8266</h4>
+      <p>Use the REST API over HTTPS. The Arduino and ESP-IDF HTTP clients both support the required headers.</p>
+    </div>
+    <div class="device-card">
+      <h4>OT gateways</h4>
+      <p>Any gateway that can make outbound HTTPS calls — Tosibox, HMS Anybus, Ewon Flexy — can push files via the API.</p>
+    </div>
+  </div>
+
+  <h2>Sending a file from a Linux device</h2>
+
+  <p>Using curl (available on all Pi and gateway images):</p>
+
+  <div class="code-block">curl -X POST https://api.paramant.app/v1/upload \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@/path/to/sensor-log.csv" \
+  -F "recipient=recipient@example.com" \
+  -F "ttl=3600"</div>
+
+  <p>The response contains a burn-on-read download URL you can pass to the recipient through any channel:</p>
+
+  <div class="code-block">{"id":"abc123","url":"https://paramant.app/get/abc123","expires_at":"..."}</div>
+
+  <h2>Sending a file from MicroPython (ESP32)</h2>
+
+  <div class="code-block">import urequests, uos
+
+API_KEY = "YOUR_API_KEY"
+FILE_PATH = "/sd/reading.bin"
+
+with open(FILE_PATH, "rb") as f:
+    data = f.read()
+
+resp = urequests.post(
+    "https://api.paramant.app/v1/upload",
+    headers={"Authorization": "Bearer " + API_KEY,
+             "Content-Type": "application/octet-stream",
+             "X-Filename": "reading.bin",
+             "X-Recipient": "ops@example.com"},
+    data=data
+)
+print(resp.json()["url"])</div>
+
+  <div class="tip"><p>Keep the API key in flash storage, not compiled into firmware. On ESP32 use NVS (Non-Volatile Storage) or a separate credentials partition so you can update the key without reflashing.</p></div>
+
+  <h2>Key rotation on deployed devices</h2>
+
+  <p>Rotate keys on a schedule, or immediately after a device is decommissioned, repaired, or handled by a third party. The rotation process:</p>
+
+  <ol style="margin:16px 0 16px 20px;display:flex;flex-direction:column;gap:10px">
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Generate a new key in the dashboard.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Push the new key to the device (OTA update, secure provisioning, or physical access).</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Verify the device is sending successfully with the new key.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Revoke the old key in the dashboard.</li>
+  </ol>
+
+  <div class="warn"><p>Revoke the old key only after confirming the new key works. A revoked key stops working immediately — there is no grace period.</p></div>
+
+  <h2>Rate limits</h2>
+
+  <p>The API accepts up to <strong>60 uploads per minute</strong> per API key. For high-frequency sensor data, batch readings into a single file before uploading rather than sending one file per measurement. Files up to 5 GB are supported.</p>
+
+  <hr class="divider">
+
+  <h3>Common questions</h3>
+
+  <div class="troubleshoot-item">
+    <div class="q">My device gets a 401 on every request.</div>
+    <div class="a">Check that the Authorization header is exactly <code>Bearer YOUR_KEY</code> with a space after "Bearer". Also verify the key has not been revoked in the dashboard.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">TLS handshake fails on my embedded device.</div>
+    <div class="a">Paramant requires TLS 1.2 or higher. Older firmware may use an outdated CA bundle. Update the device firmware or provision the current ISRG Root X1 certificate from Let's Encrypt.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">Can I self-host the relay on a local network and reach it from devices?</div>
+    <div class="a">Yes. Self-host a Paramant relay on your LAN and point devices at your internal hostname. See the <a href="/docs#self-hosting">self-hosting guide</a> and <a href="/install-pi.sh">install-pi.sh</a> for a Raspberry Pi relay setup.</div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Related</h3>
+  <div class="next-steps">
+    <a href="/help/api-key-vs-totp" class="next-step-card">
+      <h3>API key vs TOTP</h3>
+      <p>Why machine clients only need the API key.</p>
+    </a>
+    <a href="/docs#api" class="next-step-card">
+      <h3>Full API reference</h3>
+      <p>All endpoints, parameters, and response schemas.</p>
+    </a>
+  </div>
+
+</main>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">
+          FIPS 203 / 204 &middot; Hetzner DE<br>
+          GDPR &middot; no US CLOUD Act<br>
+          BUSL-1.1 &middot; &copy; 2026 PARAMANT
+        </p>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Product</div>
+        <div class="footer-links">
+          <a href="/send">Send a file</a>
+          <a href="/parashare">ParaShare</a>
+          <a href="/drop">ParaDrop</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/vs">vs. alternatives</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="/status">Status</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Compliance</div>
+        <div class="footer-links">
+          <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
+          <a href="/compliance/iec62443">IEC 62443</a>
+          <a href="/compliance/nen7510">NEN 7510</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/government">Government</a>
+          <a href="/ot">OT guide</a>
+          <a href="/hndl">HNDL threat</a>
+          <a href="/crypto-agility">Crypto agility</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/signup">Create account</a>
+          <a href="/status">Status</a>
+          <a href="/sla">SLA</a>
+          <a href="/security">Security</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=9" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+</body>
+</html>
