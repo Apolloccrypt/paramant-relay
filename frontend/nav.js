@@ -169,6 +169,17 @@
     }
   });
 
+  // ── Reset mobile state when viewport crosses into desktop ─
+  // Without this, opening the drawer on mobile then rotating / resizing
+  // to desktop leaves the drawer visible with no way to close it
+  // (hamburger is display:none at >1023px) and body stuck scroll-locked.
+  var desktopQuery = window.matchMedia('(min-width: 1024px)');
+  function onDesktopChange(e) {
+    if (e.matches && mobile.classList.contains('open')) closeMobileMenu();
+  }
+  if (desktopQuery.addEventListener) desktopQuery.addEventListener('change', onDesktopChange);
+  else if (desktopQuery.addListener) desktopQuery.addListener(onDesktopChange);
+
   // ── Mobile accordions ─────────────────────────────────
   mobile.querySelectorAll('.nav-mobile-group-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
