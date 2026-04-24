@@ -18,7 +18,7 @@ fi
 source "$ENV_FILE"
 
 # Guard: check verplichte secrets
-for var in ADMIN_TOKEN TOTP_SECRET RESEND_API_KEY FLY_API_TOKEN; do
+for var in ADMIN_TOKEN TOTP_SECRET RESEND_API_KEY; do
   if [ -z "${!var}" ]; then
     echo "FOUT: $var niet gezet in .env"
     exit 1
@@ -53,7 +53,6 @@ for f in deploy/systemd/*.service; do
     -e "s|REPLACE_ADMIN_TOKEN|$ADMIN_TOKEN|g" \
     -e "s|REPLACE_TOTP_SECRET|$TOTP_SECRET|g" \
     -e "s|REPLACE_RESEND_KEY|$RESEND_API_KEY|g" \
-    -e "s|REPLACE_FLY_TOKEN|$FLY_API_TOKEN|g" \
     "$f" > "$TMPDIR/$(basename $f)"
 done
 scp "$TMPDIR"/*.service root@$SERVER:/etc/systemd/system/
