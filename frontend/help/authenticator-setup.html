@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Set up your authenticator — PARAMANT Help</title>
-<meta name="description" content="How to set up your authenticator app for Paramant. About 3 minutes. Works with 1Password, Bitwarden, Authy, Google Authenticator, and any RFC 6238 app.">
+<meta name="description" content="How to set up your authenticator app for Paramant. About 3 minutes. Paramant requires a SHA-256 TOTP app: Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth, or 2FAS.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -322,7 +322,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Set up your <em>authenticator</em> app.</h1>
 
-<p class="lead">About 3 minutes. One-time setup. Works with 1Password, Bitwarden, Authy, Google Authenticator, and any RFC 6238 compatible app.</p>
+<p class="lead">About 3 minutes. One-time setup. Paramant uses <strong>SHA-256</strong> TOTP &mdash; works with Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth, and 2FAS. <strong>Google Authenticator and Microsoft Authenticator do not work</strong> (SHA-1 only).</p>
 
   <div class="step">
     <div class="step-num">1</div>
@@ -330,11 +330,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <h2>Install an authenticator app</h2>
       <p>Pick one — all are free:</p>
       <ul class="app-list">
-        <li><strong>1Password</strong><span class="tag">recommended</span> — syncs across devices, family and team plans available</li>
+        <li><strong>Raivo</strong><span class="tag">recommended iOS</span> — open source, iCloud backup, single-device</li>
+        <li><strong>Aegis</strong><span class="tag">recommended Android</span> — open source, encrypted local backup</li>
+        <li><strong>1Password</strong> — syncs across devices, family and team plans available</li>
         <li><strong>Bitwarden</strong> — free, open source, works on all platforms</li>
         <li><strong>Authy</strong> — cloud backup, multi-device</li>
-        <li><strong>Google Authenticator</strong> — simple, single device</li>
-        <li><strong>Microsoft Authenticator</strong> — good if already using Microsoft 365</li>
+        <li><strong>Ente Auth</strong> — open source, E2E-encrypted cloud backup</li>
+        <li><strong>2FAS</strong> — iOS/Android, browser extension companion</li>
       </ul>
       <p>Install on your phone before continuing.</p>
     </div>
@@ -347,7 +349,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <p>You received a setup link in your welcome email. It looks like:</p>
       <div class="code-block">https://paramant.app/auth/setup?token=XXXXXXXX</div>
       <p>Click it on your computer. The link expires 14 days after issue.</p>
-      <div class="tip"><p>If your link has expired, request a new one at <a href="/auth/resend-setup">paramant.app/auth/resend-setup</a>.</p></div>
+      <div class="tip"><p>If your link has expired, request a new one at <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p></div>
     </div>
   </div>
 
@@ -357,10 +359,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <h2>Scan the QR code</h2>
       <p>Open your authenticator app on your phone and add a new entry:</p>
       <ul class="app-list">
+        <li><strong>Raivo (iOS)</strong> — tap + &rarr; "Scan QR Code"</li>
+        <li><strong>Aegis (Android)</strong> — tap + &rarr; "Scan a QR code"</li>
         <li><strong>1Password</strong> — tap + &rarr; "Scan QR Code"</li>
         <li><strong>Bitwarden</strong> — Add item &rarr; Login &rarr; Authenticator key &rarr; Scan QR</li>
         <li><strong>Authy</strong> — tap + &rarr; "Scan QR Code"</li>
-        <li><strong>Google Authenticator</strong> — tap + &rarr; "Scan a QR code"</li>
       </ul>
       <p>Point the camera at the QR code on paramant.app. The app shows a 6-digit code that changes every 30 seconds.</p>
     </div>
@@ -410,7 +413,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="troubleshoot-item">
     <div class="q">"Setup link expired"</div>
     <div class="a">
-      <p>Request a new link at <a href="/auth/resend-setup">paramant.app/auth/resend-setup</a>.</p>
+      <p>Request a new link at <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p>
     </div>
   </div>
 

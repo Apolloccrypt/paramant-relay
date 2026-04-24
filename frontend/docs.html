@@ -344,7 +344,7 @@ tr:last-child td{border-bottom:none}
   <div class="docs-hero-inner">
     <span class="eyebrow">REFERENCE</span>
     <h1>Documentation</h1>
-    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v2.4.5. The relay is untrusted by design — it never holds a decryption key.</p>
+    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v2.5.0. The relay is untrusted by design — it never holds a decryption key.</p>
     <a href="/signup" class="docs-hero-cta">Create account →</a>
   </div>
 </section>
@@ -454,7 +454,7 @@ GET /v2/check-key?k=pgp_your_key_here</pre>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px">
       <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
       <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
-      <a href="/dl/scripts/paramant_sdk.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant_sdk.py</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/sdk-py" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant_sdk.py</a>
     </div>
 
     <h3>Sender — common options</h3>
@@ -620,7 +620,7 @@ ws.onmessage = e => {
     <h2 id="health">GET /health</h2>
     <pre><span class="cm">{
   "ok": true,
-  "version": "2.4.5",
+  "version": "2.5.0",
   "sector": "health",
   "edition": "licensed",
   "uptime_s": 3600,
@@ -651,7 +651,7 @@ docker compose up -d
 
 <span class="cm"># 4. Verify</span>
 curl http://localhost:3000/health
-<span class="cm"># → {"ok":true,"version":"2.4.5","sector":"relay"}</span></pre>
+<span class="cm"># → {"ok":true,"version":"2.5.0","sector":"relay"}</span></pre>
     </div>
 
     <h3>Container port map</h3>
