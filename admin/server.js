@@ -609,10 +609,12 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   const existing = await findUserByEmail(email);
   if (existing) return res.redirect('/signup?error=account_exists');
 
-  // Create the account
+  // Create the account across every sector so the key works on every relay (including relay-main,
+  // which is what /parashare and /send target). Previously this only went to "health", which meant
+  // freshly-signed-up users would authenticate in admin but fail with "Invalid key" on uploads.
   const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
   const createdAt = new Date().toISOString();
-  const createRes = await relayFetch("health", "/v2/admin/keys", "POST", {
+  const createBody = {
     key: keyVal,
     email,
     label: label || null,
@@ -620,12 +622,24 @@ api.get("/user/signup/verify/:token", async (req, res) => {
     active: true,
     created: createdAt,
     created_at_ts: Date.now(),
-  }, false, ADMIN_TOKEN);
+  };
 
-  if (createRes.status !== 200 && createRes.status !== 201) {
-    console.error("[signup/verify] key creation failed:", createRes.status, createRes.body);
+  // health is the source of truth for admin UI visibility. Must succeed.
+  const primaryRes = await relayFetch("health", "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN);
+  if (primaryRes.status !== 200 && primaryRes.status !== 201) {
+    console.error("[signup/verify] key creation failed on health:", primaryRes.status, primaryRes.body);
     return res.redirect('/signup?error=server_error');
   }
+
+  // Fan-out to the other sectors. Best-effort — if one is briefly unavailable, reload-users
+  // can pick it up later; we don't want to leak a half-created account by failing the whole
+  // signup here after health succeeded.
+  const otherSectors = Object.keys(SECTORS).filter(s => s !== "health");
+  await Promise.all(otherSectors.map(s =>
+    relayFetch(s, "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN).catch(e => {
+      console.error(`[signup/verify] key propagation failed on ${s}:`, e && e.message || e);
+    })
+  ));
 
   const setupToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
