@@ -1305,7 +1305,7 @@ function verifyDsaSignature(payload, signature, pubKeyHex) {
     const pub = Buffer.from(pubKeyHex, 'hex');
     const sig = Buffer.from(signature, 'hex');
     const msg = Buffer.from(payload);
-    const valid = mlDsa.verify(pub, msg, sig);
+    const valid = mlDsa.verify(sig, msg, pub);
     return { valid, alg: 'ML-DSA-65' };
   } catch(e) {
     return { valid: false, reason: e.message };
@@ -3484,7 +3484,7 @@ python3 paramant-receiver.py \\
       const canonical = canonicalJSON(receiptWithoutSig);
       let sigValid = false;
       try {
-        sigValid = mlDsa.verify(relayIdentity.pk, Buffer.from(canonical, 'utf8'), Buffer.from(signature, 'base64'));
+        sigValid = mlDsa.verify(Buffer.from(signature, 'base64'), Buffer.from(canonical, 'utf8'), relayIdentity.pk);
       } catch(e) { sigValid = false; }
       if (!sigValid) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -3517,7 +3517,7 @@ python3 paramant-receiver.py \\
         const sthCanonical = canonicalJSON(sthPayload);
         let sthValid = false;
         try {
-          sthValid = mlDsa.verify(relayIdentity.pk, Buffer.from(sthCanonical, 'utf8'), Buffer.from(sthSig, 'base64'));
+          sthValid = mlDsa.verify(Buffer.from(sthSig, 'base64'), Buffer.from(sthCanonical, 'utf8'), relayIdentity.pk);
         } catch(e) { sthValid = false; }
         if (!sthValid) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
