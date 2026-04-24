@@ -202,6 +202,152 @@ Clients fetch /v2/capabilities before first send to discover what the relay supp
 - Compressed payloads. Same approach.
 - Forward secrecy via ephemeral per-session keys. This is a session management concern, not wire format.
 
+## Encoder reference (for client SDK implementations)
+
+Any client (sdk-js, sdk-py, Chromium extension, Outlook addin) that produces v1 blobs MUST follow this encoder specification exactly. The relay's decoder rejects blobs that deviate in any byte.
+
+### Field layout
+
+The blob is concatenated fields in this strict order:
+
+1. HEADER (10 bytes, fixed)
+   - MAGIC (4 bytes): the ASCII bytes `P Q H B` = `0x50 0x51 0x48 0x42`
+   - VERSION (1 byte): `0x01`
+   - KEM_ID (2 bytes, uint16 big-endian)
+   - SIG_ID (2 bytes, uint16 big-endian)
+   - FLAGS (1 byte): `0x00` in v1
+
+2. CT_KEM_LEN (4 bytes, uint32 big-endian) + CT_KEM bytes
+
+3. SENDER_PUB_LEN (4 bytes, uint32 big-endian) + SENDER_PUB bytes
+
+4. IF SIG_ID != 0x0000:
+   - SIG_LEN (4 bytes, uint32 big-endian) + SIGNATURE bytes
+   - IF SIG_ID == 0x0000: skip this section entirely (no zero-length prefix)
+
+5. NONCE (12 bytes, fixed — no length prefix)
+
+6. CT_LEN (4 bytes, uint32 big-endian) + CIPHERTEXT bytes
+
+### Pseudocode
+
+```
+function encode(params):
+  buf = []
+
+  // Header (10 bytes)
+  buf.append(bytes([0x50, 0x51, 0x48, 0x42]))       // MAGIC "PQHB"
+  buf.append(bytes([0x01]))                          // VERSION
+  buf.append(uint16_be(params.kemId))                // KEM_ID
+  buf.append(uint16_be(params.sigId))                // SIG_ID
+  buf.append(bytes([0x00]))                          // FLAGS
+
+  // Key encapsulation (length-prefixed)
+  buf.append(uint32_be(len(params.ctKem)))
+  buf.append(params.ctKem)
+  buf.append(uint32_be(len(params.senderPub)))
+  buf.append(params.senderPub)
+
+  // Signature (ONLY if signed)
+  if params.sigId != 0x0000:
+    buf.append(uint32_be(len(params.signature)))
+    buf.append(params.signature)
+
+  // Payload
+  buf.append(params.nonce)                           // 12 bytes, no prefix
+  buf.append(uint32_be(len(params.ciphertext)))
+  buf.append(params.ciphertext)
+
+  return concat(buf)
+```
+
+### Endianness clarification
+
+All uint16 and uint32 length fields are big-endian. This is the network byte order convention. A client that writes little-endian will produce a blob the relay cannot decode.
+
+- In JavaScript (Node Buffer or DataView): use `writeUInt32BE` / `setUint32(offset, value, false)`.
+- In Python: use `int.to_bytes(4, 'big')` or `struct.pack('>I', v)`.
+
+### Anonymous blobs
+
+When `sigId = 0x0000`, the signature section is OMITTED entirely. Not a zero-length prefix. The blob length is:
+
+```
+10 + 4+len(ctKem) + 4+len(senderPub) + 12 + 4+len(ciphertext)
+```
+
+When `sigId != 0x0000`, the signature section is present:
+
+```
+10 + 4+len(ctKem) + 4+len(senderPub) + 4+len(signature) + 12 + 4+len(ciphertext)
+```
+
+### GCM AAD
+
+The AES-256-GCM additional authenticated data (AAD) for the payload encryption MUST be:
+
+```
+AAD = header_bytes[0:10] || uint32_be(chunk_index)
+```
+
+For single-chunk blobs (the common case), `chunk_index = 0`.
+
+This binds algorithm choice to ciphertext integrity. A receiver decrypting the ciphertext with the wrong AAD (e.g. forgetting to include the header) gets a GCM tag mismatch.
+
+## Test vectors
+
+Clients MUST produce byte-identical output for these known inputs. Reproduce inside a relay container or verify against the reference implementation at `relay/crypto/wire-format.js`.
+
+Hex-pattern notation: `<pattern> × N` means the byte pattern (parsed as hex) is repeated N times. For example, `cafe × 296` denotes the 2-byte value `0xca 0xfe` repeated 296 times, yielding 592 bytes total.
+
+### Test vector 1: signed blob (ML-KEM-768 + ML-DSA-65)
+
+Inputs:
+
+| Field      | Value                                                   | Length (bytes) |
+|------------|---------------------------------------------------------|----------------|
+| kemId      | `0x0002` (ML-KEM-768)                                   | 2              |
+| sigId      | `0x0002` (ML-DSA-65)                                    | 2              |
+| ctKem      | `00112233445566778899aabbccddeeff` × 68                 | 1088           |
+| senderPub  | `cafe` × 296                                            | 592            |
+| signature  | `babe` × 1654                                           | 3308           |
+| nonce      | `000102030405060708090a0b`                              | 12             |
+| ciphertext | `deadbeef` × 16                                         | 64             |
+
+Expected output:
+
+- **Total length**: 5090 bytes
+- **First 10 bytes (header)**: `50514842010002000200`
+- **First 64 bytes**: `505148420100020002000000044000112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011`
+- **SHA-256 of full blob**: `002b4f6aad4fa992804a3e94c46d514b4f842e9f5c283f7a31d7c76722d0476a`
+
+### Test vector 2: anonymous blob (ML-KEM-768, no signature)
+
+Inputs:
+
+| Field      | Value                                                   | Length (bytes) |
+|------------|---------------------------------------------------------|----------------|
+| kemId      | `0x0002` (ML-KEM-768)                                   | 2              |
+| sigId      | `0x0000` (no signature)                                 | 2              |
+| ctKem      | `00112233445566778899aabbccddeeff` × 68                 | 1088           |
+| senderPub  | `cafe` × 296                                            | 592            |
+| signature  | (omitted — no section, no length prefix)                | 0              |
+| nonce      | `000102030405060708090a0b`                              | 12             |
+| ciphertext | `deadbeef` × 16                                         | 64             |
+
+Expected output:
+
+- **Total length**: 1778 bytes
+- **First 10 bytes (header)**: `50514842010002000000`
+- **First 64 bytes**: `505148420100020000000000044000112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011`
+- **SHA-256 of full blob**: `46bce75b12e90ed312420fafcbead4108d55aa25273aee3ce4f2b4f61b3d19ef`
+
+### Using these vectors
+
+An SDK that produces a blob with matching SHA-256 given the same inputs is byte-correct. An SDK that deviates must be fixed before interoperation with other SDKs.
+
+The relay's decoder is authoritative: any blob that fails decode against the relay implementation is incorrect, regardless of what the producer claims.
+
 ## References
 
 - NIST FIPS 203 — Module-Lattice-Based KEM (ML-KEM)
