@@ -1079,8 +1079,26 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  const saved = localStorage.getItem('paramant_api_key');
-  if (saved) { $('api-key').value = saved; onKeyInput(); }
+  // Prefer the session-derived key: if the user is logged in, their current API key
+  // is the authoritative value. localStorage may still hold a stale key from a
+  // previous (revoked/rotated) account and would otherwise show "Invalid key".
+  (async function resolveKey(){
+    try {
+      const r = await fetch('/api/user/account/key', { credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.api_key) {
+          $('api-key').value = d.api_key;
+          try { localStorage.setItem('paramant_api_key', d.api_key); } catch {}
+          onKeyInput();
+          return;
+        }
+      }
+    } catch {}
+    // Not logged in or endpoint unavailable: fall back to localStorage (manual paste flow).
+    const saved = localStorage.getItem('paramant_api_key');
+    if (saved) { $('api-key').value = saved; onKeyInput(); }
+  })();
   // Small delay so DOM is fully painted before Globe.gl reads dimensions
   setTimeout(() => initGlobe(), 400);
 });
