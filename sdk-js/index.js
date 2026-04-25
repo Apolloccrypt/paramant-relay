@@ -273,6 +273,42 @@ function sigEngine(sigId) {
 
 // ── Main SDK class ────────────────────────────────────────────────────────────
 
+const KNOWN_OPTS = new Set([
+  'apiKey', 'device', 'relay', 'preSharedSecret',
+  'verifyFingerprints', 'timeout',
+  'kemId', 'sigId', 'checkCapabilities',
+]);
+
+const TYPO_HINTS = {
+  relayurl: 'relay', relayUrl: 'relay', relayURL: 'relay',
+  url: 'relay', URL: 'relay', endpoint: 'relay', host: 'relay', server: 'relay',
+  apikey: 'apiKey', apiToken: 'apiKey', token: 'apiKey', key: 'apiKey',
+  deviceId: 'device', deviceID: 'device', device_id: 'device',
+};
+
+function validateOpts(opts) {
+  if (opts === null || typeof opts !== 'object' || Array.isArray(opts)) {
+    throw new GhostPipeError(
+      'GhostPipe: constructor expects an options object, got ' +
+      (Array.isArray(opts) ? 'array' : typeof opts) + '.\n' +
+      'Example: new GhostPipe({ apiKey: "pgp_...", device: "my-laptop" })\n' +
+      'See https://paramant.app/docs#sdk-js'
+    );
+  }
+  const unknown = Object.keys(opts).filter(k => !KNOWN_OPTS.has(k));
+  if (unknown.length === 0) return;
+  const lines = unknown.map(k => {
+    const hint = TYPO_HINTS[k] || TYPO_HINTS[k.toLowerCase()];
+    return hint ? `  - "${k}" — did you mean "${hint}"?` : `  - "${k}"`;
+  });
+  throw new GhostPipeError(
+    'GhostPipe: unknown constructor option(s):\n' +
+    lines.join('\n') + '\n' +
+    'Valid options: ' + Array.from(KNOWN_OPTS).join(', ') + '\n' +
+    'See https://paramant.app/docs#sdk-js'
+  );
+}
+
 export class GhostPipe {
   /**
    * Paramant Ghost Pipe client.
@@ -288,10 +324,12 @@ export class GhostPipe {
    * @param {number} [opts.sigId]  Default: 0x0002 (ML-DSA-65). Pass 0x0000 for anonymous blobs.
    * @param {boolean} [opts.checkCapabilities] Default: true
    */
-  constructor({ apiKey, device, relay = '', preSharedSecret = '',
-                verifyFingerprints = true, timeout = 30000,
-                kemId = DEFAULT_KEM_ID, sigId = DEFAULT_SIG_ID,
-                checkCapabilities = true } = {}) {
+  constructor(opts = {}) {
+    validateOpts(opts);
+    const { apiKey, device, relay = '', preSharedSecret = '',
+            verifyFingerprints = true, timeout = 30000,
+            kemId = DEFAULT_KEM_ID, sigId = DEFAULT_SIG_ID,
+            checkCapabilities = true } = opts;
     if (apiKey && !apiKey.startsWith('pgp_')) throw new AuthError('API key must start with pgp_');
     this.apiKey             = apiKey;
     this.device             = device;
