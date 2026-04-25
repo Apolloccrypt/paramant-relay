@@ -28,7 +28,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3001/health
-# {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
+# {"ok":true,"version":"2.5.0","sector":"health","edition":"licensed"}
 ```
 
 Or on a Raspberry Pi / fresh VPS:
@@ -57,9 +57,11 @@ Or via the browser — no install:
 | Resend TOTP setup link | Live — admin panel |
 | Developer API keys | Live — [paramant.app/request-key](https://paramant.app/request-key) |
 | Billing (Stripe integration) | Scaffold — Stripe connect pending |
-| Chromium browser extension | Source complete — submission pending |
-| Outlook Add-in | Source complete — DNS pending |
+| Chromium browser extension | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
+| Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Thunderbird FileLink extension | Source in repo |
+
+**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the WebApp tools (ParaShare, ParaDrop), and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished — until that lands, treat extension uploads as relay-side, not zero-knowledge.
 
 ---
 
@@ -249,7 +251,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
 ```bash
 curl https://health.paramant.app/health
-# {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
+# {"ok":true,"version":"2.5.0","sector":"health","edition":"licensed"}
 ```
 
 ### CT log (public)
