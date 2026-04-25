@@ -45,9 +45,12 @@ Changelog = "https://github.com/Apolloccrypt/paramant-relay/releases"
 [project.scripts]
 paramant-sdk = "paramant_sdk:_cli_main"
 
+[tool.setuptools]
+py-modules = ["paramant_sdk"]
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["paramant*", "paramant_sdk*"]
+include = ["paramant*"]
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]

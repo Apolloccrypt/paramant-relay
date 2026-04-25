@@ -46,11 +46,11 @@
   "homepage": "https://paramant.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/paramant/paramant-master.git",
+    "url": "git+https://github.com/Apolloccrypt/paramant-relay.git",
     "directory": "sdk-js"
   },
   "bugs": {
-    "url": "https://github.com/paramant/paramant-master/issues"
+    "url": "https://github.com/Apolloccrypt/paramant-relay/issues"
   },
   "engines": {
     "node": ">=18"
