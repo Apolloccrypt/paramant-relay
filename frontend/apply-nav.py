@@ -182,6 +182,7 @@ ADD_NAV_TO = {
     'changelog.html',
     'download.html',
     'legal.html',
+    'partners.html',
     'security/acknowledgements.html',
     'signup/verified.html',
 }
