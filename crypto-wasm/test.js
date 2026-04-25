@@ -13,32 +13,28 @@
  *   - Node.js >= 18 (has globalThis.crypto with getRandomValues + subtle)
  */
 
-import { createRequire } from 'module';
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import path from 'path';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Load noble ML-KEM-768 for keygen ────────────────────────────────────────
-// noble-mlkem-bundle.js is a browser bundle — we load it via dynamic eval so
-// it can use globalThis.crypto which Node 18+ exposes.
-const bundleSrc = readFileSync(path.join(__dir, '../frontend/noble-mlkem-bundle.js'), 'utf8');
-const bundleExports = {};
-const mod = new Function('exports', bundleSrc + '; Object.assign(exports, { ml_kem768 });');
-mod(bundleExports);
-const { ml_kem768 } = bundleExports;
+// Use the package installed under relay/node_modules so we don't need a
+// separate npm install in this directory.
+const noblePath = path.join(__dir, '../relay/node_modules/@noble/post-quantum/ml-kem.js');
+const { ml_kem768 } = await import(pathToFileURL(noblePath).href);
 
 if (!ml_kem768?.keygen) {
-  console.error('FAIL: noble-mlkem-bundle.js did not export ml_kem768.keygen');
+  console.error('FAIL: @noble/post-quantum/ml-kem.js did not export ml_kem768.keygen');
   process.exit(1);
 }
 
 // ── Load WASM ────────────────────────────────────────────────────────────────
 // wasm-pack --target web generates an init() that accepts a WASM buffer.
 // We read the binary manually and pass it to init().
-const wasmJsPath = path.join(__dir, 'pkg/paramant_crypto.js');
-const wasmBinPath = path.join(__dir, 'pkg/paramant_crypto_bg.wasm');
+const wasmJsPath = path.join(__dir, '../frontend/pkg/paramant_crypto.js');
+const wasmBinPath = path.join(__dir, '../frontend/pkg/paramant_crypto_bg.wasm');
 
 // Patch import.meta.url before importing the generated glue code
 // (the glue code uses import.meta.url to locate the WASM file when no arg is given)
@@ -75,8 +71,8 @@ if (encrypted.length !== 5 * 1024 * 1024) {
   console.error('FAIL: unexpected encrypted blob size', encrypted.length);
   process.exit(1);
 }
-if (encrypted[0] !== 0x02) {
-  console.error('FAIL: unexpected magic byte', encrypted[0].toString(16));
+if (encrypted[0] !== 0x03) {
+  console.error('FAIL: unexpected magic byte (expected 0x03 AAD-bound)', encrypted[0].toString(16));
   process.exit(1);
 }
 
@@ -99,7 +95,22 @@ if (decryptedText !== original) {
 console.log('');
 console.log('✓ WASM roundtrip OK');
 console.log('  plaintext :', original);
-console.log('  encrypted : 5 MB padded blob, magic=0x02');
+console.log('  encrypted : 5 MB padded blob, magic=0x03 (AAD-bound)');
 console.log('  decrypted : matches original');
+
+// ── AAD tampering negative test — flip a byte in the wire prelude ────────────
+{
+  const tampered = encrypted.slice();
+  tampered[5] ^= 0x01; // flip a bit in u32be(ctKemLen)
+  let threw = false;
+  try { decrypt_blob(tampered, kemSec, ecdhPrivRaw); }
+  catch (_) { threw = true; }
+  if (!threw) {
+    console.error('FAIL: tampered prelude was accepted by decrypt_blob');
+    process.exit(1);
+  }
+  console.log('✓ AAD tamper-detection OK — prelude bit-flip rejected');
+}
+
 console.log('');
 console.log('All checks passed.');

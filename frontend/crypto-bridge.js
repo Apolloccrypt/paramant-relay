@@ -2,8 +2,11 @@
  * crypto-bridge.js — wraps the Rust/WASM hybrid KEM (ML-KEM-768 + ECDH P-256 + AES-256-GCM)
  * and re-exports the same API that parashare.html, drop.html, and ontvang.html use.
  *
- * Wire format (produced by WASM, no AAD):
- *   0x02 | u32be(ctKemLen) | ctKem | u32be(senderPubLen) | senderPub | nonce(12) | u32be(ctLen) | ct
+ * Wire format produced by WASM (current — magic 0x03, AAD-bound):
+ *   0x03 | u32be(ctKemLen) | ctKem | u32be(senderPubLen) | senderPub | nonce(12) | u32be(ctLen) | ct
+ * The bytes from offset 0 through u32be(ctLen) are passed to AES-256-GCM as Associated
+ * Data, so any in-flight mutation of the wire prelude fails authentication explicitly.
+ * decrypt_blob also still accepts the legacy 0x02 layout (no AAD) for backward compat.
  * Padded to 5 MB with random bytes.
  *
  * Self-integrity: on first init, the WASM binary is fetched and its SHA-256 is checked
@@ -13,7 +16,8 @@
 import init, { encrypt_blob, decrypt_blob } from './pkg/paramant_crypto.js';
 
 // SHA-256 of frontend/pkg/paramant_crypto_bg.wasm — update after each wasm-pack build.
-const WASM_SHA256 = 'd009869a8e5eb64e8926a7c8527b15964eac2f075f3707504c596fb65067cc2a';
+// Reproducible without binaryen: see [package.metadata.wasm-pack] in crypto-wasm/Cargo.toml.
+const WASM_SHA256 = '8e9aca293143d0271cf2134f26c998933c2006099c13da9ae81c86f6940e782b';
 
 let _ready = null;
 

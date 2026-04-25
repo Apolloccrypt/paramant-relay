@@ -25,3 +25,12 @@ zeroize = "1"
 [profile.release]
 opt-level = "s"
 lto = true
+
+# Disable wasm-pack's default wasm-opt step. wasm-opt requires downloading the
+# binaryen release tarball at build time, which fails in sandboxed/offline
+# environments and breaks reproducibility of the SHA-256 pin in
+# frontend/crypto-bridge.js. Code-size cost is ~50 KB on top of the LTO'd
+# release binary; that is an acceptable trade for "builds match the pin
+# anywhere with just stable Rust + wasm-pack".
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
