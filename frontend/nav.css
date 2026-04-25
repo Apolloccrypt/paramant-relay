@@ -228,35 +228,6 @@ nav.nav .nav-hamburger span {
 }
 .nav-mobile.open { display: flex; }
 
-/* Header row (close button only — sticky nav above already shows the logo) */
-.nav-mobile-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid var(--ink-hair);
-  flex-shrink: 0;
-}
-.nav-mobile-close {
-  background: none;
-  border: 1px solid var(--ink-hair);
-  color: var(--ink);
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  transition: border-color var(--duration-base) var(--ease-sharp),
-              background var(--duration-base) var(--ease-sharp);
-}
-.nav-mobile-close:hover {
-  border-color: #B2FF3F;
-  background: rgba(178,255,63,0.1);
-  color: var(--ink);
-}
-
 /* Accordion group */
 .nav-mobile-group {
   border-bottom: 1px solid var(--ink-hair);
