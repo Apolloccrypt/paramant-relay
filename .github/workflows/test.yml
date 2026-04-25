@@ -1,0 +1,60 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sdk-js-tests:
+    name: sdk-js — node test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install sdk-js dependencies
+        working-directory: sdk-js
+        run: npm install
+      - name: Run sdk-js tests
+        working-directory: sdk-js
+        run: npm test
+
+  sdk-py-tests:
+    name: sdk-py — pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install sdk-py with test extras
+        working-directory: sdk-py
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+      - name: Run sdk-py tests
+        working-directory: sdk-py
+        run: pytest -v
+
+  shell-syntax:
+    name: shell — bash -n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax check on all .sh files
+        run: |
+          set -e
+          find . -name '*.sh' \
+            -not -path './node_modules/*' \
+            -not -path '*/node_modules/*' \
+            -not -path '*/.git/*' \
+            -not -path '*/build/*' \
+            -not -path '*/dist/*' \
+            -print0 \
+          | xargs -0 -n1 bash -n
+          echo "All shell scripts parse OK."
