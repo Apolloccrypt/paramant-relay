@@ -127,6 +127,15 @@
   if (!hamburger || !mobile) return;
 
   function openMobileMenu() {
+    // Drawer is position:fixed; align its top to the actual bottom of the
+    // sticky navbar so it never overlaps the navbar (which sits below the
+    // meta-bar on most pages, putting the navbar bottom at ~88px instead
+    // of the assumed 56px).
+    var navEl = document.querySelector('nav.nav');
+    if (navEl) {
+      var navBottom = Math.round(navEl.getBoundingClientRect().bottom);
+      mobile.style.top = navBottom + 'px';
+    }
     mobile.classList.add('open');
     hamburger.setAttribute('aria-expanded', 'true');
     hamburger.setAttribute('aria-label', 'Close menu');
