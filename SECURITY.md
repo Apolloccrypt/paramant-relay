@@ -8,6 +8,21 @@ Subject: Security vulnerability — paramant-relay
 We aim to respond within 48 hours and patch within 7 days for critical issues.
 All reports are treated with responsible disclosure.
 
+### PGP key
+
+For sensitive reports, encrypt to the Paramant Security key.
+
+| | |
+|--|--|
+| User ID | `Paramant Security <privacy@paramant.app>` |
+| Fingerprint | `09AA 452A 69DE F4A4 EB4B  72DC 5A34 D82F DAF3 54CD` |
+| Algorithm | RSA-4096 |
+| Created | 2026-04-25 |
+| Expires | 2028-04-24 |
+| Public key | <https://paramant.app/.well-known/openpgp-key.asc> |
+
+Verify the fingerprint independently before encrypting — the link above is hosted on the same domain you are reporting against. If the fingerprint we publish in this README ever differs from the key served at the URL, treat it as a compromise of one of those channels and contact us via a separate channel before sending anything sensitive.
+
 ---
 
 ## Security audits
@@ -322,6 +337,26 @@ Additional fixes applied 2026-04-13:
 | Coerced disclosure | Legal orders directed at the operator can compel log disclosure; content remains encrypted |
 | Social engineering of operators | Administrative access is protected by TOTP but not immune to targeted attacks |
 | Quantum cryptanalysis of prior TLS sessions | Mitigated by the PQ encryption layer inside TLS, which is not retroactively breakable |
+
+---
+
+## Compliance posture
+
+Paramant maps technical controls to NIS2 (EU 2022/2555), IEC 62443 (industrial control systems), and NEN 7510 (Dutch healthcare). Mapping documents are part of the standard delivery package for Enterprise customers.
+
+**What this means:**
+
+- Architecture aligns with the technical requirements of these frameworks (RAM-only storage, post-quantum key exchange, signed CT log, EU-only jurisdiction, no US CLOUD Act exposure).
+- Compliance documentation is generated from operational evidence — CT log, deployment artefacts, configuration — and updated per release.
+- A signed Data Processing Agreement under GDPR Art. 28 is available to all paid tiers.
+
+**What this does NOT mean:**
+
+- No external penetration test has been conducted as of the date of this document. The internal automated audit (2026-04-19) and the independent reviews by R. Zwarts and Ryan Williams listed above are not third-party certification.
+- No certification body has audited Paramant against ISO 27001, SOC 2, or any of the frameworks mentioned. The mapping documents are operator-generated.
+- "Compliant by design" describes architectural alignment, not formal attestation. Customers requiring independent attestation should treat Paramant as a component within their broader ISMS and contract their own auditor.
+
+If you need formal certification or third-party attestation as part of your procurement process, talk to us early — we will work with your auditor and provide the evidence we have, but we will not represent the platform as pre-certified.
 
 ---
 
