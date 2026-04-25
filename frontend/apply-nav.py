@@ -170,7 +170,6 @@ NEW_MOBILE = '''\
   </div>
 
   <a href="/help" class="nav-mobile-standalone">Help</a>
-  <div class="nav-auth-mobile" id="nav-auth-mobile"></div>
 </div>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=17">'
