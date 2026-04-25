@@ -107,6 +107,68 @@ test('GhostPipe stores v3 keypair with real ML-KEM-768 sizes', async () => {
   assert.equal(kp.sig_pub.length, 1952 * 2);
 });
 
+// Pre-fix, signed blobs were accepted on _decrypt without ever calling
+// sig.verify — every "signature" was a no-op. This regression test flips a
+// bit in the signature region and asserts decryption now fails loudly.
+test('GhostPipe._decrypt rejects a tampered ML-DSA-65 signature (post-quantum auth)', async () => {
+  const { decode: wireDecode } = await import('../src/wire-format.js');
+  const { publicKey, secretKey } = ml_kem768.keygen();
+  const pubHex = Buffer.from(publicKey).toString('hex');
+
+  const sender = new GhostPipe({
+    apiKey: 'pgp_test', device: 'sender-tamper',
+    relay: 'http://x', checkCapabilities: false,
+  });
+  await sender._loadKeypair();
+  const plaintext = new TextEncoder().encode('do not accept forged sigs');
+  const { blob } = await sender._encrypt(plaintext, pubHex, { padBlock: 16384 });
+
+  // Locate the signature region inside the (unpadded prefix of the) blob and
+  // flip the first byte. wireDecode walks the same bytes the receiver does.
+  const parsed = wireDecode(blob);
+  // sig sits after: header(10) + 4+ctKem + 4+senderPub + 4 (sigLen) — flip
+  // the first signature byte in-place.
+  const sigOffset = 10 + 4 + parsed.ctKem.length + 4 + parsed.senderPub.length + 4;
+  blob[sigOffset] ^= 0xFF;
+
+  const receiver = new GhostPipe({
+    apiKey: 'pgp_test', device: 'receiver-tamper',
+    relay: 'http://x', checkCapabilities: false,
+  });
+  receiver._keypair = {
+    version: 3, device: 'receiver-tamper',
+    kemId: KEM.ML_KEM_768, sigId: SIG.ML_DSA_65,
+    kem_pub: pubHex, kem_priv: Buffer.from(secretKey).toString('hex'),
+    sig_pub: '', sig_priv: '',
+  };
+  await assert.rejects(
+    () => receiver._decrypt(blob),
+    (err) => err.name === 'SignatureError'
+  );
+});
+
+// Wire-format-v1 + Python SDK interop: for sigId != 0x0000 the senderPub
+// field MUST carry the sender's signing public key (1952 B for ML-DSA-65),
+// not the KEM public key (1184 B). Pre-fix this was the KEM pubkey, which
+// made every signed blob un-verifiable.
+test('GhostPipe._encrypt: signed blob senderPub is the ML-DSA-65 signing pubkey (1952 bytes)', async () => {
+  const { decode: wireDecode } = await import('../src/wire-format.js');
+  const { publicKey } = ml_kem768.keygen();
+  const pubHex = Buffer.from(publicKey).toString('hex');
+
+  const sender = new GhostPipe({
+    apiKey: 'pgp_test', device: 'sender-pubsize',
+    relay: 'http://x', checkCapabilities: false,
+  });
+  await sender._loadKeypair();
+  const { blob } = await sender._encrypt(
+    new TextEncoder().encode('size check'), pubHex, { padBlock: 16384 }
+  );
+  const parsed = wireDecode(blob);
+  assert.equal(parsed.sigId, SIG.ML_DSA_65);
+  assert.equal(parsed.senderPub.length, 1952, 'senderPub must be the ML-DSA-65 signing pubkey');
+});
+
 // Pre-fix, _encrypt with padBlock > 65536 threw QuotaExceededError because
 // crypto.getRandomValues caps at 65536 bytes per call. fillRandom now chunks.
 for (const padBlock of [65536, 131072, 5 * 1024 * 1024]) {

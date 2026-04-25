@@ -542,22 +542,28 @@ export class GhostPipe {
     ));
 
     // Sender key material and signature.
+    // Per docs/wire-format-v1.md: when sigId != 0x0000, senderPub is the
+    // sender's *signing* public key so the receiver can verify the embedded
+    // signature without an out-of-band lookup. For anonymous blobs we keep
+    // the KEM pubkey there as a stable, opaque sender identifier.
     const kp = await this._loadKeypair();
-    const senderKemPub = hexToU8(kp.kem_pub);
+    const senderPubBytes = sigId !== SIG.NONE
+      ? hexToU8(kp.sig_pub)
+      : hexToU8(kp.kem_pub);
 
     let signature;
     if (sigId !== SIG.NONE) {
       const sig = sigEngine(sigId);
       if (!kp.sig_priv) throw new SignatureError('sigId != 0x0000 requires a device signing keypair');
       const sigPriv = hexToU8(kp.sig_priv);
-      // Sign ctKem || senderKemPub || nonce || ct || aad
-      const msg = concat(ctKem, senderKemPub, nonce, ct, aad);
+      // Sign ctKem || senderPub || nonce || ct || aad — must match _decrypt.
+      const msg = concat(ctKem, senderPubBytes, nonce, ct, aad);
       signature = sig.sign(msg, sigPriv);
     }
 
     const core = wireEncode({
       kemId, sigId, flags: 0x00,
-      ctKem, senderPub: senderKemPub, signature,
+      ctKem, senderPub: senderPubBytes, signature,
       nonce, ciphertext: ct,
     });
 
@@ -591,13 +597,23 @@ export class GhostPipe {
     );
     const aad = buildAAD({ kemId: parsed.kemId, sigId: parsed.sigId, flags: parsed.flags, chunkIndex: 0 });
 
-    // Verify signature if present.
+    // Verify signature if present. Sender-key pinning (TOFU) is enforced
+    // separately on send() via _tofuCheck — here we only enforce that the
+    // signature is cryptographically valid for the senderPub carried in
+    // the blob. Pre-fix this branch silently accepted any bytes in the
+    // signature field.
     if (parsed.sigId !== SIG.NONE) {
       const sig = sigEngine(parsed.sigId);
       const msg = concat(parsed.ctKem, parsed.senderPub, parsed.nonce, parsed.ciphertext, aad);
-      // Caller is responsible for checking senderPub vs expected sender's on-file signing pubkey.
-      // Here we only verify the signature is valid for the senderPub carried in the blob.
-      // Sender authenticity (pinning) is enforced via TOFU on the send() path's fetched pubkey.
+      let valid = false;
+      try {
+        valid = sig.verify(parsed.signature, msg, parsed.senderPub);
+      } catch (e) {
+        throw new SignatureError(`${sig.name} signature verification raised: ${e.message}`);
+      }
+      if (!valid) {
+        throw new SignatureError(`${sig.name} signature did not verify against senderPub`);
+      }
     }
 
     return new Uint8Array(await crypto.subtle.decrypt(
