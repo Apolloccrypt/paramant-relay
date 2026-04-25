@@ -170,6 +170,64 @@ NEW_MOBILE = '''\
   <a href="/help" class="nav-mobile-standalone">Help</a>
 </div>'''
 
+# Footer template — restructured from the previous 36-link site-map to a
+# 23-link trust anchor across four functional columns. Removed every link
+# already reachable from the main nav (products, pricing, vs, compliance
+# specifics, use cases). Brand block at the bottom unchanged.
+NEW_FOOTER = '''\
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Trust</div>
+        <div class="footer-links">
+          <a href="/status">Status</a>
+          <a href="/security">Security</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/sla">SLA</a>
+          <a href="/compliance/nis2">Compliance overview</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Connect</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/signup">Create account</a>
+          <a href="/auth/login">Sign in</a>
+          <a href="/help">Help</a>
+          <a href="/partners">Partners</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>'''
+
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=19">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=13">'
 NAV_JS    = '<script src="/nav.js?v=12" defer></script>'
@@ -287,6 +345,7 @@ def process(fpath):
             return False
     updated = re.sub(r'<nav class="nav">.*?</nav>', NEW_NAV, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated)
+    updated = re.sub(r'<footer>.*?</footer>', NEW_FOOTER, updated, flags=re.DOTALL)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
     updated = inject_nav_auth_js(updated)
