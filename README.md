@@ -387,16 +387,18 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | What a compromised relay can do | What it cannot do |
 |---------------------------------|-------------------|
 | Deny service | Read file contents |
-| Learn transfer timing | Substitute a registered public key |
-| See blob sizes (fixed 5 MB) | Decrypt any stored ciphertext |
+| Learn transfer timing | Decrypt any stored ciphertext |
+| See blob sizes (fixed 5 MB) | Substitute a registered public key once a fingerprint has been verified out-of-band (TOFU on first contact — verify the recipient's fingerprint via a separate channel before sending) |
 
 **Crypto stack:**
 
 | Layer | Standard |
 |-------|----------|
 | Key encapsulation | ML-KEM-768 · NIST FIPS 203 |
+| Hybrid KEM (browser path) | ML-KEM-768 + ECDH P-256, combined via HKDF-SHA256 |
 | Symmetric | AES-256-GCM · NIST SP 800-38D |
-| Signatures | ML-DSA-65 · NIST FIPS 204 |
+| Signatures (relay STH / receipts) | ML-DSA-65 · NIST FIPS 204 |
+| Signatures (client, SDK only) | ML-DSA-65 over `ctKem ‖ senderPub ‖ nonce ‖ ct ‖ aad` (Node/Python SDK; browser ParaShare path does not yet sign client-side) |
 | Key derivation | HKDF-SHA256 · RFC 5869 |
 | Password blobs | Argon2id · RFC 9106 |
 | Crypto runtime | Rust/WASM — browser-side encryption runs in native code |
