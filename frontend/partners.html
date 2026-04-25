@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sponsoren &amp; Gebruikers — PARAMANT</title>
-<meta name="description" content="Wie ondersteunt Paramant en wie vertrouwt erop in productie. Sponsoren en gebruikers van het post-quantum versleutelde file relay.">
-<meta property="og:title" content="Sponsoren &amp; Gebruikers — PARAMANT">
-<meta property="og:description" content="Wie ondersteunt Paramant en wie vertrouwt erop in productie.">
+<title>In the wild — PARAMANT</title>
+<meta name="description" content="Organisations that have publicly stated they use Paramant in production. Observed deployments in compliance, sovereign infrastructure, and security engagements.">
+<meta property="og:title" content="In the wild — PARAMANT">
+<meta property="og:description" content="Organisations that have publicly stated they use Paramant in production.">
 <meta property="og:url" content="https://paramant.app/partners">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Sponsoren &amp; Gebruikers — PARAMANT">
-<meta name="twitter:description" content="Wie ondersteunt Paramant en wie vertrouwt erop in productie.">
+<meta name="twitter:title" content="In the wild — PARAMANT">
+<meta name="twitter:description" content="Organisations that have publicly stated they use Paramant in production.">
 <link rel="canonical" href="https://paramant.app/partners">
 
 <link rel="stylesheet" href="/design-system.css?v=18">
@@ -38,18 +38,17 @@ h1{font-size:var(--text-3xl);line-height:1.15;margin:0 0 24px;color:var(--ink);f
 .section-header h2{font-size:var(--text-2xl);line-height:1.2;color:var(--ink);margin:0 0 16px;font-weight:700;letter-spacing:-.005em}
 .section-header p{color:var(--ink-dim);font-size:var(--text-base);line-height:1.65}
 
-.partner-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.ecosystem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
 
-.partner-card{padding:28px;border:1px solid var(--ink-hair);background:var(--bone);transition:border-color .15s}
-.partner-card:hover{border-color:var(--cobalt)}
-.partner-card .partner-logo{height:56px;display:flex;align-items:center;margin-bottom:20px}
-.partner-card .partner-logo img{max-height:100%;max-width:160px;object-fit:contain}
-.partner-card .sector-tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:8px}
-.partner-card h3{font-size:var(--text-md);margin:0 0 8px;color:var(--ink);font-weight:600}
-.partner-card p{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0}
-.partner-card .quote{border-left:2px solid var(--lime);padding-left:14px;margin:14px 0 0;color:var(--ink);font-style:italic}
-
-.placeholder{grid-column:1 / -1;padding:48px;text-align:center;color:var(--ink-dim);border:1px dashed var(--ink-hair);font-size:var(--text-sm);line-height:1.6}
+.ecosystem-card{padding:28px;border:1px solid var(--ink-hair);background:var(--bone);transition:border-color .15s;display:flex;flex-direction:column}
+.ecosystem-card:hover{border-color:var(--cobalt)}
+.ecosystem-logo{height:56px;display:flex;align-items:center;margin-bottom:20px}
+.ecosystem-logo img{max-height:100%;max-width:160px;object-fit:contain}
+.ecosystem-card h3{font-size:var(--text-md);margin:0 0 4px;color:var(--ink);font-weight:600}
+.ecosystem-meta{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin:0 0 14px}
+.ecosystem-card p{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0}
+.ecosystem-link{font-family:var(--mono);font-size:12px;color:var(--cobalt);text-decoration:none;border-bottom:1px solid var(--cobalt);padding-bottom:1px;margin-top:18px;align-self:flex-start}
+.ecosystem-link:hover{color:var(--navy);border-bottom-color:var(--navy)}
 
 .section-cta{margin-top:32px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .section-cta-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
@@ -58,7 +57,7 @@ h1{font-size:var(--text-3xl);line-height:1.15;margin:0 0 24px;color:var(--ink);f
 
 @media (max-width: 768px){
   .wrap{padding:48px 24px 80px}
-  .partner-grid{grid-template-columns:1fr}
+  .ecosystem-grid{grid-template-columns:1fr}
   .section-block{margin-bottom:64px}
   .section-header{margin-bottom:32px}
 }
@@ -145,6 +144,7 @@ h1{font-size:var(--text-3xl);line-height:1.15;margin:0 0 24px;color:var(--ink);f
         <li role="none"><a href="/status" role="menuitem">Status</a></li>
         <li role="none"><a href="/security" role="menuitem">Security</a></li>
         <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
         <li role="none"><a href="/license" role="menuitem">License</a></li>
         <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
         <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
@@ -225,6 +225,7 @@ h1{font-size:var(--text-3xl);line-height:1.15;margin:0 0 24px;color:var(--ink);f
       <a href="/status">Status</a>
       <a href="/security">Security</a>
       <a href="/sla">SLA</a>
+      <a href="/partners">Partners</a>
       <a href="/license">License</a>
       <a href="/press">Press kit</a>
       <a href="mailto:privacy@paramant.app">Contact</a>
@@ -235,73 +236,42 @@ h1{font-size:var(--text-3xl);line-height:1.15;margin:0 0 24px;color:var(--ink);f
 </div>
 
 <div class="wrap" id="main-content" tabindex="-1">
-  <div class="eyebrow">Supporters</div>
-  <h1>De mensen achter Paramant.</h1>
-  <p class="lede">Wie ondersteunt het project en wie vertrouwt erop in productie.</p>
+  <div class="eyebrow">Ecosystem</div>
+  <h1>In the wild.</h1>
+  <p class="lede">Organisations that have publicly stated they use Paramant in production. This page documents observed deployments — for case studies and references, contact below.</p>
 
-  <section class="section-block" aria-labelledby="sponsoren-h">
+  <section class="section-block" aria-labelledby="in-production-h">
     <header class="section-header">
-      <div class="eyebrow">01 — Sponsoren</div>
-      <h2 id="sponsoren-h">Wie steunt Paramant.</h2>
-      <p>Paramant wordt ondersteund door bedrijven en individuen die geloven in soevereine, post-quantum-veilige communicatie infrastructuur. Sponsoring helpt ons onafhankelijk te blijven en het project BUSL-1.1 source-available te houden.</p>
+      <div class="eyebrow">01 — In production</div>
+      <h2 id="in-production-h">Where Paramant is deployed.</h2>
+      <p>Organisations that have publicly confirmed Paramant deployment, typically as part of compliance engagements (NIS2, IEC 62443, NEN 7510) or sovereign infrastructure programmes.</p>
     </header>
 
-    <div class="partner-grid">
-      <!-- TEMPLATE — herhaal per sponsor zodra schriftelijke goedkeuring binnen is.
-      <article class="partner-card">
-        <div class="partner-logo"><img src="/images/sponsors/SPONSOR.svg" alt="Sponsor name"></div>
-        <h3>Bedrijfsnaam</h3>
-        <p>Eén regel waarom ze ondersteunen.</p>
+    <div class="ecosystem-grid">
+      <article class="ecosystem-card">
+        <div class="ecosystem-logo"><img src="/images/ecosystem/cisa.png" alt="CISA"></div>
+        <h3>CISA</h3>
+        <p class="ecosystem-meta">Cyber Information Security Agency</p>
+        <p>Independent security agency that integrates Paramant into NIS2, IEC 62443, and healthcare compliance engagements. CISA clients use Paramant for cryptographically provable file transfer with EU data sovereignty.</p>
+        <a class="ecosystem-link" href="https://cisa.one/" rel="noopener">cisa.one</a>
       </article>
-      -->
-      <p class="placeholder">
-        Logo's en namen worden hier geplaatst zodra schriftelijke toestemming is ontvangen.
-      </p>
     </div>
 
     <div class="section-cta">
-      <span class="section-cta-label">Paramant ondersteunen?</span>
-      <a class="cta-link" href="mailto:privacy@paramant.app?subject=Sponsoring">privacy@paramant.app</a>
-    </div>
-  </section>
-
-  <section class="section-block" aria-labelledby="gebruikers-h">
-    <header class="section-header">
-      <div class="eyebrow">02 — Gebruikers</div>
-      <h2 id="gebruikers-h">Wie vertrouwt op Paramant.</h2>
-      <p>Organisaties in gereguleerde sectoren gebruiken Paramant voor NIS2-conforme datatransfer. Hieronder een selectie van klanten die toestemming hebben gegeven om vermeld te worden.</p>
-    </header>
-
-    <div class="partner-grid">
-      <!-- TEMPLATE — herhaal per klant zodra logo-recht is verkregen.
-      <article class="partner-card">
-        <div class="partner-logo"><img src="/images/users/CUSTOMER.svg" alt="Customer"></div>
-        <div class="sector-tag">Sector</div>
-        <h3>Bedrijfsnaam</h3>
-        <p>Korte context.</p>
-        <p class="quote">"Quote van de klant over Paramant."</p>
-      </article>
-      -->
-      <p class="placeholder">
-        Klantenvermeldingen worden hier geplaatst zodra schriftelijke toestemming voor logo-gebruik is ontvangen. Tot die tijd kunnen prospects een referentie-gesprek aanvragen via privacy@paramant.app.
-      </p>
-    </div>
-
-    <div class="section-cta">
-      <span class="section-cta-label">Ervaring delen?</span>
-      <a class="cta-link" href="mailto:privacy@paramant.app?subject=Case+study">privacy@paramant.app</a>
+      <span class="section-cta-label">Using Paramant in production?</span>
+      <a class="cta-link" href="mailto:privacy@paramant.app?subject=Ecosystem+listing">privacy@paramant.app</a>
     </div>
   </section>
 
   <section class="section-block" aria-labelledby="case-studies-h" hidden>
-    <!-- hidden tot eerste case study live gaat. Verwijder hidden om te tonen. -->
+    <!-- Hidden until first detailed write-up. Remove the `hidden` attribute to show. -->
     <header class="section-header">
-      <div class="eyebrow">03 — Case studies</div>
-      <h2 id="case-studies-h">Hoe organisaties Paramant inzetten.</h2>
-      <p>Probleem · aanpak · resultaat — uitgebreide stukken per implementatie.</p>
+      <div class="eyebrow">02 — Case studies</div>
+      <h2 id="case-studies-h">How organisations deploy Paramant.</h2>
+      <p>Problem · approach · outcome — detailed write-ups per implementation.</p>
     </header>
-    <div class="partner-grid">
-      <!-- per case study: probleem / aanpak / resultaat -->
+    <div class="ecosystem-grid">
+      <!-- per case study: problem / approach / outcome -->
     </div>
   </section>
 </div>
@@ -366,7 +336,7 @@ h1{font-size:var(--text-3xl);line-height:1.15;margin:0 0 24px;color:var(--ink);f
         <div class="footer-links">
           <a href="mailto:privacy@paramant.app">Contact</a>
           <a href="/signup">Create account</a>
-          <a href="/partners">Sponsors &amp; users</a>
+          <a href="/partners">Partners</a>
           <a href="/status">Status</a>
           <a href="/sla">SLA</a>
           <a href="/security">Security</a>
