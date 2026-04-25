@@ -106,3 +106,21 @@ test('GhostPipe stores v3 keypair with real ML-KEM-768 sizes', async () => {
   assert.equal(kp.kem_pub.length, 1184 * 2); // hex-encoded
   assert.equal(kp.sig_pub.length, 1952 * 2);
 });
+
+// Pre-fix, _encrypt with padBlock > 65536 threw QuotaExceededError because
+// crypto.getRandomValues caps at 65536 bytes per call. fillRandom now chunks.
+for (const padBlock of [65536, 131072, 5 * 1024 * 1024]) {
+  test(`_encrypt at padBlock=${padBlock} (fillRandom regression)`, async () => {
+    const { publicKey } = ml_kem768.keygen();
+    const pubHex = Buffer.from(publicKey).toString('hex');
+    const sender = new GhostPipe({
+      apiKey: 'pgp_test', device: `sender-pad-${padBlock}`,
+      relay: 'http://x', checkCapabilities: false, sigId: SIG.NONE,
+    });
+    const { blob } = await sender._encrypt(
+      new TextEncoder().encode('quantum payload — fillRandom regression'),
+      pubHex, { padBlock, sigId: SIG.NONE }
+    );
+    assert.equal(blob.length, padBlock);
+  });
+}

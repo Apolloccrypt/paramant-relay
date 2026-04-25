@@ -107,6 +107,19 @@ function concat(...arrs) {
   return out;
 }
 
+// Web Crypto getRandomValues caps at 65536 bytes per call; fill larger buffers in chunks.
+function fillRandom(buf) {
+  const CHUNK = 65536;
+  if (buf.byteLength <= CHUNK) {
+    crypto.getRandomValues(buf);
+    return buf;
+  }
+  for (let off = 0; off < buf.byteLength; off += CHUNK) {
+    crypto.getRandomValues(buf.subarray(off, Math.min(off + CHUNK, buf.byteLength)));
+  }
+  return buf;
+}
+
 function u32be(n) {
   const b = new Uint8Array(4);
   new DataView(b.buffer).setUint32(0, n, false);
@@ -511,7 +524,7 @@ export class GhostPipe {
     });
 
     if (core.length > padBlock) throw new GhostPipeError(`Data too large (${plaintext.length} bytes) for block ${padBlock}`);
-    const padding = crypto.getRandomValues(new Uint8Array(padBlock - core.length));
+    const padding = fillRandom(new Uint8Array(padBlock - core.length));
     const blob = concat(core, padding);
     const hash = await sha256Hex(blob);
     return { blob, hash };
@@ -650,7 +663,7 @@ export class GhostPipe {
     const packet = concat(nonce, ctLen, ct);
     const padBlock = 5 * 1024 * 1024;
     if (packet.length > padBlock) throw new GhostPipeError(`Data too large (${data.length} bytes)`);
-    const blob = concat(packet, crypto.getRandomValues(new Uint8Array(padBlock - packet.length)));
+    const blob = concat(packet, fillRandom(new Uint8Array(padBlock - packet.length)));
     const { status, body } = await this._post('/v2/inbound', {
       hash:      lookupHash,
       payload:   toBase64(blob),
