@@ -527,7 +527,6 @@ hash_, receipt = gp.send_with_receipt(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain — JSON + CSV export</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>List team devices</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add device to team (Pro+)</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/metrics</td><td>Prometheus scrape endpoint</td><td>Admin token</td></tr>
     </table>
 
     <h2 id="inbound">POST /v2/inbound</h2>
@@ -710,19 +709,9 @@ docker compose up -d --build
       <p><strong style="color:#FECACA">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code> — do not delete this volume or the relay will lose its registered identity.</p>
     </div>
 
-    <!-- ── paramant-client .deb ─────────────────────────────────── -->
-    <h2 id="client-deb">paramant-client — .deb install</h2>
-    <p>The paramant-client package bundles the sender, receiver, and admin scripts as system commands. Supports amd64 and arm64 (including Raspberry Pi).</p>
-
-    <div class="cb">
-      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-      <pre><span class="cm"># One-line install (Ubuntu / Debian / Raspberry Pi OS)</span>
-curl -fsSL https://paramant.app/install-client.sh | bash
-
-<span class="cm"># Or download and install manually</span>
-wget https://github.com/Apolloccrypt/paramant-relay/releases/latest/download/paramant-client.deb
-dpkg -i paramant-client.deb</pre>
-    </div>
+    <!-- ── Admin scripts ─────────────────────────────────────────── -->
+    <h2 id="client-deb">Admin scripts</h2>
+    <p>Admin scripts ship with the relay repository under <code>scripts/</code>. After cloning <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a>, run <code>python3 scripts/paramant-admin.py [command]</code> directly. No system-wide install package is currently provided — the SDK packages on PyPI (<code>paramant-sdk</code>) and npm (<code>paramant-sdk</code>) are the canonical client integrations.</p>
 
     <h2 id="client-cli">CLI reference</h2>
     <table>
