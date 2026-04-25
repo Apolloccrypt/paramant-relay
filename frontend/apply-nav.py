@@ -97,10 +97,6 @@ NEW_NAV = '''\
 
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-header">
-    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
-  </div>
-
   <div class="nav-mobile-group">
     <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
     <div class="nav-mobile-group-items">
