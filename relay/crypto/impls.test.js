@@ -23,6 +23,11 @@ test("ML-KEM-768 rejects wrong public key size", () => {
   assert.throws(() => mlkem768.encapsulate(Buffer.alloc(100)));
 });
 
+test("ML-KEM-768 rejects wrong ciphertext size", () => {
+  const { secretKey } = mlkem768.generateKeyPair();
+  assert.throws(() => mlkem768.decapsulate(Buffer.alloc(100), secretKey));
+});
+
 test("ML-DSA-65 keygen produces expected sizes", () => {
   const { publicKey, secretKey } = mldsa65.generateKeyPair();
   assert.strictEqual(publicKey.length, 1952);
