@@ -53,7 +53,7 @@ if (RELAY_REDIS_URL) {
     .then(() => console.log('[relay/redis] connected'))
     .catch(e => console.error('[relay/redis] connect failed:', e.message));
 }
-const PORT       = parseInt(process.env.PORT       || '4000');
+const PORT       = parseInt(process.env.PORT       || '3000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
 const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
