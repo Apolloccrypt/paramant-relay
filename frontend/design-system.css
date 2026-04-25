@@ -518,10 +518,31 @@ h1 em::after {
   padding: 40px var(--space-6);
   background: var(--bone);
   cursor: pointer;
-  transition: background var(--duration-base) var(--ease-sharp);
+  transition: background var(--duration-base) var(--ease-sharp),
+              border-color var(--duration-base) var(--ease-sharp),
+              box-shadow var(--duration-base) var(--ease-out);
 }
-.drop:hover, .drop.drag-over,
-.dropzone:hover, .dropzone.drag-over { background: var(--ink-ghost); }
+/* Idle "breathe" — subtle lime ring that invites interaction without
+   shouting. Pauses on hover/focus/drag so feedback states are clean. */
+.drop:not(:hover):not(:focus-within):not(.drag-over),
+.dropzone:not(:hover):not(:focus-within):not(.drag-over) {
+  animation: drop-breathe 3.6s var(--ease-soft) infinite;
+}
+@keyframes drop-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(178,255,63,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(178,255,63,.18); }
+}
+.drop:hover, .drop:focus-within,
+.dropzone:hover, .dropzone:focus-within {
+  background: var(--ink-ghost);
+  box-shadow: 0 0 0 2px var(--ink-hair);
+}
+.drop.drag-over,
+.dropzone.drag-over {
+  background: var(--ink-ghost);
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 4px rgba(29,78,216,.18);
+}
 
 /* "01" bleeding label */
 .drop-label,
@@ -1419,6 +1440,132 @@ pre code { background: none; padding: 0; }
 
 
 /* ═══════════════════════════════════════════════════
+   EMPTY STATE
+   For zero-data tables, dashboards, lists. Replaces a sea of "—"
+   with a glyph + title + hint + optional CTA so first-time users
+   know what the surface is for and what to do next.
+   ═══════════════════════════════════════════════════ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  border: 1px dashed var(--ink-hair);
+  background: var(--bone);
+  color: var(--ink-dim);
+}
+.empty-state-glyph {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--ink-hair);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+  background: var(--bone);
+}
+.empty-state-title {
+  font-family: var(--sans);
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+.empty-state-hint {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: .04em;
+  color: var(--ink-dim);
+  max-width: 44ch;
+  line-height: 1.55;
+  margin: 0;
+}
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  justify-content: center;
+}
+
+/* Compact variant — for inside table rows or narrow cards */
+.empty-state.is-compact {
+  padding: var(--space-5) var(--space-4);
+  gap: var(--space-2);
+}
+.empty-state.is-compact .empty-state-glyph {
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-sm);
+}
+
+
+/* ═══════════════════════════════════════════════════
+   SKELETON LOADING
+   Replaces flicker placeholder divs with a calm shimmer that
+   reads as "we're loading", not "we're broken".
+   ═══════════════════════════════════════════════════ */
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--ink-ghost) 0%,
+    var(--ink-hair)  50%,
+    var(--ink-ghost) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s var(--ease-soft) infinite;
+  color: transparent;
+  user-select: none;
+  pointer-events: none;
+  min-height: 1em;
+}
+.skeleton-line { height: 12px; margin: 6px 0; }
+.skeleton-line.is-sm { height: 8px;  width: 40%; }
+.skeleton-line.is-md { height: 12px; width: 70%; }
+.skeleton-line.is-lg { height: 18px; width: 50%; }
+.skeleton-block { height: 64px; }
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position:  -200% 0; }
+}
+
+
+/* ═══════════════════════════════════════════════════
+   INDETERMINATE PROGRESS
+   For "Preparing…" / "Connecting…" — anything where ETA is
+   unknown. Reads as motion, not as a stuck bar.
+   ═══════════════════════════════════════════════════ */
+.progress-indeterminate {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: var(--ink-ghost);
+  overflow: hidden;
+}
+.progress-indeterminate::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 38%;
+  background: var(--cobalt);
+  animation: progress-slide 1.4s var(--ease-soft) infinite;
+}
+@keyframes progress-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+
+/* ═══════════════════════════════════════════════════
    MOTION SAFETY
    ═══════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
@@ -1428,6 +1575,16 @@ pre code { background: none; padding: 0; }
     transition-duration: .01ms !important;
   }
   .status-dot, .dot { animation: none; opacity: 1; }
+  /* Skeleton: stop shimmering, stay visibly grey so the placeholder
+     still reads as "loading" rather than a transparent gap. */
+  .skeleton { animation: none; background: var(--ink-ghost); }
+  /* Indeterminate progress: pin the bar centre so the track isn't blank. */
+  .progress-indeterminate::after {
+    animation: none;
+    transform: translateX(80%);
+  }
+  /* Dropzone: drop the breathing ring entirely. */
+  .drop, .dropzone { animation: none; }
 }
 
 /* ═══════════════════════════════════════════════════
