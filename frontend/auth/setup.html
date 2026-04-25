@@ -8,8 +8,8 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=16">
-<link rel="stylesheet" href="/nav.css?v=10">
+<link rel="stylesheet" href="/design-system.css?v=17">
+<link rel="stylesheet" href="/nav.css?v=11">
 <script src="/js/qrcode.min.js"></script>
 </head>
 <body>
@@ -49,7 +49,8 @@
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
+        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
         <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
@@ -93,6 +94,11 @@
 
   </ul>
 
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
@@ -132,7 +138,8 @@
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="/install-client.sh">install-client.sh</a>
+      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
+      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
       <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
@@ -152,18 +159,6 @@
       <a href="/quantum-urgency">Quantum urgency</a>
       <a href="/crypto-agility">Crypto agility</a>
       <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Use cases</button>
-    <div class="nav-mobile-group-items">
-      <a href="/ssh-key-delivery">SSH key delivery</a>
-      <a href="/audit-log-export">Audit log export</a>
-      <a href="/ma-due-diligence">M&amp;A due diligence</a>
-      <a href="/healthcare">Healthcare</a>
-      <a href="/legal-discovery">Legal discovery</a>
-      <a href="/whistleblower-channel">Whistleblower channel</a>
     </div>
   </div>
 
@@ -347,7 +342,8 @@
 
 </main>
 
-<script src="/nav.js?v=10" defer></script>
+<script src="/nav.js?v=11" defer></script>
+<script src="/js/nav-auth.js" defer></script>
 <script>
 (function() {
   const token = window.location.pathname.split('/').pop();

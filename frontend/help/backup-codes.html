@@ -61,8 +61,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=14">
-<link rel="stylesheet" href="/nav.css?v=9">
+<link rel="stylesheet" href="/design-system.css?v=17">
+<link rel="stylesheet" href="/nav.css?v=11">
 <style>
 .nav-help {
   display: inline-flex;
@@ -141,72 +141,81 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Send menu" aria-haspopup="true" aria-expanded="false">SEND</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem" class="nav-product-item"><span class="npi-title">ParaShare</span><span class="npi-sub">Verified transfers with signed receipts</span></a></li>
-        <li role="none"><a href="/drop" role="menuitem" class="nav-product-item"><span class="npi-title">ParaDrop</span><span class="npi-sub">Device to device, AirDrop alternative</span></a></li>
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Build menu" aria-haspopup="true" aria-expanded="false">BUILD</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Docs &amp; API</li>
-        <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Documentation</span><span class="npi-sub">API reference, protocol spec, install guides</span></a></li>
-        <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root — verifiable transfer history</span></a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem" class="nav-product-item"><span class="npi-title">GitHub</span><span class="npi-sub">Source code, issues, community</span></a></li>
-        <li class="nav-subheader" role="presentation">Self-host</li>
-        <li role="none"><a href="/install.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install.sh</span><span class="npi-sub">Automated Linux server installer</span></a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-pi.sh</span><span class="npi-sub">Raspberry Pi optimised installer</span></a></li>
-        <li role="none"><a href="/install-client.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-client.sh</span><span class="npi-sub">CLI client installer</span></a></li>
-        <li role="none"><a href="/download" role="menuitem" class="nav-product-item"><span class="npi-title">ParamantOS</span><span class="npi-sub">Hardened ISO for air-gapped deploys</span></a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem" class="nav-product-item"><span class="npi-title">Releases</span><span class="npi-sub">Versioned binaries and SBOMs</span></a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
+        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">COMPLIANCE</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive — essential entities</span></a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem" class="nav-product-item"><span class="npi-title">IEC 62443 (Industrial IoT)</span><span class="npi-sub">Industrial control systems compliance</span></a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem" class="nav-product-item"><span class="npi-title">NEN 7510 (Dutch Healthcare)</span><span class="npi-sub">Dutch health data protection standard</span></a></li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
         <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem" class="nav-product-item"><span class="npi-title">Jurisdiction</span><span class="npi-sub">EU ownership, CLOUD Act analysis, migration roadmap</span></a></li>
-        <li role="none"><a href="/government" role="menuitem" class="nav-product-item"><span class="npi-title">Government &amp; public sector</span><span class="npi-sub">Public procurement and NIS2 guidance</span></a></li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
         <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem" class="nav-product-item"><span class="npi-title">OT guide</span><span class="npi-sub">Operational technology integration guide</span></a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem" class="nav-product-item"><span class="npi-title">OT vs data diodes</span><span class="npi-sub">When a data diode is the better choice</span></a></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
         <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem" class="nav-product-item"><span class="npi-title">HNDL threat</span><span class="npi-sub">Harvest Now Decrypt Later — the immediate risk</span></a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem" class="nav-product-item"><span class="npi-title">Quantum urgency</span><span class="npi-sub">Why migrate before Q-Day</span></a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem" class="nav-product-item"><span class="npi-title">Crypto agility</span><span class="npi-sub">Migrating away from classical algorithms</span></a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
         <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA — sign and download</span></a></li>
-        <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
       </ul>
     </li>
 
-    <li style="margin-left:auto"><a href="/architecture" class="nav-link nav-link-btn">HOW IT WORKS</a></li>
-    <li><a href="/pricing" class="nav-link nav-link-btn">PRICING</a></li>
+    <li><a href="/vs" class="nav-link">Compare</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">ABOUT</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem" class="nav-product-item"><span class="npi-title">Status</span><span class="npi-sub">Live relay health and uptime metrics</span></a></li>
-        <li role="none"><a href="/security" role="menuitem" class="nav-product-item"><span class="npi-title">Security</span><span class="npi-sub">Pentest reports and vulnerability disclosure</span></a></li>
-        <li role="none"><a href="/vs" role="menuitem" class="nav-product-item"><span class="npi-title">Compare</span><span class="npi-sub">Paramant vs WeTransfer, Signal, Wire</span></a></li>
-        <li role="none"><a href="/changelog" role="menuitem" class="nav-product-item"><span class="npi-title">Changelog</span><span class="npi-sub">Release notes and version history</span></a></li>
-        <li role="none"><a href="/license" role="menuitem" class="nav-product-item"><span class="npi-title">License</span><span class="npi-sub">BUSL-1.1 source-available terms</span></a></li>
-        <li role="none"><a href="/press" role="menuitem" class="nav-product-item"><span class="npi-title">Press kit</span><span class="npi-sub">Logos, brand assets, media contacts</span></a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem" class="nav-product-item"><span class="npi-title">Contact</span><span class="npi-sub">privacy@paramant.app</span></a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
       </ul>
     </li>
 
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -250,7 +259,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="/install-client.sh">install-client.sh</a>
+      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
+      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
       <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
@@ -465,7 +475,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 </footer>
 
-<script src="/nav.js?v=9" defer></script>
+<script src="/nav.js?v=11" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 </body>
 </html>

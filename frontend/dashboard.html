@@ -5,8 +5,8 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Developer Dashboard</title>
-<link rel="stylesheet" href="/design-system.css?v=16">
-<link rel="stylesheet" href="/nav.css?v=10">
+<link rel="stylesheet" href="/design-system.css?v=17">
+<link rel="stylesheet" href="/nav.css?v=11">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
@@ -188,16 +188,12 @@ a:hover{color:var(--cobalt)}
 <div id="main-content" tabindex="-1" aria-hidden="true" style="outline:none"></div>
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-header">
-    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/>
-      </svg>
-    </button>
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-products">Products</button>
-    <div class="nav-mobile-group-items" id="mobile-group-products">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
       <a href="/send">Send a file</a>
       <a href="/parashare">ParaShare</a>
       <a href="/drop">ParaDrop</a>
@@ -208,8 +204,8 @@ a:hover{color:var(--cobalt)}
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-developers">Developers</button>
-    <div class="nav-mobile-group-items" id="mobile-group-developers">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
       <a href="/docs">Docs</a>
       <a href="/docs#api">API reference</a>
       <a href="/ct-log">CT Log</a>
@@ -220,20 +216,21 @@ a:hover{color:var(--cobalt)}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-selfhost">Self-host</button>
-    <div class="nav-mobile-group-items" id="mobile-group-selfhost">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="/install-client.sh">install-client.sh</a>
+      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
+      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
       <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-compliance">Compliance</button>
-    <div class="nav-mobile-group-items" id="mobile-group-compliance">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
       <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
       <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
       <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
@@ -248,24 +245,11 @@ a:hover{color:var(--cobalt)}
     </div>
   </div>
 
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Use cases</button>
-    <div class="nav-mobile-group-items">
-      <a href="/ssh-key-delivery">SSH key delivery</a>
-      <a href="/anti-phishing">Anti-phishing</a>
-      <a href="/audit-log-export">Audit log export</a>
-      <a href="/ma-due-diligence">M&amp;A due diligence</a>
-      <a href="/healthcare">Healthcare</a>
-      <a href="/legal-discovery">Legal discovery</a>
-      <a href="/whistleblower-channel">Whistleblower channel</a>
-    </div>
-  </div>
-
   <a href="/vs" class="nav-mobile-standalone">Compare</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-about">About</button>
-    <div class="nav-mobile-group-items" id="mobile-group-about">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
       <a href="/sla">SLA</a>
@@ -273,10 +257,11 @@ a:hover{color:var(--cobalt)}
       <a href="/press">Press kit</a>
       <a href="mailto:privacy@paramant.app">Contact</a>
     </div>
-  </div></div>
+  </div>
+</div>
 
 <div id="root"></div>
-<script src="/nav.js?v=10" defer></script>
+<script src="/nav.js?v=11" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 <script>
 const RELAYS=[

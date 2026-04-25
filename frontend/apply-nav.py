@@ -40,7 +40,8 @@ NEW_NAV = '''\
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
+        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
         <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
@@ -130,7 +131,8 @@ NEW_MOBILE = '''\
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="/install-client.sh">install-client.sh</a>
+      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
+      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
       <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
@@ -168,9 +170,9 @@ NEW_MOBILE = '''\
   </div>
 </div>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=6">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=6">'
-NAV_JS    = '<script src="/nav.js?v=5" defer></script>'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=17">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=11">'
+NAV_JS    = '<script src="/nav.js?v=11" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js" defer></script>'
 
 
