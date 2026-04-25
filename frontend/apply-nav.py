@@ -205,7 +205,12 @@ def inject_design_system(html):
         else:
             head_close = html.find('</head>')
             if head_close != -1:
-                html = html[:head_close] + DS_LINK + '\n' + html[head_close:]
+                html = html[:head_close] + DS_LINK + '\n' + NAV_LINK + '\n' + html[head_close:]
+                return html
+    if NAV_LINK not in html:
+        head_close = html.find('</head>')
+        if head_close != -1:
+            html = html[:head_close] + NAV_LINK + '\n' + html[head_close:]
     return html
 
 
