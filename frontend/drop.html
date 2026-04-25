@@ -1027,8 +1027,22 @@ async function startCamera() {
     document.getElementById('scanner-video').srcObject = cameraStream;
     scanQR();
   } catch(e) {
-    // Camera not available — hide scanner
-    document.getElementById('scanner-wrap').style.display = 'none';
+    // Camera unavailable — replace the black box with an empty-state
+    // that explains why and points to the manual-link fallback below.
+    var reason = 'No camera available on this device.';
+    if (e && e.name === 'NotAllowedError') reason = 'Camera permission was blocked. Allow camera access in your browser to scan QR codes.';
+    else if (e && e.name === 'NotFoundError') reason = 'No camera detected on this device.';
+    else if (window.isSecureContext === false) reason = 'Camera requires a secure (HTTPS) connection.';
+    var wrap = document.getElementById('scanner-wrap');
+    if (wrap) {
+      wrap.style.background = 'transparent';
+      wrap.style.aspectRatio = 'auto';
+      wrap.innerHTML = '<div class="empty-state is-compact" style="border:none;background:transparent">'
+        + '<div class="empty-state-glyph" aria-hidden="true">📷</div>'
+        + '<p class="empty-state-title">Camera unavailable</p>'
+        + '<p class="empty-state-hint">' + reason + ' You can paste the link manually below instead.</p>'
+        + '</div>';
+    }
   }
 }
 

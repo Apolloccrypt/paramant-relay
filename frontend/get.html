@@ -303,7 +303,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title" id="loading-title">Preparing...</div></div>
     <div class="card-body">
-      <div class="progress-wrap"><div class="progress-bar" id="pbar"></div></div>
+      <div class="progress-indeterminate" id="indeterminate-bar" style="margin:14px 0 0"></div>
+      <div class="progress-wrap" id="progress-wrap" hidden><div class="progress-bar" id="pbar"></div></div>
       <div class="status-line" id="status-msg">Starting...</div>
     </div>
   </div>
@@ -434,7 +435,16 @@ function showStep(id) {
 }
 
 function setStatus(msg, pct) {
-  document.getElementById('pbar').style.width = pct + '%';
+  var ind = document.getElementById('indeterminate-bar');
+  var wrap = document.getElementById('progress-wrap');
+  if (pct > 0) {
+    if (ind)  ind.hidden = true;
+    if (wrap) wrap.hidden = false;
+    document.getElementById('pbar').style.width = pct + '%';
+  } else {
+    if (ind)  ind.hidden = false;
+    if (wrap) wrap.hidden = true;
+  }
   document.getElementById('status-msg').textContent = msg;
 }
 

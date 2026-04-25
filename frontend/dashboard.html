@@ -471,7 +471,14 @@ function softRender(){
         </tr>`).join("")}</tbody>
       </table></div>`;
     } else {
-      dt.innerHTML=`<div style="padding:24px 20px;font-size:12px;color:${V.q};font-family:${V.mono}">No deliveries this session</div>`;
+      dt.innerHTML=`<div class="empty-state is-compact" style="border:none;background:transparent">
+        <div class="empty-state-glyph" aria-hidden="true">↯</div>
+        <p class="empty-state-title">No deliveries yet</p>
+        <p class="empty-state-hint">Run the E2E test above, or send a file from the SDK to see it land here in real time.</p>
+        <div class="empty-state-actions">
+          <button onclick="runE2ETest()" class="btn btn-secondary" style="font-size:11px;padding:10px 18px">Run E2E test</button>
+        </div>
+      </div>`;
     }
   }
   const pi=document.getElementById("poll-info");
@@ -522,7 +529,7 @@ function render(){
     <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:${V.b};border:1px solid ${V.b};margin-bottom:24px" id="stats-grid">
-      ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};padding:20px;opacity:.3"><div style="height:28px;background:${V.b}"></div></div>`).join("")}
+      ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};padding:20px"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-lg" style="margin-top:10px"></div></div>`).join("")}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
@@ -565,7 +572,12 @@ function render(){
         <span style="font-size:11px;color:${V.q}">Relay: ${relay.l}</span>
       </div>
       <div id="delivery-table">
-        <div style="padding:40px;text-align:center;font-size:13px;color:${V.q}">Loading...</div>
+        <div class="progress-indeterminate" style="margin:0"></div>
+        <div style="padding:24px 20px">
+          <div class="skeleton skeleton-line is-md"></div>
+          <div class="skeleton skeleton-line is-md"></div>
+          <div class="skeleton skeleton-line is-sm"></div>
+        </div>
       </div>
     </div>
 
@@ -575,7 +587,8 @@ function render(){
         <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log →</a>
       </div>
       <div id="audit-log" style="padding:16px 20px;min-height:80px">
-        <div style="font-size:12px;color:${V.q};font-family:${V.mono}">Loading...</div>
+        <div class="skeleton skeleton-line is-md"></div>
+        <div class="skeleton skeleton-line is-sm"></div>
       </div>
     </div>
   </div>`;
@@ -592,6 +605,12 @@ function render(){
         <span style="color:${V.q}">${esc(e.hash||"")}${e.device?" · "+esc(e.device):""}${e.latency_ms?" · "+e.latency_ms+"ms":""}</span>
       </div>`
     ).join("");
+  } else if (data) {
+    document.getElementById("audit-log").innerHTML=`<div class="empty-state is-compact" style="border:none;background:transparent;padding:12px 4px">
+      <div class="empty-state-glyph" aria-hidden="true">∅</div>
+      <p class="empty-state-title">No audit events yet</p>
+      <p class="empty-state-hint">Inbound, ACK and burn events will appear here as the relay processes traffic for your key.</p>
+    </div>`;
   }
 }
 
