@@ -13,8 +13,10 @@ export function decrypt_blob(ciphertext: Uint8Array, kem_priv: Uint8Array, ecdh_
 /**
  * Encrypt plaintext for a receiver identified by kem_pub (1184 B) and ecdh_pub (65 B).
  * Returns a 5 MB padded blob in wire format:
- *   0x02 | u32be(ctKemLen) | ctKem | u32be(senderPubLen) | senderPub | nonce(12) | u32be(ctLen) | ct
- * Matches the JS hybrid-KEM construction in parashare.html exactly.
+ *   0x03 | u32be(ctKemLen) | ctKem | u32be(senderPubLen) | senderPub | nonce(12) | u32be(ctLen) | ct
+ * All bytes from offset 0 through and including u32be(ctLen) are passed to AES-256-GCM
+ * as Associated Data so any tampering with wire metadata fails verification explicitly,
+ * rather than relying on cascade failure via HKDF salt = ctKem[..32].
  */
 export function encrypt_blob(plaintext: Uint8Array, kem_pub: Uint8Array, ecdh_pub: Uint8Array): Uint8Array;
 
