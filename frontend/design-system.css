@@ -74,7 +74,10 @@
   /* motion */
   --duration-fast: 120ms;
   --duration-base: 200ms;
+  --duration-slow: 320ms;
   --ease-sharp:    cubic-bezier(0.2, 0, 0, 1);
+  --ease-soft:     cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ─── v3 legacy token aliases (remove after Phase D HTML migration) ─── */
   --black:       #0B3A6A;
@@ -102,7 +105,12 @@
 
 html {
   scroll-behavior: smooth;
+  /* keep anchor targets clear of the 56px sticky navbar */
+  scroll-padding-top: 72px;
   -webkit-text-size-adjust: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 img, video, svg {
@@ -183,6 +191,10 @@ h1 em::after {
 :focus-visible {
   outline: 2px solid var(--cobalt);
   outline-offset: 2px;
+  transition: outline-offset var(--duration-fast) var(--ease-out);
+}
+:focus-visible:not(:active) {
+  outline-offset: 3px;
 }
 .section-cobalt :focus-visible,
 .section-navy :focus-visible,
@@ -1107,10 +1119,14 @@ h1 em::after {
   border: 1.5px solid transparent;
   transition: background var(--duration-base) var(--ease-sharp),
               color var(--duration-base) var(--ease-sharp),
-              border-color var(--duration-base) var(--ease-sharp);
+              border-color var(--duration-base) var(--ease-sharp),
+              transform var(--duration-fast) var(--ease-out);
   white-space: nowrap;
   line-height: 1;
   user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .btn:disabled {
   opacity: .35;
@@ -1228,11 +1244,16 @@ h1 em::after {
   background: var(--lime);
   border: 1px solid var(--navy);
   flex-shrink: 0;
-  animation: blink-step 2s steps(2, end) infinite;
+  animation: status-pulse 2.4s var(--ease-soft) infinite;
 }
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .55; transform: scale(.92); }
+}
+/* legacy keyframe alias — keep for any hand-rolled usage */
 @keyframes blink-step {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  50%      { opacity: .5; }
 }
 
 .status-row {
@@ -1363,6 +1384,38 @@ pre code { background: none; padding: 0; }
   text-overflow: clip;
   user-select: none;
 }
+
+
+/* ═══════════════════════════════════════════════════
+   MOTION UTILITIES
+   ═══════════════════════════════════════════════════ */
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ds-rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ds-scale-in {
+  from { opacity: 0; transform: scale(.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Page-level entrance — applied to <main> via .page-enter */
+.page-enter {
+  animation: ds-fade-in var(--duration-slow) var(--ease-out) both;
+}
+/* Block-level entrance — for cards, hero sections, lists, etc. */
+.rise-in {
+  animation: ds-rise-in var(--duration-slow) var(--ease-out) both;
+}
+/* Stagger helpers (use with .rise-in) */
+.rise-in.delay-1 { animation-delay:  60ms; }
+.rise-in.delay-2 { animation-delay: 120ms; }
+.rise-in.delay-3 { animation-delay: 180ms; }
+.rise-in.delay-4 { animation-delay: 240ms; }
+.rise-in.delay-5 { animation-delay: 300ms; }
 
 
 /* ═══════════════════════════════════════════════════
@@ -1790,11 +1843,15 @@ pre code { background: none; padding: 0; }
   text-decoration: none;
   color: var(--ink);
   transition: border-color var(--duration-base) var(--ease-sharp),
-              background var(--duration-base) var(--ease-sharp);
+              background var(--duration-base) var(--ease-sharp),
+              transform var(--duration-base) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out);
 }
 .help-card:hover {
   border-color: var(--cobalt);
   background: var(--ink-ghost);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 -3px var(--ink-ghost);
 }
 .help-card .help-card-title {
   font-size: var(--text-base);
@@ -1813,6 +1870,10 @@ pre code { background: none; padding: 0; }
   font-family: var(--mono);
   font-size: var(--text-xs);
   color: var(--cobalt);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.help-card:hover .help-card-arrow {
+  transform: translateX(4px);
 }
 
 /* Contact / CTA prompt box */

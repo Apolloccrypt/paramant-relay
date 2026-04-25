@@ -103,10 +103,16 @@ nav.nav .nav-dropdown-menu {
   z-index: 400;
   max-height: calc(100vh - 70px);
   overflow-y: auto;
+  transform-origin: top left;
 }
 nav.nav .nav-dropdown.open .nav-dropdown-menu,
 nav.nav .nav-dropdown:hover .nav-dropdown-menu {
   display: block;
+  animation: nav-dropdown-in var(--duration-base) var(--ease-out) both;
+}
+@keyframes nav-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 
 /* Divider inside panel */
@@ -167,17 +173,32 @@ nav.nav .nav-link {
   text-transform: uppercase;
   padding: var(--space-2) var(--space-3);
   text-decoration: none;
-  transition: color var(--duration-base) var(--ease-sharp);
+  transition: color var(--duration-base) var(--ease-sharp),
+              box-shadow var(--duration-base) var(--ease-out);
   white-space: nowrap;
   display: flex;
   align-items: center;
   height: 32px;
+  position: relative;
+}
+nav.nav .nav-link::after {
+  content: '';
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 4px;
+  height: 2px;
+  background: var(--cobalt);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--duration-base) var(--ease-out);
 }
 nav.nav .nav-link:hover { color: var(--cobalt); }
+nav.nav .nav-link:hover::after { transform: scaleX(.4); }
 nav.nav .nav-link.active {
   color: var(--cobalt);
-  box-shadow: inset 0 -2px 0 var(--cobalt);
 }
+nav.nav .nav-link.active::after { transform: scaleX(1); }
 
 /* ════════════════════════════════════════
    HAMBURGER
@@ -205,9 +226,21 @@ nav.nav .nav-hamburger span {
   width: 22px;
   height: 2px;
   background: var(--ink);
-  transition: transform var(--duration-base) var(--ease-sharp),
-              opacity var(--duration-fast);
+  transition: transform var(--duration-base) var(--ease-out),
+              opacity var(--duration-fast) var(--ease-out);
   pointer-events: none;
+  transform-origin: center;
+}
+/* Open state — animate to a clean cross via CSS instead of inline JS */
+nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(.4);
+}
+nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
 }
 
 /* ════════════════════════════════════════
@@ -226,7 +259,14 @@ nav.nav .nav-hamburger span {
   overflow-y: auto;
   flex-direction: column;
 }
-.nav-mobile.open { display: flex; }
+.nav-mobile.open {
+  display: flex;
+  animation: nav-mobile-in var(--duration-slow) var(--ease-out) both;
+}
+@keyframes nav-mobile-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* Accordion group */
 .nav-mobile-group {
@@ -264,13 +304,23 @@ nav.nav .nav-hamburger span {
 .nav-mobile-group.open .nav-mobile-group-btn { color: #0B3A6A; }
 .nav-mobile-group.open .nav-mobile-group-btn::after { content: '\2212'; color: #B2FF3F; }
 
-/* Group items */
+/* Group items — animated reveal using max-height + opacity */
 .nav-mobile-group-items {
-  display: none;
+  display: flex;
   flex-direction: column;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 0 0;
+  transition: max-height var(--duration-base) var(--ease-out),
+              opacity var(--duration-fast) var(--ease-out),
+              padding var(--duration-base) var(--ease-out);
+}
+.nav-mobile-group.open .nav-mobile-group-items {
+  max-height: 720px;
+  opacity: 1;
   padding: 0 0 var(--space-3);
 }
-.nav-mobile-group.open .nav-mobile-group-items { display: flex; }
 
 .nav-mobile-group-items a {
   display: block;
