@@ -168,12 +168,28 @@ NEW_MOBILE = '''\
       <a href="mailto:privacy@paramant.app">Contact</a>
     </div>
   </div>
+
+  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <div class="nav-auth-mobile" id="nav-auth-mobile"></div>
 </div>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=17">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=11">'
 NAV_JS    = '<script src="/nav.js?v=11" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js" defer></script>'
+
+# Pages that don't have <nav class="nav"> yet but should — inject the canonical
+# nav after <body> (or after a skip-link if present). App shells (admin,
+# dashboard, billing) and printable standalones (briefs, one-pager,
+# pattern-library) intentionally stay nav-less and are not in this set.
+ADD_NAV_TO = {
+    '404.html',
+    'changelog.html',
+    'download.html',
+    'legal.html',
+    'security/acknowledgements.html',
+    'signup/verified.html',
+}
 
 
 def inject_design_system(html):
@@ -221,6 +237,19 @@ def inject_nav_auth_js(html):
     return html
 
 
+def inject_nav_block(html):
+    """Insert NEW_NAV + NEW_MOBILE after the skip-link (or <body> if none)."""
+    skip = re.search(r'<a href="#main-content"[^>]*class="skip-link"[^>]*>[^<]*</a>', html)
+    if skip:
+        i = skip.end()
+    else:
+        body = re.search(r'<body[^>]*>', html)
+        if not body:
+            return html
+        i = body.end()
+    return html[:i] + '\n' + NEW_NAV + '\n' + NEW_MOBILE + html[i:]
+
+
 def replace_mobile_div(html):
     """Replace <div class="nav-mobile"...>...</div>, counting nested divs."""
     start = html.find('<div class="nav-mobile"')
@@ -244,15 +273,21 @@ def replace_mobile_div(html):
 
 def process(fpath):
     with open(fpath, encoding='utf-8') as f:
-        content = f.read()
+        original = f.read()
+    rel = os.path.relpath(fpath, frontend).replace(os.sep, '/')
+    content = original
     if '<nav class="nav">' not in content:
-        return False
+        if rel not in ADD_NAV_TO:
+            return False
+        content = inject_nav_block(content)
+        if '<nav class="nav">' not in content:
+            return False
     updated = re.sub(r'<nav class="nav">.*?</nav>', NEW_NAV, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
     updated = inject_nav_auth_js(updated)
-    if updated == content:
+    if updated == original:
         return False
     with open(fpath, 'w', encoding='utf-8') as f:
         f.write(updated)

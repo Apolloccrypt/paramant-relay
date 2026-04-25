@@ -1,33 +1,35 @@
 (function() {
-  var container = document.getElementById('nav-auth');
-  if (!container) return;
+  var desktop = document.getElementById('nav-auth');
+  var mobile  = document.getElementById('nav-auth-mobile');
+  if (!desktop && !mobile) return;
 
-  function renderLoggedOut() {
-    container.innerHTML = '<a href="/help" class="nav-help">HELP</a>' +
+  function loggedOutHTML(includeHelp) {
+    return (includeHelp ? '<a href="/help" class="nav-help">HELP</a>' : '') +
       '<a href="/auth/login" class="nav-signin">Sign in</a>' +
       '<a href="/signup" class="nav-cta">Create account</a>';
   }
 
-  function renderLoggedIn(email) {
+  function loggedInHTML(email) {
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
-    container.innerHTML =
-      '<div class="nav-user">' +
+    return '<div class="nav-user">' +
         '<button type="button" class="nav-user-trigger" aria-expanded="false">' +
           '<span class="nav-user-email">' + shortEmail + '</span>' +
-          '<span class="nav-user-chevron">\u25be</span>' +
+          '<span class="nav-user-chevron">▾</span>' +
         '</button>' +
         '<div class="nav-user-menu" hidden>' +
           '<a href="/account" class="nav-menu-item">Account</a>' +
           '<a href="/pricing" class="nav-menu-item">Plan &amp; billing</a>' +
           '<a href="/help" class="nav-menu-item">Help</a>' +
           '<div class="nav-menu-divider"></div>' +
-          '<button type="button" class="nav-menu-item nav-menu-signout" id="nav-signout">Sign out</button>' +
+          '<button type="button" class="nav-menu-item nav-menu-signout">Sign out</button>' +
         '</div>' +
       '</div>';
+  }
 
+  function attachLoggedInHandlers(container) {
     var trigger = container.querySelector('.nav-user-trigger');
     var menu    = container.querySelector('.nav-user-menu');
-    var signout = container.querySelector('#nav-signout');
+    var signout = container.querySelector('.nav-menu-signout');
 
     trigger.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -53,6 +55,23 @@
         location.reload();
       }
     });
+  }
+
+  function renderLoggedOut() {
+    if (desktop) desktop.innerHTML = loggedOutHTML(true);
+    if (mobile)  mobile.innerHTML  = loggedOutHTML(false);
+  }
+
+  function renderLoggedIn(email) {
+    var html = loggedInHTML(email);
+    if (desktop) {
+      desktop.innerHTML = html;
+      attachLoggedInHandlers(desktop);
+    }
+    if (mobile) {
+      mobile.innerHTML = html;
+      attachLoggedInHandlers(mobile);
+    }
   }
 
   (async function check() {
