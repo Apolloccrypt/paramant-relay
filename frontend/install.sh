@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PARAMANT relay installer
-# Usage: curl -fsSL https://get.paramant.app/install.sh | bash
+# Usage: curl -fsSL https://paramant.app/install.sh | bash
 # Docs:  https://github.com/Apolloccrypt/paramant-relay#self-hosting
 # BUSL-1.1 — free for Community Edition (up to 5 API keys)
 # Commercial license: https://paramant.app/pricing
