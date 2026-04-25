@@ -16,8 +16,8 @@
 <meta name="twitter:description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
 <link rel="canonical" href="https://paramant.app/docs">
 
-<link rel="stylesheet" href="/design-system.css?v=16">
-<link rel="stylesheet" href="/nav.css?v=10">
+<link rel="stylesheet" href="/design-system.css?v=17">
+<link rel="stylesheet" href="/nav.css?v=11">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
 a{color:var(--ink);text-decoration:none}
@@ -159,90 +159,81 @@ tr:last-child td{border-bottom:none}
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Send menu" aria-haspopup="true" aria-expanded="false">SEND</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem" class="nav-product-item"><span class="npi-title">ParaShare</span><span class="npi-sub">Verified transfers with signed receipts</span></a></li>
-        <li role="none"><a href="/drop" role="menuitem" class="nav-product-item"><span class="npi-title">ParaDrop</span><span class="npi-sub">Device to device, AirDrop alternative</span></a></li>
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Build menu" aria-haspopup="true" aria-expanded="false">BUILD</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Docs &amp; API</li>
-        <li role="none"><a href="/docs" role="menuitem" class="nav-product-item"><span class="npi-title">Documentation</span><span class="npi-sub">API reference, protocol spec, install guides</span></a></li>
-        <li role="none"><a href="/ct-log" role="menuitem" class="nav-product-item"><span class="npi-title">CT Log</span><span class="npi-sub">Live Merkle root — verifiable transfer history</span></a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem" class="nav-product-item"><span class="npi-title">GitHub</span><span class="npi-sub">Source code, issues, community</span></a></li>
-        <li class="nav-subheader" role="presentation">Self-host</li>
-        <li role="none"><a href="/install.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install.sh</span><span class="npi-sub">Automated Linux server installer</span></a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-pi.sh</span><span class="npi-sub">Raspberry Pi optimised installer</span></a></li>
-        <li role="none"><a href="/install-client.sh" role="menuitem" class="nav-product-item"><span class="npi-title">install-client.sh</span><span class="npi-sub">CLI client installer</span></a></li>
-        <li role="none"><a href="/download" role="menuitem" class="nav-product-item"><span class="npi-title">ParamantOS</span><span class="npi-sub">Hardened ISO for air-gapped deploys</span></a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem" class="nav-product-item"><span class="npi-title">Releases</span><span class="npi-sub">Versioned binaries and SBOMs</span></a></li>
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
+        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">COMPLIANCE</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem" class="nav-product-item"><span class="npi-title">NIS2 (EU 2022/2555)</span><span class="npi-sub">EU cybersecurity directive — essential entities</span></a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem" class="nav-product-item"><span class="npi-title">IEC 62443 (Industrial IoT)</span><span class="npi-sub">Industrial control systems compliance</span></a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem" class="nav-product-item"><span class="npi-title">NEN 7510 (Dutch Healthcare)</span><span class="npi-sub">Dutch health data protection standard</span></a></li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
         <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem" class="nav-product-item"><span class="npi-title">Jurisdiction</span><span class="npi-sub">EU ownership, CLOUD Act analysis, migration roadmap</span></a></li>
-        <li role="none"><a href="/government" role="menuitem" class="nav-product-item"><span class="npi-title">Government &amp; public sector</span><span class="npi-sub">Public procurement and NIS2 guidance</span></a></li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
         <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem" class="nav-product-item"><span class="npi-title">OT guide</span><span class="npi-sub">Operational technology integration guide</span></a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem" class="nav-product-item"><span class="npi-title">OT vs data diodes</span><span class="npi-sub">When a data diode is the better choice</span></a></li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
         <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem" class="nav-product-item"><span class="npi-title">HNDL threat</span><span class="npi-sub">Harvest Now Decrypt Later — the immediate risk</span></a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem" class="nav-product-item"><span class="npi-title">Quantum urgency</span><span class="npi-sub">Why migrate before Q-Day</span></a></li>
-        <li role="none"><a href="/crypto-agility" role="menuitem" class="nav-product-item"><span class="npi-title">Crypto agility</span><span class="npi-sub">Migrating away from classical algorithms</span></a></li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
         <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem" class="nav-product-item"><span class="npi-title">Data Processing Agreement</span><span class="npi-sub">GDPR DPA — sign and download</span></a></li>
-        <li role="none"><a href="/sla" role="menuitem" class="nav-product-item"><span class="npi-title">SLA</span><span class="npi-sub">Uptime guarantees and incident response times</span></a></li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
       </ul>
     </li>
 
+    <li><a href="/vs" class="nav-link">Compare</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Use cases menu" aria-haspopup="true" aria-expanded="false">USE CASES</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">DevOps</li>
-        <li role="none"><a href="/ssh-key-delivery" role="menuitem" class="nav-product-item"><span class="npi-title">SSH key delivery</span><span class="npi-sub">Post-quantum SSH bootstrap</span></a></li>
-        <li class="nav-subheader" role="presentation">Security</li>
-        <li role="none"><a href="/anti-phishing" role="menuitem" class="nav-product-item"><span class="npi-title">Anti-phishing</span><span class="npi-sub">Breaking mass distribution attacks</span></a></li>
-        <li class="nav-subheader" role="presentation">Enterprise</li>
-        <li role="none"><a href="/audit-log-export" role="menuitem" class="nav-product-item"><span class="npi-title">Audit log export</span><span class="npi-sub">GDPR-compliant audit evidence delivery</span></a></li>
-        <li role="none"><a href="/ma-due-diligence" role="menuitem" class="nav-product-item"><span class="npi-title">M&amp;A due diligence</span><span class="npi-sub">EU-sovereign deal rooms</span></a></li>
-        <li class="nav-subheader" role="presentation">Regulated</li>
-        <li role="none"><a href="/healthcare" role="menuitem" class="nav-product-item"><span class="npi-title">Healthcare</span><span class="npi-sub">NEN 7510 patient data transfer</span></a></li>
-        <li role="none"><a href="/legal-discovery" role="menuitem" class="nav-product-item"><span class="npi-title">Legal discovery</span><span class="npi-sub">Attorney-client privileged delivery</span></a></li>
-        <li role="none"><a href="/whistleblower-channel" role="menuitem" class="nav-product-item"><span class="npi-title">Whistleblower channel</span><span class="npi-sub">EU Whistleblower Directive compliant</span></a></li>
-      </ul>
-    </li>
-
-    <li style="margin-left:auto"><a href="/architecture" class="nav-link nav-link-btn">HOW IT WORKS</a></li>
-    <li><a href="/pricing" class="nav-link nav-link-btn">PRICING</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">ABOUT</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem" class="nav-product-item"><span class="npi-title">Status</span><span class="npi-sub">Live relay health and uptime metrics</span></a></li>
-        <li role="none"><a href="/security" role="menuitem" class="nav-product-item"><span class="npi-title">Security</span><span class="npi-sub">Pentest reports and vulnerability disclosure</span></a></li>
-        <li role="none"><a href="/vs" role="menuitem" class="nav-product-item"><span class="npi-title">Compare</span><span class="npi-sub">Paramant vs WeTransfer, Signal, Wire</span></a></li>
-        <li role="none"><a href="/changelog" role="menuitem" class="nav-product-item"><span class="npi-title">Changelog</span><span class="npi-sub">Release notes and version history</span></a></li>
-        <li role="none"><a href="/license" role="menuitem" class="nav-product-item"><span class="npi-title">License</span><span class="npi-sub">BUSL-1.1 source-available terms</span></a></li>
-        <li role="none"><a href="/press" role="menuitem" class="nav-product-item"><span class="npi-title">Press kit</span><span class="npi-sub">Logos, brand assets, media contacts</span></a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem" class="nav-product-item"><span class="npi-title">Contact</span><span class="npi-sub">privacy@paramant.app</span></a></li>
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
       </ul>
     </li>
 
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -253,16 +244,12 @@ tr:last-child td{border-bottom:none}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-header">
-    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.75"/>
-      </svg>
-    </button>
+    <button class="nav-mobile-close" id="nav-mobile-close" aria-label="Close menu">&times;</button>
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-products">Products</button>
-    <div class="nav-mobile-group-items" id="mobile-group-products">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
+    <div class="nav-mobile-group-items">
       <a href="/send">Send a file</a>
       <a href="/parashare">ParaShare</a>
       <a href="/drop">ParaDrop</a>
@@ -273,8 +260,8 @@ tr:last-child td{border-bottom:none}
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-developers">Developers</button>
-    <div class="nav-mobile-group-items" id="mobile-group-developers">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
+    <div class="nav-mobile-group-items">
       <a href="/docs">Docs</a>
       <a href="/docs#api">API reference</a>
       <a href="/ct-log">CT Log</a>
@@ -285,20 +272,21 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-selfhost">Self-host</button>
-    <div class="nav-mobile-group-items" id="mobile-group-selfhost">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
+    <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="/install-client.sh">install-client.sh</a>
+      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
+      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
       <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
   </div>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-compliance">Compliance</button>
-    <div class="nav-mobile-group-items" id="mobile-group-compliance">
+    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
+    <div class="nav-mobile-group-items">
       <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
       <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
       <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
@@ -313,24 +301,11 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>
 
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Use cases</button>
-    <div class="nav-mobile-group-items">
-      <a href="/ssh-key-delivery">SSH key delivery</a>
-      <a href="/anti-phishing">Anti-phishing</a>
-      <a href="/audit-log-export">Audit log export</a>
-      <a href="/ma-due-diligence">M&amp;A due diligence</a>
-      <a href="/healthcare">Healthcare</a>
-      <a href="/legal-discovery">Legal discovery</a>
-      <a href="/whistleblower-channel">Whistleblower channel</a>
-    </div>
-  </div>
-
   <a href="/vs" class="nav-mobile-standalone">Compare</a>
 
   <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-group-about">About</button>
-    <div class="nav-mobile-group-items" id="mobile-group-about">
+    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
+    <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
       <a href="/sla">SLA</a>
@@ -338,7 +313,8 @@ tr:last-child td{border-bottom:none}
       <a href="/press">Press kit</a>
       <a href="mailto:privacy@paramant.app">Contact</a>
     </div>
-  </div></div>
+  </div>
+</div>
 
 <section class="docs-hero">
   <div class="docs-hero-inner">
@@ -399,25 +375,28 @@ tr:last-child td{border-bottom:none}
     <h2 id="quickstart">Quick start</h2>
     <p>Send your first encrypted file in under 5 minutes. No account required — <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">create a free account here</a> (TOTP protected, key visible in dashboard).</p>
 
-    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Install the Python SDK (requires Python 3.9+, cryptography library)</p></div></div>
-    <pre>pip install cryptography</pre>
-
-    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Download the sender and receiver scripts</p></div></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px">
-      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
-      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
-    </div>
-
-    <div class="step-row"><div class="step-num">3</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Send a file — encrypted before it leaves your device</p></div></div>
+    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Install the SDK (Python 3.10+ or Node 18+; both ship the same wire-format-v1 encoder)</p></div></div>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-      <pre><span class="cm"># Terminal 1 — sender</span>
-python3 paramant-sender.py --key pgp_your_key --device laptop-01 document.pdf
-<span class="cm"># → HASH: abc123... (share this with the receiver)</span>
+      <pre><span class="cm"># Python</span>
+pip install paramant-sdk
 
-<span class="cm"># Terminal 2 — receiver (burn-on-read: one download only)</span>
-python3 paramant-receiver.py --key pgp_your_key --hash abc123...
-<span class="cm"># → document.pdf saved locally. Blob destroyed on relay.</span></pre>
+<span class="cm"># JavaScript / Node</span>
+npm install paramant-sdk</pre>
+    </div>
+
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Send a file — encrypted client-side before it leaves your device</p></div></div>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
+      <pre>from paramant_sdk import GhostPipe
+
+gp = GhostPipe(api_key="pgp_your_key", device="laptop-01")
+
+<span class="cm"># Send — returns blob hash; share with receiver</span>
+hash_ = gp.send(open("document.pdf", "rb").read(), ttl=3600)
+
+<span class="cm"># Receive — burn-on-read, one download only</span>
+data = gp.receive(hash_)</pre>
     </div>
 
     <p>Or use the direct HTTP API — no SDK needed:</p>
@@ -448,31 +427,22 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 GET /v2/check-key?k=pgp_your_key_here</pre>
 
     <!-- ── SDK ──────────────────────────────────────────────────── -->
-    <h2 id="sdk">SDK &amp; scripts</h2>
-    <p>The Python scripts handle ML-KEM-768 encryption, 5MB padding, chunking, retries, and DID authentication. No SDK package required — just <code>pip install cryptography</code>.</p>
+    <h2 id="sdk">SDK</h2>
+    <p>Two official SDKs ship the same wire-format-v1 encoder, ML-KEM-768 + ML-DSA-65 by default, and capability negotiation against <code>/v2/capabilities</code>. Pick whichever matches your runtime — they are byte-compatible on the wire.</p>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px">
-      <a href="/dl/scripts/paramant-sender.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-sender.py</a>
-      <a href="/dl/scripts/paramant-receiver.py" download style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant-receiver.py</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/sdk-py" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">↓ paramant_sdk.py</a>
+      <a href="https://pypi.org/project/paramant-sdk/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">PyPI · paramant-sdk</a>
+      <a href="https://www.npmjs.com/package/paramant-sdk" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">npm · paramant-sdk</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/sdk-py" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">GitHub · sdk-py source</a>
+      <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/sdk-js" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">GitHub · sdk-js source</a>
     </div>
 
-    <h3>Sender — common options</h3>
-    <pre>python3 paramant-sender.py \
-  --key    pgp_xxx       <span class="cm"># required — your API key</span>
-  --device mri-001       <span class="cm"># required — identifies this device</span>
-  --sector health        <span class="cm"># optional — routes to health.paramant.app</span>
-  --ttl    3600          <span class="cm"># optional — TTL in seconds (default 3600)</span>
-  --watch  /data/out/    <span class="cm"># optional — watch directory and auto-send new files</span>
-  document.pdf</pre>
+    <h3>Install</h3>
+    <pre><span class="cm"># Python (3.10+)</span>
+pip install paramant-sdk
 
-    <h3>Receiver — common options</h3>
-    <pre>python3 paramant-receiver.py \
-  --key     pgp_xxx        <span class="cm"># required</span>
-  --hash    abc123...      <span class="cm"># receive specific blob by hash</span>
-  --stream                 <span class="cm"># listen for incoming blobs via WebSocket</span>
-  --forward https://you/cb <span class="cm"># forward decrypted payload to webhook</span>
-  --out     ./received/    <span class="cm"># output directory</span></pre>
+<span class="cm"># JavaScript (Node 18+)</span>
+npm install paramant-sdk</pre>
 
     <h3>Python SDK (class-based)</h3>
     <div class="cb">
@@ -489,11 +459,7 @@ gp = GhostPipe(
 hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 
 <span class="cm"># Receive — burn-on-read, returns plaintext bytes</span>
-data = gp.receive(hash_)
-
-<span class="cm"># Anonymous drop with 12-word mnemonic</span>
-mnemonic = gp.drop(b"sensitive data", ttl=3600)
-data     = gp.pickup(mnemonic)</pre>
+data = gp.receive(hash_)</pre>
     </div>
 
     <!-- ── Use cases ──────────────────────────────────────────── -->
@@ -502,48 +468,49 @@ data     = gp.pickup(mnemonic)</pre>
 
     <h3><span class="sector-badge">health</span>Healthcare — NEN 7510, DICOM, HL7 FHIR</h3>
     <p>Send MRI scans, referral letters, and lab results between care providers. <code>health.paramant.app</code> is designed for NEN 7510 compliance — encrypted in transit, RAM-only, EU jurisdiction, per-access CT log proof.</p>
-    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send DICOM scan to specialist</span>
-python3 paramant-sender.py --key pgp_xxx --device mri-001 --sector health scan.dcm
-
-<span class="cm"># HL7 FHIR referral</span>
-paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg</pre></div>
+from paramant_sdk import GhostPipe
+gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
+hash_ = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
     <p><a href="/compliance/nen7510" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">NEN 7510 compliance page →</a></p>
 
     <h3><span class="sector-badge">legal</span>Legal &amp; Notary — eIDAS, KNB</h3>
     <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log provides tamper-evident proof of delivery without storing content.</p>
-    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-    <pre><span class="cm"># Signed deed — proof of delivery, zero storage</span>
-paramant-notary deed.pdf --sign --receipt
-
-<span class="cm"># Court document with case reference</span>
-paramant-legal summons.pdf --case ROT-2026-1234 --proof</pre></div>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
+    <pre><span class="cm"># Signed deed — burn-on-read, CT log entry as proof of delivery</span>
+from paramant_sdk import GhostPipe
+gp = GhostPipe(api_key="pgp_xxx", device="notary-01", sector="legal")
+hash_, receipt = gp.send_with_receipt(open("deed.pdf","rb").read())
+gp.verify_receipt(receipt)  <span class="cm"># ML-DSA-65 signed</span></pre></div>
 
     <h3><span class="sector-badge">iot</span>Industrial IoT — IEC 62443</h3>
     <p>PLC and sensor data relay without VPN or direct OT internet exposure. Acts as a post-quantum data diode — OT side pushes outbound only, IT side receives. Fixed 5 MB padding defeats traffic analysis.</p>
-    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-    <pre><span class="cm"># PLC heartbeat every 15s</span>
-python3 paramant-sender.py --heartbeat 15 --device plc-factory-01 --sector iot
-
-<span class="cm"># Firmware update to IoT fleet</span>
-paramant-firmware update-v2.1.bin --sign --device-group bodycams.txt</pre></div>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
+    <pre><span class="cm"># PLC telemetry — outbound only, no VPN, no inbound port</span>
+from paramant_sdk import GhostPipe
+gp = GhostPipe(api_key="pgp_xxx", device="plc-factory-01", sector="iot")
+while True:
+    gp.send(read_plc_state(), ttl=60)
+    time.sleep(15)</pre></div>
     <p><a href="/compliance/iec62443" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">IEC 62443 compliance page →</a></p>
 
     <h3><span class="sector-badge">finance</span>Finance — NIS2, DORA, ISO 20022</h3>
     <p>ISO 20022 payment file relay with per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code> — EU jurisdiction, no US Cloud Act, no metadata retention.</p>
-    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
-    <pre><span class="cm"># Watch directory for ISO 20022 files</span>
-python3 paramant-sender.py --watch /export/iso20022/ --device bank-nl-01 --sector finance
-
-<span class="cm"># CT log proof for DORA audit</span>
-curl https://finance.paramant.app/v2/ct -H "X-Api-Key: pgp_xxx"</pre></div>
+    <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
+    <pre><span class="cm"># Send ISO 20022 payment file with CT proof for DORA audit</span>
+from paramant_sdk import GhostPipe
+gp = GhostPipe(api_key="pgp_xxx", device="bank-nl-01", sector="finance")
+hash_, receipt = gp.send_with_receipt(open("pacs008.xml","rb").read())
+<span class="cm"># receipt → tree_size, sha3_root, ML-DSA-65 signature</span></pre></div>
 
     <!-- ── API Reference ──────────────────────────────────────── -->
     <h2 id="endpoints">All endpoints</h2>
     <table>
       <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth</th></tr>
       <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>—</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob (RAM-only)</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob from an authenticated client (RAM-only)</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Upload from an anonymous client — no API key, used by /send</td><td>—</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn — one retrieval only</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
@@ -1007,7 +974,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How do I get a pgp_ API key?</div>
-      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a> — create a free account to receive your API key with TOTP protection. Trial plan: 10 uploads/day, 1-hour TTL, 30-day expiry.</div>
+      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a> — create a free account to receive your API key with TOTP protection. Free plan: 10 uploads/hour per IP, 1-hour TTL, burn-on-first-read. See <a href="/pricing">/pricing</a> for tier details.</div>
     </div>
 
   </div>
@@ -1022,7 +989,7 @@ window.addEventListener('scroll', () => {
   links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
 }, { passive: true });
 </script>
-<script src="/nav.js?v=10" defer></script>
+<script src="/nav.js?v=11" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 <footer>
   <div class="container-lg">
