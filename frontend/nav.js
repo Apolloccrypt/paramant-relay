@@ -140,10 +140,6 @@
     hamburger.setAttribute('aria-expanded', 'true');
     hamburger.setAttribute('aria-label', 'Close menu');
     lockScroll();
-    var spans = hamburger.querySelectorAll('span');
-    if (spans[0]) spans[0].style.transform = 'translateY(7px) rotate(45deg)';
-    if (spans[1]) spans[1].style.opacity   = '0';
-    if (spans[2]) spans[2].style.transform = 'translateY(-7px) rotate(-45deg)';
     if (closeBtn) closeBtn.focus();
   }
 
@@ -152,8 +148,6 @@
     hamburger.setAttribute('aria-expanded', 'false');
     hamburger.setAttribute('aria-label', 'Open menu');
     unlockScroll();
-    var spans = hamburger.querySelectorAll('span');
-    spans.forEach(function (s) { s.removeAttribute('style'); });
     hamburger.focus();
   }
 

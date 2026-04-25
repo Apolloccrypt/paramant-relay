@@ -74,7 +74,10 @@
   /* motion */
   --duration-fast: 120ms;
   --duration-base: 200ms;
+  --duration-slow: 320ms;
   --ease-sharp:    cubic-bezier(0.2, 0, 0, 1);
+  --ease-soft:     cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ─── v3 legacy token aliases (remove after Phase D HTML migration) ─── */
   --black:       #0B3A6A;
@@ -102,7 +105,12 @@
 
 html {
   scroll-behavior: smooth;
+  /* keep anchor targets clear of the 56px sticky navbar */
+  scroll-padding-top: 72px;
   -webkit-text-size-adjust: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 img, video, svg {
@@ -185,6 +193,10 @@ h1 em::after {
 :focus-visible {
   outline: 2px solid var(--cobalt);
   outline-offset: 2px;
+  transition: outline-offset var(--duration-fast) var(--ease-out);
+}
+:focus-visible:not(:active) {
+  outline-offset: 3px;
 }
 .section-cobalt :focus-visible,
 .section-navy :focus-visible,
@@ -508,10 +520,31 @@ h1 em::after {
   padding: 40px var(--space-6);
   background: var(--bone);
   cursor: pointer;
-  transition: background var(--duration-base) var(--ease-sharp);
+  transition: background var(--duration-base) var(--ease-sharp),
+              border-color var(--duration-base) var(--ease-sharp),
+              box-shadow var(--duration-base) var(--ease-out);
 }
-.drop:hover, .drop.drag-over,
-.dropzone:hover, .dropzone.drag-over { background: var(--ink-ghost); }
+/* Idle "breathe" — subtle lime ring that invites interaction without
+   shouting. Pauses on hover/focus/drag so feedback states are clean. */
+.drop:not(:hover):not(:focus-within):not(.drag-over),
+.dropzone:not(:hover):not(:focus-within):not(.drag-over) {
+  animation: drop-breathe 3.6s var(--ease-soft) infinite;
+}
+@keyframes drop-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(178,255,63,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(178,255,63,.18); }
+}
+.drop:hover, .drop:focus-within,
+.dropzone:hover, .dropzone:focus-within {
+  background: var(--ink-ghost);
+  box-shadow: 0 0 0 2px var(--ink-hair);
+}
+.drop.drag-over,
+.dropzone.drag-over {
+  background: var(--ink-ghost);
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 4px rgba(29,78,216,.18);
+}
 
 /* "01" bleeding label */
 .drop-label,
@@ -1109,10 +1142,14 @@ h1 em::after {
   border: 1.5px solid transparent;
   transition: background var(--duration-base) var(--ease-sharp),
               color var(--duration-base) var(--ease-sharp),
-              border-color var(--duration-base) var(--ease-sharp);
+              border-color var(--duration-base) var(--ease-sharp),
+              transform var(--duration-fast) var(--ease-out);
   white-space: nowrap;
   line-height: 1;
   user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .btn:disabled {
   opacity: .35;
@@ -1230,11 +1267,16 @@ h1 em::after {
   background: var(--lime);
   border: 1px solid var(--navy);
   flex-shrink: 0;
-  animation: blink-step 2s steps(2, end) infinite;
+  animation: status-pulse 2.4s var(--ease-soft) infinite;
 }
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .55; transform: scale(.92); }
+}
+/* legacy keyframe alias — keep for any hand-rolled usage */
 @keyframes blink-step {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  50%      { opacity: .5; }
 }
 
 .status-row {
@@ -1368,6 +1410,164 @@ pre code { background: none; padding: 0; }
 
 
 /* ═══════════════════════════════════════════════════
+   MOTION UTILITIES
+   ═══════════════════════════════════════════════════ */
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ds-rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ds-scale-in {
+  from { opacity: 0; transform: scale(.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Page-level entrance — applied to <main> via .page-enter */
+.page-enter {
+  animation: ds-fade-in var(--duration-slow) var(--ease-out) both;
+}
+/* Block-level entrance — for cards, hero sections, lists, etc. */
+.rise-in {
+  animation: ds-rise-in var(--duration-slow) var(--ease-out) both;
+}
+/* Stagger helpers (use with .rise-in) */
+.rise-in.delay-1 { animation-delay:  60ms; }
+.rise-in.delay-2 { animation-delay: 120ms; }
+.rise-in.delay-3 { animation-delay: 180ms; }
+.rise-in.delay-4 { animation-delay: 240ms; }
+.rise-in.delay-5 { animation-delay: 300ms; }
+
+
+/* ═══════════════════════════════════════════════════
+   EMPTY STATE
+   For zero-data tables, dashboards, lists. Replaces a sea of "—"
+   with a glyph + title + hint + optional CTA so first-time users
+   know what the surface is for and what to do next.
+   ═══════════════════════════════════════════════════ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  border: 1px dashed var(--ink-hair);
+  background: var(--bone);
+  color: var(--ink-dim);
+}
+.empty-state-glyph {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--ink-hair);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+  background: var(--bone);
+}
+.empty-state-title {
+  font-family: var(--sans);
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+.empty-state-hint {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: .04em;
+  color: var(--ink-dim);
+  max-width: 44ch;
+  line-height: 1.55;
+  margin: 0;
+}
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  justify-content: center;
+}
+
+/* Compact variant — for inside table rows or narrow cards */
+.empty-state.is-compact {
+  padding: var(--space-5) var(--space-4);
+  gap: var(--space-2);
+}
+.empty-state.is-compact .empty-state-glyph {
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-sm);
+}
+
+
+/* ═══════════════════════════════════════════════════
+   SKELETON LOADING
+   Replaces flicker placeholder divs with a calm shimmer that
+   reads as "we're loading", not "we're broken".
+   ═══════════════════════════════════════════════════ */
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--ink-ghost) 0%,
+    var(--ink-hair)  50%,
+    var(--ink-ghost) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s var(--ease-soft) infinite;
+  color: transparent;
+  user-select: none;
+  pointer-events: none;
+  min-height: 1em;
+}
+.skeleton-line { height: 12px; margin: 6px 0; }
+.skeleton-line.is-sm { height: 8px;  width: 40%; }
+.skeleton-line.is-md { height: 12px; width: 70%; }
+.skeleton-line.is-lg { height: 18px; width: 50%; }
+.skeleton-block { height: 64px; }
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position:  -200% 0; }
+}
+
+
+/* ═══════════════════════════════════════════════════
+   INDETERMINATE PROGRESS
+   For "Preparing…" / "Connecting…" — anything where ETA is
+   unknown. Reads as motion, not as a stuck bar.
+   ═══════════════════════════════════════════════════ */
+.progress-indeterminate {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: var(--ink-ghost);
+  overflow: hidden;
+}
+.progress-indeterminate::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 38%;
+  background: var(--cobalt);
+  animation: progress-slide 1.4s var(--ease-soft) infinite;
+}
+@keyframes progress-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+
+/* ═══════════════════════════════════════════════════
    MOTION SAFETY
    ═══════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
@@ -1377,6 +1577,16 @@ pre code { background: none; padding: 0; }
     transition-duration: .01ms !important;
   }
   .status-dot, .dot { animation: none; opacity: 1; }
+  /* Skeleton: stop shimmering, stay visibly grey so the placeholder
+     still reads as "loading" rather than a transparent gap. */
+  .skeleton { animation: none; background: var(--ink-ghost); }
+  /* Indeterminate progress: pin the bar centre so the track isn't blank. */
+  .progress-indeterminate::after {
+    animation: none;
+    transform: translateX(80%);
+  }
+  /* Dropzone: drop the breathing ring entirely. */
+  .drop, .dropzone { animation: none; }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1792,11 +2002,15 @@ pre code { background: none; padding: 0; }
   text-decoration: none;
   color: var(--ink);
   transition: border-color var(--duration-base) var(--ease-sharp),
-              background var(--duration-base) var(--ease-sharp);
+              background var(--duration-base) var(--ease-sharp),
+              transform var(--duration-base) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out);
 }
 .help-card:hover {
   border-color: var(--cobalt);
   background: var(--ink-ghost);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 -3px var(--ink-ghost);
 }
 .help-card .help-card-title {
   font-size: var(--text-base);
@@ -1815,6 +2029,10 @@ pre code { background: none; padding: 0; }
   font-family: var(--mono);
   font-size: var(--text-xs);
   color: var(--cobalt);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.help-card:hover .help-card-arrow {
+  transform: translateX(4px);
 }
 
 /* Contact / CTA prompt box */
