@@ -1403,10 +1403,17 @@ setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap)
 // _writeUsersJson: low-level write (caller must already hold the snapshot).
 // _mutateUsersJson: safe read-modify-write inside the queue (use this at call sites).
 let _usersWriteQueue = Promise.resolve();
+// Atomic write: tmp + rename eliminates the O_TRUNC window where a concurrent
+// reader sees an empty file mid-write. Combined with the sanity check in
+// /v2/reload-users this prevents the apiKeys-wipe race on plan_change.
+async function _atomicWriteUsers(data) {
+  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}`;
+  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2));
+  await fs.promises.rename(tmp, USERS_FILE);
+}
 function _writeUsersJson(data) {
-  _usersWriteQueue = _usersWriteQueue.then(() =>
-    fs.promises.writeFile(USERS_FILE, JSON.stringify(data, null, 2))
-  ).catch(e => log('warn', 'users_write_error', { err: e.message }));
+  _usersWriteQueue = _usersWriteQueue.then(() => _atomicWriteUsers(data))
+    .catch(e => log('warn', 'users_write_error', { err: e.message }));
   return _usersWriteQueue;
 }
 function _mutateUsersJson(fn) {
@@ -1414,7 +1421,7 @@ function _mutateUsersJson(fn) {
     const raw = await fs.promises.readFile(USERS_FILE, 'utf8');
     const data = JSON.parse(raw);
     fn(data);
-    await fs.promises.writeFile(USERS_FILE, JSON.stringify(data, null, 2));
+    await _atomicWriteUsers(data);
   }).catch(e => log('warn', 'users_write_error', { err: e.message }));
   return _usersWriteQueue;
 }
@@ -2520,12 +2527,54 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(400); return res.end(J({ error: 'USERS_JSON env in gebruik — bestand reload niet van toepassing' }));
     }
     const prevCount = apiKeys.size;
+
+    // Read with retry — handle transient mid-write reads from concurrent _mutateUsersJson.
+    let parsed = null;
+    let parseErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const raw = await fs.promises.readFile(USERS_FILE, 'utf8');
+        if (!raw || raw.trim().length === 0) throw new Error('empty file');
+        const d = JSON.parse(raw);
+        if (!d || !Array.isArray(d.api_keys)) throw new Error('invalid structure');
+        parsed = d; parseErr = null; break;
+      } catch (e) {
+        parseErr = e;
+        if (attempt < 3) await new Promise(r => setTimeout(r, 100));
+      }
+    }
+
+    if (parseErr) {
+      log('error', 'reload_users_parse_failed', { prev: prevCount, err: parseErr.message });
+      res.writeHead(500); return res.end(J({ ok: false, error: 'reload_failed', prev: prevCount }));
+    }
+
+    // Build candidate Map without touching the live one.
+    const candidate = new Map();
+    for (const k of parsed.api_keys) {
+      if (k.active) candidate.set(k.key, {
+        plan: k.plan, label: k.label||'', email: k.email||'', active: true, dsa_pub: k.dsa_pub||'',
+        daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
+        is_trial: !!(k.plan === 'community' && k.trial_metadata),
+        trial_created: k.created ? new Date(k.created).getTime() : null,
+        uploads_today: 0, last_upload_day: '',
+      });
+    }
+
+    // Refuse to wipe a populated Map with an empty load — defends against the
+    // 2026-05-08 race where a concurrent write left the file readable but empty.
+    if (candidate.size === 0 && prevCount > 0) {
+      log('warn', 'reload_users_rejected', { prev: prevCount, candidate: 0, reason: 'refusing_to_wipe_populated_map' });
+      res.writeHead(409); return res.end(J({ ok: false, error: 'sanity_check_failed', prev: prevCount, candidate: 0 }));
+    }
+
+    // Atomic swap.
     apiKeys.clear();
-    loadUsers();
+    candidate.forEach((v, k) => apiKeys.set(k, v));
 
     applyKeyLimitEnforcement();
-    log('info', 'reload_users', { prev: prevCount, now: apiKeys.size });
-    res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size }));
+    log('info', 'reload_users', { prev: prevCount, now: apiKeys.size, delta: apiKeys.size - prevCount });
+    res.writeHead(200); return res.end(J({ ok: true, loaded: apiKeys.size, prev: prevCount }));
   }
 
   // ── Ghost Pipe invite rendezvous — pubkey exchange without API key ───────────
