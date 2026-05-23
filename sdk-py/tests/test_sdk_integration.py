@@ -33,8 +33,8 @@ def _make_gp(home_tmp, device: str, kem_id=0x0002, sig_id=0x0002):
     )
 
 
-def test_version_is_3_0_0():
-    assert paramant_sdk.__version__ == "3.0.0"
+def test_version_is_3_1_0():
+    assert paramant_sdk.__version__ == "3.1.0"
 
 
 def test_encrypt_decrypt_round_trip_signed(home_tmp):

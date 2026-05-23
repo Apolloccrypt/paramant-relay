@@ -31,9 +31,9 @@ import urllib.parse
 import urllib.request
 
 from paramant import capabilities, crypto, wire_format
-from paramant.errors import CapabilityMismatch, ParamantError
+from paramant.errors import CapabilityMismatch, ParamantError, UnsupportedAlgorithm
 
-__version__ = "3.0.0"
+__version__ = "3.1.0"
 
 # ── Padding block sizes ────────────────────────────────────────────────────────
 BLOCKS = {
@@ -62,26 +62,23 @@ def get_relay_url(sector: str = "health", use_edge: bool = False) -> str:
 
 
 # ── Key zeroization ───────────────────────────────────────────────────────────
-_ZEROIZE_OK = sys.implementation.name == "cpython"
-if not _ZEROIZE_OK:
-    warnings.warn(
-        "paramant-sdk: key zeroization (ctypes) is not supported on "
-        f"{sys.implementation.name}. Secret key material may persist in RAM.",
-        RuntimeWarning, stacklevel=2,
-    )
+# 3.0.0 ran ctypes.memset() on immutable `bytes`, which is undefined behaviour
+# (it can corrupt interned objects, and the offset heuristic is build-specific).
+# Instead, hold secret material in `bytearray` via _secret() and wipe that in
+# place — a defined operation on every Python implementation (F5).
+def _secret(src) -> bytearray:
+    """Return a mutable, wipeable copy of secret key material."""
+    return bytearray(src)
 
 
-def _zero(b: Optional[bytes]) -> None:
+def _zero(b) -> None:
+    """Securely wipe a bytearray in place. No-op for None/empty or immutable
+    bytes (which cannot be wiped at all — better an honest no-op than UB)."""
     if not b:
         return
-    try:
-        offset = sys.getsizeof(b) - len(b) - 1
-        ctypes.memset(id(b) + offset, 0, len(b))
-    except Exception as exc:
-        warnings.warn(
-            f"paramant-sdk: _zero() failed — key material may persist in RAM: {exc}",
-            RuntimeWarning, stacklevel=2,
-        )
+    if isinstance(b, bytearray):
+        for i in range(len(b)):
+            b[i] = 0
 
 
 # ── BIP39 helpers (drop / pickup) ─────────────────────────────────────────────
@@ -123,6 +120,10 @@ class GhostPipeError(ParamantError):
     pass
 
 
+class SignatureError(GhostPipeError):
+    """Raised when a blob's ML-DSA sender signature fails to verify (F1)."""
+
+
 class FingerprintMismatchError(GhostPipeError):
     """Raised when a device's key fingerprint differs from the stored TOFU value."""
     def __init__(self, device_id: str, stored: str, received: str):
@@ -142,19 +143,21 @@ class FingerprintMismatchError(GhostPipeError):
 # ── Canonical message signed inside a v1 blob ─────────────────────────────────
 def _canonical_sign_input(aad: bytes, ct_kem: bytes, sender_pub: bytes,
                           nonce: bytes, ciphertext: bytes) -> bytes:
-    """SHA-256 over the unsigned portion of the blob (AAD + ct_kem + sender_pub + nonce + ct).
+    """The exact byte message fed to ML-DSA for sender authentication.
 
-    This is the message fed to ML-DSA-65 for sender authentication. A downstream
-    verifier (sdk-js, another sdk-py, or a relay that adopts signature
-    verification) reproduces the same hash from the parsed blob fields.
+    CANONICAL CONVENTION (must be byte-identical in sdk-py and sdk-js):
+
+        message = ct_kem || sender_pub || nonce || ciphertext || aad
+
+    signed directly with ML-DSA (the signature scheme hashes internally). This
+    matches sdk-js `_encrypt`/`_decrypt` (concat(ctKem, senderPub, nonce, ct,
+    aad)). paramant-sdk 3.0.0 (py) instead signed SHA-256(aad || …) with a
+    different field order, so py-signed blobs did not verify in sdk-js. Aligning
+    to the sdk-js convention fixes cross-SDK authentication without a wire-format
+    version bump (the bytes on the wire are unchanged; only what the SIGNATURE
+    field is computed over changes).
     """
-    h = hashlib.sha256()
-    h.update(aad)
-    h.update(ct_kem)
-    h.update(sender_pub)
-    h.update(nonce)
-    h.update(ciphertext)
-    return h.digest()
+    return bytes(ct_kem) + bytes(sender_pub) + bytes(nonce) + bytes(ciphertext) + bytes(aad)
 
 
 # ── Main client ───────────────────────────────────────────────────────────────
@@ -188,14 +191,24 @@ class GhostPipe:
         kem_id: int = crypto.DEFAULT_KEM_ID,
         sig_id: int = crypto.DEFAULT_SIG_ID,
         negotiate_on_init: bool = True,
+        relay_identity_pub: str = "",
     ):
         if not api_key.startswith("pgp_"):
             raise GhostPipeError("API key must start with pgp_")
+        # F4: reject algorithm ids this SDK build cannot actually perform, so the
+        # blob header never claims an algorithm we did not use. (Full ML-KEM-1024
+        # / ML-DSA-87 agility is a coordinated follow-up; this build does 768/65.)
+        if int(kem_id) != crypto.KEM_ID_ML_KEM_768:
+            raise UnsupportedAlgorithm("KEM", int(kem_id))
+        if int(sig_id) not in (crypto.SIG_ID_NONE, crypto.SIG_ID_ML_DSA_65):
+            raise UnsupportedAlgorithm("SIG", int(sig_id))
         self.api_key = api_key
         self.device = device
         self.secret = secret or api_key
         self.kem_id = int(kem_id)
         self.sig_id = int(sig_id)
+        # Pinned relay identity (ML-DSA-65) for client-side receipt verification (F2).
+        self.relay_identity_pub = relay_identity_pub
         _relay = (
             relay or relay_url
             or (get_relay_url(sector) if sector else "")
@@ -277,17 +290,26 @@ class GhostPipe:
             os.replace(tmp, self._known_keys_path())
 
     @staticmethod
-    def _compute_fingerprint(kyber_pub_hex: str, ecdh_pub_hex: str) -> str:
-        """Retained from v2.x for wire compatibility with the relay's
-        computeFingerprint(kyber_pub, ecdh_pub) helper. ecdh_pub_hex is the
-        server-stored identity anchor; in v3 it is not used for encryption."""
-        buf = bytes.fromhex(kyber_pub_hex or "") + bytes.fromhex(ecdh_pub_hex or "")
+    def _pick(d: dict, *names: str) -> str:
+        for n in names:
+            if d.get(n):
+                return d[n]
+        return ""
+
+    @staticmethod
+    def _compute_fingerprint(kem_pub_hex: str, sig_pub_hex: str) -> str:
+        """Canonical fingerprint, byte-identical to sdk-js computeFingerprint (F3):
+        SHA-256(kem_pub_bytes || sig_pub_bytes), first 10 bytes as five 4-hex
+        groups. Binds BOTH the KEM key and the ML-DSA signing key. 3.0.0 (py)
+        instead hashed (kyber_pub || ecdh_anchor), which ignored the signing key
+        and produced a different fingerprint than sdk-js for the same device."""
+        buf = bytes.fromhex(kem_pub_hex or "") + bytes.fromhex(sig_pub_hex or "")
         h = hashlib.sha256(buf).hexdigest()[:20].upper()
         return f"{h[0:4]}-{h[4:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}"
 
-    def _tofu_check(self, device_id: str, kyber_pub_hex: str, ecdh_pub_hex: str,
+    def _tofu_check(self, device_id: str, kem_pub_hex: str, sig_pub_hex: str,
                     registered_at: str = "") -> str:
-        fp = self._compute_fingerprint(kyber_pub_hex, ecdh_pub_hex)
+        fp = self._compute_fingerprint(kem_pub_hex, sig_pub_hex)
         keys = self._load_known_keys()
         if device_id in keys:
             stored = keys[device_id]["fingerprint"]
@@ -394,14 +416,19 @@ class GhostPipe:
 
     def _register_pubkeys(self):
         kp = self._load_keypair()
+        # Register canonical kem_pub/sig_pub (matches sdk-js) AND the legacy
+        # kyber_pub/dsa_pub/ecdh_pub fields, so the relay and peers on either
+        # SDK keep working during rollout (F3).
         body = json.dumps({
             "device_id": self.device,
-            "ecdh_pub":  kp["ecdh_pub"],
+            "kem_pub":   kp["ml_kem_pub"],
+            "sig_pub":   kp["ml_dsa_pub"],
             "kyber_pub": kp["ml_kem_pub"],
             "dsa_pub":   kp["ml_dsa_pub"],
+            "ecdh_pub":  kp.get("ecdh_pub", ""),
         }).encode()
         status, resp = self._post("/v2/pubkey", body)
-        if status != 200:
+        if status not in (200, 409):
             raise GhostPipeError(f"Pubkey registration failed: {resp.decode()[:120]}")
 
     def _fetch_receiver_pubkeys(self, recipient: str = None):
@@ -414,16 +441,17 @@ class GhostPipe:
         if status != 200:
             raise GhostPipeError(f"Pubkey fetch failed: HTTP {status}")
         d = json.loads(body)
-        ml_kem_pub = bytes.fromhex(d["kyber_pub"]) if d.get("kyber_pub") else None
-        if not ml_kem_pub:
+        kem_hex = self._pick(d, "kem_pub", "kyber_pub")  # canonical first, legacy fallback
+        sig_hex = self._pick(d, "sig_pub", "dsa_pub")
+        if not kem_hex:
             raise GhostPipeError(
-                f"Receiver {target} has no ML-KEM public key. Upgrade the receiver to paramant-sdk>=3."
+                f"Receiver {target} has no KEM public key. Upgrade the receiver to paramant-sdk>=3."
             )
         return {
-            "ml_kem_pub": ml_kem_pub,
-            "ml_dsa_pub": bytes.fromhex(d["dsa_pub"]) if d.get("dsa_pub") else b"",
-            "kyber_hex":  d.get("kyber_pub", ""),
-            "ecdh_hex":   d.get("ecdh_pub", ""),
+            "ml_kem_pub": bytes.fromhex(kem_hex),
+            "ml_dsa_pub": bytes.fromhex(sig_hex) if sig_hex else b"",
+            "kem_hex":    kem_hex,
+            "sig_hex":    sig_hex,
             "registered_at": d.get("registered_at", ""),
         }
 
@@ -443,7 +471,8 @@ class GhostPipe:
         sender_priv = bytes.fromhex(kp["ml_dsa_priv"]) if self.sig_id != 0x0000 else b""
 
         ct_kem, shared_secret = crypto.kem_encapsulate(recipient_ml_kem_pub)
-        aes_key, pss_bytes = self._derive_payload_key(shared_secret, ct_kem, pre_shared_secret)
+        ss = _secret(shared_secret)
+        aes_key, pss_bytes = self._derive_payload_key(ss, ct_kem, pre_shared_secret)
 
         aad = wire_format.build_aad(kem_id=self.kem_id, sig_id=self.sig_id, chunk_index=0)
         nonce, ciphertext = crypto.aes_gcm_encrypt(aes_key, data, aad)
@@ -468,24 +497,31 @@ class GhostPipe:
             padded = blob + os.urandom(target - len(blob))
             return padded, hashlib.sha256(padded).hexdigest()
         finally:
-            _zero(shared_secret); _zero(aes_key); _zero(pss_bytes)
+            _zero(ss); _zero(aes_key); _zero(pss_bytes)
 
     @staticmethod
-    def _derive_payload_key(shared_secret: bytes, ct_kem: bytes,
-                             pre_shared_secret: str = "") -> Tuple[bytes, bytes]:
-        """HKDF from KEM shared secret; optional PSS mixed via a distinct info label."""
+    def _derive_payload_key(shared_secret, ct_kem: bytes,
+                            pre_shared_secret: str = "") -> Tuple[bytearray, bytearray]:
+        """HKDF from KEM shared secret; optional PSS mixed via a distinct info
+        label. Returns wipeable bytearrays (F5).
+
+        NOTE: the non-PSS path uses info=b"paramant-v1-aes-key" identically to
+        sdk-js, so the derived AES key matches cross-SDK. PSS still uses SHA3-256
+        here vs SHA-256 in sdk-js — cross-SDK PSS interop is a known follow-up;
+        the default (no-PSS) path is fully cross-compatible."""
         if pre_shared_secret:
             pss_hash = hashlib.sha3_256(pre_shared_secret.encode("utf-8")).digest()
-            ikm = shared_secret + pss_hash
+            ikm = bytes(shared_secret) + pss_hash
             info = b"paramant-v1-aes-key-pss"
         else:
             pss_hash = b""
-            ikm = shared_secret
+            ikm = bytes(shared_secret)
             info = b"paramant-v1-aes-key"
         key = crypto.derive_key(ikm, salt=ct_kem[:32], info=info)
-        return key, pss_hash
+        return _secret(key), _secret(pss_hash)
 
-    def _decrypt(self, padded_blob: bytes, pre_shared_secret: str = "") -> bytes:
+    def _decrypt(self, padded_blob: bytes, pre_shared_secret: str = "",
+                 expected_sender_sig_pub: Optional[bytes] = None) -> bytes:
         kp = self._load_keypair()
         secret_key = bytes.fromhex(kp["ml_kem_priv"])
 
@@ -504,11 +540,37 @@ class GhostPipe:
                 f"blob SIG id 0x{parsed['sig_id']:04x} != client SIG id 0x{self.sig_id:04x}"
             )
 
-        shared = crypto.kem_decapsulate(secret_key, parsed["ct_kem"])
-        aes_key, pss_bytes = self._derive_payload_key(shared, parsed["ct_kem"], pre_shared_secret)
         aad = wire_format.build_aad(
             kem_id=parsed["kem_id"], sig_id=parsed["sig_id"], chunk_index=0
         )
+
+        # ── F1: verify the sender signature BEFORE decrypting. 3.0.0 (py) never
+        # called sig_verify, so a tampered signature or a swapped sender_pub was
+        # accepted silently. sdk-js already verifies; this aligns sdk-py.
+        if parsed["sig_id"] != crypto.SIG_ID_NONE:
+            sign_input = _canonical_sign_input(
+                aad, parsed["ct_kem"], parsed["sender_pub"],
+                parsed["nonce"], parsed["ciphertext"],
+            )
+            try:
+                ok = crypto.sig_verify(parsed["sender_pub"], sign_input, parsed["signature"])
+            except Exception:
+                ok = False
+            if not ok:
+                raise SignatureError(
+                    "sender signature is invalid — blob was tampered with or the "
+                    "carried signing key does not match the signature"
+                )
+            # Identity pinning: the check above only proves internal consistency.
+            # To authenticate WHO sent it, pin against the expected sender's key.
+            if expected_sender_sig_pub is not None and \
+                    parsed["sender_pub"] != expected_sender_sig_pub:
+                raise SignatureError(
+                    "sender signing key does not match the pinned/expected sender"
+                )
+
+        shared = _secret(crypto.kem_decapsulate(secret_key, parsed["ct_kem"]))
+        aes_key, pss_bytes = self._derive_payload_key(shared, parsed["ct_kem"], pre_shared_secret)
         try:
             return crypto.aes_gcm_decrypt(aes_key, parsed["nonce"], parsed["ciphertext"], aad)
         finally:
@@ -526,7 +588,7 @@ class GhostPipe:
         """
         rec = self._fetch_receiver_pubkeys(recipient)
         target_device = recipient or self.device
-        self._tofu_check(target_device, rec["kyber_hex"], rec["ecdh_hex"], rec["registered_at"])
+        self._tofu_check(target_device, rec["kem_hex"], rec["sig_hex"], rec["registered_at"])
         padded, h = self._encrypt(
             data, rec["ml_kem_pub"], pad_block=pad_block, pre_shared_secret=pre_shared_secret,
         )
@@ -590,8 +652,15 @@ class GhostPipe:
         finally:
             _zero(aes_key); _zero(entropy)
 
-    def receive(self, hash_: str, pre_shared_secret: str = "") -> Tuple[bytes, Optional[dict]]:
-        """Retrieve data from the relay by blob hash. Burn-on-read."""
+    def receive(self, hash_: str, pre_shared_secret: str = "",
+                sender: Optional[str] = None) -> Tuple[bytes, Optional[dict]]:
+        """Retrieve data from the relay by blob hash. Burn-on-read.
+
+        If `sender` is given, the blob's ML-DSA signing key is pinned against
+        that device's registered key (via TOFU) — this authenticates WHO sent
+        the blob. Without `sender`, the signature is still verified for
+        cryptographic validity (a tampered signature is rejected), but the
+        sender's identity is not bound; a warning is emitted (F1)."""
         status, raw, headers = self._get(f"/v2/outbound/{hash_}")
         if status == 404:
             raise GhostPipeError("Blob not found. Expired, already retrieved, or never stored.")
@@ -606,7 +675,21 @@ class GhostPipe:
                 receipt = json.loads(base64.b64decode(padded).decode("utf-8"))
             except Exception:
                 pass
-        data = self._decrypt(raw, pre_shared_secret=pre_shared_secret)
+
+        expected_sig_pub = None
+        if sender is not None:
+            rec = self._fetch_receiver_pubkeys(sender)
+            self._tofu_check(sender, rec["kem_hex"], rec["sig_hex"], rec["registered_at"])
+            expected_sig_pub = rec["ml_dsa_pub"] or None
+        elif self.sig_id != crypto.SIG_ID_NONE:
+            warnings.warn(
+                "paramant-sdk: receive() called without sender=... — the sender "
+                "signature is checked for validity but NOT pinned to a known "
+                "device. Pass sender='device-id' to authenticate the origin.",
+                RuntimeWarning, stacklevel=2,
+            )
+        data = self._decrypt(raw, pre_shared_secret=pre_shared_secret,
+                             expected_sender_sig_pub=expected_sig_pub)
         return data, receipt
 
     def status(self, hash_: str) -> dict:
@@ -621,7 +704,8 @@ class GhostPipe:
         if status != 200:
             raise GhostPipeError(f"Pubkey fetch failed: HTTP {status}")
         d = json.loads(body)
-        fp = self._compute_fingerprint(d.get("kyber_pub", ""), d.get("ecdh_pub", ""))
+        fp = self._compute_fingerprint(self._pick(d, "kem_pub", "kyber_pub"),
+                                       self._pick(d, "sig_pub", "dsa_pub"))
         print(f"Device:      {target}")
         print(f"Fingerprint: {fp}")
         if d.get("registered_at"):
@@ -698,19 +782,72 @@ class GhostPipe:
         _, body, _ = self._get("/health")
         return json.loads(body)
 
-    def verify_receipt(self, receipt) -> dict:
-        if isinstance(receipt, dict):
+    @staticmethod
+    def _canonical_receipt_payload(receipt: dict):
+        """(signed_payload_bytes, signature_bytes) from a receipt: the receipt
+        minus its signature field, as canonical JSON (sorted keys, no spaces).
+        The relay MUST sign the same canonical form with its ML-DSA identity."""
+        r = dict(receipt)
+        sig_field = r.pop("sig", None) or r.pop("signature", None)
+        if not sig_field:
+            raise GhostPipeError("Receipt has no 'sig'/'signature' field to verify")
+        try:
+            signature = bytes.fromhex(sig_field)
+        except ValueError:
+            pad = sig_field.replace("-", "+").replace("_", "/")
+            pad += "=" * ((4 - len(pad) % 4) % 4)
+            signature = base64.b64decode(pad)
+        payload = json.dumps(r, sort_keys=True, separators=(",", ":")).encode()
+        return payload, signature
+
+    def verify_receipt(self, receipt, relay_identity_pub: str = "",
+                       allow_relay_fallback: bool = False) -> dict:
+        """Verify a delivery receipt CLIENT-SIDE against the pinned relay
+        identity key (F2).
+
+        3.0.0 POSTed the receipt to /v2/verify-receipt and trusted the relay's
+        answer — but the relay is untrusted by design, so it could rubber-stamp
+        a forged receipt. Here the ML-DSA signature is checked locally against a
+        key pinned out-of-band (constructor relay_identity_pub or the argument).
+        Set allow_relay_fallback=True only for debugging."""
+        if isinstance(receipt, str):
+            pad = receipt.replace("-", "+").replace("_", "/")
+            pad += "=" * ((4 - len(pad) % 4) % 4)
+            receipt = json.loads(base64.b64decode(pad).decode("utf-8"))
+
+        pub_hex = relay_identity_pub or self.relay_identity_pub
+        if not pub_hex:
+            if not allow_relay_fallback:
+                raise GhostPipeError(
+                    "No pinned relay identity public key — cannot verify the receipt "
+                    "locally. Pass relay_identity_pub=... (obtained out-of-band, e.g. "
+                    "from the CT log) when constructing GhostPipe. Refusing to delegate "
+                    "verification to the untrusted relay; pass allow_relay_fallback=True "
+                    "to override for debugging only."
+                )
+            warnings.warn(
+                "paramant-sdk: verifying receipt via the UNTRUSTED relay "
+                "(/v2/verify-receipt). This proves nothing about authenticity.",
+                RuntimeWarning, stacklevel=2,
+            )
             receipt_b64 = base64.b64encode(json.dumps(receipt).encode()).decode()
-        else:
-            receipt_b64 = receipt
-        body = json.dumps({"receipt": receipt_b64}).encode()
-        status, resp = self._post("/v2/verify-receipt", body)
-        if status != 200:
-            raise GhostPipeError(f"Receipt verification failed: HTTP {status}: {resp.decode()[:120]}")
-        result = json.loads(resp)
-        if not result.get("valid"):
-            raise GhostPipeError(f'Receipt invalid: {result.get("reason", "unknown")}')
-        return result
+            status, resp = self._post("/v2/verify-receipt", json.dumps({"receipt": receipt_b64}).encode())
+            if status != 200:
+                raise GhostPipeError(f"Receipt verification failed: HTTP {status}: {resp.decode()[:120]}")
+            result = json.loads(resp)
+            if not result.get("valid"):
+                raise GhostPipeError(f'Receipt invalid: {result.get("reason", "unknown")}')
+            return result
+
+        payload, signature = self._canonical_receipt_payload(receipt)
+        try:
+            ok = crypto.sig_verify(bytes.fromhex(pub_hex), payload, signature)
+        except Exception:
+            ok = False
+        if not ok:
+            raise GhostPipeError("Receipt signature is INVALID against the pinned relay identity key")
+        return {"valid": True, "verified_locally": True,
+                **{k: v for k, v in receipt.items() if k not in ("sig", "signature")}}
 
     def _load_seq(self) -> int:
         try:

@@ -2,6 +2,41 @@
 
 All notable changes to `paramant-sdk` (Python).
 
+## [3.1.0] — 2026-05-23
+
+Security release. Wire format unchanged (still v1, PQHB version `0x01`) — the relay
+and existing tooling are unaffected. Only client behaviour changes.
+
+### Fixed
+- **Sender signatures are now verified (F1).** `receive()`/`_decrypt()` previously never
+  called `sig_verify`, so a tampered signature or a swapped `sender_pub` was accepted
+  silently. The signature is now verified before decryption and the blob is rejected
+  (`SignatureError`) on failure.
+- **Cross-SDK signing convention aligned (F3).** The signed message is now
+  `CT_KEM || SENDER_PUB || NONCE || CIPHERTEXT || AAD` (matching sdk-js); 3.0.0 signed a
+  different SHA-256 input, so py-signed blobs did not verify in sdk-js. The device
+  fingerprint is now `SHA-256(kem_pub || sig_pub)` (binds the signing key) and is
+  byte-identical to sdk-js. `/v2/pubkey` registers canonical `kem_pub`/`sig_pub` plus
+  `kyber_pub`/`dsa_pub` aliases.
+- **Receipts are verified client-side (F2).** `verify_receipt()` checks the relay's
+  ML-DSA signature against a pinned `relay_identity_pub` instead of trusting the
+  untrusted relay's `/v2/verify-receipt`.
+- **Algorithm ids are no longer cosmetic (F4).** A `kem_id`/`sig_id` this build cannot
+  perform now raises `UnsupportedAlgorithm` at construction instead of silently using
+  ML-KEM-768/ML-DSA-65 while writing the requested id into the header.
+- **Safe key zeroization (F5).** Secret material is held in `bytearray` and wiped in
+  place; the 3.0.0 `ctypes.memset()` on immutable `bytes` (undefined behaviour) is gone.
+
+### Added
+- `receive(..., sender="device-id")` pins the sender's signing key (TOFU) to authenticate
+  the origin; without it a warning is emitted.
+- `GhostPipe(relay_identity_pub=...)` for client-side receipt verification.
+
+### Migration
+- Upgrade receivers and senders together. Existing keypairs are reused (no rotation).
+- Existing local TOFU `known_keys` entries use the old fingerprint formula and will raise
+  `FingerprintMismatchError` on next contact — re-`trust()` after out-of-band verification.
+
 ## [3.0.0] — 2026-04-24
 
 ### Breaking

@@ -149,6 +149,16 @@ async function sha256Hex(data) {
   return u8toHex(new Uint8Array(hash));
 }
 
+/** Canonical JSON: recursively sorted keys, no whitespace — matches Python
+ *  json.dumps(sort_keys=True, separators=(",",":")) for ASCII receipts (F2). */
+function canonicalJSON(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonicalJSON).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(value[k])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
 async function sha256Bytes(data) {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', data));
 }
@@ -277,6 +287,7 @@ const KNOWN_OPTS = new Set([
   'apiKey', 'device', 'relay', 'preSharedSecret',
   'verifyFingerprints', 'timeout',
   'kemId', 'sigId', 'checkCapabilities',
+  'relayIdentityPub',
 ]);
 
 const TYPO_HINTS = {
@@ -329,7 +340,7 @@ export class GhostPipe {
     const { apiKey, device, relay = '', preSharedSecret = '',
             verifyFingerprints = true, timeout = 30000,
             kemId = DEFAULT_KEM_ID, sigId = DEFAULT_SIG_ID,
-            checkCapabilities = true } = opts;
+            checkCapabilities = true, relayIdentityPub = '' } = opts;
     if (apiKey && !apiKey.startsWith('pgp_')) throw new AuthError('API key must start with pgp_');
     this.apiKey             = apiKey;
     this.device             = device;
@@ -340,6 +351,8 @@ export class GhostPipe {
     this.kemId              = kemId;
     this.sigId              = sigId;
     this.checkCapabilities  = checkCapabilities;
+    // Pinned relay identity (ML-DSA) for client-side receipt verification (F2).
+    this.relayIdentityPub   = relayIdentityPub;
     this._keypair           = null;
     this._capabilities      = null;
     // Validate algorithms early — fail fast on unknown IDs.
@@ -574,7 +587,7 @@ export class GhostPipe {
     return { blob, hash };
   }
 
-  async _decrypt(blob, pss = '') {
+  async _decrypt(blob, pss = '', { expectedSenderSigPub = null } = {}) {
     const kp = await this._loadKeypair();
     if (!isV1(blob)) throw new GhostPipeError('blob is not wire-format v1 (missing PQHB magic)');
 
@@ -614,6 +627,11 @@ export class GhostPipe {
       if (!valid) {
         throw new SignatureError(`${sig.name} signature did not verify against senderPub`);
       }
+      // Identity pinning (F1): only authenticates WHO sent it if the carried
+      // senderPub equals the expected sender's pinned signing key.
+      if (expectedSenderSigPub && u8toHex(parsed.senderPub) !== u8toHex(expectedSenderSigPub)) {
+        throw new SignatureError('sender signing key does not match the pinned/expected sender');
+      }
     }
 
     return new Uint8Array(await crypto.subtle.decrypt(
@@ -631,6 +649,8 @@ export class GhostPipe {
       sig_id:    kp.sigId,
       kem_pub:   kp.kem_pub,
       sig_pub:   kp.sig_pub || '',
+      kyber_pub: kp.kem_pub,          // legacy alias (cross-SDK with sdk-py)
+      dsa_pub:   kp.sig_pub || '',    // legacy alias
     });
     if (status !== 200 && status !== 409) throw new RelayError(status, new TextDecoder().decode(body));
     return JSON.parse(new TextDecoder().decode(body));
@@ -646,7 +666,7 @@ export class GhostPipe {
     const pubkeys = await this._fetchPubkeys(target);
     const recipientKemPub = pubkeys.kem_pub || pubkeys.kyber_pub || '';
     if (!recipientKemPub) throw new GhostPipeError(`No KEM pubkey for device '${target}'`);
-    await this._tofuCheck(target, recipientKemPub, pubkeys.sig_pub || '', pubkeys.registered_at || '');
+    await this._tofuCheck(target, recipientKemPub, pubkeys.sig_pub || pubkeys.dsa_pub || '', pubkeys.registered_at || '');
     const { blob, hash } = await this._encrypt(data, recipientKemPub, { padBlock, pss });
     const { status, body } = await this._post('/v2/inbound', {
       hash,
@@ -659,12 +679,24 @@ export class GhostPipe {
     return hash;
   }
 
-  async receive(hash_, { preSharedSecret } = {}) {
+  async receive(hash_, { preSharedSecret, sender = null } = {}) {
     const pss = preSharedSecret ?? this.preSharedSecret;
     const { status, body } = await this._get(`/v2/outbound/${hash_}`);
     if (status === 404) throw new BurnedError('Blob not found: expired, already retrieved, or never stored.');
     if (status !== 200) throw new RelayError(status, new TextDecoder().decode(body));
-    return this._decrypt(body, pss);
+
+    let expectedSenderSigPub = null;
+    if (sender) {
+      const pubkeys = await this._fetchPubkeys(sender);
+      await this._tofuCheck(sender, pubkeys.kem_pub || pubkeys.kyber_pub || '',
+                            pubkeys.sig_pub || pubkeys.dsa_pub || '', pubkeys.registered_at || '');
+      const sp = pubkeys.sig_pub || pubkeys.dsa_pub || '';
+      expectedSenderSigPub = sp ? hexToU8(sp) : null;
+    } else if (this.sigId !== SIG.NONE) {
+      console.warn('[paramant] receive() called without { sender } — the sender signature is ' +
+        'checked for validity but NOT pinned to a known device. Pass { sender } to authenticate origin.');
+    }
+    return this._decrypt(body, pss, { expectedSenderSigPub });
   }
 
   async status(hash_) {
@@ -860,10 +892,38 @@ export class GhostPipe {
     return this._json(await this._get(`/v2/ct/${index}`));
   }
 
-  async verifyReceipt(receipt) {
-    const body = typeof receipt === 'string' ? { receipt } : { receipt: JSON.stringify(receipt) };
-    const r = await this._post('/v2/verify-receipt', body);
-    return this._json(r);
+  /**
+   * Verify a delivery receipt CLIENT-SIDE against the pinned relay identity key (F2).
+   * 3.0.0 trusted the relay's own /v2/verify-receipt — but the relay is untrusted
+   * by design. With relayIdentityPub pinned (constructor or arg), the ML-DSA
+   * signature is checked locally. Pass { allowRelayFallback: true } only to debug.
+   */
+  async verifyReceipt(receipt, { relayIdentityPub, allowRelayFallback = false } = {}) {
+    if (typeof receipt === 'string') receipt = JSON.parse(new TextDecoder().decode(fromBase64(receipt)));
+    const pubHex = relayIdentityPub || this.relayIdentityPub;
+    if (!pubHex) {
+      if (!allowRelayFallback) {
+        throw new GhostPipeError(
+          'No pinned relay identity public key — cannot verify the receipt locally. ' +
+          'Construct GhostPipe with relayIdentityPub (obtained out-of-band, e.g. from the ' +
+          'CT log). Refusing to delegate verification to the untrusted relay; pass ' +
+          '{ allowRelayFallback: true } to override for debugging only.');
+      }
+      console.warn('[paramant] verifying receipt via the UNTRUSTED relay — proves nothing about authenticity.');
+      const r = await this._post('/v2/verify-receipt', { receipt: JSON.stringify(receipt) });
+      return this._json(r);
+    }
+    const r = { ...receipt };
+    const sigField = r.sig || r.signature;
+    if (!sigField) throw new GhostPipeError("Receipt has no 'sig'/'signature' field to verify");
+    delete r.sig; delete r.signature;
+    const payload = new TextEncoder().encode(canonicalJSON(r));
+    const signature = /^[0-9a-fA-F]+$/.test(sigField) ? hexToU8(sigField) : fromBase64(sigField);
+    const sig = sigEngine(SIG.ML_DSA_65);
+    let ok = false;
+    try { ok = sig.verify(signature, payload, hexToU8(pubHex)); } catch { ok = false; }
+    if (!ok) throw new GhostPipeError('Receipt signature is INVALID against the pinned relay identity key');
+    return { valid: true, verified_locally: true, ...r };
   }
 
   // ── DID ───────────────────────────────────────────────────────────────────
@@ -990,5 +1050,5 @@ async function _deriveDropKeys(entropy) {
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 
-export { SECTOR_RELAYS, fetchCapabilities, wireEncode, wireDecode, buildAAD, isV1 };
+export { SECTOR_RELAYS, fetchCapabilities, wireEncode, wireDecode, buildAAD, isV1, computeFingerprint };
 export default GhostPipe;
