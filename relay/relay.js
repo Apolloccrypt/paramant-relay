@@ -1428,7 +1428,7 @@ function _mutateUsersJson(fn) {
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
-    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",active:true}); }); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
+    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true}); }); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
   }
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
@@ -1456,7 +1456,7 @@ function loadTrialKeys() {
         // Don't overwrite a key already loaded from users.json
         if (!apiKeys.has(k.key)) {
           apiKeys.set(k.key, {
-            plan: 'community', label: k.label||'', active: true, dsa_pub: '',
+            plan: 'community', label: k.label||'', email: k.email||'', active: true, dsa_pub: '',
             daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
             is_trial: true, trial_created: k.created || Date.now(),
             uploads_today: 0, last_upload_day: '',
@@ -1928,7 +1928,7 @@ const server = http.createServer(async (req, res) => {
       const label = `trial:${name.replace(/\s+/g, '_').toLowerCase().slice(0, 40)}`;
       const trialCreated = now;
       apiKeys.set(newKey, {
-        plan: 'community', label, active: true, dsa_pub: '',
+        plan: 'community', label, email: rawEmail, active: true, dsa_pub: '',
         daily_uploads: 0, daily_reset_ts: now + DAY_MS,
         is_trial: true, trial_created: trialCreated,
         uploads_today: 0, last_upload_day: '',
@@ -3315,7 +3315,7 @@ session = client.create_session('recipient@example.com')</pre>
         return res.end(J({ error: 'Invalid email address' }));
       }
       const email = rawEmail;
-      apiKeys.set(newKey, { plan, label, active: true });
+      apiKeys.set(newKey, { plan, label, email, active: true });
       _mutateUsersJson(d => {
         d.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
         d.updated = new Date().toISOString();
