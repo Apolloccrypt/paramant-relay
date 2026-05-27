@@ -21,6 +21,3 @@ Policy: https://paramant.app/security#responsible-disclosure
 
 # Acknowledgements page (hall of fame)
 Acknowledgments: https://paramant.app/security/acknowledgements
-
-# Hiring notice
-Hiring: https://paramant.app/careers

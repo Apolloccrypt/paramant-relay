@@ -24,6 +24,19 @@ REPO="https://github.com/Apolloccrypt/paramant-relay"
 VERSION="v3.0.0"
 MIN_RAM_MB=512
 MIN_DISK_GB=4
+INSTALL_T0=$(date +%s)   # for the "download to dashboard" timer
+
+# Open a URL in the operator's browser when on a desktop; otherwise print it.
+open_browser() {
+  local url="$1"
+  if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" >/dev/null 2>&1 &
+  elif command -v open >/dev/null 2>&1; then
+    open "$url" >/dev/null 2>&1 &
+  else
+    info "Open this in your browser to finish setup: ${url}"
+  fi
+}
 
 # ── Banner ───────────────────────────────────────────────────────────────────
 echo -e "
@@ -165,20 +178,30 @@ fi
 step "Step 4/8 — Configuration"
 echo ""
 
-# Domain
-while true; do
-  read -rp "  $(echo -e "${W}Domain name${E}") (e.g. relay.example.com): " DOMAIN
+# Domain (optional). Source order: PARAMANT_DOMAIN env > first CLI arg > prompt.
+# An empty domain means localhost mode (no public domain, no Let's Encrypt).
+DOMAIN="${PARAMANT_DOMAIN:-${1:-}}"
+DOMAIN="${DOMAIN// /}"
+if [[ -z "$DOMAIN" ]]; then
+  read -rp "  $(echo -e "${W}Domain name${E}") (blank = localhost mode): " DOMAIN
   DOMAIN="${DOMAIN// /}"
-  [[ -n "$DOMAIN" ]] && break
-  warn "Domain cannot be empty"
-done
+fi
+if [[ -n "$DOMAIN" ]]; then
+  RELAY_MODE="domain"
+else
+  RELAY_MODE="localhost"
+  info "No domain set - installing in localhost mode (self-signed TLS, no Let's Encrypt)."
+fi
 
-# Email for Let's Encrypt
-while true; do
-  read -rp "  $(echo -e "${W}Email address${E}") (for SSL certificate): " LE_EMAIL
-  [[ "$LE_EMAIL" =~ ^[^@]+@[^@]+\.[^@]+$ ]] && break
-  warn "Enter a valid email address"
-done
+# Email for Let's Encrypt (only needed in domain mode)
+LE_EMAIL=""
+if [[ "$RELAY_MODE" == "domain" ]]; then
+  while true; do
+    read -rp "  $(echo -e "${W}Email address${E}") (for SSL certificate): " LE_EMAIL
+    [[ "$LE_EMAIL" =~ ^[^@]+@[^@]+\.[^@]+$ ]] && break
+    warn "Enter a valid email address"
+  done
+fi
 
 # Admin token
 echo ""
@@ -203,8 +226,9 @@ read -rp "  $(echo -e "${W}License key${E}") ${D}(plk_... for Pro, Enter to skip
 
 echo ""
 ok "Configuration complete"
-dim "  Domain:  ${DOMAIN}"
-dim "  Email:   ${LE_EMAIL}"
+dim "  Mode:    ${RELAY_MODE}"
+dim "  Domain:  ${DOMAIN:-localhost}"
+dim "  Email:   ${LE_EMAIL:-(n/a in localhost mode)}"
 dim "  Sectors: ${SECTORS}"
 dim "  Token:   ${ADMIN_TOKEN:0:8}...${ADMIN_TOKEN: -4}"
 
@@ -253,10 +277,19 @@ ENV
 chmod 600 "${INSTALL_DIR}/.env"
 ok ".env written (chmod 600)"
 
-# ── TLS certificates via Let's Encrypt ───────────────────────────────────────
-step "Step 7/8 — Obtaining TLS certificate"
+# -- TLS certificates ----------------------------------------------------------
+step "Step 7/8 - TLS certificate"
 
 mkdir -p "${INSTALL_DIR}/deploy/certs"
+
+if [[ "$RELAY_MODE" == "localhost" ]]; then
+  info "localhost mode: generating a self-signed certificate (no Let's Encrypt)."
+  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout "${INSTALL_DIR}/deploy/certs/key.pem" \
+    -out "${INSTALL_DIR}/deploy/certs/cert.pem" \
+    -subj "/CN=localhost" 2>/dev/null
+  ok "Self-signed certificate installed for localhost"
+else
 
 # Stop anything on port 80 temporarily for standalone challenge
 info "Obtaining certificate for ${DOMAIN}..."
@@ -297,6 +330,7 @@ else
     -subj "/CN=${DOMAIN}" 2>/dev/null
   warn "Self-signed cert installed — replace with Let's Encrypt when DNS is ready"
 fi
+fi   # end RELAY_MODE TLS branch
 
 # ── Launch stack ──────────────────────────────────────────────────────────────
 step "Step 8/8 — Launching relay stack"
@@ -335,7 +369,11 @@ fi
 
 # Final healthcheck
 echo ""
-HEALTH_RESP=$(curl -sk "https://${DOMAIN}/health" 2>/dev/null || curl -sk "http://127.0.0.1/health" 2>/dev/null || echo '{}')
+if [[ "$RELAY_MODE" == "domain" ]]; then
+  HEALTH_RESP=$(curl -sk "https://${DOMAIN}/health" 2>/dev/null || curl -sk "http://127.0.0.1:3000/health" 2>/dev/null || echo '{}')
+else
+  HEALTH_RESP=$(curl -sk "http://127.0.0.1:3000/health" 2>/dev/null || echo '{}')
+fi
 HEALTH_OK=$(echo "$HEALTH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ok','false'))" 2>/dev/null || echo "false")
 HEALTH_VER=$(echo "$HEALTH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "?")
 HEALTH_EDI=$(echo "$HEALTH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('edition','?'))" 2>/dev/null || echo "?")
@@ -426,6 +464,23 @@ CLISCRIPT
 chmod +x /usr/local/bin/paramant
 ok "paramant CLI installed → /usr/local/bin/paramant"
 
+# -- Open the first-time setup wizard ------------------------------------------
+if [[ "$RELAY_MODE" == "domain" ]]; then
+  SETUP_URL="https://${DOMAIN}/setup"
+else
+  SETUP_URL="http://localhost:3000/setup"
+fi
+ELAPSED=$(( $(date +%s) - INSTALL_T0 ))
+echo ""
+step "Finish in your browser"
+info "Opening the setup wizard: ${SETUP_URL}"
+open_browser "$SETUP_URL"
+if (( ELAPSED <= 90 )); then
+  ok "From download to dashboard in ${ELAPSED}s (target: 90s)."
+else
+  info "Install took ${ELAPSED}s (first Docker build dominates; later runs are faster)."
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${C}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${E}"
@@ -433,7 +488,13 @@ echo -e "${G}${BOLD}  PARAMANT installed successfully!${E}"
 echo -e "${C}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${E}"
 echo ""
 TOTP_URI="otpauth://totp/PARAMANT%20Admin?secret=${TOTP_SECRET}&issuer=PARAMANT&algorithm=SHA1&digits=6&period=30"
-echo -e "  ${W}Relay URL:${E}    https://${DOMAIN}/health"
+if [[ "$RELAY_MODE" == "domain" ]]; then
+  echo -e "  ${W}Relay URL:${E}    https://${DOMAIN}/health"
+  echo -e "  ${W}Setup:${E}        https://${DOMAIN}/setup"
+else
+  echo -e "  ${W}Relay URL:${E}    http://localhost:3000/health"
+  echo -e "  ${W}Setup:${E}        http://localhost:3000/setup"
+fi
 echo -e "  ${W}Admin token:${E}  ${ADMIN_TOKEN:0:8}...${ADMIN_TOKEN: -4}  (stored in ${INSTALL_DIR}/.env)"
 echo -e "  ${W}Install dir:${E}  ${INSTALL_DIR}"
 echo -e "  ${W}Edition:${E}      Community (up to 5 API keys)"

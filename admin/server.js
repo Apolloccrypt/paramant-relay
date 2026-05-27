@@ -7,6 +7,7 @@ const crypto  = require('crypto');
 const path    = require('path');
 const { initRedis, redis } = require('./lib/redis');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
+const configStore = require('./lib/config-store');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -358,6 +359,88 @@ api.post('/reload-all', authMiddleware, async (req, res) => {
   });
   try { await logAuditEvent('admin', 'admin_relay_reload_all', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
   res.json({ ok: Object.values(results).every(r => r.ok), results });
+});
+
+// -- Visual config (env-file editor) -----------------------------------------
+// Whitelist-driven read/write of the relay env file so operators do not have to
+// SSH in and hand-edit .env. Disabled unless ADMIN_CONFIG_ENV_PATH points at a
+// file the admin can reach (typically a shared volume). See admin/lib/
+// config-schema.js + config-store.js and ADMIN.md.
+
+api.get('/admin/config', authMiddleware, (req, res) => {
+  if (!configStore.isEnabled()) {
+    return res.status(503).json({
+      error: 'config_unavailable',
+      message: 'Set ADMIN_CONFIG_ENV_PATH to the relay env file to enable the visual config editor.',
+    });
+  }
+  try {
+    res.json({ ok: true, enabled: true, ...configStore.readConfig() });
+  } catch (err) {
+    res.status(500).json({ error: 'config_read_failed', message: err.message });
+  }
+});
+
+api.put('/admin/config', authMiddleware, async (req, res) => {
+  if (!configStore.isEnabled()) {
+    return res.status(503).json({ error: 'config_unavailable' });
+  }
+  const changes = Array.isArray(req.body && req.body.changes) ? req.body.changes : null;
+  if (!changes) return res.status(400).json({ error: 'bad_request', message: 'Body must be { changes: [{ key, value }] }' });
+
+  const result = configStore.writeConfig(changes);
+  if (!result.ok) return res.status(400).json({ error: 'config_write_failed', message: result.error });
+
+  const admin_ip = req.headers['x-real-ip'] || 'unknown';
+  // Audit each change with masked values; never log secrets in plaintext.
+  for (const ch of changes) {
+    try {
+      await logAuditEvent('admin', 'admin_config_changed', {
+        key: ch.key,
+        new_value: configStore.auditValue(ch.key, ch.value),
+        admin_ip,
+      });
+    } catch {}
+  }
+  if (result.backup) {
+    try { await logAuditEvent('admin', 'admin_config_backup_created', { backup_file: result.backup, admin_ip }); } catch {}
+  }
+
+  const requiresRestart = result.applied.some(a => a.requires_restart);
+  res.json({
+    ok: true,
+    applied: result.applied,
+    requires_restart: requiresRestart,
+    restart_targets: [...new Set(result.applied.map(a => a.requires_restart))],
+    rolled_back: false,
+  });
+});
+
+// Restart is a deliberate manual operator step. The admin service does NOT
+// execute docker/systemctl on the relays: that would be a shell exec from the
+// admin container and an automatic production action. We return instructions
+// and let the operator run it.
+api.post('/admin/config/restart', authMiddleware, async (req, res) => {
+  const admin_ip = req.headers['x-real-ip'] || 'unknown';
+  try { await logAuditEvent('admin', 'admin_config_restart_requested', { admin_ip }); } catch {}
+  res.status(501).json({
+    ok: false,
+    manual_restart_required: true,
+    message: 'Config saved. Restart the relays to apply: `docker compose restart` on the relay host (or your orchestrator equivalent). The admin panel does not restart production services automatically.',
+  });
+});
+
+// Config-scoped audit feed for the panel's Configuration tab.
+api.get('/admin/config/audit', authMiddleware, async (req, res) => {
+  try {
+    const events = await getAuditEvents('admin', {
+      limit: 100,
+      event_types: ['admin_config_changed', 'admin_config_backup_created', 'admin_config_restart_requested'],
+    });
+    res.json({ ok: true, events });
+  } catch (err) {
+    res.status(500).json({ error: 'audit_read_failed', message: err.message });
+  }
 });
 
 // ── Self-service trial key request — DEPRECATED 2026-04-21 ──────────────────
