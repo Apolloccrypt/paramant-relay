@@ -10,6 +10,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added (specification only, no implementation)
+- R016 Open-core split architecture ADR (Accepted): defines the two-repo
+  model -- paramant-relay (public, BUSL-1.1) + paramant-management
+  (private, all-rights-reserved). Covers the v1 API contract between the
+  repos, CT log discipline for customer-visible remote actions, "Paramant
+  Fleet" branding for the management plane, the public /trust page concept,
+  and per-repo licensing. Industry-standard open-core model
+  (HashiCorp/GitLab/Elastic precedent). Builds on R013/R014/R015.
 - R014 Management plane architecture ADR: defines the fleet-overview
   console on Paramant's root server. Customer + relay-instance +
   license-key data model, API endpoints (/api/fleet/*), UI structure,
