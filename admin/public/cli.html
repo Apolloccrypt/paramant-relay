@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Paramant CLI</title>
+<link rel="stylesheet" href="/admin/vendor/xterm.css">
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --panel: #232325;
+    --text: #f5f5f7;
+    --muted: #8e8e93;
+    --accent: #0a84ff;
+    --border: #2c2c2e;
+    --ok: #30d158;
+    --bad: #ff453a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; flex-direction: column; }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    -webkit-app-region: drag; user-select: none;
+  }
+  header h1 {
+    font-size: 13px; font-weight: 600; letter-spacing: .02em; margin: 0;
+  }
+  header .spacer { flex: 1; }
+  .connection-status {
+    font-size: 11px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .connection-status::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted); display: inline-block;
+  }
+  .connection-status.connected::before { background: var(--ok); }
+  .connection-status.error::before { background: var(--bad); }
+  .help-toggle {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    width: 26px; height: 26px; cursor: pointer; font-size: 13px;
+  }
+  .help-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .terminal-container {
+    flex: 1; min-height: 0; padding: 8px 10px;
+    background: var(--bg);
+  }
+  footer {
+    padding: 6px 16px; background: var(--panel);
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--muted);
+  }
+  /* xterm theme tweaks */
+  .xterm { height: 100%; }
+  .xterm-viewport::-webkit-scrollbar { width: 10px; }
+  .xterm-viewport::-webkit-scrollbar-thumb { background: #3a3a3c; border-radius: 5px; }
+
+  /* TOTP modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; width: 320px; text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  .modal h2 { font-size: 15px; margin: 0 0 6px; }
+  .modal p { font-size: 12px; color: var(--muted); margin: 0 0 16px; }
+  .modal input {
+    width: 100%; padding: 12px; font-size: 22px; letter-spacing: .4em;
+    text-align: center; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-family: "SF Mono", Menlo, monospace;
+  }
+  .modal input:focus { outline: none; border-color: var(--accent); }
+  .modal .row { display: flex; gap: 10px; margin-top: 16px; }
+  .modal button {
+    flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600;
+  }
+  .modal .ok { background: var(--accent); color: #fff; }
+  .modal .cancel { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .modal .err { color: var(--bad); font-size: 11px; min-height: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Paramant CLI</h1>
+    <span class="connection-status" id="conn">connecting</span>
+    <span class="spacer"></span>
+    <button class="help-toggle" id="help-btn" title="Show help">?</button>
+  </header>
+
+  <div id="terminal" class="terminal-container"></div>
+
+  <footer>
+    <span class="hint">type 'help' for commands &middot; Tab to complete &middot; Up/Down history &middot; Ctrl+K clear &middot; Ctrl+C cancel</span>
+  </footer>
+
+  <div class="modal-overlay" id="totp-modal">
+    <div class="modal">
+      <h2>Confirmation required</h2>
+      <p id="totp-cmd">This command changes state. Enter your 6-digit TOTP code.</p>
+      <input id="totp-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+      <div class="err" id="totp-err"></div>
+      <div class="row">
+        <button class="cancel" id="totp-cancel">Cancel</button>
+        <button class="ok" id="totp-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/vendor/xterm.js"></script>
+  <script src="/admin/cli.js"></script>
+</body>
+</html>
