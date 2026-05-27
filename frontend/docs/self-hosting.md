@@ -462,6 +462,8 @@ The CT log viewer has two tabs: **Key Registrations** (all pubkey entries) and *
 
 On first boot each relay generates an ML-DSA-65 keypair and stores it in `/data/relay-identity.json`. After the server starts it signs a registration payload and POSTs it to `RELAY_PRIMARY_URL`. The registration is verified (ML-DSA-65 signature + timestamp freshness check) and appended to the CT log.
 
+Since the M5b migration (2026-05-27) the server-side ML-DSA-65 keygen, signing and verification are provided by [paramant-core](https://github.com/Apolloccrypt/paramant-core) — a standalone, audit-ready Rust crypto library (BUSL-1.1) consumed by the relay through its `@paramant/core` NAPI binding. If that binding is missing or fails to build, the relay logs `ml_dsa_not_available` and relay-to-relay signing is disabled; rebuild `@paramant/core` to restore it.
+
 **To enable for your relay stack**, add to each service's environment in `docker-compose.yml`:
 
 ```yaml
