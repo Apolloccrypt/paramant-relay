@@ -62,7 +62,7 @@ sudo dpkg -i paramant-client_amd64.deb
 Verify:
 ```bash
 paramant-sender.py --version
-# paramant-client 2.4.5
+# paramant-client 3.0.0
 ```
 
 ### 2. Configure
