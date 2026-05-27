@@ -1222,10 +1222,9 @@ api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => 
     return res.status(502).json({ error: 'plan_update_failed' });
   }
 
-  // Reload all relay sectors so in-memory maps stay consistent
-  await Promise.allSettled(Object.keys(SECTORS).map(s =>
-    relayFetch(s, "/v2/reload-users", "POST", {}, false, ADMIN_TOKEN)
-  ));
+  // (cross-sector /v2/reload-users trigger removed: update-plan already mutates
+  // the relay's in-memory apiKeys directly. The reload was the cause of the
+  // 2026-05-08 wipe race against the concurrent users.json write.)
 
   const now = new Date().toISOString();
   const nextBilling = session.period === 'yearly'
