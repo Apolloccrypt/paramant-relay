@@ -1,4 +1,4 @@
-# PARAMANT Ghost Pipe Relay — v2.4.5
+# PARAMANT Ghost Pipe Relay — v3.0.0
 
 Node.js relay for PARAMANT Ghost Pipe. One codebase, five sector containers.
 

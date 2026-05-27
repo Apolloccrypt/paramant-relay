@@ -69,16 +69,41 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [3.0.0] - 2026-05-27 (internal, M5b architecture)
+## [3.0.0] - 2026-05-27
 
-Internal-architecture major-version bump for the M5b paramant-core integration.
-`package.json` and the `/health` endpoint report 3.0.0; the user-facing site
-(version badge, build label, marketing copy) intentionally stays at 2.5.0 until
-ParaSign GA provides a user-facing reason for a marketing major-version bump. M5b
-is a server-side architecture change, not a user-facing feature. This also resolves
-the prior internal drift (`package.json` was 1.0.0, `/health` was 2.5.0).
+Major-version bump for the M5b paramant-core integration. 3.0.0 is now the
+SINGLE version across the project: `package.json`, the `/health` endpoint, the
+README badge, the site build labels, the installer pin, and the primary docs all
+report 3.0.0.
 
-### Changed
+### Changed - Version unification (issue #45)
+
+Reverses the earlier split-version strategy (commit 77bb8d3, "keep marketing
+2.5.0"). That split left the surface drifting three ways -- `/health` and
+`package.json` at 3.0.0, the README badge and site copy at 2.5.0, and the
+installer pinned at 2.4.5 -- which the 2026-05-27 site audit flagged (M-01) and
+issue #45 tracked. There is now one version.
+
+- README version badge + `/health` examples: 2.5.0 -> 3.0.0.
+- `relay/package.json` (+ lock): 2.5.0 -> 3.0.0 (root `package.json` already 3.0.0).
+- `install.sh`, `frontend/install.sh`, `frontend/install-pi.sh` pin: v2.4.5 -> v3.0.0.
+- `relay/Dockerfile` OCI image label: 2.4.5 -> 3.0.0.
+- `relay/README.md` header + all `frontend/*.html` build labels and version
+  stamps + the primary how-to guides (api / self-hosting / licensing / ot /
+  dicom): -> 3.0.0.
+
+Deliberately NOT changed: SDK packages (`sdk-js`, `sdk-py` are independently
+versioned and already AHEAD at 3.1.0 -- downgrading would be a regression);
+historical records (the `[2.4.5]`/`[2.4.4]` release sections, "patched in v2.4.5"
+findings, `SECURITY.md`, `docs/security*.md`, the dated 2026-04 and 2026-05-27
+audit reports); ParamantOS release-tag links (separate, deprecated product); and
+the investor brief's "v2.4.5 live in production" statements (production genuinely
+lags main per audit M-01 -- claiming 3.0.0-live would be false until deployed).
+
+ParaSign GA will pick its own version (3.1.0 or 4.0.0) at launch; 3.0.0 is no
+longer reserved for it.
+
+### Changed (M5b architecture)
 - ML-KEM-768 keygen now runs on the Rust `@paramant/core` NAPI binding instead of
   the JavaScript `@noble/post-quantum` library (M5b, PR #33). Wire format and
   client behavior unchanged; this is an internal crypto-implementation swap.

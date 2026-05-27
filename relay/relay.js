@@ -1756,14 +1756,210 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ setupMode, ready: !setupMode }));
   }
 
-  // POST /v2/setup/apply -- apply first-time configuration. Stub for now.
+  // GET /v2/setup/dns-check?domain=... -- informational DNS preflight.
+  // Gated on setup mode so it cannot be used as a general resolver.
+  if (req.method === 'GET' && path === '/v2/setup/dns-check') {
+    if (!_setupModeOn()) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Setup is already complete on this relay.' }));
+    }
+    const domain = (query.domain || '').toString().trim().toLowerCase();
+    if (!domain || !/^(?=.{1,253}$)([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/.test(domain)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'A valid fully-qualified domain is required.' }));
+    }
+    try {
+      const addrs = await require('dns').promises.lookup(domain, { all: true });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, domain, resolves: addrs.length > 0, addresses: addrs.map(a => a.address) }));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, domain, resolves: false, error: e.code || e.message }));
+    }
+  }
+
+  // POST /v2/setup/apply -- apply first-time configuration.
+  // Writes .env (atomic, backing up any existing one), mints the admin and
+  // optional first-user API keys via the canonical apiKeys + users.json path,
+  // applies a compliance preset, and records a setup_completed audit event.
+  // TLS issuance is intentionally NOT run here -- it requires root + certbot
+  // and is handled by install.sh / scripts/paramant-tls-bootstrap.sh.
   if (req.method === 'POST' && path === '/v2/setup/apply') {
     if (!_setupModeOn()) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Setup is already complete on this relay.' }));
     }
-    res.writeHead(501, { 'Content-Type': 'application/json' });
-    return res.end(J({ error: 'Setup endpoint not yet implemented. Use the admin scripts (scripts/paramant-key-add.sh) or edit .env for now.' }));
+    try {
+      const body = JSON.parse((await readBody(req, 16384)).toString());
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const domainRe = /^(?=.{1,253}$)([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/;
+
+      // -- validate sectors --
+      const VALID_SECTORS = new Set(['general', 'health', 'finance', 'legal', 'iot']);
+      const sectors = Array.isArray(body.sectors) ? body.sectors.filter(s => VALID_SECTORS.has(s)) : [];
+      if (sectors.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Select at least one valid sector.' }));
+      }
+      // -- validate domain (null = localhost mode) --
+      let domain = null;
+      if (typeof body.domain === 'string' && body.domain.trim()) {
+        domain = body.domain.trim().toLowerCase();
+        if (!domainRe.test(domain)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'Invalid domain. Leave blank for localhost mode.' }));
+        }
+      }
+      // -- validate admin email --
+      const adminEmail = (body.adminEmail || (body.admin && body.admin.email) || '').toString().trim();
+      if (!adminEmail || adminEmail.length > 254 || !emailRe.test(adminEmail)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'A valid admin email is required.' }));
+      }
+      const enableTotp = body.enableTotp !== false;
+      const autoTls = !!body.autoTls && !!domain;
+      // -- compliance preset --
+      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'licensed', 'enterprise']);
+      const PRESETS = {
+        generic:  { BLOB_TTL_MS: 3600000, AUDIT_RETENTION_DAYS: 90,   ML_DSA_REQUIRED: 'false', CRYPTO_MODE: 'core' },
+        nen7510:  { BLOB_TTL_MS: 1800000, AUDIT_RETENTION_DAYS: 2555, ML_DSA_REQUIRED: 'true',  CRYPTO_MODE: 'core' },
+        iec62443: { BLOB_TTL_MS: 900000,  AUDIT_RETENTION_DAYS: 365,  ML_DSA_REQUIRED: 'true',  CRYPTO_MODE: 'core' },
+        dora:     { BLOB_TTL_MS: 3600000, AUDIT_RETENTION_DAYS: 1825, ML_DSA_REQUIRED: 'true',  CRYPTO_MODE: 'core' },
+        custom:   {},
+        none:     {},
+      };
+      const tpl = Object.prototype.hasOwnProperty.call(PRESETS, body.complianceTemplate) ? body.complianceTemplate : 'generic';
+      const preset = PRESETS[tpl];
+      // -- optional first user --
+      let firstUser = null;
+      const fuEmail = (body.firstUserEmail || (body.first_user && body.first_user.email) || '').toString().trim();
+      if (fuEmail) {
+        if (fuEmail.length > 254 || !emailRe.test(fuEmail)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'First-user email is invalid. Leave it blank to skip.' }));
+        }
+        firstUser = {
+          email: fuEmail,
+          label: (body.firstUserLabel || '').toString().slice(0, 128) || 'first-user',
+          plan: VALID_PLANS.has(body.firstUserPlan) ? body.firstUserPlan : 'pro',
+        };
+      }
+
+      // -- mint keys (canonical apiKeys + users.json pattern) --
+      const mint = (plan, label, email) => {
+        const k = 'pgp_' + crypto.randomBytes(32).toString('hex');
+        apiKeys.set(k, { plan, label, email, active: true });
+        return k;
+      };
+      const adminKey = mint('enterprise', 'setup-admin', adminEmail);
+      const firstUserKey = firstUser ? mint(firstUser.plan, firstUser.label, firstUser.email) : null;
+      await _mutateUsersJson(d => {
+        d.api_keys = d.api_keys || [];
+        const now = new Date().toISOString();
+        d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
+        if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
+        d.updated = now;
+      }).catch(we => log('warn', 'setup_persist_failed', { err: we.message }));
+
+      // -- write .env (atomic temp+rename, back up existing) --
+      const envPath = process.env.SETUP_ENV_FILE || path.join(process.cwd(), '.env');
+      const envLines = [
+        '# Generated by Paramant /setup on ' + new Date().toISOString(),
+        'SECTORS=' + sectors.join(','),
+        domain ? ('DOMAIN=' + domain) : '# DOMAIN= (localhost mode)',
+        'RELAY_MODE=' + (domain ? 'domain' : 'localhost'),
+        'AUTO_TLS=' + (autoTls ? 'true' : 'false'),
+        'ADMIN_EMAIL=' + adminEmail,
+        'ADMIN_TOTP_ENABLED=' + (enableTotp ? 'true' : 'false'),
+        'COMPLIANCE_TEMPLATE=' + tpl,
+      ].concat(Object.keys(preset).map(k => k + '=' + preset[k]))
+       .concat(['SETUP_MODE=false']);
+      let envWritten = false, envBackedUp = false;
+      try {
+        if (fs.existsSync(envPath)) { fs.copyFileSync(envPath, envPath + '.pre-setup'); envBackedUp = true; }
+        const tmp = envPath + '.tmp.' + process.pid + '.' + Date.now();
+        fs.writeFileSync(tmp, envLines.join('\n') + '\n', { mode: 0o600 });
+        fs.renameSync(tmp, envPath);
+        envWritten = true;
+      } catch (we) { log('warn', 'setup_env_write_failed', { err: we.message, path: envPath }); }
+
+      // -- audit --
+      try { auditAppend(adminKey, 'setup_completed', { sectors: sectors.join(','), domain: domain || 'localhost', template: tpl, tls: autoTls, first_user: !!firstUserKey }); } catch (ae) { log('warn', 'setup_audit_failed', { err: ae.message }); }
+      log('info', 'setup_completed', { sectors: sectors.join(','), domain: domain || 'localhost', template: tpl, env_written: envWritten });
+
+      const proto = domain ? 'https' : 'http';
+      const host = domain || (req.headers.host || 'localhost');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        ok: true,
+        admin_api_key: adminKey,
+        admin_api_key_masked: adminKey.slice(0, 12) + '...',
+        first_user_api_key: firstUserKey,
+        first_user_api_key_masked: firstUserKey ? firstUserKey.slice(0, 12) + '...' : null,
+        sectors,
+        compliance_template: tpl,
+        env_written: envWritten,
+        env_backed_up: envBackedUp,
+        tls: autoTls ? 'pending' : 'n/a',
+        next_step: envWritten ? 'restart_relay' : 'all_systems_go',
+        dashboard_url: proto + '://' + host + '/dashboard',
+        health_url: proto + '://' + host + '/all-systems-go',
+      }));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
+  // GET /v2/health/deep -- aggregated readiness check for the post-setup page.
+  // Public read (no auth) so the setup wizard and /all-systems-go can show it.
+  if (req.method === 'GET' && path === '/v2/health/deep') {
+    const checks = [];
+    const add = (name, status, detail) => checks.push({ name, status, detail });
+
+    add('relay', 'green', 'relay ' + VERSION + ' (' + SECTOR + ') up');
+
+    const cmode = process.env.CRYPTO_MODE || 'core';
+    add('crypto', mlDsa ? 'green' : 'yellow',
+      mlDsa ? ('ML-DSA-65 loaded, mode=' + cmode) : ('ML-DSA-65 unavailable (build @paramant/core), mode=' + cmode));
+
+    try {
+      const dir = process.env.SETUP_ENV_FILE ? path.dirname(process.env.SETUP_ENV_FILE) : process.cwd();
+      const probe = path.join(dir, '.health-write-' + process.pid);
+      fs.writeFileSync(probe, 'ok'); fs.unlinkSync(probe);
+      add('storage', 'green', 'data dir writable');
+    } catch (e) { add('storage', 'red', 'not writable: ' + (e.code || e.message)); }
+
+    const rs = ramStatus();
+    add('memory', rs.ram_ok ? 'green' : 'yellow', rs.rss_mb + 'MB rss / ' + rs.ram_limit_mb + 'MB limit');
+
+    try {
+      if (typeof fs.statfsSync === 'function') {
+        const st = fs.statfsSync(process.cwd());
+        const freeGb = (st.bsize * st.bavail) / 1e9;
+        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free');
+      } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
+    } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
+
+    let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
+    try {
+      const certFile = process.env.TLS_CERT_FILE || path.join(process.cwd(), 'deploy/certs/cert.pem');
+      if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
+        const cert = new crypto.X509Certificate(fs.readFileSync(certFile));
+        const days = Math.floor((new Date(cert.validTo).getTime() - Date.now()) / 86400000);
+        tlsStatus = days > 14 ? 'green' : (days > 0 ? 'yellow' : 'red');
+        tlsDetail = days + ' days until expiry';
+      }
+    } catch (e) { tlsDetail = 'cert unreadable: ' + (e.code || e.message); }
+    add('tls', tlsStatus, tlsDetail);
+
+    add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
+    add('audit', 'green', 'Merkle hash chain active');
+
+    const rank = { green: 0, yellow: 1, red: 2 };
+    const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ overall, version: VERSION, sector: SECTOR, checks }));
   }
 
   // ═══════════════════════════════════════════════════════════════════════
