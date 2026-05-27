@@ -2,214 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PARAMANT — Encrypted File Relay. Burn on Read.</title>
-<meta name="description" content="Encrypted file relay. AES-256-GCM for anonymous links. ML-KEM-768 + ECDH hybrid for verified transfers. RAM-only. Burn-on-read. EU/DE jurisdiction.">
-<meta property="og:title" content="PARAMANT — Encrypted File Relay. Burn on Read.">
-<meta property="og:description" content="Encrypted file relay. AES-256-GCM for anonymous links. ML-KEM-768 + ECDH hybrid for verified transfers. RAM-only. Burn-on-read. EU/DE jurisdiction.">
+<meta name="theme-color" content="#0B3A6A">
+<title>PARAMANT &mdash; Encrypted File Relay. Burn on Read.</title>
+<meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768 + ML-DSA-65. Burn-on-read. EU/DE. Send files, sign documents, deploy your own.">
+<meta property="og:title" content="PARAMANT &mdash; Encrypted File Relay">
+<meta property="og:description" content="Post-quantum encrypted file relay. Burn on read. EU/DE.">
+<meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:url" content="https://paramant.app/">
 <meta property="og:type" content="website">
-<meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PARAMANT — Encrypted File Relay. Burn on Read.">
-<meta name="twitter:description" content="Encrypted file relay. AES-256-GCM for anonymous links. ML-KEM-768 + ECDH hybrid for verified transfers. RAM-only. Burn-on-read. EU/DE jurisdiction.">
 <link rel="canonical" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
-
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-
-<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
-<style>
-/* ── DEPLOY CARDS ─────────────────────────────── */
-.deploy-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-.deploy-card {
-  border: 1px solid rgba(11,58,106,0.12);
-  padding: 32px 28px;
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
-}
-.deploy-card.featured {
-  border-color: #1D4ED8;
-  border-width: 2px;
-}
-.deploy-label {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: #64748b;
-  margin-bottom: 16px;
-}
-.deploy-card.featured .deploy-label {
-  background: #B2FF3F;
-  color: #0B3A6A;
-  padding: 2px 8px;
-  display: inline-block;
-  align-self: flex-start;
-}
-.deploy-card h3 {
-  font-size: 26px;
-  font-weight: 600;
-  color: #0B3A6A;
-  margin: 0 0 6px 0;
-}
-.deploy-tagline {
-  font-size: 15px;
-  color: #1D4ED8;
-  margin: 0 0 14px 0;
-  line-height: 1.4;
-}
-.deploy-body {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #475569;
-  margin: 0 0 18px 0;
-  flex-grow: 1;
-}
-.deploy-specs {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 22px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.deploy-specs li {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  color: #475569;
-  padding-left: 16px;
-  position: relative;
-}
-.deploy-specs li::before {
-  content: '·';
-  position: absolute;
-  left: 0;
-  color: #0B3A6A;
-  font-weight: 700;
-}
-.deploy-cta {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
-  color: #1D4ED8;
-  text-decoration: none;
-  letter-spacing: .02em;
-  align-self: flex-start;
-}
-.deploy-cta:hover { text-decoration: underline; }
-@media (max-width: 900px) {
-  .deploy-grid { grid-template-columns: 1fr; }
-}
-.hero-col-secondary-link {
-  display: inline-block;
-  margin: 8px 0 20px 0;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 12px;
-  color: #64748b;
-  text-decoration: none;
-  border-bottom: 1px dashed #94A3B8;
-  padding-bottom: 2px;
-  transition: all 140ms ease;
-}
-.hero-col-secondary-link:hover {
-  color: #1D4ED8;
-  border-bottom-color: #B2FF3F;
-  border-bottom-style: solid;
-}
-.hero-col-secondary-link:focus-visible {
-  outline: 2px solid #B2FF3F;
-  outline-offset: 2px;
-  color: #0B3A6A;
-}
-</style>
-<style>
-.nav-help {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  color: #475569;
-  text-decoration: none;
-  border: 1px solid #E2E8F0;
-  transition: all 140ms ease;
-  margin-right: 12px;
-}
-.nav-help::before {
-  content: "?";
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid #64748b;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  font-family: Inter, sans-serif;
-  line-height: 1;
-}
-.nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
-}
-.nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
-}
-.nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
-  outline-offset: 2px;
-}
-.nav-help-mobile {
-  display: block;
-  padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: #475569;
-  text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
-}
-.nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
-}
-@media (max-width: 900px) {
-  .nav-help { display: none; }
-}
-</style>
-<style id="products-dual-grid-css">
-@media (max-width: 800px) {
-  .section-inner > div[style*="grid-template-columns:1fr 1fr"] {
-    grid-template-columns: 1fr !important;
-    gap: 32px !important;
-  }
-}
-</style>
+<link rel="stylesheet" href="/components-parasign.css?v=2">
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
-
 <div class="meta-bar">
   <span class="">build 3.0.0</span>
   <span class="sep">·</span>
@@ -310,443 +122,98 @@
     <span></span><span></span><span></span>
   </button>
 </nav>
-<div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/send">Send a file</a>
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
-  </div>
+<main id="main-content" role="main">
 
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
-</div>
-
-<!-- § 00 HERO -->
-<section class="section section--light hero-split" id="main-content" tabindex="-1" aria-label="Two ways to use Paramant">
-  <div class="section-inner">
-
-    <header class="hero-split-header">
-      <div class="hero-split-eyebrow">
-        <span>POST-QUANTUM</span>
-        <span class="eyebrow-dot">&middot;</span>
-        <span>EU SOVEREIGN</span>
-        <span class="eyebrow-dot">&middot;</span>
-        <span>ZERO-KNOWLEDGE</span>
-      </div>
-      <h1 class="hero-split-title">File transfer without the file storage.</h1>
-      <p style="margin:20px 0 0;font-size:clamp(16px,2vw,22px);color:var(--ink-dim);font-weight:400">Files burn after one read. Use the relay, or run your own.</p>
-    </header>
-
-    <div class="hero-split-grid">
-
-      <article class="hero-col hero-col--send">
-          <div class="hero-col-label">SEND</div>
-          <h2 class="hero-col-title">Move a file securely.</h2>
-          <p class="hero-col-lede">
-            A free account tracks your sends, keeps them longer, and lets you send more per month. Or drop one file anonymously in 30 seconds.
-          </p>
-          <a href="/signup" class="btn btn-lime hero-col-cta">Create free account →</a>
-          <a href="/send" class="hero-col-secondary-link">Or skip account — send anonymously →</a>
-          <ul class="hero-col-specs">
-            <li>No password — TOTP only</li>
-            <li>Burns after read, or on timer</li>
-            <li>AES-256-GCM in-browser</li>
-          </ul>
-        </article>
-
-      <div class="hero-split-divider" aria-hidden="true"></div>
-
-      <article class="hero-col hero-col--build">
-        <div class="hero-col-label">BUILD</div>
-        <h2 class="hero-col-title">Run the relay yourself, or build on the API.</h2>
-        <p class="hero-col-lede">
-          Self-hosters on Raspberry Pi. OT teams deploying sector-isolated relays. Blockchain nodes needing ciphertext passthrough. Developers integrating encrypted transfer into their own products.
-        </p>
-        <a href="/docs" class="btn btn-lime hero-col-cta">Read the docs &rarr;</a>
-        <ul class="hero-col-specs">
-          <li>BUSL-1.1 source</li>
-          <li>docker compose up -d</li>
-          <li>NIS2, IEC&nbsp;62443, NEN&nbsp;7510</li>
-        </ul>
-      </article>
-
-    </div>
-
-    <div class="hero-trust-strip" aria-label="Technical foundation shared by both sides">
-      <span class="trust-item">
-        <span class="trust-label">CRYPTO</span>
-        <span class="trust-value">3 KEMs + 18 sigs · NIST FIPS 203/204/205/206</span>
-      </span>
-      <span class="trust-item">
-        <span class="trust-label">JURISDICTION</span>
-        <span class="trust-value">Hetzner Germany, EU only</span>
-      </span>
-      <span class="trust-item">
-        <span class="trust-label">OWNERSHIP</span>
-        <span class="trust-value">No US parent, no CLOUD Act</span>
-      </span>
-      <span class="trust-item">
-        <span class="trust-label">STORAGE</span>
-        <span class="trust-value">RAM only, no disk writes</span>
-      </span>
-    </div>
-
+<section class="home-hero">
+  <span class="eyebrow">post-quantum &middot; eu sovereign &middot; zero-knowledge</span>
+  <h1>Encrypted file transfer that leaves no trace.</h1>
+  <p class="lede">Send files anonymously, sign documents with post-quantum signatures, or deploy a self-hosted relay for healthcare, finance, legal, or industrial IoT. Burn on read. EU/DE only.</p>
+  <div class="home-cta">
+    <a class="btn btn-primary" href="/send">Send a file now</a>
+    <a class="btn btn-secondary" href="/docs#self-hosting">Self-host guide</a>
   </div>
 </section>
 
-<!-- § 01 HOW IT WORKS -->
-<section class="section-tint" style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="how">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num">01</span>
-      <h2>Four steps. Nothing stored.</h2>
-      <span class="tag">How it works</span>
-    </div>
-    <div class="steps">
-      <div>
-        <div class="how-num">1</div>
-        <strong style="display:block;font-family:var(--sans);font-size:var(--text-base);color:var(--navy);margin-bottom:var(--space-3)">Encrypt client-side</strong>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">Your file is encrypted in the browser before it leaves your device. The relay never sees plaintext.</p>
-      </div>
-      <div>
-        <div class="how-num">2</div>
-        <strong style="display:block;font-family:var(--sans);font-size:var(--text-base);color:var(--navy);margin-bottom:var(--space-3)">Transit via Ghost Pipe</strong>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The ciphertext moves through the relay and is hashed into the CT Merkle log. ParaShare verified transfers are padded to a fixed 5&nbsp;MB block; anonymous links travel at their actual encrypted size, up to 5&nbsp;MB.</p>
-      </div>
-      <div>
-        <div class="how-num">3</div>
-        <strong style="display:block;font-family:var(--sans);font-size:var(--text-base);color:var(--navy);margin-bottom:var(--space-3)">One-time download</strong>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The recipient decrypts locally. On download, the relay erases the blob from RAM. Burn-on-read.</p>
-      </div>
-      <div>
-        <div class="how-num">4</div>
-        <strong style="display:block;font-family:var(--sans);font-size:var(--text-base);color:var(--navy);margin-bottom:var(--space-3)">Cryptographic proof</strong>
-        <p style="font-size:var(--text-base);color:var(--ink);line-height:1.65">The Merkle root is updated. Transfer is proven without storing what was transferred.</p>
-      </div>
-    </div>
+<aside class="trust-bar" aria-label="Trust signals">
+  <span><strong>FIPS 203 / 204</strong> ML-KEM-768 &middot; ML-DSA-65</span>
+  <span><strong>Hetzner DE</strong> no US CLOUD Act</span>
+  <span><strong>RAM-only</strong> no disk writes</span>
+  <span><strong>BUSL-1.1</strong> source-available</span>
+</aside>
+
+<section class="home-section" aria-labelledby="prod-h">
+  <header class="home-section-head"><span class="eyebrow">Products</span><h2 id="prod-h">Four ways to use Paramant.</h2><p>One relay, four endpoints. Each tuned for a different transfer pattern. All client-side encrypted, all burn-on-read.</p></header>
+  <div class="pgrid">
+    <a class="pcard" href="/send"><span class="ptag">anonymous</span><h3>Send a file</h3><p>Drop a file, share the link, burns after one read. No account, no signup. AES-256-GCM in-browser.</p><span class="pcta">Send now</span></a>
+    <a class="pcard" href="/parashare"><span class="ptag">verified</span><h3>ParaShare</h3><p>End-to-end ML-KEM-768 hybrid with ML-DSA-65 signed receipts. Cryptographic proof of who sent what to whom.</p><span class="pcta">Try ParaShare</span></a>
+    <a class="pcard" href="/drop"><span class="ptag">device-to-device</span><h3>ParaDrop</h3><p>AirDrop alternative across iOS, Android, Windows, Linux. QR or 6-digit pairing. Encrypted in transit, burn on read.</p><span class="pcta">Use ParaDrop</span></a>
+    <a class="pcard" href="/sign"><span class="ptag">new &middot; parasign</span><h3>Sign documents</h3><p>Post-quantum ML-DSA-65 signatures. Self-contained .psign envelope. CT-log backed.</p><span class="pcta">Sign a document</span></a>
   </div>
 </section>
 
-<!-- § 01.5 THREE PRODUCTS -->
-<!-- § 02 UNDER THE HOOD — CRYPTO STRIP -->
-<style>
-.crypto-strip{background:#0B3A6A;padding:64px 24px}
-.crypto-strip-inner{max-width:1200px;margin:0 auto}
-.crypto-sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:40px;flex-wrap:wrap}
-.crypto-sec-num{background:#B2FF3F;color:#0B3A6A;padding:2px 14px;font-family:var(--mono);font-size:clamp(3rem,7vw,7rem);font-weight:700;line-height:1;display:inline-block}
-.crypto-sec-title{font-size:clamp(1.8rem,4vw,3.5rem);font-weight:600;color:#F8FAFC !important;margin:0;line-height:1.1}
-.crypto-row{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:32px}
-.crypto-item{border-left:3px solid #B2FF3F;padding-left:20px}
-.crypto-item-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:#B2FF3F !important;text-transform:uppercase;margin-bottom:8px}
-.crypto-item-tag{display:inline-block;background:#B2FF3F;color:#0B3A6A;padding:3px 10px;font-family:var(--mono);font-size:13px;font-weight:600;margin-bottom:10px}
-.crypto-item p{color:#F8FAFC !important;font-size:var(--text-sm);line-height:1.6;margin:0;opacity:.85}
-.crypto-strip-link{color:#B2FF3F !important;font-family:var(--mono);font-size:var(--text-xs);text-decoration:none;letter-spacing:.06em}
-.crypto-strip-link:hover{color:#fff;text-decoration:underline;text-decoration-color:#B2FF3F}
-@media(max-width:700px){.crypto-row{grid-template-columns:1fr;gap:24px}.crypto-sec-head{flex-direction:column;align-items:flex-start;gap:8px}}
-</style>
-<section class="crypto-strip" id="crypto" aria-labelledby="crypto-strip-title">
-  <div class="crypto-strip-inner">
-    <div class="crypto-sec-head">
-      <span class="crypto-sec-num">02</span>
-      <h2 id="crypto-strip-title" class="crypto-sec-title">Under the hood.</h2>
-      <span style="font-family:var(--mono);font-size:var(--text-xs);color:#B2FF3F;letter-spacing:.12em;text-transform:uppercase;align-self:center">Cryptography</span>
-    </div>
-    <div class="crypto-row">
-      <div class="crypto-item">
-        <span class="crypto-item-label">Anonymous one-off</span>
-        <span class="crypto-item-tag">AES-256-GCM</span>
-        <p>Browser-generated key in URL fragment — never sent to relay. Prove-by-design that we cannot decrypt what we relay.</p>
-      </div>
-      <div class="crypto-item">
-        <span class="crypto-item-label">Verified end-to-end</span>
-        <span class="crypto-item-tag">ML-KEM-768 + ECDH P-256</span>
-        <p>Post-quantum hybrid key exchange. FIPS 203. ML-DSA-65 signed receipts (FIPS 204). All math client-side.</p>
-      </div>
-    </div>
-    <p style="color:#F8FAFC;opacity:.75;font-size:var(--text-sm);line-height:1.7;margin-top:24px;max-width:60ch">The relay loads 3 KEMs and 18 signatures from FIPS 203, 204, 205, and 206. Clients pick, the relay validates against the live registry, unsupported algorithms get HTTP 415. The official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) produce wire format v1 today; the WebApp tools and extensions are migrating in stages — see <a href="/crypto-agility#06" style="color:#B2FF3F;text-decoration:underline">crypto-agility § 06</a> for per-client status.</p>
-    <a href="/security" class="crypto-strip-link">Full cryptography spec →</a>
-  </div>
-</section>
-<!-- § 03 VERIFIABLE — CT LOG -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="ct">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num">03</span>
-      <h2>Verifiable</h2>
-      <span class="tag">CT log</span>
-    </div>
-
-    <div class="ct-widget">
-      <div class="ct-header">
-        <div style="display:flex;align-items:center;gap:var(--space-3)">
-          <span class="dot" id="ct-dot"></span>
-          <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim)">Certificate Transparency Log — live</span>
-        </div>
-        <a href="/ct-log" style="font-family:var(--mono);font-size:var(--text-xs);color:var(--cobalt);letter-spacing:.06em">View all &rarr;</a>
-      </div>
-
-      <div class="ct-stats">
-        <div class="ct-stat">
-          <div class="ct-stat-label">Log entries</div>
-          <div class="ct-stat-val" id="ct-transfers">—</div>
-        </div>
-        <div class="ct-stat">
-          <div class="ct-stat-label">Registered relays</div>
-          <div class="ct-stat-val" id="ct-relays">—</div>
-        </div>
-        <div class="ct-stat">
-          <div class="ct-stat-label">STH signature</div>
-          <div class="ct-stat-val" style="font-size:var(--text-lg)" id="ct-sth-status">checking...</div>
-        </div>
-      </div>
-
-      <div class="ct-body">
-        <div class="ct-root-panel">
-          <div class="ct-feed-label">Current root</div>
-          <div style="font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);word-break:break-all;line-height:1.7" id="ct-root">syncing...</div>
-          <div style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-3);letter-spacing:.04em">SHA3-256 · tamper-evident · public</div>
-        </div>
-        <div class="ct-feed-panel">
-          <div class="ct-feed-label">Recent activity</div>
-          <div id="ct-feed" style="font-family:var(--mono);font-size:var(--text-sm);color:var(--ink-dim);line-height:2">
-            <span>loading...</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="ct-foot">
-        <div style="font-size:var(--text-base);color:var(--ink)">Every transfer hashed into a Merkle tree. Content never stored.</div>
-        <div style="display:flex;gap:var(--space-3);flex-shrink:0;flex-wrap:wrap">
-          <a href="/ct-log" class="btn btn-tertiary">View live CT log &rarr;</a>
-          <a href="/hndl" class="btn btn-tertiary">Why post-quantum now &rarr;</a>
-        </div>
-      </div>
-    </div>
+<section class="home-section alt" aria-labelledby="sec-h">
+  <header class="home-section-head"><span class="eyebrow">For your sector</span><h2 id="sec-h">Built for regulated industries.</h2><p>Sector relays on the identical Ghost Pipe protocol, with sector-specific compliance documentation.</p></header>
+  <div class="sgrid">
+    <article class="scard"><span class="slabel">Healthcare</span><h3>DICOM, referrals, lab results</h3><p class="suse">Send scans and patient records between care providers, designed for NEN 7510 with per-access CT log proof.</p><div class="schips"><a class="schip" href="/compliance/nen7510">NEN 7510</a><a class="schip" href="/sovereignty">GDPR</a></div><div class="slink"><a href="https://health.paramant.app">health.paramant.app &rarr;</a></div></article>
+    <article class="scard"><span class="slabel">Finance</span><h3>Settlement files, payment data</h3><p class="suse">Payment files with per-transaction Merkle proofs. EU jurisdiction, no US Cloud Act, no metadata retention.</p><div class="schips"><a class="schip" href="/compliance/nis2">NIS2</a><a class="schip" href="/banken">Banking</a></div><div class="slink"><a href="https://finance.paramant.app">finance.paramant.app &rarr;</a></div></article>
+    <article class="scard"><span class="slabel">Legal &amp; notary</span><h3>Court documents, deeds</h3><p class="suse">Signed documents cryptographically destroyed after receipt. Tamper-evident proof of delivery without storing content.</p><div class="schips"><a class="schip" href="/sovereignty">Sovereignty</a><a class="schip" href="/sign">ParaSign</a></div><div class="slink"><a href="https://legal.paramant.app">legal.paramant.app &rarr;</a></div></article>
+    <article class="scard"><span class="slabel">Industrial IoT</span><h3>PLC telemetry, SCADA data</h3><p class="suse">Quantum-safe data diode. PLCs push outbound only, no inbound port, no VPN. Works on a Raspberry Pi.</p><div class="schips"><a class="schip" href="/compliance/iec62443">IEC 62443</a><a class="schip" href="/ot">OT guide</a></div><div class="slink"><a href="https://iot.paramant.app">iot.paramant.app &rarr;</a></div></article>
+    <article class="scard"><span class="slabel">Government &amp; public</span><h3>Sovereign data routing</h3><p class="suse">EU-only infrastructure. No US parent company, no CLOUD Act jurisdiction. For ministries and agencies.</p><div class="schips"><a class="schip" href="/government">Government brief</a><a class="schip" href="/sovereignty">Sovereignty</a></div></article>
+    <article class="scard"><span class="slabel">Supply chain</span><h3>Firmware, SBOM, code-signing</h3><p class="suse">Distribute firmware and signed artifacts with CT-log proof. Toward EU CRA readiness.</p><div class="schips"><a class="schip" href="/hndl">CRA</a><a class="schip" href="/sign">ParaSign</a></div></article>
   </div>
 </section>
 
-<!-- § 03.5 NO PASSWORDS -->
-<section class="section-cobalt" style="padding:var(--space-9) 0" id="auth">
-  <div class="container">
-    <div class="sec-head">
-      <span class="num" style="font-size:clamp(3rem,7vw,7rem)">03.5</span>
-      <h2>No passwords. Ever.</h2>
-      <span class="tag">Authentication</span>
-    </div>
-    <p style="font-size:var(--text-base);color:var(--bone-on-navy-dim);line-height:1.7;max-width:600px;margin-bottom:var(--space-3)">
-      Paramant has no login form. No username. No password to phish, steal, or breach.
-      Authentication is a cryptographic key and an optional TOTP code — nothing else.
-    </p>
-    <div class="auth-matrix">
+<section class="home-section" aria-labelledby="how-h">
+  <header class="home-section-head"><span class="eyebrow">How it works</span><h2 id="how-h">Four steps. Nothing stored.</h2><p>Client-side encryption, ciphertext-only transit, RAM-only storage, burn after one read.</p></header>
+  <ol class="steps">
+    <li><h3>Encrypt client-side</h3><p>Your file is encrypted in the browser before it leaves your device. The relay never sees plaintext.</p></li>
+    <li><h3>Transit via Ghost Pipe</h3><p>Ciphertext moves through the relay and is hashed into the CT Merkle log.</p></li>
+    <li><h3>One-time download</h3><p>The recipient decrypts locally. On download the blob is overwritten in RAM.</p></li>
+    <li><h3>Cryptographic proof</h3><p>The Merkle root updates. The transfer is provable without storing what was transferred.</p></li>
+  </ol>
+</section>
 
-      <div class="auth-lane">
-        <span class="auth-lane-label">01 — API key</span>
-        <h3>64-char hex secret</h3>
-        <p>Generated once on account creation. Shown once. Store it in your password manager or secret vault. Rotate instantly if compromised.</p>
-      </div>
-
-      <div class="auth-lane">
-        <span class="auth-lane-label">02 — TOTP</span>
-        <h3>Authenticator app</h3>
-        <p>RFC 6238, SHA-256, 30-second codes. Works with Aegis, Authy, 1Password. Each code is single-use — replay attacks have no window.</p>
-      </div>
-
-      <div class="auth-lane">
-        <span class="auth-lane-label">03 — No password</span>
-        <h3>Zero credential surface</h3>
-        <p>Credential stuffing, dictionary attacks, and phishing require a password to target. With no password those attack vectors don't exist.</p>
-      </div>
-
-    </div>
-    <div class="cta-row">
-      <a href="/security" class="btn btn-secondary">Auth security details &rarr;</a>
-      <a href="/signup" class="btn btn-secondary">Create account &rarr;</a>
-    </div>
+<section class="home-section alt" aria-labelledby="crypto-h">
+  <header class="home-section-head"><span class="eyebrow">Under the hood</span><h2 id="crypto-h">Post-quantum, hybrid, audited.</h2><p>Default core stack is ML-KEM-768 (FIPS 203) and ML-DSA-65 (FIPS 204), with ECDH P-256 hybrid. Extended algorithm sets are opt-in (ADR R006).</p></header>
+  <div class="pgrid">
+    <div class="pcard"><span class="ptag">kem</span><h3>ML-KEM-768</h3><p>FIPS 203 key encapsulation. Default in core mode, hybrid with ECDH P-256.</p></div>
+    <div class="pcard"><span class="ptag">signature</span><h3>ML-DSA-65</h3><p>FIPS 204 signatures. Relay identity, CT log STH, and ParaSign envelopes.</p></div>
+    <div class="pcard"><span class="ptag">crypto core</span><h3>paramant-core</h3><p>Audit-ready Rust binding the relay uses for all PQ primitives since v3.0.0 (M5b).</p></div>
+    <a class="pcard" href="/security"><span class="ptag">details</span><h3>Cryptography &amp; audits</h3><p>Full algorithm choices, threat model, and the independent security audits.</p><span class="pcta">Read the spec</span></a>
   </div>
 </section>
 
-<!-- § 04 PRICING -->
-<!-- § 05 SELF-HOST -->
-<section class="section-tint" style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)" id="selfhost">
-  <div class="container-md" style="text-align:center">
-    <div class="sec-head" style="text-align:left">
-      <span class="num">04</span>
-      <h2>Run your own relay.</h2>
-      <span class="tag">Self-host</span>
-    </div>
-    <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin-bottom:var(--space-6)">
-      Source-available under BUSL-1.1. Free for up to 5 users. Works on a Raspberry Pi. If the managed service ever closes, every self-hosted relay keeps running indefinitely.
-    </p>
-    <ul style="list-style:none;padding:0;margin:0 auto var(--space-7);max-width:60ch;text-align:left;color:var(--ink);font-size:var(--text-sm);line-height:1.9">
-      <li>→ Visual setup wizard — first boot configures itself in the browser, no terminal needed</li>
-      <li>→ Built-in admin terminal — debug a running relay from the panel, without SSH</li>
-      <li>→ Add-on ecosystem — extend the relay with integrations without bloating the core</li>
-    </ul>
-    <div class="cluster" style="--cluster-gap:var(--space-4);justify-content:center;flex-direction:column;align-items:center">
-      <code style="background:var(--ink-ghost);border:1px solid #B2FF3F;padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">curl -fsSL https://paramant.app/install.sh | bash</code>
-      <span style="color:var(--ink-dim);font-family:var(--mono);font-size:var(--text-sm)">or</span>
-      <code style="background:var(--ink-ghost);border:1px solid #B2FF3F;padding:var(--space-3) var(--space-5);font-size:var(--text-sm);letter-spacing:.04em;user-select:all">docker compose up -d</code>
-    </div>
-    <div style="margin-top:var(--space-6)">
-      <a href="/docs#self-hosting" class="btn btn-secondary">Full deploy guide &rarr;</a>
-    </div>
+<section class="home-section" aria-labelledby="ct-h">
+  <header class="home-section-head"><span class="eyebrow">Verifiable</span><h2 id="ct-h">Public Merkle proof of every transfer.</h2><p>Every transfer is hashed into a public Merkle tree whose root updates on every write. Prove a transfer occurred without learning what it was.</p></header>
+  <div class="home-center"><a class="btn btn-primary" href="/ct-log">View live CT log</a> <a class="btn btn-tertiary" href="/hndl">Why post-quantum now</a></div>
+</section>
+
+<section class="selfhost">
+  <span class="eyebrow" style="display:block;margin-bottom:var(--space-2)">Self-host</span>
+  <h2>Run your own relay.</h2>
+  <p>Source-available under BUSL-1.1. Works on a Raspberry Pi. If our managed service ever closes, every self-hosted relay keeps running.</p>
+  <code>curl -fsSL https://paramant.app/install.sh | bash</code>
+  <div class="home-cta" style="margin-top:var(--space-4)"><a class="btn btn-secondary" href="/docs#self-hosting">Deploy guide</a><a class="btn btn-tertiary" href="/setup">Setup wizard</a></div>
+</section>
+
+<section class="home-section" aria-labelledby="dev-h">
+  <header class="home-section-head"><span class="eyebrow">For builders</span><h2 id="dev-h">Integrate Paramant.</h2><p>SDKs in Python and JavaScript, plus a direct HTTP/WebSocket API. Wire format v1, byte-compatible across implementations.</p></header>
+  <div class="pgrid">
+    <a class="pcard" href="/docs#quickstart"><span class="ptag">python</span><h3>paramant-sdk (Python)</h3><p>Python 3.10+. ML-KEM-768 + ML-DSA-65 by default. <code>pip install paramant-sdk</code></p><span class="pcta">Quick start</span></a>
+    <a class="pcard" href="/docs#quickstart"><span class="ptag">javascript</span><h3>paramant-sdk (Node)</h3><p>Node 18+. Same wire format as the Python SDK. <code>npm install paramant-sdk</code></p><span class="pcta">Quick start</span></a>
+    <a class="pcard" href="/docs#api"><span class="ptag">http api</span><h3>REST / WebSocket</h3><p>Full /v2 API: WebSocket push, signed receipts, DID-based device identity.</p><span class="pcta">API reference</span></a>
+    <a class="pcard" href="https://github.com/Apolloccrypt/paramant-relay"><span class="ptag">source</span><h3>GitHub</h3><p>BUSL-1.1 source. Verify the code running on your relay against the public repo.</p><span class="pcta">View on GitHub</span></a>
   </div>
 </section>
 
-<!-- § 06 THREE WAYS TO DEPLOY -->
-<section class="section section--light">
-    <div class="container">
-      
-      <header style="display:flex;align-items:baseline;gap:16px;margin-bottom:48px;">
-        <span style="font-size:72px;font-weight:700;color:#1D4ED8;font-family:Inter,sans-serif;letter-spacing:-0.04em;line-height:1;">05</span>
-        <div style="flex:1;">
-          <h2 style="font-size:36px;color:#0B3A6A;margin:0;letter-spacing:-0.01em;line-height:1.1;">Every Paramant product.</h2>
-        </div>
-        <span style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:0.15em;color:#64748b;text-transform:uppercase;">OVERVIEW</span>
-      </header>
-      
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">
-        
-        <div>
-          <h3 class="eyebrow--senders" style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px 0;padding-bottom:12px;border-bottom:1px solid #E2E8F0;">
-            FOR SENDERS
-          </h3>
-          <div style="display:flex;flex-direction:column;gap:16px;">
-            <a href="/send" class="product-card-light" style="display:block;padding:20px;background:#ffffff;text-decoration:none;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">Send a file</h4>
-                <span class="product-tag--lime">ANONYMOUS</span>
-              </div>
-              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">Drop a file, share link, burns after one read. No account, no trace.</p>
-              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">send a file →</span>
-            </a>
-            <a href="/parashare" class="product-card-light" style="display:block;padding:20px;background:#ffffff;text-decoration:none;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">ParaShare</h4>
-                <span class="product-tag--lime">VERIFIED</span>
-              </div>
-              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">ML-KEM-768 hybrid with ML-DSA-65 signed receipts. Proof of who sent what.</p>
-              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">try ParaShare →</span>
-            </a>
-            <a href="/drop" class="product-card-light" style="display:block;padding:20px;background:#ffffff;text-decoration:none;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">ParaDrop</h4>
-                <span class="product-tag--lime">DEVICE-TO-DEVICE</span>
-              </div>
-              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">AirDrop alternative across iOS, Android, Windows, Linux. QR or 6-digit code.</p>
-              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">use ParaDrop →</span>
-            </a>
-          </div>
-        </div>
-        
-        <div>
-          <h3 class="eyebrow--builders" style="font-family:IBM Plex Mono,monospace;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px 0;padding-bottom:12px;border-bottom:1px solid #E2E8F0;">
-            FOR BUILDERS
-          </h3>
-          <div style="display:flex;flex-direction:column;gap:16px;">
-            <a href="/signup" class="product-card-light" style="display:block;padding:20px;background:#ffffff;text-decoration:none;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">paramant.app</h4>
-                <span class="product-tag--cobalt">HOSTED</span>
-              </div>
-              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">Create an account on our relay. 30 seconds to your first send. EU-hosted.</p>
-              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">create account →</span>
-            </a>
-            <a href="/docs" class="product-card-light" style="display:block;padding:20px;background:#ffffff;text-decoration:none;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">Your server</h4>
-                <span class="product-tag--cobalt">SELF-HOST</span>
-              </div>
-              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">BUSL-1.1 source. Docker compose. Free up to 5 users. Raspberry Pi supported.</p>
-              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">deploy guide →</span>
-            </a>
-            <a href="/pricing#enterprise" class="product-card-light" style="display:block;padding:20px;background:#ffffff;text-decoration:none;">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-                <h4 style="font-size:17px;color:#0B3A6A;margin:0;font-weight:600;">Your infrastructure</h4>
-                <span class="product-tag--cobalt">ENTERPRISE</span>
-              </div>
-              <p style="font-size:14px;line-height:1.5;color:#475569;margin:0 0 8px 0;">Dedicated relay with SLA. Compliance docs, single-tenant. NIS2, IEC 62443, NEN 7510.</p>
-              <span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#1D4ED8;">see enterprise plan →</span>
-            </a>
-          </div>
-        </div>
-        
-      </div>
-    </div>
-  </section>
-
-<!-- FOOTER -->
+</main>
 <footer>
   <div class="container-lg">
     <div class="footer-grid">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT<br>Powered by <a href="https://github.com/Apolloccrypt/paramant-core" target="_blank" style="color:var(--ink-dim);text-decoration:underline">paramant-core</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
       </div>
       <div>
         <div class="footer-col-label">Trust</div>
@@ -776,7 +243,6 @@
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
           <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-core" target="_blank">paramant-core</a>
           <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
           <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
         </div>
@@ -795,26 +261,7 @@
     </div>
   </div>
 </footer>
-
-<style>
-/* Lime accent system — index.html */
-.lime-hi{background:#B2FF3F;color:#0B3A6A;padding:2px 5px;display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;font-style:inherit}
-#main-content h1{line-height:1.2}
-</style>
-<script src="/ct-stats.js" defer></script>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
-<script>
-(function(){
-  var root = document.getElementById('ct-root');
-  var rootMeta = document.getElementById('ct-root-meta');
-  if (!root || !rootMeta) return;
-  var ob = new MutationObserver(function(){
-    var t = root.textContent;
-    rootMeta.textContent = t && t !== 'syncing...' ? t.slice(0,8) + '...' : '—';
-  });
-  ob.observe(root, {childList:true, characterData:true, subtree:true});
-})();
-</script>
 </body>
 </html>
