@@ -51,6 +51,12 @@
     width: 26px; height: 26px; cursor: pointer; font-size: 13px;
   }
   .help-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .cli-navlink {
+    font-size: 11px; color: var(--muted); text-decoration: none;
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 10px; transition: color .15s, border-color .15s;
+  }
+  .cli-navlink:hover { color: var(--text); border-color: var(--accent); }
   .terminal-container {
     flex: 1; min-height: 0; padding: 8px 10px;
     background: var(--bg);
@@ -99,6 +105,8 @@
     <h1>Paramant CLI</h1>
     <span class="connection-status" id="conn">connecting</span>
     <span class="spacer"></span>
+    <a class="cli-navlink" href="/admin/">Hub</a>
+    <a class="cli-navlink" href="/admin/settings.html">Settings</a>
     <button class="help-toggle" id="help-btn" title="Show help">?</button>
   </header>
 
