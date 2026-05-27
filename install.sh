@@ -271,6 +271,10 @@ RAM_RESERVE_MB=256
 RAM_LIMIT_MB=1024
 RESEND_API_KEY=
 TOTP_SECRET=${TOTP_SECRET}
+# Plug-and-play: the relay serves the wizard/UI itself (no external nginx needed).
+# Set SERVE_FRONTEND=false if you run your own webserver to serve frontend/.
+SERVE_FRONTEND=true
+FRONTEND_ROOT=/app/frontend
 ${LICENSE_KEY:+PARAMANT_LICENSE=${LICENSE_KEY}}
 ENV
 
