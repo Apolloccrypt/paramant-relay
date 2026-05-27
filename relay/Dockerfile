@@ -50,6 +50,7 @@ WORKDIR /app
 # Copy only compiled node_modules from build stage — no build tools follow
 COPY --from=build /app/node_modules ./node_modules
 COPY relay.js ./
+COPY parasign.js ./
 COPY lib/ ./lib/
 COPY crypto/ ./crypto/
 
