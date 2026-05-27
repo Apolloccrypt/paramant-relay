@@ -1,0 +1,47 @@
+{
+  "$schema": "https://paramant.app/schemas/addon-manifest-v1.json",
+  "name": "paramant-addon-storage-mirror",
+  "version": "1.0.0",
+  "description": "Mirror blob ciphertext to S3 or MinIO for backup and compliance.",
+  "vendor": "Paramant Official",
+  "license": "BUSL-1.1",
+  "homepage": "https://github.com/Apolloccrypt/paramant-addons-official",
+  "compatibility": {
+    "paramant-relay": ">=3.0.0"
+  },
+  "image": "ghcr.io/apolloccrypt/paramant-addon-storage-mirror:1.0.0",
+  "capabilities": [
+    "read:blob-metadata",
+    "subscribe:stream"
+  ],
+  "communication": {
+    "channels": ["stream"],
+    "webhook_endpoint": null
+  },
+  "config_schema": {
+    "S3_ENDPOINT": {
+      "type": "string",
+      "required": true,
+      "description": "S3-compatible endpoint URL (e.g., https://s3.eu-central-1.amazonaws.com)"
+    },
+    "S3_BUCKET": {
+      "type": "string",
+      "required": true
+    },
+    "S3_ACCESS_KEY": {
+      "type": "string",
+      "required": true,
+      "secret": true
+    },
+    "S3_SECRET_KEY": {
+      "type": "string",
+      "required": true,
+      "secret": true
+    },
+    "S3_REGION": {
+      "type": "string",
+      "required": false,
+      "default": "eu-central-1"
+    }
+  }
+}
