@@ -1,0 +1,35 @@
+# Example: notify admin on every incoming health-sector blob
+#
+# Demonstrates a routing + notification flow. It observes blob metadata
+# only (never plaintext) and tightens nothing - it is a pure observer.
+# See R008 for the scope boundary this flow stays inside.
+
+flow:
+  name: notify-admin-on-health-blob
+  version: 1
+  description: Email admin every time a blob arrives in sector health
+
+  trigger:
+    type: blob_received
+    filter:
+      sector: health
+
+  actions:
+    - type: webhook
+      url: ${env.ADMIN_NOTIFY_WEBHOOK}
+      method: POST
+      body_template: |
+        {
+          "event": "health_blob_received",
+          "hash": "${trigger.hash}",
+          "timestamp": "${trigger.ts}",
+          "size": ${trigger.size}
+        }
+
+    - type: log
+      level: info
+      message: "Health blob ${trigger.hash} received from sector"
+
+  permissions_required:
+    - read:blob-metadata
+    - webhook:receive

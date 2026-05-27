@@ -20,6 +20,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Zero-knowledge guarantee preserved: no capability grants access
   to plaintext, keys, or signatures. Add-ons work on ciphertext +
   metadata only.
+- R008 low-code routing scope ADR: defines what may be expressed
+  in visual flow editor (routing, compliance toggles, retention
+  policies, notifications) and what may not (crypto switching,
+  wire format alternatives, key overrides, plaintext access).
+  YAML-based flow-definition format with capability-checked execution.
+- docs/low-code/ folder with two example flow YAML files
+  (notify-on-health-blob, mirror-to-storage).
 
 ### Changed
 - `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`

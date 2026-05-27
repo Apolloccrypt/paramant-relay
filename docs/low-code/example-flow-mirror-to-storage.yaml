@@ -1,0 +1,35 @@
+# Example: mirror finance-sector ciphertext to the storage-mirror add-on
+#
+# Demonstrates a routing flow that hands a blob to an installed R007
+# add-on (paramant-addon-storage-mirror). The add-on receives ciphertext
+# plus metadata only; the flow grants it nothing beyond the capabilities
+# it already declared in its manifest. See R007 and R008.
+
+flow:
+  name: mirror-finance-to-storage
+  version: 1
+  description: Mirror ciphertext of finance-sector blobs to S3/MinIO via the storage-mirror add-on
+
+  trigger:
+    type: blob_received
+    filter:
+      sector: finance
+
+  actions:
+    - type: addon_invoke
+      addon: paramant-addon-storage-mirror
+      action: mirror
+      # The add-on pulls ciphertext over the channel it declared
+      # (subscribe:stream). The flow passes only metadata references.
+      args:
+        hash: ${trigger.hash}
+        sector: ${trigger.sector}
+        bucket_prefix: ${env.S3_BUCKET_PREFIX}
+
+    - type: log
+      level: info
+      message: "Finance blob ${trigger.hash} queued for storage mirror"
+
+  permissions_required:
+    - read:blob-metadata
+    - subscribe:stream
