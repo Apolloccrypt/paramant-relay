@@ -23,6 +23,32 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.0.0] - 2026-05-27
+
+Major version: first post-quantum crypto-core integration. Aligns the version
+across `package.json`, the `/health` endpoint (`relay.js` VERSION), and the README
+badge, which had drifted to 1.0.0, 2.5.0, and v0.9.0-beta respectively.
+
+### Changed
+- ML-KEM-768 keygen now runs on the Rust `@paramant/core` NAPI binding instead of
+  the JavaScript `@noble/post-quantum` library (M5b, PR #33). Wire format and
+  client behavior unchanged; this is an internal crypto-implementation swap.
+- Multi-stage Dockerfile builds the `@paramant/core` binding for musl in-image,
+  pinned by `PARAMANT_CORE_COMMIT` (currently `dc454d4`, `@paramant/core`
+  0.5.0-alpha.1).
+
+### Added
+- `docs/adrs/` with R001-R004 documenting previously-implicit relay design
+  decisions (hot-fix flow, crypto-wasm vendoring, multi-stage Dockerfile,
+  blind-store policy).
+- README "Powered by paramant-core" section cross-referencing
+  Apolloccrypt/paramant-core.
+
+### Fixed
+- Login regression: `email` is now persisted in the in-memory `apiKeys` map on key
+  creation; `users.json` writes are atomic (tmp + rename); `/v2/reload-users`
+  refuses to wipe a populated map from an empty/partial read.
+
 ## [0.9.0-beta] - 2026-04-20  <!-- session 4 additions -->
 
 ### Added
