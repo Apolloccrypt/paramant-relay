@@ -10,6 +10,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added (specification only, no implementation)
+- R014 Management plane architecture ADR: defines the fleet-overview
+  console on Paramant's root server. Customer + relay-instance +
+  license-key data model, API endpoints (/api/fleet/*), UI structure,
+  audit-trail, remote actions (force-update, support-key, backup, drain),
+  and privacy-respecting telemetry opt-in. Builds on R013 license-server
+  protocol.
 - R007 Add-on architecture ADR: defines manifest format
   (paramant-addon.json), capability-based permission model
   (read:blob-metadata, subscribe:stream, etc), three communication
