@@ -1,6 +1,6 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v0.9.0--beta-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.0.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
@@ -43,6 +43,34 @@ Or via the browser — no install:
 **[Create a free account →](https://paramant.app/signup)** (TOTP, no password)
 
 **[Get a free API key →](https://paramant.app/request-key)** (email delivery, 30-second form)
+
+---
+
+## Powered by paramant-core
+
+As of v3.0.0 (M5b), PARAMANT's crypto layer is migrating from pure JavaScript
+(`@noble/post-quantum`) to a Rust core via the
+[`@paramant/core`](https://github.com/Apolloccrypt/paramant-core) NAPI binding.
+
+In production today: ML-KEM-768 keygen. Later releases migrate more call sites
+(ML-DSA signing, AEAD on the hot path, hybrid KEM). The wire format and client
+behavior are unchanged at each step  --  this is an internal implementation swap.
+
+Why a separate repo:
+
+- **Audit clarity:** crypto reviewers work on paramant-core's small Rust codebase
+  without the HTTP, admin, and billing layers.
+- **Cross-language reuse:** the same Rust crypto serves this relay (Node.js via
+  NAPI), the SDKs, and native apps.
+- **Compliance:** 325 KAT vectors, 21 ADRs, byte-equivalence proven across three
+  implementations (oqs server-side, RustCrypto browser-side, `@noble` reference).
+
+Browser-side crypto (parashare, paradrop, ontvang) lives vendored in
+[`crypto-wasm/`](crypto-wasm/) (RustCrypto, compiled to wasm32). It is validated
+against paramant-core via the cross-impl-validator crate there (ADR-0020,
+ADR-0021). See
+[paramant-core/docs/ARCHITECTURE.md](https://github.com/Apolloccrypt/paramant-core/blob/main/docs/ARCHITECTURE.md)
+for the full cross-repo overview.
 
 ---
 
