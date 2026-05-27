@@ -17,6 +17,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Fleet" branding for the management plane, the public /trust page concept,
   and per-repo licensing. Industry-standard open-core model
   (HashiCorp/GitLab/Elastic precedent). Builds on R013/R014/R015.
+- R014 Management plane architecture ADR: defines the fleet-overview
+  console on Paramant's root server. Customer + relay-instance +
+  license-key data model, API endpoints (/api/fleet/*), UI structure,
+  audit-trail, remote actions (force-update, support-key, backup, drain),
+  and privacy-respecting telemetry opt-in. Builds on R013 license-server
+  protocol.
 - R007 Add-on architecture ADR: defines manifest format
   (paramant-addon.json), capability-based permission model
   (read:blob-metadata, subscribe:stream, etc), three communication
@@ -34,6 +40,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   YAML-based flow-definition format with capability-checked execution.
 - docs/low-code/ folder with two example flow YAML files
   (notify-on-health-blob, mirror-to-storage).
+- R013 License-server protocol ADR: defines the wire format between a
+  customer relay and Paramant's central license-server. ML-DSA-65 signed
+  capability-sets, 6h check-in with nonce binding, 7-day offline grace,
+  capability-based feature gating, and 402/404/410/503 status semantics.
+  Additive to the existing offline Ed25519 PLK_KEY (backward compatible);
+  implementation deferred to later phases.
 
 ### Changed
 - `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`
