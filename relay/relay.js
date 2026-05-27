@@ -134,12 +134,13 @@ function mapCryptoErrorToHttp(err) {
 }
 // `mlDsa` is retained as an availability probe used by `if (!mlDsa)` guards
 // throughout this file. It holds the registry-resolved impl when present, or
-// null when ML-DSA-65 could not be loaded (e.g. @noble/post-quantum missing).
+// null when ML-DSA-65 could not be loaded (e.g. the @paramant/core binding is
+// missing or failed to build).
 let mlDsa = null;
 try {
   mlDsa = registry.getSig(0x0002);
   if (mlDsa) log('info', 'ml_dsa_loaded', { alg: mlDsa.name });
-} catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'npm install @noble/post-quantum', err: e.message }); }
+} catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'build/install @paramant/core', err: e.message }); }
 
 const ALLOWED = {
   ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
