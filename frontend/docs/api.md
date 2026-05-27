@@ -1,4 +1,4 @@
-# API Reference — PARAMANT v2.4.5
+# API Reference — PARAMANT v3.0.0
 
 ## Base URLs
 
@@ -328,14 +328,47 @@ The RSS feed is designed for external archiving: any subscriber retains an indep
 
 ```bash
 curl https://relay.paramant.app/health
-# {"ok":true,"version":"2.4.5","sector":"relay","edition":"community"}
+# {"ok":true,"version":"3.0.0","sector":"relay","edition":"community"}
 ```
 
 ### GET /v2/relays — Relay registry (public)
 
 ```bash
 curl https://relay.paramant.app/v2/relays
-# {"total":5,"relays":[{"url":"…","version":"2.4.5","sector":"relay",…}]}
+# {"total":5,"relays":[{"url":"…","version":"3.0.0","sector":"relay",…}]}
+```
+
+### GET /v2/capabilities — Negotiable crypto capabilities (public)
+
+Advertises the algorithm set this relay accepts on the wire. Since v3.0.0 the relay ships in `core` mode by default — a compact, two-algorithm set (ML-KEM-768 + ML-DSA-65) — with extended algorithm sets available opt-in via the `CRYPTO_MODE` environment variable (ADR R006). SDKs negotiate against this endpoint so a client and relay always agree on a shared, byte-compatible set.
+
+```bash
+curl https://relay.paramant.app/v2/capabilities
+# {"ok":true,"mode":"core","kem":["ML-KEM-768"],"sig":["ML-DSA-65"],"wire":"v1"}
+```
+
+### GET /v2/health/deep — Comprehensive health check (public)
+
+A deeper readiness probe than `/health`: in addition to the version and sector it reports on dependent subsystems (storage volume, CT log writability, relay identity key, peer reachability). Used by the setup wizard and by monitoring to distinguish "process up" from "fully operational".
+
+```bash
+curl https://relay.paramant.app/v2/health/deep
+# {"ok":true,"version":"3.0.0","checks":{"storage":"ok","ct_log":"ok","identity":"ok","peers":"ok"}}
+```
+
+### POST /v2/setup/check + /v2/setup/apply — First-run onboarding (M11)
+
+The first-run setup wizard at `/setup` drives these endpoints (ADR R005). They are gated to a relay with no keys yet (or an explicit `SETUP_MODE` flag) and are inert once the relay is provisioned.
+
+- `POST /v2/setup/check` — validate a proposed configuration (domain, DNS, TLS readiness) and run `/v2/health/deep` before any change is written.
+- `POST /v2/setup/apply` — generate the admin token, enroll TOTP, mint the first key and persist the configuration, returning an all-systems-go summary.
+
+```bash
+# Inspect readiness (safe, read-only)
+curl -X POST https://relay.paramant.app/v2/setup/check \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"relay.example.com"}'
+# {"ok":true,"setup_mode":true,"dns":"ok","tls":"pending","health":{…}}
 ```
 
 ### POST /v2/request-trial — Request a free trial API key
