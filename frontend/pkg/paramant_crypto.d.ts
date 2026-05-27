@@ -20,12 +20,34 @@ export function decrypt_blob(ciphertext: Uint8Array, kem_priv: Uint8Array, ecdh_
  */
 export function encrypt_blob(plaintext: Uint8Array, kem_pub: Uint8Array, ecdh_pub: Uint8Array): Uint8Array;
 
+/**
+ * Derive the ML-DSA-65 public key (1952 bytes) from a 32-byte seed (xi).
+ * Deterministic: the same seed always yields the same public key; the seed is
+ * the private key (mnemonic-derived, ADR-3).
+ */
+export function ml_dsa_pubkey_from_seed(xi: Uint8Array): Uint8Array;
+
+/**
+ * Deterministically sign `message` with the ML-DSA-65 key derived from the
+ * 32-byte seed (xi). Empty context. Returns a 3309-byte signature.
+ */
+export function ml_dsa_sign(xi: Uint8Array, message: Uint8Array): Uint8Array;
+
+/**
+ * Verify an ML-DSA-65 signature (empty context). public_key 1952 B, signature
+ * 3309 B. Returns false on any decode or verification failure.
+ */
+export function ml_dsa_verify(public_key: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly decrypt_blob: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly encrypt_blob: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly ml_dsa_pubkey_from_seed: (a: number, b: number) => [number, number, number, number];
+    readonly ml_dsa_sign: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly ml_dsa_verify: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
