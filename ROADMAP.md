@@ -19,12 +19,12 @@ Last updated: 2026-05-27T21:00:05+02:00 (auto-maintained by overseer session)
 ## Active development (open PRs + in-flight sessions)
 
 The authoritative live list is in docs/PROJECT-STATUS.md (regenerated each run).
-At last snapshot:
+All three parallel-session PRs merged while the overseer ran:
 
-- PR #41: R008 low-code routing scope + examples (sessie 5) -- MERGEABLE, docs-only
-- PR #40: R006 crypto-mode opt-in (sessie 1.5) -- MERGED into main
-- Sessie 7 (site docs, branch docs/site-rechttrekken-m5b): local only, not pushed,
-  no PR yet
+- PR #40: R006 crypto-mode opt-in (sessie 1.5) -- MERGED
+- PR #41: R008 low-code routing scope + examples (sessie 5) -- MERGED
+- PR #42: site-docs rechttrek for M5b reality (sessie 7) -- MERGED
+- PR #43: this overseer PR (roadmap + status + R009/R010 + coordination docs)
 - PR #28/#29: dependabot (setup-python, ws) -- routine
 
 ## Recently shipped (in main, awaiting next routine deploy)

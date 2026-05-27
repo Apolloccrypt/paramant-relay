@@ -6,24 +6,30 @@ Generated: 2026-05-27T21:00:05+02:00
 
 | #  | Title                                         | Branch                                | Status     |
 |----|-----------------------------------------------|---------------------------------------|------------|
-| 41 | docs: R008 low-code routing scope + examples  | docs/low-code-routing-r008            | MERGEABLE  |
+| 43 | docs: roadmap + project-status + deliverables | docs/roadmap-status-tracker           | this PR    |
 | 29 | chore(deps): bump ws 8.20.0 -> 8.20.1         | dependabot/npm_and_yarn/relay/ws-...  | dependabot |
 | 28 | chore(deps): bump actions/setup-python 5 -> 6 | dependabot/github_actions/setup-py-6  | dependabot |
 
 paramant-core: no open PRs.
 
+UPDATE during this session: all three parallel-session PRs landed while the
+overseer ran -- #40 (R006 crypto-mode, sessie 1.5), #41 (R008 low-code routing,
+sessie 5), and #42 (site-docs rechttrek, sessie 7) are now MERGED. main has
+advanced past this branch's base (7b6ce29).
+
 Recently merged: #34 (Sg1 ml-dsa crypto-wasm), #35 (M5b login-fixes), #36
 (version-harmonize), #37 (ml-dsa-65 -> @paramant/core), #38 (onboarding wizard),
-#39 (dashboard cards), #40 (R006 crypto-mode).
+#39 (dashboard cards), #40 (R006 crypto-mode), #41 (R008 low-code routing),
+#42 (site-docs rechttrek).
 
 ## Active branches outside main (origin)
 
-- docs/low-code-routing-r008      -> PR #41 (sessie 5)
+- docs/low-code-routing-r008      -> PR #41 MERGED, branch not deleted
+- docs/site-rechttrekken-m5b      -> PR #42 MERGED, branch not deleted
 - migrate/relay-to-paramant-core  -> merged via #37/#40, branch not deleted
 - fix/login-email-in-memory-keys  -> merged via #35, branch not deleted
 - feat/deploy-update-to-tb-addon-store -> no PR, stale? needs triage
-- docs/roadmap-status-tracker     -> this overseer PR
-- (local only, not pushed) docs/site-rechttrekken-m5b -> sessie 7, no PR yet
+- docs/roadmap-status-tracker     -> this overseer PR (#43)
 
 ## ADR status
 
@@ -60,10 +66,12 @@ Recently merged: #34 (Sg1 ml-dsa crypto-wasm), #35 (M5b login-fixes), #36
 
 ## Next immediate (sorted by readiness)
 
-1. PR #41 R008 low-code routing -- MERGEABLE, docs-only, ready for Mick's review.
-2. M5b routine deploy when 7-day soak clean (day 1 of 7).
-3. Sessie 7 site-docs -- waiting on push + PR.
-4. Triage stale branch feat/deploy-update-to-tb-addon-store.
+1. M5b routine deploy when 7-day soak clean (day 1 of 7) -- now also carries
+   R008 (#41) and site-docs (#42) since they merged this session.
+2. Reconcile /health version 3.0.0 vs marketing 2.5.0 (issue #45).
+3. Triage stale branch feat/deploy-update-to-tb-addon-store.
+4. Delete merged branches (low-code-routing-r008, site-rechttrekken-m5b,
+   migrate/relay-to-paramant-core, fix/login-email-in-memory-keys).
 
 ## Dependencies / blockers
 
