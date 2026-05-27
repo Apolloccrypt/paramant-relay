@@ -58,3 +58,31 @@ jobs:
             -print0 \
           | xargs -0 -n1 bash -n
           echo "All shell scripts parse OK."
+
+  relay-crypto-tests:
+    name: relay - crypto suite (@paramant/core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # @paramant/core is the Rust NAPI binding in the sibling paramant-core
+      # repo. Until it is published to npm it is a dev file-link, so build it
+      # here (as paramant-core's own CI does) to gate the relay crypto suite's
+      # byte-compatibility against the binding. Interim until publish.
+      - name: Install liboqs build deps
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang libclang-dev
+      - name: Build @paramant/core (sibling checkout)
+        run: |
+          git clone --depth 1 https://github.com/Apolloccrypt/paramant-core.git "${GITHUB_WORKSPACE}/../paramant-core"
+          cd "${GITHUB_WORKSPACE}/../paramant-core"
+          rustup show
+          cargo build -p paramant-core-node --release
+          cp target/release/libparamant_core_node.so crates/paramant-core-node/index.node
+      - name: Install relay deps (incl. file-linked @paramant/core)
+        working-directory: relay
+        run: npm install
+      - name: Relay crypto suite
+        working-directory: relay
+        run: node --test $(find crypto -name '*.test.js')
