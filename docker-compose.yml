@@ -55,6 +55,10 @@ x-relay-env: &relay-env
   ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
   INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
   PARAMANT_WIRE_VERSION: "${PARAMANT_WIRE_VERSION:-1}"
+  # Opt-in static frontend serving (plug-and-play self-host). Default false:
+  # production serves frontend/ via nginx and ignores this + the ro mount below.
+  SERVE_FRONTEND: "${SERVE_FRONTEND:-false}"
+  FRONTEND_ROOT: "${FRONTEND_ROOT:-/app/frontend}"
 
 # ── Shared logging ────────────────────────────────────────────────────────────
 x-relay-logging: &relay-logging
@@ -84,6 +88,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - relay-main-data:/data
+      - ./frontend:/app/frontend:ro   # SERVE_FRONTEND: inert unless opted in
     networks:
       - relay-net
     healthcheck:
@@ -120,6 +125,7 @@ services:
       - "127.0.0.1:3001:3000"
     volumes:
       - relay-health-data:/data
+      - ./frontend:/app/frontend:ro   # SERVE_FRONTEND: inert unless opted in
     networks:
       - relay-net
     healthcheck:
@@ -147,6 +153,7 @@ services:
       - "127.0.0.1:3002:3000"
     volumes:
       - relay-finance-data:/data
+      - ./frontend:/app/frontend:ro   # SERVE_FRONTEND: inert unless opted in
     networks:
       - relay-net
     healthcheck:
@@ -174,6 +181,7 @@ services:
       - "127.0.0.1:3003:3000"
     volumes:
       - relay-legal-data:/data
+      - ./frontend:/app/frontend:ro   # SERVE_FRONTEND: inert unless opted in
     networks:
       - relay-net
     healthcheck:
@@ -202,6 +210,7 @@ services:
       - "127.0.0.1:3004:3000"
     volumes:
       - relay-iot-data:/data
+      - ./frontend:/app/frontend:ro   # SERVE_FRONTEND: inert unless opted in
     networks:
       - relay-net
     healthcheck:

@@ -40,7 +40,7 @@ RUN node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.
 FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885
 
 LABEL org.opencontainers.image.title="paramant-relay" \
-      org.opencontainers.image.version="2.4.5" \
+      org.opencontainers.image.version="3.0.0" \
       org.opencontainers.image.description="Post-quantum encrypted file relay — RAM-only, burn-on-read" \
       org.opencontainers.image.source="https://github.com/Apolloccrypt/paramant-relay" \
       org.opencontainers.image.licenses="BUSL-1.1"
@@ -52,6 +52,13 @@ COPY --from=build /app/node_modules ./node_modules
 COPY relay.js ./
 COPY lib/ ./lib/
 COPY crypto/ ./crypto/
+
+# Optional static frontend serving (SERVE_FRONTEND=true, default off).
+# frontend/ lives at the repo root, outside this image's build context (./relay),
+# so it is provided at runtime as a read-only bind mount in docker-compose.yml
+# (./frontend -> /app/frontend:ro), not COPY'd here. This ENV is only the default
+# root the relay reads; production keeps SERVE_FRONTEND=false and uses nginx.
+ENV FRONTEND_ROOT=/app/frontend
 
 # Non-root user — relay never needs root after install
 # Install @paramant/core (the napi binding built for musl in the builder stage)
