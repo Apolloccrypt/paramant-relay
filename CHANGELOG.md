@@ -40,6 +40,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   YAML-based flow-definition format with capability-checked execution.
 - docs/low-code/ folder with two example flow YAML files
   (notify-on-health-blob, mirror-to-storage).
+- R015 Release-channel model ADR: defines stable/beta/edge channels,
+  semver tag scheme, channel-tagged Docker images (mtty001/relay),
+  per-main-merge GitHub Actions edge builds, maintainer-triggered
+  beta/stable promotion, cosign-signed releases, customer-side
+  channel selection + tier-gated auto-update with auto-rollback.
+  Replaces "git pull main HEAD" deploys with versioned releases.
 - R013 License-server protocol ADR: defines the wire format between a
   customer relay and Paramant's central license-server. ML-DSA-65 signed
   capability-sets, 6h check-in with nonce binding, 7-day offline grace,
