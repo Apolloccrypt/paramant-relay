@@ -35,6 +35,35 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.0.0] - 2026-05-27 (internal, M5b architecture)
+
+Internal-architecture major-version bump for the M5b paramant-core integration.
+`package.json` and the `/health` endpoint report 3.0.0; the user-facing site
+(version badge, build label, marketing copy) intentionally stays at 2.5.0 until
+ParaSign GA provides a user-facing reason for a marketing major-version bump. M5b
+is a server-side architecture change, not a user-facing feature. This also resolves
+the prior internal drift (`package.json` was 1.0.0, `/health` was 2.5.0).
+
+### Changed
+- ML-KEM-768 keygen now runs on the Rust `@paramant/core` NAPI binding instead of
+  the JavaScript `@noble/post-quantum` library (M5b, PR #33). Wire format and
+  client behavior unchanged; this is an internal crypto-implementation swap.
+- Multi-stage Dockerfile builds the `@paramant/core` binding for musl in-image,
+  pinned by `PARAMANT_CORE_COMMIT` (currently `dc454d4`, `@paramant/core`
+  0.5.0-alpha.1).
+
+### Added
+- `docs/adrs/` with R001-R004 documenting previously-implicit relay design
+  decisions (hot-fix flow, crypto-wasm vendoring, multi-stage Dockerfile,
+  blind-store policy).
+- README "Powered by paramant-core" section cross-referencing
+  Apolloccrypt/paramant-core.
+
+### Fixed
+- Login regression: `email` is now persisted in the in-memory `apiKeys` map on key
+  creation; `users.json` writes are atomic (tmp + rename); `/v2/reload-users`
+  refuses to wipe a populated map from an empty/partial read.
+
 ## [0.9.0-beta] - 2026-04-20  <!-- session 4 additions -->
 
 ### Added
