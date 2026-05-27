@@ -10,7 +10,8 @@
 
 ```bash
 curl -fsSL https://paramant.app/install.sh | bash
-# Prompts: domain, Let's Encrypt email, admin token, sectors, license key
+# Brings the relay up and opens the first-run /setup wizard in your browser
+# (falls back to a localhost URL on a headless host)
 ```
 
 **Option 2 — manual Docker setup** (4 steps):
@@ -36,6 +37,23 @@ curl -fsSL https://paramant.app/install-pi.sh | bash
 
 Flash [paramantOS](https://github.com/Apolloccrypt/ParamantOS) to USB. Relay starts on boot.
 No Linux expertise required. BIOS and UEFI supported.
+
+---
+
+## First-run setup wizard (new in v3.0.0)
+
+Whichever option you choose, the first boot lands on a web wizard at `/setup` that replaces the hand-run admin scripts (ADR R005). It is gated to a relay with no keys yet — or forced on with `SETUP_MODE=1` — and walks you through:
+
+1. **Domain & DNS** — `POST /v2/setup/check` validates the domain, DNS and TLS readiness without writing anything.
+2. **Deep health** — `GET /v2/health/deep` confirms storage, CT log, relay identity and peer reachability are all green.
+3. **Apply** — `POST /v2/setup/apply` generates the admin token, enrolls TOTP and mints your first API key from the browser, ending on an all-systems-go summary.
+
+After setup the panel exposes day-to-day operation visually:
+
+- **`/admin/settings`** — change relay configuration from the panel instead of editing `.env` and restarting.
+- **`/admin/cli`** — an in-browser admin terminal for debugging relay state without opening an SSH session.
+
+For a fully self-contained host, set `SERVE_FRONTEND=1` (ADR R011) so the relay serves its own UI and no separate web server is needed.
 
 ---
 
@@ -75,6 +93,9 @@ nano .env
 | `RAM_LIMIT_MB` | No | `1024` | Max RAM for blob storage per relay |
 | `RAM_RESERVE_MB` | No | `256` | RAM reserve before rejecting uploads |
 | `RELAY_MODE` | No | `ghost_pipe` | Endpoint set: `ghost_pipe` or `iot` |
+| `CRYPTO_MODE` | No | `core` | Algorithm set advertised on `/v2/capabilities`. `core` = ML-KEM-768 + ML-DSA-65 (compact default); `extended` opts in to the full algorithm set (ADR R006). |
+| `SERVE_FRONTEND` | No | `0` (off) | Set to `1` to have the relay serve its own UI from a read-only static handler — plug-and-play self-hosting without a separate web server (ADR R011). |
+| `SETUP_MODE` | No | auto | Forces the first-run `/setup` wizard on even when keys already exist. Normally the wizard auto-gates to a relay with no keys yet (ADR R005). |
 | `USERS_FILE` | No | `./users.json` | Path to API key store |
 | `CT_LOG_FILE` | No | `/data/ct-log.json` | Path to CT log persistence file (health relay only) |
 | `PARAMANT_LICENSE` | No | — | Relay license key (`plk_...`) — unlocks unlimited users |
@@ -115,8 +136,10 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 - See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
 
 **Dockerfile — two-stage build:**
-- Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
+- Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings and the `@paramant/core` NAPI binding
 - Stage 2 (`runtime`): lean `node:22-alpine` → copies only compiled `node_modules` + `relay.js`. No compilers, no build tools in the production image.
+
+**Crypto dependency:** since v3.0.0 the relay's server-side ML-DSA-65 signing is provided by [`@paramant/core`](https://github.com/Apolloccrypt/paramant-core) — a standalone, audit-ready Rust crypto library (BUSL-1.1) consumed through a NAPI binding (M5b). It is built into the image, so self-hosting needs no extra install step; the source is public for independent audit.
 
 ---
 

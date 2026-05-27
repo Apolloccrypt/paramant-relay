@@ -328,6 +328,7 @@ tr:last-child td{border-bottom:none}
 <div class="layout">
   <div class="sidebar">
     <h3>Getting started</h3>
+    <a href="#whats-new">What's new in 3.0.0</a>
     <a href="#quickstart">Quick start</a>
     <a href="#authentication">Authentication</a>
     <a href="#sdk">SDK &amp; scripts</a>
@@ -371,6 +372,22 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="content">
+    <!-- ── What's new in 3.0.0 ──────────────────────────────────── -->
+    <h2 id="whats-new">What's new in 3.0.0</h2>
+    <p>Version 3.0.0 keeps the wire format, API surface and crypto guarantees of 2.5.x — every 2.5.x client stays compatible — and focuses on the operator and self-host experience. The headline change is structural: the post-quantum primitives now live in their own audited library.</p>
+    <ul>
+      <li><strong>paramant-core crypto split (M5b).</strong> Server-side ML-DSA-65 signing is now provided by <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a> — a standalone, audit-ready Rust library (BUSL-1.1) the relay consumes through its <code>@paramant/core</code> NAPI binding. Client-side ML-KEM-768 still runs in the browser/SDK; the relay never holds a key. See <a href="#crypto">Crypto stack</a>.</li>
+      <li><strong>Cards-per-product dashboard.</strong> The user dashboard is rebuilt around per-product cards, drawing on the existing <code>/v2/check-key</code>, monitor and audit endpoints — no new trust surface.</li>
+      <li><strong>Refreshed interactive UI.</strong> Dark mode (top-right toggle), real-time status updates and a mobile-friendly layout across the dashboard.</li>
+      <li><strong>First-run setup wizard.</strong> A web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators — admin token, TOTP enrolment and the first key from the browser (ADR R005).</li>
+      <li><strong>Visual admin config.</strong> <code>/admin/settings</code> exposes relay configuration in the panel, so common changes no longer require editing <code>.env</code> and restarting.</li>
+      <li><strong>In-browser admin CLI.</strong> <code>/admin/cli</code> is a web terminal for admin debugging — inspect relay state without opening an SSH session.</li>
+      <li><strong>Crypto-mode negotiation (ADR R006, accepted).</strong> <code>/v2/capabilities</code> advertises a compact <em>core</em> mode (2 algorithms) by default; extended algorithm sets are opt-in. See <a href="#crypto">Crypto stack</a>.</li>
+      <li><strong>Add-on architecture (ADR R007, draft).</strong> A specification for container-isolated integrations — storage mirrors, SIEM exporters, SSO — that work on ciphertext and metadata only, never plaintext or keys.</li>
+      <li><strong>Static front-end serving (ADR R011).</strong> An opt-in <code>SERVE_FRONTEND</code> static handler lets a single relay serve its own UI for plug-and-play self-hosting. See <a href="#selfhost-docker">Self-hosting</a>.</li>
+      <li><strong>Documented design decisions.</strong> Architecture Decision Records R001–R011 capture the choices behind 3.0.0 — from the hotfix flow to the crypto split — in the repository under <code>docs/adrs/</code>.</li>
+    </ul>
+
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Quick start</h2>
     <p>Send your first encrypted file in under 5 minutes. No account required — <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">create a free account here</a> (TOTP protected, key visible in dashboard).</p>
@@ -696,8 +713,11 @@ python3 deploy/paramant-admin.py sync
 open https://your-domain.com/admin/</pre>
     </div>
     <p>Community Edition enforces a hard cap of 5 users — the 6th <code>add</code> returns HTTP 402. Add a <code>PLK_KEY</code> to <code>.env</code> to unlock unlimited users.</p>
-    <div class="callout"><span class="callout-label">Coming soon</span>
-      <p><strong style="color:#B2FF3F">Guided setup:</strong> a first-run web wizard at <code>/setup</code> is planned to replace hand-run admin scripts for first-time operators — generating the admin token, enrolling TOTP and minting the first key from the browser (design: ADR R005, draft).</p>
+    <div class="callout"><span class="callout-label">New in 3.0.0</span>
+      <p><strong style="color:#B2FF3F">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators — generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before declaring all-systems-go (design: ADR R005). Once running, <code>/admin/settings</code> exposes relay configuration visually — no more editing <code>.env</code> by hand — and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
+    </div>
+    <div class="callout"><span class="callout-label">New in 3.0.0</span>
+      <p><strong style="color:#B2FF3F">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=1</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code> — <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
     </div>
 
     <h2 id="selfhost-upgrade">Upgrade</h2>
@@ -709,7 +729,7 @@ docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>
     <div class="callout warn"><span class="callout-label">Important</span>
-      <p><strong style="color:#FECACA">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code> — do not delete this volume or the relay will lose its registered identity.</p>
+      <p><strong style="color:#FECACA">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code> — do not delete this volume or the relay will lose its registered identity. Since v3.0.0 the ML-DSA-65 signing that backs this identity comes from <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, the relay's audit-ready Rust crypto dependency (consumed via the <code>@paramant/core</code> NAPI binding) — it ships inside the Docker image, so no extra install step is needed.</p>
     </div>
 
     <!-- ── Admin scripts ─────────────────────────────────────────── -->
