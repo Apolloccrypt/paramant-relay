@@ -9,6 +9,21 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`
+  M5b pattern). Byte-compatible via paramant-core ADR-0021 cross-impl KAT. Covers
+  all ML-DSA-65 use in the relay (STH-signing + receipt/signature verify) through
+  `registry.getSig(0x0002)`.
+- `bootstrap()` now supports a `CRYPTO_MODE` env var (`core` default, `extended`
+  for all 18 algorithms). Production default drops from 18 to 2 algorithms
+  advertised via `/v2/capabilities` (ADR R006).
+
+### Migration note for self-hosters
+- If you have experimental raw-HTTP clients using ML-KEM-512/1024, ML-DSA-44/87,
+  Falcon, or SLH-DSA variants: add `CRYPTO_MODE=extended` to your `.env`. The
+  official SDKs (sdk-js, sdk-py) and browser crypto are not affected; they have
+  always used ML-KEM-768 + ML-DSA-65.
+
 ### CLI
 - 12 new operator tools added to `scripts/` and available via `install-client.sh`:
   - **Sector tools:** `paramant-cra`, `paramant-firmware`, `paramant-legal`, `paramant-notary`, `paramant-payslip`, `paramant-referral`, `paramant-ticket`
