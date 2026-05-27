@@ -23,11 +23,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [3.0.0] - 2026-05-27
+## [3.0.0] - 2026-05-27 (internal, M5b architecture)
 
-Major version: first post-quantum crypto-core integration. Aligns the version
-across `package.json`, the `/health` endpoint (`relay.js` VERSION), and the README
-badge, which had drifted to 1.0.0, 2.5.0, and v0.9.0-beta respectively.
+Internal-architecture major-version bump for the M5b paramant-core integration.
+`package.json` and the `/health` endpoint report 3.0.0; the user-facing site
+(version badge, build label, marketing copy) intentionally stays at 2.5.0 until
+ParaSign GA provides a user-facing reason for a marketing major-version bump. M5b
+is a server-side architecture change, not a user-facing feature. This also resolves
+the prior internal drift (`package.json` was 1.0.0, `/health` was 2.5.0).
 
 ### Changed
 - ML-KEM-768 keygen now runs on the Rust `@paramant/core` NAPI binding instead of

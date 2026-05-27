@@ -1,6 +1,6 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v3.0.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.5.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
@@ -48,7 +48,7 @@ Or via the browser — no install:
 
 ## Powered by paramant-core
 
-As of v3.0.0 (M5b), PARAMANT's crypto layer is migrating from pure JavaScript
+As of the M5b release, PARAMANT's crypto layer is migrating from pure JavaScript
 (`@noble/post-quantum`) to a Rust core via the
 [`@paramant/core`](https://github.com/Apolloccrypt/paramant-core) NAPI binding.
 
