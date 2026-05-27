@@ -50,6 +50,18 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - **Maintenance:** `paramant-migrate`, `paramant-roadmap` (PQC migration planner), `paramant-supply-chain`
 - Total operator tools: 38 → 44
 
+### Documentation
+- Site docs rechtgetrokken voor de M5b-realiteit: crypto-stack op `/docs`
+  benoemt nu de split (client-side ML-KEM-768 via WASM, server-side
+  ML-DSA-65 via `@paramant/core`) met paramant-core attributie + repo-link;
+  self-hosting relay-identity sectie idem. `/send` FAQ verduidelijkt dat de
+  anonieme flow AES-256-GCM symmetric-only is en verwijst voor
+  post-quantum geverifieerde transfers naar ParaShare/ParaDrop. Stale
+  `scripts/paramant-admin.py`-pad rechtgezet naar `deploy/paramant-admin.py`.
+  R005 (web onboarding wizard) en R007 (add-on architecture) als
+  coming-soon vermeld. Versie-nummers bewust ongemoeid (intern 3.0.0 vs
+  marketing build 2.5.0).
+
 ### Repository
 - `scripts/` in `paramant-relay` is now the single source of truth for all CLI tools — previously split between this repo and `ParamantOS/nixos/scripts/`
 - Server-side tools moved from `scripts/` to `deploy/`: `fix-nginx-ports.py`, `paramant-admin.py`, `post-install.sh`, `preflight.sh`, `server-fix.sh`, `verify-license.js`

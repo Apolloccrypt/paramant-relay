@@ -684,18 +684,21 @@ certbot certonly --nginx -d your-domain.com \
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
       <pre><span class="cm"># Create your first API key</span>
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "alice" \
   --plan  pro \
   --email alice@example.com
 
 <span class="cm"># Push to all relay containers</span>
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 
 <span class="cm"># Admin panel (requires ADMIN_TOKEN + TOTP if configured)</span>
 open https://your-domain.com/admin/</pre>
     </div>
     <p>Community Edition enforces a hard cap of 5 users — the 6th <code>add</code> returns HTTP 402. Add a <code>PLK_KEY</code> to <code>.env</code> to unlock unlimited users.</p>
+    <div class="callout"><span class="callout-label">Coming soon</span>
+      <p><strong style="color:#B2FF3F">Guided setup:</strong> a first-run web wizard at <code>/setup</code> is planned to replace hand-run admin scripts for first-time operators — generating the admin token, enrolling TOTP and minting the first key from the browser (design: ADR R005, draft).</p>
+    </div>
 
     <h2 id="selfhost-upgrade">Upgrade</h2>
     <div class="cb">
@@ -711,7 +714,10 @@ docker compose up -d --build
 
     <!-- ── Admin scripts ─────────────────────────────────────────── -->
     <h2 id="client-deb">Admin scripts</h2>
-    <p>Admin scripts ship with the relay repository under <code>scripts/</code>. After cloning <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a>, run <code>python3 scripts/paramant-admin.py [command]</code> directly. No system-wide install package is currently provided — the SDK packages on PyPI (<code>paramant-sdk</code>) and npm (<code>paramant-sdk</code>) are the canonical client integrations.</p>
+    <p>Admin scripts ship with the relay repository. After cloning <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a>, the server-side admin tool lives under <code>deploy/</code> — run <code>python3 deploy/paramant-admin.py [command]</code> directly. Operator helpers (key add/revoke, first-boot setup) live under <code>scripts/</code>. No system-wide install package is currently provided — the SDK packages on PyPI (<code>paramant-sdk</code>) and npm (<code>paramant-sdk</code>) are the canonical client integrations.</p>
+    <div class="callout"><span class="callout-label">Coming soon</span>
+      <p><strong style="color:#B2FF3F">Add-ons:</strong> an add-on architecture is specified for integrations that live just beyond the relay core — storage mirrors, notification bridges, SIEM exporters, OIDC/SAML SSO. Container-isolated, manifest-declared capabilities, HomeAssistant-style, working on ciphertext and metadata only (never plaintext or keys). Specification: ADR R007, draft.</p>
+    </div>
 
     <h2 id="client-cli">CLI reference</h2>
     <table>
@@ -790,6 +796,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
       <tr><td>Argon2id</td><td>Password-protected blob derive</td><td>RFC 9106</td></tr>
     </table>
     <p>Browser-side encryption runs as <strong>Rust/WASM</strong> compiled from <code>crypto-wasm/</code>. The WASM binary is SHA-256 verified at runtime before first use. The relay JS code has no access to decryption keys at any point.</p>
+    <p>The two halves of the stack run different builds of the same Rust crypto. <strong>ML-KEM-768 key encapsulation stays client-side</strong> (browser WASM / SDK) — the relay never performs a key exchange and never holds a private key. <strong>ML-DSA-65 runs server-side</strong> for the relay identity keypair, signed delivery receipts and signed tree heads (STH), and for verifying device and receipt signatures. Since the M5b migration (2026-05-27) that server-side ML-DSA-65 is provided by <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a> — a standalone, audit-ready Rust crypto library (BUSL-1.1) consumed by the relay through its <code>@paramant/core</code> NAPI binding.</p>
 
     <h2 id="burn">Burn-on-read</h2>
     <p>After <code>GET /v2/outbound/:hash</code> the relay immediately overwrites the blob buffer with cryptographically random bytes and removes the entry from memory. Encrypted payload data is <strong>never written to disk</strong> at any point during the transfer.</p>

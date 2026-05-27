@@ -499,6 +499,11 @@ select#ttl-select:focus{border-color:var(--cobalt)}
       <p class="faq-a">Not via the anonymous flow. The 5 MB limit applies to all tiers at the managed relay. Enterprise customers running a dedicated relay can configure a higher limit within their RAM budget. If you need to send larger files regularly, <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">contact us</a>.</p>
     </div>
 
+    <div class="faq-item">
+      <h4 style="font-size:var(--text-base);font-weight:700;letter-spacing:.01em;margin-bottom:var(--space-3);line-height:1.4">Is this post-quantum?</h4>
+      <p class="faq-a">The anonymous /send flow is <strong>AES-256-GCM only</strong> — a symmetric cipher with no asymmetric key exchange, so there is no quantum-vulnerable handshake to break. The key is generated in your browser and delivered out-of-band in the URL fragment. What /send deliberately does not provide is sender authentication or relay verification. For transfers that bind a registered device with post-quantum key encapsulation (ML-KEM-768) and post-quantum signatures (ML-DSA-65), use <a href="/parashare" style="color:var(--cobalt)">ParaShare</a> or <a href="/drop" style="color:var(--cobalt)">ParaDrop</a> instead.</p>
+    </div>
+
   </div>
 </section>
 
