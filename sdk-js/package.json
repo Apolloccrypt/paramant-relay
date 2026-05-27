@@ -1,7 +1,7 @@
 {
   "name": "paramant-sdk",
-  "version": "3.0.0",
-  "description": "JavaScript SDK for Paramant — real post-quantum (ML-KEM-768 + ML-DSA-65) zero-plaintext file transport, wire-format v1",
+  "version": "3.1.0",
+  "description": "JavaScript SDK for Paramant \u2014 post-quantum (ML-KEM-768 + ML-DSA-65) zero-plaintext file transport, wire-format v1 with verified sender signatures",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
@@ -26,7 +26,8 @@
     "index.d.ts",
     "src/",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "test/"
   ],
   "keywords": [
     "paramant",
@@ -63,6 +64,6 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/"
+    "test": "node --test"
   }
 }

@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.1.0 — 2026-05-23
+
+Security release. Wire format unchanged (still v1) — relay and existing tooling unaffected.
+
+### Fixed
+- **Cross-SDK interop with sdk-py (F3).** sdk-py ≤ 3.0.0 signed a different message and
+  never verified, so py↔js signed transfers were broken. The signing convention
+  (`CT_KEM || SENDER_PUB || NONCE || CIPHERTEXT || AAD`) and fingerprint
+  (`SHA-256(kem_pub || sig_pub)`, first 10 bytes) are now byte-identical across both SDKs.
+  `registerPubkeys()` also sends `kyber_pub`/`dsa_pub` aliases.
+- **Receipts verified client-side (F2).** `verifyReceipt()` checks the relay's ML-DSA
+  signature against a pinned `relayIdentityPub` instead of trusting `/v2/verify-receipt`.
+  (Pass `{ allowRelayFallback: true }` to keep the old behaviour for debugging.)
+
+### Added
+- `receive(hash, { sender })` pins the sender's signing key (TOFU) to authenticate origin;
+  without it a warning is logged.
+- `GhostPipe({ relayIdentityPub })` for client-side receipt verification.
+- `computeFingerprint` is now exported.
+- A test suite for the security fixes; `npm test` script fixed (`node --test`) and
+  `test/` is now shipped in the package.
+
+### Note
+Signature verification on `_decrypt` (rejecting tampered signatures) was already present
+in this branch; 3.1.0 adds sender-key pinning and aligns the convention with sdk-py.
+
 ## 3.0.0 — 2026-04-24
 
 **Breaking release.** See README for full migration notes.

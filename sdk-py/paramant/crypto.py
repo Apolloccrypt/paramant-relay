@@ -122,12 +122,12 @@ def aes_gcm_encrypt(key: bytes, plaintext: bytes, aad: bytes, nonce: bytes = Non
         nonce = os.urandom(12)
     if len(nonce) != 12:
         raise ValueError("AES-GCM nonce must be 12 bytes")
-    ct = AESGCM(key).encrypt(nonce, plaintext, aad)
+    ct = AESGCM(bytes(key)).encrypt(nonce, plaintext, aad)
     return nonce, ct
 
 
 def aes_gcm_decrypt(key: bytes, nonce: bytes, ciphertext: bytes, aad: bytes) -> bytes:
-    return AESGCM(key).decrypt(nonce, ciphertext, aad)
+    return AESGCM(bytes(key)).decrypt(nonce, ciphertext, aad)
 
 
 def sha256(b: bytes) -> bytes:

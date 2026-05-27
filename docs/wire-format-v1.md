@@ -82,6 +82,46 @@ AAD = MAGIC || VERSION || KEM_ID || SIG_ID || FLAGS || chunk_index_be32
 
 This means: an attacker who flips a bit in KEM_ID or SIG_ID causes GCM verification to fail. The algorithm selection is integrity-protected, not just the ciphertext body.
 
+### Signature input (sender authentication)
+
+When `SIG_ID != 0x0000`, the SENDER_PUB field carries the sender's **ML-DSA signing
+public key** (not the KEM key), and the SIGNATURE field is the ML-DSA signature over
+this exact byte message:
+
+```
+sign_input = CT_KEM || SENDER_PUB || NONCE || CIPHERTEXT || AAD
+```
+
+(concatenation, signed directly — ML-DSA hashes internally; AAD is the 14-byte value
+above). The receiver MUST recompute `sign_input` from the parsed fields and verify the
+signature against SENDER_PUB **before** decrypting, and reject the blob on failure.
+This is mandatory in both `sdk-py` (≥ 3.1.0) and `sdk-js`; the two are byte-identical.
+
+> **Identity binding.** A valid signature only proves the blob is self-consistent for
+> the carried SENDER_PUB. To authenticate *who* sent it, the receiver pins SENDER_PUB
+> against the expected sender's registered signing key (TOFU) — `receive(sender=…)` /
+> `receive(hash, { sender })`. Without pinning, a relay (or anyone who can place a blob)
+> may substitute its own signing key.
+
+> **History.** paramant-sdk 3.0.0 (py) signed `SHA-256(AAD || CT_KEM || SENDER_PUB ||
+> NONCE || CIPHERTEXT)` with a different field order, and its receiver never verified
+> the signature at all. 3.1.0 aligns py to the convention above (already used by sdk-js)
+> and enforces verification. The on-wire byte layout is unchanged, so the relay (which
+> stores blobs opaquely and does not verify signatures) and existing wire-v1 tooling are
+> unaffected — no version bump.
+
+### Device fingerprint (TOFU)
+
+The human-verifiable device fingerprint is computed identically in both SDKs as:
+
+```
+fingerprint = SHA-256(KEM_PUB_bytes || SIG_PUB_bytes)  →  first 10 bytes
+            → "XXXX-XXXX-XXXX-XXXX-XXXX"  (uppercase hex, five 4-char groups)
+```
+
+It binds both the KEM public key and the ML-DSA signing public key, so a swapped signing
+identity changes the fingerprint.
+
 ### Padding
 
 Payload is padded to one of {4 KB, 64 KB, 512 KB, 5 MB} to mask true size from a passive observer. Padding scheme identical to v0: zeros appended up to the chosen block size, smallest block that fits the payload is selected.
