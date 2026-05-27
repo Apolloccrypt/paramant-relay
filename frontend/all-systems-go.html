@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paramant - All systems</title>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/nav.css">
+  <style>
+    .asg { max-width: 560px; margin: 64px auto; padding: 0 24px; }
+    .asg-hero { text-align: center; margin-bottom: 40px; }
+    .asg-dot-lg { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center; font-size: 28px; color: #fff; }
+    .asg-overall-green  { background: #1a8f4c; }
+    .asg-overall-yellow { background: #c08a00; }
+    .asg-overall-red    { background: #b00020; }
+    .asg-overall-loading{ background: #cfd6df; }
+    .asg-title { font-size: 22px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+    .asg-sub { color: #667; margin: 0; font-size: 14px; }
+    .asg-list { border: 1px solid #e6e9ee; border-radius: 12px; overflow: hidden; }
+    .asg-row { display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+      border-bottom: 1px solid #eef1f5; cursor: default; }
+    .asg-row:last-child { border-bottom: none; }
+    .asg-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .asg-green  { background: #1a8f4c; }
+    .asg-yellow { background: #c08a00; }
+    .asg-red    { background: #b00020; }
+    .asg-loading{ background: #cfd6df; }
+    .asg-name { font-weight: 600; text-transform: capitalize; flex: 1; }
+    .asg-detail { color: #889; font-size: 13px; text-align: right; }
+    .asg-actions { margin-top: 28px; text-align: center; }
+    .asg-meta { margin-top: 18px; text-align: center; color: #99a; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="asg">
+    <div class="asg-hero">
+      <div id="overall-dot" class="asg-dot-lg asg-overall-loading">&middot;</div>
+      <h1 id="overall-title" class="asg-title">Checking systems...</h1>
+      <p id="overall-sub" class="asg-sub">Running a deep health check on your relay.</p>
+    </div>
+
+    <div id="checks" class="asg-list">
+      <div class="asg-row"><span class="asg-dot asg-loading"></span><span class="asg-name">loading</span></div>
+    </div>
+
+    <div class="asg-actions">
+      <a class="btn" href="/dashboard">Go to dashboard</a>
+    </div>
+    <p id="asg-meta" class="asg-meta"></p>
+  </main>
+
+  <script>
+  'use strict';
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+  function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+
+  function render(data){
+    var overall = (data && data.overall) || 'red';
+    var dot = document.getElementById('overall-dot');
+    var title = document.getElementById('overall-title');
+    var sub = document.getElementById('overall-sub');
+    dot.className = 'asg-dot-lg asg-overall-' + overall;
+    if (overall === 'green') {
+      dot.innerHTML = '&#10003;'; title.textContent = 'All systems go';
+      sub.textContent = 'Your relay ' + esc(data.version||'') + ' is healthy and ready.';
+    } else if (overall === 'yellow') {
+      dot.innerHTML = '!'; title.textContent = 'Up, with warnings';
+      sub.textContent = 'The relay is running; some checks need attention below.';
+    } else {
+      dot.innerHTML = '&times;'; title.textContent = 'Attention needed';
+      sub.textContent = 'One or more checks failed. See details below.';
+    }
+    var box = document.getElementById('checks');
+    var checks = (data && data.checks) || [];
+    box.innerHTML = checks.map(function(c){
+      return '<div class="asg-row">' +
+        '<span class="asg-dot asg-' + esc(c.status) + '"></span>' +
+        '<span class="asg-name">' + esc(cap(c.name)) + '</span>' +
+        '<span class="asg-detail">' + esc(c.detail) + '</span>' +
+        '</div>';
+    }).join('');
+    document.getElementById('asg-meta').textContent =
+      'Relay ' + esc(data.version||'?') + ' / sector ' + esc(data.sector||'?') + ' - updated ' + new Date().toLocaleTimeString();
+  }
+
+  function poll(){
+    fetch('/v2/health/deep', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(render)
+      .catch(function(){
+        document.getElementById('overall-title').textContent = 'Cannot reach the relay';
+        document.getElementById('overall-sub').textContent = 'The /v2/health/deep endpoint did not respond.';
+        document.getElementById('overall-dot').className = 'asg-dot-lg asg-overall-red';
+        document.getElementById('overall-dot').innerHTML = '&times;';
+      });
+  }
+  poll();
+  setInterval(poll, 5000);
+  </script>
+</body>
+</html>
