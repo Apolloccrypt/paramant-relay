@@ -7,6 +7,10 @@ const crypto  = require('crypto');
 const path    = require('path');
 const { initRedis, redis } = require('./lib/redis');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
+const { spawn } = require('child_process');
+const cliCommands = require('./lib/cli-commands');
+const cliAudit = require('./lib/cli-audit');
+const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -1793,7 +1797,185 @@ api.post('/admin/preview-email', authMiddleware, async (req, res) => {
   } catch (err) { console.error('[admin/preview-email]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 
+// -- /admin/cli -- web-based debug terminal ------------------------------------
+// Security model:
+//   - authMiddleware (admin session) required on every route.
+//   - Commands are WHITELIST-only (cli-commands.js); no arbitrary shell.
+//   - 'mutate' commands require a fresh, valid TOTP per execution.
+//   - 30 executions/min/admin (cli-ratelimit.js).
+//   - Every execution is audited (cli-audit.js -> redis global audit + relay CT).
+//   - spawn() runs handlers with NO shell and a curated env; args are validated
+//     and passed positionally so values are never shell-interpreted.
+
+// Forward CLI audit entries to the durable record: the redis global audit log,
+// and (best-effort) the relay CT log for a permanent, tamper-evident record.
+cliAudit.setForwarder(async (entry) => {
+  try { await logAuditEvent(entry.admin_id || 'cli', entry.event, entry); } catch {}
+  try {
+    await relayFetch('health', '/v2/ct', 'POST', { kind: 'admin_cli', entry }, false, ADMIN_TOKEN);
+  } catch { /* CT forwarding is best-effort; redis is the local source of truth */ }
+});
+
+// Derive a stable, non-reversible admin identifier from the session id.
+function adminIdFromReq(req) {
+  const sid = (req.headers['x-session'] || '').trim();
+  return 'adm_' + crypto.createHash('sha256').update(sid).digest('hex').slice(0, 12);
+}
+
+// Verify a 6-digit TOTP against the relay (same path as admin login MFA).
+async function verifyCliTotp(totp) {
+  if (!totp || !/^\d{6}$/.test(totp)) return false;
+  try {
+    const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, ADMIN_TOKEN);
+    return !!r.body?.ok;
+  } catch { return false; }
+}
+
+// Curated environment for handler scripts. We do NOT inherit the full process
+// env: only PATH/HOME plus paramant-relevant variables, and computed relay
+// locators. This bounds what `config show` can ever surface.
+function cliChildEnv() {
+  const env = { PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME || '/tmp' };
+  for (const [k, v] of Object.entries(process.env)) {
+    if (/^(PORT|BASE_PATH|NODE_ENV|RELAY_|SECTOR|ADMIN_|PARAMANT_|NATS_|REDIS_|RESEND_|COMPOSE_|BACKUP_)/.test(k)) {
+      env[k] = v;
+    }
+  }
+  env.RELAY_URL = SECTORS.health;
+  env.RELAY_SECTORS = Object.entries(SECTORS).map(([n, u]) => `${n}=${u}`).join(',');
+  env.ADMIN_TOKEN = ADMIN_TOKEN;
+  return env;
+}
+
+// GET /api/admin/cli/commands -- whitelist metadata for completion/help.
+api.get('/admin/cli/commands', authMiddleware, (req, res) => {
+  const commands = Object.entries(cliCommands.COMMANDS).map(([name, c]) => ({
+    name,
+    description: c.description,
+    class: c.class,
+    totp: c.totp,
+    args: c.args.map(a => ({ ...a })),
+  }));
+  res.json({ commands, rate_limit: { limit: cliRate.LIMIT, window_ms: cliRate.WINDOW } });
+});
+
+// POST /api/admin/cli/exec -- execute a whitelisted command, stream output (SSE).
+// Body: { command, args: {...}, totp? }
+api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
+  const adminId = adminIdFromReq(req);
+  const { command, args = {}, totp } = req.body || {};
+
+  // SSE helpers -- text/event-stream so output streams line-by-line to xterm.
+  let sseOpen = false;
+  const openSse = () => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+    sseOpen = true;
+  };
+  const sse = (event, data) => { if (sseOpen) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+
+  // 1-3. Whitelist lookup.
+  const cmd = cliCommands.COMMANDS[command];
+  if (!cmd) {
+    cliAudit.logCommand('cli_command_denied', { admin_id: adminId, command, reason: 'unknown_command' });
+    return res.status(404).json({ error: 'Unknown command' });
+  }
+  if (cmd.handler === '__help__') {
+    return res.status(400).json({ error: 'help is rendered client-side from /commands' });
+  }
+
+  // 5. Validate args against the schema.
+  const v = cliCommands.validateArgs(cmd, args);
+  if (!v.ok) {
+    cliAudit.logCommand('cli_command_denied', { admin_id: adminId, command, reason: 'invalid_args', detail: v.error });
+    return res.status(400).json({ error: v.error });
+  }
+
+  // 4. Mutate commands require a fresh valid TOTP.
+  if (cmd.class === 'mutate' || cmd.totp) {
+    const ok = await verifyCliTotp(totp);
+    if (!ok) {
+      cliAudit.logCommand('cli_command_denied', { admin_id: adminId, command, reason: 'totp_required' });
+      return res.status(403).json({ error: 'Valid TOTP code required for this command' });
+    }
+  }
+
+  // 6. Rate limit (30/min/admin).
+  if (!cliRate.checkRate(adminId)) {
+    cliAudit.logCommand('cli_command_denied', { admin_id: adminId, command, reason: 'rate_limited' });
+    return res.status(429).json({ error: 'Rate limit exceeded (30 commands/min)' });
+  }
+
+  // Resolve and confine the handler path inside SCRIPTS_DIR.
+  const handlerPath = path.resolve(cliCommands.SCRIPTS_DIR, cmd.handler);
+  if (!handlerPath.startsWith(cliCommands.SCRIPTS_DIR + path.sep)) {
+    return res.status(500).json({ error: 'handler_path_error' });
+  }
+  const argv = cliCommands.buildArgv(cmd, v.values);
+
+  // 7. Audit start.
+  cliAudit.logCommand('cli_command_started', { admin_id: adminId, command, args: v.values });
+
+  // 8-9. Spawn (no shell) and stream stdout/stderr over SSE.
+  openSse();
+  const started = Date.now();
+  let child;
+  try {
+    child = spawn(handlerPath, argv, {
+      cwd: cliCommands.SCRIPTS_DIR,
+      env: cliChildEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    sse('output', { stream: 'stderr', chunk: `[spawn error] ${err.message}\r\n` });
+    sse('done', { exit_code: -1, error: 'spawn_failed' });
+    cliAudit.logCommand('cli_command_error', { admin_id: adminId, command, error: err.message });
+    return res.end();
+  }
+
+  // Hard timeout so no command can run away.
+  const TIMEOUT_MS = 60_000;
+  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, TIMEOUT_MS);
+
+  // Convert bare \n to \r\n so the xterm renderer advances columns correctly.
+  const toTerm = s => s.replace(/\r?\n/g, '\r\n');
+  child.stdout.on('data', d => sse('output', { stream: 'stdout', chunk: toTerm(d.toString()) }));
+  child.stderr.on('data', d => sse('output', { stream: 'stderr', chunk: toTerm(d.toString()) }));
+
+  // 10-11. Client cancel (Ctrl+C closes the stream) -> kill the child.
+  let finished = false;
+  req.on('close', () => {
+    if (!finished) { try { child.kill('SIGKILL'); } catch {} }
+  });
+
+  child.on('error', err => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(killer);
+    sse('output', { stream: 'stderr', chunk: `[error] ${err.message}\r\n` });
+    sse('done', { exit_code: -1 });
+    cliAudit.logCommand('cli_command_error', { admin_id: adminId, command, error: err.message });
+    res.end();
+  });
+
+  child.on('close', (code, signal) => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(killer);
+    const duration_ms = Date.now() - started;
+    const exit_code = code === null ? -1 : code;
+    sse('done', { exit_code, signal: signal || null, duration_ms });
+    cliAudit.logCommand('cli_command_completed', { admin_id: adminId, command, exit_code, signal: signal || null, duration_ms });
+    res.end();
+  });
+});
+
 app.use(`${BASE_PATH}/api`, api);
+// /cli -- web debug terminal page (served before the SPA wildcard fallback).
+app.get(`${BASE_PATH}/cli`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'cli.html')));
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
