@@ -181,3 +181,55 @@ pub fn decrypt_blob(ciphertext: &[u8], kem_priv: &[u8], ecdh_priv: &[u8]) -> Res
             .map_err(|_| JsValue::from_str("AES-GCM decrypt failed — wrong key or corrupted data"))
     }
 }
+
+// ── ML-DSA-65 signatures (ParaSign Sg1) ──────────────────────────────────────
+// Seed-based: the 32-byte BIP-39-derived seed (xi) IS the signing key per
+// ParaSign Sg0 ADR-3, so no expanded secret key is ever exposed by the binding.
+// Verified byte-equivalent with paramant-core's oqs ML-DSA-65 (ADR-0021).
+// encrypt_blob / decrypt_blob above are unchanged.
+use ml_dsa::{
+    EncodedSignature, EncodedVerifyingKey, ExpandedSigningKey, Keypair, MlDsa65, Seed, Signature,
+    SigningKey, VerifyingKey,
+};
+
+/// Derive the ML-DSA-65 public key (1952 bytes) from a 32-byte seed (xi).
+/// Deterministic: the same seed always yields the same public key; the seed is
+/// the private key (mnemonic-derived, ADR-3).
+#[wasm_bindgen]
+pub fn ml_dsa_pubkey_from_seed(xi: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let seed = Seed::try_from(xi).map_err(|_| JsValue::from_str("xi must be 32 bytes"))?;
+    let sk = SigningKey::<MlDsa65>::from_seed(&seed);
+    Ok(sk.verifying_key().encode().as_slice().to_vec())
+}
+
+/// Deterministically sign `message` with the ML-DSA-65 key derived from the
+/// 32-byte seed (xi). Empty context. Returns a 3309-byte signature.
+#[wasm_bindgen]
+pub fn ml_dsa_sign(xi: &[u8], message: &[u8]) -> Result<Vec<u8>, JsValue> {
+    let seed = Seed::try_from(xi).map_err(|_| JsValue::from_str("xi must be 32 bytes"))?;
+    let esk = ExpandedSigningKey::<MlDsa65>::from_seed(&seed);
+    let sig = esk
+        .sign_deterministic(message, &[])
+        .map_err(|_| JsValue::from_str("ML-DSA-65 sign failed"))?;
+    Ok(sig.encode().as_slice().to_vec())
+}
+
+/// Verify an ML-DSA-65 signature (empty context). public_key 1952 B, signature
+/// 3309 B. Returns false on any decode or verification failure.
+#[wasm_bindgen]
+pub fn ml_dsa_verify(public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    let enc_vk = match EncodedVerifyingKey::<MlDsa65>::try_from(public_key) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let vk = VerifyingKey::<MlDsa65>::decode(&enc_vk);
+    let enc_sig = match EncodedSignature::<MlDsa65>::try_from(signature) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let sig = match Signature::<MlDsa65>::decode(&enc_sig) {
+        Some(s) => s,
+        None => return false,
+    };
+    vk.verify_with_context(message, &[], &sig)
+}

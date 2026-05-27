@@ -12,6 +12,9 @@ js-sys = "0.3"
 ml-kem = { version = "0.3.0-rc.2", features = ["getrandom"] }
 p256 = { version = "0.13", features = ["ecdh"] }
 aes-gcm = "0.10"
+# ML-DSA-65 signatures for ParaSign (Sg1). Proven byte-equivalent with
+# paramant-core's oqs via cross-impl KAT (paramant-core ADR-0021).
+ml-dsa = "0.1"
 hkdf = "0.12"
 sha2 = "0.10"
 # rand_core v0.6 — needed by p256's EphemeralSecret::random

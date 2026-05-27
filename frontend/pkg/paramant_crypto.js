@@ -55,6 +55,65 @@ export function encrypt_blob(plaintext, kem_pub, ecdh_pub) {
     return v4;
 }
 
+/**
+ * Derive the ML-DSA-65 public key (1952 bytes) from a 32-byte seed (xi).
+ * Deterministic: the same seed always yields the same public key; the seed is
+ * the private key (mnemonic-derived, ADR-3).
+ * @param {Uint8Array} xi
+ * @returns {Uint8Array}
+ */
+export function ml_dsa_pubkey_from_seed(xi) {
+    const ptr0 = passArray8ToWasm0(xi, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.ml_dsa_pubkey_from_seed(ptr0, len0);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * Deterministically sign `message` with the ML-DSA-65 key derived from the
+ * 32-byte seed (xi). Empty context. Returns a 3309-byte signature.
+ * @param {Uint8Array} xi
+ * @param {Uint8Array} message
+ * @returns {Uint8Array}
+ */
+export function ml_dsa_sign(xi, message) {
+    const ptr0 = passArray8ToWasm0(xi, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.ml_dsa_sign(ptr0, len0, ptr1, len1);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v3;
+}
+
+/**
+ * Verify an ML-DSA-65 signature (empty context). public_key 1952 B, signature
+ * 3309 B. Returns false on any decode or verification failure.
+ * @param {Uint8Array} public_key
+ * @param {Uint8Array} message
+ * @param {Uint8Array} signature
+ * @returns {boolean}
+ */
+export function ml_dsa_verify(public_key, message, signature) {
+    const ptr0 = passArray8ToWasm0(public_key, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray8ToWasm0(signature, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.ml_dsa_verify(ptr0, len0, ptr1, len1, ptr2, len2);
+    return ret !== 0;
+}
+
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

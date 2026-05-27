@@ -1,0 +1,5 @@
+# ml-dsa 0.1 (and its crypto-common 0.2 dep tree) require a recent toolchain;
+# pin a stable Rust that builds the wasm bundle reproducibly. ParaSign Sg1.
+[toolchain]
+channel = "1.95.0"
+targets = ["wasm32-unknown-unknown"]
