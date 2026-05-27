@@ -1,4 +1,4 @@
-# Self-Hosting Guide — PARAMANT Relay v2.4.5
+# Self-Hosting Guide — PARAMANT Relay v3.0.0
 
 **License:** BUSL-1.1 — source available, free for up to 5 active API keys per relay.
 
@@ -22,7 +22,7 @@ cp .env.example .env
 echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
 curl http://localhost:3001/health
-# {"ok":true,"version":"2.4.5","sector":"health","edition":"community"}
+# {"ok":true,"version":"3.0.0","sector":"health","edition":"community"}
 ```
 
 **Option 3 — Raspberry Pi / arm64:**
@@ -489,7 +489,7 @@ Expected output (one entry per registered relay):
     {
       "url": "https://relay.yourdomain.com",
       "sector": "relay",
-      "version": "2.4.5",
+      "version": "3.0.0",
       "edition": "community",
       "pk_hash": "3d9b960c...",
       "verified_since": "2026-04-11T02:14:13Z",

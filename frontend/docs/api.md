@@ -1,4 +1,4 @@
-# API Reference — PARAMANT v2.4.5
+# API Reference — PARAMANT v3.0.0
 
 ## Base URLs
 
@@ -328,14 +328,14 @@ The RSS feed is designed for external archiving: any subscriber retains an indep
 
 ```bash
 curl https://relay.paramant.app/health
-# {"ok":true,"version":"2.4.5","sector":"relay","edition":"community"}
+# {"ok":true,"version":"3.0.0","sector":"relay","edition":"community"}
 ```
 
 ### GET /v2/relays — Relay registry (public)
 
 ```bash
 curl https://relay.paramant.app/v2/relays
-# {"total":5,"relays":[{"url":"…","version":"2.4.5","sector":"relay",…}]}
+# {"total":5,"relays":[{"url":"…","version":"3.0.0","sector":"relay",…}]}
 ```
 
 ### POST /v2/request-trial — Request a free trial API key

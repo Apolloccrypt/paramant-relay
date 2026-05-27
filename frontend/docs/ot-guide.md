@@ -80,7 +80,7 @@ Verify the relay is running:
 
 ```bash
 curl http://localhost:3000/health
-# {"ok":true,"sector":"iot","version":"2.4.5"}
+# {"ok":true,"sector":"iot","version":"3.0.0"}
 ```
 
 ---

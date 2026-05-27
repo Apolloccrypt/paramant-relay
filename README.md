@@ -1,6 +1,6 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v2.5.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.0.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
@@ -28,7 +28,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3001/health
-# {"ok":true,"version":"2.5.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.0.0","sector":"health","edition":"licensed"}
 ```
 
 Or on a Raspberry Pi / fresh VPS:
@@ -279,7 +279,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
 ```bash
 curl https://health.paramant.app/health
-# {"ok":true,"version":"2.5.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.0.0","sector":"health","edition":"licensed"}
 ```
 
 ### CT log (public)

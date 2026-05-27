@@ -21,7 +21,7 @@ dim()  { echo -e "${D}$*${E}"; }
 
 INSTALL_DIR="${PARAMANT_DIR:-/opt/paramant}"
 REPO="https://github.com/Apolloccrypt/paramant-relay"
-VERSION="v2.4.5"
+VERSION="v3.0.0"
 MIN_RAM_MB=512
 MIN_DISK_GB=4
 INSTALL_T0=$(date +%s)   # for the "download to dashboard" timer

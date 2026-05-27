@@ -40,7 +40,7 @@ RUN node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.
 FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885
 
 LABEL org.opencontainers.image.title="paramant-relay" \
-      org.opencontainers.image.version="2.4.5" \
+      org.opencontainers.image.version="3.0.0" \
       org.opencontainers.image.description="Post-quantum encrypted file relay — RAM-only, burn-on-read" \
       org.opencontainers.image.source="https://github.com/Apolloccrypt/paramant-relay" \
       org.opencontainers.image.licenses="BUSL-1.1"
