@@ -1651,6 +1651,17 @@ function readBody(req, max = MAX_BLOB * 2) {
 }
 
 // ── HTTP server ───────────────────────────────────────────────────────────────
+// -- Optional static frontend serving (opt-in via SERVE_FRONTEND=true) --------
+// Off by default: production serves frontend/ via nginx. Plug-and-play self-host
+// installs (install.sh) set SERVE_FRONTEND=true so the relay can serve /setup,
+// /dashboard, etc directly. See relay/lib/static-serve.js + ADR R011.
+const _static = require('./lib/static-serve').createStaticHandler({
+  serveFrontend: process.env.SERVE_FRONTEND === 'true',
+  frontendRoot: process.env.FRONTEND_ROOT || '/app/frontend',
+  log,
+});
+if (_static.serveFrontend) log('info', 'static_serving_enabled', { root: _static.frontendRoot });
+
 const server = http.createServer(async (req, res) => {
   setHeaders(res, req);
   const parsed  = url_.parse(req.url, true);
@@ -1688,6 +1699,10 @@ const server = http.createServer(async (req, res) => {
 
   incMetric('requests_total');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  // Opt-in static frontend (off by default). Runs before the mode gate and the
+  // API routes so plug-and-play installs can serve /setup, /dashboard, etc.
+  // API paths are excluded inside maybeServeStatic, so production is unaffected.
+  if (_static.maybeServeStatic(req, res, path)) return;
   if (path === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, relay: SECTOR, version: VERSION, status: 'operational', protocol: 'ghost-pipe-v2', docs: 'https://paramant.app/docs' }));
