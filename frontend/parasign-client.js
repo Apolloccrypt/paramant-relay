@@ -4,10 +4,9 @@
 // public key (base64) are sent to the relay notary. (Contract matches
 // relay/parasign.js + the /v2/sign handler, which base64-decodes signature
 // and signer_public_key.)
-// NOTE: crypto is loaded from esm.sh (CDN). Vendoring an ML-DSA bundle is a
-// tracked follow-up (M-06 EU-sovereignty); it does not affect the no-leak model.
-import { ml_dsa65 } from 'https://esm.sh/@noble/post-quantum@0.4.1/ml-dsa';
-import { sha3_256 } from 'https://esm.sh/@noble/hashes@1.5.0/sha3';
+// Crypto is vendored same-origin (frontend/vendor/paramant-pqc.js, built from
+// @noble/post-quantum + @noble/hashes) so it loads under the site CSP (script-src 'self').
+import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
 
 const RELAY_URL = 'https://relay.paramant.app';
 let signerKey = null, documentBuffer = null, documentFilename = '', lastEnvelope = null;

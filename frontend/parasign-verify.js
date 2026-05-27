@@ -2,7 +2,7 @@
 // The document NEVER leaves the browser: only its SHA3-256 hash + the .psign
 // envelope are sent to /v2/verify (which runs the verification math).
 // The deployed /v2/verify requires X-Api-Key, so a key field is shown.
-import { sha3_256 } from 'https://esm.sh/@noble/hashes@1.5.0/sha3';
+import { sha3_256 } from '/vendor/paramant-pqc.js';
 
 const RELAY_URL = 'https://relay.paramant.app';
 let documentBuffer = null, envelope = null;
