@@ -1,6 +1,6 @@
 # PARAMANT — Post-Quantum Encrypted File Relay
 
-[![Version](https://img.shields.io/badge/version-v2.5.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v3.0.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
@@ -28,7 +28,7 @@ docker compose up -d
 
 # 4. Verify
 curl http://localhost:3001/health
-# {"ok":true,"version":"2.5.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.0.0","sector":"health","edition":"licensed"}
 ```
 
 Or on a Raspberry Pi / fresh VPS:
@@ -52,9 +52,11 @@ As of the M5b release, PARAMANT's crypto layer is migrating from pure JavaScript
 (`@noble/post-quantum`) to a Rust core via the
 [`@paramant/core`](https://github.com/Apolloccrypt/paramant-core) NAPI binding.
 
-In production today: ML-KEM-768 keygen. Later releases migrate more call sites
-(ML-DSA signing, AEAD on the hot path, hybrid KEM). The wire format and client
-behavior are unchanged at each step  --  this is an internal implementation swap.
+In production as of 3.0.0: ML-KEM-768 keygen (M5b) and server-side ML-DSA-65
+signing — the relay identity, delivery receipts and signed tree heads now run on
+`@paramant/core`. Later releases migrate the remaining call sites (AEAD on the
+hot path, hybrid KEM). The wire format and client behavior are unchanged at each
+step  --  this is an internal implementation swap.
 
 Why a separate repo:
 
@@ -71,6 +73,43 @@ against paramant-core via the cross-impl-validator crate there (ADR-0020,
 ADR-0021). See
 [paramant-core/docs/ARCHITECTURE.md](https://github.com/Apolloccrypt/paramant-core/blob/main/docs/ARCHITECTURE.md)
 for the full cross-repo overview.
+
+---
+
+## What's new in 3.0.0
+
+3.0.0 keeps the wire format, API surface and crypto guarantees of 2.5.x — every
+2.5.x client stays compatible — and concentrates on the operator and self-host
+experience. **Status:** M5b is live (crypto split), with the M11 onboarding and
+admin features landing in the 3.0.0 release.
+
+- **paramant-core crypto split (M5b).** Server-side ML-DSA-65 signing now runs on
+  the standalone [`@paramant/core`](https://github.com/Apolloccrypt/paramant-core)
+  Rust library via its NAPI binding; client-side ML-KEM-768 still runs in the
+  browser/SDK. The relay never holds a key.
+- **First-run setup wizard.** A web wizard at `/setup` replaces hand-run admin
+  scripts — admin token, TOTP and first key from the browser (ADR R005).
+- **Visual admin config + in-browser CLI.** `/admin/settings` edits relay config
+  without touching `.env`; `/admin/cli` is a web terminal for debugging without SSH.
+- **Cards-per-product dashboard.** The user dashboard is rebuilt around per-product
+  cards with dark mode, real-time updates and a mobile layout.
+- **Crypto-mode negotiation.** `/v2/capabilities` advertises a compact `core` mode
+  (2 algorithms) by default; extended sets are opt-in via `CRYPTO_MODE` (ADR R006).
+- **Add-on architecture (spec).** Container-isolated integrations that work on
+  ciphertext and metadata only (ADR R007, draft).
+- **Static front-end serving.** Opt-in `SERVE_FRONTEND=1` lets a single relay serve
+  its own UI for plug-and-play self-hosting (ADR R011).
+
+### Architecture Decision Records (this repo)
+
+| ADR | Topic | Status |
+|-----|-------|--------|
+| R005 | Plug-and-play onboarding (`/setup` wizard) | Draft |
+| R006 | Crypto-mode opt-in (`core` default / `extended`) | Accepted |
+| R007 | Add-on architecture (manifest, lifecycle, security) | Draft |
+| R011 | Static front-end serving (`SERVE_FRONTEND`) | Accepted |
+
+Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 
 ---
 
@@ -246,7 +285,10 @@ curl -fsSL https://paramant.app/install-pi.sh | bash
 
 ```bash
 curl -fsSL https://paramant.app/install.sh | bash
-# Prompts: domain, email (Let's Encrypt), admin token, sectors, license key
+# Brings the relay up and opens the first-run /setup wizard in the browser
+# (admin token, TOTP, first key — falls back to a localhost URL on headless hosts).
+# Set SERVE_FRONTEND=1 to serve the UI from the relay itself; CRYPTO_MODE selects
+# the algorithm set advertised on /v2/capabilities (ADR R005, R006, R011).
 ```
 
 ### Bootable OS (no Docker needed)
@@ -279,7 +321,7 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
 ```bash
 curl https://health.paramant.app/health
-# {"ok":true,"version":"2.5.0","sector":"health","edition":"licensed"}
+# {"ok":true,"version":"3.0.0","sector":"health","edition":"licensed"}
 ```
 
 ### CT log (public)
