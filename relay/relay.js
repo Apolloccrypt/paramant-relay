@@ -70,11 +70,14 @@ const RELAY_IDENTITY_FILE = process.env.RELAY_IDENTITY_FILE || '/data/relay-iden
 const TRIAL_KEYS_FILE     = process.env.TRIAL_KEYS_FILE     || '/data/trial-keys.jsonl';
 
 // ── Crypto agility registry (wire format v1) ─────────────────────────────────
-// bootstrap() registers ML-KEM-768 (id 0x0002) and ML-DSA-65 (id 0x0002) once
-// at module load. Every crypto call site in this file goes through
-// registry.getKEM/getSig so algorithms can be swapped without touching handlers.
+// bootstrap() registers the relay's crypto algorithms once at module load. The
+// set depends on CRYPTO_MODE: 'core' (default) = ML-KEM-768 + ML-DSA-65 only;
+// 'extended' = all 18 algorithms (see ADR R006). Every crypto call site in this
+// file goes through registry.getKEM/getSig so algorithms can be swapped without
+// touching handlers.
 const registry = require('./crypto/registry');
-require('./crypto/bootstrap').bootstrap();
+const cryptoMode = require('./crypto/bootstrap').bootstrap();
+log('info', 'crypto_mode_loaded', { mode: cryptoMode });
 const wireFormat = require('./crypto/wire-format');
 const cryptoErrors = require('./crypto/errors');
 

@@ -1,10 +1,25 @@
 // relay/crypto/bootstrap.js
 // Registers the algorithms this relay supports. Called once at startup.
-// To add a new algorithm: write an impl file, import here, register it.
+//
+// CRYPTO_MODE controls which algorithms get registered:
+//   'core'     (default) - ML-KEM-768 + ML-DSA-65 only. FIPS 203/204.
+//                          Used by all official SDKs (sdk-js, sdk-py,
+//                          crypto-wasm). Smallest audit surface.
+//   'extended' - all 18 algorithms: ML-KEM-{512,768,1024},
+//                ML-DSA-{44,65,87}, Falcon-{512,1024}, all 12 SLH-DSA
+//                variants. Crypto-agility for experimental clients
+//                using the raw HTTP API.
+//
+// To enable extended mode: set CRYPTO_MODE=extended in .env. See ADR R006.
 
 const { registerKEM, registerSig } = require('./registry');
+
+// Core impls (always loaded)
 const mlkem768 = require('./impls/mlkem768');
 const mldsa65 = require('./impls/mldsa65');
+
+// Extended impls (registered only when CRYPTO_MODE=extended). Required eagerly
+// so a missing or broken impl file fails at startup, not at first use.
 const mlkem512 = require('./impls/mlkem512');
 const mlkem1024 = require('./impls/mlkem1024');
 const mldsa44 = require('./impls/mldsa44');
@@ -25,45 +40,67 @@ const slhdsa_shake_256s = require('./impls/slhdsa_shake_256s');
 const slhdsa_shake_256f = require('./impls/slhdsa_shake_256f');
 
 let bootstrapped = false;
+let activeMode = null;
 
-function bootstrap() {
-  if (bootstrapped) return;
+function bootstrap(mode) {
+  if (bootstrapped) return activeMode;
 
-  // KEM 0x0001 = ML-KEM-512  (NIST security category 1)
-  // KEM 0x0002 = ML-KEM-768  (default, NIST security category 3)
-  // KEM 0x0003 = ML-KEM-1024 (NIST security category 5)
-  registerKEM(0x0001, mlkem512);
+  // Resolve mode: explicit arg > env > default.
+  const resolved = (mode || process.env.CRYPTO_MODE || 'core').toLowerCase();
+  if (resolved !== 'core' && resolved !== 'extended') {
+    throw new Error(`Invalid CRYPTO_MODE: ${resolved}. Must be 'core' or 'extended'.`);
+  }
+
+  // Core algorithms - loaded in both modes.
+  // KEM 0x0002 = ML-KEM-768 (FIPS 203, NIST security category 3)
   registerKEM(0x0002, mlkem768);
-  registerKEM(0x0003, mlkem1024);
-
-  // Sig 0x0001 = ML-DSA-44 (NIST security category 2)
-  // Sig 0x0002 = ML-DSA-65 (default, NIST security category 3)
-  // Sig 0x0003 = ML-DSA-87 (NIST security category 5)
-  registerSig(0x0001, mldsa44);
+  // Sig 0x0002 = ML-DSA-65 (FIPS 204, NIST security category 3)
   registerSig(0x0002, mldsa65);
-  registerSig(0x0003, mldsa87);
 
-  // Sig 0x0100 = Falcon-512  (FIPS 206, NIST security category 1)
-  // Sig 0x0101 = Falcon-1024 (FIPS 206, NIST security category 5)
-  registerSig(0x0100, falcon512);
-  registerSig(0x0101, falcon1024);
+  if (resolved === 'extended') {
+    // Additional ML-KEM levels.
+    registerKEM(0x0001, mlkem512);
+    registerKEM(0x0003, mlkem1024);
 
-  // Sig 0x0200..0x020B = SLH-DSA / SPHINCS+ (FIPS 205)
-  // 's' variants are small-signature/slow-signing; 'f' variants are fast-signing/larger-signature.
-  registerSig(0x0200, slhdsa_sha2_128s);
-  registerSig(0x0201, slhdsa_sha2_128f);
-  registerSig(0x0202, slhdsa_sha2_192s);
-  registerSig(0x0203, slhdsa_sha2_192f);
-  registerSig(0x0204, slhdsa_sha2_256s);
-  registerSig(0x0205, slhdsa_sha2_256f);
-  registerSig(0x0206, slhdsa_shake_128s);
-  registerSig(0x0207, slhdsa_shake_128f);
-  registerSig(0x0208, slhdsa_shake_192s);
-  registerSig(0x0209, slhdsa_shake_192f);
-  registerSig(0x020A, slhdsa_shake_256s);
-  registerSig(0x020B, slhdsa_shake_256f);
+    // Additional ML-DSA levels.
+    registerSig(0x0001, mldsa44);
+    registerSig(0x0003, mldsa87);
+
+    // Falcon (FIPS 206).
+    registerSig(0x0100, falcon512);
+    registerSig(0x0101, falcon1024);
+
+    // SLH-DSA / SPHINCS+ (FIPS 205). 's' = small-sig/slow, 'f' = fast/larger-sig.
+    registerSig(0x0200, slhdsa_sha2_128s);
+    registerSig(0x0201, slhdsa_sha2_128f);
+    registerSig(0x0202, slhdsa_sha2_192s);
+    registerSig(0x0203, slhdsa_sha2_192f);
+    registerSig(0x0204, slhdsa_sha2_256s);
+    registerSig(0x0205, slhdsa_sha2_256f);
+    registerSig(0x0206, slhdsa_shake_128s);
+    registerSig(0x0207, slhdsa_shake_128f);
+    registerSig(0x0208, slhdsa_shake_192s);
+    registerSig(0x0209, slhdsa_shake_192f);
+    registerSig(0x020A, slhdsa_shake_256s);
+    registerSig(0x020B, slhdsa_shake_256f);
+  }
 
   bootstrapped = true;
+  activeMode = resolved;
+  return resolved;
 }
 
-module.exports = { bootstrap };
+function getActiveMode() {
+  return activeMode;
+}
+
+// For testing: clear the registry and bootstrap state so a different mode can
+// be exercised in the same process.
+function resetBootstrap() {
+  const { clearRegistry } = require('./registry');
+  clearRegistry();
+  bootstrapped = false;
+  activeMode = null;
+}
+
+module.exports = { bootstrap, getActiveMode, resetBootstrap };
