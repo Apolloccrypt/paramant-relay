@@ -88,6 +88,40 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 | `POST` | `/admin/delete-account` | `{ key, confirm: "DELETE", notify }` | Delete account |
 | `POST` | `/admin/preview-email` | `{ type, key }` | Preview email HTML + text before sending. Types: `welcome`, `setup`, `reset-confirm` |
 
+### Visual config editor
+
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `GET` | `/admin/config` | -- | Whitelisted config keys + current values. Secrets masked, never returned in plaintext. 503 if disabled. |
+| `PUT` | `/admin/config` | `{ changes: [{ key, value }] }` | Validate (all-or-nothing) + atomic write + backup. Audit-logged per change. |
+| `POST` | `/admin/config/restart` | -- | Returns 501 + manual restart instructions. Does NOT restart relays automatically (see below). |
+| `GET` | `/admin/config/audit` | -- | Config-scoped audit feed (`admin_config_changed`, `*_backup_created`, `*_restart_requested`). |
+
+UI: `/admin/settings.html` (linked from the dashboard header). Sidebar groups,
+type-specific controls (toggle / slider / select / input), dirty-state
+highlight, secret replace-modal, save-then-restart banner.
+
+**Enabling it.** The editor is OFF until `ADMIN_CONFIG_ENV_PATH` points at the
+env file the relays load. The admin runs as a separate process from the relays,
+so that path is normally a file on a shared volume mounted into both the admin
+and relay containers. If unset, `GET /admin/config` returns 503 and the page
+shows an "not enabled" notice -- we never guess a path and edit the wrong file.
+
+**Whitelist only.** Only keys defined in `admin/lib/config-schema.js` are
+readable or writable; any other key in the env file is invisible and untouched.
+Writes preserve comments, blank lines, and out-of-whitelist keys.
+
+**Secrets.** Secret keys are masked on read and replace-only on write.
+`ADMIN_TOKEN` and `TOTP_SECRET` (the credentials that protect this panel) are
+read-only here on purpose -- rotate them on the host so a typo + restart cannot
+lock you out of the panel.
+
+**Restart is manual by design.** Saving writes the env file; relays read env at
+startup, so changes apply on the next relay restart. The admin does NOT exec
+`docker compose restart` / `systemctl` on the relays: that would be a shell exec
+from the admin container and an automatic production action. The panel shows the
+command to run instead.
+
 ---
 
 ## Redis key layout (admin-relevant)
