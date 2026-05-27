@@ -33,6 +33,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   YAML-based flow-definition format with capability-checked execution.
 - docs/low-code/ folder with two example flow YAML files
   (notify-on-health-blob, mirror-to-storage).
+- R013 License-server protocol ADR: defines the wire format between a
+  customer relay and Paramant's central license-server. ML-DSA-65 signed
+  capability-sets, 6h check-in with nonce binding, 7-day offline grace,
+  capability-based feature gating, and 402/404/410/503 status semantics.
+  Additive to the existing offline Ed25519 PLK_KEY (backward compatible);
+  implementation deferred to later phases.
 
 ### Changed
 - `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`
