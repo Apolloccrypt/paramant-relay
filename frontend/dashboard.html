@@ -13,6 +13,32 @@ body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:1
 input,select,button{font-family:var(--mono);font-size:13px}
 a{color:var(--ink-dim);text-decoration:none}
 a:hover{color:var(--cobalt)}
+
+/* Cards-per-product (Lovelace-style) — backwards-compatible toevoeging */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1px;background:rgba(11,58,106,.15);border:1px solid rgba(11,58,106,.15);margin-bottom:24px}
+.card{background:#EEF2F6;padding:18px 20px;display:flex;flex-direction:column;min-height:168px}
+.card-wide{grid-column:span 2}
+@media (max-width:720px){.card-wide{grid-column:span 1}}
+.card-header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(11,58,106,.15)}
+.card-header h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:#0B3A6A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.card-sub{font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:rgba(11,58,106,.45);letter-spacing:.06em;text-transform:uppercase}
+.badge-coming{background:rgba(11,58,106,.08);color:rgba(11,58,106,.65);padding:2px 8px;font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.card-body{flex:1;display:flex;flex-direction:column;justify-content:center}
+.card-footer{margin-top:12px;padding-top:10px;border-top:1px solid rgba(11,58,106,.15);display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:11px}
+.card-footer a,.card-link{color:rgba(11,58,106,.65)}
+.card-footer a:hover,.card-link:hover{color:#1D4ED8}
+.card-footer button{background:none;border:1px solid rgba(11,58,106,.15);color:rgba(11,58,106,.65);padding:4px 10px;font-size:11px;cursor:pointer}
+.card-footer button:hover{border-color:#1D4ED8;color:#1D4ED8}
+.empty-state-card{color:rgba(11,58,106,.45);font-size:12px;line-height:1.6;margin:0}
+.empty-state-card a{color:#1D4ED8}
+.stat-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(11,58,106,.06)}
+.stat-row:last-child{border-bottom:none}
+.stat-label{color:rgba(11,58,106,.45);font-size:11px;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.04em}
+.stat-value{font-weight:600;font-size:12px;color:#0B3A6A;text-align:right}
+.card-entry{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(11,58,106,.06);font-size:11px;font-family:'SF Mono','Fira Code',monospace}
+.card-entry:last-child{border-bottom:none}
+.card-entry-meta{color:rgba(11,58,106,.45);flex-shrink:0}
+.card-loading{font-size:11px;color:rgba(11,58,106,.45);font-family:'SF Mono','Fira Code',monospace}
 </style>
 <meta property="og:title" content="PARAMANT — Developer Dashboard">
 <meta property="og:description" content="PARAMANT — Developer Dashboard">
@@ -485,6 +511,87 @@ function softRender(){
   if(pi)pi.textContent=loading?"polling...":lastPoll?"↻ "+lastPoll.toLocaleTimeString():"";
 }
 
+// ── Cards-per-product loader (Lovelace-style) — hergebruikt apiKey/relay + echte relay-endpoints ──
+async function cardFetch(path){
+  const r=await fetch(relay.u+path,{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(8000)});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
+function cardSet(name,html){
+  const el=document.querySelector(`[data-card="${name}"] .card-body`);
+  if(el)el.innerHTML=html;
+}
+function cardErr(name,msg){cardSet(name,`<p class="empty-state-card">Unavailable: ${esc(msg)}</p>`)}
+function cardRow(label,val){return`<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-value">${val}</span></div>`}
+
+const PLAN_RETENTION={free:"1 hour",community:"1 hour",pro:"24 hours",enterprise:"7 days"};
+const PLAN_VIEWS={free:"1",community:"1",pro:"10",enterprise:"100"};
+const TRANSFER_EVENTS=["inbound","outbound_view","drop_created","drop_pickup"];
+const EVENT_LABEL={inbound:"Sent",outbound_view:"Received",outbound_burn:"Burned",ack_received:"ACK",drop_created:"Drop created",drop_pickup:"Drop pickup",did_registered:"Key registered",attestation:"Attestation",inbound_aborted:"Aborted"};
+function evLabel(e){return EVENT_LABEL[e]||e||"event"}
+function evTime(ts){return ts?(String(ts).slice(11,19)||String(ts).slice(0,10)):""}
+
+// Account + Plan cards — /v2/check-key returns {valid, plan} only
+async function loadAccountPlan(){
+  try{
+    const d=await cardFetch("/v2/check-key");
+    const plan=d.plan||"—";
+    cardSet("account",
+      cardRow("Relay",esc(relay.l))+
+      cardRow("Status",d.valid?`<span style="color:${V.g}">Connected</span>`:`<span style="color:#8c3a3a">Invalid key</span>`)+
+      cardRow("Region","eu/de · ram only"));
+    cardSet("plan",
+      cardRow("Tier",esc(plan))+
+      cardRow("Max file","5 MB")+
+      cardRow("Retention",PLAN_RETENTION[plan]||"—")+
+      cardRow("Views / blob",PLAN_VIEWS[plan]||"—"));
+  }catch(e){cardErr("account",e.message);cardErr("plan",e.message)}
+}
+
+// Stream card — /v2/monitor
+async function loadStreamCard(){
+  try{
+    const d=await cardFetch("/v2/monitor");
+    const dl=d.delivery||{};const sr=dl.success_rate;const st=d.stats||{};
+    cardSet("stream",
+      cardRow("Blobs in flight",d.blobs_in_flight??"—")+
+      cardRow("Inbound total",st.inbound??"—")+
+      cardRow("Delivery rate",sr!=null?(sr*100).toFixed(1)+"%":"—"));
+  }catch(e){cardErr("stream",e.message)}
+}
+
+// Transfer + Activity + Keys cards — all from /v2/audit
+async function loadAuditCards(){
+  try{
+    const d=await cardFetch("/v2/audit?limit=100");
+    const entries=d.entries||[];
+    const tf=entries.filter(e=>TRANSFER_EVENTS.includes(e.event)).slice(0,5);
+    cardSet("transfer",tf.length
+      ? tf.map(e=>`<div class="card-entry"><span>${esc(evLabel(e.event))}${e.bytes?" · "+(e.bytes/1024).toFixed(1)+"KB":""}</span><span class="card-entry-meta">${esc(evTime(e.ts))}</span></div>`).join("")
+      : `<p class="empty-state-card">No transfers yet. <a href="/send">Send your first file.</a></p>`);
+    const recent=entries.slice(0,8);
+    cardSet("activity",recent.length
+      ? recent.map(e=>`<div class="card-entry"><span>${esc(evLabel(e.event))}${e.device?" · "+esc(e.device):""}</span><span class="card-entry-meta">${esc(evTime(e.ts))}</span></div>`).join("")
+      : `<p class="empty-state-card">No activity yet.</p>`);
+    const devices=new Set(entries.filter(e=>e.event==="did_registered"&&e.device).map(e=>e.device));
+    const masked=(apiKey||"").slice(0,8)+"…";
+    cardSet("keys",
+      cardRow("API key",`<code>${esc(masked)}</code>`)+
+      cardRow("Devices",devices.size||"—")+
+      cardRow("Audit chain",d.chain_valid?`<span style="color:${V.g}">verified</span>`:`<span style="color:#8c7a2d">—</span>`));
+  }catch(e){cardErr("transfer",e.message);cardErr("activity",e.message);cardErr("keys",e.message)}
+}
+
+function loadCards(){
+  if(!apiKey)return;
+  loadAccountPlan();
+  loadStreamCard();
+  loadAuditCards();
+}
+
+function waitlistSign(){alert('Email privacy@paramant.app with subject "ParaSign waitlist" to be notified when browser-side post-quantum signing lands.')}
+function rotateKey(){alert("Key rotation currently runs via the admin script / SDK. A self-service web flow is coming soon.")}
+
 function render(){
   if(!apiKey){
     document.getElementById("root").innerHTML=`
@@ -527,6 +634,48 @@ function render(){
 
   <div style="max-width:1100px;margin:0 auto;padding:28px 40px">
     <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
+
+    <div class="cards-grid">
+      <article class="card" data-card="account">
+        <header class="card-header"><h2>Account</h2></header>
+        <div class="card-body"><p class="card-loading">Loading...</p></div>
+      </article>
+
+      <article class="card" data-card="plan">
+        <header class="card-header"><h2>Plan</h2></header>
+        <div class="card-body"><p class="card-loading">Loading...</p></div>
+        <footer class="card-footer"><a href="/pricing">Pricing</a></footer>
+      </article>
+
+      <article class="card card-wide" data-card="transfer">
+        <header class="card-header"><h2>Transfer</h2><span class="card-sub">Send / ParaShare / ParaDrop</span></header>
+        <div class="card-body"><p class="card-loading">Loading transfers...</p></div>
+        <footer class="card-footer"><a href="/send">Send a file</a><a href="/parashare">ParaShare</a><a href="/drop">ParaDrop</a></footer>
+      </article>
+
+      <article class="card" data-card="sign">
+        <header class="card-header"><h2>Sign</h2><span class="badge-coming">Coming soon</span></header>
+        <div class="card-body"><p class="empty-state-card">ParaSign: browser-side post-quantum document signing. In development.</p></div>
+        <footer class="card-footer"><button onclick="waitlistSign()">Notify me</button></footer>
+      </article>
+
+      <article class="card" data-card="stream">
+        <header class="card-header"><h2>Stream</h2><span class="card-sub">Ghost Pipe</span></header>
+        <div class="card-body"><p class="card-loading">Loading status...</p></div>
+        <footer class="card-footer"><a href="/docs">Stream docs</a></footer>
+      </article>
+
+      <article class="card" data-card="keys">
+        <header class="card-header"><h2>Keys</h2></header>
+        <div class="card-body"><p class="card-loading">Loading...</p></div>
+        <footer class="card-footer"><button onclick="rotateKey()">Rotate key</button><a href="/docs#api">Key docs</a></footer>
+      </article>
+
+      <article class="card card-wide" data-card="activity">
+        <header class="card-header"><h2>Recent activity</h2><a href="/ct-log" class="card-link">CT log &rarr;</a></header>
+        <div class="card-body"><p class="card-loading">Loading...</p></div>
+      </article>
+    </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:${V.b};border:1px solid ${V.b};margin-bottom:24px" id="stats-grid">
       ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};padding:20px"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-lg" style="margin-top:10px"></div></div>`).join("")}
@@ -596,6 +745,7 @@ function render(){
   renderHealthBar();
   if(data)softRender();
   fetchMonitor();
+  loadCards();
 
   if(data&&data.audit&&data.audit.length){
     document.getElementById("audit-log").innerHTML=data.audit.map(e=>
@@ -622,7 +772,7 @@ function login(){
   render();setInterval(fetchMonitor,5000);
 }
 function logout(){apiKey="";data=null;testLog=[];render()}
-function changeRelay(u){relay=RELAYS.find(r=>r.u===u)||RELAYS[0];fetchMonitor()}
+function changeRelay(u){relay=RELAYS.find(r=>r.u===u)||RELAYS[0];fetchMonitor();loadCards()}
 
 fetchHealth();setInterval(fetchHealth,30000);render();
 </script>
