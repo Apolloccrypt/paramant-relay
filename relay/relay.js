@@ -80,6 +80,7 @@ const cryptoMode = require('./crypto/bootstrap').bootstrap();
 log('info', 'crypto_mode_loaded', { mode: cryptoMode });
 const wireFormat = require('./crypto/wire-format');
 const cryptoErrors = require('./crypto/errors');
+const parasign = require('./parasign');
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -152,14 +153,16 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup'],
+               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sign','/v2/verify'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
-               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup'],
+               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sign','/v2/verify'],
   full:       null,
 };
 
@@ -605,6 +608,28 @@ function ctAppendTransfer(blobHash, sector) {
   ctWrite(entry);
   const sth = produceSth(entry.index + 1, entry.tree_hash);
   return { ...entry, sth };
+}
+
+// Appends a ParaSign signing event to the CT log (R017). Commits to the
+// document hash and the signer public-key hash -- never to document content.
+// Leaf hash reuses ctLeafHash(identityHash, keyHex, ts) with the signer
+// public-key hash as identity and the document hash as the committed value.
+function ctAppendParasign(documentHashHex, signerPkHash) {
+  const ts = new Date().toISOString();
+  const leaf_hash = ctLeafHash(signerPkHash, documentHashHex, ts);
+  const index = ctLog.length;
+  const allEntries = [...ctLog, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, index);
+  const entry = {
+    index, type: 'parasign', leaf_hash, tree_hash,
+    document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
+  };
+  ctLog.push(entry);
+  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWrite(entry);
+  produceSth(entry.index + 1, entry.tree_hash);
+  return entry;
 }
 
 // ── Signed Tree Head — produce, sign, and persist an STH for every root change ─
@@ -3844,6 +3869,81 @@ python3 paramant-receiver.py \\
         pw_protected:     !!entry.pw_hash,
       }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/sign — ParaSign notary (R017) ───────────────────────────────────
+  // The signature is made client-side; this relay NEVER receives a private key
+  // and never receives document content -- only the SHA3-256 hash, the signer's
+  // ML-DSA-65 signature, and the signer's public key. The relay verifies the
+  // signature, logs it to the CT tree, and counter-signs the .psign envelope.
+  if (path === '/v2/sign' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 65536)).toString());
+      const documentHash = (d.document_hash || '').toString().trim().toLowerCase();
+      const signatureB64 = (d.signature || '').toString();
+      const signerPubB64 = (d.signer_public_key || '').toString();
+      const signerLabel  = d.signer_label ? d.signer_label.toString().slice(0, 256) : null;
+      const ttlDays      = Number.isFinite(d.ttl_days) ? d.ttl_days : 365;
+
+      if (!/^[0-9a-f]{64}$/.test(documentHash)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'document_hash must be a 64-char SHA3-256 hex string' })); }
+      if (!signatureB64 || !signerPubB64)       { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signature and signer_public_key are required' })); }
+
+      // Refuse to notarise a signature that does not verify against the supplied key.
+      let signerOk = false;
+      try {
+        signerOk = registry.getSig(0x0002).verify(
+          Buffer.from(signatureB64, 'base64'),
+          Buffer.from(documentHash, 'hex'),
+          Buffer.from(signerPubB64, 'base64'));
+      } catch (e) { signerOk = false; }
+      if (!signerOk) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer signature does not verify against signer_public_key' })); }
+
+      const signerPkHash = crypto.createHash('sha3-256').update(Buffer.from(signerPubB64, 'base64')).digest('hex');
+      const ctEntry = ctAppendParasign(documentHash, signerPkHash);
+
+      const envelope = parasign.buildEnvelope(
+        { documentHashHex: documentHash, signatureB64, signerPubB64, signerLabel, ttlDays, ctLogIndex: ctEntry.index },
+        { relaySign: (msg) => registry.getSig(0x0002).sign(msg, relayIdentity.sk), relayPkHash: relayIdentity.pk_hash });
+
+      log('info', 'parasign_signed', { ct_index: ctEntry.index, signer_pk_hash: signerPkHash.slice(0, 16) + '…' });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, envelope }));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
+  // ── POST /v2/verify — ParaSign envelope verification (R017, public) ──────────
+  // Stateless. The same checks run client-side; this is a convenience endpoint.
+  if (path === '/v2/verify' && req.method === 'POST') {
+    if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 65536)).toString());
+      if (!d.envelope) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope required' })); }
+      const documentHashHex = d.document_hash ? d.document_hash.toString().trim().toLowerCase() : null;
+
+      const result = parasign.verifyEnvelope(
+        { documentHashHex, envelope: d.envelope },
+        { sigVerify: (sig, msg, pub) => { try { return registry.getSig(0x0002).verify(sig, msg, pub); } catch (e) { return false; } },
+          relayPub: relayIdentity.pk });
+
+      // The envelope signature can only be checked here if THIS relay notarised it.
+      if (d.envelope.notary && d.envelope.notary.relay_pk_hash && d.envelope.notary.relay_pk_hash !== relayIdentity.pk_hash) {
+        result.note = 'envelope was notarised by a different relay; verify its envelope_signature against notary.relay_pubkey_url';
+      }
+
+      const out = { valid: result.valid, errors: result.errors, verified_at: new Date().toISOString(),
+        signer_label: (d.envelope.signer && d.envelope.signer.label) || null };
+      if (result.note) out.note = result.note;
+      res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
+      return res.end(J(out));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
   }
 
   // ── POST /v2/verify-receipt — Verify a signed delivery receipt ───────────────

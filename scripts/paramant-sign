@@ -1,0 +1,154 @@
+#!/usr/bin/env node
+'use strict';
+// paramant-sign -- ParaSign CLI (ParaSign Sg1 step 3, R017).
+//
+// Signing happens LOCALLY. The signer's private key (a 32-byte seed) never
+// leaves this machine; only the document hash, the signature, and the public
+// key are sent to the relay, which notarises them into a .psign envelope.
+//
+// Usage:
+//   paramant-sign keygen [--out key.json]
+//   paramant-sign sign   --key key.json --document FILE [--out FILE.psign]
+//                        [--label NAME] [--ttl-days N] [--relay URL] [--api-key K]
+//   paramant-sign verify --psign FILE.psign --document FILE [--relay URL]
+//
+// Env: PARAMANT_RELAY (default https://relay.paramant.app), PARAMANT_API_KEY.
+
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
+
+function loadMlDsa() {
+  let mod;
+  try { mod = require('@noble/post-quantum/ml-dsa.js'); }
+  catch (_) { mod = require(path.join(__dirname, '../relay/node_modules/@noble/post-quantum/ml-dsa.js')); }
+  return mod.ml_dsa65;
+}
+
+function sha3hex(buf) { return crypto.createHash('sha3-256').update(buf).digest('hex'); }
+function die(msg) { console.error('error: ' + msg); process.exit(1); }
+
+function parseArgs(argv) {
+  const out = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) { out[a.slice(2)] = (argv[i + 1] && !argv[i + 1].startsWith('--')) ? argv[++i] : true; }
+    else out._.push(a);
+  }
+  return out;
+}
+
+function postJson(urlStr, headers, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const lib = u.protocol === 'http:' ? http : https;
+    const body = Buffer.from(JSON.stringify(bodyObj));
+    const req = lib.request({
+      hostname: u.hostname, port: u.port || (u.protocol === 'http:' ? 80 : 443),
+      path: u.pathname + u.search, method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json', 'Content-Length': body.length }, headers),
+    }, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => { try { resolve({ status: res.statusCode, json: JSON.parse(d) }); } catch (e) { resolve({ status: res.statusCode, json: { raw: d } }); } });
+    });
+    req.on('error', reject); req.write(body); req.end();
+  });
+}
+
+function cmdKeygen(args) {
+  const out = typeof args.out === 'string' ? args.out : 'paramant-key.json';
+  const mlDsa = loadMlDsa();
+  const seed = crypto.randomBytes(32);
+  const kp = mlDsa.keygen(seed);
+  const record = {
+    algorithm: 'ML-DSA-65',
+    note: 'PRIVATE KEY. The "seed" is your signing key -- keep it secret, never commit it.',
+    seed: seed.toString('hex'),
+    public_key: Buffer.from(kp.publicKey).toString('base64'),
+  };
+  fs.writeFileSync(out, JSON.stringify(record, null, 2), { mode: 0o600 });
+  console.log('wrote ' + out + ' (mode 600).');
+  console.log('public key (base64): ' + record.public_key.slice(0, 32) + '...');
+  console.log('KEEP THIS FILE SECRET. It is the only copy of your signing key.');
+}
+
+async function cmdSign(args) {
+  if (!args.key || !args.document) die('sign needs --key and --document');
+  const mlDsa = loadMlDsa();
+  const relay = args.relay || process.env.PARAMANT_RELAY || 'https://relay.paramant.app';
+  const apiKey = args['api-key'] || process.env.PARAMANT_API_KEY || '';
+  if (!apiKey) die('an API key is required (--api-key or PARAMANT_API_KEY)');
+
+  const key = JSON.parse(fs.readFileSync(args.key, 'utf8'));
+  if (!key.seed) die('key file has no "seed"');
+  const kp = mlDsa.keygen(Buffer.from(key.seed, 'hex'));
+
+  const docBuf = fs.readFileSync(args.document);
+  const hashHex = sha3hex(docBuf);
+  // Sign the 32-byte hash locally; the secret key stays here.
+  const signature = mlDsa.sign(kp.secretKey, Buffer.from(hashHex, 'hex'));
+
+  const resp = await postJson(relay.replace(/\/$/, '') + '/v2/sign', { 'X-Api-Key': apiKey }, {
+    document_hash: hashHex,
+    signature: Buffer.from(signature).toString('base64'),
+    signer_public_key: Buffer.from(kp.publicKey).toString('base64'),
+    signer_label: typeof args.label === 'string' ? args.label : undefined,
+    ttl_days: args['ttl-days'] ? Number(args['ttl-days']) : undefined,
+  });
+  if (resp.status !== 200 || !resp.json.envelope) die('relay /v2/sign failed: ' + JSON.stringify(resp.json));
+
+  const out = typeof args.out === 'string' ? args.out : args.document + '.psign';
+  fs.writeFileSync(out, JSON.stringify(resp.json.envelope, null, 2));
+  console.log('signed: ' + out + '  (ct_log_index ' + resp.json.envelope.notary.ct_log_index + ')');
+}
+
+async function cmdVerify(args) {
+  if (!args.psign || !args.document) die('verify needs --psign and --document');
+  const mlDsa = loadMlDsa();
+  const relay = args.relay || process.env.PARAMANT_RELAY || 'https://relay.paramant.app';
+
+  const envelope = JSON.parse(fs.readFileSync(args.psign, 'utf8'));
+  const docBuf = fs.readFileSync(args.document);
+  const hashHex = sha3hex(docBuf);
+
+  // Local checks (no network): document binding + signer signature.
+  const hashOk = hashHex === envelope.document_hash;
+  let signerOk = false;
+  try {
+    signerOk = mlDsa.verify(
+      Buffer.from(envelope.signature, 'base64'),
+      Buffer.from(envelope.document_hash, 'hex'),
+      Buffer.from(envelope.signer.public_key, 'base64'));
+  } catch (e) { signerOk = false; }
+
+  // Notary (envelope) signature: ask the relay (public, no auth).
+  let notary = { reachable: false };
+  try {
+    const resp = await postJson(relay.replace(/\/$/, '') + '/v2/verify', {}, { document_hash: hashHex, envelope });
+    notary = { reachable: true, status: resp.status, result: resp.json };
+  } catch (e) { notary = { reachable: false, error: e.message }; }
+
+  const localValid = hashOk && signerOk;
+  console.log(JSON.stringify({
+    document_hash_matches: hashOk,
+    signer_signature_valid: signerOk,
+    local_verdict: localValid ? 'signer+document OK (notary checked below)' : 'INVALID',
+    signer_label: envelope.signer && envelope.signer.label,
+    notary,
+  }, null, 2));
+  process.exit(localValid && notary.reachable && notary.result && notary.result.valid ? 0 : 1);
+}
+
+(async () => {
+  const args = parseArgs(process.argv.slice(2));
+  const cmd = args._[0];
+  try {
+    if (cmd === 'keygen') return cmdKeygen(args);
+    if (cmd === 'sign') return await cmdSign(args);
+    if (cmd === 'verify') return await cmdVerify(args);
+    console.error('usage: paramant-sign <keygen|sign|verify> [options]  (see header)');
+    process.exit(2);
+  } catch (e) { die(e.message); }
+})();

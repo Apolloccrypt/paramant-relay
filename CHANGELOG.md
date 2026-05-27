@@ -9,6 +9,26 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- ParaSign Sg1 step 3 (issue #49): document signing where the relay is a
+  NOTARY, not a key holder. `POST /v2/sign` (auth) verifies a client-made
+  ML-DSA-65 signature, logs it to the CT tree, and counter-signs a `.psign`
+  envelope with the relay identity; `POST /v2/verify` (public, no auth)
+  validates an envelope statelessly. The relay never receives a signer private
+  key or document content -- only the SHA3-256 hash, the signature, and the
+  signer public key.
+- `relay/parasign.js`: pure `.psign` envelope build/verify, unit-tested in
+  `relay/crypto/parasign.test.js` (valid, hash-mismatch, tampered field,
+  tampered signature, wrong notary key, expired).
+- `scripts/paramant-sign`: node CLI (`keygen` / `sign` / `verify`) that signs
+  locally with `@noble/post-quantum` ML-DSA-65 (byte-equivalent to the relay's
+  `@paramant/core` per ADR-0021) and never sends the key to the relay.
+- R017 ADR: `.psign` envelope format and notary trust model.
+- Deferred to a follow-up: the browser sign/verify UI. It needs in-browser
+  SHA3-256, which the vendored WASM and noble bundle do not yet expose; the
+  secure client-side signing path (seed-based ML-DSA-65 in `crypto-bridge.js`)
+  is already present and waits only on that hash primitive.
+
 ### Added (specification only, no implementation)
 - R016 Open-core split architecture ADR (Accepted): defines the two-repo
   model -- paramant-relay (public, BUSL-1.1) + paramant-management
