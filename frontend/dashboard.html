@@ -39,6 +39,66 @@ a:hover{color:var(--cobalt)}
 .card-entry:last-child{border-bottom:none}
 .card-entry-meta{color:rgba(11,58,106,.45);flex-shrink:0}
 .card-loading{font-size:11px;color:rgba(11,58,106,.45);font-family:'SF Mono','Fira Code',monospace}
+
+/* === v2 dashboard: dark mode, drill-down, search, mobile, skeleton rows === */
+:root[data-theme="dark"]{--bone:#0B1622;--ink:#E8EEF6;--ink-dim:rgba(232,238,246,.65);--cobalt:#5B9BFF}
+[data-theme="dark"] body{background:#0B1622;color:#E8EEF6}
+[data-theme="dark"] .meta-bar,[data-theme="dark"] .nav{background:#0B1622;color:#E8EEF6;border-color:rgba(180,200,230,.15)}
+[data-theme="dark"] .cards-grid{background:rgba(180,200,230,.15);border-color:rgba(180,200,230,.15)}
+[data-theme="dark"] .card{background:#13202E}
+[data-theme="dark"] .card-header,[data-theme="dark"] .card-footer{border-color:rgba(180,200,230,.12)}
+[data-theme="dark"] .card-header h2,[data-theme="dark"] .stat-value{color:#E8EEF6}
+[data-theme="dark"] .stat-row,[data-theme="dark"] .card-entry{border-color:rgba(180,200,230,.08)}
+[data-theme="dark"] .nav-help{color:#98A7BD;border-color:rgba(180,200,230,.2)}
+[data-theme="dark"] a{color:rgba(232,238,246,.65)}
+
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid rgba(11,58,106,.15);background:transparent;color:inherit;cursor:pointer;border-radius:8px;transition:background .15s ease,border-color .15s ease}
+.theme-toggle:hover{border-color:#1D4ED8}
+[data-theme="dark"] .theme-toggle{border-color:rgba(180,200,230,.2)}
+.theme-toggle svg{width:16px;height:16px}
+
+/* clickable drill-down cards */
+.card[data-card]{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.card[data-card]:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(11,58,106,.10)}
+[data-theme="dark"] .card[data-card]:hover{box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.card[data-card]:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}
+.card-footer a,.card-footer button{position:relative;z-index:2}
+
+/* drill-down side panel */
+.side-panel-backdrop{position:fixed;inset:0;background:rgba(11,22,34,.4);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:90}
+.side-panel-backdrop.open{opacity:1;pointer-events:auto}
+.side-panel{position:fixed;right:0;top:0;height:100vh;width:min(460px,100vw);background:var(--bone,#F8FAFC);color:var(--ink,#0B3A6A);border-left:1px solid rgba(11,58,106,.15);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);overflow-y:auto;padding:24px 26px;z-index:100}
+[data-theme="dark"] .side-panel{background:#0F1B28;border-left-color:rgba(180,200,230,.15)}
+.side-panel.open{transform:translateX(0);box-shadow:-8px 0 32px rgba(11,22,34,.18)}
+.side-panel-close{position:absolute;top:18px;right:20px;width:30px;height:30px;border:none;background:none;font-size:24px;line-height:1;color:inherit;cursor:pointer;opacity:.55}
+.side-panel-close:hover{opacity:1}
+.side-panel h3{font-size:16px;margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.side-panel .sp-sub{font-size:11px;font-family:'SF Mono','Fira Code',monospace;color:rgba(11,58,106,.45);letter-spacing:.06em;text-transform:uppercase;margin-bottom:18px}
+[data-theme="dark"] .side-panel .sp-sub{color:rgba(232,238,246,.45)}
+
+/* search */
+.dash-search{position:relative;display:inline-flex;align-items:center}
+.dash-search input{width:200px;max-width:44vw;background:transparent;border:1px solid rgba(11,58,106,.2);border-radius:999px;padding:7px 30px 7px 30px;font-size:12px;color:inherit;outline:none;transition:border-color .15s ease,width .2s ease}
+.dash-search input:focus{border-color:#1D4ED8;width:240px}
+[data-theme="dark"] .dash-search input{border-color:rgba(180,200,230,.25)}
+.dash-search .si{position:absolute;left:10px;width:13px;height:13px;opacity:.5;pointer-events:none}
+.dash-search .kbd{position:absolute;right:11px;font-size:10px;font-family:'SF Mono',monospace;opacity:.45;pointer-events:none}
+.search-hidden{display:none !important}
+
+/* skeleton card body */
+.card-skel{display:flex;flex-direction:column;gap:10px;width:100%}
+
+/* mobile */
+@media (max-width:768px){
+  .dash-wrap{padding:20px 16px !important}
+  .dash-head{padding:22px 16px 16px !important}
+  .dash-2col{grid-template-columns:1fr !important}
+  .side-panel{width:100vw;border-left:none}
+  .dash-search input,.dash-search input:focus{width:130px;max-width:38vw}
+}
+@media (max-width:480px){
+  .card-header h2{font-size:12px}
+}
 </style>
 <meta property="og:title" content="PARAMANT — Developer Dashboard">
 <meta property="og:description" content="PARAMANT — Developer Dashboard">
@@ -286,6 +346,13 @@ a:hover{color:var(--cobalt)}
 </div>
 
 <div id="root"></div>
+
+<div id="side-panel-backdrop" class="side-panel-backdrop" onclick="closeSidePanel()"></div>
+<aside id="side-panel" class="side-panel" aria-label="Detail panel">
+  <button class="side-panel-close" onclick="closeSidePanel()" aria-label="Close panel">&times;</button>
+  <div id="side-panel-content"></div>
+</aside>
+
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 <script>
@@ -296,14 +363,38 @@ const RELAYS=[
   {l:"IoT",u:"https://iot.paramant.app",sector:"iot"},
 ];
 
-// v4 design tokens — cobalt for success/active states, no lime text
-const V={
-  bg:"#F8FAFC", sur:"#EEF2F6", b:"rgba(11,58,106,.15)",
-  t:"#0B3A6A", m:"rgba(11,58,106,.65)", q:"rgba(11,58,106,.45)",
-  g:"#1D4ED8",  // cobalt (#1D4ED8) — v4 success/active indicator
-  font:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
-  mono:"'SF Mono','Fira Code','Cascadia Code',monospace"
+// v4 design tokens — cobalt for success/active states, no lime text.
+// Theme-aware: the SPA interpolates V.x into inline styles, so a theme
+// switch is just reassigning V + re-render (CSS chrome handled by [data-theme]).
+const _FONT="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+const _MONO="'SF Mono','Fira Code','Cascadia Code',monospace";
+const THEMES={
+  light:{bg:"#F8FAFC", sur:"#EEF2F6", b:"rgba(11,58,106,.15)",
+    t:"#0B3A6A", m:"rgba(11,58,106,.65)", q:"rgba(11,58,106,.45)",
+    g:"#1D4ED8", font:_FONT, mono:_MONO},
+  // on-brand deep-navy dark (not pure black) — keeps PARAMANT petrol identity
+  dark:{bg:"#0B1622", sur:"#13202E", b:"rgba(180,200,230,.15)",
+    t:"#E8EEF6", m:"rgba(232,238,246,.70)", q:"rgba(232,238,246,.45)",
+    g:"#5B9BFF", font:_FONT, mono:_MONO}
 };
+function initialTheme(){
+  try{const s=localStorage.getItem("paramant-theme");if(s==="light"||s==="dark")return s}catch{}
+  return (window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";
+}
+let theme=initialTheme();
+let V=THEMES[theme];
+document.documentElement.dataset.theme=theme;
+function applyTheme(t){
+  theme=t;V=THEMES[t];document.documentElement.dataset.theme=t;
+  try{localStorage.setItem("paramant-theme",t)}catch{}
+  render();
+}
+function toggleTheme(){applyTheme(theme==="dark"?"light":"dark")}
+function themeToggleBtn(){
+  const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>';
+  return `<button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle theme">${theme==="dark"?sun:moon}</button>`;
+}
 
 let apiKey="",relay=RELAYS[0],data=null,health={},lastPoll=null,loading=false;
 let testLog=[],testRunning=false;
@@ -337,12 +428,13 @@ async function fetchMonitor(){
   const al=document.getElementById("audit-log");
   if(al&&data&&data.audit&&data.audit.length){
     al.innerHTML=data.audit.map(e=>
-      `<div style="display:flex;gap:20px;font-size:11px;font-family:${V.mono};padding:4px 0;border-bottom:1px solid ${V.b}">
+      `<div data-row-text="${esc((e.leaf_hash||"")+" "+(e.iso||e.ts||""))}" style="display:flex;gap:20px;font-size:11px;font-family:${V.mono};padding:4px 0;border-bottom:1px solid ${V.b}">
         <span style="color:${V.q};flex-shrink:0">${(e.iso||e.ts||"").slice(11,19)||"—"}</span>
         <span style="color:${e.device_hash?"#4a6a9c":V.m}">${esc(e.leaf_hash?(e.leaf_hash).slice(0,16)+"…":"—")}</span>
         <span style="color:${V.q}">index: ${e.index??""}</span>
       </div>`
     ).join("");
+    applySearchFilter();
   } else if(al&&data){
     al.innerHTML=`<div style="font-size:12px;color:${V.q};font-family:${V.mono}">No audit entries</div>`;
   }
@@ -487,7 +579,7 @@ function softRender(){
     if(d.history&&d.history.length){
       dt.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
         <thead><tr>${["Hash","Device","Size","Status","Auth","Age"].map(h=>`<th style="text-align:left;padding:10px 16px;font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;border-bottom:1px solid ${V.b};text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
-        <tbody>${d.history.map((it,i)=>`<tr style="background:${i%2===0?V.bg:V.sur}">
+        <tbody>${d.history.map((it,i)=>`<tr data-row-text="${esc((it.hash||"")+" "+(it.device||""))}" style="background:${i%2===0?V.bg:V.sur}">
           <td style="padding:10px 16px;font-size:11px;color:${V.q};font-family:${V.mono}">${esc(it.hash||"")}</td>
           <td style="padding:10px 16px;font-size:12px;color:${V.m}">${esc(it.device||"—")}</td>
           <td style="padding:10px 16px;font-size:12px;color:${V.m}">${it.size?(it.size/1024).toFixed(1)+"KB":"—"}</td>
@@ -508,7 +600,8 @@ function softRender(){
     }
   }
   const pi=document.getElementById("poll-info");
-  if(pi)pi.textContent=loading?"polling...":lastPoll?"↻ "+lastPoll.toLocaleTimeString():"";
+  if(pi)pi.textContent=loading?"polling...":(ws?"⚡ live · ":"")+(lastPoll?"↻ "+lastPoll.toLocaleTimeString():"");
+  applySearchFilter();
 }
 
 // ── Cards-per-product loader (Lovelace-style) — hergebruikt apiKey/relay + echte relay-endpoints ──
@@ -596,6 +689,7 @@ function render(){
   if(!apiKey){
     document.getElementById("root").innerHTML=`
     <div style="padding:80px 24px 64px">
+      <div style="position:fixed;top:74px;right:24px;z-index:50">${themeToggleBtn()}</div>
       <div style="width:100%;max-width:400px;margin:0 auto">
         <h1 style="font-family:${V.font};font-size:24px;font-weight:700;color:${V.t};letter-spacing:-.02em;margin-bottom:8px">Dashboard</h1>
         <p style="font-size:13px;color:${V.q};margin-bottom:28px;line-height:1.65">Monitor delivery stats, run end-to-end tests, inspect the CT log, and debug your integration.</p>
@@ -615,13 +709,19 @@ function render(){
   }
 
   document.getElementById("root").innerHTML=`
-  <div style="border-bottom:1px solid ${V.b};padding:28px 40px 20px">
+  <div class="dash-head" style="border-bottom:1px solid ${V.b};padding:28px 40px 20px">
     <div style="max-width:1100px;margin:0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
       <div>
         <div style="font-family:${V.mono};font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:${V.q};margin-bottom:6px">Relay: ${relay.l}</div>
         <h1 style="font-family:${V.font};font-size:26px;font-weight:700;letter-spacing:-.02em;color:${V.t}">Dashboard</h1>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding-top:4px;flex-wrap:wrap">
+        <span class="dash-search">
+          <svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="dash-search-input" type="search" placeholder="Search transfers, events..." oninput="onSearch(this.value)" aria-label="Search">
+          <span class="kbd">${navigator.platform.indexOf("Mac")>=0?"&#8984;K":"^K"}</span>
+        </span>
+        ${themeToggleBtn()}
         <select id="rs2" style="background:${V.bg};border:1px solid ${V.b};padding:6px 10px;color:${V.t};font-size:11px;font-family:${V.mono}" onchange="changeRelay(this.value)">
           ${RELAYS.map(r=>`<option value="${r.u}" ${r.u===relay.u?"selected":""}>${r.l}</option>`).join("")}
         </select>
@@ -632,24 +732,24 @@ function render(){
     </div>
   </div>
 
-  <div style="max-width:1100px;margin:0 auto;padding:28px 40px">
+  <div class="dash-wrap" style="max-width:1100px;margin:0 auto;padding:28px 40px">
     <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
 
     <div class="cards-grid">
       <article class="card" data-card="account">
         <header class="card-header"><h2>Account</h2></header>
-        <div class="card-body"><p class="card-loading">Loading...</p></div>
+        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
       </article>
 
       <article class="card" data-card="plan">
         <header class="card-header"><h2>Plan</h2></header>
-        <div class="card-body"><p class="card-loading">Loading...</p></div>
+        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
         <footer class="card-footer"><a href="/pricing">Pricing</a></footer>
       </article>
 
       <article class="card card-wide" data-card="transfer">
         <header class="card-header"><h2>Transfer</h2><span class="card-sub">Send / ParaShare / ParaDrop</span></header>
-        <div class="card-body"><p class="card-loading">Loading transfers...</p></div>
+        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
         <footer class="card-footer"><a href="/send">Send a file</a><a href="/parashare">ParaShare</a><a href="/drop">ParaDrop</a></footer>
       </article>
 
@@ -661,19 +761,19 @@ function render(){
 
       <article class="card" data-card="stream">
         <header class="card-header"><h2>Stream</h2><span class="card-sub">Ghost Pipe</span></header>
-        <div class="card-body"><p class="card-loading">Loading status...</p></div>
+        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
         <footer class="card-footer"><a href="/docs">Stream docs</a></footer>
       </article>
 
       <article class="card" data-card="keys">
         <header class="card-header"><h2>Keys</h2></header>
-        <div class="card-body"><p class="card-loading">Loading...</p></div>
+        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
         <footer class="card-footer"><button onclick="rotateKey()">Rotate key</button><a href="/docs#api">Key docs</a></footer>
       </article>
 
       <article class="card card-wide" data-card="activity">
         <header class="card-header"><h2>Recent activity</h2><a href="/ct-log" class="card-link">CT log &rarr;</a></header>
-        <div class="card-body"><p class="card-loading">Loading...</p></div>
+        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
       </article>
     </div>
 
@@ -681,7 +781,7 @@ function render(){
       ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};padding:20px"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-lg" style="margin-top:10px"></div></div>`).join("")}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="dash-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
         <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">E2E Test trail</span>
@@ -764,15 +864,136 @@ function render(){
   }
 }
 
+let pollTimer=null,ws=null,wsRetry=null,refreshT=null;
+
+// ── Real-time stream via /v2/stream (ticket-auth). Polling stays as a
+//    fallback/safety-net, so nothing breaks if WS is unavailable. ──
+async function setupRealtimeStream(){
+  if(!apiKey)return;
+  closeStream();
+  let ticket;
+  try{
+    const r=await fetch(relay.u+"/v2/ws-ticket",{method:"POST",headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(6000)});
+    if(!r.ok)return; // relay/mode without WS → keep polling
+    ticket=(await r.json()).ticket;
+  }catch{return}
+  if(!ticket)return;
+  try{
+    ws=new WebSocket(relay.u.replace(/^http/,"ws")+"/v2/stream?ticket="+encodeURIComponent(ticket));
+  }catch{return}
+  ws.onmessage=(e)=>{
+    let msg;try{msg=JSON.parse(e.data)}catch{return}
+    if(msg.type==="blob_ready"){
+      // debounce: a burst of events → one refresh
+      clearTimeout(refreshT);
+      refreshT=setTimeout(()=>{fetchMonitor();loadCards()},250);
+      const pi=document.getElementById("poll-info");
+      if(pi)pi.textContent="⚡ live";
+    }
+  };
+  ws.onclose=()=>{ws=null;if(apiKey){clearTimeout(wsRetry);wsRetry=setTimeout(setupRealtimeStream,5000)}};
+  ws.onerror=()=>{try{ws&&ws.close()}catch{}};
+}
+function closeStream(){clearTimeout(wsRetry);if(ws){try{ws.onclose=null;ws.close()}catch{}ws=null}}
+
 function login(){
   const k=document.getElementById("ki").value.trim();
   const u=document.getElementById("rs").value;
   if(!k.startsWith("pgp_"))return;
   apiKey=k;relay=RELAYS.find(r=>r.u===u)||RELAYS[0];
-  render();setInterval(fetchMonitor,5000);
+  render();
+  if(!pollTimer)pollTimer=setInterval(fetchMonitor,5000);
+  setupRealtimeStream();
 }
-function logout(){apiKey="";data=null;testLog=[];render()}
-function changeRelay(u){relay=RELAYS.find(r=>r.u===u)||RELAYS[0];fetchMonitor();loadCards()}
+function logout(){apiKey="";data=null;testLog=[];if(pollTimer){clearInterval(pollTimer);pollTimer=null}closeStream();closeSidePanel();render()}
+function changeRelay(u){relay=RELAYS.find(r=>r.u===u)||RELAYS[0];fetchMonitor();loadCards();setupRealtimeStream()}
+
+// ── Client-side search/filter across audit-log, deliveries, activity ──
+let searchQuery="";
+function onSearch(v){
+  searchQuery=(v||"").trim().toLowerCase();
+  applySearchFilter();
+}
+function applySearchFilter(){
+  const q=searchQuery;
+  // rows that carry data-row-text get filtered; empty query shows all
+  document.querySelectorAll("[data-row-text]").forEach(el=>{
+    const hit=!q||el.getAttribute("data-row-text").toLowerCase().includes(q);
+    el.classList.toggle("search-hidden",!hit);
+  });
+  document.querySelectorAll("[data-search-scope]").forEach(scope=>{
+    const visible=scope.querySelectorAll("[data-row-text]:not(.search-hidden)").length;
+    const empty=scope.querySelector("[data-search-empty]");
+    if(empty)empty.classList.toggle("search-hidden",!q||visible>0);
+  });
+}
+
+// ── Drill-down side panel ──
+function spRow(l,v){return `<div class="stat-row"><span class="stat-label">${l}</span><span class="stat-value">${v}</span></div>`}
+function sidePanelContent(type){
+  const d=data||{};const dl=d.delivery||{};const st=d.stats||{};
+  const A=(d.audit||[]);
+  if(type==="account")return `<h3>Account</h3><div class="sp-sub">connection</div>`+
+    spRow("Relay",esc(relay.l))+spRow("Endpoint",esc(relay.u.replace("https://","")))+
+    spRow("Sector",esc(relay.sector))+spRow("Region","eu/de")+spRow("Storage","RAM only")+
+    spRow("API key",`<code>${esc((apiKey||"").slice(0,12))}…</code>`);
+  if(type==="plan")return `<h3>Plan &amp; usage</h3><div class="sp-sub">this relay</div>`+
+    spRow("Sent total",dl.total??st.inbound??"—")+spRow("Acknowledged",dl.acked??"—")+
+    spRow("Success rate",dl.success_rate!=null?dl.success_rate+"%":"—")+
+    spRow("Burned",st.burned??"—")+spRow("Max file","5 MB")+
+    `<div style="margin-top:18px"><a href="/pricing" style="color:#1D4ED8">View pricing →</a></div>`;
+  if(type==="transfer"||type==="activity"){
+    const title=type==="transfer"?"Transfer history":"Audit trail";
+    const rows=(d.history&&d.history.length)?d.history:A;
+    const body=rows&&rows.length
+      ? `<div data-search-scope>`+rows.map(it=>{
+          const label=esc(it.hash||it.event||it.leaf_hash||"");
+          const meta=esc(it.device||it.sent_ts&&(Math.round((Date.now()-it.sent_ts)/1000)+"s")||(it.ts||"").slice(11,19)||"");
+          return `<div class="card-entry" data-row-text="${label} ${meta}"><span>${label.slice(0,28)}</span><span class="card-entry-meta">${meta}</span></div>`;
+        }).join("")+`<div class="empty-state-card search-hidden" data-search-empty>No matches.</div></div>`
+      : `<p class="empty-state-card">Nothing here yet.</p>`;
+    return `<h3>${title}</h3><div class="sp-sub">${rows?rows.length:0} entries · searchable</div>`+body;
+  }
+  if(type==="stream")return `<h3>Stream</h3><div class="sp-sub">Ghost Pipe · ${ws?"live":"polling"}</div>`+
+    spRow("Blobs in flight",d.blobs_in_flight??"—")+spRow("Inbound total",st.inbound??"—")+
+    spRow("Webhooks sent",st.webhooks_sent??"—")+spRow("Connection",ws?"WebSocket (real-time)":"5s polling")+
+    `<p class="empty-state-card" style="margin-top:16px">Events stream over /v2/stream when the relay pushes blob_ready; otherwise the dashboard polls /v2/monitor every 5s.</p>`;
+  if(type==="keys")return `<h3>Keys &amp; devices</h3><div class="sp-sub">this key</div>`+
+    spRow("API key",`<code>${esc((apiKey||"").slice(0,12))}…</code>`)+
+    spRow("Audit chain",d.chain_valid?"verified":"—")+
+    `<div style="margin-top:18px"><button onclick="rotateKey()" class="btn btn-secondary" style="font-size:11px;padding:8px 14px;cursor:pointer">Rotate key</button></div>`;
+  if(type==="sign")return `<h3>ParaSign</h3><div class="sp-sub">coming soon</div>`+
+    `<p class="empty-state-card">Browser-side post-quantum document signing. In development.</p>`+
+    `<div style="margin-top:16px"><button onclick="waitlistSign()" class="btn btn-secondary" style="font-size:11px;padding:8px 14px;cursor:pointer">Notify me</button></div>`;
+  return `<h3>${esc(type)}</h3>`;
+}
+function openSidePanel(type){
+  const p=document.getElementById("side-panel");
+  const bd=document.getElementById("side-panel-backdrop");
+  const c=document.getElementById("side-panel-content");
+  if(!p||!c)return;
+  c.innerHTML=sidePanelContent(type);
+  p.classList.add("open");if(bd)bd.classList.add("open");
+  applySearchFilter();
+}
+function closeSidePanel(){
+  const p=document.getElementById("side-panel");
+  const bd=document.getElementById("side-panel-backdrop");
+  if(p)p.classList.remove("open");if(bd)bd.classList.remove("open");
+}
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Escape")closeSidePanel();
+  if((e.metaKey||e.ctrlKey)&&(e.key==="k"||e.key==="K")){
+    const s=document.getElementById("dash-search-input");
+    if(s){e.preventDefault();s.focus()}
+  }
+});
+// Delegated card-click → drill-down. Ignore clicks on links/buttons in footers.
+document.addEventListener("click",(e)=>{
+  if(e.target.closest("a,button"))return;
+  const card=e.target.closest("[data-card]");
+  if(card)openSidePanel(card.getAttribute("data-card"));
+});
 
 fetchHealth();setInterval(fetchHealth,30000);render();
 </script>
