@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verify signature — PARAMANT</title>
+<meta name="description" content="Verify a .psign envelope against the original document. ML-DSA-65 (FIPS 204).">
+<link rel="canonical" href="https://paramant.app/verify">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=19">
+<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/components-parasign.css?v=1">
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div class="meta-bar">
+  <span class="">build 3.0.0</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
+        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
+        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
+        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
+        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
+        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
+        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
+        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
+        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
+        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
+        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
+        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
+        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li class="nav-subheader" role="presentation">Standards</li>
+        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
+        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
+        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
+        <li class="nav-subheader" role="presentation">Sovereignty</li>
+        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
+        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
+        <li class="nav-subheader" role="presentation">OT</li>
+        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
+        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
+        <li class="nav-subheader" role="presentation">Post-quantum</li>
+        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
+        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
+        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
+        <li class="nav-subheader" role="presentation">Legal</li>
+        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
+      </ul>
+    </li>
+
+    <li><a href="/vs" class="nav-link">Compare</a></li>
+
+    <li class="nav-dropdown">
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
+      <ul class="nav-dropdown-menu" role="menu">
+        <li role="none"><a href="/status" role="menuitem">Status</a></li>
+        <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
+        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
+        <li role="none"><a href="/license" role="menuitem">License</a></li>
+        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
+        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
+      </ul>
+    </li>
+
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<main id="main-content" role="main">
+<div class="ps-wrap">
+  <header class="ps-head">
+    <p class="ps-kicker">Verify signature</p>
+    <h1 class="ps-title">Verify a .psign envelope</h1>
+    <p class="ps-lede">Check that a document has not been altered since signing. The document never leaves your browser &mdash; only its SHA3-256 hash and the envelope are sent.</p>
+  </header>
+
+  <section class="card ps-panel" aria-labelledby="v1">
+    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Original document</h2></div>
+    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Choose the original document</span><span class="ps-file-meta" id="vf-document-info">No file selected</span></label>
+  </section>
+
+  <section class="card ps-panel" aria-labelledby="v2">
+    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope &amp; key</h2></div>
+    <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
+    <div class="ps-field">
+      <label class="ps-label" for="vf-api-key">API key (X-Api-Key)</label>
+      <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
+      <p class="ps-warn">The verify endpoint currently requires an API key. (Fully account-free, client-side verification is a planned enhancement.)</p>
+    </div>
+  </section>
+
+  <section class="card ps-panel" aria-labelledby="v3">
+    <div class="ps-panel-head"><span class="ps-step">3</span><h2 id="v3" class="ps-panel-title">Verify</h2></div>
+    <button class="btn btn-primary" id="vf-verify" type="button" disabled>Verify signature</button>
+    <div class="ps-result" id="vf-result" hidden role="status" aria-live="polite"></div>
+  </section>
+
+  <aside class="ps-info">
+    <h2>What is checked</h2>
+    <ul>
+      <li>SHA3-256 of your document matches the hash inside the envelope</li>
+      <li>The signer's ML-DSA-65 signature over that hash is valid</li>
+      <li>The relay's notary signature over the envelope is valid</li>
+      <li>The envelope has not expired</li>
+    </ul>
+    <p><a href="/sign">Sign a document &rarr;</a></p>
+  </aside>
+</div>
+</main>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Trust</div>
+        <div class="footer-links">
+          <a href="/status">Status</a>
+          <a href="/security">Security</a>
+          <a href="/trust">Trust</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/sla">SLA</a>
+          <a href="/compliance/nis2">Compliance overview</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/setup">Setup wizard</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Connect</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/signup">Create account</a>
+          <a href="/auth/login">Sign in</a>
+          <a href="/help">Help</a>
+          <a href="/partners">Partners</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=12" defer></script>
+<script src="/js/nav-auth.js" defer></script>
+<script type="module" src="/parasign-verify.js?v=1"></script>
+</body>
+</html>

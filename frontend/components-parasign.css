@@ -1,0 +1,73 @@
+/* ParaSign page components (/sign, /verify).
+ * Uses ONLY design-system.css tokens (--ink, --bone, --space-*, etc.).
+ * No hardcoded colors, no invented tokens. Dark mode follows .dark via tokens. */
+
+.ps-wrap { max-width: 760px; margin: var(--space-6) auto; padding: 0 var(--space-4); }
+.ps-head { margin-bottom: var(--space-6); }
+.ps-kicker {
+  font-family: var(--mono); font-size: var(--text-xs); letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-dim); margin: 0 0 var(--space-2);
+}
+.ps-title { font-size: var(--text-3xl); margin: 0 0 var(--space-2); line-height: 1.1; }
+.ps-lede { color: var(--ink-dim); font-size: var(--text-md); line-height: 1.5; margin: 0; }
+
+.ps-panel { margin-bottom: var(--space-4); }
+.ps-panel-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+.ps-step {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.6rem; height: 1.6rem; flex: 0 0 1.6rem; border-radius: 50%;
+  background: var(--navy); color: var(--bone); font-family: var(--mono);
+  font-size: var(--text-xs); font-weight: 700;
+}
+.ps-panel-title { font-size: var(--text-lg); margin: 0; }
+.ps-help { color: var(--ink-dim); font-size: var(--text-sm); line-height: 1.5; margin: 0 0 var(--space-4); }
+
+.ps-btn-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+
+.ps-file {
+  display: block; padding: var(--space-5); border: 1.5px dashed var(--ink-hair);
+  border-radius: 10px; text-align: center; cursor: pointer; background: var(--ink-ghost);
+  transition: border-color .15s, background .15s;
+}
+.ps-file:hover { border-color: var(--navy); }
+.ps-file input[type=file] { display: none; }
+.ps-file-cta { display: block; font-weight: 600; margin-bottom: var(--space-1); }
+.ps-file-meta { display: block; font-family: var(--mono); font-size: var(--text-xs); color: var(--ink-dim); }
+
+.ps-field { margin-top: var(--space-4); }
+.ps-label { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--ink-dim); margin-bottom: var(--space-2); }
+.ps-input {
+  width: 100%; padding: var(--space-3); border: 1.5px solid var(--ink-hair);
+  border-radius: 8px; font-size: var(--text-md); background: var(--bone);
+  color: var(--ink); font-family: var(--sans);
+}
+.ps-input.mono { font-family: var(--mono); }
+.ps-input:focus { outline: none; border-color: var(--navy); }
+
+.ps-kv { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-5); font-size: var(--text-sm); }
+.ps-kv dt { color: var(--ink-dim); }
+.ps-kv dd { margin: 0; }
+.mono { font-family: var(--mono); font-size: var(--text-xs); word-break: break-all; }
+
+.ps-keybox { background: var(--ink-ghost); border-radius: 8px; padding: var(--space-4); margin-top: var(--space-4); }
+.ps-warn { margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--ink-dim); }
+
+.ps-banner { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: 8px; font-size: var(--text-sm); border-left: 3px solid var(--ink-hair); background: var(--ink-ghost); color: var(--ink); }
+.ps-banner.info { border-left-color: var(--navy); }
+.ps-banner.ok   { border-left-color: var(--lime); }
+.ps-banner.err  { border-left-color: var(--ink); background: var(--bone-2); }
+
+.ps-result { margin-top: var(--space-4); padding: var(--space-4); border-radius: 8px; background: var(--ink-ghost); }
+.ps-result .ps-btn-row { margin-top: var(--space-4); }
+
+.ps-info { margin-top: var(--space-6); padding: var(--space-5); background: var(--ink-ghost); border-radius: 12px; }
+.ps-info h2 { font-size: var(--text-md); margin: 0 0 var(--space-3); }
+.ps-info p, .ps-info li { font-size: var(--text-sm); color: var(--ink-dim); line-height: 1.5; }
+.ps-info ul { margin: 0; padding-left: var(--space-5); }
+
+@media (max-width: 600px) {
+  .ps-wrap { margin: var(--space-4) auto; }
+  .ps-title { font-size: var(--text-2xl); }
+  .ps-btn-row { flex-direction: column; align-items: stretch; }
+  .ps-btn-row .btn { width: 100%; }
+}
