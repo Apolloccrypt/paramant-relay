@@ -86,6 +86,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   R005 (web onboarding wizard) en R007 (add-on architecture) als
   coming-soon vermeld. Versie-nummers bewust ongemoeid (intern 3.0.0 vs
   marketing build 2.5.0).
+- New customer-facing `/trust` page (`frontend/trust.html`): plain-language
+  transparency on how license-check works, what Paramant can and cannot see
+  of a relay, how to verify a deployment (source / image / planned signed
+  releases / CT log), and which remote actions are possible versus
+  structurally impossible. Every claim tagged Live or Planned; planned items
+  link to the public protocol ADRs (R013 licensing, R014 management plane,
+  R015 releases, R016 open-core). Linked from the About nav and footer on all
+  pages, plus cross-refs from `/docs` and `/security`.
 
 ### Repository
 - `scripts/` in `paramant-relay` is now the single source of truth for all CLI tools — previously split between this repo and `ParamantOS/nixos/scripts/`
