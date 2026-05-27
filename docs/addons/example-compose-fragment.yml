@@ -1,0 +1,15 @@
+# docker-compose.fragment.yml
+# This is merged into the relay's docker-compose runtime by the
+# paramant-addon-enable script.
+
+services:
+  paramant-addon-storage-mirror:
+    image: ghcr.io/apolloccrypt/paramant-addon-storage-mirror:1.0.0
+    restart: unless-stopped
+    env_file:
+      - ./addons/storage-mirror/config/env
+    depends_on:
+      - relay-main
+    networks:
+      - paramant-net
+    # No exposed ports - communicates outbound only to relay and S3
