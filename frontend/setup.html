@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paramant - First-time setup</title>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/nav.css">
+</head>
+<body>
+  <main class="setup-wizard" style="max-width:640px;margin:48px auto;padding:0 20px">
+    <h1>Paramant first-time setup</h1>
+    <p>Take about 5 minutes to configure your relay. This wizard runs once;
+       it closes itself after your first user is created.</p>
+
+    <noscript>
+      <p><strong>JavaScript is required for this wizard.</strong> You can
+         still configure the relay by hand: edit <code>.env</code> and use
+         <code>scripts/paramant-key-add.sh</code>.</p>
+    </noscript>
+
+    <div class="step" data-step="1">
+      <h2>Step 1 of 6: Choose your sectors</h2>
+      <p>Each sector is a relay for a specific compliance domain.</p>
+      <label><input type="checkbox" name="sector-general" checked> General relay</label><br>
+      <label><input type="checkbox" name="sector-health"> Health (NEN 7510)</label><br>
+      <label><input type="checkbox" name="sector-finance"> Finance (NIS2/DORA)</label><br>
+      <label><input type="checkbox" name="sector-legal"> Legal (eIDAS)</label><br>
+      <label><input type="checkbox" name="sector-iot"> IoT (IEC 62443)</label>
+      <div class="actions"><button class="next" type="button">Next</button></div>
+    </div>
+
+    <div class="step" data-step="2" hidden>
+      <h2>Step 2 of 6: Domain and TLS</h2>
+      <p>What domain will users reach this relay on?</p>
+      <input type="text" name="domain" placeholder="relay.your-org.com" required>
+      <label><input type="checkbox" name="auto-tls" checked> Automatically obtain TLS via Let's Encrypt</label>
+      <p class="hint">Requires DNS A records for each sector subdomain.</p>
+      <div class="actions">
+        <button class="back" type="button">Back</button>
+        <button class="next" type="button">Next</button>
+      </div>
+    </div>
+
+    <div class="step" data-step="3" hidden>
+      <h2>Step 3 of 6: Admin email and security</h2>
+      <input type="email" name="admin-email" required placeholder="you@your-org.com">
+      <label><input type="checkbox" name="enable-totp" checked> Enable TOTP for admin login</label>
+      <div class="actions">
+        <button class="back" type="button">Back</button>
+        <button class="next" type="button">Next</button>
+      </div>
+    </div>
+
+    <div class="step" data-step="4" hidden>
+      <h2>Step 4 of 6: First user account</h2>
+      <p>Create your first user API key. You will receive it by email.</p>
+      <input type="email" name="first-user-email" required placeholder="user@your-org.com">
+      <input type="text" name="first-user-label" placeholder="my-laptop">
+      <select name="first-user-plan">
+        <option value="pro">Pro</option>
+        <option value="enterprise">Enterprise (requires PLK_KEY)</option>
+      </select>
+      <div class="actions">
+        <button class="back" type="button">Back</button>
+        <button class="next" type="button">Next</button>
+      </div>
+    </div>
+
+    <div class="step" data-step="5" hidden>
+      <h2>Step 5 of 6: Compliance template</h2>
+      <p>We will preset retention, audit, and TTL defaults for your use case.</p>
+      <select name="compliance-template">
+        <option value="generic">Generic (NIS2 baseline)</option>
+        <option value="nen7510">NEN 7510 (Dutch healthcare)</option>
+        <option value="iec62443">IEC 62443 (OT/SCADA)</option>
+        <option value="dora">DORA (financial entities)</option>
+        <option value="custom">Custom (configure manually later)</option>
+      </select>
+      <div class="actions">
+        <button class="back" type="button">Back</button>
+        <button class="next" type="button">Next</button>
+      </div>
+    </div>
+
+    <div class="step" data-step="6" hidden>
+      <h2>Step 6 of 6: Review and start</h2>
+      <p>Review your configuration before applying it.</p>
+      <pre id="review-summary" aria-live="polite"></pre>
+      <div class="actions">
+        <button class="back" type="button">Back</button>
+        <button id="apply" type="button">Apply configuration</button>
+      </div>
+      <p id="apply-status" class="hint"></p>
+    </div>
+
+    <div class="step" data-step="done" hidden>
+      <h2>Setup complete</h2>
+      <p>Your relay is configured. Sign in to the dashboard to send your
+         first file.</p>
+      <a href="/auth/login" class="btn">Sign in</a>
+    </div>
+  </main>
+
+  <script src="/setup.js"></script>
+</body>
+</html>

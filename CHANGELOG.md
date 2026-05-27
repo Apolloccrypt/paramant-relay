@@ -9,6 +9,18 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (specification only, no implementation)
+- R007 Add-on architecture ADR: defines manifest format
+  (paramant-addon.json), capability-based permission model
+  (read:blob-metadata, subscribe:stream, etc), three communication
+  channels (webhook, WebSocket, NATS), docker-compose extension
+  lifecycle, and registry structure (official + community + local).
+- docs/addons/ directory with README + example manifest + example
+  compose fragment.
+- Zero-knowledge guarantee preserved: no capability grants access
+  to plaintext, keys, or signatures. Add-ons work on ciphertext +
+  metadata only.
+
 ### CLI
 - 12 new operator tools added to `scripts/` and available via `install-client.sh`:
   - **Sector tools:** `paramant-cra`, `paramant-firmware`, `paramant-legal`, `paramant-notary`, `paramant-payslip`, `paramant-referral`, `paramant-ticket`

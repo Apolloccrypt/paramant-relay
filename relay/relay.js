@@ -148,14 +148,14 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user'],
+               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
-               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user'],
+               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup'],
   full:       null,
 };
 
@@ -1734,6 +1734,32 @@ const server = http.createServer(async (req, res) => {
         : 'rolling_out_q2_2026',
       capabilities_version: 1,
     }));
+  }
+
+  // -- First-time onboarding wizard (ADR R005) ----------------------------
+  // Public, no auth. Gated on first-time mode: the relay is considered fresh
+  // while it has no API keys loaded (apiKeys.size === 0), or when SETUP_MODE
+  // is explicitly set. These are scaffolding stubs: /v2/setup/check reports
+  // the gate; /v2/setup/apply is not yet implemented (returns 501).
+  function _setupModeOn() {
+    return apiKeys.size === 0 || process.env.SETUP_MODE === 'true';
+  }
+
+  // GET /v2/setup/check -- is the relay in first-time setup mode?
+  if (req.method === 'GET' && path === '/v2/setup/check') {
+    const setupMode = _setupModeOn();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ setupMode, ready: !setupMode }));
+  }
+
+  // POST /v2/setup/apply -- apply first-time configuration. Stub for now.
+  if (req.method === 'POST' && path === '/v2/setup/apply') {
+    if (!_setupModeOn()) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Setup is already complete on this relay.' }));
+    }
+    res.writeHead(501, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'Setup endpoint not yet implemented. Use the admin scripts (scripts/paramant-key-add.sh) or edit .env for now.' }));
   }
 
   // ═══════════════════════════════════════════════════════════════════════
