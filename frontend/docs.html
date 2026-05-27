@@ -373,6 +373,7 @@ tr:last-child td{border-bottom:none}
     <a href="#compliance-nen7510">NEN 7510</a>
     <a href="#compliance-iec62443">IEC 62443</a>
     <h3>FAQ</h3>
+    <a href="#operator-scripts">Operator scripts</a>
     <a href="#faq">Frequently asked</a>
   </div>
 
@@ -951,6 +952,22 @@ python3 scripts/paramant-admin.py sync</pre>
     <p><a href="/compliance/iec62443" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full IEC 62443 compliance documentation →</a></p>
 
     <!-- ── FAQ ──────────────────────────────────────────────────── -->
+    <!-- Operator scripts -->
+    <h2 id="operator-scripts">Operator scripts</h2>
+    <p>Self-host operators get a set of command-line helpers under <code>scripts/</code> in the <a href="https://github.com/Apolloccrypt/paramant-relay" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-relay</a> repo. SSH into your relay host and run them from the repo root. For most of these there is an in-browser equivalent at <a href="/admin/cli" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">/admin/cli</a> (admin login required).</p>
+    <ul>
+      <li><strong>Keys.</strong> <code>scripts/paramant-key-add.sh</code> &mdash; provision an API key.</li>
+      <li><strong>Signing.</strong> <code>scripts/paramant-sign</code> &mdash; ParaSign CLI: sign a document (ML-DSA-65, client-side) and notarise it into a <code>.psign</code> envelope, or verify one. See ADR R017.</li>
+      <li><strong>Deploy safety.</strong> <code>scripts/post-deploy-verify.sh</code> &mdash; post-deploy smoke test (exit 2 on critical failure); <code>scripts/rollback-3.0.0.sh</code> &mdash; roll back to the previously-built relay image.</li>
+      <li><strong>Backups.</strong> <code>scripts/backup-users-json.sh</code> &mdash; age-encrypted backup of relay key metadata (already wired into cron, 03:15 daily; decrypt only in tmpfs).</li>
+    </ul>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre><span class="cm"># on the relay host, from the repo root</span>
+./scripts/paramant-key-add.sh "customer-acme" pro ops@acme.example
+./scripts/post-deploy-verify.sh https://paramant.app</pre>
+    </div>
+
     <h2 id="faq">Frequently asked questions</h2>
 
     <div class="faq-item">
