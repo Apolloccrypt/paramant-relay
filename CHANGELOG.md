@@ -27,6 +27,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   YAML-based flow-definition format with capability-checked execution.
 - docs/low-code/ folder with two example flow YAML files
   (notify-on-health-blob, mirror-to-storage).
+- R015 Release-channel model ADR: defines stable/beta/edge channels,
+  semver tag scheme, channel-tagged Docker images (mtty001/relay),
+  per-main-merge GitHub Actions edge builds, maintainer-triggered
+  beta/stable promotion, cosign-signed releases, customer-side
+  channel selection + tier-gated auto-update with auto-rollback.
+  Replaces "git pull main HEAD" deploys with versioned releases.
 
 ### Changed
 - `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`
