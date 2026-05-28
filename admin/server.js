@@ -700,7 +700,7 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   if (existing) return res.redirect('/signup?error=account_exists');
 
   // Create the account across every sector so the key works on every relay (including relay-main,
-  // which is what /parashare and /send target). Previously this only went to "health", which meant
+  // which is what /parashare targets). Previously this only went to "health", which meant
   // freshly-signed-up users would authenticate in admin but fail with "Invalid key" on uploads.
   const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
   const createdAt = new Date().toISOString();
@@ -1112,11 +1112,11 @@ api.get("/user/dashboard-fragment", authUser, async (req, res) => {
 <section aria-label="Primary actions">
   <h2 class="block-h">Send &amp; receive</h2>
   <div class="action-pair">
-    <a class="action-card" href="/send" aria-label="Send a file">
+    <a class="action-card" href="/parashare" aria-label="Send a file">
       <div class="icon" aria-hidden="true">&rarr;</div>
       <h2>Send a file</h2>
-      <p>Encrypt a file in your browser, share a one-time link. AES-256-GCM with ML-KEM-768 hybrid key wrap. Burn-on-read.</p>
-      <div class="pq-line">Client-side &middot; burn-on-read</div>
+      <p>Encrypt a file in your browser, share a signed link. AES-256-GCM with ML-KEM-768 hybrid key wrap and ML-DSA-65 signed receipts. Burn-on-read.</p>
+      <div class="pq-line">Client-side &middot; signed &middot; burn-on-read</div>
     </a>
     <a class="action-card" href="/get" aria-label="Receive a file">
       <div class="icon" aria-hidden="true">&larr;</div>
@@ -1163,7 +1163,7 @@ api.get("/user/dashboard-fragment", authUser, async (req, res) => {
 
 // GET /api/user/check
 // Lightweight session-validity probe for nginx auth_request on gated tool
-// routes (/send, /parashare, /drop, /sign). authUser handles the cookie check
+// routes (/parashare, /drop, /sign). authUser handles the cookie check
 // and returns 401 on miss; this handler only fires on hit.
 api.get("/user/check", authUser, (req, res) => {
   res.status(200).end();

@@ -684,51 +684,43 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">07</div>
-    <h2 class="section-title">Two modes</h2>
-    <p class="section-desc">Paramant has two transfer modes. Quick /send is an in-browser one-shot link with no sender-to-receiver identity binding. Verified ParaShare adds identity, post-quantum key exchange, and cryptographic proof of origin.</p>
+    <h2 class="section-title">Verified transfer</h2>
+    <p class="section-desc">Every Paramant transfer is account-bound and end-to-end encrypted in the browser. ParaShare adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
 
     <table class="modes-table">
       <thead>
         <tr>
-          <th>Feature</th>
-          <th><span class="mode-badge">Quick send<br>Send a file</span></th>
+          <th>Property</th>
           <th><span class="mode-badge mode-badge--lime">Verified<br>ParaShare</span></th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td>Account needed</td>
-          <td>Yes (sign-in gate)</td>
           <td>Yes</td>
         </tr>
         <tr>
           <td>Encryption</td>
-          <td>AES-256-GCM, browser-generated key in URL fragment</td>
           <td>Hybrid ML-KEM-768 + ECDH P-256, then AES-256-GCM</td>
         </tr>
         <tr>
           <td>Sender signature</td>
-          <td>None</td>
-          <td>ML-DSA-65 — mathematically tied to sender identity</td>
+          <td>ML-DSA-65, mathematically tied to sender identity</td>
         </tr>
         <tr>
           <td>Reads allowed</td>
-          <td>One — burned on first open</td>
-          <td>One — burned on first open</td>
+          <td>One, burned on first open</td>
         </tr>
         <tr>
           <td>Proof of origin</td>
-          <td>None</td>
-          <td>Yes — CT log entry, verifiable by recipient</td>
+          <td>CT log entry, verifiable by recipient</td>
         </tr>
         <tr>
           <td>Post-quantum safe</td>
-          <td>No (classical AES key exchange)</td>
-          <td>Yes — ML-KEM-768 defeats HNDL attacks</td>
+          <td>Yes, ML-KEM-768 defeats HNDL attacks</td>
         </tr>
         <tr>
           <td>Good for</td>
-          <td>Quick one-off browser-encrypted shares</td>
           <td>Legal, healthcare, financial, compliance workflows</td>
         </tr>
       </tbody>
@@ -741,7 +733,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   <div class="arch-inner">
     <div class="section-num">08</div>
     <h2 class="section-title">Components</h2>
-    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare, ParaDrop, /send). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare, ParaDrop). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
 
     <table class="modes-table">
       <thead>
@@ -776,11 +768,6 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
           <td><strong>ParaDrop (webapp)</strong></td>
           <td>Device-to-device transfer over the relay, browser-to-browser.</td>
           <td>Same WASM bridge as ParaShare. Pre-v1 layout. Migration to v1 in progress.</td>
-        </tr>
-        <tr>
-          <td><strong>Send (browser-encrypted)</strong></td>
-          <td>One-shot link encrypted in the browser. Used by the <code>/send</code> page (sign-in gated).</td>
-          <td>AES-256-GCM, browser-generated key delivered in the URL fragment. No identity-binding by design — not a v1 candidate.</td>
         </tr>
         <tr>
           <td><strong>Chromium extension</strong></td>

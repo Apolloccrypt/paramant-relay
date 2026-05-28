@@ -277,12 +277,12 @@ footer {
 <h2>Product Architecture</h2>
 <div class="three-col">
   <div>
-    <h3>/send — consumer</h3>
-    <p>No account needed. AES-256-GCM in browser. Magic link with key in URL fragment. Burns after one download. WeTransfer replacement, better security.</p>
+    <h3>ParaShare, verified transfer</h3>
+    <p>ML-KEM-768 + ECDH hybrid key exchange. Browser-side encryption. ML-DSA-65 signed receipts. Fingerprint verification. Multi-file vault. TTL 30s to 24h. Account-bound. Full post-quantum stack, no anonymous tier.</p>
   </div>
   <div>
-    <h3>ParaShare — pro</h3>
-    <p>ML-KEM-768 + ECDH hybrid. Fingerprint verification. Multi-file vault. TTL 30s–24h. API key required. Full post-quantum stack.</p>
+    <h3>ParaDrop, device-to-device</h3>
+    <p>AirDrop alternative across iOS, Android, Windows, Linux. 6-digit pairing code. Encrypted in transit, burn on read. Account-bound.</p>
   </div>
   <div>
     <h3>Ghost Pipe OT — enterprise</h3>
@@ -318,9 +318,8 @@ footer {
     </ul>
     <h3>Frontend</h3>
     <ul>
-      <li>/send — keyless magic link, no account (live)</li>
-      <li>/parashare — ML-KEM-768 E2E with fingerprint verification</li>
-      <li>/drop — AirDrop alternative, burn-on-read</li>
+      <li>/parashare, ML-KEM-768 E2E with fingerprint verification (account-bound)</li>
+      <li>/drop, AirDrop alternative, burn-on-read (account-bound)</li>
       <li>Dashboard, CT log viewer, compliance pages</li>
       <li>ParamantOS — bootable relay (NixOS, USB → running relay in minutes)</li>
     </ul>
@@ -388,7 +387,7 @@ footer {
   <div>
     <h3>Distribution</h3>
     <ul>
-      <li><strong>Self-serve:</strong> /send as viral top-of-funnel. WeTransfer replacement for anyone who needs zero-trace transfer.</li>
+      <li><strong>Self-serve:</strong> Free-tier ParaShare as top-of-funnel. Verified, account-bound transfer for anyone who needs zero-trace, post-quantum delivery.</li>
       <li><strong>Inbound:</strong> LinkedIn thought leadership (HNDL, Chipsoft, NIS2 urgency). Content converts to trial key requests.</li>
       <li><strong>Direct:</strong> OT prospects via security architect network. Healthcare via IT integrators.</li>
       <li><strong>Partner:</strong> IT integrators serving healthcare and legal (first conversations in progress).</li>
@@ -397,7 +396,7 @@ footer {
 </div>
 
 <h2>12-Month Roadmap</h2>
-<div class="roadmap-row"><div class="roadmap-q">Q2 2026</div><div class="roadmap-items">/send magic link MVP live · OT brief complete · Healthcare brief complete · Investor brief complete</div></div>
+<div class="roadmap-row"><div class="roadmap-q">Q2 2026</div><div class="roadmap-items">ParaShare MVP live (account-bound) · OT brief complete · Healthcare brief complete · Investor brief complete</div></div>
 <div class="roadmap-row"><div class="roadmap-q">Q3 2026</div><div class="roadmap-items">Pro billing (Stripe) · 50 MB disk-backed tier · Outlook plugin (Pro) · First paying customers</div></div>
 <div class="roadmap-row"><div class="roadmap-q">Q4 2026</div><div class="roadmap-items">First enterprise OT contract (target: port or Airbus supplier) · Team dashboard · 100 Pro users target</div></div>
 <div class="roadmap-row"><div class="roadmap-q">Q1 2027</div><div class="roadmap-items">NEN 7510 third-party audit (TÜV or equivalent) · ParamantOS v2 (reproducible NixOS build) · 3 enterprise contracts</div></div>
