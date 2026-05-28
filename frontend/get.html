@@ -31,6 +31,21 @@ body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:
 main{max-width:520px;margin:0 auto;padding:80px 24px}
 main:has(#step-preview.active){max-width:880px}
 #preview-canvas-list canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);margin-bottom:12px;background:#fff}
+.page-wrap{position:relative;margin-bottom:12px}
+.page-wrap.placing{cursor:crosshair}
+.stamp-marker{position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,0.06);pointer-events:none;font-family:var(--mono);font-size:9px;color:var(--navy);padding:4px;box-sizing:border-box;line-height:1.25;overflow:hidden}
+.stamp-marker .sm-name{font-weight:700;font-size:10px}
+.stamp-marker .sm-meta{color:var(--ink-dim);font-size:8px}
+.stamp-marker .sm-pqtag{position:absolute;right:3px;bottom:2px;font-size:7px;letter-spacing:.08em;color:var(--cobalt)}
+.sign-toolbar{background:var(--bone-2);border:1px solid var(--ink-hair);padding:14px 16px;margin-bottom:12px;font-size:12px;color:var(--ink-dim)}
+.sign-toolbar .st-hint{font-family:var(--mono);font-size:11px;margin-bottom:6px}
+.sign-form{display:grid;gap:10px;margin-top:10px}
+.sign-form label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
+.sign-form input,.sign-form select{width:100%;padding:9px 10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:12px}
+.disclaimer{background:#fff4d6;border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:#5a3f00;margin-bottom:14px;line-height:1.5}
+.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap}
+.btn-row .btn{flex:1;margin:0}
 h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .sub{font-size:13px;color:var(--ink-dim);margin-bottom:32px;line-height:1.7}
 .step{display:none;animation:fadeIn .2s ease}
@@ -353,7 +368,35 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     </div>
   </div>
 
+  <div class="sign-toolbar" id="sign-toolbar" hidden>
+    <div class="st-hint" id="sign-hint">Click on the page where you want to place your signature.</div>
+    <div class="sign-form" id="sign-form" hidden>
+      <div>
+        <label for="signer-name">Signer name</label>
+        <input type="text" id="signer-name" maxlength="80" autocomplete="name" placeholder="e.g. Mick Beer">
+      </div>
+      <div>
+        <label for="signer-key-src">Signing key</label>
+        <select id="signer-key-src">
+          <option value="ephemeral">Generate one-time key for this signature</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="sign-confirm" type="button">Sign and download</button>
+        <button class="btn btn-outline" id="sign-move" type="button">Move stamp</button>
+        <button class="btn btn-outline" id="sign-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="preview-canvas-list" style="margin:16px 0"></div>
+
+  <div class="disclaimer" id="sign-disclaimer" hidden>
+    <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
+    The signature uses ML-DSA-65 (FIPS 204) and is produced locally in your browser.
+    The relay never sees the document. This is a cryptographic attestation, not a
+    qualified electronic signature under eIDAS or a notarised legal instrument.
+  </div>
 
   <div style="margin-bottom:24px">
     <span class="tag green">Decrypted locally</span>
@@ -361,8 +404,26 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <span class="tag green">Rendered in browser</span>
   </div>
 
-  <button class="btn btn-outline" id="preview-download" type="button">Download original PDF</button>
-  <a href="/dashboard" class="btn" style="margin-top:12px">Open your dashboard</a>
+  <div class="btn-row" id="preview-actions">
+    <button class="btn" id="preview-sign" type="button">Sign this document</button>
+    <button class="btn btn-outline" id="preview-download" type="button">Download original PDF</button>
+  </div>
+  <a href="/dashboard" class="btn btn-outline" style="margin-top:12px">Open your dashboard</a>
+
+  <div class="card" id="sign-result" hidden style="margin-top:24px">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Signed</div></div>
+    <div class="card-body">
+      <div class="file-name" id="sign-result-name"></div>
+      <div class="file-size" id="sign-result-meta"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn" id="sign-download-pdf" type="button">Download signed PDF</button>
+        <button class="btn btn-outline" id="sign-download-psign" type="button">Download .psign envelope</button>
+      </div>
+      <p class="sub" style="margin-top:12px;font-size:11px">
+        Recipients can verify the envelope at <a href="/verify">/verify</a>.
+      </p>
+    </div>
+  </div>
 </div>
 
 <!-- Burned / already used -->
@@ -444,6 +505,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
+<script type="module" src="/vendor/parasign-bridge.js"></script>
+<script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
 <script>
 const RELAY = 'https://health.paramant.app';
 
@@ -499,10 +562,18 @@ async function waitForPdfjs() {
   });
 }
 
+// Cache the decrypted PDF bytes + filename so the sign-mode can re-use them
+// without going back to the relay (which has burned its copy by now).
+let __pdfBytes = null;
+let __pdfFilename = '';
+
 async function renderPdfPreview(bytes, name) {
+  __pdfBytes = bytes;
+  __pdfFilename = name;
+
   const pdfjs = await waitForPdfjs();
   // PDF.js mutates the input buffer. Pass a copy so the original stays intact
-  // for the download-original button.
+  // for the download-original and sign-stamp paths.
   const copy = new Uint8Array(bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
 
@@ -515,10 +586,15 @@ async function renderPdfPreview(bytes, name) {
     const targetWidth = Math.min(840, Math.floor(window.innerWidth * 0.9));
     const scale = targetWidth / baseViewport.width;
     const viewport = page.getViewport({ scale });
+    const wrap = document.createElement('div');
+    wrap.className = 'page-wrap';
+    wrap.dataset.pageIndex = String(i - 1);
+    wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    container.appendChild(canvas);
+    wrap.appendChild(canvas);
+    container.appendChild(wrap);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   }
 
@@ -528,17 +604,279 @@ async function renderPdfPreview(bytes, name) {
     (pdf.numPages > MAX_PAGES ? ' (showing first ' + MAX_PAGES + ')' : '');
   document.getElementById('preview-filesize').textContent = formatSize(bytes.length);
 
-  const btn = document.getElementById('preview-download');
-  btn.onclick = () => {
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  const dlBtn = document.getElementById('preview-download');
+  dlBtn.onclick = () => downloadBytes(bytes, name, 'application/pdf');
+
+  const signBtn = document.getElementById('preview-sign');
+  if (signBtn) signBtn.onclick = enterSignMode;
+}
+
+function downloadBytes(bytes, name, mime) {
+  const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+}
+
+// ====================================================================
+// Sign-mode (Model 1: recipient signs the document they just received).
+// Zero-knowledge: relay never sees the document or the new signature.
+// ML-DSA-65 + SHA3-256 produced locally via /vendor/paramant-pqc.js.
+// ====================================================================
+
+const STAMP_PDF_W = 200;
+const STAMP_PDF_H = 70;
+
+let __stampState = null;     // { pageIndex, x, y, w, h } in PDF points
+let __signerKey  = null;     // { secretKey, publicKey } Uint8Arrays
+
+function toHex(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0');
+  return s;
+}
+
+function toB64(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+}
+
+async function waitForParasign() {
+  if (window.__parasign) return window.__parasign;
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('Signing library failed to load')), 10000);
+    window.addEventListener('parasign:ready', () => { clearTimeout(t); resolve(window.__parasign); }, { once: true });
+  });
+}
+
+async function waitForPdfLib() {
+  if (window.PDFLib) return window.PDFLib;
+  // pdf-lib is loaded with `defer` so it should be present after DOMContentLoaded.
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const tick = () => {
+      if (window.PDFLib) return resolve(window.PDFLib);
+      if (Date.now() - start > 10000) return reject(new Error('pdf-lib failed to load'));
+      setTimeout(tick, 50);
+    };
+    tick();
+  });
+}
+
+async function enterSignMode() {
+  document.getElementById('sign-toolbar').hidden = false;
+  document.getElementById('sign-disclaimer').hidden = false;
+  document.getElementById('sign-form').hidden = true;
+  document.getElementById('sign-hint').textContent = 'Click on the page where you want to place your signature.';
+  document.querySelectorAll('.page-wrap').forEach(wrap => {
+    wrap.classList.add('placing');
+    wrap.addEventListener('click', onPlaceClick);
+  });
+  document.getElementById('preview-actions').style.display = 'none';
+
+  // Populate key sources from vault (if any keys exist).
+  try {
+    const p = await waitForParasign();
+    if (await p.vaultAvailable()) {
+      const sel = document.getElementById('signer-key-src');
+      const items = await p.vaultList();
+      for (const it of items) {
+        const opt = document.createElement('option');
+        opt.value = 'vault:' + it.id;
+        opt.textContent = 'Vault: ' + (it.label || (it.pk_hash || '').slice(0, 12));
+        sel.appendChild(opt);
+      }
+    }
+  } catch {}
+
+  document.getElementById('sign-cancel').onclick = exitSignMode;
+  document.getElementById('sign-move').onclick = () => {
+    clearStampMarker();
+    document.getElementById('sign-form').hidden = true;
+    document.getElementById('sign-hint').textContent = 'Click again to reposition the signature.';
+    document.querySelectorAll('.page-wrap').forEach(wrap => {
+      wrap.classList.add('placing');
+      wrap.addEventListener('click', onPlaceClick);
+    });
   };
+  document.getElementById('sign-confirm').onclick = confirmSign;
+}
+
+function exitSignMode() {
+  document.getElementById('sign-toolbar').hidden = true;
+  document.getElementById('sign-disclaimer').hidden = true;
+  document.getElementById('preview-actions').style.display = '';
+  clearStampMarker();
+  document.querySelectorAll('.page-wrap').forEach(wrap => {
+    wrap.classList.remove('placing');
+    wrap.removeEventListener('click', onPlaceClick);
+  });
+  __stampState = null;
+}
+
+function clearStampMarker() {
+  document.querySelectorAll('.stamp-marker').forEach(el => el.remove());
+}
+
+function onPlaceClick(e) {
+  const wrap = e.currentTarget;
+  const canvas = wrap.querySelector('canvas');
+  const rect = canvas.getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;   // pdf-points per displayed pixel
+  const pxX = e.clientX - rect.left;
+  const pxY = e.clientY - rect.top;
+  const stampPxW = STAMP_PDF_W / ratio;
+  const stampPxH = STAMP_PDF_H / ratio;
+  const left = Math.max(0, Math.min(rect.width  - stampPxW, pxX - stampPxW / 2));
+  const top  = Math.max(0, Math.min(rect.height - stampPxH, pxY - stampPxH / 2));
+  const pdfX = left * ratio;
+  const pdfYTop = top * ratio;
+  // pdf-lib uses bottom-left origin in PDF points.
+  const pdfYBottom = wrap._pdfPage.height - pdfYTop - STAMP_PDF_H;
+  __stampState = {
+    pageIndex: wrap._pdfPage.index,
+    x: pdfX, y: pdfYBottom, w: STAMP_PDF_W, h: STAMP_PDF_H
+  };
+  clearStampMarker();
+  renderStampMarker(wrap, left, top, stampPxW, stampPxH);
+  // Stop placing-mode until the user clicks Move.
+  document.querySelectorAll('.page-wrap').forEach(w => {
+    w.classList.remove('placing');
+    w.removeEventListener('click', onPlaceClick);
+  });
+  document.getElementById('sign-form').hidden = false;
+  document.getElementById('sign-hint').textContent = 'Signature position selected on page ' + (wrap._pdfPage.index + 1) + '. Fill in your name and confirm.';
+}
+
+function renderStampMarker(wrap, left, top, w, h) {
+  const m = document.createElement('div');
+  m.className = 'stamp-marker';
+  m.style.left = left + 'px';
+  m.style.top  = top  + 'px';
+  m.style.width  = w + 'px';
+  m.style.height = h + 'px';
+  const name = (document.getElementById('signer-name').value || 'Signer').slice(0, 40);
+  m.innerHTML =
+    '<div class="sm-name">Signed by ' + escapeHtml(name) + '</div>' +
+    '<div class="sm-meta">' + new Date().toISOString().slice(0, 10) + '</div>' +
+    '<div class="sm-meta">PQ key: pending</div>' +
+    '<div class="sm-pqtag">PARAMANT - PQ</div>';
+  wrap.appendChild(m);
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function ensureSignerKey() {
+  const sel = document.getElementById('signer-key-src').value;
+  const p = await waitForParasign();
+  if (sel === 'ephemeral') {
+    const seed = crypto.getRandomValues(new Uint8Array(32));
+    const kp = p.ml_dsa65.keygen(seed);
+    __signerKey = { secretKey: kp.secretKey, publicKey: kp.publicKey };
+    return __signerKey;
+  }
+  if (sel.startsWith('vault:')) {
+    const id = parseInt(sel.slice('vault:'.length), 10);
+    const pass = prompt('Passphrase to unlock the vault key:');
+    if (!pass) throw new Error('Vault unlock cancelled');
+    const unlocked = await p.vaultUnlock(id, pass);
+    __signerKey = { secretKey: unlocked.secretKey, publicKey: unlocked.publicKey };
+    return __signerKey;
+  }
+  throw new Error('Unsupported key source');
+}
+
+async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
+  const PDFLib = await waitForPdfLib();
+  const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
+  const page = pdfDoc.getPages()[stamp.pageIndex];
+  const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  const navy = PDFLib.rgb(0.043, 0.227, 0.416);
+  const dim  = PDFLib.rgb(0.3, 0.3, 0.3);
+
+  page.drawRectangle({
+    x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h,
+    borderColor: navy, borderWidth: 1.2,
+    color: navy, opacity: 0.04
+  });
+  const padding = 6;
+  let yCursor = stamp.y + stamp.h - padding - 8;
+  page.drawText('Signed by ' + signerName, { x: stamp.x + padding, y: yCursor, size: 9, font: fontBold, color: navy });
+  yCursor -= 12;
+  page.drawText(dateStr, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
+  yCursor -= 10;
+  page.drawText('PQ key: ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
+  page.drawText('PARAMANT - PQ', { x: stamp.x + stamp.w - 66, y: stamp.y + 4, size: 6, font: fontBold, color: navy });
+
+  return await pdfDoc.save();
+}
+
+async function confirmSign() {
+  if (!__stampState) return;
+  const name = (document.getElementById('signer-name').value || '').trim();
+  if (!name) { document.getElementById('sign-hint').textContent = 'Please enter your name.'; return; }
+
+  document.getElementById('sign-hint').textContent = 'Signing in browser (ML-DSA-65)...';
+  document.getElementById('sign-confirm').disabled = true;
+
+  try {
+    const p = await waitForParasign();
+    const key = await ensureSignerKey();
+    const fingerprint = toHex(p.sha3_256(key.publicKey)).slice(0, 16);
+    const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
+
+    const stampedPdfBytes = await buildStampedPdf(__pdfBytes, __stampState, name, dateStr, fingerprint);
+    const origHash = p.sha3_256(__pdfBytes);
+    const stampedHash = p.sha3_256(stampedPdfBytes);
+
+    const coords = { pageIndex: __stampState.pageIndex, x: __stampState.x, y: __stampState.y, w: __stampState.w, h: __stampState.h, name, date: dateStr };
+    const coordsBytes = new TextEncoder().encode(JSON.stringify(coords));
+
+    const msg = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
+    msg.set(origHash, 0);
+    msg.set(stampedHash, origHash.length);
+    msg.set(coordsBytes, origHash.length + stampedHash.length);
+
+    const signature = p.ml_dsa65.sign(key.secretKey, msg);
+
+    const envelope = {
+      version: 'parasign-visual-1',
+      algorithm: 'ML-DSA-65',
+      hash_algorithm: 'SHA3-256',
+      original_filename: __pdfFilename,
+      stamped_filename: 'signed-' + __pdfFilename,
+      original_hash: toHex(origHash),
+      stamped_hash: toHex(stampedHash),
+      coords,
+      signer_public_key: toB64(key.publicKey),
+      signer_pk_fingerprint: fingerprint,
+      signature: toB64(signature),
+      signed_at: dateStr,
+      disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.'
+    };
+
+    const stampedName = 'signed-' + __pdfFilename;
+    const psignName = stampedName.replace(/\.pdf$/i, '') + '.psign';
+
+    document.getElementById('sign-result').hidden = false;
+    document.getElementById('sign-result-name').textContent = stampedName;
+    document.getElementById('sign-result-meta').textContent = formatSize(stampedPdfBytes.length) + ' - ML-DSA-65 - fingerprint ' + fingerprint;
+    document.getElementById('sign-download-pdf').onclick = () => downloadBytes(stampedPdfBytes, stampedName, 'application/pdf');
+    document.getElementById('sign-download-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(envelope, null, 2)), psignName, 'application/json');
+
+    document.getElementById('sign-hint').textContent = 'Signed. Download the stamped PDF and the .psign envelope below.';
+  } catch (e) {
+    document.getElementById('sign-hint').textContent = 'Signing failed: ' + (e.message || e);
+    document.getElementById('sign-confirm').disabled = false;
+  }
 }
 
 function goReceive() {
