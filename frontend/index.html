@@ -35,16 +35,7 @@
 
   <ul class="nav-links">
 
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/sign" role="menuitem">ParaSign</a></li>
-        <li role="none"><a href="/verify" role="menuitem">Verify signature</a></li>
-      </ul>
-    </li>
+    <li><a href="/#products" class="nav-link">Products</a></li>
 
     <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
 
@@ -126,16 +117,7 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/send">Send a file</a>
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/sign">ParaSign</a>
-      <a href="/verify">Verify signature</a>
-    </div>
-  </div>
+  <a href="/#products" class="nav-mobile-standalone">Products</a>
 
   <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
 
@@ -231,13 +213,13 @@
   <span><strong>BUSL-1.1</strong> source-available</span>
 </aside>
 
-<section class="home-section" aria-labelledby="prod-h">
+<section class="home-section" id="products" aria-labelledby="prod-h">
   <header class="home-section-head"><span class="eyebrow">Products</span><h2 id="prod-h">Four ways to use Paramant.</h2><p>One relay, four endpoints. Each tuned for a different transfer pattern. All client-side encrypted, all burn-on-read.</p></header>
   <div class="pgrid">
-    <a class="pcard" href="/send"><span class="ptag">fast</span><h3>Send a file</h3><p>Drop a file from your dashboard, share the link, burns after one read. AES-256-GCM in-browser, bound to your account.</p><span class="pcta">Send a file</span></a>
-    <a class="pcard" href="/parashare"><span class="ptag">verified</span><h3>ParaShare</h3><p>End-to-end ML-KEM-768 hybrid with ML-DSA-65 signed receipts. Cryptographic proof of who sent what to whom.</p><span class="pcta">Try ParaShare</span></a>
-    <a class="pcard" href="/drop"><span class="ptag">device-to-device</span><h3>ParaDrop</h3><p>AirDrop alternative across iOS, Android, Windows, Linux. QR or 6-digit pairing. Encrypted in transit, burn on read.</p><span class="pcta">Use ParaDrop</span></a>
-    <a class="pcard" href="/sign"><span class="ptag">new &middot; parasign</span><h3>Sign documents</h3><p>Post-quantum ML-DSA-65 signatures. Self-contained .psign envelope. CT-log backed.</p><span class="pcta">Sign a document</span></a>
+    <a class="pcard" href="/dashboard"><span class="ptag">fast</span><h3>Send a file</h3><p>Drop a file from your dashboard, share the link, burns after one read. AES-256-GCM in-browser, bound to your account.</p><span class="pcta">Open your dashboard</span></a>
+    <a class="pcard" href="/dashboard"><span class="ptag">verified</span><h3>ParaShare</h3><p>End-to-end ML-KEM-768 hybrid with ML-DSA-65 signed receipts. Cryptographic proof of who sent what to whom.</p><span class="pcta">Open your dashboard</span></a>
+    <a class="pcard" href="/dashboard"><span class="ptag">device-to-device</span><h3>ParaDrop</h3><p>AirDrop alternative across iOS, Android, Windows, Linux. QR or 6-digit pairing. Encrypted in transit, burn on read.</p><span class="pcta">Open your dashboard</span></a>
+    <a class="pcard" href="/dashboard"><span class="ptag">new &middot; parasign</span><h3>Sign documents</h3><p>Post-quantum ML-DSA-65 signatures. Self-contained .psign envelope. CT-log backed.</p><span class="pcta">Open your dashboard</span></a>
   </div>
 </section>
 
@@ -246,10 +228,10 @@
   <div class="sgrid">
     <article class="scard"><span class="slabel">Healthcare</span><h3>DICOM, referrals, lab results</h3><p class="suse">Send scans and patient records between care providers, designed for NEN 7510 with per-access CT log proof.</p><div class="schips"><a class="schip" href="/compliance/nen7510">NEN 7510</a><a class="schip" href="/sovereignty">GDPR</a></div><div class="slink"><a href="https://health.paramant.app">health.paramant.app &rarr;</a></div></article>
     <article class="scard"><span class="slabel">Finance</span><h3>Settlement files, payment data</h3><p class="suse">Payment files with per-transaction Merkle proofs. EU jurisdiction, no US Cloud Act, no metadata retention.</p><div class="schips"><a class="schip" href="/compliance/nis2">NIS2</a><a class="schip" href="/banken">Banking</a></div><div class="slink"><a href="https://finance.paramant.app">finance.paramant.app &rarr;</a></div></article>
-    <article class="scard"><span class="slabel">Legal &amp; notary</span><h3>Court documents, deeds</h3><p class="suse">Signed documents cryptographically destroyed after receipt. Tamper-evident proof of delivery without storing content.</p><div class="schips"><a class="schip" href="/sovereignty">Sovereignty</a><a class="schip" href="/sign">ParaSign</a></div><div class="slink"><a href="https://legal.paramant.app">legal.paramant.app &rarr;</a></div></article>
+    <article class="scard"><span class="slabel">Legal &amp; notary</span><h3>Court documents, deeds</h3><p class="suse">Signed documents cryptographically destroyed after receipt. Tamper-evident proof of delivery without storing content.</p><div class="schips"><a class="schip" href="/sovereignty">Sovereignty</a><a class="schip" href="/dashboard">ParaSign</a></div><div class="slink"><a href="https://legal.paramant.app">legal.paramant.app &rarr;</a></div></article>
     <article class="scard"><span class="slabel">Industrial IoT</span><h3>PLC telemetry, SCADA data</h3><p class="suse">Quantum-safe data diode. PLCs push outbound only, no inbound port, no VPN. Works on a Raspberry Pi.</p><div class="schips"><a class="schip" href="/compliance/iec62443">IEC 62443</a><a class="schip" href="/ot">OT guide</a></div><div class="slink"><a href="https://iot.paramant.app">iot.paramant.app &rarr;</a></div></article>
     <article class="scard"><span class="slabel">Government &amp; public</span><h3>Sovereign data routing</h3><p class="suse">EU-only infrastructure. No US parent company, no CLOUD Act jurisdiction. For ministries and agencies.</p><div class="schips"><a class="schip" href="/government">Government brief</a><a class="schip" href="/sovereignty">Sovereignty</a></div></article>
-    <article class="scard"><span class="slabel">Supply chain</span><h3>Firmware, SBOM, code-signing</h3><p class="suse">Distribute firmware and signed artifacts with CT-log proof. Toward EU CRA readiness.</p><div class="schips"><a class="schip" href="/hndl">CRA</a><a class="schip" href="/sign">ParaSign</a></div></article>
+    <article class="scard"><span class="slabel">Supply chain</span><h3>Firmware, SBOM, code-signing</h3><p class="suse">Distribute firmware and signed artifacts with CT-log proof. Toward EU CRA readiness.</p><div class="schips"><a class="schip" href="/hndl">CRA</a><a class="schip" href="/dashboard">ParaSign</a></div></article>
   </div>
 </section>
 

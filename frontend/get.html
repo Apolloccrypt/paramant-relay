@@ -136,16 +136,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
   <ul class="nav-links">
 
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
-        <li role="none"><a href="/sign" role="menuitem">ParaSign</a></li>
-        <li role="none"><a href="/verify" role="menuitem">Verify signature</a></li>
-      </ul>
-    </li>
+    <li><a href="/#products" class="nav-link">Products</a></li>
 
     <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
 
@@ -227,16 +218,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/send">Send a file</a>
-      <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
-      <a href="/sign">ParaSign</a>
-      <a href="/verify">Verify signature</a>
-    </div>
-  </div>
+  <a href="/#products" class="nav-mobile-standalone">Products</a>
 
   <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
 
@@ -353,7 +335,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <span class="tag green">AES-256-GCM</span>
   </div>
 
-  <a href="/send" class="btn btn-outline">Send a file</a>
+  <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
 </div>
 
 <!-- Burned / already used -->
@@ -361,7 +343,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <span class="burned-icon" style="margin-top:16px">&#x1F525;</span>
   <p class="burned-msg">This file has already been downloaded and burned.</p>
   <p class="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
-  <a href="/send" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Send a file</a>
+  <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Open your dashboard</a>
 </div>
 
 <!-- Error -->
@@ -374,7 +356,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <div class="status-line err" id="error-msg"></div>
     </div>
   </div>
-  <a href="/send" class="btn btn-outline">Send a file</a>
+  <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
 </div>
 
 </main>
