@@ -29,9 +29,11 @@ const state = {
     keySrc: 'ephemeral',
     key: null,           // { secretKey, publicKey }
     apiKey: '',
-    sigStyle: 'typed',   // 'typed' | 'drawn' | 'image'
-    sigImageBytes: null, // Uint8Array (PNG for drawn, PNG/JPG for image)
-    sigImageType: null,  // 'png' | 'jpg'
+    sigStyle: 'typed',     // 'typed' | 'drawn' | 'image'
+    sigImageBytes: null,   // Uint8Array (PNG for drawn, PNG/JPG for image)
+    sigImageType: null,    // 'png' | 'jpg'
+    sigImageDataUrl: null, // pre-computed data: URL for <img src=>
+    docImageDataUrl: null, // pre-computed data: URL when doc is a viewable image
   },
   result: null,          // { stampedBytes?, envelope, fingerprint, notary? }
 };
@@ -75,6 +77,18 @@ function formatSize(n) {
 }
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// CSP on this site allows img-src 'self' data: (no blob:), so previews for
+// drawn/uploaded signatures and for image documents must go through a
+// data: URL or they fail silently and only show the alt text.
+function bytesToDataUrl(bytes, mime) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('FileReader error'));
+    r.readAsDataURL(new Blob([bytes], { type: mime }));
+  });
 }
 
 // ====================================================================
@@ -122,8 +136,15 @@ function initStepDoc() {
 async function onDocChosen(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   state.doc = { bytes, name: file.name, size: file.size };
+  state.signer.docImageDataUrl = null;
   const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
   state.mode = isPdf ? 'pdf' : 'hash';
+  // Pre-compute a data: URL when the document is itself a viewable image,
+  // so the review pane can render <img src=> without violating img-src CSP.
+  const mimeGuess = guessMimeFromMagic(bytes);
+  if (mimeGuess && mimeGuess.startsWith('image/')) {
+    try { state.signer.docImageDataUrl = await bytesToDataUrl(bytes, mimeGuess); } catch {}
+  }
   if (isPdf) {
     setActive('step-place');
     await renderPdfForPlacement();
@@ -296,11 +317,13 @@ function initDrawCanvas() {
   async function end(ev) {
     if (!drawing) return;
     drawing = false;
-    // Convert to PNG bytes and stash. refreshIdentityValid will enable Continue.
+    // Convert to PNG bytes + data URL and stash. refreshIdentityValid will enable Continue.
     cv.toBlob(async (blob) => {
       if (!blob) return;
-      state.signer.sigImageBytes = new Uint8Array(await blob.arrayBuffer());
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      state.signer.sigImageBytes = bytes;
       state.signer.sigImageType = 'png';
+      state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, 'image/png');
       refreshIdentityValid();
     }, 'image/png');
   }
@@ -338,9 +361,9 @@ function initImageUpload() {
     const type = (f.type === 'image/jpeg') ? 'jpg' : 'png';
     state.signer.sigImageBytes = bytes;
     state.signer.sigImageType = type;
-    const url = URL.createObjectURL(new Blob([bytes], { type: f.type }));
+    state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, f.type);
     const img = $('ds-sig-image-preview');
-    img.src = url;
+    img.src = state.signer.sigImageDataUrl;
     img.style.display = 'block';
     refreshIdentityValid();
   });
@@ -513,14 +536,12 @@ async function renderDocPreview() {
     return;
   }
 
-  // Non-PDF: try to show the file inline if it is an image type the browser knows.
-  const mimeGuess = guessMimeFromMagic(state.doc.bytes);
-  if (mimeGuess && mimeGuess.startsWith('image/')) {
-    const url = URL.createObjectURL(new Blob([state.doc.bytes], { type: mimeGuess }));
+  // Non-PDF: try to show the file inline if it is a viewable image. We use
+  // a pre-computed data: URL because CSP blocks blob: in img-src.
+  if (state.signer.docImageDataUrl) {
     const img = document.createElement('img');
-    img.src = url;
+    img.src = state.signer.docImageDataUrl;
     img.alt = state.doc.name;
-    img.onload = () => setTimeout(() => URL.revokeObjectURL(url), 5000);
     pane.appendChild(img);
     return;
   }
@@ -550,13 +571,10 @@ function renderSigPreview() {
     return;
   }
 
-  if (state.signer.sigImageBytes) {
-    const mime = state.signer.sigImageType === 'jpg' ? 'image/jpeg' : 'image/png';
-    const url = URL.createObjectURL(new Blob([state.signer.sigImageBytes], { type: mime }));
+  if (state.signer.sigImageDataUrl) {
     const img = document.createElement('img');
-    img.src = url;
+    img.src = state.signer.sigImageDataUrl;
     img.alt = state.signer.sigStyle === 'drawn' ? 'Drawn signature' : 'Uploaded signature';
-    img.onload = () => setTimeout(() => URL.revokeObjectURL(url), 5000);
     pane.appendChild(img);
     return;
   }
@@ -579,11 +597,8 @@ function stampMockupHtml() {
     ? toHex(sha3_256(state.signer.key.publicKey)).slice(0, 8)
     : 'pending';
   let mid = '';
-  if (state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes) {
-    const mime = state.signer.sigImageType === 'jpg' ? 'image/jpeg' : 'image/png';
-    const url = URL.createObjectURL(new Blob([state.signer.sigImageBytes], { type: mime }));
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    mid = `<img class="ds-sm-sig-img" src="${url}" alt="">`;
+  if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
+    mid = `<img class="ds-sm-sig-img" src="${state.signer.sigImageDataUrl}" alt="">`;
   } else {
     mid = `<div class="ds-sm-sig-typed">${escapeHtml(name)}</div>`;
   }
@@ -851,6 +866,31 @@ function showDone() {
     $('ds-dl-pdf').onclick = () => downloadBytes(r.stampedBytes, 'signed-' + state.doc.name, 'application/pdf');
   } else {
     $('ds-dl-pdf').hidden = true;
+  }
+
+  // Populate the 'how to use' files list and notary-condition bullet.
+  // psignName already computed above (used for the .psign download button).
+  const filesList = $('ds-usage-files');
+  if (filesList) {
+    filesList.innerHTML = '';
+    if (r.stampedBytes) {
+      const li1 = document.createElement('li');
+      li1.innerHTML = `<span class="ds-usage-files-file">signed-${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">the visible document with your Paramant seal</span>`;
+      filesList.appendChild(li1);
+    } else {
+      const li1 = document.createElement('li');
+      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">the original file (unchanged - hash-only mode does not modify it)</span>`;
+      filesList.appendChild(li1);
+    }
+    const li2 = document.createElement('li');
+    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">the cryptographic envelope (ML-DSA-65 signature + your public key + metadata)</span>`;
+    filesList.appendChild(li2);
+  }
+  const notaryLine = $('ds-usage-notary-line');
+  if (notaryLine) {
+    notaryLine.textContent = r.envelope.notary
+      ? 'Paramant\'s relay counter-signed the envelope, and the signature is logged in the public CT log - recipients see independent witness of when this signing happened.'
+      : 'No relay witness on this signature - that is fine for self-attestation but means there is no independent third-party timestamp.';
   }
 
   // Render the signed result so the user can see their stamp before downloading.

@@ -96,6 +96,14 @@
 .ds-proof-card details summary{cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--ink-dim);font-weight:600}
 .ds-proof-card details[open] summary{color:var(--navy);margin-bottom:8px}
 .ds-proof-json{background:var(--bone);border:1px solid var(--ink-hair);padding:10px;font-family:var(--mono);font-size:10px;line-height:1.5;color:var(--navy);white-space:pre-wrap;word-break:break-all;max-height:240px;overflow:auto}
+.ds-usage-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:16px 18px;margin-top:24px}
+.ds-usage-card .ds-proof-h{margin-bottom:10px}
+.ds-usage-p{font-size:13px;color:var(--ink);line-height:1.6;margin:10px 0 6px}
+.ds-usage-list{font-size:13px;color:var(--ink);line-height:1.7;margin:0 0 12px;padding-left:22px}
+.ds-usage-list li{margin-bottom:6px}
+.ds-usage-list code{font-family:var(--mono);font-size:11px;background:var(--bone);border:1px solid var(--ink-hair);padding:1px 6px;color:var(--navy)}
+.ds-usage-files-file{font-family:var(--mono);font-size:12px;color:var(--navy);font-weight:700}
+.ds-usage-files-note{font-size:11px;color:var(--ink-dim);margin-left:8px}
 @media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
 @media(max-width:640px){
@@ -464,6 +472,23 @@
       <a class="btn btn-tertiary" href="/verify">Verify an envelope</a>
       <button class="btn btn-tertiary" id="ds-restart" type="button">Sign another</button>
     </div>
+
+    <div class="ds-usage-card">
+      <h3 class="ds-proof-h">How to use your signature</h3>
+      <p class="ds-usage-p">Share <strong>both</strong> files with the recipient. They prove ownership only as a pair.</p>
+      <ol class="ds-usage-list" id="ds-usage-files"></ol>
+      <p class="ds-usage-p"><strong>Recipients verify in either of two ways:</strong></p>
+      <ol class="ds-usage-list">
+        <li>Open <a href="/verify">paramant.app/verify</a>, drop both files in, and hit Verify. The page recomputes SHA3-256 of the document, runs ML-DSA-65 verify against the public key in the envelope, and (if the envelope was counter-signed) confirms the relay's signature against Paramant's published <a href="/ct-log">CT log</a>.</li>
+        <li>Or run the CLI: <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> from <a href="/docs#operator-scripts">paramant-sign</a>. Same checks, offline.</li>
+      </ol>
+      <p class="ds-usage-p"><strong>A green 'verified' result means three things at once:</strong></p>
+      <ul class="ds-usage-list">
+        <li>The document bytes have not changed since you signed.</li>
+        <li>The signature was produced by the holder of the private key matching the public key in the envelope.</li>
+        <li id="ds-usage-notary-line"></li>
+      </ul>
+    </div>
   </section>
 </div>
 </main>
@@ -526,6 +551,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=6"></script>
+<script type="module" src="/sign-flow.js?v=7"></script>
 </body>
 </html>
