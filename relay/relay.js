@@ -739,6 +739,9 @@ function _flushPeerSthsOnExit() {
 }
 
 // ── Gossip — broadcast our latest STH to all registered peers ─────────────────
+// Outbound HTTPS goes through safeHttpsRequest so the per-request DNS guard
+// catches peers that registered with a public hostname but DNS-rebound to a
+// private/loopback IP before gossip fires. Same defence as pushWebhooks.
 async function broadcastSTH(sth) {
   if (!sth || !relayIdentity) return;
   const peers = [...relayRegistry.values()].filter(r => r.url && r.url !== RELAY_SELF_URL);
@@ -749,24 +752,19 @@ async function broadcastSTH(sth) {
     relay_pk_hash: relayIdentity.pk_hash,
   });
   for (const peer of peers) {
-    if (!isSsrfSafeUrl(peer.url)) { log('warn', 'gossip_ssrf_blocked', { url: (peer.url||'').slice(0,60) }); continue; }
+    const target = new URL('/v2/sth/ingest', peer.url).toString();
     try {
-      const target = new URL('/v2/sth/ingest', peer.url);
-      const mod = target.protocol === 'https:' ? https : http;
-      await new Promise(resolve => {
-        const r = mod.request({
-          hostname: target.hostname,
-          port: target.port || (target.protocol === 'https:' ? 443 : 80),
-          path: target.pathname,
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-        }, res2 => { res2.resume(); resolve(); });
-        r.setTimeout(3000, () => { r.destroy(); resolve(); });
-        r.on('error', () => resolve()); // non-blocking, best-effort
-        r.write(body);
-        r.end();
+      await safeHttpsRequest(target, {
+        method:  'POST',
+        timeout: 3000,
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        body,
       });
-    } catch {}
+    } catch (e) {
+      if      (e.code === 'SSRF_URL') log('warn', 'gossip_ssrf_blocked',          { url: (peer.url||'').slice(0,60) });
+      else if (e.code === 'SSRF_DNS') log('warn', 'gossip_dns_rebinding_blocked', { url: (peer.url||'').slice(0,60), resolved: e.resolved });
+      // network errors are non-blocking, best-effort (peer may be offline)
+    }
   }
 }
 
@@ -1644,37 +1642,71 @@ function isSsrfSafeUrl(urlStr) {
   } catch { return false; }
 }
 
+// ── Safe outbound HTTPS request ───────────────────────────────────────────────
+// Single helper used by every outbound request the relay makes (gossip,
+// webhooks). Two-stage SSRF guard:
+//   1. isSsrfSafeUrl(urlStr) - reject by URL (RFC1918, localhost, ports, ...)
+//   2. dns.lookup(hostname)  - re-resolve and reject if the resolved IP is
+//      itself unsafe (DNS-rebinding: a hostname that was public at
+//      registration may have flipped to a private IP before the request fires)
+// The request connects to the resolved IP directly (`hostname: resolved.address`)
+// with Host + servername set to the original hostname so TLS verification
+// still works. This pins the connection to the IP we just verified and
+// closes the TOCTOU window between the lookup and the connect.
+const _dnsPromises = require('dns').promises;
+async function safeHttpsRequest(urlStr, opts = {}) {
+  if (!isSsrfSafeUrl(urlStr)) {
+    const err = new Error('SSRF: URL not safe'); err.code = 'SSRF_URL'; throw err;
+  }
+  const u = new URL(urlStr);
+  const resolved = await _dnsPromises.lookup(u.hostname);
+  if (!isSsrfSafeUrl('https://' + resolved.address + '/')) {
+    const err = new Error('SSRF: resolved IP not safe (possible DNS rebinding)');
+    err.code = 'SSRF_DNS'; err.resolved = resolved.address;
+    throw err;
+  }
+  const headers = Object.assign({ Host: u.hostname }, opts.headers || {});
+  return new Promise((resolve, reject) => {
+    const r = https.request({
+      hostname:   resolved.address,
+      port:       u.port || 443,
+      path:       u.pathname + (u.search || ''),
+      method:     opts.method || 'POST',
+      headers,
+      servername: u.hostname,
+      timeout:    opts.timeout || 5000,
+    }, res2 => {
+      const chunks = [];
+      res2.on('data', c => chunks.push(c));
+      res2.on('end',  () => resolve({ status: res2.statusCode, headers: res2.headers, body: Buffer.concat(chunks) }));
+    });
+    r.on('timeout', () => { r.destroy(new Error('request timeout')); });
+    r.on('error',   reject);
+    if (opts.body) r.write(opts.body);
+    r.end();
+  });
+}
+
 // ── Webhook push ──────────────────────────────────────────────────────────────
 async function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = webhooks.get(`${deviceId}:${apiKey}`) || [];
   for (const hook of hooks) {
-    if (!isSsrfSafeUrl(hook.url)) { log('warn', 'webhook_ssrf_blocked', { url: (hook.url||'').slice(0,60) }); continue; }
-    // DNS rebinding defense: resolve the hostname and verify the resulting IP
-    // Prevents attack where domain resolves to public IP at registration, then DNS
-    // TTL expires and is switched to a private/RFC1918 address before firing.
-    try {
-      const _wu = new URL(hook.url);
-      const _resolved = await require('dns').promises.lookup(_wu.hostname);
-      if (!isSsrfSafeUrl('https://' + _resolved.address + '/')) {
-        log('warn', 'webhook_dns_rebinding_blocked', { url: hook.url.slice(0,60), resolved: _resolved.address });
-        continue;
-      }
-    } catch(e) {
-      log('warn', 'webhook_dns_resolve_fail', { url: (hook.url||'').slice(0,60), err: e.message });
-      continue;
-    }
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
+    const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
     try {
-      const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
-      const req = https.request(hook.url, {
-        method: 'POST',
+      await safeHttpsRequest(hook.url, {
+        method:  'POST',
+        timeout: 5000,
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
-                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, 'User-Agent': `paramant-relay/${VERSION}` }
+                   'X-Paramant-Event': event, 'X-Paramant-Sig': sig, 'User-Agent': `paramant-relay/${VERSION}` },
+        body: payload,
       });
-      req.on('error', () => {});
-      req.write(payload); req.end();
       stats.webhooks_sent++;
-    } catch(e) { log('warn', 'webhook_fail', { url: (hook.url||'').slice(0,60) }); }
+    } catch(e) {
+      if      (e.code === 'SSRF_URL') log('warn', 'webhook_ssrf_blocked',          { url: (hook.url||'').slice(0,60) });
+      else if (e.code === 'SSRF_DNS') log('warn', 'webhook_dns_rebinding_blocked', { url: (hook.url||'').slice(0,60), resolved: e.resolved });
+      else                            log('warn', 'webhook_fail',                  { url: (hook.url||'').slice(0,60), err: e.message });
+    }
   }
 }
 
