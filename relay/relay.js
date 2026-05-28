@@ -3239,7 +3239,17 @@ session = client.create_session('recipient@example.com')</pre>
   // ── POST /v2/anon-inbound — Keyless upload for magic-link flow ───────────────
   // No API key required. Rate limited by IP. Sender encrypts AES-256-GCM client-side;
   // the decryption key travels in the URL fragment only — relay never sees it.
+  // DEPRECATED 2026-05-28 (relay): the anonymous tier is being retired. The endpoint
+  // continues to serve sdk-js 3.x callers but advertises retirement via the
+  // Deprecation + Sunset response headers (RFC 8594 / draft-ietf-httpapi-deprecation).
+  // Removal happens in a future major release after telemetry shows traffic has
+  // drained.
   if (path === '/v2/anon-inbound' && req.method === 'POST') {
+    // Sticky headers: every writeHead() below will inherit these unless it
+    // explicitly overrides them, so 200/400/409/413/429/503 all carry them.
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', 'Wed, 31 Dec 2026 00:00:00 GMT');
+    res.setHeader('Link', '<https://paramant.app/parashare>; rel="successor-version"');
     const ANON_MAX = 5 * 1024 * 1024;
     const ANON_RPH = parseInt(process.env.ANON_RATE_PER_HOUR || '10');
     const HOUR_MS  = 3_600_000;

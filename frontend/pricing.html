@@ -368,7 +368,7 @@
 
     <div class="prose-section">
       <h3>Encryption</h3>
-      <p>Every tier uses the same cryptography. Quick /send transfers use AES-256-GCM with a browser-generated key that lives only in the URL fragment. Verified transfers via ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
+      <p>Every tier uses the same cryptography. Verified transfers via ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
     </div>
 
     <div class="prose-section">
@@ -412,10 +412,6 @@
       <div class="faq-a">RAM-only storage is finite. 5 MB covers every document that matters: contracts, medical referrals, legal filings, sensor payloads, firmware chunks. The limit is a consequence of the architecture, not an upsell gate. Enterprise customers with dedicated relays can configure higher limits.</div>
     </div>
 
-    <div class="faq-item">
-      <p class="faq-q">Does the /send flow use ML-KEM-768?</p>
-      <div class="faq-a">No. The /send flow uses AES-256-GCM with a browser-generated key delivered in the URL fragment. The key never reaches the relay. ML-KEM-768 + ECDH P-256 hybrid key exchange is used by <a href="/parashare">ParaShare</a> — the registered-device, verified-transfer flow.</div>
-    </div>
 
     <div class="faq-item">
       <p class="faq-q">Can I self-host Paramant for free?</p>
