@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
 <link rel="stylesheet" href="/parapear.css">
-<link rel="stylesheet" href="/components-parasign.css?v=2">
+<link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
 /* Hero pointing peer. Points at the primary 'Open your dashboard' CTA so
    the work-model is obvious: this is where you start. Tokens only. */
@@ -296,24 +296,27 @@
 <section class="section-dark" aria-labelledby="ct-h">
   <div class="home-section">
     <header class="home-section-head"><span class="eyebrow">Verifiable</span><h2 id="ct-h">Public Merkle proof of every transfer.</h2><p>Every transfer is hashed into a public Merkle tree whose root updates on every write. Prove a transfer occurred without learning what it was.</p></header>
-    <div class="ct-widget" role="region" aria-label="Live CT log">
-      <div class="ct-header">
-        <span><span class="dot" id="ct-dot" aria-hidden="true"></span> Certificate Transparency &middot; live</span>
-        <a href="/ct-log" style="color:var(--lime);text-decoration:none;font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.06em">View all &rarr;</a>
-      </div>
-      <div class="ct-stats">
-        <div class="ct-stat"><div class="ct-stat-label">Log entries</div><div class="ct-stat-val" id="ct-transfers">&mdash;</div></div>
-        <div class="ct-stat"><div class="ct-stat-label">Registered relays</div><div class="ct-stat-val" id="ct-relays">&mdash;</div></div>
-        <div class="ct-stat"><div class="ct-stat-label">STH signature</div><div class="ct-stat-val" id="ct-sth-status" style="font-size:var(--text-lg)">checking&hellip;</div></div>
-      </div>
-      <div class="ct-body">
-        <div class="ct-root-panel">
-          <div class="ct-feed-label">Latest root</div>
-          <div id="ct-root" style="font-family:var(--mono);font-size:var(--text-sm);color:var(--bone-on-navy-dim);word-break:break-all;line-height:1.7">syncing&hellip;</div>
+    <div class="ctw" role="region" aria-label="Live CT log">
+      <div class="ctw-stats">
+        <div class="ctw-stat">
+          <div class="ctw-num" id="ct-transfers">742</div>
+          <div class="ctw-lbl">Log entries</div>
+        </div>
+        <div class="ctw-stat">
+          <div class="ctw-num" id="ct-relays">5</div>
+          <div class="ctw-lbl">Registered relays</div>
+        </div>
+        <div class="ctw-stat">
+          <div class="ctw-num ctw-num-sm" id="ct-sth-status">ML-DSA-65</div>
+          <div class="ctw-lbl">STH signature</div>
         </div>
       </div>
-      <div class="ct-foot">
-        <span>Signed with ML-DSA-65 (FIPS 204)</span>
+      <div class="ctw-root">
+        <span class="ctw-root-lbl">Latest Merkle root (SHA3-256)</span>
+        <code class="ctw-root-val" id="ct-root">syncing&hellip;</code>
+      </div>
+      <div class="ctw-foot">
+        <span class="ctw-status"><span class="ctw-dot" id="ct-dot" aria-hidden="true"></span> Live &middot; Hetzner DE &middot; Signed with ML-DSA-65 (FIPS 204)</span>
         <a class="btn btn-lime" href="/ct-log">View live CT log</a>
       </div>
     </div>
@@ -395,6 +398,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
-<script src="/ct-stats.js" defer></script>
+<script src="/ct-stats.js?v=2" defer></script>
 </body>
 </html>

@@ -9,10 +9,10 @@
 
   function setDot(ok) {
     var dot = document.getElementById('ct-dot');
-    if (dot) dot.style.background = ok ? '#00cc33' : '#c84040';
+    if (dot) dot.style.background = ok ? '#B2FF3F' : '#FCA5A5';
   }
 
-  // /ct/feed — tree_size, root, last 50 entries with types
+  // /ct/feed -- tree_size, root, last 50 entries with types
   fetch(RELAY + '/ct/feed', {signal: AbortSignal.timeout(6000)})
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -22,15 +22,18 @@
 
       var root = d.root;
       if (root && root !== '0'.repeat(64)) {
-        set('ct-root', root.slice(0, 16) + '...' + root.slice(-8));
+        set('ct-root', root.slice(0, 16) + ' ... ' + root.slice(-16));
       }
 
       if (d.entries) {
-        // Registered relays = device key registrations (no type or type='key_reg')
-        var keyRegCount = d.entries.filter(function(e) {
-          return !e.type || e.type === 'key_reg';
-        }).length;
-        set('ct-relays', keyRegCount.toLocaleString());
+        var sectors = {};
+        d.entries.forEach(function(e) {
+          if (e && (e.type === 'relay_reg' || e.type === 'key_reg' || !e.type) && e.s) {
+            sectors[e.s] = true;
+          }
+        });
+        var n = Object.keys(sectors).length;
+        if (n > 0) set('ct-relays', n.toLocaleString());
 
         var feedEl = document.getElementById('ct-feed');
         if (feedEl && d.entries.length) {
@@ -38,10 +41,10 @@
           var rows = last3.map(function(e) {
             var ts = new Date(e.t);
             var time = ts.toISOString().slice(11, 19);
-            var hash = e.h ? e.h.slice(0, 12) + '...' : '—';
+            var hash = e.h ? e.h.slice(0, 12) + '...' : '--';
             return '<div><span style="color:var(--quiet)">#' + e.i + '</span>'
-              + ' &nbsp;·&nbsp; ' + hash
-              + ' &nbsp;·&nbsp; <span style="color:var(--quiet)">' + time + ' UTC</span></div>';
+              + ' &nbsp;&middot;&nbsp; ' + hash
+              + ' &nbsp;&middot;&nbsp; <span style="color:var(--quiet)">' + time + ' UTC</span></div>';
           });
           feedEl.innerHTML = rows.join('');
         }
@@ -49,7 +52,7 @@
     })
     .catch(function() { setDot(false); });
 
-  // STH status — disk-backed, signed with ML-DSA-65
+  // STH status -- disk-backed, signed with ML-DSA-65
   fetch(RELAY + '/v2/sth', {signal: AbortSignal.timeout(5000)})
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -57,10 +60,8 @@
       if (!el) return;
       if (d.ok && d.sth) {
         el.textContent = 'ML-DSA-65';
-        el.style.color = '#00cc33';
       } else {
         el.textContent = 'signed';
-        el.style.color = '#555';
       }
     })
     .catch(function() { set('ct-sth-status', 'offline'); });
