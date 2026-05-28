@@ -17,7 +17,17 @@ const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const BASE_PATH   = (process.env.BASE_PATH || '').replace(/\/$/, '');
 
+// All five relay sectors the admin needs to know about. Until 2026-05-28 the
+// 'main' relay (the one served at relay.paramant.app, internal SECTOR="relay")
+// was missing from this map even though docker-compose exposes RELAY_MAIN.
+// That blanked it out of signup fan-out, /admin/keys/all aggregation, and
+// stats -- so its /data/users.json drifted ~8 days behind the other sectors
+// (24 keys vs 114 on health). The map is the single source of truth for
+// every Object.keys(SECTORS) iteration in this file; add a sector here and
+// the rest follows. findUserByEmail() stays health-only on purpose: health
+// is the canonical admin-UI source and the lookup is hot-path.
 const SECTORS = {
+  main:    process.env.RELAY_MAIN    || 'http://relay-main:3000',
   health:  process.env.RELAY_HEALTH  || 'http://relay-health:3005',
   legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3002',
   finance: process.env.RELAY_FINANCE || 'http://relay-finance:3003',
@@ -734,9 +744,12 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   const existing = await findUserByEmail(email);
   if (existing) return res.redirect('/signup?error=account_exists');
 
-  // Create the account across every sector so the key works on every relay (including relay-main,
-  // which is what /parashare targets). Previously this only went to "health", which meant
-  // freshly-signed-up users would authenticate in admin but fail with "Invalid key" on uploads.
+  // Create the account across every sector listed in SECTORS so the key works
+  // on every relay -- including main (relay.paramant.app, internal sector
+  // "relay") which the SDK and direct API consumers target. Before SECTORS
+  // gained the 'main' entry (added together with this comment), the fan-out
+  // silently skipped main even while claiming to write to "every sector",
+  // and main's users.json drifted weeks behind the others.
   const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
   const createdAt = new Date().toISOString();
   const createBody = {
