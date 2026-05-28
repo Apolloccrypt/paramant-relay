@@ -83,6 +83,9 @@
 .ds-theme-btn{padding:8px 16px;border:0;background:transparent;color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-left:1px solid var(--ink-hair)}
 .ds-theme-btn.active{background:var(--cobalt);color:#fff}
 .ds-theme-btn:hover:not(.active){color:var(--navy)}
+.ds-api-status{margin:6px 0 0;padding:6px 10px;background:var(--bone);border:1px solid var(--ink-hair);font-size:11px}
+.ds-api-status.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,.04)}
+.ds-api-status.warn{border-color:#d4a017;color:#7a5300;background:#fff4d6}
 .ds-review-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 .ds-review-h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);font-weight:700;margin:0 0 8px}
 .ds-review-pane{background:var(--bone);border:1px solid var(--ink-hair);min-height:140px;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
@@ -427,16 +430,16 @@
     </div>
     <details class="ds-advanced" id="ds-advanced-block">
       <summary>Advanced: Paramant relay integration</summary>
-      <p><strong>Heads-up:</strong> being logged in to this website is <em>not</em> the same as having an API key for the relay. The website uses a session cookie to show you /sign; the relay API uses a separate <code>pgp_...</code> key. You need to copy your key from the Dashboard once - this browser tab remembers it after that.</p>
       <p>Optional for self-sign, <strong>required if you added recipients</strong>. With your Paramant API key, the relay (a) counter-signs the envelope and writes it to the public CT log, and (b) creates the multi-party envelope so co-signers can sign at <code>/co-sign?env=...</code>.</p>
       <div class="ds-field">
-        <label class="ds-label" for="ds-api-key">X-Api-Key (format: <code>pgp_...</code>)</label>
+        <label class="ds-label" for="ds-api-key">Your relay API key</label>
         <input class="ds-input" type="password" id="ds-api-key" placeholder="pgp_..." autocomplete="off">
+        <p class="ds-hint ds-api-status" id="ds-api-key-status" hidden></p>
         <div class="ds-actions" style="margin-top:8px">
           <a class="btn btn-tertiary" href="/dashboard#api-keys" target="_blank" rel="noopener" style="min-width:auto">Open my Dashboard</a>
           <button class="btn btn-tertiary" type="button" id="ds-api-key-clear" style="min-width:auto">Clear this key</button>
         </div>
-        <p class="ds-hint" style="margin-top:6px">Stored in this browser tab only (sessionStorage). Cleared when you close the tab. The key is sent only to <code>health.paramant.app</code>, never to other recipients.</p>
+        <p class="ds-hint" style="margin-top:6px">Linked to your account session (email + OTP). If you are logged in, this field fills automatically. The key is sent only to <code>health.paramant.app</code>, never to other recipients.</p>
       </div>
     </details>
     <div class="ds-actions">
@@ -611,6 +614,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=10"></script>
+<script type="module" src="/sign-flow.js?v=11"></script>
 </body>
 </html>

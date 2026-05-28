@@ -1580,17 +1580,21 @@ function wireThemeToggle() {
   });
 }
 
-// The relay API key (pgp_...) is separate from the website session cookie.
-// We remember it per-tab in sessionStorage so the user pastes it once and
-// not on every sign attempt within the same browser session.
+// The relay API key (pgp_...) is bound to the user's website session. We
+// auto-fetch it via /api/user/account/key when the page loads, so logged-in
+// users never have to paste anything. We also persist whatever ends up in
+// the field per-tab in sessionStorage as a fallback.
 function initApiKeyPersistence() {
   const input = $('ds-api-key');
   const clearBtn = $('ds-api-key-clear');
   if (!input) return;
+
+  // Hydrate from sessionStorage first (fast, no network).
   try {
     const saved = sessionStorage.getItem('paramant_sign_api_key');
     if (saved) input.value = saved;
   } catch {}
+
   input.addEventListener('input', () => {
     const v = input.value.trim();
     try {
@@ -1602,6 +1606,36 @@ function initApiKeyPersistence() {
     input.value = '';
     try { sessionStorage.removeItem('paramant_sign_api_key'); } catch {}
   });
+
+  // Auto-fetch from the website session (paramant_user_session cookie).
+  // If the user is logged in, /api/user/account/key returns { api_key: 'pgp_...' }
+  // and we silently fill the field. If they are not logged in, or the
+  // endpoint is unavailable, we leave the field empty for manual paste.
+  autoFetchApiKey(input).catch(() => {});
+}
+
+async function autoFetchApiKey(input) {
+  // Don't overwrite a value the user has already typed.
+  if (input.value.trim()) return;
+  try {
+    const r = await fetch('/api/user/account/key', { credentials: 'include' });
+    if (!r.ok) return;
+    const d = await r.json().catch(() => null);
+    const key = d && d.api_key;
+    if (key && /^pgp_/.test(key)) {
+      input.value = key;
+      try { sessionStorage.setItem('paramant_sign_api_key', key); } catch {}
+      // Surface that this happened so users understand why the field is filled.
+      const adv = document.getElementById('ds-advanced-block');
+      if (adv && !adv.open) adv.dataset.autofilled = '1';
+      const status = document.getElementById('ds-api-key-status');
+      if (status) {
+        status.hidden = false;
+        status.textContent = 'API key auto-loaded from your account session.';
+        status.className = 'ds-hint ds-api-status ok';
+      }
+    }
+  } catch {}
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
