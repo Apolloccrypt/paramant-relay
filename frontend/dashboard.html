@@ -1,180 +1,93 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Developer Dashboard</title>
-<link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=13">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your Paramant — Dashboard</title>
+<meta name="description" content="Your Paramant hub: send, receive, sign, verify. Post-quantum + AES-256-GCM. All crypto runs in your browser.">
+<meta name="theme-color" content="#0B1622">
+<link rel="icon" type="image/svg+xml" href="/assets/paramant-icon.svg">
+<link rel="preconnect" href="https://relay.paramant.app">
+<link rel="preload" href="/design-system.css" as="style">
+<link rel="stylesheet" href="/design-system.css">
+<link rel="stylesheet" href="/nav.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
-input,select,button{font-family:var(--mono);font-size:13px}
-a{color:var(--ink-dim);text-decoration:none}
-a:hover{color:var(--cobalt)}
+/* Page-scoped hub styles. Uses ONLY real design tokens (--navy, --ink, --bone,
+   --bone-2, --ink-dim, --ink-hair, --lime, --cobalt, --mono, --sans, --space-*).
+   The dashboard is always light (brand). The earlier "donkerblauw" came from
+   the PR #54 SPA's own internal dark mode; that rewrite is gone, so this
+   page now follows the design system (light) like the rest of the site.
+   The only literal-color rule is .nav-cta: the global nav.css CTA can render
+   with white text under certain UAs; brand pairing is lime-bg + navy-text. */
 
-/* Cards-per-product (Lovelace-style) — backwards-compatible toevoeging */
-.cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1px;background:rgba(11,58,106,.15);border:1px solid rgba(11,58,106,.15);margin-bottom:24px}
-.card{background:#EEF2F6;padding:18px 20px;display:flex;flex-direction:column;min-height:168px}
-.card-wide{grid-column:span 2}
-@media (max-width:720px){.card-wide{grid-column:span 1}}
-.card-header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(11,58,106,.15)}
-.card-header h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:#0B3A6A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
-.card-sub{font-size:10px;font-family:'SF Mono','Fira Code',monospace;color:rgba(11,58,106,.45);letter-spacing:.06em;text-transform:uppercase}
-.badge-coming{background:rgba(11,58,106,.08);color:rgba(11,58,106,.65);padding:2px 8px;font-size:9px;letter-spacing:.08em;text-transform:uppercase}
-.card-body{flex:1;display:flex;flex-direction:column;justify-content:center}
-.card-footer{margin-top:12px;padding-top:10px;border-top:1px solid rgba(11,58,106,.15);display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:11px}
-.card-footer a,.card-link{color:rgba(11,58,106,.65)}
-.card-footer a:hover,.card-link:hover{color:#1D4ED8}
-.card-footer button{background:none;border:1px solid rgba(11,58,106,.15);color:rgba(11,58,106,.65);padding:4px 10px;font-size:11px;cursor:pointer}
-.card-footer button:hover{border-color:#1D4ED8;color:#1D4ED8}
-.empty-state-card{color:rgba(11,58,106,.45);font-size:12px;line-height:1.6;margin:0}
-.empty-state-card a{color:#1D4ED8}
-.stat-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(11,58,106,.06)}
-.stat-row:last-child{border-bottom:none}
-.stat-label{color:rgba(11,58,106,.45);font-size:11px;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.04em}
-.stat-value{font-weight:600;font-size:12px;color:#0B3A6A;text-align:right}
-.card-entry{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(11,58,106,.06);font-size:11px;font-family:'SF Mono','Fira Code',monospace}
-.card-entry:last-child{border-bottom:none}
-.card-entry-meta{color:rgba(11,58,106,.45);flex-shrink:0}
-.card-loading{font-size:11px;color:rgba(11,58,106,.45);font-family:'SF Mono','Fira Code',monospace}
+.nav-cta, a.nav-cta, .nav .nav-cta { color: var(--navy) !important; }
 
-/* === v2 dashboard: dark mode, drill-down, search, mobile, skeleton rows === */
-:root[data-theme="dark"]{--bone:#0B1622;--ink:#E8EEF6;--ink-dim:rgba(232,238,246,.65);--cobalt:#5B9BFF}
-[data-theme="dark"] body{background:#0B1622;color:#E8EEF6}
-[data-theme="dark"] .meta-bar,[data-theme="dark"] .nav{background:#0B1622;color:#E8EEF6;border-color:rgba(180,200,230,.15)}
-[data-theme="dark"] .cards-grid{background:rgba(180,200,230,.15);border-color:rgba(180,200,230,.15)}
-[data-theme="dark"] .card{background:#13202E}
-[data-theme="dark"] .card-header,[data-theme="dark"] .card-footer{border-color:rgba(180,200,230,.12)}
-[data-theme="dark"] .card-header h2,[data-theme="dark"] .stat-value{color:#E8EEF6}
-[data-theme="dark"] .stat-row,[data-theme="dark"] .card-entry{border-color:rgba(180,200,230,.08)}
-[data-theme="dark"] .nav-help{color:#98A7BD;border-color:rgba(180,200,230,.2)}
-[data-theme="dark"] a{color:rgba(232,238,246,.65)}
+main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
 
-.theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid rgba(11,58,106,.15);background:transparent;color:inherit;cursor:pointer;border-radius:8px;transition:background .15s ease,border-color .15s ease}
-.theme-toggle:hover{border-color:#1D4ED8}
-[data-theme="dark"] .theme-toggle{border-color:rgba(180,200,230,.2)}
-.theme-toggle svg{width:16px;height:16px}
+.hub-hero { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-5); }
+.hub-hero h1 { font-family: var(--sans); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; letter-spacing: -.01em; margin: 0; color: var(--ink); }
+.hub-hero .sub { font-family: var(--sans); font-size: 15px; line-height: 1.55; color: var(--ink-dim); max-width: 680px; margin: 0; }
+.hub-hero .pq-tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.hub-hero .pq-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); }
 
-/* clickable drill-down cards */
-.card[data-card]{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
-.card[data-card]:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(11,58,106,.10)}
-[data-theme="dark"] .card[data-card]:hover{box-shadow:0 6px 20px rgba(0,0,0,.45)}
-.card[data-card]:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}
-.card-footer a,.card-footer button{position:relative;z-index:2}
+.auth-status { border: 1px solid var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; background: transparent; }
+.auth-status .auth-msg { font-family: var(--sans); font-size: 14px; color: var(--ink); margin: 0; flex: 1 1 auto; min-width: 220px; line-height: 1.5; }
+.auth-status .auth-msg strong { color: var(--ink); font-weight: 600; }
+.auth-status .auth-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.auth-status .auth-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--bone-2); color: var(--ink-dim); font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-left: 6px; }
 
-/* drill-down side panel */
-.side-panel-backdrop{position:fixed;inset:0;background:rgba(11,22,34,.4);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:90}
-.side-panel-backdrop.open{opacity:1;pointer-events:auto}
-.side-panel{position:fixed;right:0;top:0;height:100vh;width:min(460px,100vw);background:var(--bone,#F8FAFC);color:var(--ink,#0B3A6A);border-left:1px solid rgba(11,58,106,.15);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);overflow-y:auto;padding:24px 26px;z-index:100}
-[data-theme="dark"] .side-panel{background:#0F1B28;border-left-color:rgba(180,200,230,.15)}
-.side-panel.open{transform:translateX(0);box-shadow:-8px 0 32px rgba(11,22,34,.18)}
-.side-panel-close{position:absolute;top:18px;right:20px;width:30px;height:30px;border:none;background:none;font-size:24px;line-height:1;color:inherit;cursor:pointer;opacity:.55}
-.side-panel-close:hover{opacity:1}
-.side-panel h3{font-size:16px;margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
-.side-panel .sp-sub{font-size:11px;font-family:'SF Mono','Fira Code',monospace;color:rgba(11,58,106,.45);letter-spacing:.06em;text-transform:uppercase;margin-bottom:18px}
-[data-theme="dark"] .side-panel .sp-sub{color:rgba(232,238,246,.45)}
+.btn-primary, .btn-secondary { font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: .04em; padding: 9px 14px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--lime); color: var(--navy); border-color: var(--lime); }
+.btn-primary:hover { filter: brightness(.96); }
+.btn-secondary { background: transparent; color: var(--ink); border-color: var(--ink-hair); }
+.btn-secondary:hover { border-color: var(--ink); }
 
-/* search */
-.dash-search{position:relative;display:inline-flex;align-items:center}
-.dash-search input{width:200px;max-width:44vw;background:transparent;border:1px solid rgba(11,58,106,.2);border-radius:999px;padding:7px 30px 7px 30px;font-size:12px;color:inherit;outline:none;transition:border-color .15s ease,width .2s ease}
-.dash-search input:focus{border-color:#1D4ED8;width:240px}
-[data-theme="dark"] .dash-search input{border-color:rgba(180,200,230,.25)}
-.dash-search .si{position:absolute;left:10px;width:13px;height:13px;opacity:.5;pointer-events:none}
-.dash-search .kbd{position:absolute;right:11px;font-size:10px;font-family:'SF Mono',monospace;opacity:.45;pointer-events:none}
-.search-hidden{display:none !important}
+.key-paste { display: none; gap: var(--space-2); align-items: center; width: 100%; margin-top: var(--space-2); flex-wrap: wrap; }
+.key-paste.open { display: flex; }
+.key-paste input { flex: 1 1 240px; min-width: 200px; font-family: var(--mono); font-size: 13px; padding: 9px 12px; border: 1px solid var(--ink-hair); border-radius: 8px; background: transparent; color: var(--ink); }
+.key-paste input:focus { outline: none; border-color: var(--ink); }
+.key-paste .key-err { color: var(--ink); font-family: var(--mono); font-size: 11px; opacity: .8; }
 
-/* skeleton card body */
-.card-skel{display:flex;flex-direction:column;gap:10px;width:100%}
+.block-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin: var(--space-5) 0 var(--space-3); }
 
-/* mobile */
-@media (max-width:768px){
-  .dash-wrap{padding:20px 16px !important}
-  .dash-head{padding:22px 16px 16px !important}
-  .dash-2col{grid-template-columns:1fr !important}
-  .side-panel{width:100vw;border-left:none}
-  .dash-search input,.dash-search input:focus{width:130px;max-width:38vw}
-}
-@media (max-width:480px){
-  .card-header h2{font-size:12px}
-}
-</style>
-<meta property="og:title" content="PARAMANT — Developer Dashboard">
-<meta property="og:description" content="PARAMANT — Developer Dashboard">
-<meta property="og:url" content="https://paramant.app/dashboard">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PARAMANT — Developer Dashboard">
-<meta name="twitter:description" content="PARAMANT — Developer Dashboard">
-<link rel="canonical" href="https://paramant.app/dashboard">
-<style>
-.nav-help {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  color: #475569;
-  text-decoration: none;
-  border: 1px solid #E2E8F0;
-  transition: all 140ms ease;
-  margin-right: 12px;
-}
-.nav-help::before {
-  content: "?";
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid #64748b;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  font-family: Inter, sans-serif;
-  line-height: 1;
-}
-.nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
-}
-.nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
-}
-.nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
-  outline-offset: 2px;
-}
-.nav-help-mobile {
-  display: block;
-  padding: 12px 20px;
-  font-family: IBM Plex Mono, monospace;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: #475569;
-  text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
-}
-.nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
-}
-@media (max-width: 900px) {
-  .nav-help { display: none; }
-}
+.action-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+@media (max-width: 640px) { .action-pair { grid-template-columns: 1fr; } }
+
+.action-card { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); border: 1px solid var(--ink-hair); border-radius: 14px; text-decoration: none; color: var(--ink); background: transparent; transition: border-color .15s, transform .15s; }
+.action-card:hover { border-color: var(--ink); transform: translateY(-1px); }
+.action-card .icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--lime); color: var(--navy); font-family: var(--mono); font-weight: 700; font-size: 18px; margin-bottom: var(--space-2); }
+.action-card h2 { font-family: var(--sans); font-size: 19px; margin: 0; color: var(--ink); letter-spacing: -.01em; }
+.action-card p { font-family: var(--sans); font-size: 14px; line-height: 1.5; margin: 0; color: var(--ink-dim); }
+.action-card .pq-line { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); margin-top: var(--space-2); }
+
+.tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.tool-card { display: flex; flex-direction: column; gap: 4px; padding: var(--space-3) var(--space-4); border: 1px solid var(--ink-hair); border-radius: 12px; text-decoration: none; color: var(--ink); background: transparent; transition: border-color .15s; }
+.tool-card:hover { border-color: var(--ink); }
+.tool-card h3 { font-family: var(--sans); font-size: 16px; margin: 0; color: var(--ink); }
+.tool-card p { font-family: var(--sans); font-size: 13px; line-height: 1.5; margin: 0; color: var(--ink-dim); }
+
+.account-block { margin-top: var(--space-5); }
+.account-block.empty { display: none; }
+.account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
+.acct-card { border: 1px solid var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); background: transparent; }
+.acct-card .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
+.acct-card .val { font-family: var(--sans); font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
+.acct-card .val.small { font-size: 15px; font-family: var(--mono); }
+
+.account-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+
+.relay-row { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; }
+.relay-row .relay-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+.chip { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--ink-hair); background: transparent; color: var(--ink); cursor: pointer; }
+.chip:hover { border-color: var(--ink); }
+.chip.active { background: var(--lime); color: var(--navy); border-color: var(--lime); }
+
 </style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-to-main">Skip to main content</a>
 
+<!-- BEGIN canonical chrome (verbatim from send.html — same nav + mobile drawer + footer used site-wide) -->
 <div class="meta-bar">
   <span class="">build 3.0.0</span>
   <span class="sep">·</span>
@@ -189,7 +102,7 @@ a:hover{color:var(--cobalt)}
   <ul class="nav-links">
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Products menu" aria-haspopup="true" aria-expanded="false">Products</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/send" role="menuitem">Send a file</a></li>
         <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
@@ -203,7 +116,7 @@ a:hover{color:var(--cobalt)}
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Developers menu" aria-haspopup="true" aria-expanded="false">Developers</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
         <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
@@ -215,20 +128,21 @@ a:hover{color:var(--cobalt)}
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Self-host menu" aria-haspopup="true" aria-expanded="false">Self-host</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
         <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="/install-client.sh" role="menuitem">install-client.sh</a></li>
+        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
+        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
         <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open Compliance menu" aria-haspopup="true" aria-expanded="false">Compliance</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li class="nav-subheader" role="presentation">Standards</li>
         <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
@@ -252,12 +166,13 @@ a:hover{color:var(--cobalt)}
     <li><a href="/vs" class="nav-link">Compare</a></li>
 
     <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-label="Open About menu" aria-haspopup="true" aria-expanded="false">About</button>
+      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/status" role="menuitem">Status</a></li>
         <li role="none"><a href="/security" role="menuitem">Security</a></li>
         <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
         <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
+        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
         <li role="none"><a href="/license" role="menuitem">License</a></li>
         <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
         <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
@@ -267,7 +182,6 @@ a:hover{color:var(--cobalt)}
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -275,7 +189,7 @@ a:hover{color:var(--cobalt)}
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
-<div id="main-content" tabindex="-1" aria-hidden="true" style="outline:none"></div>
+</nav>
 <div class="nav-mobile" id="nav-mobile">
   <div class="nav-mobile-group">
     <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
@@ -352,679 +266,302 @@ a:hover{color:var(--cobalt)}
 
   <a href="/help" class="nav-mobile-standalone">Help</a>
 </div>
+<!-- END canonical chrome -->
 
-<style id="ps-launch-css">
-.launch-wrap{max-width:1100px;margin:24px auto 0;padding:0 20px}
-.launch-head{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:12px}
-.launch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-.launch-card{display:block;padding:16px;border:1px solid var(--ink-hair);border-radius:12px;background:transparent;text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
-.launch-card:hover{border-color:var(--cobalt);transform:translateY(-2px)}
-.launch-card .lt{font-weight:700;font-size:14px;margin-bottom:4px;font-family:var(--sans)}
-.launch-card .ld{font-size:12px;color:var(--ink-dim);line-height:1.4}
-@media(max-width:600px){.launch-grid{grid-template-columns:1fr 1fr}}
-</style>
-<section class="launch-wrap" aria-label="Quick actions">
-  <div class="launch-head">Quick actions</div>
-  <div class="launch-grid">
-    <a class="launch-card" href="/send"><div class="lt">Send a file</div><div class="ld">Anonymous, burn-on-read</div></a>
-    <a class="launch-card" href="/parashare"><div class="lt">ParaShare</div><div class="ld">Verified, signed receipts</div></a>
-    <a class="launch-card" href="/drop"><div class="lt">ParaDrop</div><div class="ld">Device-to-device</div></a>
-    <a class="launch-card" href="/sign"><div class="lt">ParaSign</div><div class="ld">Sign a document</div></a>
-    <a class="launch-card" href="/verify"><div class="lt">Verify signature</div><div class="ld">Check a .psign</div></a>
-    <a class="launch-card" href="/get"><div class="lt">Receive</div><div class="ld">Open a secure link</div></a>
-  </div>
-</section>
-<div id="root"></div>
+<main id="main-content" class="hub">
 
-<div id="side-panel-backdrop" class="side-panel-backdrop" onclick="closeSidePanel()"></div>
-<aside id="side-panel" class="side-panel" aria-label="Detail panel">
-  <button class="side-panel-close" onclick="closeSidePanel()" aria-label="Close panel">&times;</button>
-  <div id="side-panel-content"></div>
-</aside>
-
-<script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script>
-const RELAYS=[
-  {l:"Health",u:"https://health.paramant.app",sector:"healthcare"},
-  {l:"Finance",u:"https://finance.paramant.app",sector:"finance"},
-  {l:"Legal",u:"https://legal.paramant.app",sector:"legal"},
-  {l:"IoT",u:"https://iot.paramant.app",sector:"iot"},
-];
-
-// v4 design tokens — cobalt for success/active states, no lime text.
-// Theme-aware: the SPA interpolates V.x into inline styles, so a theme
-// switch is just reassigning V + re-render (CSS chrome handled by [data-theme]).
-const _FONT="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
-const _MONO="'SF Mono','Fira Code','Cascadia Code',monospace";
-const THEMES={
-  light:{bg:"#F8FAFC", sur:"#EEF2F6", b:"rgba(11,58,106,.15)",
-    t:"#0B3A6A", m:"rgba(11,58,106,.65)", q:"rgba(11,58,106,.45)",
-    g:"#1D4ED8", font:_FONT, mono:_MONO},
-  // on-brand deep-navy dark (not pure black) — keeps PARAMANT petrol identity
-  dark:{bg:"#0B1622", sur:"#13202E", b:"rgba(180,200,230,.15)",
-    t:"#E8EEF6", m:"rgba(232,238,246,.70)", q:"rgba(232,238,246,.45)",
-    g:"#5B9BFF", font:_FONT, mono:_MONO}
-};
-function initialTheme(){
-  try{const s=localStorage.getItem("paramant-theme");if(s==="light"||s==="dark")return s}catch{}
-  return (window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";
-}
-let theme=initialTheme();
-let V=THEMES[theme];
-document.documentElement.dataset.theme=theme;
-function applyTheme(t){
-  theme=t;V=THEMES[t];document.documentElement.dataset.theme=t;
-  try{localStorage.setItem("paramant-theme",t)}catch{}
-  render();
-}
-function toggleTheme(){applyTheme(theme==="dark"?"light":"dark")}
-function themeToggleBtn(){
-  const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
-  const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>';
-  return `<button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle theme">${theme==="dark"?sun:moon}</button>`;
-}
-
-let apiKey="",relay=RELAYS[0],data=null,health={},lastPoll=null,loading=false;
-let testLog=[],testRunning=false;
-
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}
-
-async function fetchHealth(){
-  await Promise.all(RELAYS.map(async r=>{
-    try{const res=await fetch(r.u+"/health",{signal:AbortSignal.timeout(4000)});
-      health[r.u]=res.ok?await res.json():false}
-    catch{health[r.u]=false}
-  }));
-  renderHealthBar();
-}
-
-async function fetchMonitor(){
-  if(!apiKey)return;
-  loading=true;softRender();
-  try{
-    const r=await fetch(relay.u+"/v2/monitor",{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(8000)});
-    if(r.ok){data=await r.json();lastPoll=new Date()}
-    else data=null;
-    if(data){
-      try{
-        const ct=await fetch(relay.u+"/v2/ct/log?limit=10",{signal:AbortSignal.timeout(5000)});
-        if(ct.ok){const ctd=await ct.json();data.audit=ctd.entries||[]}
-      }catch{}
-    }
-  }catch(e){}
-  loading=false;softRender();
-  const al=document.getElementById("audit-log");
-  if(al&&data&&data.audit&&data.audit.length){
-    al.innerHTML=data.audit.map(e=>
-      `<div data-row-text="${esc((e.leaf_hash||"")+" "+(e.iso||e.ts||""))}" style="display:flex;gap:20px;font-size:11px;font-family:${V.mono};padding:4px 0;border-bottom:1px solid ${V.b}">
-        <span style="color:${V.q};flex-shrink:0">${(e.iso||e.ts||"").slice(11,19)||"—"}</span>
-        <span style="color:${e.device_hash?"#4a6a9c":V.m}">${esc(e.leaf_hash?(e.leaf_hash).slice(0,16)+"…":"—")}</span>
-        <span style="color:${V.q}">index: ${e.index??""}</span>
-      </div>`
-    ).join("");
-    applySearchFilter();
-  } else if(al&&data){
-    al.innerHTML=`<div style="font-size:12px;color:${V.q};font-family:${V.mono}">No audit entries</div>`;
-  }
-}
-
-function addTestLog(msg,level="info"){
-  const t=new Date().toLocaleTimeString();
-  const sym={info:"·",ok:"✓",error:"✗",send:"→",recv:"←",warn:"⚠"}[level]||"·";
-  const col={info:V.q,ok:V.g,error:"#8c3a3a",send:"#4a6a9c",recv:V.g,warn:"#8c7a2d"}[level]||V.q;
-  testLog.push({t,sym,msg,col});
-  if(testLog.length>50)testLog.shift();
-  renderTestLog();
-}
-
-function renderTestLog(){
-  const el=document.getElementById("test-log");
-  if(!el)return;
-  el.innerHTML=testLog.slice(-20).reverse().map(e=>
-    `<div style="display:flex;gap:12px;padding:4px 0;border-bottom:1px solid ${V.b};font-size:12px;font-family:${V.mono}">
-      <span style="color:${V.q};flex-shrink:0">${e.t}</span>
-      <span style="color:${e.col};flex-shrink:0">${e.sym}</span>
-      <span style="color:${V.m}">${esc(e.msg)}</span>
-    </div>`
-  ).join("");
-}
-
-async function runE2ETest(){
-  if(testRunning){addTestLog("Test already running","warn");return}
-  if(!apiKey){addTestLog("No API key","error");return}
-  testRunning=true;testLog=[];
-  addTestLog("E2E test started — "+relay.u,"info");
-  try{
-    // Step 1 — Health
-    addTestLog("1/6 — Relay health check","info");
-    const hd=await fetch(relay.u+"/health",{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
-    if(!hd.ok)throw new Error("Relay unhealthy");
-    addTestLog("Relay v"+hd.version+" | uptime "+hd.uptime_s+"s","ok");
-
-    // Step 2 — API key
-    addTestLog("2/6 — API key validation","info");
-    const kd=await fetch(relay.u+"/v2/check-key",{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)}).then(r=>r.json());
-    if(!kd.valid)throw new Error("API key invalid");
-    addTestLog("Key valid | plan: "+kd.plan,"ok");
-
-    // Step 3 — Upload blob
-    addTestLog("3/6 — uploading 5 MB test blob...","info");
-    const payload=new TextEncoder().encode("PARAMANT-E2E-"+Date.now());
-    const blobBuf=new Uint8Array(5242880);
-    blobBuf.set(payload);
-    const hashBuf=await crypto.subtle.digest("SHA-256",blobBuf);
-    const hash=Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-    // Base64 encode in chunks (5 MB won't fit in a single btoa call)
-    let b64="";
-    const chunk=8192;
-    for(let i=0;i<blobBuf.length;i+=chunk){b64+=String.fromCharCode(...blobBuf.subarray(i,i+chunk));}
-    b64=btoa(b64);
-    const body=JSON.stringify({hash,payload:b64,ttl_ms:300000});
-    const t0=Date.now();
-    const up=await fetch(relay.u+"/v2/inbound",{
-      method:"POST",
-      headers:{"X-Api-Key":apiKey,"Content-Type":"application/json"},
-      body,signal:AbortSignal.timeout(30000)
-    });
-    if(!up.ok){const err=await up.json().catch(()=>({}));throw new Error("Upload HTTP "+up.status+(err.error?" — "+err.error:""));}
-    const upRes=await up.json();
-    if(!upRes.ok&&!upRes.hash)throw new Error("Upload failed: "+(upRes.error||"unknown"));
-    const upMs=Date.now()-t0;
-    addTestLog("Sent in "+upMs+"ms | hash: "+hash.slice(0,16)+"...","ok");
-
-    // Step 4 — Status check
-    addTestLog("4/6 — Status verification","info");
-    const st=await fetch(relay.u+"/v2/status/"+hash,{
-      headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(5000)
-    }).then(r=>r.json());
-    if(!st.available)throw new Error("Blob not available after upload");
-    addTestLog("Blob available in RAM | "+Math.round((st.size||5*1024*1024)/1024)+"KB","ok");
-
-    // Step 5 — Download + burn
-    addTestLog("5/6 — Download + burn-on-read","info");
-    const t1=Date.now();
-    const dl=await fetch(relay.u+"/v2/outbound/"+hash,{
-      headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(30000)
-    });
-    if(!dl.ok)throw new Error("Download HTTP "+dl.status);
-    const received=await dl.arrayBuffer();
-    const dlMs=Date.now()-t1;
-    addTestLog("Received in "+dlMs+"ms | "+Math.round(received.byteLength/1024)+"KB","ok");
-
-    // Step 6 — Burn verification
-    addTestLog("6/6 — Burn verification","info");
-    await new Promise(r=>setTimeout(r,300));
-    const burned=await fetch(relay.u+"/v2/status/"+hash,{
-      headers:{"X-Api-Key":apiKey}
-    }).then(r=>r.json()).catch(()=>({available:false}));
-    if(burned.available)throw new Error("Blob still available after read — burn-on-read defect");
-    addTestLog("Blob burned after download","ok");
-
-    addTestLog("","info");
-    addTestLog("E2E passed in "+(upMs+dlMs)+"ms | upload: "+upMs+"ms | download: "+dlMs+"ms","ok");
-    fetchMonitor();
-  }catch(e){addTestLog("Test failed: "+e.message,"error")}
-  testRunning=false;
-}
-
-function statCard(label,val,sub,color){
-  return`<div style="background:${V.sur};border:1px solid ${V.b};padding:20px">
-    <div style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">${label}</div>
-    <div style="font-size:28px;font-weight:800;letter-spacing:-.02em;color:${color||V.t};font-family:${V.font}">${val!=null?val:"—"}</div>
-    ${sub?`<div style="font-size:11px;color:${V.q};margin-top:4px;font-family:${V.mono}">${sub}</div>`:""}
-  </div>`
-}
-
-function renderHealthBar(){
-  const el=document.getElementById("hbar");
-  if(!el)return;
-  el.innerHTML=RELAYS.map(r=>{
-    const hd=health[r.u];const ok=hd&&(hd.ok||hd.status==='ok');const fail=hd===false;
-    return`<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:11px;font-family:${V.mono};border:1px solid ${ok?V.g:fail?"#8c3a3a":V.b};background:${ok?V.g:V.bg};color:${ok?V.bg:fail?"#8c3a3a":V.q}">
-      ${r.l}${ok&&hd.uptime_s?" "+Math.floor(hd.uptime_s/3600)+"h":""}
-    </span>`
-  }).join("");
-}
-
-function softRender(){
-  const el=document.getElementById("stats-grid");
-  if(!el||!data)return;
-  const d=data||{};const dl=d.delivery||{};const st=d.stats||{};
-  const sr=dl.success_rate;
-  const src=sr>=95?V.g:sr>=80?"#8c7a2d":"#8c3a3a";
-  el.innerHTML=
-    statCard("Sent",dl.total??st.inbound,"total blobs")+
-    statCard("Acknowledged",dl.acked,"with ACK",V.g)+
-    statCard("Success rate",sr!=null?sr+"%":null,null,src)+
-    statCard("Avg latency",dl.avg_latency_ms!=null?dl.avg_latency_ms+"ms":null,"send → ACK","#4a6a9c")+
-    statCard("In flight",d.blobs_in_flight,"in RAM","#8c7a2d")+
-    statCard("Burned",st.burned,"burn-on-read")+
-    statCard("Pending",dl.pending,null,dl.pending>0?"#8c7a2d":V.t)+
-    statCard("Webhooks",st.webhooks_sent);
-
-  const dt=document.getElementById("delivery-table");
-  if(dt){
-    if(d.history&&d.history.length){
-      dt.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
-        <thead><tr>${["Hash","Device","Size","Status","Auth","Age"].map(h=>`<th style="text-align:left;padding:10px 16px;font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.06em;border-bottom:1px solid ${V.b};text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
-        <tbody>${d.history.map((it,i)=>`<tr data-row-text="${esc((it.hash||"")+" "+(it.device||""))}" style="background:${i%2===0?V.bg:V.sur}">
-          <td style="padding:10px 16px;font-size:11px;color:${V.q};font-family:${V.mono}">${esc(it.hash||"")}</td>
-          <td style="padding:10px 16px;font-size:12px;color:${V.m}">${esc(it.device||"—")}</td>
-          <td style="padding:10px 16px;font-size:12px;color:${V.m}">${it.size?(it.size/1024).toFixed(1)+"KB":"—"}</td>
-          <td style="padding:10px 16px;font-size:12px">${it.acked?`<span style="color:${V.g}">ACK ${it.latency_ms?it.latency_ms+"ms":""}</span>`:`<span style="color:#8c7a2d">pending</span>`}</td>
-          <td style="padding:10px 16px;font-size:12px">${it.sig_verified?`<span style="color:${V.g}">verified</span>`:`<span style="color:${V.q}">—</span>`}</td>
-          <td style="padding:10px 16px;font-size:11px;color:${V.q}">${it.sent_ts?Math.round((Date.now()-it.sent_ts)/1000)+"s":"—"}</td>
-        </tr>`).join("")}</tbody>
-      </table></div>`;
-    } else {
-      dt.innerHTML=`<div class="empty-state is-compact" style="border:none;background:transparent">
-        <div class="empty-state-glyph" aria-hidden="true">↯</div>
-        <p class="empty-state-title">No deliveries yet</p>
-        <p class="empty-state-hint">Run the E2E test above, or send a file from the SDK to see it land here in real time.</p>
-        <div class="empty-state-actions">
-          <button onclick="runE2ETest()" class="btn btn-secondary" style="font-size:11px;padding:10px 18px">Run E2E test</button>
-        </div>
-      </div>`;
-    }
-  }
-  const pi=document.getElementById("poll-info");
-  if(pi)pi.textContent=loading?"polling...":(ws?"⚡ live · ":"")+(lastPoll?"↻ "+lastPoll.toLocaleTimeString():"");
-  applySearchFilter();
-}
-
-// ── Cards-per-product loader (Lovelace-style) — hergebruikt apiKey/relay + echte relay-endpoints ──
-async function cardFetch(path){
-  const r=await fetch(relay.u+path,{headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(8000)});
-  if(!r.ok)throw new Error("HTTP "+r.status);
-  return r.json();
-}
-function cardSet(name,html){
-  const el=document.querySelector(`[data-card="${name}"] .card-body`);
-  if(el)el.innerHTML=html;
-}
-function cardErr(name,msg){cardSet(name,`<p class="empty-state-card">Unavailable: ${esc(msg)}</p>`)}
-function cardRow(label,val){return`<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-value">${val}</span></div>`}
-
-const PLAN_RETENTION={free:"1 hour",community:"1 hour",pro:"24 hours",enterprise:"7 days"};
-const PLAN_VIEWS={free:"1",community:"1",pro:"10",enterprise:"100"};
-const TRANSFER_EVENTS=["inbound","outbound_view","drop_created","drop_pickup"];
-const EVENT_LABEL={inbound:"Sent",outbound_view:"Received",outbound_burn:"Burned",ack_received:"ACK",drop_created:"Drop created",drop_pickup:"Drop pickup",did_registered:"Key registered",attestation:"Attestation",inbound_aborted:"Aborted"};
-function evLabel(e){return EVENT_LABEL[e]||e||"event"}
-function evTime(ts){return ts?(String(ts).slice(11,19)||String(ts).slice(0,10)):""}
-
-// Account + Plan cards — /v2/check-key returns {valid, plan} only
-async function loadAccountPlan(){
-  try{
-    const d=await cardFetch("/v2/check-key");
-    const plan=d.plan||"—";
-    cardSet("account",
-      cardRow("Relay",esc(relay.l))+
-      cardRow("Status",d.valid?`<span style="color:${V.g}">Connected</span>`:`<span style="color:#8c3a3a">Invalid key</span>`)+
-      cardRow("Region","eu/de · ram only"));
-    cardSet("plan",
-      cardRow("Tier",esc(plan))+
-      cardRow("Max file","5 MB")+
-      cardRow("Retention",PLAN_RETENTION[plan]||"—")+
-      cardRow("Views / blob",PLAN_VIEWS[plan]||"—"));
-  }catch(e){cardErr("account",e.message);cardErr("plan",e.message)}
-}
-
-// Stream card — /v2/monitor
-async function loadStreamCard(){
-  try{
-    const d=await cardFetch("/v2/monitor");
-    const dl=d.delivery||{};const sr=dl.success_rate;const st=d.stats||{};
-    cardSet("stream",
-      cardRow("Blobs in flight",d.blobs_in_flight??"—")+
-      cardRow("Inbound total",st.inbound??"—")+
-      cardRow("Delivery rate",sr!=null?(sr*100).toFixed(1)+"%":"—"));
-  }catch(e){cardErr("stream",e.message)}
-}
-
-// Transfer + Activity + Keys cards — all from /v2/audit
-async function loadAuditCards(){
-  try{
-    const d=await cardFetch("/v2/audit?limit=100");
-    const entries=d.entries||[];
-    const tf=entries.filter(e=>TRANSFER_EVENTS.includes(e.event)).slice(0,5);
-    cardSet("transfer",tf.length
-      ? tf.map(e=>`<div class="card-entry"><span>${esc(evLabel(e.event))}${e.bytes?" · "+(e.bytes/1024).toFixed(1)+"KB":""}</span><span class="card-entry-meta">${esc(evTime(e.ts))}</span></div>`).join("")
-      : `<p class="empty-state-card">No transfers yet. <a href="/send">Send your first file.</a></p>`);
-    const recent=entries.slice(0,8);
-    cardSet("activity",recent.length
-      ? recent.map(e=>`<div class="card-entry"><span>${esc(evLabel(e.event))}${e.device?" · "+esc(e.device):""}</span><span class="card-entry-meta">${esc(evTime(e.ts))}</span></div>`).join("")
-      : `<p class="empty-state-card">No activity yet.</p>`);
-    const devices=new Set(entries.filter(e=>e.event==="did_registered"&&e.device).map(e=>e.device));
-    const masked=(apiKey||"").slice(0,8)+"…";
-    cardSet("keys",
-      cardRow("API key",`<code>${esc(masked)}</code>`)+
-      cardRow("Devices",devices.size||"—")+
-      cardRow("Audit chain",d.chain_valid?`<span style="color:${V.g}">verified</span>`:`<span style="color:#8c7a2d">—</span>`));
-  }catch(e){cardErr("transfer",e.message);cardErr("activity",e.message);cardErr("keys",e.message)}
-}
-
-function loadCards(){
-  if(!apiKey)return;
-  loadAccountPlan();
-  loadStreamCard();
-  loadAuditCards();
-}
-
-function waitlistSign(){alert('Email privacy@paramant.app with subject "ParaSign waitlist" to be notified when browser-side post-quantum signing lands.')}
-function rotateKey(){alert("Key rotation currently runs via the admin script / SDK. A self-service web flow is coming soon.")}
-
-function render(){
-  if(!apiKey){
-    document.getElementById("root").innerHTML=`
-    <div style="padding:80px 24px 64px">
-      <div style="position:fixed;top:74px;right:24px;z-index:50">${themeToggleBtn()}</div>
-      <div style="width:100%;max-width:400px;margin:0 auto">
-        <h1 style="font-family:${V.font};font-size:24px;font-weight:700;color:${V.t};letter-spacing:-.02em;margin-bottom:8px">Dashboard</h1>
-        <p style="font-size:13px;color:${V.q};margin-bottom:28px;line-height:1.65">Monitor delivery stats, run end-to-end tests, inspect the CT log, and debug your integration.</p>
-        <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
-        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">API key</label>
-        <input id="ki" placeholder="pgp_..." style="width:100%;background:${V.bg};border:1.5px solid ${V.t};padding:12px 14px;color:${V.t};font-size:13px;outline:none;margin-bottom:16px;font-family:${V.mono}">
-        <label style="display:block;font-size:11px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Relay</label>
-        <select id="rs" style="width:100%;background:${V.bg};border:1.5px solid ${V.t};padding:12px 14px;color:${V.t};font-size:13px;margin-bottom:24px;appearance:none">
-          ${RELAYS.map(r=>`<option value="${r.u}">${r.l} — ${r.u.replace("https://","")}</option>`).join("")}
-        </select>
-        <button onclick="login()" style="width:100%;background:${V.g};color:${V.bg};border:none;padding:13px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.08em;text-transform:uppercase">Connect</button>
+  <section class="hub-hero" aria-label="Your Paramant">
+    <div class="pq-tag"><span class="pq-dot" aria-hidden="true"></span>ML-KEM-768 · ML-DSA-65 · AES-256-GCM · client-side</div>
+    <h1>Your Paramant</h1>
+    <p class="sub">Encrypted send/receive and post-quantum signing. All keys and plaintext stay in your browser — the relay never sees them.</p>
+    <div class="auth-status" id="auth-status" aria-live="polite">
+      <p class="auth-msg" id="auth-msg">Checking your sign-in…</p>
+      <div class="auth-actions" id="auth-actions"></div>
+      <div class="key-paste" id="key-paste">
+        <input id="key-input" type="password" placeholder="pgp_..." autocomplete="off" spellcheck="false" aria-label="API key">
+        <button class="btn-primary" id="key-save" type="button">Save</button>
+        <button class="btn-secondary" id="key-cancel" type="button">Cancel</button>
+        <span class="key-err" id="key-err"></span>
       </div>
-    </div>`;
-    renderHealthBar();
-    document.getElementById("ki").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
-    return;
-  }
+    </div>
+  </section>
 
-  document.getElementById("root").innerHTML=`
-  <div class="dash-head" style="border-bottom:1px solid ${V.b};padding:28px 40px 20px">
-    <div style="max-width:1100px;margin:0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
+  <section aria-label="Primary actions">
+    <h2 class="block-h">Send &amp; receive</h2>
+    <div class="action-pair">
+      <a class="action-card" href="/send" aria-label="Send a file">
+        <div class="icon" aria-hidden="true">→</div>
+        <h2>Send a file</h2>
+        <p>Encrypt a file in your browser, share a one-time link. AES-256-GCM with ML-KEM-768 hybrid key wrap. Burn-on-read.</p>
+        <div class="pq-line">Client-side · burn-on-read</div>
+      </a>
+      <a class="action-card" href="/get" aria-label="Receive a file">
+        <div class="icon" aria-hidden="true">←</div>
+        <h2>Receive a file</h2>
+        <p>Open a secure link someone sent you. Decryption happens in your browser; no account needed.</p>
+        <div class="pq-line">No account · zero-knowledge</div>
+      </a>
+    </div>
+  </section>
+
+  <section aria-label="More tools">
+    <h2 class="block-h">More tools</h2>
+    <div class="tools-grid">
+      <a class="tool-card" href="/parashare">
+        <h3>ParaShare</h3>
+        <p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p>
+      </a>
+      <a class="tool-card" href="/drop">
+        <h3>ParaDrop</h3>
+        <p>Device-to-device transfer. 6-digit pairing code. End-to-end encrypted.</p>
+      </a>
+      <a class="tool-card" href="/sign">
+        <h3>ParaSign</h3>
+        <p>Sign documents with ML-DSA-65 (FIPS 204). CT-log notarized.</p>
+      </a>
+      <a class="tool-card" href="/verify">
+        <h3>Verify a signature</h3>
+        <p>Check a .psign envelope against its document. Local hash, relay-side math.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="account-block empty" id="account-block" aria-label="Your account">
+    <h2 class="block-h">Your account</h2>
+    <div class="account-grid" id="account-grid"></div>
+    <div class="relay-row" id="relay-row" hidden>
+      <span class="relay-lbl">Sector</span>
+      <button class="chip active" data-relay="https://relay.paramant.app" type="button">Main</button>
+      <button class="chip" data-relay="https://health.paramant.app" type="button">Health</button>
+      <button class="chip" data-relay="https://finance.paramant.app" type="button">Finance</button>
+      <button class="chip" data-relay="https://legal.paramant.app" type="button">Legal</button>
+      <button class="chip" data-relay="https://iot.paramant.app" type="button">IoT</button>
+    </div>
+    <div class="account-actions">
+      <button class="btn-secondary" id="acct-refresh" type="button">Refresh</button>
+      <a class="btn-secondary" href="/admin/">Admin console</a>
+      <button class="btn-secondary" id="acct-signout" type="button">Sign out</button>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid">
       <div>
-        <div style="font-family:${V.mono};font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:${V.q};margin-bottom:6px">Relay: ${relay.l}</div>
-        <h1 style="font-family:${V.font};font-size:26px;font-weight:700;letter-spacing:-.02em;color:${V.t}">Dashboard</h1>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;padding-top:4px;flex-wrap:wrap">
-        <span class="dash-search">
-          <svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="dash-search-input" type="search" placeholder="Search transfers, events..." oninput="onSearch(this.value)" aria-label="Search">
-          <span class="kbd">${navigator.platform.indexOf("Mac")>=0?"&#8984;K":"^K"}</span>
-        </span>
-        ${themeToggleBtn()}
-        <select id="rs2" style="background:${V.bg};border:1px solid ${V.b};padding:6px 10px;color:${V.t};font-size:11px;font-family:${V.mono}" onchange="changeRelay(this.value)">
-          ${RELAYS.map(r=>`<option value="${r.u}" ${r.u===relay.u?"selected":""}>${r.l}</option>`).join("")}
-        </select>
-        <span id="poll-info" style="font-size:11px;color:${V.q};font-family:${V.mono}"></span>
-        <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log</a>
-        <button onclick="logout()" style="background:none;border:1px solid ${V.b};color:${V.q};padding:5px 12px;font-size:11px;cursor:pointer">Sign out</button>
+      <div>
+        <div class="footer-col-label">Trust</div>
+        <div class="footer-links">
+          <a href="/status">Status</a>
+          <a href="/security">Security</a>
+          <a href="/trust">Trust</a>
+          <a href="/ct-log">CT Log</a>
+          <a href="/license">License</a>
+          <a href="/press">Press kit</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/sla">SLA</a>
+          <a href="/compliance/nis2">Compliance overview</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Self-host</div>
+        <div class="footer-links">
+          <a href="/docs#self-hosting">Deploy guide</a>
+          <a href="/setup">Setup wizard</a>
+          <a href="/install.sh">install.sh</a>
+          <a href="/install-pi.sh">install-pi.sh</a>
+          <a href="/download">ParamantOS</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Connect</div>
+        <div class="footer-links">
+          <a href="mailto:privacy@paramant.app">Contact</a>
+          <a href="/signup">Create account</a>
+          <a href="/auth/login">Sign in</a>
+          <a href="/help">Help</a>
+          <a href="/partners">Partners</a>
+          <a href="/changelog">Changelog</a>
+        </div>
       </div>
     </div>
   </div>
+</footer>
 
-  <div class="dash-wrap" style="max-width:1100px;margin:0 auto;padding:28px 40px">
-    <div id="hbar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
+<script src="/nav.js" defer></script>
+<script>
+// Hub controller. ASCII-only inline JS. No external imports.
+(function(){
+  'use strict';
 
-    <div class="cards-grid">
-      <article class="card" data-card="account">
-        <header class="card-header"><h2>Account</h2></header>
-        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
-      </article>
+  var KEY_LS = 'paramant_api_key';
+  var DEFAULT_RELAY = 'https://relay.paramant.app';
 
-      <article class="card" data-card="plan">
-        <header class="card-header"><h2>Plan</h2></header>
-        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
-        <footer class="card-footer"><a href="/pricing">Pricing</a></footer>
-      </article>
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[<>&"]/g, function(c){ return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
 
-      <article class="card card-wide" data-card="transfer">
-        <header class="card-header"><h2>Transfer</h2><span class="card-sub">Send / ParaShare / ParaDrop</span></header>
-        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
-        <footer class="card-footer"><a href="/send">Send a file</a><a href="/parashare">ParaShare</a><a href="/drop">ParaDrop</a></footer>
-      </article>
+  function getKey(){ try { return (localStorage.getItem(KEY_LS) || '').trim(); } catch(e){ return ''; } }
+  function setKey(k){ try { localStorage.setItem(KEY_LS, k); } catch(e){} }
+  function clearKey(){ try { localStorage.removeItem(KEY_LS); } catch(e){} }
 
-      <article class="card" data-card="sign">
-        <header class="card-header"><h2>Sign</h2><span class="badge-coming">Coming soon</span></header>
-        <div class="card-body"><p class="empty-state-card">ParaSign: browser-side post-quantum document signing. In development.</p></div>
-        <footer class="card-footer"><button onclick="waitlistSign()">Notify me</button></footer>
-      </article>
-
-      <article class="card" data-card="stream">
-        <header class="card-header"><h2>Stream</h2><span class="card-sub">Ghost Pipe</span></header>
-        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
-        <footer class="card-footer"><a href="/docs">Stream docs</a></footer>
-      </article>
-
-      <article class="card" data-card="keys">
-        <header class="card-header"><h2>Keys</h2></header>
-        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
-        <footer class="card-footer"><button onclick="rotateKey()">Rotate key</button><a href="/docs#api">Key docs</a></footer>
-      </article>
-
-      <article class="card card-wide" data-card="activity">
-        <header class="card-header"><h2>Recent activity</h2><a href="/ct-log" class="card-link">CT log &rarr;</a></header>
-        <div class="card-body"><div class="card-skel"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-md"></div><div class="skeleton skeleton-line is-sm"></div></div></div>
-      </article>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:${V.b};border:1px solid ${V.b};margin-bottom:24px" id="stats-grid">
-      ${[1,2,3,4,5,6,7,8].map(()=>`<div style="background:${V.sur};padding:20px"><div class="skeleton skeleton-line is-sm"></div><div class="skeleton skeleton-line is-lg" style="margin-top:10px"></div></div>`).join("")}
-    </div>
-
-    <div class="dash-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
-        <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">E2E Test trail</span>
-          <button onclick="runE2ETest()" style="background:${V.t};color:${V.bg};border:none;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:${V.mono};letter-spacing:.06em">Run test</button>
-        </div>
-        <div id="test-log" style="padding:16px 20px;min-height:200px;max-height:320px;overflow-y:auto">
-          <div style="font-size:12px;color:${V.q};font-family:${V.mono}">Click "Run test" to verify the full send → relay → receive → burn flow.</div>
-        </div>
-      </div>
-
-      <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
-        <div style="padding:14px 20px;border-bottom:1px solid ${V.b}">
-          <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">Quick start</span>
-        </div>
-        <div style="padding:20px;font-family:${V.mono};font-size:12px;line-height:1.9;background:rgba(11,58,106,.04);overflow-x:auto;white-space:nowrap">
-          <div><span style="color:${V.q}"># Install</span></div>
-          <div><span style="color:${V.m}">pip install paramant-sdk</span></div>
-          <div>&nbsp;</div>
-          <div><span style="color:${V.q}"># Receive</span></div>
-          <div><span style="color:${V.m}">python3 paramant-receiver.py \\</span></div>
-          <div><span style="color:${V.m}">  --key </span><span style="color:${V.g}">${esc(apiKey)}</span><span style="color:${V.m}"> \\</span></div>
-          <div><span style="color:${V.m}">  --device my-device \\</span></div>
-          <div><span style="color:${V.m}">  --output /tmp/received/</span></div>
-          <div>&nbsp;</div>
-          <div><span style="color:${V.q}"># Send</span></div>
-          <div><span style="color:${V.m}">python3 paramant-sender.py \\</span></div>
-          <div><span style="color:${V.m}">  --key </span><span style="color:${V.g}">${esc(apiKey)}</span><span style="color:${V.m}"> \\</span></div>
-          <div><span style="color:${V.m}">  --device my-device \\</span></div>
-          <div><span style="color:${V.m}">  --file document.pdf</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div style="background:${V.sur};border:1px solid ${V.b};margin-bottom:16px;overflow:hidden">
-      <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">Recent deliveries</span>
-        <span style="font-size:11px;color:${V.q}">Relay: ${relay.l}</span>
-      </div>
-      <div id="delivery-table">
-        <div class="progress-indeterminate" style="margin:0"></div>
-        <div style="padding:24px 20px">
-          <div class="skeleton skeleton-line is-md"></div>
-          <div class="skeleton skeleton-line is-md"></div>
-          <div class="skeleton skeleton-line is-sm"></div>
-        </div>
-      </div>
-    </div>
-
-    <div style="background:${V.sur};border:1px solid ${V.b};overflow:hidden">
-      <div style="padding:14px 20px;border-bottom:1px solid ${V.b};display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:10px;font-family:${V.mono};color:${V.q};letter-spacing:.1em;text-transform:uppercase">Merkle audit log</span>
-        <a href="/ct-log" style="font-size:11px;color:${V.q}">CT log →</a>
-      </div>
-      <div id="audit-log" style="padding:16px 20px;min-height:80px">
-        <div class="skeleton skeleton-line is-md"></div>
-        <div class="skeleton skeleton-line is-sm"></div>
-      </div>
-    </div>
-  </div>`;
-
-  renderHealthBar();
-  if(data)softRender();
-  fetchMonitor();
-  loadCards();
-
-  if(data&&data.audit&&data.audit.length){
-    document.getElementById("audit-log").innerHTML=data.audit.map(e=>
-      `<div style="display:flex;gap:20px;font-size:11px;font-family:${V.mono};padding:4px 0;border-bottom:1px solid ${V.b}">
-        <span style="color:${V.q};flex-shrink:0">${(e.ts||"").slice(11,19)}</span>
-        <span style="color:${e.event&&e.event.includes("ack")?V.g:e.event&&e.event.includes("inbound")?"#4a6a9c":V.m}">${esc(e.event||"")}</span>
-        <span style="color:${V.q}">${esc(e.hash||"")}${e.device?" · "+esc(e.device):""}${e.latency_ms?" · "+e.latency_ms+"ms":""}</span>
-      </div>`
-    ).join("");
-  } else if (data) {
-    document.getElementById("audit-log").innerHTML=`<div class="empty-state is-compact" style="border:none;background:transparent;padding:12px 4px">
-      <div class="empty-state-glyph" aria-hidden="true">∅</div>
-      <p class="empty-state-title">No audit events yet</p>
-      <p class="empty-state-hint">Inbound, ACK and burn events will appear here as the relay processes traffic for your key.</p>
-    </div>`;
-  }
-}
-
-let pollTimer=null,ws=null,wsRetry=null,refreshT=null;
-
-// ── Real-time stream via /v2/stream (ticket-auth). Polling stays as a
-//    fallback/safety-net, so nothing breaks if WS is unavailable. ──
-async function setupRealtimeStream(){
-  if(!apiKey)return;
-  closeStream();
-  let ticket;
-  try{
-    const r=await fetch(relay.u+"/v2/ws-ticket",{method:"POST",headers:{"X-Api-Key":apiKey},signal:AbortSignal.timeout(6000)});
-    if(!r.ok)return; // relay/mode without WS → keep polling
-    ticket=(await r.json()).ticket;
-  }catch{return}
-  if(!ticket)return;
-  try{
-    ws=new WebSocket(relay.u.replace(/^http/,"ws")+"/v2/stream?ticket="+encodeURIComponent(ticket));
-  }catch{return}
-  ws.onmessage=(e)=>{
-    let msg;try{msg=JSON.parse(e.data)}catch{return}
-    if(msg.type==="blob_ready"){
-      // debounce: a burst of events → one refresh
-      clearTimeout(refreshT);
-      refreshT=setTimeout(()=>{fetchMonitor();loadCards()},250);
-      const pi=document.getElementById("poll-info");
-      if(pi)pi.textContent="⚡ live";
+  function renderAuth(state){
+    var msg = $('auth-msg'); var act = $('auth-actions');
+    if (state === 'loading') {
+      msg.textContent = 'Checking your sign-in...';
+      act.innerHTML = '';
+      return;
     }
-  };
-  ws.onclose=()=>{ws=null;if(apiKey){clearTimeout(wsRetry);wsRetry=setTimeout(setupRealtimeStream,5000)}};
-  ws.onerror=()=>{try{ws&&ws.close()}catch{}};
-}
-function closeStream(){clearTimeout(wsRetry);if(ws){try{ws.onclose=null;ws.close()}catch{}ws=null}}
-
-function login(){
-  const k=document.getElementById("ki").value.trim();
-  const u=document.getElementById("rs").value;
-  if(!k.startsWith("pgp_"))return;
-  apiKey=k;relay=RELAYS.find(r=>r.u===u)||RELAYS[0];
-  render();
-  if(!pollTimer)pollTimer=setInterval(fetchMonitor,5000);
-  setupRealtimeStream();
-}
-function logout(){apiKey="";data=null;testLog=[];if(pollTimer){clearInterval(pollTimer);pollTimer=null}closeStream();closeSidePanel();render()}
-function changeRelay(u){relay=RELAYS.find(r=>r.u===u)||RELAYS[0];fetchMonitor();loadCards();setupRealtimeStream()}
-
-// ── Client-side search/filter across audit-log, deliveries, activity ──
-let searchQuery="";
-function onSearch(v){
-  searchQuery=(v||"").trim().toLowerCase();
-  applySearchFilter();
-}
-function applySearchFilter(){
-  const q=searchQuery;
-  // rows that carry data-row-text get filtered; empty query shows all
-  document.querySelectorAll("[data-row-text]").forEach(el=>{
-    const hit=!q||el.getAttribute("data-row-text").toLowerCase().includes(q);
-    el.classList.toggle("search-hidden",!hit);
-  });
-  document.querySelectorAll("[data-search-scope]").forEach(scope=>{
-    const visible=scope.querySelectorAll("[data-row-text]:not(.search-hidden)").length;
-    const empty=scope.querySelector("[data-search-empty]");
-    if(empty)empty.classList.toggle("search-hidden",!q||visible>0);
-  });
-}
-
-// ── Drill-down side panel ──
-function spRow(l,v){return `<div class="stat-row"><span class="stat-label">${l}</span><span class="stat-value">${v}</span></div>`}
-function sidePanelContent(type){
-  const d=data||{};const dl=d.delivery||{};const st=d.stats||{};
-  const A=(d.audit||[]);
-  if(type==="account")return `<h3>Account</h3><div class="sp-sub">connection</div>`+
-    spRow("Relay",esc(relay.l))+spRow("Endpoint",esc(relay.u.replace("https://","")))+
-    spRow("Sector",esc(relay.sector))+spRow("Region","eu/de")+spRow("Storage","RAM only")+
-    spRow("API key",`<code>${esc((apiKey||"").slice(0,12))}…</code>`);
-  if(type==="plan")return `<h3>Plan &amp; usage</h3><div class="sp-sub">this relay</div>`+
-    spRow("Sent total",dl.total??st.inbound??"—")+spRow("Acknowledged",dl.acked??"—")+
-    spRow("Success rate",dl.success_rate!=null?dl.success_rate+"%":"—")+
-    spRow("Burned",st.burned??"—")+spRow("Max file","5 MB")+
-    `<div style="margin-top:18px"><a href="/pricing" style="color:#1D4ED8">View pricing →</a></div>`;
-  if(type==="transfer"||type==="activity"){
-    const title=type==="transfer"?"Transfer history":"Audit trail";
-    const rows=(d.history&&d.history.length)?d.history:A;
-    const body=rows&&rows.length
-      ? `<div data-search-scope>`+rows.map(it=>{
-          const label=esc(it.hash||it.event||it.leaf_hash||"");
-          const meta=esc(it.device||it.sent_ts&&(Math.round((Date.now()-it.sent_ts)/1000)+"s")||(it.ts||"").slice(11,19)||"");
-          return `<div class="card-entry" data-row-text="${label} ${meta}"><span>${label.slice(0,28)}</span><span class="card-entry-meta">${meta}</span></div>`;
-        }).join("")+`<div class="empty-state-card search-hidden" data-search-empty>No matches.</div></div>`
-      : `<p class="empty-state-card">Nothing here yet.</p>`;
-    return `<h3>${title}</h3><div class="sp-sub">${rows?rows.length:0} entries · searchable</div>`+body;
+    if (state === 'none') {
+      msg.innerHTML = '<strong>Not signed in.</strong> Send, receive, and verify still work without an account. Sign in to manage transfers and signatures.';
+      act.innerHTML = ''
+        + '<a class="btn-primary" href="/auth/login">Sign in</a>'
+        + '<a class="btn-secondary" href="/signup">Create account</a>'
+        + '<button class="btn-secondary" type="button" id="paste-toggle">Paste API key</button>';
+      var pt = $('paste-toggle');
+      if (pt) pt.addEventListener('click', function(){
+        $('key-paste').classList.toggle('open');
+        var inp = $('key-input'); if (inp) inp.focus();
+      });
+      return;
+    }
+    if (state.kind === 'valid') {
+      var label = state.label ? esc(state.label) : 'key';
+      var plan = state.plan ? '<span class="auth-pill">' + esc(state.plan) + '</span>' : '';
+      msg.innerHTML = '<strong>Signed in</strong> as ' + label + ' ' + plan;
+      act.innerHTML = '';
+      return;
+    }
+    if (state.kind === 'invalid') {
+      msg.innerHTML = '<strong>Key was rejected.</strong> ' + esc(state.detail || 'The relay did not accept this API key.');
+      act.innerHTML = '<button class="btn-secondary" type="button" id="paste-toggle">Paste a different key</button>'
+                   + '<button class="btn-secondary" type="button" id="signout-here">Clear stored key</button>';
+      var pt2 = $('paste-toggle');
+      var so = $('signout-here');
+      if (pt2) pt2.addEventListener('click', function(){ $('key-paste').classList.toggle('open'); });
+      if (so) so.addEventListener('click', function(){ clearKey(); location.reload(); });
+      return;
+    }
+    if (state.kind === 'unreachable') {
+      msg.innerHTML = '<strong>Relay unreachable.</strong> Your key may still be valid; could not reach <code class="auth-pill">' + esc(state.relay) + '</code>.';
+      act.innerHTML = '<button class="btn-secondary" type="button" id="retry-now">Retry</button>';
+      var rn = $('retry-now');
+      if (rn) rn.addEventListener('click', function(){ load(); });
+      return;
+    }
   }
-  if(type==="stream")return `<h3>Stream</h3><div class="sp-sub">Ghost Pipe · ${ws?"live":"polling"}</div>`+
-    spRow("Blobs in flight",d.blobs_in_flight??"—")+spRow("Inbound total",st.inbound??"—")+
-    spRow("Webhooks sent",st.webhooks_sent??"—")+spRow("Connection",ws?"WebSocket (real-time)":"5s polling")+
-    `<p class="empty-state-card" style="margin-top:16px">Events stream over /v2/stream when the relay pushes blob_ready; otherwise the dashboard polls /v2/monitor every 5s.</p>`;
-  if(type==="keys")return `<h3>Keys &amp; devices</h3><div class="sp-sub">this key</div>`+
-    spRow("API key",`<code>${esc((apiKey||"").slice(0,12))}…</code>`)+
-    spRow("Audit chain",d.chain_valid?"verified":"—")+
-    `<div style="margin-top:18px"><button onclick="rotateKey()" class="btn btn-secondary" style="font-size:11px;padding:8px 14px;cursor:pointer">Rotate key</button></div>`;
-  if(type==="sign")return `<h3>ParaSign</h3><div class="sp-sub">coming soon</div>`+
-    `<p class="empty-state-card">Browser-side post-quantum document signing. In development.</p>`+
-    `<div style="margin-top:16px"><button onclick="waitlistSign()" class="btn btn-secondary" style="font-size:11px;padding:8px 14px;cursor:pointer">Notify me</button></div>`;
-  return `<h3>${esc(type)}</h3>`;
-}
-function openSidePanel(type){
-  const p=document.getElementById("side-panel");
-  const bd=document.getElementById("side-panel-backdrop");
-  const c=document.getElementById("side-panel-content");
-  if(!p||!c)return;
-  c.innerHTML=sidePanelContent(type);
-  p.classList.add("open");if(bd)bd.classList.add("open");
-  applySearchFilter();
-}
-function closeSidePanel(){
-  const p=document.getElementById("side-panel");
-  const bd=document.getElementById("side-panel-backdrop");
-  if(p)p.classList.remove("open");if(bd)bd.classList.remove("open");
-}
-document.addEventListener("keydown",(e)=>{
-  if(e.key==="Escape")closeSidePanel();
-  if((e.metaKey||e.ctrlKey)&&(e.key==="k"||e.key==="K")){
-    const s=document.getElementById("dash-search-input");
-    if(s){e.preventDefault();s.focus()}
-  }
-});
-// Delegated card-click → drill-down. Ignore clicks on links/buttons in footers.
-document.addEventListener("click",(e)=>{
-  if(e.target.closest("a,button"))return;
-  const card=e.target.closest("[data-card]");
-  if(card)openSidePanel(card.getAttribute("data-card"));
-});
 
-fetchHealth();setInterval(fetchHealth,30000);render();
+  $('key-save').addEventListener('click', function(){
+    var v = ($('key-input').value || '').trim();
+    var err = $('key-err'); err.textContent = '';
+    if (!v) { err.textContent = 'Empty.'; return; }
+    if (!/^pgp_/.test(v) && v.length < 24) { err.textContent = 'Does not look like an API key.'; return; }
+    setKey(v);
+    $('key-paste').classList.remove('open');
+    $('key-input').value = '';
+    load();
+  });
+  $('key-cancel').addEventListener('click', function(){
+    $('key-paste').classList.remove('open');
+    $('key-input').value = '';
+    $('key-err').textContent = '';
+  });
+
+  var currentRelay = DEFAULT_RELAY;
+  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-relay]'), function(b){
+    b.addEventListener('click', function(){
+      Array.prototype.forEach.call(document.querySelectorAll('.chip[data-relay]'), function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      currentRelay = b.getAttribute('data-relay');
+      loadAccount(getKey());
+    });
+  });
+
+  function renderAccount(d){
+    if (!d) {
+      $('account-block').classList.add('empty');
+      $('account-grid').innerHTML = '';
+      $('relay-row').hidden = true;
+      return;
+    }
+    $('account-block').classList.remove('empty');
+    $('relay-row').hidden = false;
+    var rows = [];
+    rows.push({ lbl: 'Plan', val: esc(d.plan || d.tier || 'standard'), small: false });
+    if (d.label) rows.push({ lbl: 'Label', val: esc(d.label), small: true });
+    if (d.expires_at) rows.push({ lbl: 'Expires', val: esc(String(d.expires_at).slice(0, 10)), small: true });
+    if (d.transfers != null) rows.push({ lbl: 'Transfers', val: String(d.transfers), small: false });
+    if (d.quota_bytes != null) rows.push({ lbl: 'Quota', val: humanBytes(d.quota_bytes), small: true });
+    if (d.signatures != null) rows.push({ lbl: 'Signatures', val: String(d.signatures), small: false });
+    if (d.ct_log_size != null) rows.push({ lbl: 'CT-log size', val: String(d.ct_log_size), small: true });
+    $('account-grid').innerHTML = rows.map(function(r){
+      return '<div class="acct-card"><div class="lbl">' + r.lbl + '</div><div class="val' + (r.small ? ' small' : '') + '">' + r.val + '</div></div>';
+    }).join('');
+  }
+
+  function humanBytes(n){
+    if (n == null) return '-';
+    var u = ['B','KB','MB','GB','TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return n.toFixed(n < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
+  }
+
+  function fetchJSON(url, key, ms){
+    var ctrl = ('AbortController' in window) ? new AbortController() : null;
+    var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, ms || 8000) : 0;
+    var opts = { headers: { 'X-Api-Key': key, 'Accept': 'application/json' } };
+    if (ctrl) opts.signal = ctrl.signal;
+    return fetch(url, opts)
+      .then(function(r){
+        if (t) clearTimeout(t);
+        if (r.status === 401 || r.status === 403) return { __invalid: true, status: r.status };
+        if (!r.ok) return { __error: true, status: r.status };
+        return r.json().catch(function(){ return {}; });
+      })
+      .catch(function(e){ if (t) clearTimeout(t); return { __network: true, msg: e.message }; });
+  }
+
+  function loadAccount(key){
+    if (!key) { renderAccount(null); return; }
+    fetchJSON(currentRelay + '/v2/check-key', key).then(function(d){
+      if (d.__invalid) { renderAuth({ kind: 'invalid', detail: 'HTTP ' + d.status }); renderAccount(null); return; }
+      if (d.__network) { renderAuth({ kind: 'unreachable', relay: currentRelay }); renderAccount(null); return; }
+      if (d.__error)   { renderAuth({ kind: 'unreachable', relay: currentRelay }); renderAccount(null); return; }
+      renderAuth({ kind: 'valid', label: d.label || d.name || null, plan: d.plan || d.tier || null });
+      fetchJSON(currentRelay + '/v2/monitor', key).then(function(m){
+        var safeM = (m && !m.__error && !m.__network && !m.__invalid) ? m : {};
+        var merged = {};
+        Object.keys(d || {}).forEach(function(k){ merged[k] = d[k]; });
+        Object.keys(safeM).forEach(function(k){ if (merged[k] == null) merged[k] = safeM[k]; });
+        renderAccount(merged);
+      });
+    });
+  }
+
+  function load(){
+    renderAuth('loading');
+    var key = getKey();
+    if (!key) { renderAuth('none'); renderAccount(null); return; }
+    loadAccount(key);
+  }
+
+  $('acct-refresh').addEventListener('click', function(){ load(); });
+  $('acct-signout').addEventListener('click', function(){ clearKey(); location.reload(); });
+
+  load();
+})();
 </script>
 </body>
 </html>
