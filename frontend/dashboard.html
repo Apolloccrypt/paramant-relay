@@ -285,8 +285,8 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
         <a class="action-card" href="/get" aria-label="Receive a file">
           <div class="icon" aria-hidden="true">←</div>
           <h2>Receive a file</h2>
-          <p>Open a secure link someone sent you. Decryption happens in your browser; no account needed.</p>
-          <div class="pq-line">No account · zero-knowledge</div>
+          <p>Open a secure link someone sent you. Decryption happens locally in your browser.</p>
+          <div class="pq-line">Browser-only · zero-knowledge</div>
         </a>
       </div>
     </section>
@@ -398,8 +398,8 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 //
 // We do NOT touch the API key here. The API key is shown (masked) on the
 // account page; the dashboard's job is to confirm the user is signed in and
-// surface launchers into the tool pages. Anonymous flows (/send /get) work
-// without a session too; gated tools handle their own X-Api-Key.
+// surface launchers into the tool pages. The recipient flow (/get) is the
+// only public one; sender tools require a session.
 (function(){
   'use strict';
 

@@ -330,7 +330,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
     <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where the zero-knowledge guarantee holds today</div>
-    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0), the WebApp tools (ParaShare, ParaDrop), and the anonymous <code>/send</code> link flow — every one of those encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
+    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0), the WebApp tools (ParaShare, ParaDrop), and the <code>/send</code> link flow — every one of those encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
   </div>
 
   <p style="font-size:var(--text-sm);color:var(--ink-dim)">For the full audit history, patch timeline, and cryptographic architecture, see the <a href="/architecture">architecture page</a>.</p>
@@ -356,7 +356,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </table>
 
   <h3>Hybrid key exchange</h3>
-  <p>ParaShare authenticated transfers use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both — breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure. Anonymous /send transfers use AES-256-GCM with a browser-generated key delivered in the URL fragment.</p>
+  <p>ParaShare authenticated transfers use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both — breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure. Quick /send transfers use AES-256-GCM with a browser-generated key delivered in the URL fragment.</p>
 
   <p style="margin-top:10px;font-size:var(--text-sm);color:var(--ink-dim)">See also: <a href="/hndl">Harvest Now, Decrypt Later &rarr;</a> — why data collected today can be decrypted at Q-Day, and how RAM-only transfer removes the target.</p>
 
@@ -378,7 +378,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding</div>
-      <p style="margin:0">ParaShare authenticated uploads are padded to a fixed 5 MB block for DPI masking. Anonymous uploads are stored at their actual encrypted size, up to a 5 MB maximum.</p>
+      <p style="margin:0">ParaShare authenticated uploads are padded to a fixed 5 MB block for DPI masking. Quick /send uploads are stored at their actual encrypted size, up to a 5 MB maximum.</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">ML-DSA-65 relay identity</div>
