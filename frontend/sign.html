@@ -38,10 +38,18 @@
 .ds-info-card dd{font-family:var(--mono);font-size:12px;color:var(--ink);word-break:break-all;margin:0}
 .ds-page-wrap{position:relative;margin-bottom:14px;cursor:crosshair}
 .ds-page-wrap canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff}
-.ds-stamp-marker{position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.06);pointer-events:none;font-family:var(--mono);font-size:9px;color:var(--navy);padding:4px;box-sizing:border-box;line-height:1.25;overflow:hidden}
-.ds-sm-name{font-weight:700;font-size:10px}
-.ds-sm-meta{color:var(--ink-dim);font-size:8px}
-.ds-sm-pqtag{position:absolute;right:3px;bottom:2px;font-size:7px;letter-spacing:.08em;color:var(--cobalt)}
+.ds-stamp-marker{position:absolute;border:1px solid var(--cobalt);background:rgba(11,58,106,.03);pointer-events:none;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
+.ds-sm-band{background:var(--cobalt);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:2px 5px;line-height:1;flex:0 0 auto}
+.ds-sm-logo{font-family:var(--mono);font-weight:700;letter-spacing:.04em;font-size:8px}
+.ds-sm-logo span{color:var(--lime)}
+.ds-sm-badge{font-family:var(--mono);font-weight:700;font-size:6px;letter-spacing:.08em}
+.ds-sm-mid{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:2px 4px;overflow:hidden;min-height:0}
+.ds-sm-mid .ds-sm-sig-img{max-height:100%;max-width:100%;object-fit:contain}
+.ds-sm-mid .ds-sm-sig-typed{font-family:'Times New Roman',Times,serif;font-style:italic;font-size:clamp(11px,1.6vw,20px);text-align:center;line-height:1.1}
+.ds-sm-foot{display:flex;justify-content:space-between;padding:1px 5px;border-top:.5px solid rgba(11,58,106,.25);font-size:7px;line-height:1.15;flex:0 0 auto}
+.ds-sm-foot .ds-sm-name{font-weight:700;color:var(--navy)}
+.ds-sm-foot .ds-sm-date{color:var(--ink-dim);font-family:var(--mono)}
+.ds-sm-crypto{padding:0 5px 2px;font-family:var(--mono);font-size:6px;color:var(--ink-dim);line-height:1.1;flex:0 0 auto}
 .ds-hint{font-size:12px;color:var(--ink-dim);font-family:var(--mono);margin-bottom:12px}
 .ds-field{margin-bottom:16px}
 .ds-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
@@ -75,13 +83,20 @@
 .ds-review-pane.has-pdf{padding:0;background:#fff;align-items:flex-start;max-height:380px;overflow-y:auto}
 .ds-review-pane canvas{width:100%;height:auto;display:block}
 .ds-review-pane img{max-width:100%;max-height:120px}
-.ds-review-pane .ds-mockup-stamp{position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.06);pointer-events:none;font-family:var(--mono);font-size:9px;color:var(--navy);padding:4px;box-sizing:border-box;line-height:1.25;overflow:hidden}
-.ds-review-pane .ds-mockup-stamp .ds-sm-name{font-weight:700;font-size:10px}
-.ds-review-pane .ds-mockup-stamp .ds-sm-meta{color:var(--ink-dim);font-size:8px}
-.ds-review-pane .ds-mockup-stamp .ds-sm-pqtag{position:absolute;right:3px;bottom:2px;font-size:7px;letter-spacing:.08em;color:var(--cobalt)}
-.ds-review-pane .ds-mockup-stamp img{max-width:100%;max-height:60%;display:block;margin:0 auto}
+.ds-review-pane .ds-mockup-stamp{position:absolute;border:1px solid var(--cobalt);background:rgba(11,58,106,.03);pointer-events:none;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
 .ds-review-pane .ds-pane-meta{font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;word-break:break-all;text-align:left;padding:6px}
 .ds-typed-preview{font-family:'Brush Script MT', cursive, sans-serif;font-size:32px;color:var(--navy);font-weight:400}
+.ds-review-cap{font-size:11px;color:var(--ink-dim);margin:0 0 8px;line-height:1.5}
+.ds-proof-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:16px 18px;margin-bottom:18px}
+.ds-proof-h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);font-weight:700;margin:0 0 6px}
+.ds-proof-dl{display:grid;grid-template-columns:200px 1fr;gap:6px 12px;font-size:12px;margin:10px 0 0}
+.ds-proof-dl dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding-top:1px}
+.ds-proof-dl dd{font-family:var(--mono);font-size:11px;color:var(--ink);word-break:break-all;margin:0}
+.ds-proof-card details{margin-top:14px}
+.ds-proof-card details summary{cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--ink-dim);font-weight:600}
+.ds-proof-card details[open] summary{color:var(--navy);margin-bottom:8px}
+.ds-proof-json{background:var(--bone);border:1px solid var(--ink-hair);padding:10px;font-family:var(--mono);font-size:10px;line-height:1.5;color:var(--navy);white-space:pre-wrap;word-break:break-all;max-height:240px;overflow:auto}
+@media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
 @media(max-width:640px){
   .ds-wrap{padding:0 16px;margin-top:24px}
@@ -377,13 +392,32 @@
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
-        <h3 class="ds-review-h">Document preview</h3>
+        <h3 class="ds-review-h">Document preview - visual seal</h3>
+        <p class="ds-review-cap">The stamp on the document is the visible Paramant seal. Drag it during placement; this is what readers see.</p>
         <div id="ds-review-doc-preview" class="ds-review-pane"></div>
       </div>
       <div class="ds-review-col">
-        <h3 class="ds-review-h">Your signature</h3>
+        <h3 class="ds-review-h">Your signature mark</h3>
+        <p class="ds-review-cap">Typed name, drawn line, or uploaded image - this is what sits inside the seal.</p>
         <div id="ds-review-sig-preview" class="ds-review-pane"></div>
       </div>
+    </div>
+
+    <div class="ds-proof-card">
+      <h3 class="ds-proof-h">Cryptographic proof (.psign envelope)</h3>
+      <p class="ds-review-cap">The visual seal is supporting evidence. This envelope is the mathematical proof anyone can verify offline using only your public key. The signature itself is produced when you click Sign now.</p>
+      <dl class="ds-proof-dl">
+        <dt>Algorithm</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
+        <dt>Hash algorithm</dt>     <dd>SHA3-256</dd>
+        <dt>Document SHA3-256</dt>  <dd id="ds-proof-doc-hash">-</dd>
+        <dt>Signer key fingerprint</dt><dd id="ds-proof-fp">-</dd>
+        <dt>Counter-signed by relay</dt><dd id="ds-proof-notary">-</dd>
+        <dt>Envelope version</dt>   <dd id="ds-proof-version">-</dd>
+      </dl>
+      <details>
+        <summary>Show envelope structure</summary>
+        <pre id="ds-proof-json" class="ds-proof-json"></pre>
+      </details>
     </div>
 
     <div class="ds-info-card">
@@ -492,6 +526,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=5"></script>
+<script type="module" src="/sign-flow.js?v=6"></script>
 </body>
 </html>

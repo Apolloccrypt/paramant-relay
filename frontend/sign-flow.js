@@ -16,8 +16,8 @@ const RELAY = 'https://health.paramant.app';
 // State
 // ====================================================================
 
-const STAMP_PDF_W = 200;
-const STAMP_PDF_H = 70;
+const STAMP_PDF_W = 240;
+const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
 
 const state = {
@@ -197,12 +197,7 @@ function renderStampMarker(wrap, left, top, w, h) {
   const m = document.createElement('div');
   m.className = 'ds-stamp-marker';
   m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
-  const name = (state.signer.name || 'Signer').slice(0, 40);
-  m.innerHTML =
-    `<div class="ds-sm-name">Signed by ${escapeHtml(name)}</div>` +
-    `<div class="ds-sm-meta">${new Date().toISOString().slice(0, 10)}</div>` +
-    `<div class="ds-sm-meta">PQ key: (set in next step)</div>` +
-    `<div class="ds-sm-pqtag">PARAMANT - PQ</div>`;
+  m.innerHTML = stampMockupHtml();
   wrap.appendChild(m);
 }
 
@@ -424,6 +419,53 @@ function fillReview() {
     ? 'Yes - relay will counter-sign + write to CT log'
     : 'No - envelope is self-contained (still verifiable)';
 
+  // Cryptographic proof card: the mathematical evidence that backs the
+  // visual seal. Document hash is computed live; fingerprint depends on
+  // the key source.
+  const docHashHex = toHex(sha3_256(state.doc.bytes));
+  $('ds-proof-doc-hash').textContent = docHashHex;
+  if (state.signer.key && state.signer.key.publicKey) {
+    $('ds-proof-fp').textContent = toHex(sha3_256(state.signer.key.publicKey));
+  } else if (state.signer.keySrc === 'ephemeral') {
+    $('ds-proof-fp').textContent = '(generated when you click Sign - the key never existed before this moment)';
+  } else {
+    $('ds-proof-fp').textContent = '(resolved when you click Sign)';
+  }
+  $('ds-proof-notary').textContent = state.signer.apiKey ? 'Yes (will fail-stop if the relay rejects the key)' : 'No (envelope is self-contained)';
+  $('ds-proof-version').textContent = state.mode === 'pdf' ? 'parasign-visual-1' : 'parasign-hash-1';
+
+  // Envelope-structure preview (placeholders where post-sign data lives).
+  const previewEnv = state.mode === 'pdf' ? {
+    version: 'parasign-visual-1',
+    algorithm: 'ML-DSA-65',
+    hash_algorithm: 'SHA3-256',
+    original_filename: state.doc.name,
+    stamped_filename: 'signed-' + state.doc.name,
+    original_hash: docHashHex,
+    stamped_hash: '<computed when the PDF is stamped>',
+    coords: { pageIndex: state.stamp.pageIndex, x: Math.round(state.stamp.x), y: Math.round(state.stamp.y), w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: '<set on sign>' },
+    signature_style: state.signer.sigStyle,
+    signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
+    signer_public_key: '<base64 of your ML-DSA-65 public key>',
+    signer_pk_fingerprint: '<sha3_256(pubkey)[..16]>',
+    signature: '<base64 of ML-DSA-65 signature over (origHash || stampedHash || coords)>',
+    signed_at: '<set on sign>',
+    disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+  } : {
+    version: 'parasign-hash-1',
+    algorithm: 'ML-DSA-65',
+    hash_algorithm: 'SHA3-256',
+    original_filename: state.doc.name,
+    document_hash: docHashHex,
+    signer_name: state.signer.name,
+    signer_public_key: '<base64 of your ML-DSA-65 public key>',
+    signer_pk_fingerprint: '<sha3_256(pubkey)[..16]>',
+    signature: '<base64 of ML-DSA-65 signature over document_hash>',
+    signed_at: '<set on sign>',
+    disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+  };
+  $('ds-proof-json').textContent = JSON.stringify(previewEnv, null, 2);
+
   // Render visual previews of doc + signature so the signer sees exactly
   // what they are about to commit to before clicking Sign now.
   renderReviewPreviews().catch(err => console.warn('review preview failed', err));
@@ -523,18 +565,40 @@ function renderSigPreview() {
 }
 
 function stampInnerHtml() {
+  return stampMockupHtml();
+}
+
+// Single source of truth for the on-screen stamp mockup (placement marker +
+// review preview). The PDF renderer in buildStampedPdf produces the real
+// thing; this mockup is a faithful HTML/CSS approximation so the signer
+// sees the same layout before clicking Sign.
+function stampMockupHtml() {
   const name = (state.signer.name || 'Signer').slice(0, 40);
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
   const fp = (state.signer.key && state.signer.key.publicKey)
     ? toHex(sha3_256(state.signer.key.publicKey)).slice(0, 8)
-    : '(generated on sign)';
+    : 'pending';
+  let mid = '';
   if (state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes) {
     const mime = state.signer.sigImageType === 'jpg' ? 'image/jpeg' : 'image/png';
     const url = URL.createObjectURL(new Blob([state.signer.sigImageBytes], { type: mime }));
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    return `<img src="${url}" alt=""><div class="ds-sm-name" style="font-size:8px">${escapeHtml(name)}</div><div class="ds-sm-meta">${dateStr} - PQ ${fp}</div><div class="ds-sm-pqtag">PARAMANT - PQ</div>`;
+    mid = `<img class="ds-sm-sig-img" src="${url}" alt="">`;
+  } else {
+    mid = `<div class="ds-sm-sig-typed">${escapeHtml(name)}</div>`;
   }
-  return `<div class="ds-sm-name">Signed by ${escapeHtml(name)}</div><div class="ds-sm-meta">${dateStr}</div><div class="ds-sm-meta">PQ key: ${fp}</div><div class="ds-sm-pqtag">PARAMANT - PQ</div>`;
+  return (
+    `<div class="ds-sm-band">` +
+      `<span class="ds-sm-logo">Para<span>MANT</span></span>` +
+      `<span class="ds-sm-badge">POST-QUANTUM SIGNED</span>` +
+    `</div>` +
+    `<div class="ds-sm-mid">${mid}</div>` +
+    `<div class="ds-sm-foot">` +
+      `<span class="ds-sm-name">${escapeHtml(name)}</span>` +
+      `<span class="ds-sm-date">${dateStr}</span>` +
+    `</div>` +
+    `<div class="ds-sm-crypto">ML-DSA-65 (FIPS 204) - PQ ${fp}</div>`
+  );
 }
 
 function guessMimeFromMagic(bytes) {
@@ -550,48 +614,75 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   const PDFLib = await waitForPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
   const page = pdfDoc.getPages()[stamp.pageIndex];
-  const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+  const font     = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-  const navy = PDFLib.rgb(0.043, 0.227, 0.416);
-  const dim  = PDFLib.rgb(0.3, 0.3, 0.3);
+  const fontItal = await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanItalic);
+  const navy  = PDFLib.rgb(0.043, 0.227, 0.416);
+  const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
+  const white = PDFLib.rgb(1, 1, 1);
 
-  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: navy, opacity: 0.04 });
+  // Outer border + faint fill
+  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: navy, opacity: 0.03 });
 
-  const padding = 6;
+  // Branded top band: cobalt bar with logo + PQ badge
+  const bandH = 16;
+  page.drawRectangle({ x: stamp.x, y: stamp.y + stamp.h - bandH, width: stamp.w, height: bandH, color: navy });
+  // 'Para' + 'MANT' both white on navy (no two-tone in PDF stamp; we keep the
+  // wordmark monochrome here for legibility at small print sizes).
+  page.drawText('ParaMANT', { x: stamp.x + 8, y: stamp.y + stamp.h - 11, size: 9, font: fontBold, color: white });
+  const badge = 'POST-QUANTUM SIGNED';
+  const badgeW = fontBold.widthOfTextAtSize(badge, 6);
+  page.drawText(badge, { x: stamp.x + stamp.w - badgeW - 8, y: stamp.y + stamp.h - 10.5, size: 6, font: fontBold, color: white });
 
-  // If the signer provided a drawn/uploaded signature, render it as the top
-  // half of the stamp and shrink the metadata block below it. Otherwise the
-  // stamp uses the original text-only layout.
+  // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2
+  const footerH = 22;
+  page.drawText(signerName, { x: stamp.x + 8, y: stamp.y + 13, size: 8, font: fontBold, color: navy });
+  const dateW = font.widthOfTextAtSize(dateStr, 7);
+  page.drawText(dateStr, { x: stamp.x + stamp.w - dateW - 8, y: stamp.y + 13, size: 7, font, color: dim });
+  const cryptoLine = 'ML-DSA-65 (FIPS 204)  -  PQ ' + fingerprint8;
+  page.drawText(cryptoLine, { x: stamp.x + 8, y: stamp.y + 4, size: 6, font, color: dim });
+
+  // Middle area: signature image, or signer name in italic for the 'typed' style
+  const midY = stamp.y + footerH;
+  const midH = stamp.h - bandH - footerH;
+  const padX = 8;
+
   const hasImg = state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes;
   if (hasImg) {
     const embed = state.signer.sigImageType === 'jpg'
       ? await pdfDoc.embedJpg(state.signer.sigImageBytes)
       : await pdfDoc.embedPng(state.signer.sigImageBytes);
-    const maxW = stamp.w - padding * 2;
-    const maxH = stamp.h * 0.55;
+    const maxW = stamp.w - padX * 2;
+    const maxH = midH - 4;
     const scale = Math.min(maxW / embed.width, maxH / embed.height);
     const w = embed.width * scale;
     const h = embed.height * scale;
     page.drawImage(embed, {
       x: stamp.x + (stamp.w - w) / 2,
-      y: stamp.y + stamp.h - padding - h,
+      y: midY + (midH - h) / 2,
       width: w, height: h,
     });
-    // Metadata block underneath the image
-    let yCursor = stamp.y + stamp.h - padding - h - 10;
-    page.drawText(signerName, { x: stamp.x + padding, y: yCursor, size: 8, font: fontBold, color: navy });
-    yCursor -= 9;
-    page.drawText(dateStr + '  -  PQ ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 6, font, color: dim });
   } else {
-    let yCursor = stamp.y + stamp.h - padding - 8;
-    page.drawText('Signed by ' + signerName, { x: stamp.x + padding, y: yCursor, size: 9, font: fontBold, color: navy });
-    yCursor -= 12;
-    page.drawText(dateStr, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
-    yCursor -= 10;
-    page.drawText('PQ key: ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
+    // Typed signature: render the name in TimesRomanItalic so it reads as
+    // a 'signature' rather than a label. Scale font to fit.
+    const maxW = stamp.w - padX * 2;
+    let fontSize = 22;
+    while (fontSize > 9 && fontItal.widthOfTextAtSize(signerName, fontSize) > maxW) fontSize -= 1;
+    const w = fontItal.widthOfTextAtSize(signerName, fontSize);
+    page.drawText(signerName, {
+      x: stamp.x + (stamp.w - w) / 2,
+      y: midY + (midH - fontSize) / 2 + 2,
+      size: fontSize, font: fontItal, color: navy,
+    });
   }
 
-  page.drawText('PARAMANT - PQ', { x: stamp.x + stamp.w - 66, y: stamp.y + 4, size: 6, font: fontBold, color: navy });
+  // Subtle horizontal divider above the metadata band
+  page.drawLine({
+    start: { x: stamp.x + 6, y: stamp.y + footerH - 1 },
+    end:   { x: stamp.x + stamp.w - 6, y: stamp.y + footerH - 1 },
+    thickness: 0.5, color: navy, opacity: 0.25,
+  });
+
   return await pdfDoc.save();
 }
 
