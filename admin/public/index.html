@@ -129,7 +129,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .pag-info{font-size:12px;font-family:var(--ff-mono);color:#475569;flex:1;text-align:center}
 /* Responsive */
 @media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}.tabs{overflow-x:auto}}
-@media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding:0 12px}.main{padding:14px}.hdr-meta .lic{display:none}}
+@media(max-width:720px){
+  .hdr{flex-wrap:wrap;height:auto;min-height:56px;padding-top:8px;padding-bottom:0;align-items:center}
+  .tabs{order:3;flex-basis:100%;width:100%;border-top:1px solid rgba(11,58,106,.08);margin-top:8px;-webkit-overflow-scrolling:touch}
+  .tabs button{padding:12px 14px 10px}
+  .panel .tbl-wrap,.panel #u-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding-left:12px;padding-right:12px}.main{padding:14px}.hdr-meta .lic{display:none}}
 
 /* Action menu group labels */
 .ag-lbl{display:block;padding:4px 14px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;pointer-events:none;user-select:none}
