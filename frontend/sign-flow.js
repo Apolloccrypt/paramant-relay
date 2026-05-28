@@ -29,6 +29,9 @@ const state = {
     keySrc: 'ephemeral',
     key: null,           // { secretKey, publicKey }
     apiKey: '',
+    sigStyle: 'typed',   // 'typed' | 'drawn' | 'image'
+    sigImageBytes: null, // Uint8Array (PNG for drawn, PNG/JPG for image)
+    sigImageType: null,  // 'png' | 'jpg'
   },
   result: null,          // { stampedBytes?, envelope, fingerprint, notary? }
 };
@@ -45,7 +48,10 @@ function setActive(stepId) {
   document.querySelectorAll('.ds-stepper li').forEach(li => {
     const k = li.dataset.step;
     const order = ['doc', 'place', 'identity', 'sign'];
-    const currentIdx = order.indexOf(stepId.replace('step-', '').replace('hash-only', 'place'));
+    // step-done lives past the final step, so treat all stepper items as 'done'.
+    const currentIdx = stepId === 'step-done'
+      ? order.length
+      : order.indexOf(stepId.replace('step-', '').replace('hash-only', 'place'));
     const myIdx = order.indexOf(k);
     li.classList.toggle('active', myIdx === currentIdx);
     li.classList.toggle('done',   myIdx < currentIdx);
@@ -207,9 +213,16 @@ function renderStampMarker(wrap, left, top, w, h) {
 async function initStepIdentity() {
   $('ds-signer-name').addEventListener('input', () => {
     state.signer.name = $('ds-signer-name').value.trim();
-    $('ds-identity-continue').disabled = !state.signer.name;
+    refreshIdentityValid();
   });
   $('ds-signer-name').dispatchEvent(new Event('input'));
+
+  // Signature style tabs
+  document.querySelectorAll('.ds-sig-tabs .ds-tab').forEach(tab => {
+    tab.addEventListener('click', () => selectSigStyle(tab.dataset.sig));
+  });
+  initDrawCanvas();
+  initImageUpload();
 
   // Populate vault keys if available.
   try {
@@ -224,6 +237,118 @@ async function initStepIdentity() {
       }
     }
   } catch {}
+}
+
+function refreshIdentityValid() {
+  // Identity is valid when there's a name AND the chosen sig-style has its data.
+  const hasName = !!state.signer.name;
+  const hasSig =
+    state.signer.sigStyle === 'typed' ? true :
+    state.signer.sigStyle === 'drawn' ? !!state.signer.sigImageBytes :
+    state.signer.sigStyle === 'image' ? !!state.signer.sigImageBytes :
+    false;
+  $('ds-identity-continue').disabled = !(hasName && hasSig);
+}
+
+function selectSigStyle(style) {
+  state.signer.sigStyle = style;
+  document.querySelectorAll('.ds-sig-tabs .ds-tab').forEach(t => {
+    const active = t.dataset.sig === style;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  for (const k of ['typed', 'drawn', 'image']) {
+    $('ds-sig-panel-' + k).hidden = (k !== style);
+  }
+  refreshIdentityValid();
+}
+
+// ---- drawn-signature canvas (pointer + touch) ----
+function initDrawCanvas() {
+  const cv = $('ds-sig-canvas');
+  const ctx = cv.getContext('2d');
+  // Fill white so the exported PNG isn't transparent against light backgrounds
+  // (pdf-lib renders transparent PNG fine, but a white-bg signature also
+  // shows clearly during the on-screen preview marker).
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = '#0b3a6a';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  let drawing = false;
+  let last = null;
+
+  function pos(ev) {
+    const r = cv.getBoundingClientRect();
+    const x = ((ev.clientX ?? (ev.touches && ev.touches[0].clientX)) - r.left) * (cv.width / r.width);
+    const y = ((ev.clientY ?? (ev.touches && ev.touches[0].clientY)) - r.top) * (cv.height / r.height);
+    return { x, y };
+  }
+
+  function start(ev) { ev.preventDefault(); drawing = true; last = pos(ev); }
+  function move(ev) {
+    if (!drawing) return;
+    ev.preventDefault();
+    const p = pos(ev);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    last = p;
+  }
+  async function end(ev) {
+    if (!drawing) return;
+    drawing = false;
+    // Convert to PNG bytes and stash. refreshIdentityValid will enable Continue.
+    cv.toBlob(async (blob) => {
+      if (!blob) return;
+      state.signer.sigImageBytes = new Uint8Array(await blob.arrayBuffer());
+      state.signer.sigImageType = 'png';
+      refreshIdentityValid();
+    }, 'image/png');
+  }
+
+  cv.addEventListener('pointerdown', start);
+  cv.addEventListener('pointermove', move);
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointerleave', end);
+  cv.addEventListener('touchstart', start, { passive: false });
+  cv.addEventListener('touchmove',  move,  { passive: false });
+  cv.addEventListener('touchend',   end);
+
+  $('ds-sig-clear').addEventListener('click', () => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    state.signer.sigImageBytes = null;
+    state.signer.sigImageType = null;
+    refreshIdentityValid();
+  });
+}
+
+// ---- image upload ----
+function initImageUpload() {
+  const inp = $('ds-sig-image-input');
+  const drop = $('ds-sig-image-drop');
+  drop.addEventListener('click', () => inp.click());
+  inp.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (f.size > 1024 * 1024) {
+      alert('Image too large (max 1 MB).');
+      return;
+    }
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const type = (f.type === 'image/jpeg') ? 'jpg' : 'png';
+    state.signer.sigImageBytes = bytes;
+    state.signer.sigImageType = type;
+    const url = URL.createObjectURL(new Blob([bytes], { type: f.type }));
+    const img = $('ds-sig-image-preview');
+    img.src = url;
+    img.style.display = 'block';
+    refreshIdentityValid();
+  });
 }
 
 async function resolveSignerKey() {
@@ -278,9 +403,17 @@ function hexToBytes(s) {
 // ====================================================================
 
 function fillReview() {
+  // Sync keySrc from the dropdown into state (was only set inside resolveSignerKey,
+  // which only runs after Sign is clicked - too late for the review card).
+  state.signer.keySrc = $('ds-key-src').value;
+
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
   $('ds-review-mode').textContent = state.mode === 'pdf' ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) : 'Hash-only (SHA3-256 attestation)';
   $('ds-review-name').textContent = state.signer.name;
+  $('ds-review-sig').textContent =
+    state.signer.sigStyle === 'typed'  ? 'Typed name in the stamp' :
+    state.signer.sigStyle === 'drawn'  ? 'Drawn signature (' + formatSize(state.signer.sigImageBytes.length) + ' PNG)' :
+                                         'Uploaded image (' + formatSize(state.signer.sigImageBytes.length) + ' ' + state.signer.sigImageType.toUpperCase() + ')';
   $('ds-review-key-src').textContent =
     state.signer.keySrc === 'ephemeral' ? 'One-time key generated in this browser' :
     state.signer.keySrc === 'file'      ? 'Key file from disk' :
@@ -288,8 +421,8 @@ function fillReview() {
   const apiKey = $('ds-api-key').value.trim();
   state.signer.apiKey = apiKey;
   $('ds-review-notary').textContent = apiKey
-    ? 'Yes: relay will counter-sign + write to CT log'
-    : 'No: envelope is self-contained (still verifiable)';
+    ? 'Yes - relay will counter-sign + write to CT log'
+    : 'No - envelope is self-contained (still verifiable)';
 }
 
 async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
@@ -300,14 +433,43 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const navy = PDFLib.rgb(0.043, 0.227, 0.416);
   const dim  = PDFLib.rgb(0.3, 0.3, 0.3);
+
   page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: navy, opacity: 0.04 });
+
   const padding = 6;
-  let yCursor = stamp.y + stamp.h - padding - 8;
-  page.drawText('Signed by ' + signerName, { x: stamp.x + padding, y: yCursor, size: 9, font: fontBold, color: navy });
-  yCursor -= 12;
-  page.drawText(dateStr, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
-  yCursor -= 10;
-  page.drawText('PQ key: ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
+
+  // If the signer provided a drawn/uploaded signature, render it as the top
+  // half of the stamp and shrink the metadata block below it. Otherwise the
+  // stamp uses the original text-only layout.
+  const hasImg = state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes;
+  if (hasImg) {
+    const embed = state.signer.sigImageType === 'jpg'
+      ? await pdfDoc.embedJpg(state.signer.sigImageBytes)
+      : await pdfDoc.embedPng(state.signer.sigImageBytes);
+    const maxW = stamp.w - padding * 2;
+    const maxH = stamp.h * 0.55;
+    const scale = Math.min(maxW / embed.width, maxH / embed.height);
+    const w = embed.width * scale;
+    const h = embed.height * scale;
+    page.drawImage(embed, {
+      x: stamp.x + (stamp.w - w) / 2,
+      y: stamp.y + stamp.h - padding - h,
+      width: w, height: h,
+    });
+    // Metadata block underneath the image
+    let yCursor = stamp.y + stamp.h - padding - h - 10;
+    page.drawText(signerName, { x: stamp.x + padding, y: yCursor, size: 8, font: fontBold, color: navy });
+    yCursor -= 9;
+    page.drawText(dateStr + '  -  PQ ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 6, font, color: dim });
+  } else {
+    let yCursor = stamp.y + stamp.h - padding - 8;
+    page.drawText('Signed by ' + signerName, { x: stamp.x + padding, y: yCursor, size: 9, font: fontBold, color: navy });
+    yCursor -= 12;
+    page.drawText(dateStr, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
+    yCursor -= 10;
+    page.drawText('PQ key: ' + fingerprint8, { x: stamp.x + padding, y: yCursor, size: 7, font, color: dim });
+  }
+
   page.drawText('PARAMANT - PQ', { x: stamp.x + stamp.w - 66, y: stamp.y + 4, size: 6, font: fontBold, color: navy });
   return await pdfDoc.save();
 }
@@ -349,6 +511,8 @@ async function doSign() {
         original_hash: toHex(origHash),
         stamped_hash:  toHex(stampedHash),
         coords,
+        signature_style: state.signer.sigStyle,
+        signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: toB64(state.signer.key.publicKey),
         signer_pk_fingerprint: fingerprint,
         signature: toB64(signature),
@@ -425,13 +589,39 @@ function downloadBytes(bytes, name, mime) {
 function showDone() {
   setActive('step-done');
   const r = state.result;
+
+  // Success banner: signature was produced locally regardless of the optional
+  // notary outcome. Soften the wording so a failed/skipped notary call does
+  // not look like 'signing failed'.
+  const sb = $('ds-success-banner');
+  if (sb) {
+    sb.hidden = false;
+    sb.className = 'ds-success';
+    sb.innerHTML =
+      '<div class="ds-success-icon" aria-hidden="true">&#10003;</div>' +
+      '<div><strong>Signed locally with ML-DSA-65.</strong>' +
+      ' <span>Your private key never left this browser. The envelope below is self-contained and verifiable offline.</span></div>';
+  }
+
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;
-  $('ds-done-notary').textContent = r.envelope.notary
-    ? 'Notarised by relay (CT log index ' + (r.envelope.notary.ct_log_index || '?') + ')'
-    : r.envelope.notary_error
-      ? 'Notarised: failed (' + r.envelope.notary_error + ')'
-      : 'Self-contained envelope (no relay notarisation)';
+  $('ds-done-mode').textContent = state.mode === 'pdf'
+    ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1)
+    : 'Hash-only attestation (SHA3-256)';
+
+  // Notary line: only show when something happened, frame failure as
+  // 'optional step skipped' rather than an error.
+  if (r.envelope.notary) {
+    $('ds-done-notary').textContent = 'Yes - relay co-signed and added a CT-log entry';
+  } else if (r.envelope.notary_error) {
+    const reason = /401/.test(r.envelope.notary_error) ? 'API key was not accepted by the relay'
+                 : /403/.test(r.envelope.notary_error) ? 'API key has no notary permission'
+                 : 'relay was unreachable';
+    $('ds-done-notary').textContent = 'Skipped (' + reason + ') - the local signature is still fully valid';
+  } else {
+    $('ds-done-notary').textContent = 'Skipped (no API key provided) - the local signature is still fully valid';
+  }
+
   const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
   $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
   if (r.stampedBytes) {
@@ -439,6 +629,44 @@ function showDone() {
     $('ds-dl-pdf').onclick = () => downloadBytes(r.stampedBytes, 'signed-' + state.doc.name, 'application/pdf');
   } else {
     $('ds-dl-pdf').hidden = true;
+  }
+
+  // Render the signed result so the user can see their stamp before downloading.
+  renderSignedPreview().catch(() => {});
+}
+
+async function renderSignedPreview() {
+  const container = $('ds-signed-preview');
+  if (!container) return;
+  container.innerHTML = '';
+  const r = state.result;
+  if (state.mode !== 'pdf' || !r.stampedBytes) {
+    // Hash-only mode: there's no rendered document, show the hash for confirmation.
+    container.innerHTML =
+      '<div class="ds-info-card"><dl>' +
+      '<dt>Signed bytes (SHA3-256)</dt><dd>' + escapeHtml(r.envelope.document_hash || '-') + '</dd>' +
+      '<dt>Signature (b64, first 32)</dt><dd>' + escapeHtml((r.envelope.signature || '').slice(0, 32)) + '...</dd>' +
+      '</dl></div>';
+    return;
+  }
+  const pdfjs = await waitForPdfjs();
+  const copy = new Uint8Array(r.stampedBytes);
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  // Show only the page that holds the stamp (and the next page if it exists)
+  // so the user does not have to scroll far on long documents.
+  const idxs = [state.stamp.pageIndex];
+  if (state.stamp.pageIndex + 1 < pdf.numPages) idxs.push(state.stamp.pageIndex + 1);
+  for (const idx of idxs) {
+    const page = await pdf.getPage(idx + 1);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    const scale = targetWidth / baseViewport.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    container.appendChild(canvas);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   }
 }
 
