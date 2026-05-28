@@ -101,9 +101,15 @@ function bytesToDataUrl(bytes, mime) {
 
 async function waitForPdfjs() {
   if (window.__pdfjsLib) return window.__pdfjsLib;
+  if (window.__pdfjsLoadError) throw new Error('PDF.js failed to load: ' + (window.__pdfjsLoadError.message || window.__pdfjsLoadError));
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('PDF.js failed to load')), 10000);
+    const t = setTimeout(() => reject(new Error('PDF.js did not load within 10s. Likely cause: cached vendor file is corrupted. Try hard-refresh (Cmd/Ctrl+Shift+R) to bypass cache.')), 10000);
     window.addEventListener('pdfjs:ready', () => { clearTimeout(t); resolve(window.__pdfjsLib); }, { once: true });
+    window.addEventListener('pdfjs:error', (e) => {
+      clearTimeout(t);
+      const detail = (e && e.detail && (e.detail.message || e.detail.toString())) || 'unknown';
+      reject(new Error('PDF.js failed to load: ' + detail));
+    }, { once: true });
   });
 }
 
@@ -169,11 +175,25 @@ async function onDocChosen(file) {
       container.innerHTML =
         '<div style="padding:18px;border:1px solid #d4a017;background:#fff4d6;color:#5a3f00;font-size:13px;line-height:1.6">' +
         '<strong>Could not render the document.</strong> ' + escapeHtml(err && err.message ? err.message : String(err)) +
-        '<p style="margin-top:8px;font-size:11px;color:var(--ink-dim)">If this is a PDF: hard-refresh the page (Cmd+Shift+R / Ctrl+Shift+R) to clear any cached old version of PDF.js. ' +
-        'If the file is encrypted or password-protected, decrypt it first. ' +
-        'You can also go back and pick a different file.</p>' +
+        '<p style="margin-top:8px;font-size:11px;color:var(--ink-dim)">If this is a PDF: hard-refresh the page (Cmd+Shift+R / Ctrl+Shift+R) to clear any cached PDF.js version. ' +
+        'If the file is encrypted or password-protected, decrypt it first.</p>' +
+        '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">' +
+        '  <button class="btn btn-primary" id="ds-fallback-hash" type="button" style="min-width:auto">Sign as hash-only (no visual stamp)</button>' +
+        '  <button class="btn btn-tertiary" id="ds-fallback-back" type="button" style="min-width:auto">Pick a different file</button>' +
+        '</div>' +
         '</div>';
       $('ds-place-continue').disabled = true;
+      // Fallback: skip placement entirely and sign as hash-only attestation.
+      document.getElementById('ds-fallback-hash').addEventListener('click', () => {
+        state.mode = 'hash';
+        state.stamp = null;
+        setActive('step-hash-only');
+        $('ds-hash-only-name').textContent = state.doc.name;
+        $('ds-hash-only-size').textContent = formatSize(state.doc.size);
+        $('ds-hash-only-hash').textContent = toHex(sha3_256(state.doc.bytes));
+        $('ds-hash-only-continue').disabled = false;
+      });
+      document.getElementById('ds-fallback-back').addEventListener('click', () => setActive('step-doc'));
     }
   } else {
     setActive('step-hash-only');
