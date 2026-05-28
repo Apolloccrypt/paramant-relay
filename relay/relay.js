@@ -28,6 +28,8 @@ const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
 const userSigning   = require('./lib/user-signing');
+const tiers         = require('./lib/tiers');
+const quota         = require('./lib/quota');
 
 const VERSION    = '3.0.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -1638,9 +1640,16 @@ function loadTrialKeys() {
   } catch(e) { /* file may not exist yet */ }
 }
 
-// Pubkey plan limits and TTL
+// Pubkey plan limits and TTL.
+// _pubkeyTtl stays local: it tracks how long a *registered device pubkey*
+// is retained, which is not in TIER_LIMITS' scope yet (the brief only maps
+// devices count + view TTL + max views + monthly quotas + file size).
+// _pubkeyMax now reads device caps from TIER_LIMITS via tiers.tierLimitNum so
+// there is one source of truth for the per-tier device count.
 const _pubkeyTtl = { free: 7 * 86_400_000, pro: 30 * 86_400_000, enterprise: 365 * 86_400_000 };
-const _pubkeyMax = { free: 5, pro: 50, enterprise: Infinity };
+const _pubkeyMax = new Proxy({}, {
+  get(_t, plan) { return tiers.tierLimitNum(plan, 'devices'); },
+});
 const INVITE_PUBKEY_TTL = 3_600_000; // 1 hour
 
 // TTL flush — clean pubkey rate limit map hourly + expired pubkeys
@@ -1882,6 +1891,11 @@ const server = http.createServer(async (req, res) => {
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
   const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
+  // account_id is what Phase 3 counters key on. For now it is 1:1 with apiKey
+  // (or with the DID device for DID-auth), which means existing single-device
+  // users see no change. Once multi-device sharing of an account_id lands, the
+  // counter math automatically aggregates across devices.
+  if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.device_id) || null;
   const clientIp = getClientIp(req);
 
   // Community Edition limit: block keys that exceed the 5-key cap
@@ -3554,13 +3568,14 @@ session = client.create_session('recipient@example.com')</pre>
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      const _planMaxTtl = { dev: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
-      const _plan = keyData?.plan || 'dev';
-      const _maxTtl = _planMaxTtl[_plan] || _planMaxTtl.dev;
+      // Per-tier view TTL ceiling -- single source of truth in lib/tiers.js.
+      // Falls back to community ceiling when the plan is missing or unrecognised.
+      const _plan = keyData?.plan || 'community';
+      const _maxTtl = tiers.tierLimitNum(_plan, 'view_ttl_ms');
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
-      // Access policies: max_views (default 1 = burn-on-read) + Argon2id password
-      const _planMaxViews = { free: 1, pro: 10, enterprise: 100 };
-      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, _planMaxViews[keyData?.plan || 'pro'] || 1));
+      // Access policies: max_views (default 1 = burn-on-read) + Argon2id password.
+      // Per-tier max_views ceiling also lives in lib/tiers.js now.
+      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(keyData?.plan || 'pro', 'max_views') || 1));
       let pw_hash = null;
       if (password) {
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
@@ -3590,6 +3605,23 @@ session = client.create_session('recipient@example.com')</pre>
       stats.inbound++; stats.bytes_in += blob.length;
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
+
+      // Phase 3 quota counter: tally one transfer per account_id per month.
+      // ParaShare sends chunks of the same file with a shared meta.file_id, so
+      // we dedup on file_id (preferred) or on the encrypted-blob hash (single-
+      // blob SDK path). A 111-chunk upload counts as one transfer; a brand-new
+      // upload tomorrow with the same file_id counts as a new transfer (24 h
+      // dedup window).
+      //
+      // COUNT ONLY -- no gate, no 402. If Redis is unavailable the counter is
+      // skipped silently; the upload completes either way.
+      if (keyData && keyData.account_id) {
+        const dedupKey = (meta && meta.file_id)
+          ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
+          : quota.firstChunkHash(blob);
+        quota.recordTransfer(redisClient, keyData.account_id, dedupKey, log)
+          .catch(() => { /* never throws but be defensive */ });
+      }
 
       if (deviceId) {
         pushWebhooks(apiKey, deviceId, 'blob_ready', { hash, size: blob.length, ttl_ms: ttl, sig_valid: sigResult.valid });
@@ -3953,6 +3985,61 @@ session = client.create_session('recipient@example.com')</pre>
     return res.end(J({ ok: true, count: keys.length, keys, license: licenseInfo }));
   }
 
+  // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────
+  // Returns this-month transfer + sign counts per account, plus the limits
+  // from lib/tiers.js so an operator can sanity-check the counters before
+  // any quota gate is ever enabled. Auth: ADMIN_TOKEN (handled above).
+  if (path === '/v2/admin/usage' && req.method === 'GET') {
+    const month = quota.ymKey();
+    const out = [];
+    for (const [k, v] of apiKeys.entries()) {
+      const accountId = v.account_id || k;
+      const usage = await quota.readUsage(redisClient, accountId, month);
+      const plan = v.plan || 'community';
+      out.push({
+        account_id: accountId,
+        api_key_prefix: k.slice(0, 12),
+        plan,
+        label: v.label || '',
+        email: v.email || null,
+        active: !!v.active,
+        usage,
+        limits: {
+          transfers_month: tiers.tierLimit(plan, 'transfers_month'),
+          signs_month:     tiers.tierLimit(plan, 'signs_month'),
+          file_mb:         tiers.tierLimit(plan, 'file_mb'),
+          devices:         tiers.tierLimit(plan, 'devices'),
+        },
+      });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, month, count: out.length, redis_available: !!(redisClient && redisClient.isReady), accounts: out }));
+  }
+  const usageMatch = path.match(/^\/v2\/admin\/usage\/([A-Za-z0-9_.\-:]+)$/);
+  if (usageMatch && req.method === 'GET') {
+    const accountId = decodeURIComponent(usageMatch[1]);
+    const entry = [...apiKeys.entries()].find(([k, v]) => (v.account_id || k) === accountId || k === accountId);
+    const plan = entry ? (entry[1].plan || 'community') : 'community';
+    const month = quota.ymKey();
+    const usage = await quota.readUsage(redisClient, accountId, month);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      ok: true,
+      account_id: accountId,
+      plan,
+      known_to_relay: !!entry,
+      month,
+      redis_available: !!(redisClient && redisClient.isReady),
+      usage,
+      limits: {
+        transfers_month: tiers.tierLimit(plan, 'transfers_month'),
+        signs_month:     tiers.tierLimit(plan, 'signs_month'),
+        file_mb:         tiers.tierLimit(plan, 'file_mb'),
+        devices:         tiers.tierLimit(plan, 'devices'),
+      },
+    }));
+  }
+
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     try {
@@ -4296,6 +4383,14 @@ python3 paramant-receiver.py \\
         { relaySign: (msg) => registry.getSig(0x0002).sign(msg, relayIdentity.sk), relayPkHash: relayIdentity.pk_hash });
 
       log('info', 'parasign_signed', { ct_index: ctEntry.index, signer_pk_hash: signerPkHash.slice(0, 16) + '…' });
+
+      // Phase 3 quota counter: tally one sign per account_id per month.
+      // No dedup -- every counter-signature is a billable event.
+      // COUNT ONLY -- no gate, no 402. Redis failure does not block the response.
+      if (keyData && keyData.account_id) {
+        quota.recordSign(redisClient, keyData.account_id, log).catch(() => {});
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope }));
     } catch (e) {
