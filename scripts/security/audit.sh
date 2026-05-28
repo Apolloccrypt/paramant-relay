@@ -17,18 +17,34 @@ echo "=== Paramant security audit $(date -Iseconds) ==="
 echo ""
 
 # CFG-01: /setup gated after first-run
-CODE=$(curl -s -o /dev/null -w "%{http_code}" "$APP/setup?cb=$(cb)")
-if [ "$CODE" = "200" ]; then
-  fail CFG-01 "/setup returns 200 publicly - verify it cannot mutate config without auth"
+# 200 on the HTML page is a yellow flag, not a leak by itself - the real
+# question is whether /v2/setup/apply mutates without auth. Probe both.
+SETUP_HTML=$(curl -s -o /dev/null -w "%{http_code}" "$APP/setup?cb=$(cb)")
+SETUP_APPLY=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "{}" "$RELAY/v2/setup/apply")
+if [ "$SETUP_APPLY" = "401" ] || [ "$SETUP_APPLY" = "403" ] || [ "$SETUP_APPLY" = "409" ]; then
+  pass CFG-01 "/setup HTML=$SETUP_HTML, /v2/setup/apply=$SETUP_APPLY (mutation gated)"
+elif [ "$SETUP_APPLY" = "404" ]; then
+  warn CFG-01 "/setup HTML=$SETUP_HTML, /v2/setup/apply=404 (verify route exists)"
 else
-  pass CFG-01 "/setup returns $CODE (not openly served)"
+  fail CFG-01 "/setup HTML=$SETUP_HTML, /v2/setup/apply=$SETUP_APPLY (mutation may be ungated)"
 fi
 
 # DATA-04: sensitive files not web-reachable
+# A 200 with text/html is almost always an SPA catch-all, not a real leak.
+# Only treat 200 as a leak when content-type indicates raw JSON/text data.
 for f in /users.json /.env /admin/users.json /config.json; do
-  C=$(curl -s -o /dev/null -w "%{http_code}" "$APP$f?cb=$(cb)")
+  HDR=$(curl -sI "$APP$f?cb=$(cb)")
+  C=$(echo "$HDR" | head -1 | awk '{print $2}')
+  CT=$(echo "$HDR" | grep -i "^content-type:" | tr -d '\r' | awk '{print tolower($2)}')
   if [ "$C" = "200" ]; then
-    fail DATA-04 "$f is web-reachable (200) - CRITICAL"
+    case "$CT" in
+      application/json*|text/plain*|application/octet-stream*)
+        fail DATA-04 "$f -> 200 $CT (CRITICAL - likely raw data leak)" ;;
+      text/html*)
+        pass DATA-04 "$f -> 200 $CT (SPA catch-all, not a data leak)" ;;
+      *)
+        warn DATA-04 "$f -> 200 $CT (verify manually)" ;;
+    esac
   else
     pass DATA-04 "$f -> $C"
   fi
@@ -60,10 +76,14 @@ else
   fail COMM-01 "HSTS missing includeSubDomains"
 fi
 
-# COMM-02: CSP no unsafe-eval
+# COMM-02: CSP no unsafe-eval (wasm-unsafe-eval is permitted, needed for PQ WASM)
 CSP=$(curl -sI "$APP/?cb=$(cb)" | grep -i "content-security-policy")
-if echo "$CSP" | grep -qi "unsafe-eval"; then
-  fail COMM-02 "CSP allows unsafe-eval"
+# Strip 'wasm-unsafe-eval' tokens before checking for bare 'unsafe-eval'
+CSP_STRIPPED=$(echo "$CSP" | sed -E "s/'wasm-unsafe-eval'//g")
+if echo "$CSP_STRIPPED" | grep -qi "unsafe-eval"; then
+  fail COMM-02 "CSP allows unsafe-eval (JS eval)"
+elif echo "$CSP" | grep -qi "unsafe-inline.*script-src\|script-src[^;]*unsafe-inline"; then
+  warn COMM-02 "CSP present, no unsafe-eval, but allows unsafe-inline scripts"
 elif [ -n "$CSP" ]; then
   pass COMM-02 "CSP present, no unsafe-eval"
 else

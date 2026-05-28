@@ -1,16 +1,16 @@
-=== Paramant security audit 2026-05-28T09:11:59+02:00 ===
+=== Paramant security audit 2026-05-28T09:14:16+02:00 ===
 
-FAIL  CFG-01       /setup returns 200 publicly - verify it cannot mutate config without auth
+PASS  CFG-01       /setup HTML=200, /v2/setup/apply=409 (mutation gated)
 PASS  DATA-04      /users.json -> 404
 PASS  DATA-04      /.env -> 404
-FAIL  DATA-04      /admin/users.json is web-reachable (200) - CRITICAL
+PASS  DATA-04      /admin/users.json -> 200 text/html; (SPA catch-all, not a data leak)
 PASS  DATA-04      /config.json -> 404
 PASS  API-02       /v2/admin/config -> 401 (rejects unauth)
 PASS  API-02       /v2/admin/exec -> 401 (rejects unauth)
 PASS  API-02       /admin/api/settings -> 401 (rejects unauth)
 PASS  AUTH-01      /v2/sign requires auth/valid body (401)
 PASS  COMM-01      HSTS present with includeSubDomains
-FAIL  COMM-02      CSP allows unsafe-eval
+WARN  COMM-02      CSP present, no unsafe-eval, but allows unsafe-inline scripts
 PASS  COMM-04      x-content-type-options present
 PASS  COMM-04      x-frame-options present
 PASS  COMM-04      referrer-policy present
