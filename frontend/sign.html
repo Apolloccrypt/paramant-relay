@@ -12,6 +12,60 @@
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
 <link rel="stylesheet" href="/components-parasign.css?v=2">
+<style>
+.ds-wrap{max-width:880px;margin:48px auto;padding:0 24px}
+.ds-head{margin-bottom:28px}
+.ds-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.ds-title{font-size:32px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px;color:var(--navy)}
+.ds-lede{font-size:14px;color:var(--ink-dim);line-height:1.7;max-width:620px}
+.ds-stepper{list-style:none;display:flex;gap:8px;padding:0;margin:0 0 32px;border-bottom:1px solid var(--ink-hair);counter-reset:dsstep}
+.ds-stepper li{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding:14px 0;border-bottom:2px solid transparent;counter-increment:dsstep;text-align:center}
+.ds-stepper li::before{content:counter(dsstep);display:inline-block;width:20px;height:20px;border:1px solid var(--ink-hair);border-radius:50%;line-height:18px;font-size:10px;margin-right:6px;font-weight:700}
+.ds-stepper li.active{color:var(--cobalt);border-bottom-color:var(--cobalt)}
+.ds-stepper li.active::before{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,.06)}
+.ds-stepper li.done{color:var(--navy)}
+.ds-stepper li.done::before{border-color:var(--cobalt);color:#fff;background:var(--cobalt)}
+.ds-step{margin-bottom:24px}
+.ds-step h2{font-size:18px;font-weight:700;margin-bottom:6px;color:var(--navy)}
+.ds-step .ds-sub{font-size:13px;color:var(--ink-dim);margin-bottom:20px;line-height:1.6}
+.ds-dropzone{border:2px dashed var(--ink-hair);background:var(--bone);padding:48px 24px;text-align:center;cursor:pointer;transition:all 140ms ease}
+.ds-dropzone:hover,.ds-dropzone.drag{border-color:var(--cobalt);background:rgba(11,58,106,.04)}
+.ds-dropzone p.big{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:6px}
+.ds-dropzone p.small{font-size:12px;color:var(--ink-dim)}
+.ds-info-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:16px 18px;margin-bottom:18px}
+.ds-info-card dl{display:grid;grid-template-columns:160px 1fr;gap:8px 14px;margin:0;font-size:12px}
+.ds-info-card dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim)}
+.ds-info-card dd{font-family:var(--mono);font-size:12px;color:var(--ink);word-break:break-all;margin:0}
+.ds-page-wrap{position:relative;margin-bottom:14px;cursor:crosshair}
+.ds-page-wrap canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff}
+.ds-stamp-marker{position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.06);pointer-events:none;font-family:var(--mono);font-size:9px;color:var(--navy);padding:4px;box-sizing:border-box;line-height:1.25;overflow:hidden}
+.ds-sm-name{font-weight:700;font-size:10px}
+.ds-sm-meta{color:var(--ink-dim);font-size:8px}
+.ds-sm-pqtag{position:absolute;right:3px;bottom:2px;font-size:7px;letter-spacing:.08em;color:var(--cobalt)}
+.ds-hint{font-size:12px;color:var(--ink-dim);font-family:var(--mono);margin-bottom:12px}
+.ds-field{margin-bottom:16px}
+.ds-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.ds-input,.ds-select{width:100%;padding:10px 12px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:13px}
+.ds-input:focus,.ds-select:focus{outline:none;border-color:var(--cobalt)}
+.ds-advanced{margin:20px 0 10px;padding:14px;background:var(--bone-2);border:1px solid var(--ink-hair)}
+.ds-advanced summary{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-dim);font-weight:600}
+.ds-advanced[open] summary{margin-bottom:12px;color:var(--navy)}
+.ds-advanced p{font-size:12px;color:var(--ink-dim);line-height:1.6;margin-bottom:10px}
+.ds-disclaimer{background:#fff4d6;border:1px solid #d4a017;padding:12px 16px;font-size:12px;color:#5a3f00;margin:14px 0;line-height:1.5}
+.ds-disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
+.ds-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.ds-actions .btn{flex:0 1 auto;min-width:160px}
+.ds-banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-top:12px;line-height:1.5;font-family:var(--mono)}
+.ds-banner.err{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1);background:rgba(255,80,80,0.06)}
+.ds-banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,0.04)}
+@media(max-width:640px){
+  .ds-wrap{padding:0 16px;margin-top:24px}
+  .ds-title{font-size:24px}
+  .ds-stepper li{font-size:10px;padding:10px 0}
+  .ds-stepper li::before{display:block;margin:0 auto 4px}
+  .ds-info-card dl{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -179,95 +233,130 @@
 </div>
 
 <main id="main-content" role="main">
-<div class="ps-wrap">
-  <header class="ps-head">
-    <p class="ps-kicker">ParaSign &middot; post-quantum signature</p>
-    <h1 class="ps-title">Sign a document</h1>
-    <p class="ps-lede">ML-DSA-65 (FIPS 204). Your private key and the document never leave this browser &mdash; only the document hash and the signature are sent to the notary. Recipients get a self-contained <code>.psign</code> envelope.</p>
+<div class="ds-wrap">
+  <header class="ds-head">
+    <p class="ds-kicker">ParaSign - post-quantum signature</p>
+    <h1 class="ds-title">Sign a document</h1>
+    <p class="ds-lede">Pick a document, place your signature where you want it, and sign locally. The document, the private key, and the signature never leave your browser unless you ask the relay to counter-sign.</p>
   </header>
 
-  <section class="card ps-panel" aria-labelledby="s1">
-    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="s1" class="ps-panel-title">Signing key</h2></div>
-    <p class="ps-help">Generate a fresh ML-DSA-65 key, unlock one from this browser, or load a key file. The private key never leaves the browser.</p>
+  <ol class="ds-stepper" aria-label="Sign progress">
+    <li data-step="doc" class="active">Document</li>
+    <li data-step="place">Place</li>
+    <li data-step="identity">Identity</li>
+    <li data-step="sign">Sign</li>
+  </ol>
 
-    <div class="ps-vault-row" id="ps-vault-row" hidden>
-      <label class="ps-label" for="ps-vault-select">Use a key from this browser</label>
-      <select class="ps-input" id="ps-vault-select"></select>
-      <button class="btn btn-primary" id="ps-vault-unlock" type="button">Unlock</button>
+  <!-- Step 1: pick document -->
+  <section class="ds-step" id="step-doc">
+    <h2>Pick the document you want to sign</h2>
+    <p class="ds-sub">PDFs get a visual signature stamp you can place on any page. Other file types get a hash-only attestation that recipients verify by re-hashing the file.</p>
+    <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Pick or drop a file">
+      <p class="big">Drop a file here, or click to choose</p>
+      <p class="small">Stays in your browser. Nothing is uploaded yet.</p>
+      <input type="file" id="ds-doc-input" hidden>
     </div>
+  </section>
 
-    <div class="ps-btn-row">
-      <button class="btn btn-primary" id="ps-gen-key" type="button">Generate new key</button>
-      <label class="btn btn-secondary">Load key file<input type="file" id="ps-load-key" accept=".json,application/json" hidden></label>
-      <button class="btn btn-tertiary" id="ps-save-key" type="button" disabled>Download key</button>
-      <button class="btn btn-secondary" id="ps-save-vault" type="button" disabled>Save to this browser</button>
+  <!-- Step 2 (PDF): place stamp -->
+  <section class="ds-step" id="step-place" hidden>
+    <h2>Place your signature</h2>
+    <p class="ds-sub">Click anywhere on a page to drop the stamp. Click another spot to move it. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
+    <p class="ds-hint" id="ds-place-hint">Click a page to drop the signature stamp.</p>
+    <div id="ds-pdf-canvas-list"></div>
+    <div class="ds-actions">
+      <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-place-continue" type="button" disabled>Continue</button>
     </div>
+  </section>
 
-    <div class="ps-vault-form" id="ps-vault-form" hidden>
-      <p class="ps-help"><strong>Set a passphrase to encrypt this key in your browser.</strong> We never see it and we cannot reset it. If you forget it, this key is gone. Download a backup file too, to be safe.</p>
-      <div class="ps-field">
-        <label class="ps-label" for="ps-vault-pass">Passphrase (8 chars min)</label>
-        <input class="ps-input mono" type="password" id="ps-vault-pass" autocomplete="new-password" minlength="8">
-      </div>
-      <div class="ps-field">
-        <label class="ps-label" for="ps-vault-pass2">Confirm passphrase</label>
-        <input class="ps-input mono" type="password" id="ps-vault-pass2" autocomplete="new-password" minlength="8">
-      </div>
-      <div class="ps-btn-row">
-        <button class="btn btn-primary" id="ps-vault-confirm" type="button">Save in browser</button>
-        <button class="btn btn-tertiary" id="ps-vault-cancel" type="button">Cancel</button>
-      </div>
-    </div>
-
-    <div class="ps-vault-form" id="ps-unlock-form" hidden>
-      <div class="ps-field">
-        <label class="ps-label" for="ps-unlock-pass">Passphrase for the selected key</label>
-        <input class="ps-input mono" type="password" id="ps-unlock-pass" autocomplete="current-password">
-      </div>
-      <div class="ps-btn-row">
-        <button class="btn btn-primary" id="ps-unlock-confirm" type="button">Unlock</button>
-        <button class="btn btn-tertiary" id="ps-unlock-cancel" type="button">Cancel</button>
-      </div>
-    </div>
-
-    <div class="ps-keybox" id="ps-key-info" hidden>
-      <dl class="ps-kv">
-        <dt>Public key fingerprint</dt><dd class="mono" id="ps-pubkey-fp">-</dd>
-        <dt>Algorithm</dt><dd>ML-DSA-65 (FIPS 204)</dd>
+  <!-- Step 2-alt (non-PDF): hash-only mode -->
+  <section class="ds-step" id="step-hash-only" hidden>
+    <h2>Hash-only signature</h2>
+    <p class="ds-sub">This file type cannot be visually stamped. You will sign the SHA3-256 of the bytes; recipients verify by re-hashing the same file.</p>
+    <div class="ds-info-card">
+      <dl>
+        <dt>File</dt>          <dd id="ds-hash-only-name">-</dd>
+        <dt>Size</dt>          <dd id="ds-hash-only-size">-</dd>
+        <dt>SHA3-256</dt>      <dd id="ds-hash-only-hash">-</dd>
       </dl>
-      <p class="ps-warn">Private key is in memory only. Save it to this browser (encrypted) or download a key file if you want to reuse this identity.</p>
+    </div>
+    <div class="ds-actions">
+      <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Continue</button>
     </div>
   </section>
 
-  <section class="card ps-panel" aria-labelledby="s2">
-    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="s2" class="ps-panel-title">Document &amp; key</h2></div>
-    <label class="ps-file"><input type="file" id="ps-document"><span class="ps-file-cta">Choose a document (or drop here)</span><span class="ps-file-meta" id="ps-document-info">No file selected</span></label>
-    <div class="ps-field">
-      <label class="ps-label" for="ps-label">Optional signer label</label>
-      <input class="ps-input" type="text" id="ps-label" maxlength="80" placeholder="e.g. Mick Beer / Paramant">
+  <!-- Step 3: identity -->
+  <section class="ds-step" id="step-identity" hidden>
+    <h2>Who is signing?</h2>
+    <p class="ds-sub">Your name is baked into the visible stamp (for PDFs) and into the .psign envelope.</p>
+    <div class="ds-field">
+      <label class="ds-label" for="ds-signer-name">Your name</label>
+      <input class="ds-input" type="text" id="ds-signer-name" maxlength="80" placeholder="e.g. Mick Beer" autocomplete="name">
     </div>
-    <div class="ps-field">
-      <label class="ps-label" for="ps-api-key">API key (X-Api-Key)</label>
-      <input class="ps-input mono" type="password" id="ps-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">Required to authenticate the notarise request. The key is sent only as the request header; your signing key is never sent.</p>
+    <div class="ds-field">
+      <label class="ds-label" for="ds-key-src">Signing key</label>
+      <select class="ds-select" id="ds-key-src">
+        <option value="ephemeral">Generate a one-time key (simplest)</option>
+        <option value="file">Load a key file from disk</option>
+      </select>
+    </div>
+    <details class="ds-advanced">
+      <summary>Advanced: counter-sign with the Paramant relay</summary>
+      <p>Optional. With your relay API key, the relay also signs your envelope and writes it to the public CT log, so recipients can trace it. Without a key, your envelope is fully self-contained - still verifiable, just without a third-party witness.</p>
+      <div class="ds-field">
+        <label class="ds-label" for="ds-api-key">X-Api-Key (optional)</label>
+        <input class="ds-input" type="password" id="ds-api-key" placeholder="pgp_..." autocomplete="off">
+      </div>
+    </details>
+    <div class="ds-actions">
+      <button class="btn btn-tertiary" id="ds-identity-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-identity-continue" type="button" disabled>Continue</button>
     </div>
   </section>
 
-  <section class="card ps-panel" aria-labelledby="s3">
-    <div class="ps-panel-head"><span class="ps-step">3</span><h2 id="s3" class="ps-panel-title">Sign</h2></div>
-    <button class="btn btn-primary" id="ps-sign" type="button" disabled>Sign document</button>
-    <div class="ps-banner" id="ps-sign-status" hidden role="status" aria-live="polite"></div>
-    <div class="ps-result" id="ps-result" hidden>
-      <dl class="ps-kv"><dt>Status</dt><dd>Signed &amp; notarised</dd><dt>CT log index</dt><dd class="mono" id="ps-ct-index">-</dd></dl>
-      <div class="ps-btn-row"><button class="btn btn-primary" id="ps-download-psign" type="button">Download .psign</button><a class="btn btn-tertiary" href="/verify">Verify an envelope</a></div>
+  <!-- Step 4: review + sign -->
+  <section class="ds-step" id="step-sign" hidden>
+    <h2>Review and sign</h2>
+    <div class="ds-info-card">
+      <dl>
+        <dt>Document</dt>      <dd id="ds-review-doc">-</dd>
+        <dt>Mode</dt>          <dd id="ds-review-mode">-</dd>
+        <dt>Signer</dt>        <dd id="ds-review-name">-</dd>
+        <dt>Key source</dt>    <dd id="ds-review-key-src">-</dd>
+        <dt>Counter-sign</dt>  <dd id="ds-review-notary">-</dd>
+      </dl>
     </div>
+    <div class="ds-disclaimer">
+      <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
+      ML-DSA-65 (FIPS 204) cryptographic attestation, produced in your browser. Not a notarised legal signature under eIDAS or any qualified-trust regime.
+    </div>
+    <div class="ds-actions">
+      <button class="btn btn-tertiary" id="ds-sign-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-sign-now" type="button">Sign now</button>
+    </div>
+    <div class="ds-banner" id="ds-sign-status" hidden role="status" aria-live="polite"></div>
   </section>
 
-  <aside class="ps-info">
-    <h2>What is in a .psign?</h2>
-    <p>The signature, your public key, the SHA3-256 of the document, a CT-log proof, and the relay's notary signature. The recipient verifies against the original document.</p>
-    <p><a href="/verify">Verify a .psign envelope &rarr;</a> &middot; <a href="/docs#operator-scripts">CLI: paramant-sign &rarr;</a></p>
-  </aside>
+  <!-- Done -->
+  <section class="ds-step" id="step-done" hidden>
+    <h2>Signed</h2>
+    <p class="ds-sub">The signature was produced locally. The downloads below are self-contained: anyone with the public key can verify them offline.</p>
+    <div class="ds-info-card">
+      <dl>
+        <dt>Document</dt>      <dd id="ds-done-name">-</dd>
+        <dt>Key fingerprint</dt><dd id="ds-done-fingerprint">-</dd>
+        <dt>Notarisation</dt>  <dd id="ds-done-notary">-</dd>
+      </dl>
+    </div>
+    <div class="ds-actions">
+      <button class="btn btn-primary" id="ds-dl-pdf" type="button" hidden>Download signed PDF</button>
+      <button class="btn btn-secondary" id="ds-dl-psign" type="button">Download .psign envelope</button>
+      <a class="btn btn-tertiary" href="/verify">Verify an envelope</a>
+      <button class="btn btn-tertiary" id="ds-restart" type="button">Sign another</button>
+    </div>
+  </section>
 </div>
 </main>
 
@@ -327,6 +416,8 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
-<script type="module" src="/parasign-client.js?v=2"></script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
+<script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
+<script type="module" src="/sign-flow.js?v=1"></script>
 </body>
 </html>
