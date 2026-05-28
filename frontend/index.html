@@ -212,7 +212,7 @@
       <span class="ppp-label">Start here</span>
     </div>
     <div class="home-cta">
-      <a class="btn btn-primary" href="/dashboard">Open your dashboard</a>
+      <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
       <a class="btn btn-secondary" href="/signup">Create account</a>
       <a class="btn btn-tertiary" href="/docs#self-hosting">Self-host guide</a>
     </div>
@@ -265,21 +265,59 @@
     <li><h3>One-time download</h3><p>The recipient decrypts locally. On download the blob is overwritten in RAM.</p></li>
     <li><h3>Cryptographic proof</h3><p>The Merkle root updates. The transfer is provable without storing what was transferred.</p></li>
   </ol>
-</section>
-
-<section class="home-section alt" aria-labelledby="crypto-h">
-  <header class="home-section-head"><span class="eyebrow">Under the hood</span><h2 id="crypto-h">Post-quantum, hybrid, audited.</h2><p>Default core stack is ML-KEM-768 (FIPS 203) and ML-DSA-65 (FIPS 204), with ECDH P-256 hybrid. Extended algorithm sets are opt-in (ADR R006).</p></header>
-  <div class="pgrid">
-    <div class="pcard"><span class="ptag">kem</span><h3>ML-KEM-768</h3><p>FIPS 203 key encapsulation. Default in core mode, hybrid with ECDH P-256.</p></div>
-    <div class="pcard"><span class="ptag">signature</span><h3>ML-DSA-65</h3><p>FIPS 204 signatures. Relay identity, CT log STH, and ParaSign envelopes.</p></div>
-    <div class="pcard"><span class="ptag">crypto core</span><h3>paramant-core</h3><p>Audit-ready Rust binding the relay uses for all PQ primitives since v3.0.0 (M5b).</p></div>
-    <a class="pcard" href="/security"><span class="ptag">details</span><h3>Cryptography &amp; audits</h3><p>Full algorithm choices, threat model, and the independent security audits.</p><span class="pcta">Read the spec</span></a>
+  <div class="callout" role="note">
+    <h4>Burn-on-read</h4>
+    <p>The relay holds ciphertext in RAM only, never on disk. The moment a recipient downloads, the blob is overwritten and the slot is gone. There is no second copy to subpoena and nothing on disk for an operator or attacker to recover.</p>
   </div>
 </section>
 
-<section class="home-section" aria-labelledby="ct-h">
-  <header class="home-section-head"><span class="eyebrow">Verifiable</span><h2 id="ct-h">Public Merkle proof of every transfer.</h2><p>Every transfer is hashed into a public Merkle tree whose root updates on every write. Prove a transfer occurred without learning what it was.</p></header>
-  <div class="home-center"><a class="btn btn-primary" href="/ct-log">View live CT log</a> <a class="btn btn-tertiary" href="/hndl">Why post-quantum now</a></div>
+<section class="section-dark" aria-labelledby="crypto-h">
+  <div class="home-section">
+    <header class="home-section-head"><span class="eyebrow">Under the hood</span><h2 id="crypto-h">Post-quantum, hybrid, audited.</h2><p>Default core stack is ML-KEM-768 (FIPS 203) and ML-DSA-65 (FIPS 204), with ECDH P-256 hybrid. Extended algorithm sets are opt-in (ADR R006).</p></header>
+    <ul class="crypto-strip" aria-label="Algorithm stack">
+      <li><span class="alg-tag">FIPS 203</span><strong>ML-KEM-768</strong></li>
+      <li><span class="alg-tag">FIPS 204</span><strong>ML-DSA-65</strong></li>
+      <li><span class="alg-tag">Classical hybrid</span><strong>ECDH P-256</strong></li>
+      <li><span class="alg-tag">AEAD</span><strong>AES-256-GCM</strong></li>
+    </ul>
+    <div class="pgrid">
+      <div class="pcard"><span class="ptag">kem</span><h3>ML-KEM-768</h3><p>FIPS 203 key encapsulation. Default in core mode, hybrid with ECDH P-256.</p></div>
+      <div class="pcard"><span class="ptag">signature</span><h3>ML-DSA-65</h3><p>FIPS 204 signatures. Relay identity, CT log STH, and ParaSign envelopes.</p></div>
+      <div class="pcard"><span class="ptag">crypto core</span><h3>paramant-core</h3><p>Audit-ready Rust binding the relay uses for all PQ primitives since v3.0.0 (M5b).</p></div>
+      <a class="pcard" href="/security"><span class="ptag">details</span><h3>Cryptography &amp; audits</h3><p>Full algorithm choices, threat model, and the independent security audits.</p><span class="pcta">Read the spec</span></a>
+    </div>
+    <div class="callout" role="note">
+      <h4>Why post-quantum now</h4>
+      <p>Adversaries can capture ciphertext today and decrypt it later once a cryptographically relevant quantum computer arrives. Files that need to stay private past 2030 need post-quantum keys today. Paramant ships ML-KEM-768 + ML-DSA-65 in the default core stack, hybrid with ECDH P-256 so classical security is preserved.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section-dark" aria-labelledby="ct-h">
+  <div class="home-section">
+    <header class="home-section-head"><span class="eyebrow">Verifiable</span><h2 id="ct-h">Public Merkle proof of every transfer.</h2><p>Every transfer is hashed into a public Merkle tree whose root updates on every write. Prove a transfer occurred without learning what it was.</p></header>
+    <div class="ct-widget" role="region" aria-label="Live CT log">
+      <div class="ct-header">
+        <span><span class="dot" id="ct-dot" aria-hidden="true"></span> Certificate Transparency &middot; live</span>
+        <a href="/ct-log" style="color:var(--lime);text-decoration:none;font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.06em">View all &rarr;</a>
+      </div>
+      <div class="ct-stats">
+        <div class="ct-stat"><div class="ct-stat-label">Log entries</div><div class="ct-stat-val" id="ct-transfers">&mdash;</div></div>
+        <div class="ct-stat"><div class="ct-stat-label">Registered relays</div><div class="ct-stat-val" id="ct-relays">&mdash;</div></div>
+        <div class="ct-stat"><div class="ct-stat-label">STH signature</div><div class="ct-stat-val" id="ct-sth-status" style="font-size:var(--text-lg)">checking&hellip;</div></div>
+      </div>
+      <div class="ct-body">
+        <div class="ct-root-panel">
+          <div class="ct-feed-label">Latest root</div>
+          <div id="ct-root" style="font-family:var(--mono);font-size:var(--text-sm);color:var(--bone-on-navy-dim);word-break:break-all;line-height:1.7">syncing&hellip;</div>
+        </div>
+      </div>
+      <div class="ct-foot">
+        <span>Signed with ML-DSA-65 (FIPS 204)</span>
+        <a class="btn btn-lime" href="/ct-log">View live CT log</a>
+      </div>
+    </div>
+  </div>
 </section>
 
 <section class="selfhost">
@@ -357,5 +395,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
+<script src="/ct-stats.js" defer></script>
 </body>
 </html>
