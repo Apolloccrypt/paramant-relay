@@ -529,6 +529,21 @@ async function sendVerificationEmail(email, token, requestIP) {
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
 }
 
+// Send "someone tried to sign up with your email" notice to an existing
+// account owner. Called from the duplicate branch of /api/user/signup so
+// both branches do the same kind of outbound work (no timing oracle).
+async function sendDuplicateSignupAttempt(email, requestIP) {
+  const msg = emailTemplates.duplicateSignupAttemptEmail({ email, requestedAt: Date.now(), requestIP });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY not set');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+}
+
 // Send TOTP reset confirmation email (step 1 of two-stage flow)
 async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt) {
   const msg = emailTemplates.resetConfirmationEmail({ confirmToken, requestedAt, requestIP: maskedIp });
@@ -643,32 +658,52 @@ api.post("/user/signup", async (req, res) => {
   if (emailCount === 1) await redis().expire(emailKey, 86400);
   if (emailCount > 10) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
 
-  // 5. Already has an active account? — silent success to prevent enumeration
+  // 5. Both branches do the same kind of work (one Redis SET + one outbound
+  // mail enqueue) and return the same response, so the request cannot be
+  // used as an existence oracle through timing or response shape. The
+  // outbound mail is dispatched fire-and-forget via setImmediate so the
+  // Resend API latency (~200-500ms) is not in the response path.
   const existing = await findUserByEmail(norm);
-  if (existing) {
-    // Don't reveal whether email is registered — log silently and return same shape
-    console.log(`[signup] duplicate signup attempt for existing account: ${norm} from ${ip}`);
-    // Still send a "we sent you an email" response to prevent user enumeration
-    return res.json({ success: true, message: "verification_email_sent" });
-  }
-
-  // 6. Store pending signup in Redis (24h TTL), send verification email
   const verifyToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:signup:pending:${verifyToken}`,
-    JSON.stringify({ email: norm, label: label || null, ip, requested_at: Date.now() }),
-    { EX: 86400 }
-  );
 
-  try {
-    await sendVerificationEmail(norm, verifyToken, ip);
-  } catch (err) {
-    console.error("[signup] verification email failed:", err.message);
-    await redis().del(`paramant:signup:pending:${verifyToken}`).catch(() => {});
-    return res.status(500).json({ error: "email_failed", message: "Could not send verification email. Please try again." });
+  if (existing) {
+    // Dummy token entry under an isolated namespace. Cannot be redeemed for
+    // signup (the verify route only reads paramant:signup:pending:*). Keeps
+    // the Redis I/O equivalent to the new-email branch.
+    await redis().set(
+      `paramant:signup:duplicate:${verifyToken}`,
+      JSON.stringify({ email_hash: emailHash, ip, attempted_at: Date.now() }),
+      { EX: 86400 }
+    );
+    // Fire-and-forget: tell the actual owner someone tried to claim their
+    // address. Only the real account holder can receive this mail, so it is
+    // not itself an oracle.
+    setImmediate(() => {
+      sendDuplicateSignupAttempt(norm, ip).catch(err =>
+        console.error("[signup] duplicate notice failed:", err.message));
+    });
+    console.log(`[signup] duplicate signup attempt: ${emailHash.slice(0, 8)} from ${ip}`);
+  } else {
+    // Real pending signup token.
+    await redis().set(
+      `paramant:signup:pending:${verifyToken}`,
+      JSON.stringify({ email: norm, label: label || null, ip, requested_at: Date.now() }),
+      { EX: 86400 }
+    );
+    // Fire-and-forget verification mail. On Resend failure we delete the
+    // pending token so the caller can retry the signup form. Per-email rate
+    // limit still applies, but a single Resend hiccup will not surface as a
+    // 500 to the user.
+    setImmediate(() => {
+      sendVerificationEmail(norm, verifyToken, ip).catch(err => {
+        console.error("[signup] verification email failed:", err.message);
+        redis().del(`paramant:signup:pending:${verifyToken}`).catch(() => {});
+      });
+    });
+    console.log(`[signup] pending signup for ${norm} from ${ip}`);
   }
 
-  console.log(`[signup] pending signup for ${norm} from ${ip}`);
+  // Identical response shape and timing in both branches.
   res.json({ success: true, message: "verification_email_sent" });
 });
 
@@ -847,9 +882,16 @@ api.post("/user/login", async (req, res) => {
           sendSetupEmail(um.email || user.email, setupToken).catch(e => console.error('[login/totp_required] email:', e.message));
         }
       }
-      return res.status(403).json({ error: "totp_setup_required", message: "Your administrator requires TOTP. Check your email for a setup link." });
+      // Setup mail is dispatched fire-and-forget above. Respond identically
+      // to "no such account" so the status code cannot be used as an
+      // enumeration oracle. Was: 403 totp_setup_required, which leaked the
+      // fact that the email belongs to a real account with admin-required
+      // TOTP not yet set up.
+      return res.status(401).json({ error: "invalid_credentials" });
     }
-    return res.status(403).json({ error: "totp_not_configured" });
+    // Same 401 for TOTP-not-configured so this branch also does not leak
+    // account existence. Was: 403 totp_not_configured.
+    return res.status(401).json({ error: "invalid_credentials" });
   }
 
   const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });

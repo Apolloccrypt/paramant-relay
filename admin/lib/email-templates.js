@@ -422,6 +422,55 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
   return { ...wrap(text, html, { refId: 'verify-' + token.slice(0, 8) }), subject: 'Verify your Paramant account' };
 }
 
+// ── DUPLICATE SIGNUP ATTEMPT NOTICE ─────────────────────────────────────────
+// Sent to the existing account owner when someone tries to sign up using
+// their email. Required so the signup endpoint does the same kind of work
+// (Redis write + outbound mail) on the existing-email branch as on the
+// new-email branch, removing the ~50ms-vs-~500ms enumeration side-channel.
+function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
+  const dateStr = formatTS(requestedAt);
+  const maskedIp = maskIP(requestIP);
+  const loginUrl = `${BASE_URL}/auth/login`;
+
+  const preheader = 'Someone tried to create a Paramant account with your email.';
+  const text = [
+    'Signup attempt on your Paramant account',
+    '',
+    `Someone just attempted to create a Paramant account using ${email}.`,
+    'Your existing account was not changed and no new account was created.',
+    '',
+    'If this was you trying to sign in, use the login page instead:',
+    loginUrl,
+    '',
+    'If this was not you, ignore this email. The attempt was rate-limited.',
+    '',
+    `Attempt at: ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}`,
+    '',
+    'Paramant',
+  ].join('\n');
+
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signup attempt on your account</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      Someone just tried to create a Paramant account with <strong>${email}</strong>. Your existing account was not changed and no new account was created.
+    </p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      If this was you trying to sign in, use the login page:
+    </p>
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Sign in to Paramant</a>
+    </div>
+    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
+      <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
+        If this was not you, ignore this email. The attempt was rate-limited and no account was created.
+        <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}.
+      </p>
+    </div>
+  `);
+
+  return { ...wrap(text, html, { refId: 'dup-' + Date.now().toString(36) }), subject: 'Signup attempt on your Paramant account' };
+}
+
 // ── BACKUP CODES RESET NOTIFICATION ─────────────────────────────────────────
 function backupCodesResetEmail({ email, requestedAt }) {
   const dateStr = formatTS(requestedAt);
@@ -504,6 +553,7 @@ module.exports = {
   backupCodesResetEmail,
   setupEmail,
   signupVerificationEmail,
+  duplicateSignupAttemptEmail,
   resetConfirmationEmail,
   welcomeEmail,
   billingConfirmationEmail,
