@@ -353,6 +353,27 @@ a:hover{color:var(--cobalt)}
   <a href="/help" class="nav-mobile-standalone">Help</a>
 </div>
 
+<style id="ps-launch-css">
+.launch-wrap{max-width:1100px;margin:24px auto 0;padding:0 20px}
+.launch-head{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:12px}
+.launch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.launch-card{display:block;padding:16px;border:1px solid var(--ink-hair);border-radius:12px;background:transparent;text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+.launch-card:hover{border-color:var(--cobalt);transform:translateY(-2px)}
+.launch-card .lt{font-weight:700;font-size:14px;margin-bottom:4px;font-family:var(--sans)}
+.launch-card .ld{font-size:12px;color:var(--ink-dim);line-height:1.4}
+@media(max-width:600px){.launch-grid{grid-template-columns:1fr 1fr}}
+</style>
+<section class="launch-wrap" aria-label="Quick actions">
+  <div class="launch-head">Quick actions</div>
+  <div class="launch-grid">
+    <a class="launch-card" href="/send"><div class="lt">Send a file</div><div class="ld">Anonymous, burn-on-read</div></a>
+    <a class="launch-card" href="/parashare"><div class="lt">ParaShare</div><div class="ld">Verified, signed receipts</div></a>
+    <a class="launch-card" href="/drop"><div class="lt">ParaDrop</div><div class="ld">Device-to-device</div></a>
+    <a class="launch-card" href="/sign"><div class="lt">ParaSign</div><div class="ld">Sign a document</div></a>
+    <a class="launch-card" href="/verify"><div class="lt">Verify signature</div><div class="ld">Check a .psign</div></a>
+    <a class="launch-card" href="/get"><div class="lt">Receive</div><div class="ld">Open a secure link</div></a>
+  </div>
+</section>
 <div id="root"></div>
 
 <div id="side-panel-backdrop" class="side-panel-backdrop" onclick="closeSidePanel()"></div>

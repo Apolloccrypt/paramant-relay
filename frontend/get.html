@@ -303,6 +303,20 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </div>
 <main id="main-content">
 
+<!-- No token: public receive landing -->
+<div class="step" id="step-enter">
+  <h1>Receive a file</h1>
+  <p class="sub">Paste the secure link you were sent. The file decrypts in your browser &mdash; the relay never has the key. No account needed.</p>
+  <div class="card">
+    <div class="card-body">
+      <input id="enter-link" type="text" placeholder="https://paramant.app/get?t=..." autocomplete="off" spellcheck="false" style="width:100%;padding:12px;border:1px solid var(--ink-hair);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--bone);color:var(--ink)">
+      <div class="status-line err" id="enter-err" style="margin-top:8px"></div>
+      <button class="btn" onclick="goReceive()" style="margin-top:14px">Receive</button>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:16px">Have a 6-digit code instead? Use <a href="/drop">ParaDrop</a>.</p>
+</div>
+
 <!-- Downloading + decrypting -->
 <div class="step active" id="step-loading">
   <h1>Secure file incoming</h1>
@@ -465,11 +479,25 @@ function formatSize(n) {
   return n + ' B';
 }
 
+function goReceive() {
+  const el = document.getElementById('enter-link');
+  const errEl = document.getElementById('enter-err');
+  if (errEl) errEl.textContent = '';
+  const v = (el && el.value || '').trim();
+  if (!v) return;
+  try { location.href = new URL(v, location.origin).href; }
+  catch { if (errEl) errEl.textContent = 'That does not look like a valid receive link.'; }
+}
+
 async function init() {
   const params = new URLSearchParams(location.search);
   const token = params.get('t');
   const fragment = location.hash.slice(1);
 
+  if (!token && !fragment) {
+    showStep('step-enter');
+    return;
+  }
   if (!token || !fragment) {
     showError('Invalid link — missing download token or encryption key.');
     return;
