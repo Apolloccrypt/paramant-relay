@@ -1143,6 +1143,14 @@ api.get("/user/dashboard-fragment", authUser, async (req, res) => {
   }
 });
 
+// GET /api/user/check
+// Lightweight session-validity probe for nginx auth_request on gated tool
+// routes (/send, /parashare, /drop, /sign). authUser handles the cookie check
+// and returns 401 on miss; this handler only fires on hit.
+api.get("/user/check", authUser, (req, res) => {
+  res.status(200).end();
+});
+
 // GET /api/user/account
 api.get("/user/account", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
