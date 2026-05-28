@@ -1,0 +1,31 @@
+=== Paramant security audit 2026-05-28T09:11:59+02:00 ===
+
+FAIL  CFG-01       /setup returns 200 publicly - verify it cannot mutate config without auth
+PASS  DATA-04      /users.json -> 404
+PASS  DATA-04      /.env -> 404
+FAIL  DATA-04      /admin/users.json is web-reachable (200) - CRITICAL
+PASS  DATA-04      /config.json -> 404
+PASS  API-02       /v2/admin/config -> 401 (rejects unauth)
+PASS  API-02       /v2/admin/exec -> 401 (rejects unauth)
+PASS  API-02       /admin/api/settings -> 401 (rejects unauth)
+PASS  AUTH-01      /v2/sign requires auth/valid body (401)
+PASS  COMM-01      HSTS present with includeSubDomains
+FAIL  COMM-02      CSP allows unsafe-eval
+PASS  COMM-04      x-content-type-options present
+PASS  COMM-04      x-frame-options present
+PASS  COMM-04      referrer-policy present
+PASS  SUP-04       no CDN imports in frontend JS
+PASS  CRYPTO-05    vendored crypto bundle present
+PASS  CRYPTO-03    parasign-client sends hash+sig+pubkey only
+PASS  LOG-01       no obvious PII logging in relay/*.js
+WARN  AUTH-04      no 429 in 15 rapid auth probes
+
+=== controls requiring manual/source review (not auto-probeable) ===
+TODO  ARCH-02      admin process+network isolation - verify nginx + compose
+TODO  AUTH-02      TOTP enforced not bypassable - source review admin/server.js
+TODO  VAL-04       admin CLI command whitelist - source review
+TODO  COMM-03      admin network isolation (VPN/IP-allowlist/mTLS)
+TODO  SUP-02       cosign-signed images
+TODO  TRANS-01     admin actions to CT log
+
+Audit complete. Update COMPLIANCE-CHECKLIST.md Status/Evidence from these results.
