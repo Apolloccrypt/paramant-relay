@@ -127,11 +127,12 @@ a.pcard:hover { border-color: var(--navy); transform: translateY(-2px); }
 .section-dark .home-section-head .eyebrow { color: var(--lime); }
 .section-dark .home-section-head h2 { color: var(--bone-on-navy); }
 .section-dark .home-section-head p  { color: var(--bone-on-navy-dim); }
-.section-dark .pcard { background: transparent; border-color: var(--bone-on-navy-hair); }
+.section-dark .pcard { background: transparent; border-color: var(--bone-on-navy-hair); border-radius: 0; border-top: 2px solid var(--lime); }
 .section-dark a.pcard:hover { border-color: var(--lime); transform: translateY(-2px); }
 .section-dark .pcard h3 { color: var(--bone-on-navy); }
 .section-dark .pcard p  { color: var(--bone-on-navy-dim); }
-.section-dark .pcard .ptag { background: var(--bone-on-navy-hair); color: var(--lime); }
+.section-dark .pcard code { font-family: var(--mono); font-size: 0.92em; color: var(--lime); background: var(--bone-on-navy-hair); padding: 1px 4px; }
+.section-dark .pcard .ptag { background: transparent; color: var(--lime); border-radius: 0; border-left: 2px solid var(--lime); padding-left: var(--space-2); }
 .section-dark .pcard .pcta { color: var(--lime); }
 
 /* Algorithm chip strip (tokens only) */
