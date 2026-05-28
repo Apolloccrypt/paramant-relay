@@ -27,6 +27,7 @@ const path   = require('path');
 const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
+const userSigning   = require('./lib/user-signing');
 
 const VERSION    = '3.0.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -154,7 +155,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
@@ -162,7 +163,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer'],
   full:       null,
 };
 
@@ -624,6 +625,32 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
   const entry = {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
+  };
+  ctLog.push(entry);
+  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWrite(entry);
+  produceSth(entry.index + 1, entry.tree_hash);
+  return entry;
+}
+
+// Appends a signing-pubkey lifecycle event (enroll / revoke) to the CT log so
+// identity changes are tamper-evident. user_id is hashed (SHA3-256) before
+// emission — verifiers see a stable identity-handle without the raw API key.
+// `eventType` must be 'signing_pk_enrolled' or 'signing_pk_revoked'.
+function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
+  if (eventType !== 'signing_pk_enrolled' && eventType !== 'signing_pk_revoked') {
+    throw new Error('invalid eventType: ' + eventType);
+  }
+  const ts = new Date().toISOString();
+  const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
+  const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
+  const index = ctLog.length;
+  const allEntries = [...ctLog, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, index);
+  const entry = {
+    index, type: eventType, leaf_hash, tree_hash,
+    user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
   };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
@@ -1301,6 +1328,18 @@ function checkKeyRateOk(ip) {
   b.count++; checkKeyRateLimits.set(ip, b); return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of checkKeyRateLimits) if (now > v.resetAt + 60000) checkKeyRateLimits.delete(k); }, 120_000);
+
+// Per-IP rate limit for /v2/lookup-signer/:pk_hash (max 30/min) — prevents
+// enumeration of (pubkey → email) bindings even though only exact hash matches.
+const lookupSignerRateLimits = new Map();
+function lookupSignerRateOk(ip) {
+  const now = Date.now();
+  const b = lookupSignerRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
+  if (b.count >= 30) return false;
+  b.count++; lookupSignerRateLimits.set(ip, b); return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of lookupSignerRateLimits) if (now > v.resetAt + 60000) lookupSignerRateLimits.delete(k); }, 120_000);
 
 // Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
 const statusRateLimits = new Map();
@@ -2137,12 +2176,171 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // Account-bound signing identity (ML-DSA-65 public-key enrollment)
+  // ═══════════════════════════════════════════════════════════════════════
+  // Stores the *public half* of a user's signing key. Private keys never
+  // reach the server. Multi-device (array per user); revoke keeps history.
+  // Internal — X-Internal-Auth only — the admin server proxies user-session
+  // requests through these.
+
+  // POST /v2/user/signing-key — enroll a new pubkey. TOTP-gated.
+  if (req.method === "POST" && path === "/v2/user/signing-key") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, pk_b64, label, totp } = JSON.parse((await readBody(req, 16384)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      if (!pk_b64 || typeof pk_b64 !== "string") { res.writeHead(400); return res.end(J({ error: "missing_pk_b64" })); }
+      if (!totp || !/^\d{6}$/.test(String(totp))) { res.writeHead(400); return res.end(J({ error: "totp_required" })); }
+      // TOTP gate — sensitive op, prevents session-hijack pk-swap
+      const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
+      const totpResult = await verifyTotpGeneric(totp, totpSecret, {
+        algorithm: "sha256", window: 1,
+        replayKey: `paramant:user:replay:${user_id}`,
+      });
+      if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      // Store (server-side pk_hash computation — never trust client)
+      let result;
+      try {
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));
+      }
+      const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled", user_id, result.entry.pk_hash_sha3);
+      log("info", "signing_pk_enrolled", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        pk_hash: result.entry.pk_hash_sha3.slice(0, 16) + "…",
+        reenrolled: result.reenrolled,
+        ct_index: ctEntry.index,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({
+        ok: true,
+        pk_hash_sha3: result.entry.pk_hash_sha3,
+        label: result.entry.label,
+        enrolled_at: result.entry.enrolled_at,
+        reenrolled: result.reenrolled,
+        ct_index: ctEntry.index,
+      }));
+    } catch (err) {
+      console.error("[user/signing-key POST]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // GET /v2/user/signing-key — list the user's enrolled keys (no TOTP, read-only).
+  // Returns metadata only (pk_hash, label, timestamps); pk_b64 is intentionally
+  // omitted so the index leaks no key material if the list response is logged.
+  if (req.method === "GET" && path === "/v2/user/signing-key") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const user_id = query.user_id;
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const arr = await userSigning.getSigningPks(redisClient, user_id);
+      const projected = arr.map(e => ({
+        alg: e.alg,
+        pk_hash_sha3: e.pk_hash_sha3,
+        label: e.label,
+        enrolled_at: e.enrolled_at,
+        revoked_at: e.revoked_at,
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, keys: projected, total: projected.length }));
+    } catch (err) {
+      console.error("[user/signing-key GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // DELETE /v2/user/signing-key — revoke a pubkey. TOTP-gated. Keeps history
+  // (sets revoked_at) so older envelopes remain verifiable as "valid at signing time".
+  if (req.method === "DELETE" && path === "/v2/user/signing-key") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, pk_hash_sha3, totp } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !pk_hash_sha3) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      if (!totp || !/^\d{6}$/.test(String(totp))) { res.writeHead(400); return res.end(J({ error: "totp_required" })); }
+      const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
+      const totpResult = await verifyTotpGeneric(totp, totpSecret, {
+        algorithm: "sha256", window: 1,
+        replayKey: `paramant:user:replay:${user_id}`,
+      });
+      if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      let result;
+      try {
+        result = await userSigning.revokeSigningPk(redisClient, user_id, pk_hash_sha3);
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));
+      }
+      if (!result.revoked) {
+        const code = result.reason === "not_found" ? 404 : 409;
+        res.writeHead(code, { "Content-Type": "application/json" });
+        return res.end(J({ error: result.reason }));
+      }
+      const ctEntry = ctAppendSigningPkEvent("signing_pk_revoked", user_id, pk_hash_sha3);
+      log("info", "signing_pk_revoked", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        pk_hash: pk_hash_sha3.slice(0, 16) + "…",
+        ct_index: ctEntry.index,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, revoked_at: result.entry.revoked_at, ct_index: ctEntry.index }));
+    } catch (err) {
+      console.error("[user/signing-key DELETE]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
   if (path === '/v2/check-key') {
     if (!checkKeyRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
     const kd = apiKeys.get(apiKey);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ valid: !!(kd?.active), plan: kd?.plan || null }));
+  }
+
+  // ── GET /v2/lookup-signer/:pk_hash — public reverse-lookup for verifiers ──
+  // Exact 64-hex-char SHA3-256 match only — no prefix scan, no enumeration.
+  // The caller must already possess the envelope (= the pk) to ask; we return
+  // label + email (if enrolled). Rate-limited 30/min/IP to blunt scraping.
+  if (req.method === 'GET' && path.startsWith('/v2/lookup-signer/')) {
+    if (!lookupSignerRateOk(clientIp)) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' }));
+    }
+    const pkHash = path.slice('/v2/lookup-signer/'.length);
+    if (!/^[0-9a-f]{64}$/.test(pkHash)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pk_hash must be 64-char SHA3-256 hex' }));
+    }
+    try {
+      const found = await userSigning.lookupByPkHash(redisClient, pkHash);
+      if (!found) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(J({ found: false }));
+      }
+      let email = null;
+      try {
+        const metaRaw = await redisClient.get(`paramant:user:meta:${found.userId}`);
+        if (metaRaw) { const m = JSON.parse(metaRaw); email = m.email || null; }
+      } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        found: true,
+        alg: found.entry.alg,
+        label: found.entry.label,
+        email,
+        enrolled_at: found.entry.enrolled_at,
+        revoked_at: found.entry.revoked_at,
+      }));
+    } catch (err) {
+      console.error('[lookup-signer]', err.message);
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
   }
 
   // ── POST /v2/request-trial — Self-service trial key request (public, no auth) ──
