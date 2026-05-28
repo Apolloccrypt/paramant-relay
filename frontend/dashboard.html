@@ -4,86 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Your Paramant — Dashboard</title>
-<meta name="description" content="Your Paramant hub: send, receive, sign, verify. Post-quantum + AES-256-GCM. All crypto runs in your browser.">
+<meta name="description" content="Sign in to your Paramant dashboard.">
 <meta name="theme-color" content="#0B1622">
 <link rel="icon" type="image/svg+xml" href="/assets/paramant-icon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
-<link rel="preload" href="/design-system.css" as="style">
 <link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
+<noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
 <style>
-/* Page-scoped hub styles. Uses ONLY real design tokens (--navy, --ink, --bone,
-   --bone-2, --ink-dim, --ink-hair, --lime, --cobalt, --mono, --sans, --space-*).
-   The dashboard is always light (brand). The earlier "donkerblauw" came from
-   the PR #54 SPA's own internal dark mode; that rewrite is gone, so this
-   page now follows the design system (light) like the rest of the site.
-   The only literal-color rule is .nav-cta: the global nav.css CTA can render
-   with white text under certain UAs; brand pairing is lime-bg + navy-text. */
-
+/* Loader-only styles. This static file is the server-side gate's public
+   face: zero dashboard tool-surface markup, zero user-data, zero
+   hub-specific CSS classes. The authenticated hub (Send / Receive / More
+   tools / Account) is rendered ONLY by /api/user/dashboard-fragment in the
+   admin container, gated by the same authUser middleware /api/user/account
+   uses. No parallel auth-logic, no nginx config change. */
 .nav-cta, a.nav-cta, .nav .nav-cta { color: var(--navy) !important; }
-
-main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
-
-.hub-hero { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-5); }
-.hub-hero h1 { font-family: var(--sans); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; letter-spacing: -.01em; margin: 0; color: var(--ink); }
-.hub-hero .sub { font-family: var(--sans); font-size: 15px; line-height: 1.55; color: var(--ink-dim); max-width: 680px; margin: 0; }
-.hub-hero .pq-tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
-.hub-hero .pq-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); }
-
-.auth-status { border: 1px solid var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; background: transparent; }
-.auth-status .auth-msg { font-family: var(--sans); font-size: 14px; color: var(--ink); margin: 0; flex: 1 1 auto; min-width: 220px; line-height: 1.5; }
-.auth-status .auth-msg strong { color: var(--ink); font-weight: 600; }
-.auth-status .auth-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-.auth-status .auth-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--bone-2); color: var(--ink-dim); font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-left: 6px; }
-
-.btn-primary, .btn-secondary { font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: .04em; padding: 9px 14px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-.btn-primary { background: var(--lime); color: var(--navy); border-color: var(--lime); }
-.btn-primary:hover { filter: brightness(.96); }
-.btn-secondary { background: transparent; color: var(--ink); border-color: var(--ink-hair); }
-.btn-secondary:hover { border-color: var(--ink); }
-
-.block-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin: var(--space-5) 0 var(--space-3); }
-
-.action-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-@media (max-width: 640px) { .action-pair { grid-template-columns: 1fr; } }
-
-.action-card { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); border: 1px solid var(--ink-hair); border-radius: 14px; text-decoration: none; color: var(--ink); background: transparent; transition: border-color .15s, transform .15s; }
-.action-card:hover { border-color: var(--ink); transform: translateY(-1px); }
-.action-card .icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--lime); color: var(--navy); font-family: var(--mono); font-weight: 700; font-size: 18px; margin-bottom: var(--space-2); }
-.action-card h2 { font-family: var(--sans); font-size: 19px; margin: 0; color: var(--ink); letter-spacing: -.01em; }
-.action-card p { font-family: var(--sans); font-size: 14px; line-height: 1.5; margin: 0; color: var(--ink-dim); }
-.action-card .pq-line { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); margin-top: var(--space-2); }
-
-.tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
-.tool-card { display: flex; flex-direction: column; gap: 4px; padding: var(--space-3) var(--space-4); border: 1px solid var(--ink-hair); border-radius: 12px; text-decoration: none; color: var(--ink); background: transparent; transition: border-color .15s; }
-.tool-card:hover { border-color: var(--ink); }
-.tool-card h3 { font-family: var(--sans); font-size: 16px; margin: 0; color: var(--ink); }
-.tool-card p { font-family: var(--sans); font-size: 13px; line-height: 1.5; margin: 0; color: var(--ink-dim); }
-
-.account-block { margin-top: var(--space-5); }
-.account-block.empty { display: none; }
-.account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
-.acct-card { border: 1px solid var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); background: transparent; }
-.acct-card .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
-.acct-card .val { font-family: var(--sans); font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
-.acct-card .val.small { font-size: 15px; font-family: var(--mono); }
-
-.account-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
-
+main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); min-height: 360px; }
+.pa-loading { text-align: center; padding: var(--space-6) var(--space-4); font-family: var(--sans); color: var(--ink-dim); font-size: 14px; }
+.pa-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--ink-hair); border-top-color: var(--lime); border-radius: 50%; animation: pa-spin 0.8s linear infinite; vertical-align: middle; margin-right: 10px; }
+@keyframes pa-spin { to { transform: rotate(360deg); } }
+.pa-err-link { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 </style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<!-- BEGIN canonical chrome (verbatim from send.html — same nav + mobile drawer + footer used site-wide) -->
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
-
+<!-- Canonical site chrome (same nav + mobile drawer that every page uses).
+     The Products dropdown text necessarily lists tool names; this is global
+     navigation, not dashboard content. The dashboard tool-surface markup
+     (action cards, account block, paste-key) is NOT present in this static
+     file — it is server-rendered only by the auth-gated
+     /api/user/dashboard-fragment route. -->
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -254,77 +205,13 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 
   <a href="/help" class="nav-mobile-standalone">Help</a>
 </div>
-<!-- END canonical chrome -->
 
-<main id="main-content" class="hub">
-
-  <section class="hub-hero" aria-label="Your Paramant">
-    <div class="pq-tag"><span class="pq-dot" aria-hidden="true"></span>ML-KEM-768 · ML-DSA-65 · AES-256-GCM · client-side</div>
-    <h1>Your Paramant</h1>
-    <p class="sub">Encrypted send/receive and post-quantum signing. All keys and plaintext stay in your browser — the relay never sees them.</p>
-    <div class="auth-status" id="auth-status" aria-live="polite">
-      <p class="auth-msg" id="auth-msg">Checking your sign-in…</p>
-      <div class="auth-actions" id="auth-actions"></div>
+<main id="main-content" class="pa-main">
+  <div id="hub-mount">
+    <div class="pa-loading">
+      <span class="pa-spinner" aria-hidden="true"></span>Verifying your session…
     </div>
-  </section>
-
-  <!-- Hub interior. Hidden until /api/user/account returns 200 (i.e. the
-       user has a valid httpOnly session set by /auth/login after email +
-       TOTP). Nothing actionable renders for an unauthenticated visitor. -->
-  <div id="hub-private" hidden>
-
-    <section aria-label="Primary actions">
-      <h2 class="block-h">Send &amp; receive</h2>
-      <div class="action-pair">
-        <a class="action-card" href="/send" aria-label="Send a file">
-          <div class="icon" aria-hidden="true">→</div>
-          <h2>Send a file</h2>
-          <p>Encrypt a file in your browser, share a one-time link. AES-256-GCM with ML-KEM-768 hybrid key wrap. Burn-on-read.</p>
-          <div class="pq-line">Client-side · burn-on-read</div>
-        </a>
-        <a class="action-card" href="/get" aria-label="Receive a file">
-          <div class="icon" aria-hidden="true">←</div>
-          <h2>Receive a file</h2>
-          <p>Open a secure link someone sent you. Decryption happens in your browser; no account needed.</p>
-          <div class="pq-line">No account · zero-knowledge</div>
-        </a>
-      </div>
-    </section>
-
-    <section aria-label="More tools">
-      <h2 class="block-h">More tools</h2>
-      <div class="tools-grid">
-        <a class="tool-card" href="/parashare">
-          <h3>ParaShare</h3>
-          <p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p>
-        </a>
-        <a class="tool-card" href="/drop">
-          <h3>ParaDrop</h3>
-          <p>Device-to-device transfer. 6-digit pairing code. End-to-end encrypted.</p>
-        </a>
-        <a class="tool-card" href="/sign">
-          <h3>ParaSign</h3>
-          <p>Sign documents with ML-DSA-65 (FIPS 204). CT-log notarized.</p>
-        </a>
-        <a class="tool-card" href="/verify">
-          <h3>Verify a signature</h3>
-          <p>Check a .psign envelope against its document. Local hash, relay-side math.</p>
-        </a>
-      </div>
-    </section>
-
-    <section class="account-block empty" id="account-block" aria-label="Your account">
-      <h2 class="block-h">Your account</h2>
-      <div class="account-grid" id="account-grid"></div>
-      <div class="account-actions">
-        <a class="btn-secondary" href="/account">Manage account</a>
-        <button class="btn-secondary" id="acct-refresh" type="button">Refresh</button>
-        <button class="btn-secondary" id="acct-signout" type="button">Sign out</button>
-      </div>
-    </section>
-
   </div>
-
 </main>
 
 <footer>
@@ -384,138 +271,61 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 
 <script src="/nav.js" defer></script>
 <script>
-// Dashboard controller. ASCII-only inline JS. No external imports.
-//
-// Auth contract (matches /auth/login.html + /account.html, the live flow):
-//   - Login is at /auth/login (email + 6-digit TOTP from authenticator app).
-//   - The session cookie is httpOnly + Secure + SameSite=Strict, set by the
-//     relay after TOTP verification. JS cannot read or set it.
-//   - To check session: GET /api/user/account with credentials: 'include'.
-//       200 -> {email, api_key_masked, plan, label, created_at,
-//               backup_codes_remaining, sessions, session_expires_at}
-//       401 -> not signed in -> redirect to /auth/login.
-//   - To sign out: POST /api/user/logout with credentials: 'include'.
-//
-// We do NOT touch the API key here. The API key is shown (masked) on the
-// account page; the dashboard's job is to confirm the user is signed in and
-// surface launchers into the tool pages. Anonymous flows (/send /get) work
-// without a session too; gated tools handle their own X-Api-Key.
+// Dashboard loader. ASCII-only. Reuses /api/user/* session validation (the
+// existing authUser middleware in admin/server.js — no parallel logic).
+// 401 -> hard redirect to /auth/login?next=/dashboard. 200 -> inject the
+// server-rendered hub fragment. innerHTML parses <style> tags so the hub's
+// own CSS arrives with the fragment; <script> tags injected via innerHTML
+// do NOT execute (browser security), which is why all interactivity in the
+// fragment uses [data-pa-action] hooks bound here by event delegation.
 (function(){
   'use strict';
+  var loginUrl = '/auth/login?next=' + encodeURIComponent('/dashboard');
+  var mount = document.getElementById('hub-mount');
+  if (!mount) return;
 
-  var $ = function(id){ return document.getElementById(id); };
-  var esc = function(s){ return String(s == null ? '' : s).replace(/[<>&"]/g, function(c){ return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
-
-  // Strict gate: hub interior is visible ONLY when /api/user/account returns 200.
-  // Every other state (loading / no session / network error) keeps it hidden.
-  function setHubVisible(yes){
-    var el = $('hub-private');
-    if (el) el.hidden = !yes;
-  }
-
-  function renderAuth(state){
-    var msg = $('auth-msg'); var act = $('auth-actions');
-    if (state === 'loading') {
-      msg.textContent = 'Checking your sign-in...';
-      act.innerHTML = '';
-      setHubVisible(false);
-      return;
+  mount.addEventListener('click', function(ev){
+    var t = ev.target.closest && ev.target.closest('[data-pa-action]');
+    if (!t) return;
+    var act = t.getAttribute('data-pa-action');
+    if (act === 'refresh') {
+      ev.preventDefault();
+      location.reload();
+    } else if (act === 'signout') {
+      ev.preventDefault();
+      t.disabled = true;
+      fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
+        .catch(function(){})
+        .then(function(){ location.href = '/auth/login'; });
     }
-    if (state === 'none') {
-      msg.innerHTML = '<strong>Sign in to your Paramant.</strong> Email + TOTP from your authenticator app. Nothing on this dashboard is accessible without an active session.';
-      var next = encodeURIComponent('/dashboard');
-      act.innerHTML = ''
-        + '<a class="btn-primary" href="/auth/login?next=' + next + '">Sign in</a>'
-        + '<a class="btn-secondary" href="/signup">Create account</a>';
-      setHubVisible(false);
-      return;
-    }
-    if (state.kind === 'valid') {
-      var who = state.email ? esc(state.email) : 'your account';
-      var plan = state.plan ? '<span class="auth-pill">' + esc(state.plan) + '</span>' : '';
-      msg.innerHTML = '<strong>Signed in</strong> as ' + who + ' ' + plan;
-      act.innerHTML = '';
-      setHubVisible(true);
-      return;
-    }
-    if (state.kind === 'error') {
-      msg.innerHTML = '<strong>Could not verify your session.</strong> ' + esc(state.detail || 'Network error.');
-      act.innerHTML = '<button class="btn-secondary" type="button" id="retry-now">Retry</button>'
-                   + '<a class="btn-secondary" href="/auth/login?next=' + encodeURIComponent('/dashboard') + '">Sign in again</a>';
-      var rn = $('retry-now');
-      if (rn) rn.addEventListener('click', function(){ load(); });
-      setHubVisible(false);
-      return;
-    }
-  }
-
-  function renderAccount(d){
-    if (!d) {
-      $('account-block').classList.add('empty');
-      $('account-grid').innerHTML = '';
-      return;
-    }
-    $('account-block').classList.remove('empty');
-    var rows = [];
-    if (d.plan) rows.push({ lbl: 'Plan', val: esc(d.plan), small: false });
-    if (d.email) rows.push({ lbl: 'Email', val: esc(d.email), small: true });
-    if (d.api_key_masked) rows.push({ lbl: 'API key', val: esc(d.api_key_masked), small: true });
-    if (d.label) rows.push({ lbl: 'Label', val: esc(d.label), small: true });
-    if (d.created_at) {
-      var ds = new Date(d.created_at);
-      rows.push({ lbl: 'Created', val: isNaN(ds.getTime()) ? esc(String(d.created_at).slice(0,10)) : ds.toLocaleDateString(), small: true });
-    }
-    if (d.backup_codes_remaining != null) {
-      rows.push({ lbl: 'Backup codes', val: String(d.backup_codes_remaining) + ' left', small: true });
-    }
-    if (d.session_expires_at) {
-      var es = new Date(d.session_expires_at);
-      if (!isNaN(es.getTime())) {
-        var mins = Math.max(0, Math.round((es.getTime() - Date.now()) / 60000));
-        rows.push({ lbl: 'Session expires', val: mins + ' min', small: true });
-      }
-    }
-    $('account-grid').innerHTML = rows.map(function(r){
-      return '<div class="acct-card"><div class="lbl">' + r.lbl + '</div><div class="val' + (r.small ? ' small' : '') + '">' + r.val + '</div></div>';
-    }).join('');
-  }
-
-  function fetchSession(ms){
-    var ctrl = ('AbortController' in window) ? new AbortController() : null;
-    var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, ms || 8000) : 0;
-    var opts = { credentials: 'include', headers: { 'Accept': 'application/json' } };
-    if (ctrl) opts.signal = ctrl.signal;
-    return fetch('/api/user/account', opts)
-      .then(function(r){
-        if (t) clearTimeout(t);
-        if (r.status === 401 || r.status === 403) return { __none: true, status: r.status };
-        if (!r.ok) return { __error: true, status: r.status };
-        return r.json().catch(function(){ return {}; });
-      })
-      .catch(function(e){ if (t) clearTimeout(t); return { __network: true, msg: e.message }; });
-  }
-
-  function load(){
-    renderAuth('loading');
-    fetchSession().then(function(d){
-      if (d.__none)    { renderAuth('none'); renderAccount(null); return; }
-      if (d.__network) { renderAuth({ kind: 'error', detail: 'Could not reach the auth service.' }); renderAccount(null); return; }
-      if (d.__error)   { renderAuth({ kind: 'error', detail: 'Server returned HTTP ' + d.status + '.' }); renderAccount(null); return; }
-      renderAuth({ kind: 'valid', email: d.email, plan: d.plan });
-      renderAccount(d);
-    });
-  }
-
-  $('acct-refresh').addEventListener('click', function(){ load(); });
-  $('acct-signout').addEventListener('click', function(){
-    var btn = $('acct-signout');
-    if (btn) btn.disabled = true;
-    fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
-      .catch(function(){})
-      .then(function(){ location.href = '/auth/login'; });
   });
 
-  load();
+  function showError(detail){
+    mount.innerHTML = '<div class="pa-loading">Could not load your dashboard. <a class="pa-err-link" href="' + loginUrl + '">Sign in again</a>' + (detail ? '<br><small>' + detail + '</small>' : '') + '</div>';
+  }
+
+  var ctrl = ('AbortController' in window) ? new AbortController() : null;
+  var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, 10000) : 0;
+  var opts = { credentials: 'include', headers: { 'Accept': 'text/html' }, cache: 'no-store' };
+  if (ctrl) opts.signal = ctrl.signal;
+
+  fetch('/api/user/dashboard-fragment', opts).then(function(r){
+    if (t) clearTimeout(t);
+    if (r.status === 401 || r.status === 403) {
+      location.replace(loginUrl);
+      return null;
+    }
+    if (!r.ok) {
+      showError('HTTP ' + r.status);
+      return null;
+    }
+    return r.text();
+  }).then(function(html){
+    if (html != null) mount.innerHTML = html;
+  }).catch(function(){
+    if (t) clearTimeout(t);
+    showError('Network error');
+  });
 })();
 </script>
 </body>
