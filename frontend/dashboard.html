@@ -13,18 +13,94 @@
 <link rel="stylesheet" href="/parapear.css">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
 <style>
-/* Loader-only styles. This static file is the server-side gate's public
-   face: zero dashboard tool-surface markup, zero user-data, zero
-   hub-specific CSS classes. The authenticated hub (Send / Receive / More
-   tools / Account) is rendered ONLY by /api/user/dashboard-fragment in the
-   admin container, gated by the same authUser middleware /api/user/account
-   uses. No parallel auth-logic, no nginx config change. */
+/* Dashboard. Client-side rendered from /api/user/me JSON. Auth-gate stays
+   hard: on 401 the loader hard-redirects to /auth/login?next=/dashboard
+   before any tool-surface markup is revealed. The placeholder shown during
+   the fetch carries no user data and no enumerated tool routes.
+   Design: design-system tokens only. Apple-style: generous whitespace,
+   soft elevation (shadows, not borders), one lime accent on the flagship
+   cards, sober monochrome elsewhere. */
 .nav-cta, a.nav-cta, .nav .nav-cta { color: var(--navy) !important; }
-main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); min-height: 360px; }
-.pa-loading { text-align: center; padding: var(--space-6) var(--space-4); font-family: var(--sans); color: var(--ink-dim); font-size: 14px; }
+
+main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); min-height: 70vh; }
+
+/* Placeholder shown until fetch lands or redirects */
+.pa-loading { padding: var(--space-7) var(--space-4); text-align: center; color: var(--ink-dim); font-family: var(--sans); font-size: 14px; }
 .pa-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--ink-hair); border-top-color: var(--lime); border-radius: 50%; animation: pa-spin 0.8s linear infinite; vertical-align: middle; margin-right: 10px; }
 @keyframes pa-spin { to { transform: rotate(360deg); } }
 .pa-err-link { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+[hidden] { display: none !important; }
+
+/* Hero strip -- compact, identity + plan */
+.dh-hero { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) 0 var(--space-4); border-bottom: 1px solid var(--ink-hair); margin-bottom: var(--space-6); }
+.dh-hero h1 { font-family: var(--sans); font-size: clamp(26px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.018em; margin: 0; color: var(--ink); font-weight: 600; }
+.dh-hero h1 small { display: block; font-size: 14px; font-weight: 400; color: var(--ink-dim); margin-top: var(--space-1); letter-spacing: 0; }
+.dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 4px 10px; border: 1px solid var(--ink-hair); border-radius: 999px; background: var(--bone); }
+.dh-hero .dh-plan strong { color: var(--ink); font-weight: 600; }
+
+/* Onboarding hint (ParaPear, dismissible once) */
+.dh-onb { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); border-radius: 16px; background: var(--bone); border: 1px solid var(--ink-hair); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.04); }
+.dh-onb img { width: 92px; height: auto; flex-shrink: 0; }
+.dh-onb .dh-onb-text { flex: 1 1 auto; font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink); }
+.dh-onb .dh-onb-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
+.dh-onb .dh-onb-dismiss { background: transparent; border: none; padding: 8px 10px; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; border-radius: 8px; line-height: 1; }
+.dh-onb .dh-onb-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
+@media (max-width: 600px) { .dh-onb { flex-direction: column; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); } .dh-onb img { width: 96px; } }
+
+/* Flagship pair -- the two big actions */
+.dh-flagship { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); margin-bottom: var(--space-7); }
+.dh-flag-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-6) var(--space-5) var(--space-5); border-radius: 18px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.05), 0 4px 14px rgba(11,58,106,0.04); border: 1px solid rgba(11,58,106,0.06); position: relative; overflow: hidden; }
+.dh-flag-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(11,58,106,0.06), 0 14px 32px rgba(11,58,106,0.08); }
+.dh-flag-card:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
+.dh-flag-icon { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; border-radius: 16px; background: var(--lime); color: var(--navy); font-family: var(--mono); font-weight: 700; font-size: 24px; margin-bottom: var(--space-2); flex-shrink: 0; }
+.dh-flag-card h2 { font-family: var(--sans); font-size: 22px; line-height: 1.2; letter-spacing: -.01em; margin: 0; color: var(--ink); font-weight: 600; }
+.dh-flag-card p { font-family: var(--sans); font-size: 14.5px; line-height: 1.55; color: var(--ink-dim); margin: 0; flex: 1; }
+.dh-flag-meta { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding-top: var(--space-3); border-top: 1px solid var(--ink-hair); margin-top: var(--space-3); }
+.dh-flag-cta { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin-top: var(--space-2); display: inline-flex; align-items: center; gap: 6px; }
+.dh-flag-cta::after { content: "\2192"; transition: transform .18s ease; }
+.dh-flag-card:hover .dh-flag-cta::after { transform: translateX(3px); }
+@media (max-width: 720px) { .dh-flagship { grid-template-columns: 1fr; gap: var(--space-3); margin-bottom: var(--space-6); } .dh-flag-card { padding: var(--space-5) var(--space-4); border-radius: 16px; } .dh-flag-icon { width: 48px; height: 48px; font-size: 20px; border-radius: 14px; } .dh-flag-card h2 { font-size: 19px; } }
+
+/* Secondary tools row */
+.dh-tools-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 var(--space-3); }
+.dh-tools-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
+.dh-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-7); }
+.dh-tool { display: flex; flex-direction: column; gap: 4px; padding: var(--space-4) var(--space-4); border-radius: 14px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.03); border: 1px solid rgba(11,58,106,0.06); }
+.dh-tool:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(11,58,106,0.04), 0 6px 14px rgba(11,58,106,0.06); }
+.dh-tool:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.dh-tool h3 { font-family: var(--sans); font-size: 16px; font-weight: 600; margin: 0; color: var(--ink); letter-spacing: -.005em; }
+.dh-tool p { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+
+/* Account block -- compact, expandable */
+.dh-acct { border-radius: 16px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.04); overflow: hidden; }
+.dh-acct-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); cursor: pointer; user-select: none; flex-wrap: wrap; list-style: none; color: var(--ink); }
+.dh-acct-head::-webkit-details-marker { display: none; }
+.dh-acct-head:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
+.dh-acct-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
+.dh-acct-chev { font-family: var(--mono); font-size: 16px; color: var(--ink-dim); transition: transform .2s ease; line-height: 1; }
+.dh-acct[open] .dh-acct-chev { transform: rotate(90deg); }
+.dh-acct-body { padding: 0 var(--space-5) var(--space-5); }
+.dh-acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--ink-hair); }
+.dh-acct-cell { padding: var(--space-3) 0; }
+.dh-acct-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
+.dh-acct-val { font-family: var(--sans); font-size: 18px; color: var(--ink); letter-spacing: -.005em; }
+.dh-acct-val.mono { font-family: var(--mono); font-size: 14px; }
+.dh-acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--ink-hair); margin-top: var(--space-3); }
+.dh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: 1px solid var(--ink-hair); background: transparent; color: var(--ink); transition: border-color .15s ease, background .15s ease; }
+.dh-btn:hover { border-color: var(--ink); background: var(--ink-ghost); }
+.dh-btn:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.dh-btn.warn:hover { border-color: var(--ink); background: var(--ink-ghost); color: var(--ink); }
+.dh-btn[disabled] { opacity: .55; cursor: default; }
+@media (max-width: 600px) { .dh-acct-head { padding: var(--space-3) var(--space-4); } .dh-acct-body { padding: 0 var(--space-4) var(--space-4); } }
+
+/* Fade-in once the data lands */
+.dh-loaded > * { animation: dh-fade .3s ease-out both; }
+.dh-loaded > *:nth-child(2) { animation-delay: .04s; }
+.dh-loaded > *:nth-child(3) { animation-delay: .08s; }
+.dh-loaded > *:nth-child(4) { animation-delay: .12s; }
+.dh-loaded > *:nth-child(5) { animation-delay: .16s; }
+@keyframes dh-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .dh-loaded > * { animation: none; } .dh-flag-card, .dh-tool { transition: none; } }
 </style>
 </head>
 <body>
@@ -192,16 +268,84 @@ main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--
 </div>
 
 <main id="main-content" class="pa-main">
-  <div id="hub-mount">
-    <div class="pa-loading">
-      <div class="parapear-block">
-        <img class="parapear-img" src="/assets/parapear/parapear-wait.png" alt="" aria-hidden="true" decoding="async" width="120" height="120">
-        <div class="parapear-bubble">
-          <span class="parapear-kicker">One moment</span>
-          <span class="pa-spinner" aria-hidden="true"></span>Checking your session.
-        </div>
+  <div id="dh-loading" class="pa-loading">
+    <div class="parapear-block">
+      <img class="parapear-img" src="/assets/parapear/parapear-wait.png" alt="" aria-hidden="true" decoding="async" width="120" height="120">
+      <div class="parapear-bubble">
+        <span class="parapear-kicker">One moment</span>
+        <span class="pa-spinner" aria-hidden="true"></span>Checking your session.
       </div>
     </div>
+  </div>
+
+  <div id="dh-root" hidden>
+    <header class="dh-hero" aria-labelledby="dh-h1">
+      <h1 id="dh-h1">Your Paramant<small data-dh="email"></small></h1>
+      <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
+    </header>
+
+    <aside class="dh-onb" data-pa-onboarding aria-label="Getting started" hidden>
+      <img src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="92" height="92">
+      <div class="dh-onb-text">
+        <span class="dh-onb-kicker">Welcome</span>
+        Everything lives here. Pick a flagship below to start, or open <strong>More tools</strong> for the full set. Recipients never need an account.
+      </div>
+      <button class="dh-onb-dismiss" type="button" data-pa-action="dismiss-onboarding" aria-label="Dismiss this tip">Got it</button>
+    </aside>
+
+    <section class="dh-flagship" aria-label="Primary actions">
+      <a class="dh-flag-card" href="/parashare" aria-label="Send a file via ParaShare">
+        <span class="dh-flag-icon" aria-hidden="true">&rarr;</span>
+        <h2>Send a file</h2>
+        <p>Encrypt in your browser, share a signed link, burn after one read. ML-KEM-768 hybrid key wrap, ML-DSA-65 signed receipt.</p>
+        <span class="dh-flag-cta">Open ParaShare</span>
+        <span class="dh-flag-meta">Client-side &middot; signed &middot; burn-on-read</span>
+      </a>
+      <a class="dh-flag-card" href="/sign" aria-label="Sign a document with ParaSign">
+        <span class="dh-flag-icon" aria-hidden="true">&#9998;</span>
+        <h2>Sign a document</h2>
+        <p>Post-quantum ML-DSA-65 signatures with self-contained .psign envelopes. CT-log notarised, verifiable without an account.</p>
+        <span class="dh-flag-cta">Open ParaSign</span>
+        <span class="dh-flag-meta">FIPS 204 &middot; .psign envelope &middot; CT-log notarised</span>
+      </a>
+    </section>
+
+    <div class="dh-tools-head"><h2>More tools</h2></div>
+    <section class="dh-tools" aria-label="More tools">
+      <a class="dh-tool" href="/get"><h3>Receive a file</h3><p>Open a secure link someone sent you. Decryption happens locally.</p></a>
+      <a class="dh-tool" href="/parashare"><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
+      <a class="dh-tool" href="/drop"><h3>ParaDrop</h3><p>Device-to-device transfer. Six-digit pairing code. End-to-end encrypted.</p></a>
+      <a class="dh-tool" href="/verify"><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
+    </section>
+
+    <details class="dh-acct" aria-label="Account details">
+      <summary class="dh-acct-head" id="dh-acct-toggle">
+        <h2>Manage account</h2>
+        <span class="dh-acct-chev" aria-hidden="true">&rsaquo;</span>
+      </summary>
+      <div class="dh-acct-body">
+        <div class="dh-acct-grid">
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Plan</div><div class="dh-acct-val" data-dh="plan">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Email</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">API key</div><div class="dh-acct-val mono" data-dh="api-key">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Member since</div><div class="dh-acct-val" data-dh="created">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Backup codes left</div><div class="dh-acct-val" data-dh="backup">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Session expires</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
+        </div>
+        <div class="dh-acct-actions">
+          <a class="dh-btn" href="/account">Account &amp; security</a>
+          <a class="dh-btn" href="/pricing">Plan &amp; billing</a>
+          <button type="button" class="dh-btn" data-pa-action="refresh">Refresh</button>
+          <button type="button" class="dh-btn warn" data-pa-action="signout">Sign out</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div id="dh-error" class="pa-loading" hidden>
+    Could not load your dashboard.
+    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Sign in again</a>
+    <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
 
@@ -261,82 +405,7 @@ main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--
 </footer>
 
 <script src="/nav.js" defer></script>
-<script>
-// Dashboard loader. ASCII-only. Reuses /api/user/* session validation (the
-// existing authUser middleware in admin/server.js — no parallel logic).
-// 401 -> hard redirect to /auth/login?next=/dashboard. 200 -> inject the
-// server-rendered hub fragment. innerHTML parses <style> tags so the hub's
-// own CSS arrives with the fragment; <script> tags injected via innerHTML
-// do NOT execute (browser security), which is why all interactivity in the
-// fragment uses [data-pa-action] hooks bound here by event delegation.
-(function(){
-  'use strict';
-  var loginUrl = '/auth/login?next=' + encodeURIComponent('/dashboard');
-  var mount = document.getElementById('hub-mount');
-  if (!mount) return;
-
-  var ONBOARDING_KEY = 'paramant.onboarding.dismissed.v1';
-
-  function applyOnboardingState(){
-    try {
-      if (localStorage.getItem(ONBOARDING_KEY) === '1') {
-        var hint = mount.querySelector('[data-pa-onboarding]');
-        if (hint) hint.style.display = 'none';
-      }
-    } catch (_) { /* localStorage blocked: leave hint visible */ }
-  }
-
-  mount.addEventListener('click', function(ev){
-    var t = ev.target.closest && ev.target.closest('[data-pa-action]');
-    if (!t) return;
-    var act = t.getAttribute('data-pa-action');
-    if (act === 'refresh') {
-      ev.preventDefault();
-      location.reload();
-    } else if (act === 'signout') {
-      ev.preventDefault();
-      t.disabled = true;
-      fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
-        .catch(function(){})
-        .then(function(){ location.href = '/auth/login'; });
-    } else if (act === 'dismiss-onboarding') {
-      ev.preventDefault();
-      var hint = t.closest('[data-pa-onboarding]');
-      if (hint) hint.style.display = 'none';
-      try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
-    }
-  });
-
-  function showError(detail){
-    mount.innerHTML = '<div class="pa-loading">Could not load your dashboard. <a class="pa-err-link" href="' + loginUrl + '">Sign in again</a>' + (detail ? '<br><small>' + detail + '</small>' : '') + '</div>';
-  }
-
-  var ctrl = ('AbortController' in window) ? new AbortController() : null;
-  var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, 10000) : 0;
-  var opts = { credentials: 'include', headers: { 'Accept': 'text/html' }, cache: 'no-store' };
-  if (ctrl) opts.signal = ctrl.signal;
-
-  fetch('/api/user/dashboard-fragment', opts).then(function(r){
-    if (t) clearTimeout(t);
-    if (r.status === 401 || r.status === 403) {
-      location.replace(loginUrl);
-      return null;
-    }
-    if (!r.ok) {
-      showError('HTTP ' + r.status);
-      return null;
-    }
-    return r.text();
-  }).then(function(html){
-    if (html != null) {
-      mount.innerHTML = html;
-      applyOnboardingState();
-    }
-  }).catch(function(){
-    if (t) clearTimeout(t);
-    showError('Network error');
-  });
-})();
-</script>
+<script src="/js/nav-auth.js" defer></script>
+<script src="/js/dashboard.js" defer></script>
 </body>
 </html>
