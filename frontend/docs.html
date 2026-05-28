@@ -402,7 +402,7 @@ tr:last-child td{border-bottom:none}
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Quick start</h2>
-    <p>Send your first encrypted file in under 5 minutes. No account required — <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">create a free account here</a> (TOTP protected, key visible in dashboard).</p>
+    <p>Send your first encrypted file in under 5 minutes. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Create a free account here</a> (TOTP protected, key visible in dashboard).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Install the SDK (Python 3.10+ or Node 18+; both ship the same wire-format-v1 encoder)</p></div></div>
     <div class="cb">
@@ -539,7 +539,7 @@ hash_, receipt = gp.send_with_receipt(open("pacs008.xml","rb").read())
       <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth</th></tr>
       <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>—</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob from an authenticated client (RAM-only)</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Upload from an anonymous client — no API key, used by /send</td><td>—</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Upload from a browser client — used by /send (browser AES-256-GCM, key in URL fragment)</td><td>—</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn — one retrieval only</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
@@ -836,7 +836,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
     <p>Two-step burn: first the blob is zeroed in-place, then the Map entry is deleted. This prevents a brief window where a partial read could occur.</p>
 
     <h2 id="padding">5 MB fixed padding (ParaShare)</h2>
-    <p>ParaShare authenticated blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. An observer on the network cannot determine the size, type, or content of the transferred file — effective DPI masking for classified data flows. Anonymous blobs retain their actual encrypted size up to 5 MB.</p>
+    <p>ParaShare authenticated blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. An observer on the network cannot determine the size, type, or content of the transferred file — effective DPI masking for classified data flows. Quick /send blobs retain their actual encrypted size up to 5 MB.</p>
 
     <h2 id="ct-log">Certificate Transparency log</h2>
     <p>Every transfer hash and device registration is appended to a public Merkle tree. The root hash changes with every write and is publicly verifiable. Anyone can prove a transfer occurred without learning what was transferred.</p>
@@ -901,7 +901,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><th>What a compromised relay can do</th><th>What it cannot do</th></tr>
       <tr><td>Deny or delay service</td><td>Read file contents (no decryption key)</td></tr>
       <tr><td>Learn transfer timing and frequency</td><td>Substitute a registered ML-KEM public key (CT log prevents rollback)</td></tr>
-      <tr><td>Observe ParaShare blob sizes (all fixed 5 MB) or anonymous blob sizes (variable, up to 5 MB)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
+      <tr><td>Observe ParaShare blob sizes (all fixed 5 MB) or /send blob sizes (variable, up to 5 MB)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
       <tr><td>Block a specific device hash</td><td>Decrypt any stored ciphertext</td></tr>
     </table>
     <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not sufficient — both must be broken simultaneously.</p>

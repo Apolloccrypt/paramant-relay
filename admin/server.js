@@ -1103,8 +1103,8 @@ api.get("/user/dashboard-fragment", authUser, async (req, res) => {
     <a class="action-card" href="/get" aria-label="Receive a file">
       <div class="icon" aria-hidden="true">&larr;</div>
       <h2>Receive a file</h2>
-      <p>Open a secure link someone sent you. Decryption happens in your browser; no account needed.</p>
-      <div class="pq-line">No account &middot; zero-knowledge</div>
+      <p>Open a secure link someone sent you. Decryption happens locally in your browser.</p>
+      <div class="pq-line">Browser-only &middot; zero-knowledge</div>
     </a>
   </div>
 </section>

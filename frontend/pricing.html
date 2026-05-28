@@ -5,15 +5,15 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pricing — PARAMANT</title>
-<meta name="description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only, no account. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
+<meta name="description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
 <meta property="og:title" content="Pricing — PARAMANT">
-<meta property="og:description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only, no account. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
+<meta property="og:description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
 <meta property="og:url" content="https://paramant.app/pricing">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Pricing — PARAMANT">
-<meta name="twitter:description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only, no account. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
+<meta name="twitter:description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
 <link rel="canonical" href="https://paramant.app/pricing">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
@@ -301,9 +301,9 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Three tiers</span>
     </div>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.75;margin-bottom:var(--space-6)">
-      Send files for free. No account required. Scale when you need audit trails, team access, or a dedicated relay.
+      Send files for free with a Paramant account. Scale when you need audit trails, team access, or a dedicated relay.
     </p>
-    <a href="/send" class="btn btn-secondary">No account? Send a file instantly &rarr;</a>
+    <a href="/send" class="btn btn-secondary">Sign in and send a file &rarr;</a>
   </div>
 </section>
 
@@ -316,7 +316,7 @@
         <div class="tier-name">Free</div>
         <div class="tier-price">&euro;0</div>
         <div class="tier-price-note">Forever &middot; no card required</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For one-off anonymous sends. No account, no tracking.</p>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For one-off browser-encrypted sends. No tracking.</p>
         <ul class="tier-features">
           <li>AES-256-GCM, browser-generated key</li>
           <li>5 MB per file</li>
@@ -386,7 +386,7 @@
 
     <div class="prose-section">
       <h3>Encryption</h3>
-      <p>Every tier uses the same cryptography. Anonymous transfers use AES-256-GCM with a browser-generated key that lives only in the URL fragment. Verified transfers via ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
+      <p>Every tier uses the same cryptography. Quick /send transfers use AES-256-GCM with a browser-generated key that lives only in the URL fragment. Verified transfers via ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
     </div>
 
     <div class="prose-section">
@@ -431,8 +431,8 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Does the anonymous /send flow use ML-KEM-768?</p>
-      <div class="faq-a">No. The anonymous send flow (/send, no account) uses AES-256-GCM with a browser-generated key delivered in the URL fragment. The key never reaches the relay. ML-KEM-768 + ECDH P-256 hybrid key exchange is used by <a href="/parashare">ParaShare</a> — the registered-device, verified-transfer flow.</div>
+      <p class="faq-q">Does the /send flow use ML-KEM-768?</p>
+      <div class="faq-a">No. The /send flow uses AES-256-GCM with a browser-generated key delivered in the URL fragment. The key never reaches the relay. ML-KEM-768 + ECDH P-256 hybrid key exchange is used by <a href="/parashare">ParaShare</a> — the registered-device, verified-transfer flow.</div>
     </div>
 
     <div class="faq-item">
