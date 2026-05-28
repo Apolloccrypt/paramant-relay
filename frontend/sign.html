@@ -413,11 +413,12 @@
       <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. The key is what cryptographically binds the signature - so it cannot be forged.</p>
     </div>
     <details class="ds-advanced">
-      <summary>Advanced: counter-sign with the Paramant relay</summary>
-      <p>Optional. With your relay API key, the relay also signs your envelope and writes it to the public CT log, so recipients can trace it. Without a key, your envelope is fully self-contained - still verifiable, just without a third-party witness.</p>
+      <summary>Advanced: Paramant relay integration</summary>
+      <p>Optional for self-sign, <strong>required if you added recipients</strong>. With your Paramant API key, the relay (a) counter-signs the envelope and writes it to the public CT log, and (b) creates the multi-party envelope so co-signers can sign at <code>/co-sign?env=...</code>. Without a key your envelope is fully self-contained but recipients cannot use the co-sign flow.</p>
       <div class="ds-field">
-        <label class="ds-label" for="ds-api-key">X-Api-Key (optional)</label>
+        <label class="ds-label" for="ds-api-key">X-Api-Key (format: <code>pgp_...</code>)</label>
         <input class="ds-input" type="password" id="ds-api-key" placeholder="pgp_..." autocomplete="off">
+        <p class="ds-hint" style="margin-top:6px">Find or create one at <a href="/dashboard#api-keys" target="_blank">Dashboard &gt; API Keys</a>. The key is sent only to the relay, never to other recipients.</p>
       </div>
     </details>
     <div class="ds-actions">
@@ -592,6 +593,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=8"></script>
+<script type="module" src="/sign-flow.js?v=9"></script>
 </body>
 </html>

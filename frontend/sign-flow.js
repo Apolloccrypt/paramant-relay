@@ -21,9 +21,10 @@ const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
 
 const state = {
-  mode: null,            // 'pdf' | 'hash'
+  mode: null,            // 'pdf' | 'image' | 'hash'
+  imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
-  stamp: null,           // { pageIndex, x, y, w, h } in PDF points
+  stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
   signer: {
     name: '',
     keySrc: 'ephemeral',
@@ -139,17 +140,28 @@ async function onDocChosen(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   state.doc = { bytes, name: file.name, size: file.size };
   state.signer.docImageDataUrl = null;
+  state.imageType = null;
+
   const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
-  state.mode = isPdf ? 'pdf' : 'hash';
-  // Pre-compute a data: URL when the document is itself a viewable image,
-  // so the review pane can render <img src=> without violating img-src CSP.
   const mimeGuess = guessMimeFromMagic(bytes);
+  const isPng = mimeGuess === 'image/png';
+  const isJpg = mimeGuess === 'image/jpeg';
+  const canPlaceVisually = isPdf || isPng || isJpg;
+
+  state.mode = isPdf ? 'pdf' : (isPng || isJpg) ? 'image' : 'hash';
+  if (isPng) state.imageType = 'png';
+  else if (isJpg) state.imageType = 'jpg';
+
+  // Pre-compute a data: URL for viewable images so the review pane can use
+  // <img src=> without hitting CSP blob: restrictions.
   if (mimeGuess && mimeGuess.startsWith('image/')) {
     try { state.signer.docImageDataUrl = await bytesToDataUrl(bytes, mimeGuess); } catch {}
   }
-  if (isPdf) {
+
+  if (canPlaceVisually) {
     setActive('step-place');
-    await renderPdfForPlacement();
+    if (isPdf) await renderPdfForPlacement();
+    else       await renderImageForPlacement();
   } else {
     setActive('step-hash-only');
     $('ds-hash-only-name').textContent = file.name;
@@ -157,6 +169,44 @@ async function onDocChosen(file) {
     $('ds-hash-only-hash').textContent = toHex(sha3_256(bytes));
     $('ds-hash-only-continue').disabled = false;
   }
+}
+
+function loadImageElement(bytes, mime) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('image decode failed'));
+      img.src = r.result;
+    };
+    r.onerror = () => reject(new Error('FileReader error'));
+    r.readAsDataURL(new Blob([bytes], { type: mime }));
+  });
+}
+
+async function renderImageForPlacement() {
+  $('ds-place-continue').disabled = true;
+  const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
+  const img = await loadImageElement(state.doc.bytes, mime);
+
+  const container = $('ds-pdf-canvas-list');
+  container.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'ds-page-wrap';
+  wrap.dataset.pageIndex = '0';
+  // For image mode we store natural image dimensions as 'page' size and a
+  // mode marker so onPlaceClick knows not to flip Y.
+  wrap._pdfPage = { width: img.naturalWidth, height: img.naturalHeight, index: 0, isImage: true };
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  wrap.appendChild(canvas);
+  container.appendChild(wrap);
+  wrap.addEventListener('click', onPlaceClick);
+
+  $('ds-place-page-count').textContent = '1 image (' + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
 }
 
 // ====================================================================
@@ -199,21 +249,45 @@ function onPlaceClick(e) {
   const wrap = e.currentTarget;
   const canvas = wrap.querySelector('canvas');
   const rect = canvas.getBoundingClientRect();
+  const isImage = !!wrap._pdfPage.isImage;
   const ratio = wrap._pdfPage.width / rect.width;
   const pxX = e.clientX - rect.left;
   const pxY = e.clientY - rect.top;
-  const stampPxW = STAMP_PDF_W / ratio;
-  const stampPxH = STAMP_PDF_H / ratio;
+
+  // Image mode scales the stamp to ~25% of the natural image width so it
+  // stays legible regardless of the screenshot/photo resolution. PDF mode
+  // uses fixed PDF-point dimensions.
+  let stampNatW, stampNatH;
+  if (isImage) {
+    stampNatW = Math.min(wrap._pdfPage.width * 0.25, 480);
+    stampNatH = stampNatW * (STAMP_PDF_H / STAMP_PDF_W);
+  } else {
+    stampNatW = STAMP_PDF_W;
+    stampNatH = STAMP_PDF_H;
+  }
+  const stampPxW = stampNatW / ratio;
+  const stampPxH = stampNatH / ratio;
+
   const left = Math.max(0, Math.min(rect.width  - stampPxW, pxX - stampPxW / 2));
   const top  = Math.max(0, Math.min(rect.height - stampPxH, pxY - stampPxH / 2));
-  const pdfX = left * ratio;
-  const pdfYTop = top * ratio;
-  const pdfYBottom = wrap._pdfPage.height - pdfYTop - STAMP_PDF_H;
-  state.stamp = { pageIndex: wrap._pdfPage.index, x: pdfX, y: pdfYBottom, w: STAMP_PDF_W, h: STAMP_PDF_H };
+  const natX = left * ratio;
+  const natYTop = top * ratio;
+
+  if (isImage) {
+    // Image-pixel coords, top-left origin (matches canvas + ctx.drawImage).
+    state.stamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
+  } else {
+    // pdf-lib uses bottom-left origin in PDF points.
+    const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
+    state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
+  }
+
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
   renderStampMarker(wrap, left, top, stampPxW, stampPxH);
   $('ds-place-continue').disabled = false;
-  $('ds-place-hint').textContent = 'Stamp on page ' + (wrap._pdfPage.index + 1) + '. Click another spot to move it.';
+  $('ds-place-hint').textContent = isImage
+    ? 'Stamp placed on the image. Click another spot to move it.'
+    : 'Stamp on page ' + (wrap._pdfPage.index + 1) + '. Click another spot to move it.';
 }
 
 function renderStampMarker(wrap, left, top, w, h) {
@@ -418,6 +492,25 @@ function hexToBytes(s) {
   return out;
 }
 
+function signedImageName() {
+  const ext = state.imageType === 'jpg' ? 'jpg' : 'png';
+  const dotIdx = state.doc.name.lastIndexOf('.');
+  if (dotIdx < 0) return 'signed-' + state.doc.name + '.' + ext;
+  return 'signed-' + state.doc.name.slice(0, dotIdx) + '.' + ext;
+}
+
+function signedDocName() {
+  if (state.mode === 'pdf')   return 'signed-' + state.doc.name;
+  if (state.mode === 'image') return signedImageName();
+  return state.doc.name;
+}
+
+function signedDocMime() {
+  if (state.mode === 'pdf') return 'application/pdf';
+  if (state.mode === 'image') return state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
+  return 'application/octet-stream';
+}
+
 // Matches the recipe the relay's Lua script reproduces server-side
 // (see relay/envelope.js: signMessageBytes). Used to sign as party 0 when
 // the user creates a multi-party envelope, and read by /co-sign for parties
@@ -443,7 +536,10 @@ function fillReview() {
   state.signer.keySrc = $('ds-key-src').value;
 
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
-  $('ds-review-mode').textContent = state.mode === 'pdf' ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) : 'Hash-only (SHA3-256 attestation)';
+  $('ds-review-mode').textContent =
+    state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
+    state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
+                             'Hash-only (SHA3-256 attestation)';
   $('ds-review-name').textContent = state.signer.name;
   $('ds-review-sig').textContent =
     state.signer.sigStyle === 'typed'  ? 'Typed name in the stamp' :
@@ -467,7 +563,9 @@ function fillReview() {
     const list = state.recipients.map(r => r.label + (r.email ? ' (' + r.email + ')' : '')).join(', ');
     recCell.innerHTML = state.recipients.length + ' co-signer' + (state.recipients.length === 1 ? '' : 's') + ': ' + escapeHtml(list);
     if (!apiKey) {
-      recCell.innerHTML += '<br><span style="color:rgba(180,20,20,1);font-size:11px">Multi-party envelope needs your X-Api-Key (Advanced section). Sign now will fail without it.</span>';
+      recCell.innerHTML += '<br><span style="color:rgba(180,20,20,1);font-size:11px">Multi-party envelope needs your X-Api-Key in the Advanced section. Get one at <a href="/dashboard#api-keys" target="_blank" style="color:rgba(180,20,20,1);text-decoration:underline">Dashboard &gt; API Keys</a>.</span>';
+    } else if (!/^pgp_/.test(apiKey)) {
+      recCell.innerHTML += '<br><span style="color:rgba(180,20,20,1);font-size:11px">The API key in Advanced does not start with <code>pgp_</code>. Paramant keys look like <code>pgp_...</code> - check at <a href="/dashboard#api-keys" target="_blank" style="color:rgba(180,20,20,1);text-decoration:underline">Dashboard &gt; API Keys</a>.</span>';
     }
   }
 
@@ -484,7 +582,10 @@ function fillReview() {
     $('ds-proof-fp').textContent = '(resolved when you click Sign)';
   }
   $('ds-proof-notary').textContent = state.signer.apiKey ? 'Yes (will fail-stop if the relay rejects the key)' : 'No (envelope is self-contained)';
-  $('ds-proof-version').textContent = state.mode === 'pdf' ? 'parasign-visual-1' : 'parasign-hash-1';
+  $('ds-proof-version').textContent =
+    state.mode === 'pdf'   ? 'parasign-visual-1' :
+    state.mode === 'image' ? 'parasign-image-1'  :
+                             'parasign-hash-1';
 
   // Envelope-structure preview (placeholders where post-sign data lives).
   const previewEnv = state.mode === 'pdf' ? {
@@ -565,8 +666,36 @@ async function renderDocPreview() {
     return;
   }
 
-  // Non-PDF: try to show the file inline if it is a viewable image. We use
-  // a pre-computed data: URL because CSP blocks blob: in img-src.
+  // Image-mode: render the image with the same stamp-mockup overlay
+  // the PDF preview gets, so the signer sees WHERE the seal will land.
+  if (state.mode === 'image' && state.signer.docImageDataUrl && state.stamp) {
+    pane.classList.add('has-pdf');   // reuse PDF-pane layout (top-aligned, scrollable)
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;display:inline-block;width:100%';
+    const img = document.createElement('img');
+    img.src = state.signer.docImageDataUrl;
+    img.alt = state.doc.name;
+    img.style.cssText = 'display:block;width:100%;height:auto';
+    wrap.appendChild(img);
+    pane.appendChild(wrap);
+    img.onload = () => {
+      // Image natural -> displayed ratio
+      const rect = img.getBoundingClientRect();
+      const ratio = state.doc && state.signer.docImageDataUrl ? (img.naturalWidth / rect.width) : 1;
+      const left = state.stamp.x / ratio;
+      const top  = state.stamp.y / ratio;
+      const w = state.stamp.w / ratio;
+      const h = state.stamp.h / ratio;
+      const mock = document.createElement('div');
+      mock.className = 'ds-mockup-stamp';
+      mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+      mock.innerHTML = stampInnerHtml();
+      wrap.appendChild(mock);
+    };
+    return;
+  }
+
+  // Non-PDF, non-image with mode hash: try to show as plain image if viewable.
   if (state.signer.docImageDataUrl) {
     const img = document.createElement('img');
     img.src = state.signer.docImageDataUrl;
@@ -652,6 +781,108 @@ function guessMimeFromMagic(bytes) {
   if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
   if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'image/webp';
   return null;
+}
+
+async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerprint8, imageType) {
+  const mime = imageType === 'jpg' ? 'image/jpeg' : 'image/png';
+  const img = await loadImageElement(origBytes, mime);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+
+  // Load the signature image (if any) before drawing so we can do a
+  // synchronous compose pass.
+  let sigImg = null;
+  if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
+    sigImg = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('signature image decode failed'));
+      i.src = state.signer.sigImageDataUrl;
+    });
+  }
+
+  drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg);
+
+  return await new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) return reject(new Error('canvas toBlob failed'));
+      resolve(new Uint8Array(await blob.arrayBuffer()));
+    }, mime, imageType === 'jpg' ? 0.92 : undefined);
+  });
+}
+
+function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg) {
+  const { x, y, w, h } = stamp;
+  // Outer fill + border
+  ctx.fillStyle = 'rgba(11, 58, 106, 0.03)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#0b3a6a';
+  ctx.lineWidth = Math.max(1, w / 200);
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+  // Cobalt header band with ParaMANT wordmark + POST-QUANTUM SIGNED badge
+  const bandH = h * 0.18;
+  ctx.fillStyle = '#0b3a6a';
+  ctx.fillRect(x, y, w, bandH);
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.font = 'bold ' + (bandH * 0.55) + 'px Helvetica, Arial, sans-serif';
+  ctx.fillText('ParaMANT', x + w * 0.025, y + bandH / 2);
+  ctx.textAlign = 'right';
+  ctx.font = 'bold ' + (bandH * 0.4) + 'px Helvetica, Arial, sans-serif';
+  ctx.fillText('POST-QUANTUM SIGNED', x + w - w * 0.025, y + bandH / 2);
+
+  // Middle area: signature image (drawn/uploaded) or italic typed name
+  const midY = y + bandH + h * 0.02;
+  const midH = h * 0.5;
+  const padX = w * 0.04;
+  if (sigImg) {
+    const maxW = w - padX * 2;
+    const maxH = midH;
+    const scale = Math.min(maxW / sigImg.naturalWidth, maxH / sigImg.naturalHeight);
+    const sw = sigImg.naturalWidth * scale;
+    const sh = sigImg.naturalHeight * scale;
+    ctx.drawImage(sigImg, x + (w - sw) / 2, midY + (midH - sh) / 2, sw, sh);
+  } else {
+    ctx.fillStyle = '#0b3a6a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let fontSize = midH * 0.7;
+    ctx.font = 'italic ' + fontSize + 'px "Times New Roman", Times, serif';
+    while (fontSize > h * 0.12 && ctx.measureText(signerName).width > (w - padX * 2)) {
+      fontSize -= 1;
+      ctx.font = 'italic ' + fontSize + 'px "Times New Roman", Times, serif';
+    }
+    ctx.fillText(signerName, x + w / 2, midY + midH / 2);
+  }
+
+  // Divider above the footer band
+  ctx.strokeStyle = 'rgba(11, 58, 106, 0.25)';
+  ctx.lineWidth = Math.max(0.5, w / 400);
+  ctx.beginPath();
+  ctx.moveTo(x + padX, y + h - h * 0.28);
+  ctx.lineTo(x + w - padX, y + h - h * 0.28);
+  ctx.stroke();
+
+  // Footer: signer name + date on row 1, crypto on row 2
+  const footY1 = y + h - h * 0.21;
+  const footY2 = y + h - h * 0.08;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#0b3a6a';
+  ctx.textAlign = 'left';
+  ctx.font = 'bold ' + (h * 0.085) + 'px Helvetica, Arial, sans-serif';
+  ctx.fillText(signerName, x + padX, footY1);
+  ctx.fillStyle = '#4d4d4d';
+  ctx.font = (h * 0.08) + 'px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(dateStr, x + w - padX, footY1);
+  ctx.textAlign = 'left';
+  ctx.font = (h * 0.07) + 'px ui-monospace, Menlo, monospace';
+  ctx.fillText('ML-DSA-65 (FIPS 204) - PQ ' + fingerprint8, x + padX, footY2);
 }
 
 async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
@@ -745,12 +976,14 @@ async function doSign() {
     let messageBytes;
     let envelope;
 
-    if (state.mode === 'pdf') {
-      $('ds-sign-status').textContent = 'Stamping PDF...';
-      stampedBytes = await buildStampedPdf(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint);
+    if (state.mode === 'pdf' || state.mode === 'image') {
+      $('ds-sign-status').textContent = state.mode === 'pdf' ? 'Stamping PDF...' : 'Stamping image...';
+      stampedBytes = state.mode === 'pdf'
+        ? await buildStampedPdf(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint)
+        : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
       const origHash = sha3_256(state.doc.bytes);
       const stampedHash = sha3_256(stampedBytes);
-      const coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr };
+      const coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage };
       const coordsBytes = new TextEncoder().encode(JSON.stringify(coords));
       messageBytes = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
       messageBytes.set(origHash, 0);
@@ -758,12 +991,13 @@ async function doSign() {
       messageBytes.set(coordsBytes, origHash.length + stampedHash.length);
       $('ds-sign-status').textContent = 'Signing in browser (ML-DSA-65)...';
       const signature = ml_dsa65.sign(state.signer.key.secretKey, messageBytes);
+      const stampedName = state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name;
       envelope = {
-        version: 'parasign-visual-1',
+        version: state.mode === 'pdf' ? 'parasign-visual-1' : 'parasign-image-1',
         algorithm: 'ML-DSA-65',
         hash_algorithm: 'SHA3-256',
         original_filename: state.doc.name,
-        stamped_filename: 'signed-' + state.doc.name,
+        stamped_filename: stampedName,
         original_hash: toHex(origHash),
         stamped_hash:  toHex(stampedHash),
         coords,
@@ -801,10 +1035,13 @@ async function doSign() {
     // Requires an API key (the /v2/envelopes endpoint is auth-gated).
     if (state.recipients.length > 0) {
       if (!state.signer.apiKey) {
-        throw new Error('Adding recipients requires your Paramant X-Api-Key (under Advanced). Get one from your Dashboard, or remove the recipients to sign only for yourself.');
+        throw new Error('Adding recipients requires your Paramant X-Api-Key. Open the Advanced section in step 4 and paste it there. You can find or create one at Dashboard > API Keys (https://paramant.app/dashboard#api-keys). Alternatively, remove the recipients to sign only for yourself.');
+      }
+      if (!/^pgp_[A-Za-z0-9_-]{16,}$/.test(state.signer.apiKey)) {
+        throw new Error('The X-Api-Key you entered does not look like a Paramant API key (expected format: pgp_... with at least 16 chars after). Double-check the value at Dashboard > API Keys (https://paramant.app/dashboard#api-keys).');
       }
       $('ds-sign-status').textContent = 'Creating multi-party envelope on the relay...';
-      const docHashForEnvelope = state.mode === 'pdf' ? envelope.stamped_hash : envelope.document_hash;
+      const docHashForEnvelope = state.mode === 'pdf' || state.mode === 'image' ? envelope.stamped_hash : envelope.document_hash;
       const allParties = [{ label: state.signer.name + ' (sender)' }, ...state.recipients];
       let createR, createBody;
       try {
@@ -823,9 +1060,10 @@ async function doSign() {
         throw new Error('Envelope creation aborted: the relay was unreachable (' + (netErr.message || netErr) + ').');
       }
       if (!createR.ok) {
-        const reason = createR.status === 401 ? 'the API key was not accepted by the relay'
-                     : createR.status === 429 ? 'the relay rate-limited envelope creation - try again in an hour'
-                     : 'the relay returned HTTP ' + createR.status + (createBody && createBody.error ? ' (' + createBody.error + ')' : '');
+        const reason = createR.status === 401
+          ? 'the API key was not accepted by the relay. Verify the value at Dashboard > API Keys (https://paramant.app/dashboard#api-keys), or remove recipients to sign only for yourself'
+          : createR.status === 429 ? 'the relay rate-limited envelope creation - try again in an hour'
+          : 'the relay returned HTTP ' + createR.status + (createBody && createBody.error ? ' (' + createBody.error + ')' : '');
         throw new Error('Envelope creation aborted: ' + reason + '. No envelope was produced; recipients have not been notified.');
       }
       state.envelope = createBody.envelope;
@@ -940,9 +1178,10 @@ function showDone() {
 
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;
-  $('ds-done-mode').textContent = state.mode === 'pdf'
-    ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1)
-    : 'Hash-only attestation (SHA3-256)';
+  $('ds-done-mode').textContent =
+    state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
+    state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
+                             'Hash-only attestation (SHA3-256)';
 
   // Notary line: only show when something happened, frame failure as
   // 'optional step skipped' rather than an error.
@@ -961,7 +1200,8 @@ function showDone() {
   $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
   if (r.stampedBytes) {
     $('ds-dl-pdf').hidden = false;
-    $('ds-dl-pdf').onclick = () => downloadBytes(r.stampedBytes, 'signed-' + state.doc.name, 'application/pdf');
+    $('ds-dl-pdf').textContent = state.mode === 'pdf' ? 'Download signed PDF' : 'Download signed image';
+    $('ds-dl-pdf').onclick = () => downloadBytes(r.stampedBytes, signedDocName(), signedDocMime());
   } else {
     $('ds-dl-pdf').hidden = true;
   }
@@ -973,7 +1213,8 @@ function showDone() {
     filesList.innerHTML = '';
     if (r.stampedBytes) {
       const li1 = document.createElement('li');
-      li1.innerHTML = `<span class="ds-usage-files-file">signed-${escapeHtml(state.doc.name)}</span><span class="ds-usage-files-note">the visible document with your Paramant seal</span>`;
+      const what = state.mode === 'pdf' ? 'signed PDF' : 'signed image';
+      li1.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(signedDocName())}</span><span class="ds-usage-files-note">the ${what} with your visible Paramant seal baked in</span>`;
       filesList.appendChild(li1);
     } else {
       const li1 = document.createElement('li');
@@ -1052,8 +1293,9 @@ async function renderSignedPreview() {
   if (!container) return;
   container.innerHTML = '';
   const r = state.result;
-  if (state.mode !== 'pdf' || !r.stampedBytes) {
-    // Hash-only mode: there's no rendered document, show the hash for confirmation.
+
+  // Hash-only mode: nothing rendered, just show the hash + signature head.
+  if (state.mode === 'hash' || !r.stampedBytes) {
     container.innerHTML =
       '<div class="ds-info-card"><dl>' +
       '<dt>Signed bytes (SHA3-256)</dt><dd>' + escapeHtml(r.envelope.document_hash || '-') + '</dd>' +
@@ -1061,11 +1303,24 @@ async function renderSignedPreview() {
       '</dl></div>';
     return;
   }
+
+  // Image mode: show the stamped image (the seal is baked into the bytes).
+  if (state.mode === 'image') {
+    const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
+    const dataUrl = await bytesToDataUrl(r.stampedBytes, mime);
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.alt = signedDocName();
+    img.style.cssText = 'width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff';
+    container.appendChild(img);
+    return;
+  }
+
+  // PDF mode: render the stamp page (and the next page if it exists) so the
+  // signer sees their stamp in context without scrolling long documents.
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
-  // Show only the page that holds the stamp (and the next page if it exists)
-  // so the user does not have to scroll far on long documents.
   const idxs = [state.stamp.pageIndex];
   if (state.stamp.pageIndex + 1 < pdf.numPages) idxs.push(state.stamp.pageIndex + 1);
   for (const idx of idxs) {
