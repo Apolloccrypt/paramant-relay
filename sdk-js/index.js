@@ -712,6 +712,11 @@ export class GhostPipe {
   // ── Anonymous inbound (wire-format v1, sigId=0x0000) ───────────────────────
 
   /**
+   * @deprecated since 3.2.0. The anonymous tier is being retired; the
+   *   `/v2/anon-inbound` endpoint will be removed in a future major release.
+   *   Migrate to `send()` (authenticated, ML-DSA-65 signed), which provides
+   *   identity binding and CT-log proof of origin.
+   *
    * Submit an anonymous v1 blob to /v2/anon-inbound given a recipient's KEM public key.
    *
    * @param {Uint8Array} data
@@ -723,6 +728,11 @@ export class GhostPipe {
    * @returns {Promise<{hash: string, blob: Uint8Array, response: any}>}
    */
   async sendAnonymous(data, recipientKemPubHex, { ttl = 3600, maxViews = 1, padBlock = 5 * 1024 * 1024 } = {}) {
+    if (!GhostPipe._anonDeprecationWarned) {
+      GhostPipe._anonDeprecationWarned = true;
+      // eslint-disable-next-line no-console
+      console.warn('[paramant-sdk] sendAnonymous() is deprecated and will be removed in 4.0.0. Migrate to send() for authenticated, signed transfers.');
+    }
     await this._ensureCapabilities();
     const { blob, hash } = await this._encrypt(data, recipientKemPubHex, {
       padBlock, kemId: this.kemId, sigId: SIG.NONE,

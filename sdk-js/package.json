@@ -1,6 +1,6 @@
 {
   "name": "paramant-sdk",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "JavaScript SDK for Paramant \u2014 post-quantum (ML-KEM-768 + ML-DSA-65) zero-plaintext file transport, wire-format v1 with verified sender signatures",
   "type": "module",
   "main": "./index.js",

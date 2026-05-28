@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.2.0 - 2026-05-28
+
+### Deprecated
+- **`sendAnonymous()` is deprecated.** The anonymous tier is being retired.
+  The `/v2/anon-inbound` relay endpoint will be removed in a future major
+  release. Callers will see a one-shot `console.warn` per process and a
+  `Deprecation: true` response header from the relay. Migrate to `send()`
+  for authenticated, ML-DSA-65 signed transfers with CT-log proof of origin.
+  No wire-format change; no other API behaviour changed in this release.
+
 ## 3.1.0 — 2026-05-23
 
 Security release. Wire format unchanged (still v1) — relay and existing tooling unaffected.

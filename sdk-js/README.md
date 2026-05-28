@@ -144,10 +144,15 @@ const hash = await gp.send(buffer, {
 const data = await gp.receive(hash, { preSharedSecret: 'horse-battery' });
 ```
 
-### `sendAnonymous(data, recipientKemPubHex, options?)`
+### `sendAnonymous(data, recipientKemPubHex, options?)` (deprecated)
 
-Anonymous blob (`sigId=0x0000`) to `/v2/anon-inbound` — useful for pseudonymous
-drops to a known recipient without a sender-side API key.
+**Deprecated since 3.2.0.** The anonymous tier is being retired. The
+`/v2/anon-inbound` endpoint will be removed in a future major release. Migrate
+to `send()` (authenticated, ML-DSA-65 signed), which provides identity binding
+and CT-log proof of origin.
+
+Existing callers will see a one-shot `console.warn` per process and a
+`Deprecation: true` response header from the relay.
 
 ```js
 const { hash } = await gp.sendAnonymous(buffer, recipientKemPubHex, { ttl: 86400 });
