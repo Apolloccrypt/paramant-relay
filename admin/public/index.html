@@ -128,8 +128,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .pag select{padding:5px 8px;border:1.5px solid rgba(11,58,106,.15);background:#fff;color:#0B3A6A;font-size:12px;font-family:var(--ff-mono)}
 .pag-info{font-size:12px;font-family:var(--ff-mono);color:#475569;flex:1;text-align:center}
 /* Responsive */
-@media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}.tabs{overflow-x:auto}}
-@media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding:0 12px}.main{padding:14px}.hdr-meta .lic{display:none}}
+@media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}
+  .hdr{flex-wrap:wrap;height:auto;min-height:56px;padding:8px 16px;gap:8px;row-gap:0}
+  .hdr-brand{order:1}
+  .hdr-meta{order:2;margin-left:auto;gap:6px}
+  .hdr-meta .lo-btn{padding:5px 10px;font-size:10px;letter-spacing:.06em}
+  .tabs{order:3;width:100%;border-top:1px solid rgba(11,58,106,.08);margin:0 -16px;padding:0 16px;-webkit-overflow-scrolling:touch}
+  .tabs button{padding:12px 14px 10px;font-size:13px}
+}
+@media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding:8px 12px}.main{padding:14px}.hdr-meta .lic{display:none}.tabs{margin:0 -12px;padding:0 12px}}
 
 /* Action menu group labels */
 .ag-lbl{display:block;padding:4px 14px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;pointer-events:none;user-select:none}
