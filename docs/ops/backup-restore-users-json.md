@@ -36,7 +36,7 @@ Lose it and all backups are permanently unreadable.
 
 - Keep an OFFLINE copy of the private key (USB in a physical safe, or printed
   on paper). Retrieve it once with:
-  `ssh root@116.203.86.81 'cat /root/.config/paramant-backup/key.txt'`
+  `ssh root@<your-relay-host> 'cat /path/to/your/backup-key.txt'` (substitute host + path for your install)
 - NEVER commit the private key to any git repository, public or private.
 - The private key sitting next to the backups on the same box is fine for
   availability but means a full-host compromise exposes both — the offline
