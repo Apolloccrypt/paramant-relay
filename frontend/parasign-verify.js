@@ -32,13 +32,9 @@ function fromB64(s) {
 }
 
 function update() {
-  // Client-side capable envelopes do not require an API key.
-  if (envelope && isClientSideVersion(envelope.version)) {
-    $('vf-verify').disabled = !(documentBuffer && envelope);
-  } else {
-    const apiKey = ($('vf-api-key').value || '').trim();
-    $('vf-verify').disabled = !(documentBuffer && envelope && apiKey);
-  }
+  // Only modern envelopes are accepted. The button enables on doc + envelope;
+  // if envelope.version is unsupported, verify() shows a clear error.
+  $('vf-verify').disabled = !(documentBuffer && envelope);
 }
 
 function isClientSideVersion(v) {
@@ -69,23 +65,13 @@ async function onEnv(file) {
     const idx = (envelope.notary && envelope.notary.ct_log_index);
     if (idx != null) info.push('ct_log_index: ' + idx);
     $('vf-envelope-info').textContent = info.join('  |  ');
-    // Show/hide the right section based on what this envelope needs.
-    const apiSection = $('vf-api-section');
     const csBadge = $('vf-clientside-badge');
-    if (isClientSideVersion(envelope.version)) {
-      if (apiSection) apiSection.hidden = true;
-      if (csBadge)   csBadge.hidden = false;
-    } else {
-      if (apiSection) apiSection.hidden = false;
-      if (csBadge)   csBadge.hidden = true;
-    }
+    if (csBadge) csBadge.hidden = !isClientSideVersion(envelope.version);
   } catch (e) {
     $('vf-envelope-info').textContent = 'Invalid envelope: ' + e.message;
     envelope = null;
-    const apiSection = $('vf-api-section');
     const csBadge = $('vf-clientside-badge');
-    if (apiSection) apiSection.hidden = true;
-    if (csBadge)   csBadge.hidden = true;
+    if (csBadge) csBadge.hidden = true;
   }
   update();
 }
@@ -150,25 +136,16 @@ async function verify() {
   $('vf-verify').disabled = true;
   $('vf-result').hidden = false;
   try {
-    if (isClientSideVersion(envelope.version)) {
-      $('vf-result').innerHTML = '<div class="ps-banner info">Verifying locally (no API key, no relay round-trip)...</div>';
-      const r = await clientSideVerify();
-      await renderResult(r);
+    if (!isClientSideVersion(envelope.version)) {
+      $('vf-result').innerHTML =
+        '<div class="ps-banner err"><strong>Unsupported envelope version: <code>' + esc(envelope.version || '(none)') + '</code>.</strong> ' +
+        'Only modern envelopes produced by the current /sign flow are accepted: <code>parasign-visual-1</code>, <code>parasign-image-1</code>, <code>parasign-hash-1</code>. ' +
+        'If you have an old <code>parasign-v1</code> file, re-sign it via <a href="/sign">/sign</a>.</div>';
       return;
     }
-    $('vf-result').innerHTML = '<div class="ps-banner info">Hashing locally + verifying via relay...</div>';
-    const docHash = sha3_256(new Uint8Array(documentBuffer));
-    const res = await fetch(RELAY_URL + '/v2/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': $('vf-api-key').value.trim() },
-      body: JSON.stringify({ document_hash: toHex(docHash), envelope }),
-    });
-    if (!res.ok && res.status !== 200) {
-      const t = await res.text();
-      $('vf-result').innerHTML = '<div class="ps-banner err">Relay HTTP ' + res.status + ': ' + esc(t.slice(0, 200)) + '</div>';
-      return;
-    }
-    await renderResult(await res.json());
+    $('vf-result').innerHTML = '<div class="ps-banner info">Verifying locally (no account, no network call)...</div>';
+    const r = await clientSideVerify();
+    await renderResult(r);
   } catch (e) {
     $('vf-result').innerHTML = '<div class="ps-banner err">Verify failed: ' + esc(e.message) + '</div>';
   } finally { $('vf-verify').disabled = false; }
@@ -228,5 +205,4 @@ async function renderResult(r) {
 
 $('vf-document').addEventListener('change', e => onDoc(e.target.files[0]));
 $('vf-envelope').addEventListener('change', e => onEnv(e.target.files[0]));
-$('vf-api-key').addEventListener('input', update);
 $('vf-verify').addEventListener('click', verify);
