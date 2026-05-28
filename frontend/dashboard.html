@@ -42,12 +42,6 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 .btn-secondary { background: transparent; color: var(--ink); border-color: var(--ink-hair); }
 .btn-secondary:hover { border-color: var(--ink); }
 
-.key-paste { display: none; gap: var(--space-2); align-items: center; width: 100%; margin-top: var(--space-2); flex-wrap: wrap; }
-.key-paste.open { display: flex; }
-.key-paste input { flex: 1 1 240px; min-width: 200px; font-family: var(--mono); font-size: 13px; padding: 9px 12px; border: 1px solid var(--ink-hair); border-radius: 8px; background: transparent; color: var(--ink); }
-.key-paste input:focus { outline: none; border-color: var(--ink); }
-.key-paste .key-err { color: var(--ink); font-family: var(--mono); font-size: 11px; opacity: .8; }
-
 .block-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin: var(--space-5) 0 var(--space-3); }
 
 .action-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
@@ -75,12 +69,6 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 .acct-card .val.small { font-size: 15px; font-family: var(--mono); }
 
 .account-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
-
-.relay-row { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; }
-.relay-row .relay-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
-.chip { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--ink-hair); background: transparent; color: var(--ink); cursor: pointer; }
-.chip:hover { border-color: var(--ink); }
-.chip.active { background: var(--lime); color: var(--navy); border-color: var(--lime); }
 
 </style>
 </head>
@@ -277,18 +265,12 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
     <div class="auth-status" id="auth-status" aria-live="polite">
       <p class="auth-msg" id="auth-msg">Checking your sign-in…</p>
       <div class="auth-actions" id="auth-actions"></div>
-      <div class="key-paste" id="key-paste">
-        <input id="key-input" type="password" placeholder="pgp_..." autocomplete="off" spellcheck="false" aria-label="API key">
-        <button class="btn-primary" id="key-save" type="button">Save</button>
-        <button class="btn-secondary" id="key-cancel" type="button">Cancel</button>
-        <span class="key-err" id="key-err"></span>
-      </div>
     </div>
   </section>
 
-  <!-- Hub interior. Hidden until the API key is validated server-side
-       (/v2/check-key against the selected sector relay). Nothing actionable
-       renders for an unauthenticated visitor. -->
+  <!-- Hub interior. Hidden until /api/user/account returns 200 (i.e. the
+       user has a valid httpOnly session set by /auth/login after email +
+       TOTP). Nothing actionable renders for an unauthenticated visitor. -->
   <div id="hub-private" hidden>
 
     <section aria-label="Primary actions">
@@ -334,15 +316,8 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
     <section class="account-block empty" id="account-block" aria-label="Your account">
       <h2 class="block-h">Your account</h2>
       <div class="account-grid" id="account-grid"></div>
-      <div class="relay-row" id="relay-row" hidden>
-        <span class="relay-lbl">Sector</span>
-        <button class="chip active" data-relay="https://relay.paramant.app" type="button">Main</button>
-        <button class="chip" data-relay="https://health.paramant.app" type="button">Health</button>
-        <button class="chip" data-relay="https://finance.paramant.app" type="button">Finance</button>
-        <button class="chip" data-relay="https://legal.paramant.app" type="button">Legal</button>
-        <button class="chip" data-relay="https://iot.paramant.app" type="button">IoT</button>
-      </div>
       <div class="account-actions">
+        <a class="btn-secondary" href="/account">Manage account</a>
         <button class="btn-secondary" id="acct-refresh" type="button">Refresh</button>
         <button class="btn-secondary" id="acct-signout" type="button">Sign out</button>
       </div>
@@ -409,22 +384,30 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 
 <script src="/nav.js" defer></script>
 <script>
-// Hub controller. ASCII-only inline JS. No external imports.
+// Dashboard controller. ASCII-only inline JS. No external imports.
+//
+// Auth contract (matches /auth/login.html + /account.html, the live flow):
+//   - Login is at /auth/login (email + 6-digit TOTP from authenticator app).
+//   - The session cookie is httpOnly + Secure + SameSite=Strict, set by the
+//     relay after TOTP verification. JS cannot read or set it.
+//   - To check session: GET /api/user/account with credentials: 'include'.
+//       200 -> {email, api_key_masked, plan, label, created_at,
+//               backup_codes_remaining, sessions, session_expires_at}
+//       401 -> not signed in -> redirect to /auth/login.
+//   - To sign out: POST /api/user/logout with credentials: 'include'.
+//
+// We do NOT touch the API key here. The API key is shown (masked) on the
+// account page; the dashboard's job is to confirm the user is signed in and
+// surface launchers into the tool pages. Anonymous flows (/send /get) work
+// without a session too; gated tools handle their own X-Api-Key.
 (function(){
   'use strict';
-
-  var KEY_LS = 'paramant_api_key';
-  var DEFAULT_RELAY = 'https://relay.paramant.app';
 
   var $ = function(id){ return document.getElementById(id); };
   var esc = function(s){ return String(s == null ? '' : s).replace(/[<>&"]/g, function(c){ return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
 
-  function getKey(){ try { return (localStorage.getItem(KEY_LS) || '').trim(); } catch(e){ return ''; } }
-  function setKey(k){ try { localStorage.setItem(KEY_LS, k); } catch(e){} }
-  function clearKey(){ try { localStorage.removeItem(KEY_LS); } catch(e){} }
-
-  // Strict gate: hub interior is visible ONLY when /v2/check-key returns 200.
-  // Every other state (loading / no-key / invalid / unreachable) keeps it hidden.
+  // Strict gate: hub interior is visible ONLY when /api/user/account returns 200.
+  // Every other state (loading / no session / network error) keeps it hidden.
   function setHubVisible(yes){
     var el = $('hub-private');
     if (el) el.hidden = !yes;
@@ -439,38 +422,26 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
       return;
     }
     if (state === 'none') {
-      msg.innerHTML = '<strong>Sign in to your Paramant.</strong> A valid API key is required to use this dashboard. Nothing here is accessible without one.';
+      msg.innerHTML = '<strong>Sign in to your Paramant.</strong> Email + TOTP from your authenticator app. Nothing on this dashboard is accessible without an active session.';
+      var next = encodeURIComponent('/dashboard');
       act.innerHTML = ''
-        + '<a class="btn-secondary" href="/auth/login">Sign in</a>'
+        + '<a class="btn-primary" href="/auth/login?next=' + next + '">Sign in</a>'
         + '<a class="btn-secondary" href="/signup">Create account</a>';
-      // Auto-open the key-paste field — the gate is the only thing on the page.
-      $('key-paste').classList.add('open');
-      var inp = $('key-input'); if (inp) try { inp.focus(); } catch(e){}
       setHubVisible(false);
       return;
     }
     if (state.kind === 'valid') {
-      var label = state.label ? esc(state.label) : 'key';
+      var who = state.email ? esc(state.email) : 'your account';
       var plan = state.plan ? '<span class="auth-pill">' + esc(state.plan) + '</span>' : '';
-      msg.innerHTML = '<strong>Signed in</strong> as ' + label + ' ' + plan;
+      msg.innerHTML = '<strong>Signed in</strong> as ' + who + ' ' + plan;
       act.innerHTML = '';
-      $('key-paste').classList.remove('open');
       setHubVisible(true);
       return;
     }
-    if (state.kind === 'invalid') {
-      msg.innerHTML = '<strong>Key was rejected.</strong> ' + esc(state.detail || 'The relay did not accept this API key.');
-      act.innerHTML = '<button class="btn-secondary" type="button" id="signout-here">Clear stored key</button>';
-      var so = $('signout-here');
-      if (so) so.addEventListener('click', function(){ clearKey(); location.reload(); });
-      // Re-open the field so the user can correct.
-      $('key-paste').classList.add('open');
-      setHubVisible(false);
-      return;
-    }
-    if (state.kind === 'unreachable') {
-      msg.innerHTML = '<strong>Relay unreachable.</strong> Cannot reach <code class="auth-pill">' + esc(state.relay) + '</code> to verify your key. The dashboard stays locked until verification succeeds.';
-      act.innerHTML = '<button class="btn-secondary" type="button" id="retry-now">Retry</button>';
+    if (state.kind === 'error') {
+      msg.innerHTML = '<strong>Could not verify your session.</strong> ' + esc(state.detail || 'Network error.');
+      act.innerHTML = '<button class="btn-secondary" type="button" id="retry-now">Retry</button>'
+                   + '<a class="btn-secondary" href="/auth/login?next=' + encodeURIComponent('/dashboard') + '">Sign in again</a>';
       var rn = $('retry-now');
       if (rn) rn.addEventListener('click', function(){ load(); });
       setHubVisible(false);
@@ -478,102 +449,71 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
     }
   }
 
-  $('key-save').addEventListener('click', function(){
-    var v = ($('key-input').value || '').trim();
-    var err = $('key-err'); err.textContent = '';
-    if (!v) { err.textContent = 'Empty.'; return; }
-    if (!/^pgp_/.test(v) && v.length < 24) { err.textContent = 'Does not look like an API key.'; return; }
-    setKey(v);
-    $('key-paste').classList.remove('open');
-    $('key-input').value = '';
-    load();
-  });
-  $('key-cancel').addEventListener('click', function(){
-    $('key-paste').classList.remove('open');
-    $('key-input').value = '';
-    $('key-err').textContent = '';
-  });
-
-  var currentRelay = DEFAULT_RELAY;
-  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-relay]'), function(b){
-    b.addEventListener('click', function(){
-      Array.prototype.forEach.call(document.querySelectorAll('.chip[data-relay]'), function(x){ x.classList.remove('active'); });
-      b.classList.add('active');
-      currentRelay = b.getAttribute('data-relay');
-      loadAccount(getKey());
-    });
-  });
-
   function renderAccount(d){
     if (!d) {
       $('account-block').classList.add('empty');
       $('account-grid').innerHTML = '';
-      $('relay-row').hidden = true;
       return;
     }
     $('account-block').classList.remove('empty');
-    $('relay-row').hidden = false;
     var rows = [];
-    rows.push({ lbl: 'Plan', val: esc(d.plan || d.tier || 'standard'), small: false });
+    if (d.plan) rows.push({ lbl: 'Plan', val: esc(d.plan), small: false });
+    if (d.email) rows.push({ lbl: 'Email', val: esc(d.email), small: true });
+    if (d.api_key_masked) rows.push({ lbl: 'API key', val: esc(d.api_key_masked), small: true });
     if (d.label) rows.push({ lbl: 'Label', val: esc(d.label), small: true });
-    if (d.expires_at) rows.push({ lbl: 'Expires', val: esc(String(d.expires_at).slice(0, 10)), small: true });
-    if (d.transfers != null) rows.push({ lbl: 'Transfers', val: String(d.transfers), small: false });
-    if (d.quota_bytes != null) rows.push({ lbl: 'Quota', val: humanBytes(d.quota_bytes), small: true });
-    if (d.signatures != null) rows.push({ lbl: 'Signatures', val: String(d.signatures), small: false });
-    if (d.ct_log_size != null) rows.push({ lbl: 'CT-log size', val: String(d.ct_log_size), small: true });
+    if (d.created_at) {
+      var ds = new Date(d.created_at);
+      rows.push({ lbl: 'Created', val: isNaN(ds.getTime()) ? esc(String(d.created_at).slice(0,10)) : ds.toLocaleDateString(), small: true });
+    }
+    if (d.backup_codes_remaining != null) {
+      rows.push({ lbl: 'Backup codes', val: String(d.backup_codes_remaining) + ' left', small: true });
+    }
+    if (d.session_expires_at) {
+      var es = new Date(d.session_expires_at);
+      if (!isNaN(es.getTime())) {
+        var mins = Math.max(0, Math.round((es.getTime() - Date.now()) / 60000));
+        rows.push({ lbl: 'Session expires', val: mins + ' min', small: true });
+      }
+    }
     $('account-grid').innerHTML = rows.map(function(r){
       return '<div class="acct-card"><div class="lbl">' + r.lbl + '</div><div class="val' + (r.small ? ' small' : '') + '">' + r.val + '</div></div>';
     }).join('');
   }
 
-  function humanBytes(n){
-    if (n == null) return '-';
-    var u = ['B','KB','MB','GB','TB'], i = 0;
-    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
-    return n.toFixed(n < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
-  }
-
-  function fetchJSON(url, key, ms){
+  function fetchSession(ms){
     var ctrl = ('AbortController' in window) ? new AbortController() : null;
     var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, ms || 8000) : 0;
-    var opts = { headers: { 'X-Api-Key': key, 'Accept': 'application/json' } };
+    var opts = { credentials: 'include', headers: { 'Accept': 'application/json' } };
     if (ctrl) opts.signal = ctrl.signal;
-    return fetch(url, opts)
+    return fetch('/api/user/account', opts)
       .then(function(r){
         if (t) clearTimeout(t);
-        if (r.status === 401 || r.status === 403) return { __invalid: true, status: r.status };
+        if (r.status === 401 || r.status === 403) return { __none: true, status: r.status };
         if (!r.ok) return { __error: true, status: r.status };
         return r.json().catch(function(){ return {}; });
       })
       .catch(function(e){ if (t) clearTimeout(t); return { __network: true, msg: e.message }; });
   }
 
-  function loadAccount(key){
-    if (!key) { renderAccount(null); return; }
-    fetchJSON(currentRelay + '/v2/check-key', key).then(function(d){
-      if (d.__invalid) { renderAuth({ kind: 'invalid', detail: 'HTTP ' + d.status }); renderAccount(null); return; }
-      if (d.__network) { renderAuth({ kind: 'unreachable', relay: currentRelay }); renderAccount(null); return; }
-      if (d.__error)   { renderAuth({ kind: 'unreachable', relay: currentRelay }); renderAccount(null); return; }
-      renderAuth({ kind: 'valid', label: d.label || d.name || null, plan: d.plan || d.tier || null });
-      fetchJSON(currentRelay + '/v2/monitor', key).then(function(m){
-        var safeM = (m && !m.__error && !m.__network && !m.__invalid) ? m : {};
-        var merged = {};
-        Object.keys(d || {}).forEach(function(k){ merged[k] = d[k]; });
-        Object.keys(safeM).forEach(function(k){ if (merged[k] == null) merged[k] = safeM[k]; });
-        renderAccount(merged);
-      });
+  function load(){
+    renderAuth('loading');
+    fetchSession().then(function(d){
+      if (d.__none)    { renderAuth('none'); renderAccount(null); return; }
+      if (d.__network) { renderAuth({ kind: 'error', detail: 'Could not reach the auth service.' }); renderAccount(null); return; }
+      if (d.__error)   { renderAuth({ kind: 'error', detail: 'Server returned HTTP ' + d.status + '.' }); renderAccount(null); return; }
+      renderAuth({ kind: 'valid', email: d.email, plan: d.plan });
+      renderAccount(d);
     });
   }
 
-  function load(){
-    renderAuth('loading');
-    var key = getKey();
-    if (!key) { renderAuth('none'); renderAccount(null); return; }
-    loadAccount(key);
-  }
-
   $('acct-refresh').addEventListener('click', function(){ load(); });
-  $('acct-signout').addEventListener('click', function(){ clearKey(); location.reload(); });
+  $('acct-signout').addEventListener('click', function(){
+    var btn = $('acct-signout');
+    if (btn) btn.disabled = true;
+    fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
+      .catch(function(){})
+      .then(function(){ location.href = '/auth/login'; });
+  });
 
   load();
 })();
