@@ -21,10 +21,38 @@
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-main{max-width:640px;margin:0 auto;padding:32px 24px;position:relative;z-index:10}
+main{max-width:640px;margin:0 auto;padding:24px 24px 32px;position:relative;z-index:10}
 h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.sub{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:40px;line-height:1.7}
+.sub{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:32px;line-height:1.7}
 .hero-block{border:1px solid var(--ink-hair);padding:24px 28px;margin-bottom:40px}
+
+/* Stepper at the top of the flow -- gives the user a "you are here" sense */
+.ps-stepper{list-style:none;margin:0 0 28px;padding:0;display:flex;gap:0;position:relative}
+.ps-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;min-width:0}
+.ps-step-dot{width:11px;height:11px;border-radius:50%;background:var(--bone-2);border:1.5px solid var(--ink-hair);transition:background .25s var(--ease-sharp),border-color .25s var(--ease-sharp),transform .25s var(--ease-sharp);position:relative;z-index:2}
+.ps-step.active .ps-step-dot{background:var(--lime);border-color:var(--lime);transform:scale(1.25);box-shadow:0 0 0 4px rgba(178,255,63,.18)}
+.ps-step.done .ps-step-dot{background:var(--cobalt);border-color:var(--cobalt)}
+.ps-step-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);text-align:center;line-height:1.3;transition:color .25s var(--ease-sharp)}
+.ps-step.active .ps-step-label{color:var(--navy);font-weight:600}
+.ps-step.done .ps-step-label{color:var(--cobalt)}
+.ps-step:not(:last-child)::after{content:"";position:absolute;top:5px;left:calc(50% + 8px);right:calc(-50% + 8px);height:1.5px;background:var(--ink-hair);z-index:1;transition:background .25s var(--ease-sharp)}
+.ps-step.done:not(:last-child)::after{background:var(--cobalt)}
+@media (max-width:560px){.ps-step-label{font-size:9px;letter-spacing:.06em}.ps-stepper{gap:2px}}
+
+/* Inline along-the-way guide -- explains what is happening at each step */
+.ps-guide{font-family:var(--sans);font-size:var(--text-sm);line-height:1.6;color:var(--ink-dim);padding:12px 14px;border-left:2px solid var(--lime);background:rgba(178,255,63,.06);margin-bottom:18px;border-radius:0 6px 6px 0}
+.ps-guide strong{color:var(--ink);font-weight:600}
+.ps-guide .ps-guide-kicker{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);margin-bottom:4px;font-weight:700}
+
+/* Slim API-key row -- shown when key was auto-fetched from /api/user/account/key */
+.ps-key-slim{display:none;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:16px;font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);flex-wrap:wrap}
+.ps-key-slim .ps-key-status{display:inline-flex;align-items:center;gap:8px}
+.ps-key-slim .ps-key-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--lime);flex-shrink:0}
+.ps-key-slim .ps-key-mask{color:var(--navy);font-weight:600}
+.ps-key-slim .ps-key-change{background:transparent;border:none;padding:4px 6px;color:var(--cobalt);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
+.ps-key-slim .ps-key-change:hover{color:var(--navy)}
+#step-setup.has-saved-key .ps-key-card{display:none}
+#step-setup.has-saved-key .ps-key-slim{display:flex}
 
 .card{border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:16px}
 .card-head{padding:14px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
@@ -394,9 +422,43 @@ select:focus{border-color:var(--cobalt)}
 
 <main id="main-content" style="position:relative;z-index:10">
 
+<!-- Stepper -- visible above the active step, updates as you move through -->
+<ol class="ps-stepper" id="ps-stepper" aria-label="ParaShare progress">
+  <li class="ps-step active" data-step-key="setup">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">1 &middot; Setup</span>
+  </li>
+  <li class="ps-step" data-step-key="share">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">2 &middot; Share</span>
+  </li>
+  <li class="ps-step" data-step-key="verify">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">3 &middot; Verify</span>
+  </li>
+  <li class="ps-step" data-step-key="encrypt">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">4 &middot; Encrypt</span>
+  </li>
+  <li class="ps-step" data-step-key="done">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">5 &middot; Done</span>
+  </li>
+</ol>
+
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
-  <div class="card">
+  <div class="ps-guide">
+    <span class="ps-guide-kicker">Step 1 of 5 &middot; Setup</span>
+    <strong>Pick a file, set how long the link lives.</strong> Your file stays in your browser until step 4. The relay never sees plaintext.
+  </div>
+
+  <div class="ps-key-slim" aria-label="Signed-in API key">
+    <span class="ps-key-status">Using your account key <span class="ps-key-mask" id="ps-key-mask">pgp_...</span></span>
+    <button type="button" class="ps-key-change" onclick="expandApiKeyCard()">Change</button>
+  </div>
+
+  <div class="card ps-key-card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>
     <div class="card-body">
       <span class="label">API key</span>
@@ -408,7 +470,7 @@ select:focus{border-color:var(--cobalt)}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
     <div class="card-body">
-      <span class="label">Select file(s) — select multiple for vault mode</span>
+      <span class="label">Select file(s) &mdash; select multiple for vault mode</span>
       <input type="file" id="file-input" multiple onchange="onFileSelect()">
       <div class="status-line" id="file-status">No file selected</div>
       <div id="vault-list" style="margin-top:8px;display:none"></div>
@@ -429,13 +491,17 @@ select:focus{border-color:var(--cobalt)}
     </div>
   </div>
 
-  <button class="btn" id="btn-create-session" disabled onclick="createSession()">Create secure session →</button>
+  <button class="btn" id="btn-create-session" disabled onclick="createSession()">Create secure session &rarr;</button>
 </div>
 
 <!-- STEP 2: Waiting for receiver -->
 <div class="step" id="step-waiting">
   <h1>Share this link</h1>
-  <p class="sub">Send this link to the receiver. Their browser will generate a keypair. You'll see their fingerprint appear below — verify it with them before sending.</p>
+  <p class="sub">Send this link to the receiver. Their browser will generate a keypair. You'll see their fingerprint appear below &mdash; verify it with them before sending.</p>
+  <div class="ps-guide">
+    <span class="ps-guide-kicker">Step 2 of 5 &middot; Share</span>
+    <strong>Send the one-time link via any channel.</strong> The link only tells the receiver where to connect; no key, no file, no metadata. When they open it, their browser generates an ML-KEM-768 keypair and we move to verify.
+  </div>
 
   <div class="card">
     <div class="card-head"><div class="dot amber" id="waiting-dot"></div><div class="card-head-title" id="waiting-title">Waiting for receiver...</div></div>
@@ -474,6 +540,10 @@ select:focus{border-color:var(--cobalt)}
 <div class="step" id="step-encrypting">
   <h1>Encrypting &amp; sending</h1>
   <p class="sub">File is being encrypted with the receiver's ML-KEM-768 public key. The relay will never see the plaintext or the key.</p>
+  <div class="ps-guide">
+    <span class="ps-guide-kicker">Step 4 of 5 &middot; Encrypt &amp; send</span>
+    <strong>This all happens in your browser.</strong> ML-KEM-768 wraps a fresh AES-256-GCM key for the receiver, each chunk is signed with ML-DSA-65, then ciphertext-only flows to the relay. The receipt lands in the public CT log.
+  </div>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
@@ -610,6 +680,54 @@ function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
   globeOnStepChange(id);
+  // The 5-stage stepper describes the sender's journey. Hide it for the
+  // receiver-only download path (step-tb-download); show + advance otherwise.
+  var stepper = $('ps-stepper');
+  if (stepper) stepper.style.display = (id === 'step-tb-download') ? 'none' : '';
+  var stepperKey = ({
+    'step-setup': 'setup',
+    'step-waiting': 'share',
+    'step-encrypting': 'encrypt',
+    'step-done': 'done'
+  })[id];
+  if (stepperKey) setStepperStage(stepperKey);
+}
+
+// Stepper: highlight current stage, mark earlier stages as done.
+var STEPPER_ORDER = ['setup', 'share', 'verify', 'encrypt', 'done'];
+function setStepperStage(key) {
+  var idx = STEPPER_ORDER.indexOf(key);
+  if (idx < 0) return;
+  var nodes = document.querySelectorAll('#ps-stepper .ps-step');
+  nodes.forEach(function(n, i) {
+    n.classList.remove('active');
+    n.classList.remove('done');
+    if (i < idx) n.classList.add('done');
+    else if (i === idx) n.classList.add('active');
+  });
+}
+
+// Show the full API-key card (used by the "Change" link in the slim row)
+function expandApiKeyCard() {
+  var s = $('step-setup');
+  if (s) s.classList.remove('has-saved-key');
+  var inp = $('api-key');
+  if (inp) { inp.value = ''; inp.focus(); onKeyInput(); }
+  try { localStorage.removeItem('paramant_api_key'); } catch (_) {}
+}
+
+// Apply slim API-key view when a key was auto-fetched (login flow) or
+// saved locally. Pure cosmetic: the underlying input still holds the key.
+function applySlimApiKeyView() {
+  var inp = $('api-key');
+  if (!inp || !inp.value) return;
+  var mask = $('ps-key-mask');
+  if (mask) {
+    var v = inp.value;
+    mask.textContent = v.length > 14 ? v.slice(0, 8) + '...' + v.slice(-4) : v;
+  }
+  var s = $('step-setup');
+  if (s) s.classList.add('has-saved-key');
 }
 function setStatus(id, msg, cls) {
   const el = $(id);
@@ -688,6 +806,7 @@ async function showReceiverConnected(kyberPub, ecdhPub) {
   $('waiting-title').textContent = 'Receiver connected';
   $('waiting-dot').className = 'dot';
   setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+  setStepperStage('verify');
   // TOFU: check if we've verified this fingerprint before
   if (isFingerprintKnown(fp)) {
     $('fp-seen-before').style.display = '';
@@ -1068,13 +1187,18 @@ document.addEventListener('DOMContentLoaded', () => {
           $('api-key').value = d.api_key;
           try { localStorage.setItem('paramant_api_key', d.api_key); } catch {}
           onKeyInput();
+          applySlimApiKeyView();
           return;
         }
       }
     } catch {}
     // Not logged in or endpoint unavailable: fall back to localStorage (manual paste flow).
     const saved = localStorage.getItem('paramant_api_key');
-    if (saved) { $('api-key').value = saved; onKeyInput(); }
+    if (saved) {
+      $('api-key').value = saved;
+      onKeyInput();
+      applySlimApiKeyView();
+    }
   })();
   // Small delay so DOM is fully painted before Globe.gl reads dimensions
   setTimeout(() => initGlobe(), 400);
