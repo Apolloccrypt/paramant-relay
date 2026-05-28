@@ -196,16 +196,36 @@ async function renderImageForPlacement() {
   const wrap = document.createElement('div');
   wrap.className = 'ds-page-wrap';
   wrap.dataset.pageIndex = '0';
-  // For image mode we store natural image dimensions as 'page' size and a
-  // mode marker so onPlaceClick knows not to flip Y.
   wrap._pdfPage = { width: img.naturalWidth, height: img.naturalHeight, index: 0, isImage: true };
+
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
   canvas.getContext('2d').drawImage(img, 0, 0);
+
+  // EXPLICIT display dimensions so onPlaceClick's getBoundingClientRect()
+  // matches the natural aspect ratio. Relying on CSS height:auto for canvas
+  // with high-aspect intrinsic dims is unreliable across browsers - some
+  // computed height:auto from the canvas height attribute instead of from
+  // the aspect ratio, which broke clamping at the bottom of the image.
+  const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+  const scale = Math.min(1, targetWidth / img.naturalWidth);
+  canvas.style.width  = (img.naturalWidth  * scale) + 'px';
+  canvas.style.height = (img.naturalHeight * scale) + 'px';
+
   wrap.appendChild(canvas);
   container.appendChild(wrap);
   wrap.addEventListener('click', onPlaceClick);
+
+  // If there's already a stamp from a previous visit, restore the marker so
+  // the user does not lose visible progress when navigating back here.
+  if (state.stamp && state.stamp.isImage) {
+    const left = state.stamp.x * scale;
+    const top  = state.stamp.y * scale;
+    const w = state.stamp.w * scale;
+    const h = state.stamp.h * scale;
+    await renderStampMarker(wrap, left, top, w, h);
+  }
 
   $('ds-place-page-count').textContent = '1 image (' + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
 }
