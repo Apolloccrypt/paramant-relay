@@ -68,14 +68,25 @@ async function onEnv(file) {
     if (envelope.signer && envelope.signer.label) info.push('signer: ' + envelope.signer.label);
     const idx = (envelope.notary && envelope.notary.ct_log_index);
     if (idx != null) info.push('ct_log_index: ' + idx);
-    if (isClientSideVersion(envelope.version)) {
-      info.push('verified locally (no API key needed)');
-    }
     $('vf-envelope-info').textContent = info.join('  |  ');
-    // Hide API-key requirement for client-side envelopes
-    const apiSection = document.querySelector('.vf-api-section');
-    if (apiSection) apiSection.style.opacity = isClientSideVersion(envelope.version) ? '0.5' : '1';
-  } catch (e) { $('vf-envelope-info').textContent = 'Invalid envelope: ' + e.message; envelope = null; }
+    // Show/hide the right section based on what this envelope needs.
+    const apiSection = $('vf-api-section');
+    const csBadge = $('vf-clientside-badge');
+    if (isClientSideVersion(envelope.version)) {
+      if (apiSection) apiSection.hidden = true;
+      if (csBadge)   csBadge.hidden = false;
+    } else {
+      if (apiSection) apiSection.hidden = false;
+      if (csBadge)   csBadge.hidden = true;
+    }
+  } catch (e) {
+    $('vf-envelope-info').textContent = 'Invalid envelope: ' + e.message;
+    envelope = null;
+    const apiSection = $('vf-api-section');
+    const csBadge = $('vf-clientside-badge');
+    if (apiSection) apiSection.hidden = true;
+    if (csBadge)   csBadge.hidden = true;
+  }
   update();
 }
 

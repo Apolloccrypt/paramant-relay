@@ -192,12 +192,17 @@
   </section>
 
   <section class="card ps-panel" aria-labelledby="v2">
-    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope &amp; key</h2></div>
+    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope</h2></div>
     <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
-    <div class="ps-field">
+
+    <div class="ps-field vf-api-section" id="vf-api-section" hidden>
+      <p class="ps-warn" id="vf-api-explain">This envelope uses the legacy <code>parasign-v1</code> format. Verification needs to round-trip through the relay, which requires an API key.</p>
       <label class="ps-label" for="vf-api-key">API key (X-Api-Key)</label>
       <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">The verify endpoint currently requires an API key. (Fully account-free, client-side verification is a planned enhancement.)</p>
+    </div>
+
+    <div class="ps-banner ok" id="vf-clientside-badge" hidden style="margin-top:12px">
+      <strong>Client-side verification.</strong> No account, no API key, no network call after the envelope is loaded - your browser runs SHA3-256 + ML-DSA-65 locally and matches them against the envelope.
     </div>
   </section>
 
@@ -276,6 +281,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
-<script type="module" src="/parasign-verify.js?v=4"></script>
+<script type="module" src="/parasign-verify.js?v=5"></script>
 </body>
 </html>
