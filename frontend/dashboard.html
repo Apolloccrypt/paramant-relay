@@ -85,7 +85,7 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
 </style>
 </head>
 <body>
-<a href="#main-content" class="skip-to-main">Skip to main content</a>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- BEGIN canonical chrome (verbatim from send.html — same nav + mobile drawer + footer used site-wide) -->
 <div class="meta-bar">
@@ -286,63 +286,69 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
     </div>
   </section>
 
-  <section aria-label="Primary actions">
-    <h2 class="block-h">Send &amp; receive</h2>
-    <div class="action-pair">
-      <a class="action-card" href="/send" aria-label="Send a file">
-        <div class="icon" aria-hidden="true">→</div>
-        <h2>Send a file</h2>
-        <p>Encrypt a file in your browser, share a one-time link. AES-256-GCM with ML-KEM-768 hybrid key wrap. Burn-on-read.</p>
-        <div class="pq-line">Client-side · burn-on-read</div>
-      </a>
-      <a class="action-card" href="/get" aria-label="Receive a file">
-        <div class="icon" aria-hidden="true">←</div>
-        <h2>Receive a file</h2>
-        <p>Open a secure link someone sent you. Decryption happens in your browser; no account needed.</p>
-        <div class="pq-line">No account · zero-knowledge</div>
-      </a>
-    </div>
-  </section>
+  <!-- Hub interior. Hidden until the API key is validated server-side
+       (/v2/check-key against the selected sector relay). Nothing actionable
+       renders for an unauthenticated visitor. -->
+  <div id="hub-private" hidden>
 
-  <section aria-label="More tools">
-    <h2 class="block-h">More tools</h2>
-    <div class="tools-grid">
-      <a class="tool-card" href="/parashare">
-        <h3>ParaShare</h3>
-        <p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p>
-      </a>
-      <a class="tool-card" href="/drop">
-        <h3>ParaDrop</h3>
-        <p>Device-to-device transfer. 6-digit pairing code. End-to-end encrypted.</p>
-      </a>
-      <a class="tool-card" href="/sign">
-        <h3>ParaSign</h3>
-        <p>Sign documents with ML-DSA-65 (FIPS 204). CT-log notarized.</p>
-      </a>
-      <a class="tool-card" href="/verify">
-        <h3>Verify a signature</h3>
-        <p>Check a .psign envelope against its document. Local hash, relay-side math.</p>
-      </a>
-    </div>
-  </section>
+    <section aria-label="Primary actions">
+      <h2 class="block-h">Send &amp; receive</h2>
+      <div class="action-pair">
+        <a class="action-card" href="/send" aria-label="Send a file">
+          <div class="icon" aria-hidden="true">→</div>
+          <h2>Send a file</h2>
+          <p>Encrypt a file in your browser, share a one-time link. AES-256-GCM with ML-KEM-768 hybrid key wrap. Burn-on-read.</p>
+          <div class="pq-line">Client-side · burn-on-read</div>
+        </a>
+        <a class="action-card" href="/get" aria-label="Receive a file">
+          <div class="icon" aria-hidden="true">←</div>
+          <h2>Receive a file</h2>
+          <p>Open a secure link someone sent you. Decryption happens in your browser; no account needed.</p>
+          <div class="pq-line">No account · zero-knowledge</div>
+        </a>
+      </div>
+    </section>
 
-  <section class="account-block empty" id="account-block" aria-label="Your account">
-    <h2 class="block-h">Your account</h2>
-    <div class="account-grid" id="account-grid"></div>
-    <div class="relay-row" id="relay-row" hidden>
-      <span class="relay-lbl">Sector</span>
-      <button class="chip active" data-relay="https://relay.paramant.app" type="button">Main</button>
-      <button class="chip" data-relay="https://health.paramant.app" type="button">Health</button>
-      <button class="chip" data-relay="https://finance.paramant.app" type="button">Finance</button>
-      <button class="chip" data-relay="https://legal.paramant.app" type="button">Legal</button>
-      <button class="chip" data-relay="https://iot.paramant.app" type="button">IoT</button>
-    </div>
-    <div class="account-actions">
-      <button class="btn-secondary" id="acct-refresh" type="button">Refresh</button>
-      <a class="btn-secondary" href="/admin/">Admin console</a>
-      <button class="btn-secondary" id="acct-signout" type="button">Sign out</button>
-    </div>
-  </section>
+    <section aria-label="More tools">
+      <h2 class="block-h">More tools</h2>
+      <div class="tools-grid">
+        <a class="tool-card" href="/parashare">
+          <h3>ParaShare</h3>
+          <p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p>
+        </a>
+        <a class="tool-card" href="/drop">
+          <h3>ParaDrop</h3>
+          <p>Device-to-device transfer. 6-digit pairing code. End-to-end encrypted.</p>
+        </a>
+        <a class="tool-card" href="/sign">
+          <h3>ParaSign</h3>
+          <p>Sign documents with ML-DSA-65 (FIPS 204). CT-log notarized.</p>
+        </a>
+        <a class="tool-card" href="/verify">
+          <h3>Verify a signature</h3>
+          <p>Check a .psign envelope against its document. Local hash, relay-side math.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="account-block empty" id="account-block" aria-label="Your account">
+      <h2 class="block-h">Your account</h2>
+      <div class="account-grid" id="account-grid"></div>
+      <div class="relay-row" id="relay-row" hidden>
+        <span class="relay-lbl">Sector</span>
+        <button class="chip active" data-relay="https://relay.paramant.app" type="button">Main</button>
+        <button class="chip" data-relay="https://health.paramant.app" type="button">Health</button>
+        <button class="chip" data-relay="https://finance.paramant.app" type="button">Finance</button>
+        <button class="chip" data-relay="https://legal.paramant.app" type="button">Legal</button>
+        <button class="chip" data-relay="https://iot.paramant.app" type="button">IoT</button>
+      </div>
+      <div class="account-actions">
+        <button class="btn-secondary" id="acct-refresh" type="button">Refresh</button>
+        <button class="btn-secondary" id="acct-signout" type="button">Sign out</button>
+      </div>
+    </section>
+
+  </div>
 
 </main>
 
@@ -417,24 +423,30 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
   function setKey(k){ try { localStorage.setItem(KEY_LS, k); } catch(e){} }
   function clearKey(){ try { localStorage.removeItem(KEY_LS); } catch(e){} }
 
+  // Strict gate: hub interior is visible ONLY when /v2/check-key returns 200.
+  // Every other state (loading / no-key / invalid / unreachable) keeps it hidden.
+  function setHubVisible(yes){
+    var el = $('hub-private');
+    if (el) el.hidden = !yes;
+  }
+
   function renderAuth(state){
     var msg = $('auth-msg'); var act = $('auth-actions');
     if (state === 'loading') {
       msg.textContent = 'Checking your sign-in...';
       act.innerHTML = '';
+      setHubVisible(false);
       return;
     }
     if (state === 'none') {
-      msg.innerHTML = '<strong>Not signed in.</strong> Send, receive, and verify still work without an account. Sign in to manage transfers and signatures.';
+      msg.innerHTML = '<strong>Sign in to your Paramant.</strong> A valid API key is required to use this dashboard. Nothing here is accessible without one.';
       act.innerHTML = ''
-        + '<a class="btn-primary" href="/auth/login">Sign in</a>'
-        + '<a class="btn-secondary" href="/signup">Create account</a>'
-        + '<button class="btn-secondary" type="button" id="paste-toggle">Paste API key</button>';
-      var pt = $('paste-toggle');
-      if (pt) pt.addEventListener('click', function(){
-        $('key-paste').classList.toggle('open');
-        var inp = $('key-input'); if (inp) inp.focus();
-      });
+        + '<a class="btn-secondary" href="/auth/login">Sign in</a>'
+        + '<a class="btn-secondary" href="/signup">Create account</a>';
+      // Auto-open the key-paste field — the gate is the only thing on the page.
+      $('key-paste').classList.add('open');
+      var inp = $('key-input'); if (inp) try { inp.focus(); } catch(e){}
+      setHubVisible(false);
       return;
     }
     if (state.kind === 'valid') {
@@ -442,23 +454,26 @@ main.hub { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--spac
       var plan = state.plan ? '<span class="auth-pill">' + esc(state.plan) + '</span>' : '';
       msg.innerHTML = '<strong>Signed in</strong> as ' + label + ' ' + plan;
       act.innerHTML = '';
+      $('key-paste').classList.remove('open');
+      setHubVisible(true);
       return;
     }
     if (state.kind === 'invalid') {
       msg.innerHTML = '<strong>Key was rejected.</strong> ' + esc(state.detail || 'The relay did not accept this API key.');
-      act.innerHTML = '<button class="btn-secondary" type="button" id="paste-toggle">Paste a different key</button>'
-                   + '<button class="btn-secondary" type="button" id="signout-here">Clear stored key</button>';
-      var pt2 = $('paste-toggle');
+      act.innerHTML = '<button class="btn-secondary" type="button" id="signout-here">Clear stored key</button>';
       var so = $('signout-here');
-      if (pt2) pt2.addEventListener('click', function(){ $('key-paste').classList.toggle('open'); });
       if (so) so.addEventListener('click', function(){ clearKey(); location.reload(); });
+      // Re-open the field so the user can correct.
+      $('key-paste').classList.add('open');
+      setHubVisible(false);
       return;
     }
     if (state.kind === 'unreachable') {
-      msg.innerHTML = '<strong>Relay unreachable.</strong> Your key may still be valid; could not reach <code class="auth-pill">' + esc(state.relay) + '</code>.';
+      msg.innerHTML = '<strong>Relay unreachable.</strong> Cannot reach <code class="auth-pill">' + esc(state.relay) + '</code> to verify your key. The dashboard stays locked until verification succeeds.';
       act.innerHTML = '<button class="btn-secondary" type="button" id="retry-now">Retry</button>';
       var rn = $('retry-now');
       if (rn) rn.addEventListener('click', function(){ load(); });
+      setHubVisible(false);
       return;
     }
   }
