@@ -671,6 +671,31 @@ async function renderReviewPreviews() {
   renderSigPreview();
 }
 
+// Always-readable preview of the stamp graphic, sized for inspection.
+// Independent of how the document is scaled in the preview pane.
+async function appendStampDetail(pane) {
+  const detail = document.createElement('div');
+  detail.style.cssText = 'padding:14px;background:var(--bone-2);border-top:1px solid var(--ink-hair)';
+  const label = document.createElement('p');
+  label.style.cssText = 'font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);margin:0 0 8px';
+  label.textContent = 'How the seal will look (at preview size)';
+  detail.appendChild(label);
+
+  const detailW = Math.min(300, Math.max(220, (pane.clientWidth || 280) - 40));
+  const detailH = Math.round(detailW * (STAMP_PDF_H / STAMP_PDF_W));
+  try {
+    const stampCanvas = await createStampPreviewCanvas(detailW, detailH);
+    stampCanvas.style.cssText = 'width:' + detailW + 'px;height:' + detailH + 'px;display:block;border:1px solid var(--ink-hair);background:#fff';
+    detail.appendChild(stampCanvas);
+  } catch {
+    const fallback = document.createElement('div');
+    fallback.style.cssText = 'padding:20px;border:1px dashed var(--ink-hair);color:var(--ink-dim);font-size:11px';
+    fallback.textContent = 'Could not render seal preview (missing signature image?).';
+    detail.appendChild(fallback);
+  }
+  pane.appendChild(detail);
+}
+
 async function renderDocPreview() {
   const pane = $('ds-review-doc-preview');
   if (!pane) return;
@@ -705,35 +730,117 @@ async function renderDocPreview() {
       stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
       pane.appendChild(stampCanvas);
     } catch {}
+    await appendStampDetail(pane);
     return;
   }
 
-  // Image-mode: render the image with the same stamp-mockup overlay
-  // the PDF preview gets, so the signer sees WHERE the seal will land.
+  // Image-mode: scrollable natural-size view (so the user can pan and see
+  // the seal at full quality) + position outline on the image + zoom
+  // controls + a separate seal-detail canvas below at fixed readable size.
   if (state.mode === 'image' && state.signer.docImageDataUrl && state.stamp) {
-    pane.classList.add('has-pdf');   // reuse PDF-pane layout (top-aligned, scrollable)
+    pane.classList.add('has-pdf');
+    pane.style.display = 'block';
+    pane.style.padding = '0';
+
+    // Zoom toolbar
+    const toolbar = document.createElement('div');
+    toolbar.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--bone-2);border-bottom:1px solid var(--ink-hair);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim)';
+    toolbar.innerHTML =
+      '<span style="margin-right:6px">Zoom</span>' +
+      '<button class="ds-zoom-btn active" data-zoom="fit" type="button" style="padding:4px 10px;border:1px solid var(--ink-hair);background:transparent;font:inherit;color:inherit;cursor:pointer">Fit</button>' +
+      '<button class="ds-zoom-btn" data-zoom="0.5" type="button" style="padding:4px 10px;border:1px solid var(--ink-hair);background:transparent;font:inherit;color:inherit;cursor:pointer">50%</button>' +
+      '<button class="ds-zoom-btn" data-zoom="1" type="button" style="padding:4px 10px;border:1px solid var(--ink-hair);background:transparent;font:inherit;color:inherit;cursor:pointer">100%</button>' +
+      '<button class="ds-zoom-btn" data-zoom="2" type="button" style="padding:4px 10px;border:1px solid var(--ink-hair);background:transparent;font:inherit;color:inherit;cursor:pointer">200%</button>' +
+      '<span style="margin-left:auto;font-size:9px;text-transform:none;letter-spacing:0;color:var(--ink-dim)">Scroll + drag to pan</span>';
+    pane.appendChild(toolbar);
+
+    // Scrollable viewport
+    const viewport = document.createElement('div');
+    viewport.style.cssText = 'position:relative;width:100%;max-height:380px;overflow:auto;cursor:grab;background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 8px,#eaeef3 8px,#eaeef3 16px)';
+    pane.appendChild(viewport);
+
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative;display:inline-block;width:100%';
+    wrap.style.cssText = 'position:relative;display:inline-block;line-height:0';
+    viewport.appendChild(wrap);
+
     const img = document.createElement('img');
     img.src = state.signer.docImageDataUrl;
     img.alt = state.doc.name;
-    img.style.cssText = 'display:block;width:100%;height:auto';
+    img.style.cssText = 'display:block';
     wrap.appendChild(img);
-    pane.appendChild(wrap);
-    img.onload = async () => {
-      // Image natural -> displayed ratio
-      const rect = img.getBoundingClientRect();
-      const ratio = img.naturalWidth / rect.width;
-      const left = state.stamp.x / ratio;
-      const top  = state.stamp.y / ratio;
-      const w = state.stamp.w / ratio;
-      const h = state.stamp.h / ratio;
-      try {
-        const stampCanvas = await createStampPreviewCanvas(w, h);
-        stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
-        wrap.appendChild(stampCanvas);
-      } catch {}
+
+    function applyZoom(mode) {
+      if (mode === 'fit') {
+        // Fit to viewport width (minus a tiny margin for the scrollbar)
+        const viewW = viewport.clientWidth - 4;
+        const scale = Math.min(1, viewW / img.naturalWidth);
+        img.style.width = (img.naturalWidth * scale) + 'px';
+        img.style.height = (img.naturalHeight * scale) + 'px';
+      } else {
+        const s = parseFloat(mode);
+        img.style.width = (img.naturalWidth * s) + 'px';
+        img.style.height = (img.naturalHeight * s) + 'px';
+      }
+      // Reposition the outline to match the new display scale
+      const outline = wrap.querySelector('[data-role="stamp-outline"]');
+      if (outline) {
+        const displayW = parseFloat(img.style.width);
+        const ratio = img.naturalWidth / displayW;
+        outline.style.left   = (state.stamp.x / ratio) + 'px';
+        outline.style.top    = (state.stamp.y / ratio) + 'px';
+        outline.style.width  = (state.stamp.w / ratio) + 'px';
+        outline.style.height = (state.stamp.h / ratio) + 'px';
+      }
+    }
+
+    img.onload = () => {
+      applyZoom('fit');
+      // Position outline (natural coords initially, repositioned by applyZoom)
+      const outline = document.createElement('div');
+      outline.dataset.role = 'stamp-outline';
+      outline.style.cssText = 'position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.18);pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.6) inset';
+      wrap.appendChild(outline);
+      applyZoom('fit');
     };
+
+    toolbar.querySelectorAll('.ds-zoom-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        toolbar.querySelectorAll('.ds-zoom-btn').forEach(o => o.classList.remove('active'));
+        b.classList.add('active');
+        applyZoom(b.dataset.zoom);
+      });
+    });
+
+    // Click-and-drag panning
+    let dragging = false, dragStartX = 0, dragStartY = 0, scrollStartX = 0, scrollStartY = 0;
+    viewport.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      dragStartX = e.clientX; dragStartY = e.clientY;
+      scrollStartX = viewport.scrollLeft; scrollStartY = viewport.scrollTop;
+      viewport.style.cursor = 'grabbing';
+      viewport.setPointerCapture(e.pointerId);
+    });
+    viewport.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      viewport.scrollLeft = scrollStartX - (e.clientX - dragStartX);
+      viewport.scrollTop  = scrollStartY - (e.clientY - dragStartY);
+    });
+    viewport.addEventListener('pointerup', (e) => {
+      dragging = false;
+      viewport.style.cursor = 'grab';
+      try { viewport.releasePointerCapture(e.pointerId); } catch {}
+    });
+
+    const cap = document.createElement('p');
+    cap.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--ink-dim);padding:8px 12px;margin:0;border-top:1px solid var(--ink-hair);background:var(--bone)';
+    cap.innerHTML =
+      'Position: <strong>' + Math.round(state.stamp.x) + ', ' + Math.round(state.stamp.y) +
+      '</strong> px - seal <strong>' + Math.round(state.stamp.w) + ' x ' + Math.round(state.stamp.h) +
+      '</strong> px on the original image';
+    pane.appendChild(cap);
+
+    // Stamp at a readable preview size so the user can inspect the content.
+    await appendStampDetail(pane);
     return;
   }
 
@@ -1211,10 +1318,10 @@ async function doSign() {
       }
       if (!r.ok) {
         const reason =
-          r.status === 401 ? 'the API key was not accepted by the relay (check it under Advanced, or clear the field to sign without a counter-signature)' :
-          r.status === 403 ? 'the API key does not have notary permission on this relay' :
-          r.status === 429 ? 'the relay rate-limited the notary endpoint - retry in a minute' :
-          'the relay returned HTTP ' + r.status + (body && body.error ? ' (' + body.error + ')' : '');
+          r.status === 401 ? 'your API key is not in the relay allowlist. The website session (email + OTP) and the relay user database are managed separately - your account may need to be enrolled on this relay. Either contact the relay operator, or clear the API key in Advanced to sign locally without a relay counter-signature'
+          : r.status === 403 ? 'the API key does not have notary permission on this relay'
+          : r.status === 429 ? 'the relay rate-limited the notary endpoint - retry in a minute'
+          : 'the relay returned HTTP ' + r.status + (body && body.error ? ' (' + body.error + ')' : '');
         throw new Error('Counter-sign aborted: ' + reason + '. No envelope was produced - the document was not signed.');
       }
       envelope.notary = body.envelope && body.envelope.notary ? body.envelope.notary : body.envelope;

@@ -86,6 +86,8 @@
 .ds-api-status{margin:6px 0 0;padding:6px 10px;background:var(--bone);border:1px solid var(--ink-hair);font-size:11px}
 .ds-api-status.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,.04)}
 .ds-api-status.warn{border-color:#d4a017;color:#7a5300;background:#fff4d6}
+.ds-zoom-btn.active{background:var(--cobalt) !important;color:#fff !important;border-color:var(--cobalt) !important}
+.ds-zoom-btn:hover:not(.active){border-color:var(--cobalt) !important;color:var(--navy) !important}
 .ds-review-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 .ds-review-h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);font-weight:700;margin:0 0 8px}
 .ds-review-pane{background:var(--bone);border:1px solid var(--ink-hair);min-height:140px;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
@@ -614,6 +616,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=11"></script>
+<script type="module" src="/sign-flow.js?v=12"></script>
 </body>
 </html>
