@@ -23,6 +23,7 @@
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/parapear.css">
 <style>
 .send-hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:var(--space-8);align-items:start}
 .spec-table{width:100%;border:1px solid var(--ink-hair);margin-top:var(--space-6)}
@@ -370,6 +371,14 @@ select#ttl-select:focus{border-color:var(--cobalt)}
 
         <!-- Step 2: Link ready -->
         <div id="step-link" class="step">
+
+          <aside class="parapear-block is-success" aria-label="Encryption complete">
+            <img class="parapear-img" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" loading="lazy" decoding="async" width="120" height="120">
+            <div class="parapear-bubble">
+              <span class="parapear-kicker">ParaPear</span>
+              <strong>Done.</strong> And cryptographically proven. Your file is encrypted in your browser; the link below carries the key.
+            </div>
+          </aside>
 
           <p style="font-family:var(--mono);font-size:var(--text-sm);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:var(--space-3)">Link ready</p>
           <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin-bottom:var(--space-5)">Share this link. The file decrypts in the recipient's browser and is deleted from the relay after one download.</p>

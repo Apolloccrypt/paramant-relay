@@ -13,6 +13,7 @@
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/parapear.css">
 <style>
 /* Page: parashare — transfer UI */
 
@@ -504,6 +505,14 @@ select:focus{border-color:var(--cobalt)}
 </div>
 
 <div class="step" id="step-done">
+  <aside class="parapear-block is-success" aria-label="Transfer complete">
+    <img class="parapear-img" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" loading="lazy" decoding="async" width="120" height="120">
+    <div class="parapear-bubble">
+      <span class="parapear-kicker">ParaPear</span>
+      <strong>Done.</strong> And cryptographically proven. Receipt signed with ML-DSA-65 (FIPS 204); the relay never saw your key.
+    </div>
+  </aside>
+
   <h1>Sent.</h1>
   <p class="sub">The receiver can now download the file. After one download it is permanently destroyed.</p>
 
