@@ -153,16 +153,28 @@ async function onDocChosen(file) {
   if (isPng) state.imageType = 'png';
   else if (isJpg) state.imageType = 'jpg';
 
-  // Pre-compute a data: URL for viewable images so the review pane can use
-  // <img src=> without hitting CSP blob: restrictions.
   if (mimeGuess && mimeGuess.startsWith('image/')) {
     try { state.signer.docImageDataUrl = await bytesToDataUrl(bytes, mimeGuess); } catch {}
   }
 
   if (canPlaceVisually) {
     setActive('step-place');
-    if (isPdf) await renderPdfForPlacement();
-    else       await renderImageForPlacement();
+    const container = $('ds-pdf-canvas-list');
+    container.innerHTML = '<p style="padding:18px;font-family:var(--mono);font-size:12px;color:var(--ink-dim);text-align:center">Loading ' + (isPdf ? 'PDF' : 'image') + '...</p>';
+    try {
+      if (isPdf) await renderPdfForPlacement();
+      else       await renderImageForPlacement();
+    } catch (err) {
+      console.error('render failed:', err);
+      container.innerHTML =
+        '<div style="padding:18px;border:1px solid #d4a017;background:#fff4d6;color:#5a3f00;font-size:13px;line-height:1.6">' +
+        '<strong>Could not render the document.</strong> ' + escapeHtml(err && err.message ? err.message : String(err)) +
+        '<p style="margin-top:8px;font-size:11px;color:var(--ink-dim)">If this is a PDF: hard-refresh the page (Cmd+Shift+R / Ctrl+Shift+R) to clear any cached old version of PDF.js. ' +
+        'If the file is encrypted or password-protected, decrypt it first. ' +
+        'You can also go back and pick a different file.</p>' +
+        '</div>';
+      $('ds-place-continue').disabled = true;
+    }
   } else {
     setActive('step-hash-only');
     $('ds-hash-only-name').textContent = file.name;
