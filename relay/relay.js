@@ -3364,6 +3364,14 @@ session = client.create_session('recipient@example.com')</pre>
   // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
   // All other paths: require a valid X-Api-Key (pgp_ key in users.json)
   const isAdminPath = path.startsWith('/v2/admin');
+  // Public envelope recipient endpoints: GET status, POST view, POST sign
+  // are reachable without an API key (the recipient may be an external
+  // party). POST /v2/envelopes (create) is intentionally NOT in this list
+  // and is still gated.
+  const isEnvelopePublic = path.startsWith('/v2/envelopes/') && (
+    req.method === 'GET' ||
+    (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
+  );
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
     const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && safeEqual(adminHeader, process.env.ADMIN_TOKEN);
@@ -3372,7 +3380,7 @@ session = client.create_session('recipient@example.com')</pre>
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
-  } else if (!keyData?.active) {
+  } else if (!keyData?.active && !isEnvelopePublic) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
