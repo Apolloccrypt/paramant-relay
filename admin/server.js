@@ -1084,7 +1084,22 @@ api.get("/user/dashboard-fragment", authUser, async (req, res) => {
 .acct-card .val { font-family: var(--sans); font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
 .acct-card .val.small { font-size: 15px; font-family: var(--mono); }
 .pa-act-row { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+.pa-onboarding { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-4) 0 var(--space-5); padding: var(--space-3) var(--space-4); border: 1px solid var(--ink-hair); border-radius: 14px; background: transparent; }
+.pa-onboarding .pa-onb-img { width: clamp(72px, 10vw, 104px); height: auto; flex-shrink: 0; }
+.pa-onboarding .pa-onb-text { flex: 1 1 auto; font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink); }
+.pa-onboarding .pa-onb-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
+.pa-onboarding .pa-onb-dismiss { background: transparent; border: 1px solid var(--ink-hair); border-radius: 8px; padding: 6px 10px; font-family: var(--sans); font-size: 12px; color: var(--ink-dim); cursor: pointer; line-height: 1; }
+.pa-onboarding .pa-onb-dismiss:hover { border-color: var(--ink); color: var(--ink); }
+@media (max-width: 640px) { .pa-onboarding { flex-direction: column; align-items: flex-start; } .pa-onboarding .pa-onb-img { width: 80px; } }
 </style>
+<aside class="pa-onboarding" data-pa-onboarding aria-label="Getting started">
+  <img class="pa-onb-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="104" height="104">
+  <div class="pa-onb-text">
+    <span class="pa-onb-kicker">Welcome</span>
+    Everything lives here. Pick a tool below to start &mdash; send a file, share verified, drop device-to-device, or sign.
+  </div>
+  <button class="pa-onb-dismiss" type="button" data-pa-action="dismiss-onboarding" aria-label="Dismiss this tip">Got it</button>
+</aside>
 <section class="hub-hero" aria-label="Your Paramant">
   <div class="pq-tag"><span class="pq-dot" aria-hidden="true"></span>ML-KEM-768 · ML-DSA-65 · AES-256-GCM · client-side</div>
   <h1>Your Paramant</h1>

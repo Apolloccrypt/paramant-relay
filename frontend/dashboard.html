@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://relay.paramant.app">
 <link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/nav.css">
+<link rel="stylesheet" href="/parapear.css">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
 <style>
 /* Loader-only styles. This static file is the server-side gate's public
@@ -193,7 +194,13 @@ main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--
 <main id="main-content" class="pa-main">
   <div id="hub-mount">
     <div class="pa-loading">
-      <span class="pa-spinner" aria-hidden="true"></span>Verifying your session…
+      <div class="parapear-block">
+        <img class="parapear-img" src="/assets/parapear/parapear-wait.png" alt="" aria-hidden="true" decoding="async" width="120" height="120">
+        <div class="parapear-bubble">
+          <span class="parapear-kicker">One moment</span>
+          <span class="pa-spinner" aria-hidden="true"></span>Checking your session.
+        </div>
+      </div>
     </div>
   </div>
 </main>
@@ -268,6 +275,17 @@ main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--
   var mount = document.getElementById('hub-mount');
   if (!mount) return;
 
+  var ONBOARDING_KEY = 'paramant.onboarding.dismissed.v1';
+
+  function applyOnboardingState(){
+    try {
+      if (localStorage.getItem(ONBOARDING_KEY) === '1') {
+        var hint = mount.querySelector('[data-pa-onboarding]');
+        if (hint) hint.style.display = 'none';
+      }
+    } catch (_) { /* localStorage blocked: leave hint visible */ }
+  }
+
   mount.addEventListener('click', function(ev){
     var t = ev.target.closest && ev.target.closest('[data-pa-action]');
     if (!t) return;
@@ -281,6 +299,11 @@ main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--
       fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
         .catch(function(){})
         .then(function(){ location.href = '/auth/login'; });
+    } else if (act === 'dismiss-onboarding') {
+      ev.preventDefault();
+      var hint = t.closest('[data-pa-onboarding]');
+      if (hint) hint.style.display = 'none';
+      try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
     }
   });
 
@@ -305,7 +328,10 @@ main.pa-main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--
     }
     return r.text();
   }).then(function(html){
-    if (html != null) mount.innerHTML = html;
+    if (html != null) {
+      mount.innerHTML = html;
+      applyOnboardingState();
+    }
   }).catch(function(){
     if (t) clearTimeout(t);
     showError('Network error');

@@ -1,0 +1,96 @@
+/* ParaPear mascot component. Design-system tokens only.
+   Use:
+     <aside class="parapear-block">
+       <img class="parapear-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" loading="lazy" decoding="async">
+       <div class="parapear-bubble">microcopy here</div>
+     </aside>
+*/
+
+.parapear-block {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  margin: var(--space-4, 16px) 0;
+}
+
+.parapear-img {
+  width: clamp(64px, 12vw, 120px);
+  height: auto;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.parapear-bubble {
+  position: relative;
+  flex: 1 1 auto;
+  font-family: var(--sans, Inter, system-ui, sans-serif);
+  font-size: var(--text-base, 15px);
+  line-height: 1.55;
+  color: var(--ink, #0B3A6A);
+  background: transparent;
+  border: 1px solid var(--ink-hair, rgba(11,58,106,0.18));
+  border-radius: 12px;
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+}
+
+.parapear-bubble strong {
+  color: var(--ink, #0B3A6A);
+  font-weight: 600;
+}
+
+.parapear-bubble .parapear-kicker {
+  display: block;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-dim, #64748B);
+  margin-bottom: 4px;
+}
+
+.parapear-bubble a {
+  color: var(--cobalt, #1D4ED8);
+}
+
+.parapear-dismiss {
+  align-self: flex-start;
+  margin-left: var(--space-2, 8px);
+  background: transparent;
+  border: 1px solid var(--ink-hair, rgba(11,58,106,0.18));
+  border-radius: 8px;
+  font-family: var(--sans, Inter, system-ui, sans-serif);
+  font-size: 12px;
+  color: var(--ink-dim, #64748B);
+  padding: 6px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.parapear-dismiss:hover {
+  border-color: var(--ink, #0B3A6A);
+  color: var(--ink, #0B3A6A);
+}
+
+/* Accent variant: warm green dot before the kicker, reuses --lime. */
+.parapear-block.is-success .parapear-bubble::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lime, #B2FF3F);
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+
+@media (max-width: 640px) {
+  .parapear-block {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3, 12px);
+  }
+  .parapear-img {
+    width: 96px;
+  }
+}
