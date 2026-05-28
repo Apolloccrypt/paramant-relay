@@ -82,6 +82,7 @@ log('info', 'crypto_mode_loaded', { mode: cryptoMode });
 const wireFormat = require('./crypto/wire-format');
 const cryptoErrors = require('./crypto/errors');
 const parasign = require('./parasign');
+const envelopeMod = require('./envelope');
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -155,7 +156,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
@@ -163,7 +164,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
                '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
   full:       null,
 };
 
@@ -625,6 +626,30 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
   const entry = {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
+  };
+  ctLog.push(entry);
+  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWrite(entry);
+  produceSth(entry.index + 1, entry.tree_hash);
+  return entry;
+}
+
+// Appends an envelope lifecycle event (create / view / sign / complete) to
+// the CT log. The relay never sees the document - the leaf commits only to
+// the envelope id, event type, and a sha3-256 over the structured payload.
+function ctAppendEnvelope(eventType, envelopeId, payload) {
+  const ts = new Date().toISOString();
+  const valueHash = crypto.createHash('sha3-256')
+    .update(eventType).update('|').update(envelopeId).update('|')
+    .update(JSON.stringify(payload || {})).digest('hex');
+  const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
+  const index = ctLog.length;
+  const allEntries = [...ctLog, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, index);
+  const entry = {
+    index, type: 'envelope_' + eventType, leaf_hash, tree_hash,
+    envelope_id: envelopeId, payload: payload || {}, ts, proof
   };
   ctLog.push(entry);
   if (ctLog.length > CT_MAX) ctLog.shift();
@@ -1338,6 +1363,40 @@ function lookupSignerRateOk(ip) {
   b.count++; lookupSignerRateLimits.set(ip, b); return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of lookupSignerRateLimits) if (now > v.resetAt + 60000) lookupSignerRateLimits.delete(k); }, 120_000);
+
+// Per-IP rate limits for /v2/envelopes/* (Model 2 multi-party signing).
+// Create is throttled per API key to prevent quota abuse; view/sign are
+// per-IP to blunt enumeration of unguessable but still finite env-ids.
+const envCreateLimits = new Map();        // apiKey  -> { count, resetAt }
+const envViewLimits   = new Map();        // ip      -> { count, resetAt }
+const envSignLimits   = new Map();        // ip      -> { count, resetAt }
+function envCreateRateOk(apiKey) {
+  const now = Date.now();
+  const b = envCreateLimits.get(apiKey) || { count: 0, resetAt: now + 3600_000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 3600_000; }
+  if (b.count >= 50) return false;          // 50/hour/key
+  b.count++; envCreateLimits.set(apiKey, b); return true;
+}
+function envViewRateOk(ip) {
+  const now = Date.now();
+  const b = envViewLimits.get(ip) || { count: 0, resetAt: now + 60_000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
+  if (b.count >= 30) return false;          // 30/min/ip
+  b.count++; envViewLimits.set(ip, b); return true;
+}
+function envSignRateOk(ip) {
+  const now = Date.now();
+  const b = envSignLimits.get(ip) || { count: 0, resetAt: now + 60_000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
+  if (b.count >= 10) return false;          // 10/min/ip
+  b.count++; envSignLimits.set(ip, b); return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of envCreateLimits) if (now > v.resetAt + 60_000) envCreateLimits.delete(k);
+  for (const [k, v] of envViewLimits)   if (now > v.resetAt + 60_000) envViewLimits.delete(k);
+  for (const [k, v] of envSignLimits)   if (now > v.resetAt + 60_000) envSignLimits.delete(k);
+}, 120_000);
 
 // Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
 const statusRateLimits = new Map();
@@ -4251,6 +4310,124 @@ python3 paramant-receiver.py \\
       if (result.note) out.note = result.note;
       res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
       return res.end(J(out));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
+  // ── Multi-party envelope endpoints (ParaSign Model 2) ───────────────────────
+  // The relay only knows: doc hash (sha3-256), envelope id (unguessable),
+  // party labels, and party signatures over (sha3_256(id||doc_hash||index)).
+  // Documents and private keys never reach this host.
+  //
+  // POST /v2/envelopes              -> create (auth: X-Api-Key)
+  // GET  /v2/envelopes/:id          -> redacted status (public, rate-limited)
+  // POST /v2/envelopes/:id/view     -> mark party viewed (public)
+  // POST /v2/envelopes/:id/sign     -> party submits ML-DSA signature (public)
+  function _envStore() {
+    if (!redisClient || !redisClient.isReady) return null;
+    if (!mlDsa || !registry || !relayIdentity) return null;
+    if (!_envStore._inst) {
+      _envStore._inst = new envelopeMod.EnvelopeStore(redisClient, {
+        ctAppend: ctAppendEnvelope,
+        sigVerify: (sig, msg, pub) => {
+          try { return registry.getSig(0x0002).verify(sig, msg, pub); } catch { return false; }
+        },
+      });
+    }
+    return _envStore._inst;
+  }
+
+  // POST /v2/envelopes -- create a new envelope.
+  if (path === '/v2/envelopes' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    if (!envCreateRateOk(apiKey)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable (redis or crypto not ready)' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 65536)).toString());
+      const docHash = (d.doc_hash || d.document_hash || '').toString().trim().toLowerCase();
+      const parties = Array.isArray(d.parties) ? d.parties : [];
+      const origFilename = (d.original_filename || '').toString();
+      const ttlDays = Number.isFinite(d.ttl_days) ? d.ttl_days : envelopeMod.DEFAULT_TTL_DAYS;
+      const creatorPkHash = d.creator_public_key
+        ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
+        : '';
+      const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays });
+      log('info', 'envelope_created', { id: out.id, parties: out.party_count });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, envelope: out }));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
+  // GET /v2/envelopes/:id -- redacted public status.
+  if (req.method === 'GET' && path.startsWith('/v2/envelopes/')) {
+    if (!envViewRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const id = path.slice('/v2/envelopes/'.length).split('/')[0];
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+    try {
+      const env = await store.getRedacted(id);
+      if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, envelope: env, sign_message_recipe: 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)' }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // POST /v2/envelopes/:id/view -- party signals it has opened the envelope.
+  if (req.method === 'POST' && path.startsWith('/v2/envelopes/') && path.endsWith('/view')) {
+    if (!envViewRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const id = path.slice('/v2/envelopes/'.length, -'/view'.length);
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
+      const pi = parseInt(d.party_index, 10);
+      if (!Number.isInteger(pi) || pi < 0) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+      const ok = await store.markViewed(id, pi);
+      if (!ok) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true }));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
+  // POST /v2/envelopes/:id/sign -- party submits its ML-DSA-65 signature.
+  if (req.method === 'POST' && path.startsWith('/v2/envelopes/') && path.endsWith('/sign')) {
+    if (!envSignRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const id = path.slice('/v2/envelopes/'.length, -'/sign'.length);
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 32768)).toString());
+      const pi = parseInt(d.party_index, 10);
+      const signerPub = (d.signer_public_key || '').toString();
+      const sig = (d.signature || '').toString();
+      if (!Number.isInteger(pi) || pi < 0 || !signerPub || !sig) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
+      }
+      const out = await store.sign(id, pi, signerPub, sig);
+      if (!out.ok) {
+        const code = out.code === 'not_found' ? 404 : out.code === 'bad_signature' ? 400 : out.code === 'closed' ? 410 : 409;
+        res.writeHead(code, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: out.code }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status }));
     } catch (e) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
