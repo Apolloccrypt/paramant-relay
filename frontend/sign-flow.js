@@ -423,6 +423,127 @@ function fillReview() {
   $('ds-review-notary').textContent = apiKey
     ? 'Yes - relay will counter-sign + write to CT log'
     : 'No - envelope is self-contained (still verifiable)';
+
+  // Render visual previews of doc + signature so the signer sees exactly
+  // what they are about to commit to before clicking Sign now.
+  renderReviewPreviews().catch(err => console.warn('review preview failed', err));
+}
+
+async function renderReviewPreviews() {
+  await renderDocPreview();
+  renderSigPreview();
+}
+
+async function renderDocPreview() {
+  const pane = $('ds-review-doc-preview');
+  if (!pane) return;
+  pane.innerHTML = '';
+  pane.classList.remove('has-pdf');
+
+  if (state.mode === 'pdf') {
+    pane.classList.add('has-pdf');
+    const pdfjs = await waitForPdfjs();
+    const copy = new Uint8Array(state.doc.bytes);
+    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+    const page = await pdf.getPage(state.stamp.pageIndex + 1);
+    const baseViewport = page.getViewport({ scale: 1 });
+    // Target a smaller render for the review (max ~340px wide) so it fits the grid cell.
+    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
+    const scale = targetW / baseViewport.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    pane.appendChild(canvas);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Mock the stamp as an absolutely positioned overlay so the user sees
+    // where it will land. Convert PDF points -> displayed pixels.
+    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
+    const left = state.stamp.x / ratio;
+    const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
+    const w = state.stamp.w / ratio;
+    const h = state.stamp.h / ratio;
+    const mock = document.createElement('div');
+    mock.className = 'ds-mockup-stamp';
+    mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+    mock.innerHTML = stampInnerHtml();
+    pane.appendChild(mock);
+    return;
+  }
+
+  // Non-PDF: try to show the file inline if it is an image type the browser knows.
+  const mimeGuess = guessMimeFromMagic(state.doc.bytes);
+  if (mimeGuess && mimeGuess.startsWith('image/')) {
+    const url = URL.createObjectURL(new Blob([state.doc.bytes], { type: mimeGuess }));
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = state.doc.name;
+    img.onload = () => setTimeout(() => URL.revokeObjectURL(url), 5000);
+    pane.appendChild(img);
+    return;
+  }
+
+  // Fallback: filename + size + hash so the signer can confirm what they picked.
+  const meta = document.createElement('div');
+  meta.className = 'ds-pane-meta';
+  const sha = toHex(sha3_256(state.doc.bytes));
+  meta.innerHTML =
+    '<div><strong>File</strong> ' + escapeHtml(state.doc.name) + '</div>' +
+    '<div><strong>Size</strong> ' + formatSize(state.doc.size) + '</div>' +
+    '<div style="margin-top:8px"><strong>SHA3-256</strong></div>' +
+    '<div style="font-size:10px">' + sha + '</div>';
+  pane.appendChild(meta);
+}
+
+function renderSigPreview() {
+  const pane = $('ds-review-sig-preview');
+  if (!pane) return;
+  pane.innerHTML = '';
+
+  if (state.signer.sigStyle === 'typed') {
+    const el = document.createElement('div');
+    el.className = 'ds-typed-preview';
+    el.textContent = state.signer.name || '(no name)';
+    pane.appendChild(el);
+    return;
+  }
+
+  if (state.signer.sigImageBytes) {
+    const mime = state.signer.sigImageType === 'jpg' ? 'image/jpeg' : 'image/png';
+    const url = URL.createObjectURL(new Blob([state.signer.sigImageBytes], { type: mime }));
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = state.signer.sigStyle === 'drawn' ? 'Drawn signature' : 'Uploaded signature';
+    img.onload = () => setTimeout(() => URL.revokeObjectURL(url), 5000);
+    pane.appendChild(img);
+    return;
+  }
+
+  pane.textContent = '(no signature data)';
+}
+
+function stampInnerHtml() {
+  const name = (state.signer.name || 'Signer').slice(0, 40);
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fp = (state.signer.key && state.signer.key.publicKey)
+    ? toHex(sha3_256(state.signer.key.publicKey)).slice(0, 8)
+    : '(generated on sign)';
+  if (state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes) {
+    const mime = state.signer.sigImageType === 'jpg' ? 'image/jpeg' : 'image/png';
+    const url = URL.createObjectURL(new Blob([state.signer.sigImageBytes], { type: mime }));
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return `<img src="${url}" alt=""><div class="ds-sm-name" style="font-size:8px">${escapeHtml(name)}</div><div class="ds-sm-meta">${dateStr} - PQ ${fp}</div><div class="ds-sm-pqtag">PARAMANT - PQ</div>`;
+  }
+  return `<div class="ds-sm-name">Signed by ${escapeHtml(name)}</div><div class="ds-sm-meta">${dateStr}</div><div class="ds-sm-meta">PQ key: ${fp}</div><div class="ds-sm-pqtag">PARAMANT - PQ</div>`;
+}
+
+function guessMimeFromMagic(bytes) {
+  if (bytes.length < 4) return null;
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return 'image/png';
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return 'image/jpeg';
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
+  if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'image/webp';
+  return null;
 }
 
 async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {

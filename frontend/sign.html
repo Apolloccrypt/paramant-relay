@@ -69,6 +69,20 @@
 .ds-tab.active{color:var(--cobalt);border-bottom-color:var(--cobalt)}
 .ds-sig-panel{padding:6px 0 0}
 #ds-sig-canvas{border:1px solid var(--ink-hair);background:#fff;width:100%;max-width:500px;height:auto;cursor:crosshair;touch-action:none;display:block}
+.ds-review-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.ds-review-h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);font-weight:700;margin:0 0 8px}
+.ds-review-pane{background:var(--bone);border:1px solid var(--ink-hair);min-height:140px;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
+.ds-review-pane.has-pdf{padding:0;background:#fff;align-items:flex-start;max-height:380px;overflow-y:auto}
+.ds-review-pane canvas{width:100%;height:auto;display:block}
+.ds-review-pane img{max-width:100%;max-height:120px}
+.ds-review-pane .ds-mockup-stamp{position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.06);pointer-events:none;font-family:var(--mono);font-size:9px;color:var(--navy);padding:4px;box-sizing:border-box;line-height:1.25;overflow:hidden}
+.ds-review-pane .ds-mockup-stamp .ds-sm-name{font-weight:700;font-size:10px}
+.ds-review-pane .ds-mockup-stamp .ds-sm-meta{color:var(--ink-dim);font-size:8px}
+.ds-review-pane .ds-mockup-stamp .ds-sm-pqtag{position:absolute;right:3px;bottom:2px;font-size:7px;letter-spacing:.08em;color:var(--cobalt)}
+.ds-review-pane .ds-mockup-stamp img{max-width:100%;max-height:60%;display:block;margin:0 auto}
+.ds-review-pane .ds-pane-meta{font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;word-break:break-all;text-align:left;padding:6px}
+.ds-typed-preview{font-family:'Brush Script MT', cursive, sans-serif;font-size:32px;color:var(--navy);font-weight:400}
+@media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
 @media(max-width:640px){
   .ds-wrap{padding:0 16px;margin-top:24px}
   .ds-title{font-size:24px}
@@ -359,6 +373,19 @@
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Review and sign</h2>
+    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. The signature is created locally the moment you click Sign now.</p>
+
+    <div class="ds-review-grid">
+      <div class="ds-review-col">
+        <h3 class="ds-review-h">Document preview</h3>
+        <div id="ds-review-doc-preview" class="ds-review-pane"></div>
+      </div>
+      <div class="ds-review-col">
+        <h3 class="ds-review-h">Your signature</h3>
+        <div id="ds-review-sig-preview" class="ds-review-pane"></div>
+      </div>
+    </div>
+
     <div class="ds-info-card">
       <dl>
         <dt>Document</dt>      <dd id="ds-review-doc">-</dd>
@@ -369,6 +396,7 @@
         <dt>Counter-sign</dt>  <dd id="ds-review-notary">-</dd>
       </dl>
     </div>
+
     <div class="ds-disclaimer">
       <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
       ML-DSA-65 (FIPS 204) cryptographic attestation, produced in your browser. Not a notarised legal signature under eIDAS or any qualified-trust regime.
@@ -464,6 +492,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=3"></script>
+<script type="module" src="/sign-flow.js?v=4"></script>
 </body>
 </html>
