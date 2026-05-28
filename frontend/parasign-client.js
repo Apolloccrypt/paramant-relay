@@ -7,6 +7,7 @@
 // Crypto is vendored same-origin (frontend/vendor/paramant-pqc.js, built from
 // @noble/post-quantum + @noble/hashes) so it loads under the site CSP (script-src 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
+import { vaultAvailable, vaultList, vaultStore, vaultUnlock } from '/vendor/vault.js';
 
 const RELAY_URL = 'https://relay.paramant.app';
 let signerKey = null, documentBuffer = null, documentFilename = '', lastEnvelope = null;
@@ -15,6 +16,12 @@ const $ = id => document.getElementById(id);
 const toHex = u8 => Array.from(u8, b => b.toString(16).padStart(2, '0')).join('');
 const fromHex = h => new Uint8Array(h.match(/.{2}/g).map(b => parseInt(b, 16)));
 function toB64(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s); }
+function fromB64(s) {
+  const bin = atob(s);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
 
 function setStatus(kind, msg) {
   const el = $('ps-sign-status'); if (!el) return;
@@ -25,14 +32,20 @@ function updateSignButton() {
   $('ps-sign').disabled = !(signerKey && documentBuffer && apiKey);
 }
 
+function showKeyInfo() {
+  $('ps-pubkey-fp').textContent = toHex(sha3_256(signerKey.publicKey)).slice(0, 32) + '...';
+  $('ps-key-info').hidden = false;
+  $('ps-save-key').disabled = false;
+  const saveVaultBtn = $('ps-save-vault'); if (saveVaultBtn) saveVaultBtn.disabled = false;
+}
+
 function generateKey() {
   setStatus('info', 'Generating ML-DSA-65 key locally (in this browser only)...');
   try {
     const keys = ml_dsa65.keygen(crypto.getRandomValues(new Uint8Array(32)));
     signerKey = { secretKey: keys.secretKey, publicKey: keys.publicKey };
-    $('ps-pubkey-fp').textContent = toHex(sha3_256(keys.publicKey)).slice(0, 32) + '...';
-    $('ps-key-info').hidden = false; $('ps-save-key').disabled = false;
-    setStatus('ok', 'Key generated. Private key stays in browser memory.');
+    showKeyInfo();
+    setStatus('ok', 'Key generated. Save to this browser, download a backup, or sign right now.');
     updateSignButton();
   } catch (e) { setStatus('err', 'Keygen failed: ' + e.message); }
 }
@@ -42,8 +55,7 @@ async function loadKey(file) {
     const d = JSON.parse(await file.text());
     if (!d.secretKey || !d.publicKey) throw new Error('invalid key file');
     signerKey = { secretKey: fromHex(d.secretKey), publicKey: fromHex(d.publicKey) };
-    $('ps-pubkey-fp').textContent = toHex(sha3_256(signerKey.publicKey)).slice(0, 32) + '...';
-    $('ps-key-info').hidden = false; $('ps-save-key').disabled = false;
+    showKeyInfo();
     setStatus('ok', 'Key loaded (client-side only).'); updateSignButton();
   } catch (e) { setStatus('err', 'Load failed: ' + e.message); }
 }
@@ -99,6 +111,110 @@ function download() {
   a.download = (documentFilename || 'document') + '.psign'; a.click(); URL.revokeObjectURL(a.href);
 }
 
+// --- Vault flows (additive; throwaway key + JSON file paths stay intact) ---
+
+let pendingVaultId = null;
+
+function showForm(id, show) {
+  const el = $(id); if (!el) return;
+  el.hidden = !show;
+  if (show) {
+    const firstInput = el.querySelector('input');
+    if (firstInput) firstInput.focus();
+  }
+}
+
+async function refreshVaultRow() {
+  if (!(await vaultAvailable())) return;
+  let list = [];
+  try { list = await vaultList(); } catch { return; }
+  const row = $('ps-vault-row');
+  const sel = $('ps-vault-select');
+  if (!row || !sel) return;
+  if (!list.length) { row.hidden = true; return; }
+  sel.innerHTML = '';
+  for (const e of list) {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    const fp = (e.pk_hash || '').slice(0, 12);
+    opt.textContent = (e.label ? e.label + ' ' : '') + '(' + fp + '...)';
+    sel.appendChild(opt);
+  }
+  row.hidden = false;
+}
+
+function onSaveVaultClick() {
+  if (!signerKey) return;
+  setStatus('info', 'Choose a passphrase to encrypt this key in your browser.');
+  showForm('ps-vault-form', true);
+}
+
+async function onVaultConfirm() {
+  if (!signerKey) return;
+  const p1 = ($('ps-vault-pass').value || '');
+  const p2 = ($('ps-vault-pass2').value || '');
+  if (p1.length < 8) { setStatus('err', 'Passphrase must be at least 8 characters.'); return; }
+  if (p1 !== p2)     { setStatus('err', 'Passphrases do not match.'); return; }
+  setStatus('info', 'Deriving KEK with PBKDF2 (this takes a moment)...');
+  try {
+    const pk_b64 = toB64(signerKey.publicKey);
+    const pk_hash = toHex(sha3_256(signerKey.publicKey));
+    const label = $('ps-label').value || null;
+    await vaultStore({
+      alg: 'ML-DSA-65',
+      label,
+      pk_b64,
+      pk_hash,
+      secretKeyBytes: signerKey.secretKey,
+      passphrase: p1,
+    });
+    $('ps-vault-pass').value = ''; $('ps-vault-pass2').value = '';
+    showForm('ps-vault-form', false);
+    await refreshVaultRow();
+    setStatus('ok', 'Key saved in this browser. You can now sign without re-generating.');
+  } catch (e) { setStatus('err', 'Save failed: ' + e.message); }
+}
+
+function onVaultCancel() {
+  $('ps-vault-pass').value = ''; $('ps-vault-pass2').value = '';
+  showForm('ps-vault-form', false);
+}
+
+function onUnlockClick() {
+  const sel = $('ps-vault-select');
+  if (!sel || !sel.value) return;
+  pendingVaultId = sel.value;
+  setStatus('info', 'Enter the passphrase for this key.');
+  showForm('ps-unlock-form', true);
+}
+
+async function onUnlockConfirm() {
+  const pass = ($('ps-unlock-pass').value || '');
+  if (!pass) return;
+  setStatus('info', 'Deriving KEK + decrypting (this takes a moment)...');
+  try {
+    const r = await vaultUnlock(pendingVaultId, pass);
+    signerKey = { secretKey: r.secretKeyBytes, publicKey: fromB64(r.pk_b64) };
+    showKeyInfo();
+    if (r.label) $('ps-label').value = r.label;
+    $('ps-unlock-pass').value = '';
+    showForm('ps-unlock-form', false);
+    setStatus('ok', 'Key unlocked. Ready to sign.');
+    updateSignButton();
+  } catch (e) {
+    $('ps-unlock-pass').value = '';
+    setStatus('err', e.message === 'wrong passphrase' ? 'Wrong passphrase. Try again.' : 'Unlock failed: ' + e.message);
+  }
+}
+
+function onUnlockCancel() {
+  $('ps-unlock-pass').value = '';
+  pendingVaultId = null;
+  showForm('ps-unlock-form', false);
+}
+
+// --- Wire up ---
+
 $('ps-gen-key').addEventListener('click', generateKey);
 $('ps-load-key').addEventListener('change', e => e.target.files[0] && loadKey(e.target.files[0]));
 $('ps-save-key').addEventListener('click', saveKey);
@@ -106,3 +222,13 @@ $('ps-document').addEventListener('change', e => onDoc(e.target.files[0]));
 $('ps-api-key').addEventListener('input', updateSignButton);
 $('ps-sign').addEventListener('click', sign);
 $('ps-download-psign').addEventListener('click', download);
+
+const saveVaultBtn = $('ps-save-vault'); if (saveVaultBtn) saveVaultBtn.addEventListener('click', onSaveVaultClick);
+const vaultConfirm = $('ps-vault-confirm'); if (vaultConfirm) vaultConfirm.addEventListener('click', onVaultConfirm);
+const vaultCancel  = $('ps-vault-cancel');  if (vaultCancel)  vaultCancel.addEventListener('click', onVaultCancel);
+const unlockBtn    = $('ps-vault-unlock');  if (unlockBtn)    unlockBtn.addEventListener('click', onUnlockClick);
+const unlockOk     = $('ps-unlock-confirm');if (unlockOk)     unlockOk.addEventListener('click', onUnlockConfirm);
+const unlockNo     = $('ps-unlock-cancel'); if (unlockNo)     unlockNo.addEventListener('click', onUnlockCancel);
+
+// On page-load: scan vault, show the picker if keys exist.
+refreshVaultRow();
