@@ -43,9 +43,10 @@
         <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
         <li role="none"><a href="/sign" role="menuitem">ParaSign</a></li>
         <li role="none"><a href="/verify" role="menuitem">Verify signature</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
       </ul>
     </li>
+
+    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
 
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
 
@@ -133,9 +134,10 @@
       <a href="/drop">ParaDrop</a>
       <a href="/sign">ParaSign</a>
       <a href="/verify">Verify signature</a>
-      <a href="/dashboard">Dashboard</a>
     </div>
   </div>
+
+  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
 
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
 
@@ -204,12 +206,22 @@
 
 <section class="home-hero">
   <span class="eyebrow">post-quantum &middot; eu sovereign &middot; zero-knowledge</span>
-  <h1>Encrypted file transfer that leaves no trace.</h1>
-  <p class="lede">Send files anonymously, sign documents with post-quantum signatures, or deploy a self-hosted relay for healthcare, finance, legal, or industrial IoT. Burn on read. EU/DE only.</p>
+  <h1>Your encrypted workspace for files and signatures.</h1>
+  <p class="lede">Sign in to your dashboard with an API key and TOTP to send encrypted files, sign documents with post-quantum signatures, and share device-to-device. Everything client-side encrypted, burn on read, bound to your account. EU/DE only.</p>
   <div class="home-cta">
-    <a class="btn btn-primary" href="/send">Send a file now</a>
-    <a class="btn btn-secondary" href="/docs#self-hosting">Self-host guide</a>
+    <a class="btn btn-primary" href="/dashboard">Open your dashboard</a>
+    <a class="btn btn-secondary" href="/signup">Create account</a>
+    <a class="btn btn-tertiary" href="/docs#self-hosting">Self-host guide</a>
   </div>
+</section>
+
+<section class="home-section" aria-labelledby="howwork-h">
+  <header class="home-section-head"><span class="eyebrow">How Paramant works</span><h2 id="howwork-h">One dashboard. Every tool.</h2><p>Paramant is account-bound. You work from a single dashboard; the people you send to need nothing at all.</p></header>
+  <ol class="steps">
+    <li><h3>Sign in</h3><p>Your API key plus a TOTP code. No password to phish, no shared secret in your inbox.</p></li>
+    <li><h3>Work from your dashboard</h3><p>Send, share, drop, and sign &mdash; all in one place, every transfer bound to your account and your audit log.</p></li>
+    <li><h3>Recipients need no account</h3><p>They open your link or verify your .psign signature with just the valid info you sent them. Zero-knowledge for them, full audit trail for you.</p></li>
+  </ol>
 </section>
 
 <aside class="trust-bar" aria-label="Trust signals">
@@ -222,7 +234,7 @@
 <section class="home-section" aria-labelledby="prod-h">
   <header class="home-section-head"><span class="eyebrow">Products</span><h2 id="prod-h">Four ways to use Paramant.</h2><p>One relay, four endpoints. Each tuned for a different transfer pattern. All client-side encrypted, all burn-on-read.</p></header>
   <div class="pgrid">
-    <a class="pcard" href="/send"><span class="ptag">anonymous</span><h3>Send a file</h3><p>Drop a file, share the link, burns after one read. No account, no signup. AES-256-GCM in-browser.</p><span class="pcta">Send now</span></a>
+    <a class="pcard" href="/send"><span class="ptag">fast</span><h3>Send a file</h3><p>Drop a file from your dashboard, share the link, burns after one read. AES-256-GCM in-browser, bound to your account.</p><span class="pcta">Send a file</span></a>
     <a class="pcard" href="/parashare"><span class="ptag">verified</span><h3>ParaShare</h3><p>End-to-end ML-KEM-768 hybrid with ML-DSA-65 signed receipts. Cryptographic proof of who sent what to whom.</p><span class="pcta">Try ParaShare</span></a>
     <a class="pcard" href="/drop"><span class="ptag">device-to-device</span><h3>ParaDrop</h3><p>AirDrop alternative across iOS, Android, Windows, Linux. QR or 6-digit pairing. Encrypted in transit, burn on read.</p><span class="pcta">Use ParaDrop</span></a>
     <a class="pcard" href="/sign"><span class="ptag">new &middot; parasign</span><h3>Sign documents</h3><p>Post-quantum ML-DSA-65 signatures. Self-contained .psign envelope. CT-log backed.</p><span class="pcta">Sign a document</span></a>
