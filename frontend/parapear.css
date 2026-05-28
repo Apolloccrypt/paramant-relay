@@ -14,7 +14,7 @@
 }
 
 .parapear-img {
-  width: clamp(64px, 12vw, 120px);
+  width: clamp(140px, 22vw, 220px);
   height: auto;
   flex-shrink: 0;
   user-select: none;
@@ -91,6 +91,6 @@
     gap: var(--space-3, 12px);
   }
   .parapear-img {
-    width: 96px;
+    width: 160px;
   }
 }
