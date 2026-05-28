@@ -104,6 +104,19 @@
 .ds-usage-list code{font-family:var(--mono);font-size:11px;background:var(--bone);border:1px solid var(--ink-hair);padding:1px 6px;color:var(--navy)}
 .ds-usage-files-file{font-family:var(--mono);font-size:12px;color:var(--navy);font-weight:700}
 .ds-usage-files-note{font-size:11px;color:var(--ink-dim);margin-left:8px}
+.ds-recipients-list{display:flex;flex-direction:column;gap:10px}
+.ds-recipient-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;padding:10px 12px;background:var(--bone-2);border:1px solid var(--ink-hair);align-items:center}
+.ds-recipient-row .ds-input{padding:8px 10px;font-size:12px}
+.ds-recipient-row .ds-rm{padding:6px 12px;background:transparent;border:1px solid var(--ink-hair);color:var(--ink-dim);font-family:var(--mono);font-size:10px;cursor:pointer}
+.ds-recipient-row .ds-rm:hover{color:rgba(180,20,20,1);border-color:rgba(180,20,20,.4)}
+.ds-recipient-empty{padding:24px;text-align:center;border:1px dashed var(--ink-hair);color:var(--ink-dim);font-size:12px;background:var(--bone)}
+.ds-party-links{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+.ds-party-link-row{display:grid;grid-template-columns:120px 1fr auto;gap:10px;padding:10px 12px;background:var(--bone);border:1px solid var(--ink-hair);align-items:center;font-size:12px}
+.ds-party-link-row .ds-pl-label{font-weight:700;color:var(--navy)}
+.ds-party-link-row .ds-pl-url{font-family:var(--mono);font-size:11px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-party-link-row .ds-pl-copy{padding:6px 14px;background:var(--cobalt);color:#fff;border:0;font-family:var(--mono);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700}
+.ds-party-link-row .ds-pl-copy.copied{background:var(--lime);color:var(--navy)}
+@media(max-width:640px){.ds-recipient-row,.ds-party-link-row{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
 @media(max-width:640px){
@@ -291,6 +304,7 @@
   <ol class="ds-stepper" aria-label="Sign progress">
     <li data-step="doc" class="active">Document</li>
     <li data-step="place">Place</li>
+    <li data-step="recipients">Recipients</li>
     <li data-step="identity">Identity</li>
     <li data-step="sign">Sign</li>
   </ol>
@@ -332,6 +346,25 @@
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
+  <section class="ds-step" id="step-recipients" hidden>
+    <h2>Recipients (optional)</h2>
+    <p class="ds-sub">If this is for someone else to co-sign or acknowledge, add them here. Each recipient gets their own co-sign link that you share with them out-of-band (you mail the signed PDF + their link separately). Leave empty to sign only for yourself.</p>
+
+    <div class="ds-recipients-list" id="ds-recipients-list"></div>
+
+    <div class="ds-actions" style="margin-top:8px">
+      <button class="btn btn-tertiary" id="ds-add-recipient" type="button">+ Add recipient</button>
+    </div>
+
+    <div class="ds-banner" id="ds-recipients-hint" hidden></div>
+
+    <div class="ds-actions" style="margin-top:18px">
+      <button class="btn btn-tertiary" id="ds-recipients-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-recipients-continue" type="button">Continue</button>
     </div>
   </section>
 
@@ -435,6 +468,7 @@
         <dt>Signer</dt>        <dd id="ds-review-name">-</dd>
         <dt>Signature style</dt><dd id="ds-review-sig">-</dd>
         <dt>Key source</dt>    <dd id="ds-review-key-src">-</dd>
+        <dt>Recipients</dt>    <dd id="ds-review-recipients">-</dd>
         <dt>Counter-sign</dt>  <dd id="ds-review-notary">-</dd>
       </dl>
     </div>
@@ -471,6 +505,13 @@
       <button class="btn btn-secondary" id="ds-dl-psign" type="button">Download .psign envelope</button>
       <a class="btn btn-tertiary" href="/verify">Verify an envelope</a>
       <button class="btn btn-tertiary" id="ds-restart" type="button">Sign another</button>
+    </div>
+
+    <div class="ds-usage-card" id="ds-party-links-card" hidden>
+      <h3 class="ds-proof-h">Share with your recipients</h3>
+      <p class="ds-usage-p">Each recipient signs at their own URL. Mail them the signed PDF + their personal link. Recipients verify the document hash locally before signing - their signature is added to the envelope on the relay.</p>
+      <div class="ds-party-links" id="ds-party-links"></div>
+      <p class="ds-usage-p" style="font-size:11px;color:var(--ink-dim)">Status of all parties is visible at any time via <a id="ds-envelope-status-link" href="#">the envelope status page</a>.</p>
     </div>
 
     <div class="ds-usage-card">
@@ -551,6 +592,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=7"></script>
+<script type="module" src="/sign-flow.js?v=8"></script>
 </body>
 </html>

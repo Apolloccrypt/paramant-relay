@@ -35,6 +35,8 @@ const state = {
     sigImageDataUrl: null, // pre-computed data: URL for <img src=>
     docImageDataUrl: null, // pre-computed data: URL when doc is a viewable image
   },
+  recipients: [],        // [{label, email}]; if empty -> single-party local sign only
+  envelope: null,        // populated when recipients.length > 0 after POST /v2/envelopes
   result: null,          // { stampedBytes?, envelope, fingerprint, notary? }
 };
 
@@ -49,7 +51,7 @@ function setActive(stepId) {
   document.querySelectorAll('.ds-step').forEach(s => s.hidden = (s.id !== stepId));
   document.querySelectorAll('.ds-stepper li').forEach(li => {
     const k = li.dataset.step;
-    const order = ['doc', 'place', 'identity', 'sign'];
+    const order = ['doc', 'place', 'recipients', 'identity', 'sign'];
     // step-done lives past the final step, so treat all stepper items as 'done'.
     const currentIdx = stepId === 'step-done'
       ? order.length
@@ -416,6 +418,21 @@ function hexToBytes(s) {
   return out;
 }
 
+// Matches the recipe the relay's Lua script reproduces server-side
+// (see relay/envelope.js: signMessageBytes). Used to sign as party 0 when
+// the user creates a multi-party envelope, and read by /co-sign for parties
+// 1..N when they sign their own slot.
+function buildEnvelopeSignMessage(envId, docHashHex, partyIndex) {
+  const idBytes = new TextEncoder().encode(envId);
+  const hashBytes = hexToBytes(docHashHex);
+  const piBytes = new TextEncoder().encode(String(partyIndex));
+  const combined = new Uint8Array(idBytes.length + hashBytes.length + piBytes.length);
+  combined.set(idBytes, 0);
+  combined.set(hashBytes, idBytes.length);
+  combined.set(piBytes, idBytes.length + hashBytes.length);
+  return sha3_256(combined);
+}
+
 // ====================================================================
 // Step 4: review + sign
 // ====================================================================
@@ -441,6 +458,18 @@ function fillReview() {
   $('ds-review-notary').textContent = apiKey
     ? 'Yes - relay will counter-sign + write to CT log'
     : 'No - envelope is self-contained (still verifiable)';
+
+  // Recipients summary; warn if recipients but no API key (envelope creation will fail).
+  const recCell = $('ds-review-recipients');
+  if (state.recipients.length === 0) {
+    recCell.textContent = 'None - personal signature only';
+  } else {
+    const list = state.recipients.map(r => r.label + (r.email ? ' (' + r.email + ')' : '')).join(', ');
+    recCell.innerHTML = state.recipients.length + ' co-signer' + (state.recipients.length === 1 ? '' : 's') + ': ' + escapeHtml(list);
+    if (!apiKey) {
+      recCell.innerHTML += '<br><span style="color:rgba(180,20,20,1);font-size:11px">Multi-party envelope needs your X-Api-Key (Advanced section). Sign now will fail without it.</span>';
+    }
+  }
 
   // Cryptographic proof card: the mathematical evidence that backs the
   // visual seal. Document hash is computed live; fingerprint depends on
@@ -766,6 +795,75 @@ async function doSign() {
       };
     }
 
+    // Multi-party envelope: if the user added recipients, create the envelope
+    // on the relay with the (possibly stamped) document hash, then auto-sign
+    // as party 0. The recipients then sign via /co-sign?env=...&p=<i>.
+    // Requires an API key (the /v2/envelopes endpoint is auth-gated).
+    if (state.recipients.length > 0) {
+      if (!state.signer.apiKey) {
+        throw new Error('Adding recipients requires your Paramant X-Api-Key (under Advanced). Get one from your Dashboard, or remove the recipients to sign only for yourself.');
+      }
+      $('ds-sign-status').textContent = 'Creating multi-party envelope on the relay...';
+      const docHashForEnvelope = state.mode === 'pdf' ? envelope.stamped_hash : envelope.document_hash;
+      const allParties = [{ label: state.signer.name + ' (sender)' }, ...state.recipients];
+      let createR, createBody;
+      try {
+        createR = await fetch(RELAY + '/v2/envelopes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': state.signer.apiKey },
+          body: JSON.stringify({
+            doc_hash: docHashForEnvelope,
+            parties: allParties,
+            original_filename: state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name,
+            creator_public_key: envelope.signer_public_key,
+          }),
+        });
+        createBody = await createR.json().catch(() => null);
+      } catch (netErr) {
+        throw new Error('Envelope creation aborted: the relay was unreachable (' + (netErr.message || netErr) + ').');
+      }
+      if (!createR.ok) {
+        const reason = createR.status === 401 ? 'the API key was not accepted by the relay'
+                     : createR.status === 429 ? 'the relay rate-limited envelope creation - try again in an hour'
+                     : 'the relay returned HTTP ' + createR.status + (createBody && createBody.error ? ' (' + createBody.error + ')' : '');
+        throw new Error('Envelope creation aborted: ' + reason + '. No envelope was produced; recipients have not been notified.');
+      }
+      state.envelope = createBody.envelope;
+
+      // Auto-sign as party 0 with the same ML-DSA-65 key
+      $('ds-sign-status').textContent = 'Auto-signing as party 0 (sender)...';
+      const envMsg = buildEnvelopeSignMessage(state.envelope.id, docHashForEnvelope, 0);
+      const envSig = ml_dsa65.sign(state.signer.key.secretKey, envMsg);
+      let signR, signBody;
+      try {
+        signR = await fetch(RELAY + '/v2/envelopes/' + state.envelope.id + '/sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            party_index: 0,
+            signer_public_key: envelope.signer_public_key,
+            signature: toB64(envSig),
+          }),
+        });
+        signBody = await signR.json().catch(() => null);
+      } catch (netErr) {
+        throw new Error('Envelope ' + state.envelope.id + ' was created but auto-signing as party 0 failed (' + (netErr.message || netErr) + '). Recipients cannot proceed until this is resolved.');
+      }
+      if (!signR.ok) {
+        throw new Error('Envelope ' + state.envelope.id + ' was created but auto-signing as party 0 returned HTTP ' + signR.status + (signBody && signBody.error ? ' (' + signBody.error + ')' : '') + '. Recipients cannot proceed.');
+      }
+
+      // Bake multi-party info into the .psign envelope so recipients of the
+      // file can also see which envelope it belongs to.
+      envelope.multiparty = {
+        envelope_id: state.envelope.id,
+        party_count: state.envelope.party_count,
+        party_links: state.envelope.party_links,
+        expires_at: state.envelope.expires_at,
+        sender_signed_at: signBody.signed_count >= 1,
+      };
+    }
+
     // Optional notary call (only when an API key was supplied). If the user
     // explicitly asked for counter-signing, treat a failure as a HARD STOP:
     // we will NOT hand back an envelope that says 'notary requested but
@@ -893,8 +991,60 @@ function showDone() {
       : 'No relay witness on this signature - that is fine for self-attestation but means there is no independent third-party timestamp.';
   }
 
+  // Multi-party: render share-links for the recipients (party 1..N).
+  // Sender (party 0) is auto-signed; their link is not displayed.
+  if (r.envelope.multiparty && r.envelope.multiparty.party_links) {
+    renderPartyLinks(r.envelope.multiparty);
+  }
+
   // Render the signed result so the user can see their stamp before downloading.
   renderSignedPreview().catch(() => {});
+}
+
+function renderPartyLinks(mp) {
+  const card = $('ds-party-links-card');
+  const list = $('ds-party-links');
+  if (!card || !list) return;
+  card.hidden = false;
+  list.innerHTML = '';
+  // Skip party 0 (sender, already signed). Show 1..N.
+  const links = mp.party_links.filter(p => p.party_index > 0);
+  if (links.length === 0) { card.hidden = true; return; }
+
+  for (const p of links) {
+    const recipient = state.recipients[p.party_index - 1] || { label: 'Recipient ' + p.party_index };
+    const fullUrl = location.origin + p.sign_path;
+    const row = document.createElement('div');
+    row.className = 'ds-party-link-row';
+    row.innerHTML =
+      `<div class="ds-pl-label">${escapeHtml(recipient.label)}${recipient.email ? '<div style="font-size:10px;color:var(--ink-dim);font-weight:400">' + escapeHtml(recipient.email) + '</div>' : ''}</div>` +
+      `<div class="ds-pl-url" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>` +
+      `<button class="ds-pl-copy" type="button">Copy link</button>`;
+    const btn = row.querySelector('.ds-pl-copy');
+    btn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy link'; btn.classList.remove('copied'); }, 1500);
+      } catch {
+        // Fallback: select the URL element for manual copy
+        const range = document.createRange();
+        range.selectNode(row.querySelector('.ds-pl-url'));
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        btn.textContent = 'Select all (Ctrl+C)';
+      }
+    };
+    list.appendChild(row);
+  }
+
+  // Status-page link points at the relay's redacted envelope view.
+  const statusLink = $('ds-envelope-status-link');
+  if (statusLink) {
+    statusLink.href = RELAY + '/v2/envelopes/' + mp.envelope_id;
+    statusLink.textContent = 'envelope ' + mp.envelope_id.slice(0, 10) + '... on the relay';
+  }
 }
 
 async function renderSignedPreview() {
@@ -937,11 +1087,17 @@ async function renderSignedPreview() {
 // ====================================================================
 
 function wireNav() {
-  $('ds-place-continue').addEventListener('click', () => { setActive('step-identity'); fillReviewPreviews(); });
-  $('ds-hash-only-continue').addEventListener('click', () => { setActive('step-identity'); fillReviewPreviews(); });
+  $('ds-place-continue').addEventListener('click', () => { setActive('step-recipients'); renderRecipients(); });
+  $('ds-hash-only-continue').addEventListener('click', () => { setActive('step-recipients'); renderRecipients(); });
   $('ds-place-back').addEventListener('click', () => setActive('step-doc'));
   $('ds-hash-only-back').addEventListener('click', () => setActive('step-doc'));
-  $('ds-identity-back').addEventListener('click', () => setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only'));
+  $('ds-recipients-back').addEventListener('click', () => setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only'));
+  $('ds-recipients-continue').addEventListener('click', () => {
+    commitRecipientsFromDom();
+    setActive('step-identity');
+  });
+  $('ds-add-recipient').addEventListener('click', addRecipientRow);
+  $('ds-identity-back').addEventListener('click', () => setActive('step-recipients'));
   $('ds-identity-continue').addEventListener('click', () => {
     fillReview();
     setActive('step-sign');
@@ -951,13 +1107,68 @@ function wireNav() {
   $('ds-restart').addEventListener('click', () => location.reload());
 }
 
-function fillReviewPreviews() {
-  // Optional bridge so the identity step can preview the name on a placed stamp.
-  // Re-render the live stamp marker text whenever the name changes.
+// ====================================================================
+// Recipients step
+// ====================================================================
+
+function renderRecipients() {
+  const list = $('ds-recipients-list');
+  list.innerHTML = '';
+  if (state.recipients.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'ds-recipient-empty';
+    empty.innerHTML = 'No recipients yet. Click <strong>+ Add recipient</strong> if this needs to be co-signed by someone else, or click <strong>Continue</strong> to sign only for yourself.';
+    list.appendChild(empty);
+    return;
+  }
+  state.recipients.forEach((r, i) => list.appendChild(buildRecipientRow(i, r)));
+}
+
+function buildRecipientRow(idx, data) {
+  const row = document.createElement('div');
+  row.className = 'ds-recipient-row';
+  row.dataset.idx = String(idx);
+  row.innerHTML =
+    `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="Recipient name (required)" value="${escapeHtml(data.label || '')}">` +
+    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="Email (optional, for your reference only)" value="${escapeHtml(data.email || '')}">` +
+    `<button class="ds-rm" type="button" data-action="remove">Remove</button>`;
+  row.querySelector('[data-action="remove"]').addEventListener('click', () => removeRecipientRow(idx));
+  return row;
+}
+
+function addRecipientRow() {
+  commitRecipientsFromDom();
+  state.recipients.push({ label: '', email: '' });
+  renderRecipients();
+  // Focus the new row's label input
+  const rows = document.querySelectorAll('.ds-recipient-row');
+  const last = rows[rows.length - 1];
+  if (last) last.querySelector('[data-field="label"]').focus();
+}
+
+function removeRecipientRow(idx) {
+  commitRecipientsFromDom();
+  state.recipients.splice(idx, 1);
+  renderRecipients();
+}
+
+function commitRecipientsFromDom() {
+  // Read current input values back into state (the rows are uncontrolled).
+  const rows = document.querySelectorAll('.ds-recipient-row');
+  state.recipients = Array.from(rows).map(row => ({
+    label: row.querySelector('[data-field="label"]').value.trim(),
+    email: row.querySelector('[data-field="email"]').value.trim(),
+  })).filter(r => r.label.length > 0);   // drop empty rows silently
+}
+
+function wireLiveStampUpdates() {
+  // Whenever the signer's name changes (identity step), re-render any
+  // placement marker in step-place so the name shown there reflects what
+  // will end up in the stamp. Attached once at init.
   $('ds-signer-name').addEventListener('input', () => {
     if (state.mode !== 'pdf' || !state.stamp) return;
-    document.querySelectorAll('.ds-stamp-marker .ds-sm-name').forEach(el => {
-      el.textContent = 'Signed by ' + (state.signer.name || 'Signer').slice(0, 40);
+    document.querySelectorAll('.ds-stamp-marker').forEach(el => {
+      el.innerHTML = stampMockupHtml();
     });
   });
 }
@@ -966,6 +1177,7 @@ function init() {
   initStepDoc();
   initStepIdentity();
   wireNav();
+  wireLiveStampUpdates();
   setActive('step-doc');
 }
 
