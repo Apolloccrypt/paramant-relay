@@ -1023,142 +1023,40 @@ api.get("/user/session/verify", async (req, res) => {
 
 // ── Account management ────────────────────────────────────────────────────────
 
-// GET /api/user/dashboard-fragment
-// Server-side gate for /dashboard. Returns the authenticated hub HTML
-// (Content-Type: text/html) only when the request carries a valid
-// paramant_user_session cookie (validated by authUser, the exact same
-// middleware /api/user/account uses — no parallel auth logic). The
-// static /dashboard.html loader fetches this and either injects it
-// (200) or redirects to /auth/login?next=/dashboard (401). This keeps
-// every tool-surface marker out of the unauthenticated response.
-api.get("/user/dashboard-fragment", authUser, async (req, res) => {
+// GET /api/user/me
+// JSON identity + account-summary endpoint backing the client-side /dashboard.
+// Same authUser cookie middleware as /api/user/account. Returns just what the
+// dashboard needs (no sessions scan -- that belongs to /account). 401 when the
+// paramant_user_session cookie is absent or expired.
+api.get("/user/me", authUser, async (req, res) => {
   try {
     const { user_id, email } = req.userSession;
     const user = await findUserByEmail(email);
-    const plan = (user && user.plan) || "standard";
-    const label = (user && user.label) || "";
-    const createdAt = (user && user.created_at) || null;
-    const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
-    const apiKeyMasked = user_id.slice(0, 8) + "..." + user_id.slice(-4);
-    const sessionExpiresAt = new Date(Date.now() + 3600 * 1000);
-    const expiresMin = Math.max(0, Math.round((sessionExpiresAt.getTime() - Date.now()) / 60000));
-    const createdDisplay = createdAt
-      ? (function(){ const d = new Date(createdAt); return isNaN(d.getTime()) ? String(createdAt).slice(0,10) : d.toISOString().slice(0,10); })()
-      : "—";
-
-    const esc = (s) => String(s == null ? "" : s).replace(/[<>&"]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"}[c]));
-
+    const backupCount = await redis()
+      .sCard(`paramant:user:backup_codes:${user_id}`)
+      .catch(() => 0);
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.send(`<style id="hub-style">
-.hub-hero { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-5); }
-.hub-hero h1 { font-family: var(--sans); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; letter-spacing: -.01em; margin: 0; color: var(--ink); }
-.hub-hero .sub { font-family: var(--sans); font-size: 15px; line-height: 1.55; color: var(--ink-dim); max-width: 680px; margin: 0; }
-.hub-hero .pq-tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
-.hub-hero .pq-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); }
-.auth-status { border: 1px solid var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; background: transparent; }
-.auth-status .auth-msg { font-family: var(--sans); font-size: 14px; color: var(--ink); margin: 0; flex: 1 1 auto; min-width: 220px; line-height: 1.5; }
-.auth-status .auth-msg strong { color: var(--ink); font-weight: 600; }
-.auth-status .auth-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--bone-2); color: var(--ink-dim); font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-left: 6px; }
-.pa-btn { font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: .04em; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--ink-hair); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--ink); }
-.pa-btn:hover { border-color: var(--ink); }
-.block-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin: var(--space-5) 0 var(--space-3); }
-.action-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-@media (max-width: 640px) { .action-pair { grid-template-columns: 1fr; } }
-.action-card { display: flex; flex-direction: column; gap: 6px; padding: var(--space-4); border: 1px solid var(--ink-hair); border-radius: 14px; text-decoration: none; color: var(--ink); background: transparent; transition: border-color .15s, transform .15s; }
-.action-card:hover { border-color: var(--ink); transform: translateY(-1px); }
-.action-card .icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--lime); color: var(--navy); font-family: var(--mono); font-weight: 700; font-size: 18px; margin-bottom: var(--space-2); }
-.action-card h2 { font-family: var(--sans); font-size: 19px; margin: 0; color: var(--ink); letter-spacing: -.01em; }
-.action-card p { font-family: var(--sans); font-size: 14px; line-height: 1.5; margin: 0; color: var(--ink-dim); }
-.action-card .pq-line { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); margin-top: var(--space-2); }
-.tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
-.tool-card { display: flex; flex-direction: column; gap: 4px; padding: var(--space-3) var(--space-4); border: 1px solid var(--ink-hair); border-radius: 12px; text-decoration: none; color: var(--ink); background: transparent; transition: border-color .15s; }
-.tool-card:hover { border-color: var(--ink); }
-.tool-card h3 { font-family: var(--sans); font-size: 16px; margin: 0; color: var(--ink); }
-.tool-card p { font-family: var(--sans); font-size: 13px; line-height: 1.5; margin: 0; color: var(--ink-dim); }
-.acct-block { margin-top: var(--space-5); }
-.acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
-.acct-card { border: 1px solid var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); background: transparent; }
-.acct-card .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
-.acct-card .val { font-family: var(--sans); font-size: 22px; color: var(--ink); letter-spacing: -.01em; }
-.acct-card .val.small { font-size: 15px; font-family: var(--mono); }
-.pa-act-row { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
-.pa-onboarding { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-4) 0 var(--space-5); padding: var(--space-3) var(--space-4); border: 1px solid var(--ink-hair); border-radius: 14px; background: transparent; }
-.pa-onboarding .pa-onb-img { width: clamp(140px, 18vw, 200px); height: auto; flex-shrink: 0; }
-.pa-onboarding .pa-onb-text { flex: 1 1 auto; font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink); }
-.pa-onboarding .pa-onb-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
-.pa-onboarding .pa-onb-dismiss { background: transparent; border: 1px solid var(--ink-hair); border-radius: 8px; padding: 6px 10px; font-family: var(--sans); font-size: 12px; color: var(--ink-dim); cursor: pointer; line-height: 1; }
-.pa-onboarding .pa-onb-dismiss:hover { border-color: var(--ink); color: var(--ink); }
-@media (max-width: 640px) { .pa-onboarding { flex-direction: column; align-items: flex-start; } .pa-onboarding .pa-onb-img { width: 150px; } }
-</style>
-<aside class="pa-onboarding" data-pa-onboarding aria-label="Getting started">
-  <img class="pa-onb-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="104" height="104">
-  <div class="pa-onb-text">
-    <span class="pa-onb-kicker">Welcome</span>
-    Everything lives here. Pick a tool below to start &mdash; send a file, share verified, drop device-to-device, or sign.
-  </div>
-  <button class="pa-onb-dismiss" type="button" data-pa-action="dismiss-onboarding" aria-label="Dismiss this tip">Got it</button>
-</aside>
-<section class="hub-hero" aria-label="Your Paramant">
-  <div class="pq-tag"><span class="pq-dot" aria-hidden="true"></span>ML-KEM-768 · ML-DSA-65 · AES-256-GCM · client-side</div>
-  <h1>Your Paramant</h1>
-  <p class="sub">Encrypted send/receive and post-quantum signing. All keys and plaintext stay in your browser — the relay never sees them.</p>
-  <div class="auth-status" aria-live="polite">
-    <p class="auth-msg"><strong>Signed in</strong> as ${esc(email)} <span class="auth-pill">${esc(plan)}</span></p>
-  </div>
-</section>
-
-<section aria-label="Primary actions">
-  <h2 class="block-h">Send &amp; receive</h2>
-  <div class="action-pair">
-    <a class="action-card" href="/parashare" aria-label="Send a file">
-      <div class="icon" aria-hidden="true">&rarr;</div>
-      <h2>Send a file</h2>
-      <p>Encrypt a file in your browser, share a signed link. AES-256-GCM with ML-KEM-768 hybrid key wrap and ML-DSA-65 signed receipts. Burn-on-read.</p>
-      <div class="pq-line">Client-side &middot; signed &middot; burn-on-read</div>
-    </a>
-    <a class="action-card" href="/get" aria-label="Receive a file">
-      <div class="icon" aria-hidden="true">&larr;</div>
-      <h2>Receive a file</h2>
-      <p>Open a secure link someone sent you. Decryption happens locally in your browser.</p>
-      <div class="pq-line">Browser-only &middot; zero-knowledge</div>
-    </a>
-  </div>
-</section>
-
-<section aria-label="More tools">
-  <h2 class="block-h">More tools</h2>
-  <div class="tools-grid">
-    <a class="tool-card" href="/parashare"><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
-    <a class="tool-card" href="/drop"><h3>ParaDrop</h3><p>Device-to-device transfer. 6-digit pairing code. End-to-end encrypted.</p></a>
-    <a class="tool-card" href="/sign"><h3>ParaSign</h3><p>Sign documents with ML-DSA-65 (FIPS 204). CT-log notarized.</p></a>
-    <a class="tool-card" href="/verify"><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
-  </div>
-</section>
-
-<section class="acct-block" aria-label="Your account">
-  <h2 class="block-h">Your account</h2>
-  <div class="acct-grid">
-    <div class="acct-card"><div class="lbl">Plan</div><div class="val">${esc(plan)}</div></div>
-    <div class="acct-card"><div class="lbl">Email</div><div class="val small">${esc(email)}</div></div>
-    <div class="acct-card"><div class="lbl">API key</div><div class="val small">${esc(apiKeyMasked)}</div></div>
-    ${label ? `<div class="acct-card"><div class="lbl">Label</div><div class="val small">${esc(label)}</div></div>` : ""}
-    <div class="acct-card"><div class="lbl">Created</div><div class="val small">${esc(createdDisplay)}</div></div>
-    <div class="acct-card"><div class="lbl">Backup codes</div><div class="val small">${backupCount} left</div></div>
-    <div class="acct-card"><div class="lbl">Session</div><div class="val small">${expiresMin} min</div></div>
-  </div>
-  <div class="pa-act-row">
-    <a class="pa-btn" href="/account">Manage account</a>
-    <button class="pa-btn" type="button" data-pa-action="refresh">Refresh</button>
-    <button class="pa-btn" type="button" data-pa-action="signout">Sign out</button>
-  </div>
-</section>
-`);
+    res.json({
+      email,
+      label: user?.label || null,
+      plan: (user && user.plan) || "standard",
+      created_at: user?.created_at || null,
+      api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
+      backup_codes_remaining: backupCount,
+      session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+    });
   } catch (err) {
-    console.error("[dashboard-fragment]", err.message);
-    res.status(500).send("<p>Dashboard temporarily unavailable.</p>");
+    console.error("[user/me]", err.message);
+    res.status(503).json({ error: "user_data_unavailable" });
   }
+});
+
+// Legacy server-rendered dashboard fragment has been removed in favour of
+// /api/user/me + client-side rendering in frontend/dashboard.html. Kept as a
+// 410 stub so any cached old loader gets a clear "go re-fetch the page" answer
+// instead of a silent failure.
+api.get("/user/dashboard-fragment", (req, res) => {
+  res.status(410).json({ error: "gone", hint: "use /api/user/me" });
 });
 
 // GET /api/user/check
