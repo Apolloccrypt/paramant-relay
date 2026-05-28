@@ -35,6 +35,7 @@ const state = {
     sigImageType: null,    // 'png' | 'jpg'
     sigImageDataUrl: null, // pre-computed data: URL for <img src=>
     docImageDataUrl: null, // pre-computed data: URL when doc is a viewable image
+    stampTheme: 'dark',    // 'dark' (cobalt header band, white text) | 'light' (white band, navy text)
   },
   recipients: [],        // [{label, email}]; if empty -> single-party local sign only
   envelope: null,        // populated when recipients.length > 0 after POST /v2/envelopes
@@ -245,7 +246,7 @@ async function renderPdfForPlacement() {
     (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
 }
 
-function onPlaceClick(e) {
+async function onPlaceClick(e) {
   const wrap = e.currentTarget;
   const canvas = wrap.querySelector('canvas');
   const rect = canvas.getBoundingClientRect();
@@ -283,19 +284,60 @@ function onPlaceClick(e) {
   }
 
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
-  renderStampMarker(wrap, left, top, stampPxW, stampPxH);
+  await renderStampMarker(wrap, left, top, stampPxW, stampPxH);
   $('ds-place-continue').disabled = false;
   $('ds-place-hint').textContent = isImage
     ? 'Stamp placed on the image. Click another spot to move it.'
     : 'Stamp on page ' + (wrap._pdfPage.index + 1) + '. Click another spot to move it.';
 }
 
-function renderStampMarker(wrap, left, top, w, h) {
+async function renderStampMarker(wrap, left, top, w, h) {
   const m = document.createElement('div');
   m.className = 'ds-stamp-marker';
-  m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
-  m.innerHTML = stampMockupHtml();
+  m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px;background:transparent;border:0;padding:0;overflow:visible;pointer-events:none`;
+  try {
+    const canvas = await createStampPreviewCanvas(w, h);
+    canvas.style.cssText = 'width:100%;height:100%;display:block';
+    m.appendChild(canvas);
+  } catch {
+    // Fallback if signature image load fails: at least show the placement box.
+    m.style.cssText += ';border:2px solid var(--cobalt);background:rgba(11,58,106,.05)';
+  }
   wrap.appendChild(m);
+}
+
+// Renders the actual stamp graphic (via drawStampOnCanvas) at the requested
+// display dimensions. This is the canvas equivalent of stampMockupHtml: it
+// scales correctly at any size because it is the same code that bakes the
+// stamp into the final PDF/image, and stays hi-dpi sharp via devicePixelRatio.
+async function createStampPreviewCanvas(widthPx, heightPx) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(widthPx * dpr));
+  canvas.height = Math.max(1, Math.round(heightPx * dpr));
+  canvas.style.width = widthPx + 'px';
+  canvas.style.height = heightPx + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  let sigImg = null;
+  if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
+    sigImg = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('sig image load failed'));
+      i.src = state.signer.sigImageDataUrl;
+    });
+  }
+
+  const name = (state.signer.name || 'Signer').slice(0, 40);
+  const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const fp = (state.signer.key && state.signer.key.publicKey)
+    ? toHex(sha3_256(state.signer.key.publicKey)).slice(0, 8)
+    : 'pending';
+
+  drawStampOnCanvas(ctx, { x: 0, y: 0, w: widthPx, h: heightPx }, name, dateStr, fp, sigImg);
+  return canvas;
 }
 
 // ====================================================================
@@ -651,18 +693,18 @@ async function renderDocPreview() {
     canvas.height = Math.floor(viewport.height);
     pane.appendChild(canvas);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    // Mock the stamp as an absolutely positioned overlay so the user sees
-    // where it will land. Convert PDF points -> displayed pixels.
+    // Mock the stamp as an absolutely positioned canvas (same rendering as
+    // the real stamp) so it scales correctly at the preview size.
     const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
     const left = state.stamp.x / ratio;
     const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
     const w = state.stamp.w / ratio;
     const h = state.stamp.h / ratio;
-    const mock = document.createElement('div');
-    mock.className = 'ds-mockup-stamp';
-    mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
-    mock.innerHTML = stampInnerHtml();
-    pane.appendChild(mock);
+    try {
+      const stampCanvas = await createStampPreviewCanvas(w, h);
+      stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
+      pane.appendChild(stampCanvas);
+    } catch {}
     return;
   }
 
@@ -678,19 +720,19 @@ async function renderDocPreview() {
     img.style.cssText = 'display:block;width:100%;height:auto';
     wrap.appendChild(img);
     pane.appendChild(wrap);
-    img.onload = () => {
+    img.onload = async () => {
       // Image natural -> displayed ratio
       const rect = img.getBoundingClientRect();
-      const ratio = state.doc && state.signer.docImageDataUrl ? (img.naturalWidth / rect.width) : 1;
+      const ratio = img.naturalWidth / rect.width;
       const left = state.stamp.x / ratio;
       const top  = state.stamp.y / ratio;
       const w = state.stamp.w / ratio;
       const h = state.stamp.h / ratio;
-      const mock = document.createElement('div');
-      mock.className = 'ds-mockup-stamp';
-      mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
-      mock.innerHTML = stampInnerHtml();
-      wrap.appendChild(mock);
+      try {
+        const stampCanvas = await createStampPreviewCanvas(w, h);
+        stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
+        wrap.appendChild(stampCanvas);
+      } catch {}
     };
     return;
   }
@@ -724,7 +766,8 @@ function renderSigPreview() {
   if (state.signer.sigStyle === 'typed') {
     const el = document.createElement('div');
     el.className = 'ds-typed-preview';
-    el.textContent = state.signer.name || '(no name)';
+    el.textContent = state.signer.name || '(enter your name in step 4)';
+    if (!state.signer.name) el.style.color = 'var(--ink-dim)';
     pane.appendChild(el);
     return;
   }
@@ -737,7 +780,16 @@ function renderSigPreview() {
     return;
   }
 
-  pane.textContent = '(no signature data)';
+  // Empty-state for picked-style-without-data
+  const hint = document.createElement('div');
+  hint.className = 'ds-pane-meta';
+  hint.style.color = 'var(--ink-dim)';
+  hint.textContent = state.signer.sigStyle === 'drawn'
+    ? 'No signature drawn yet. Go back to Identity (step 4), pick Draw signature, and use the canvas.'
+    : state.signer.sigStyle === 'image'
+      ? 'No signature image uploaded yet. Go back to Identity (step 4), pick Upload image, and choose a PNG or JPG.'
+      : 'No signature data.';
+  pane.appendChild(hint);
 }
 
 function stampInnerHtml() {
@@ -816,18 +868,31 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
 
 function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg) {
   const { x, y, w, h } = stamp;
+  const theme = state.signer.stampTheme || 'dark';
+  const bandFill = theme === 'light' ? '#ffffff' : '#0b3a6a';
+  const bandText = theme === 'light' ? '#0b3a6a' : '#ffffff';
+  const bodyBg   = theme === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(11,58,106,0.03)';
+
   // Outer fill + border
-  ctx.fillStyle = 'rgba(11, 58, 106, 0.03)';
+  ctx.fillStyle = bodyBg;
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = '#0b3a6a';
   ctx.lineWidth = Math.max(1, w / 200);
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 
-  // Cobalt header band with ParaMANT wordmark + POST-QUANTUM SIGNED badge
+  // Header band: cobalt+white for dark theme, white+navy for light theme
   const bandH = h * 0.18;
-  ctx.fillStyle = '#0b3a6a';
+  ctx.fillStyle = bandFill;
   ctx.fillRect(x, y, w, bandH);
-  ctx.fillStyle = '#ffffff';
+  if (theme === 'light') {
+    ctx.strokeStyle = '#0b3a6a';
+    ctx.lineWidth = Math.max(0.5, w / 400);
+    ctx.beginPath();
+    ctx.moveTo(x, y + bandH);
+    ctx.lineTo(x + w, y + bandH);
+    ctx.stroke();
+  }
+  ctx.fillStyle = bandText;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.font = 'bold ' + (bandH * 0.55) + 'px Helvetica, Arial, sans-serif';
@@ -895,19 +960,33 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   const navy  = PDFLib.rgb(0.043, 0.227, 0.416);
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
   const white = PDFLib.rgb(1, 1, 1);
+  const theme = state.signer.stampTheme || 'dark';
+  const bandFill = theme === 'light' ? white : navy;
+  const bandText = theme === 'light' ? navy  : white;
 
-  // Outer border + faint fill
-  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: navy, opacity: 0.03 });
+  // Outer border + faint fill (slightly more visible in light theme so the
+  // stamp doesn't disappear against bright doc backgrounds).
+  page.drawRectangle({
+    x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h,
+    borderColor: navy, borderWidth: 1.2,
+    color: theme === 'light' ? white : navy,
+    opacity: theme === 'light' ? 0.92 : 0.03,
+  });
 
-  // Branded top band: cobalt bar with logo + PQ badge
+  // Branded top band: cobalt bar (dark) or white bar (light) with navy text
   const bandH = 16;
-  page.drawRectangle({ x: stamp.x, y: stamp.y + stamp.h - bandH, width: stamp.w, height: bandH, color: navy });
-  // 'Para' + 'MANT' both white on navy (no two-tone in PDF stamp; we keep the
-  // wordmark monochrome here for legibility at small print sizes).
-  page.drawText('ParaMANT', { x: stamp.x + 8, y: stamp.y + stamp.h - 11, size: 9, font: fontBold, color: white });
+  page.drawRectangle({ x: stamp.x, y: stamp.y + stamp.h - bandH, width: stamp.w, height: bandH, color: bandFill });
+  if (theme === 'light') {
+    page.drawLine({
+      start: { x: stamp.x, y: stamp.y + stamp.h - bandH },
+      end:   { x: stamp.x + stamp.w, y: stamp.y + stamp.h - bandH },
+      thickness: 0.6, color: navy,
+    });
+  }
+  page.drawText('ParaMANT', { x: stamp.x + 8, y: stamp.y + stamp.h - 11, size: 9, font: fontBold, color: bandText });
   const badge = 'POST-QUANTUM SIGNED';
   const badgeW = fontBold.widthOfTextAtSize(badge, 6);
-  page.drawText(badge, { x: stamp.x + stamp.w - badgeW - 8, y: stamp.y + stamp.h - 10.5, size: 6, font: fontBold, color: white });
+  page.drawText(badge, { x: stamp.x + stamp.w - badgeW - 8, y: stamp.y + stamp.h - 10.5, size: 6, font: fontBold, color: bandText });
 
   // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2
   const footerH = 22;
@@ -1144,8 +1223,31 @@ async function doSign() {
     state.result = { stampedBytes, envelope, fingerprint };
     showDone();
   } catch (e) {
+    const msg = e.message || String(e);
     $('ds-sign-status').className = 'ds-banner err';
-    $('ds-sign-status').textContent = (e.message || String(e));
+    // If this is an API-key issue, render a click-through link to the dashboard
+    // and a button to re-open the Advanced section, so the user does not have
+    // to read the URL out of the error and paste it manually.
+    if (/API key|api.key/i.test(msg)) {
+      $('ds-sign-status').innerHTML =
+        escapeHtml(msg).replace(/\(https?:[^)]+\)/g, m => {
+          const url = m.slice(1, -1);
+          return '(<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" style="color:rgba(180,20,20,1);text-decoration:underline">' + escapeHtml(url) + '</a>)';
+        }) +
+        '<div class="ds-actions" style="margin-top:10px">' +
+          '<a class="btn btn-primary" style="min-width:auto" href="/dashboard#api-keys" target="_blank" rel="noopener">Open Dashboard - API Keys</a>' +
+          '<button class="btn btn-tertiary" type="button" style="min-width:auto" id="ds-go-edit-key">Edit key in Advanced</button>' +
+        '</div>';
+      const goBtn = document.getElementById('ds-go-edit-key');
+      if (goBtn) goBtn.addEventListener('click', () => {
+        setActive('step-identity');
+        const adv = document.getElementById('ds-advanced-block');
+        if (adv) adv.open = true;
+        setTimeout(() => { const k = $('ds-api-key'); if (k) k.focus(); }, 100);
+      });
+    } else {
+      $('ds-sign-status').textContent = msg;
+    }
     $('ds-sign-now').disabled = false;
   }
 }
@@ -1344,15 +1446,18 @@ async function renderSignedPreview() {
 function wireNav() {
   $('ds-place-continue').addEventListener('click', () => { setActive('step-recipients'); renderRecipients(); });
   $('ds-hash-only-continue').addEventListener('click', () => { setActive('step-recipients'); renderRecipients(); });
+  $('ds-identity-back').addEventListener('click', () => setActive('step-recipients'));
   $('ds-place-back').addEventListener('click', () => setActive('step-doc'));
   $('ds-hash-only-back').addEventListener('click', () => setActive('step-doc'));
-  $('ds-recipients-back').addEventListener('click', () => setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only'));
+  $('ds-recipients-back').addEventListener('click', () => {
+    commitRecipientsFromDom();
+    setActive(state.mode === 'pdf' || state.mode === 'image' ? 'step-place' : 'step-hash-only');
+  });
   $('ds-recipients-continue').addEventListener('click', () => {
     commitRecipientsFromDom();
     setActive('step-identity');
   });
   $('ds-add-recipient').addEventListener('click', addRecipientRow);
-  $('ds-identity-back').addEventListener('click', () => setActive('step-recipients'));
   $('ds-identity-continue').addEventListener('click', () => {
     fillReview();
     setActive('step-sign');
@@ -1420,11 +1525,23 @@ function wireLiveStampUpdates() {
   // Whenever the signer's name changes (identity step), re-render any
   // placement marker in step-place so the name shown there reflects what
   // will end up in the stamp. Attached once at init.
+  let pending = null;
   $('ds-signer-name').addEventListener('input', () => {
-    if (state.mode !== 'pdf' || !state.stamp) return;
-    document.querySelectorAll('.ds-stamp-marker').forEach(el => {
-      el.innerHTML = stampMockupHtml();
-    });
+    if ((state.mode !== 'pdf' && state.mode !== 'image') || !state.stamp) return;
+    // Debounce so we don't redraw on every keystroke
+    if (pending) clearTimeout(pending);
+    pending = setTimeout(async () => {
+      const markers = document.querySelectorAll('.ds-stamp-marker');
+      for (const m of markers) {
+        const w = m.clientWidth, h = m.clientHeight;
+        m.innerHTML = '';
+        try {
+          const c = await createStampPreviewCanvas(w, h);
+          c.style.cssText = 'width:100%;height:100%;display:block';
+          m.appendChild(c);
+        } catch {}
+      }
+    }, 120);
   });
 }
 
@@ -1433,7 +1550,58 @@ function init() {
   initStepIdentity();
   wireNav();
   wireLiveStampUpdates();
+  initApiKeyPersistence();
+  wireThemeToggle();
   setActive('step-doc');
+}
+
+function wireThemeToggle() {
+  document.querySelectorAll('.ds-theme-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const theme = btn.dataset.theme;
+      state.signer.stampTheme = theme;
+      document.querySelectorAll('.ds-theme-btn').forEach(b => {
+        const isActive = b.dataset.theme === theme;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+      // Repaint any existing on-screen stamp markers with the new theme.
+      const markers = document.querySelectorAll('.ds-stamp-marker');
+      for (const m of markers) {
+        const w = m.clientWidth, h = m.clientHeight;
+        m.innerHTML = '';
+        try {
+          const c = await createStampPreviewCanvas(w, h);
+          c.style.cssText = 'width:100%;height:100%;display:block';
+          m.appendChild(c);
+        } catch {}
+      }
+    });
+  });
+}
+
+// The relay API key (pgp_...) is separate from the website session cookie.
+// We remember it per-tab in sessionStorage so the user pastes it once and
+// not on every sign attempt within the same browser session.
+function initApiKeyPersistence() {
+  const input = $('ds-api-key');
+  const clearBtn = $('ds-api-key-clear');
+  if (!input) return;
+  try {
+    const saved = sessionStorage.getItem('paramant_sign_api_key');
+    if (saved) input.value = saved;
+  } catch {}
+  input.addEventListener('input', () => {
+    const v = input.value.trim();
+    try {
+      if (v) sessionStorage.setItem('paramant_sign_api_key', v);
+      else sessionStorage.removeItem('paramant_sign_api_key');
+    } catch {}
+  });
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    input.value = '';
+    try { sessionStorage.removeItem('paramant_sign_api_key'); } catch {}
+  });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

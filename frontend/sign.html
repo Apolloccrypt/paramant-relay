@@ -77,6 +77,12 @@
 .ds-tab.active{color:var(--cobalt);border-bottom-color:var(--cobalt)}
 .ds-sig-panel{padding:6px 0 0}
 #ds-sig-canvas{border:1px solid var(--ink-hair);background:#fff;width:100%;max-width:500px;height:auto;cursor:crosshair;touch-action:none;display:block}
+.ds-place-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px;padding:8px 0}
+.ds-theme-toggle{display:inline-flex;align-items:center;gap:0;border:1px solid var(--ink-hair);background:var(--bone);margin-left:auto}
+.ds-theme-label{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding:0 12px}
+.ds-theme-btn{padding:8px 16px;border:0;background:transparent;color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-left:1px solid var(--ink-hair)}
+.ds-theme-btn.active{background:var(--cobalt);color:#fff}
+.ds-theme-btn:hover:not(.active){color:var(--navy)}
 .ds-review-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 .ds-review-h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);font-weight:700;margin:0 0 8px}
 .ds-review-pane{background:var(--bone);border:1px solid var(--ink-hair);min-height:140px;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
@@ -324,7 +330,14 @@
   <section class="ds-step" id="step-place" hidden>
     <h2>Place your signature</h2>
     <p class="ds-sub">Click anywhere on a page to drop the stamp. Click another spot to move it. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
-    <p class="ds-hint" id="ds-place-hint">Click a page to drop the signature stamp.</p>
+    <div class="ds-place-toolbar">
+      <p class="ds-hint" id="ds-place-hint" style="margin:0">Click a page to drop the signature stamp.</p>
+      <div class="ds-theme-toggle" role="radiogroup" aria-label="Seal style">
+        <span class="ds-theme-label">Seal style</span>
+        <button class="ds-theme-btn active" data-theme="dark" type="button" aria-pressed="true">Dark</button>
+        <button class="ds-theme-btn" data-theme="light" type="button" aria-pressed="false">Light</button>
+      </div>
+    </div>
     <div id="ds-pdf-canvas-list"></div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
@@ -412,13 +425,18 @@
       </select>
       <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. The key is what cryptographically binds the signature - so it cannot be forged.</p>
     </div>
-    <details class="ds-advanced">
+    <details class="ds-advanced" id="ds-advanced-block">
       <summary>Advanced: Paramant relay integration</summary>
-      <p>Optional for self-sign, <strong>required if you added recipients</strong>. With your Paramant API key, the relay (a) counter-signs the envelope and writes it to the public CT log, and (b) creates the multi-party envelope so co-signers can sign at <code>/co-sign?env=...</code>. Without a key your envelope is fully self-contained but recipients cannot use the co-sign flow.</p>
+      <p><strong>Heads-up:</strong> being logged in to this website is <em>not</em> the same as having an API key for the relay. The website uses a session cookie to show you /sign; the relay API uses a separate <code>pgp_...</code> key. You need to copy your key from the Dashboard once - this browser tab remembers it after that.</p>
+      <p>Optional for self-sign, <strong>required if you added recipients</strong>. With your Paramant API key, the relay (a) counter-signs the envelope and writes it to the public CT log, and (b) creates the multi-party envelope so co-signers can sign at <code>/co-sign?env=...</code>.</p>
       <div class="ds-field">
         <label class="ds-label" for="ds-api-key">X-Api-Key (format: <code>pgp_...</code>)</label>
         <input class="ds-input" type="password" id="ds-api-key" placeholder="pgp_..." autocomplete="off">
-        <p class="ds-hint" style="margin-top:6px">Find or create one at <a href="/dashboard#api-keys" target="_blank">Dashboard &gt; API Keys</a>. The key is sent only to the relay, never to other recipients.</p>
+        <div class="ds-actions" style="margin-top:8px">
+          <a class="btn btn-tertiary" href="/dashboard#api-keys" target="_blank" rel="noopener" style="min-width:auto">Open my Dashboard</a>
+          <button class="btn btn-tertiary" type="button" id="ds-api-key-clear" style="min-width:auto">Clear this key</button>
+        </div>
+        <p class="ds-hint" style="margin-top:6px">Stored in this browser tab only (sessionStorage). Cleared when you close the tab. The key is sent only to <code>health.paramant.app</code>, never to other recipients.</p>
       </div>
     </details>
     <div class="ds-actions">
@@ -593,6 +611,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=9"></script>
+<script type="module" src="/sign-flow.js?v=10"></script>
 </body>
 </html>
