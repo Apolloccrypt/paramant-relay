@@ -188,18 +188,54 @@
 
   <section class="card ps-panel" aria-labelledby="s1">
     <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="s1" class="ps-panel-title">Signing key</h2></div>
-    <p class="ps-help">Generate a fresh ML-DSA-65 key or load one you saved earlier. The key stays in browser memory.</p>
+    <p class="ps-help">Generate a fresh ML-DSA-65 key, unlock one from this browser, or load a key file. The private key never leaves the browser.</p>
+
+    <div class="ps-vault-row" id="ps-vault-row" hidden>
+      <label class="ps-label" for="ps-vault-select">Use a key from this browser</label>
+      <select class="ps-input" id="ps-vault-select"></select>
+      <button class="btn btn-primary" id="ps-vault-unlock" type="button">Unlock</button>
+    </div>
+
     <div class="ps-btn-row">
       <button class="btn btn-primary" id="ps-gen-key" type="button">Generate new key</button>
       <label class="btn btn-secondary">Load key file<input type="file" id="ps-load-key" accept=".json,application/json" hidden></label>
       <button class="btn btn-tertiary" id="ps-save-key" type="button" disabled>Download key</button>
+      <button class="btn btn-secondary" id="ps-save-vault" type="button" disabled>Save to this browser</button>
     </div>
+
+    <div class="ps-vault-form" id="ps-vault-form" hidden>
+      <p class="ps-help"><strong>Set a passphrase to encrypt this key in your browser.</strong> We never see it and we cannot reset it. If you forget it, this key is gone. Download a backup file too, to be safe.</p>
+      <div class="ps-field">
+        <label class="ps-label" for="ps-vault-pass">Passphrase (8 chars min)</label>
+        <input class="ps-input mono" type="password" id="ps-vault-pass" autocomplete="new-password" minlength="8">
+      </div>
+      <div class="ps-field">
+        <label class="ps-label" for="ps-vault-pass2">Confirm passphrase</label>
+        <input class="ps-input mono" type="password" id="ps-vault-pass2" autocomplete="new-password" minlength="8">
+      </div>
+      <div class="ps-btn-row">
+        <button class="btn btn-primary" id="ps-vault-confirm" type="button">Save in browser</button>
+        <button class="btn btn-tertiary" id="ps-vault-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+
+    <div class="ps-vault-form" id="ps-unlock-form" hidden>
+      <div class="ps-field">
+        <label class="ps-label" for="ps-unlock-pass">Passphrase for the selected key</label>
+        <input class="ps-input mono" type="password" id="ps-unlock-pass" autocomplete="current-password">
+      </div>
+      <div class="ps-btn-row">
+        <button class="btn btn-primary" id="ps-unlock-confirm" type="button">Unlock</button>
+        <button class="btn btn-tertiary" id="ps-unlock-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+
     <div class="ps-keybox" id="ps-key-info" hidden>
       <dl class="ps-kv">
         <dt>Public key fingerprint</dt><dd class="mono" id="ps-pubkey-fp">-</dd>
         <dt>Algorithm</dt><dd>ML-DSA-65 (FIPS 204)</dd>
       </dl>
-      <p class="ps-warn">Private key is in memory only. Download it if you want to reuse this identity later.</p>
+      <p class="ps-warn">Private key is in memory only. Save it to this browser (encrypted) or download a key file if you want to reuse this identity.</p>
     </div>
   </section>
 

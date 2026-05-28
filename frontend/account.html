@@ -339,9 +339,40 @@
   </div>
 </section>
 
-<section class="section">
+<section class="section" id="signing-identity-section">
   <div class="marker">
     <div class="num">03</div>
+    <h2>Signing identity.</h2>
+    <div class="tag">ML-DSA-65<br>persistent</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+        Enrolled keys
+      </div>
+      <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
+      <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
+      <p class="small mt-2">
+        Public keys are bound to your account so verifiers can attribute signatures. Private keys never leave your browser. <a href="/sign">Manage at /sign</a>.
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+        Browser vault
+      </div>
+      <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
+      <p class="small mt-2">
+        <strong>Your passphrase encrypts your signing key in this browser. We never see it and we cannot reset it. If you forget it, this key is gone.</strong> Download a backup key file at <a href="/sign">/sign</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="marker">
+    <div class="num">04</div>
     <h2>Active sessions.</h2>
     <div class="tag">devices<br>signed in</div>
   </div>
@@ -357,7 +388,7 @@
 
 <section class="section" id="billing-section">
   <div class="marker">
-    <div class="num">04</div>
+    <div class="num">05</div>
     <h2>Plan &amp; billing.</h2>
     <div class="tag">subscription<br>and history</div>
   </div>
@@ -397,7 +428,7 @@
 
 <section class="section">
   <div class="marker">
-    <div class="num">05</div>
+    <div class="num">06</div>
     <h2>Session.</h2>
     <div class="tag">this browser<br>right now</div>
   </div>
@@ -410,7 +441,7 @@
 
 <section class="section">
   <div class="marker">
-    <div class="num">06</div>
+    <div class="num">07</div>
     <h2>Delete account.</h2>
     <div class="tag">permanent<br>cannot undo</div>
   </div>
@@ -638,6 +669,102 @@
   loadBilling();
   loadBillingHistory();
 })();
+</script>
+
+<script type="module">
+import { vaultAvailable, vaultList } from '/vendor/vault.js';
+
+const escHtml = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+
+function fmtTs(iso) {
+  if (!iso) return '-';
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+async function loadEnrolledKeys() {
+  const listEl = document.getElementById('signing-list');
+  const emptyEl = document.getElementById('signing-empty');
+  try {
+    const res = await fetch('/api/user/account/signing-key', { credentials: 'include' });
+    if (!res.ok) {
+      emptyEl.textContent = 'Could not load enrolled keys (HTTP ' + res.status + ').';
+      return;
+    }
+    const data = await res.json();
+    const keys = (data.keys || []);
+    if (!keys.length) {
+      emptyEl.textContent = 'No signing keys enrolled on your account yet. Visit /sign to generate one and enroll it.';
+      listEl.innerHTML = '';
+      return;
+    }
+    emptyEl.hidden = true;
+    listEl.innerHTML = keys.map(k => {
+      const fp = escHtml((k.pk_hash_sha3 || '').slice(0, 16));
+      const lbl = k.label ? escHtml(k.label) : '<em>no label</em>';
+      const enrolled = escHtml(fmtTs(k.enrolled_at));
+      const revoked = k.revoked_at ? ' &middot; revoked ' + escHtml(fmtTs(k.revoked_at)) : '';
+      const alg = escHtml(k.alg || '?');
+      const btn = k.revoked_at
+        ? ''
+        : '<button type="button" class="btn btn-secondary btn-small" data-revoke="' + escHtml(k.pk_hash_sha3) + '">Revoke</button>';
+      return '<li style="padding:12px 0;border-bottom:1px solid var(--border-soft, #e5e7eb)">' +
+        '<div style="font-weight:600">' + lbl + '</div>' +
+        '<div class="mono small" style="margin:4px 0">' + fp + '...</div>' +
+        '<div class="small" style="color:var(--muted, #6b7280)">' + alg + ' &middot; enrolled ' + enrolled + revoked + '</div>' +
+        (btn ? '<div style="margin-top:8px">' + btn + '</div>' : '') +
+        '</li>';
+    }).join('');
+    listEl.querySelectorAll('button[data-revoke]').forEach(b => {
+      b.addEventListener('click', () => revokeKey(b.getAttribute('data-revoke')));
+    });
+  } catch (e) {
+    emptyEl.textContent = 'Could not load enrolled keys: ' + e.message;
+  }
+}
+
+async function revokeKey(pkHash) {
+  const totp = window.prompt('Revoke this signing key?\n\nEnter your 6-digit TOTP code to confirm.');
+  if (!totp) return;
+  if (!/^\d{6}$/.test(totp)) { alert('TOTP must be 6 digits.'); return; }
+  try {
+    const res = await fetch('/api/user/account/signing-key', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pk_hash_sha3: pkHash, totp }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { alert('Revoke failed: ' + (body.error || ('HTTP ' + res.status))); return; }
+    await loadEnrolledKeys();
+  } catch (e) { alert('Revoke failed: ' + e.message); }
+}
+
+async function loadVaultStatus() {
+  const el = document.getElementById('vault-status');
+  if (!(await vaultAvailable())) {
+    el.textContent = 'IndexedDB or WebCrypto not available in this browser. You can still generate a key at /sign and download a backup file.';
+    return;
+  }
+  try {
+    const list = await vaultList();
+    if (!list.length) {
+      el.textContent = 'No keys saved in this browser yet. Go to /sign to generate one and save it here.';
+      return;
+    }
+    const fmt = e => (e.label ? e.label : '(no label)') + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
+    const last = list.reduce((acc, e) => (e.last_used_at && (!acc || e.last_used_at > acc) ? e.last_used_at : acc), null);
+    el.textContent = list.length + ' key' + (list.length === 1 ? '' : 's') + ' saved in this browser'
+      + (last ? '. Last used ' + fmtTs(last) : '. Never unlocked yet')
+      + '. Keys: ' + list.map(fmt).join(', ');
+  } catch (e) {
+    el.textContent = 'Could not read browser vault: ' + e.message;
+  }
+}
+
+loadEnrolledKeys();
+loadVaultStatus();
 </script>
 
 </body>
