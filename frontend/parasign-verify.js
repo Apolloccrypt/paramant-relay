@@ -114,11 +114,14 @@ async function clientSideVerify() {
       const origHash = hexToBytes(envelope.original_hash || '');
       if (origHash.length !== 32) errors.push('original_hash missing or wrong length');
       const stampedHash = docHashBytes;
-      const coordsBytes = new TextEncoder().encode(JSON.stringify(envelope.coords || {}));
-      const msg = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
+      // New schema uses .stamps (array), legacy uses .coords (single object).
+      // Sign-message bytes = JSON.stringify of whichever shape was used.
+      const stampsField = envelope.stamps ? envelope.stamps : (envelope.coords || {});
+      const stampsBytes = new TextEncoder().encode(JSON.stringify(stampsField));
+      const msg = new Uint8Array(origHash.length + stampedHash.length + stampsBytes.length);
       msg.set(origHash, 0);
       msg.set(stampedHash, origHash.length);
-      msg.set(coordsBytes, origHash.length + stampedHash.length);
+      msg.set(stampsBytes, origHash.length + stampedHash.length);
       const sig = fromB64(envelope.signature);
       const pk  = fromB64(envelope.signer_public_key);
       const ok = ml_dsa65.verify(pk, msg, sig);

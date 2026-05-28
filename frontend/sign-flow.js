@@ -24,7 +24,8 @@ const state = {
   mode: null,            // 'pdf' | 'image' | 'hash'
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
-  stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
+  stamps: [],            // [{pageIndex, x, y, w, h, isImage?}] - one per click, removable individually.
+                         // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
   signer: {
     name: '',
     keySrc: 'ephemeral',
@@ -186,7 +187,7 @@ async function onDocChosen(file) {
       // Fallback: skip placement entirely and sign as hash-only attestation.
       document.getElementById('ds-fallback-hash').addEventListener('click', () => {
         state.mode = 'hash';
-        state.stamp = null;
+        state.stamps = [];
         setActive('step-hash-only');
         $('ds-hash-only-name').textContent = state.doc.name;
         $('ds-hash-only-size').textContent = formatSize(state.doc.size);
@@ -249,15 +250,14 @@ async function renderImageForPlacement() {
   container.appendChild(wrap);
   wrap.addEventListener('click', onPlaceClick);
 
-  // If there's already a stamp from a previous visit, restore the marker so
-  // the user does not lose visible progress when navigating back here.
-  if (state.stamp && state.stamp.isImage) {
-    const left = state.stamp.x * scale;
-    const top  = state.stamp.y * scale;
-    const w = state.stamp.w * scale;
-    const h = state.stamp.h * scale;
-    await renderStampMarker(wrap, left, top, w, h);
+  // If there are stamps from a previous visit, restore the markers.
+  for (let i = 0; i < state.stamps.length; i++) {
+    const s = state.stamps[i];
+    if (s.isImage && s.pageIndex === 0) {
+      await renderStampMarker(wrap, s.x * scale, s.y * scale, s.w * scale, s.h * scale, i);
+    }
   }
+  updatePlaceHint();
 
   $('ds-place-page-count').textContent = '1 image (' + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
 }
@@ -296,6 +296,9 @@ async function renderPdfForPlacement() {
   $('ds-place-page-count').textContent =
     pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
     (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
+  // Restore existing stamps (in case user navigated away + back).
+  if (state.stamps.length > 0) await rerenderAllMarkers();
+  updatePlaceHint();
 }
 
 async function onPlaceClick(e) {
@@ -326,36 +329,90 @@ async function onPlaceClick(e) {
   const natX = left * ratio;
   const natYTop = top * ratio;
 
+  let newStamp;
   if (isImage) {
-    // Image-pixel coords, top-left origin (matches canvas + ctx.drawImage).
-    state.stamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
+    newStamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
   } else {
-    // pdf-lib uses bottom-left origin in PDF points.
     const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
-    state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
+    newStamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
   }
+  state.stamps.push(newStamp);
+  const stampIdx = state.stamps.length - 1;
+  await renderStampMarker(wrap, left, top, stampPxW, stampPxH, stampIdx);
 
-  document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
-  await renderStampMarker(wrap, left, top, stampPxW, stampPxH);
   $('ds-place-continue').disabled = false;
-  $('ds-place-hint').textContent = isImage
-    ? 'Stamp placed on the image. Click another spot to move it.'
-    : 'Stamp on page ' + (wrap._pdfPage.index + 1) + '. Click another spot to move it.';
+  updatePlaceHint();
 }
 
-async function renderStampMarker(wrap, left, top, w, h) {
+function updatePlaceHint() {
+  const n = state.stamps.length;
+  if (n === 0) {
+    $('ds-place-hint').textContent = 'Click a page to drop the signature stamp.';
+  } else if (n === 1) {
+    $('ds-place-hint').textContent = '1 stamp placed. Click another spot to add another, or remove this one with the X.';
+  } else {
+    $('ds-place-hint').textContent = n + ' stamps placed. Click anywhere to add more, or remove individual stamps with the X.';
+  }
+  const clearBtn = $('ds-place-clear-all');
+  if (clearBtn) clearBtn.hidden = (n < 2);
+}
+
+async function renderStampMarker(wrap, left, top, w, h, stampIdx) {
   const m = document.createElement('div');
   m.className = 'ds-stamp-marker';
+  m.dataset.stampIdx = String(stampIdx);
   m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px;background:transparent;border:0;padding:0;overflow:visible;pointer-events:none`;
   try {
     const canvas = await createStampPreviewCanvas(w, h);
     canvas.style.cssText = 'width:100%;height:100%;display:block';
     m.appendChild(canvas);
   } catch {
-    // Fallback if signature image load fails: at least show the placement box.
     m.style.cssText += ';border:2px solid var(--cobalt);background:rgba(11,58,106,.05)';
   }
+  // X button to remove just this stamp (does not interfere with placement clicks
+  // because the marker itself is pointer-events:none).
+  const x = document.createElement('button');
+  x.className = 'ds-stamp-x';
+  x.type = 'button';
+  x.title = 'Remove this stamp';
+  x.textContent = 'x';
+  x.dataset.stampIdx = String(stampIdx);
+  x.addEventListener('click', (ev) => { ev.stopPropagation(); removeStamp(stampIdx); });
+  m.appendChild(x);
   wrap.appendChild(m);
+}
+
+function removeStamp(idx) {
+  state.stamps.splice(idx, 1);
+  // Re-render all markers (indices shift after splice).
+  document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
+  rerenderAllMarkers().catch(() => {});
+  updatePlaceHint();
+  if (state.stamps.length === 0) $('ds-place-continue').disabled = true;
+}
+
+async function rerenderAllMarkers() {
+  // Place all stamps back on their corresponding canvases in step-place.
+  const wraps = document.querySelectorAll('.ds-page-wrap');
+  for (let i = 0; i < state.stamps.length; i++) {
+    const s = state.stamps[i];
+    const wrap = Array.from(wraps).find(w => w._pdfPage && w._pdfPage.index === s.pageIndex);
+    if (!wrap) continue;
+    const canvas = wrap.querySelector('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const ratio = wrap._pdfPage.width / rect.width;
+    const stampPxW = s.w / ratio;
+    const stampPxH = s.h / ratio;
+    let left, top;
+    if (s.isImage) {
+      left = s.x / ratio;
+      top  = s.y / ratio;
+    } else {
+      left = s.x / ratio;
+      top  = (wrap._pdfPage.height - s.y - s.h) / ratio;
+    }
+    await renderStampMarker(wrap, left, top, stampPxW, stampPxH, i);
+  }
 }
 
 // Renders the actual stamp graphic (via drawStampOnCanvas) at the requested
@@ -593,6 +650,13 @@ function signedImageName() {
   return 'signed-' + state.doc.name.slice(0, dotIdx) + '.' + ext;
 }
 
+function describePdfStamps() {
+  if (state.stamps.length === 0) return 'PDF (no stamp placed yet)';
+  const pages = [...new Set(state.stamps.map(s => s.pageIndex + 1))].sort((a, b) => a - b);
+  const pagesStr = pages.length === 1 ? 'page ' + pages[0] : 'pages ' + pages.join(', ');
+  return state.stamps.length + ' stamp' + (state.stamps.length === 1 ? '' : 's') + ' on ' + pagesStr;
+}
+
 function signedDocName() {
   if (state.mode === 'pdf')   return 'signed-' + state.doc.name;
   if (state.mode === 'image') return signedImageName();
@@ -631,8 +695,8 @@ function fillReview() {
 
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
   $('ds-review-mode').textContent =
-    state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
-    state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
+    state.mode === 'pdf'   ? describePdfStamps() :
+    state.mode === 'image' ? state.stamps.length + ' stamp' + (state.stamps.length === 1 ? '' : 's') + ' baked into the image (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only (SHA3-256 attestation)';
   $('ds-review-name').textContent = state.signer.name;
   $('ds-review-sig').textContent =
@@ -690,7 +754,7 @@ function fillReview() {
     stamped_filename: 'signed-' + state.doc.name,
     original_hash: docHashHex,
     stamped_hash: '<computed when the PDF is stamped>',
-    coords: { pageIndex: state.stamp.pageIndex, x: Math.round(state.stamp.x), y: Math.round(state.stamp.y), w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: '<set on sign>' },
+    stamps: state.stamps.map(s => ({ pageIndex: s.pageIndex, x: Math.round(s.x), y: Math.round(s.y), w: s.w, h: s.h, isImage: !!s.isImage, name: state.signer.name, date: '<set on sign>' })),
     signature_style: state.signer.sigStyle,
     signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
     signer_public_key: '<base64 of your ML-DSA-65 public key>',
@@ -754,34 +818,45 @@ async function renderDocPreview() {
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
 
-  if (state.mode === 'pdf') {
+  if (state.mode === 'pdf' && state.stamps.length > 0) {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
     const copy = new Uint8Array(state.doc.bytes);
     const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
-    const page = await pdf.getPage(state.stamp.pageIndex + 1);
-    const baseViewport = page.getViewport({ scale: 1 });
-    // Target a smaller render for the review (max ~340px wide) so it fits the grid cell.
-    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    const scale = targetW / baseViewport.width;
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    pane.appendChild(canvas);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    // Mock the stamp as an absolutely positioned canvas (same rendering as
-    // the real stamp) so it scales correctly at the preview size.
-    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
-    const left = state.stamp.x / ratio;
-    const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
-    const w = state.stamp.w / ratio;
-    const h = state.stamp.h / ratio;
-    try {
-      const stampCanvas = await createStampPreviewCanvas(w, h);
-      stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
-      pane.appendChild(stampCanvas);
-    } catch {}
+    // Render every page that has at least one stamp, with all stamps for
+    // that page overlaid as canvas mockups.
+    const pagesNeeded = [...new Set(state.stamps.map(s => s.pageIndex))].sort((a, b) => a - b);
+    const targetW = Math.min(640, Math.floor((pane.clientWidth || 640) - 24));
+    for (const pageIdx of pagesNeeded) {
+      const page = await pdf.getPage(pageIdx + 1);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = targetW / baseViewport.width;
+      const viewport = page.getViewport({ scale });
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:block;margin:0 auto 14px';
+      const label = document.createElement('div');
+      label.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--ink-dim);padding:4px 0';
+      label.textContent = 'Page ' + (pageIdx + 1);
+      wrap.appendChild(label);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      wrap.appendChild(canvas);
+      pane.appendChild(wrap);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
+      for (const stamp of state.stamps.filter(s => s.pageIndex === pageIdx)) {
+        const left = stamp.x / ratio;
+        const top  = (baseViewport.height - stamp.y - stamp.h) / ratio + 18;  // +18 for label
+        const w = stamp.w / ratio;
+        const h = stamp.h / ratio;
+        try {
+          const stampCanvas = await createStampPreviewCanvas(w, h);
+          stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
+          wrap.appendChild(stampCanvas);
+        } catch {}
+      }
+    }
     await appendStampDetail(pane);
     return;
   }
@@ -789,7 +864,7 @@ async function renderDocPreview() {
   // Image-mode: scrollable natural-size view (so the user can pan and see
   // the seal at full quality) + position outline on the image + zoom
   // controls + a separate seal-detail canvas below at fixed readable size.
-  if (state.mode === 'image' && state.signer.docImageDataUrl && state.stamp) {
+  if (state.mode === 'image' && state.signer.docImageDataUrl && state.stamps.length > 0) {
     pane.classList.add('has-pdf');
     pane.style.display = 'block';
     pane.style.padding = '0';
@@ -808,7 +883,7 @@ async function renderDocPreview() {
 
     // Scrollable viewport
     const viewport = document.createElement('div');
-    viewport.style.cssText = 'position:relative;width:100%;max-height:380px;overflow:auto;cursor:grab;background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 8px,#eaeef3 8px,#eaeef3 16px)';
+    viewport.style.cssText = 'position:relative;width:100%;max-height:640px;overflow:auto;cursor:grab;background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 8px,#eaeef3 8px,#eaeef3 16px)';
     pane.appendChild(viewport);
 
     const wrap = document.createElement('div');
@@ -833,25 +908,30 @@ async function renderDocPreview() {
         img.style.width = (img.naturalWidth * s) + 'px';
         img.style.height = (img.naturalHeight * s) + 'px';
       }
-      // Reposition the outline to match the new display scale
-      const outline = wrap.querySelector('[data-role="stamp-outline"]');
-      if (outline) {
-        const displayW = parseFloat(img.style.width);
-        const ratio = img.naturalWidth / displayW;
-        outline.style.left   = (state.stamp.x / ratio) + 'px';
-        outline.style.top    = (state.stamp.y / ratio) + 'px';
-        outline.style.width  = (state.stamp.w / ratio) + 'px';
-        outline.style.height = (state.stamp.h / ratio) + 'px';
-      }
+      // Reposition every outline to match the new display scale
+      const displayW = parseFloat(img.style.width);
+      const ratio = img.naturalWidth / displayW;
+      wrap.querySelectorAll('[data-role="stamp-outline"]').forEach((outline) => {
+        const idx = parseInt(outline.dataset.stampIdx, 10);
+        const s = state.stamps[idx];
+        if (!s) return;
+        outline.style.left   = (s.x / ratio) + 'px';
+        outline.style.top    = (s.y / ratio) + 'px';
+        outline.style.width  = (s.w / ratio) + 'px';
+        outline.style.height = (s.h / ratio) + 'px';
+      });
     }
 
     img.onload = () => {
       applyZoom('fit');
-      // Position outline (natural coords initially, repositioned by applyZoom)
-      const outline = document.createElement('div');
-      outline.dataset.role = 'stamp-outline';
-      outline.style.cssText = 'position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.18);pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.6) inset';
-      wrap.appendChild(outline);
+      // One outline per stamp.
+      state.stamps.forEach((s, i) => {
+        const outline = document.createElement('div');
+        outline.dataset.role = 'stamp-outline';
+        outline.dataset.stampIdx = String(i);
+        outline.style.cssText = 'position:absolute;border:2px solid var(--cobalt);background:rgba(11,58,106,.18);pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.6) inset';
+        wrap.appendChild(outline);
+      });
       applyZoom('fit');
     };
 
@@ -885,10 +965,15 @@ async function renderDocPreview() {
 
     const cap = document.createElement('p');
     cap.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--ink-dim);padding:8px 12px;margin:0;border-top:1px solid var(--ink-hair);background:var(--bone)';
-    cap.innerHTML =
-      'Position: <strong>' + Math.round(state.stamp.x) + ', ' + Math.round(state.stamp.y) +
-      '</strong> px - seal <strong>' + Math.round(state.stamp.w) + ' x ' + Math.round(state.stamp.h) +
-      '</strong> px on the original image';
+    if (state.stamps.length === 1) {
+      const s = state.stamps[0];
+      cap.innerHTML =
+        '<strong>1 stamp</strong> at <strong>' + Math.round(s.x) + ', ' + Math.round(s.y) +
+        '</strong> px - seal <strong>' + Math.round(s.w) + ' x ' + Math.round(s.h) +
+        '</strong> px on the original image';
+    } else {
+      cap.innerHTML = '<strong>' + state.stamps.length + ' stamps</strong> placed on the image';
+    }
     pane.appendChild(cap);
 
     // Stamp at a readable preview size so the user can inspect the content.
@@ -994,7 +1079,7 @@ function guessMimeFromMagic(bytes) {
   return null;
 }
 
-async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerprint8, imageType) {
+async function buildStampedImage(origBytes, stamps, signerName, dateStr, fingerprint8, imageType) {
   const mime = imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(origBytes, mime);
   const canvas = document.createElement('canvas');
@@ -1003,8 +1088,6 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0);
 
-  // Load the signature image (if any) before drawing so we can do a
-  // synchronous compose pass.
   let sigImg = null;
   if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
     sigImg = await new Promise((resolve, reject) => {
@@ -1015,7 +1098,10 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
     });
   }
 
-  drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg);
+  const stampsArr = Array.isArray(stamps) ? stamps : [stamps];
+  for (const stamp of stampsArr) {
+    drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg);
+  }
 
   return await new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {
@@ -1109,13 +1195,21 @@ function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg
   ctx.fillText('ML-DSA-65 (FIPS 204) - PQ ' + fingerprint8, x + padX, footY2);
 }
 
-async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
+async function buildStampedPdf(origBytes, stamps, signerName, dateStr, fingerprint8) {
   const PDFLib = await waitForPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
-  const page = pdfDoc.getPages()[stamp.pageIndex];
   const font     = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const fontItal = await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanItalic);
+  const stampsArr = Array.isArray(stamps) ? stamps : [stamps];
+  for (const stamp of stampsArr) {
+    await drawOneStampOnPdf(pdfDoc, stamp, signerName, dateStr, fingerprint8, font, fontBold, fontItal, PDFLib);
+  }
+  return await pdfDoc.save();
+}
+
+async function drawOneStampOnPdf(pdfDoc, stamp, signerName, dateStr, fingerprint8, font, fontBold, fontItal, PDFLib) {
+  const page = pdfDoc.getPages()[stamp.pageIndex];
   const navy  = PDFLib.rgb(0.043, 0.227, 0.416);
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
   const white = PDFLib.rgb(1, 1, 1);
@@ -1195,8 +1289,6 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
     end:   { x: stamp.x + stamp.w - 6, y: stamp.y + footerH - 1 },
     thickness: 0.5, color: navy, opacity: 0.25,
   });
-
-  return await pdfDoc.save();
 }
 
 async function doSign() {
@@ -1215,18 +1307,29 @@ async function doSign() {
     let envelope;
 
     if (state.mode === 'pdf' || state.mode === 'image') {
+      if (state.stamps.length === 0) {
+        throw new Error('Place at least one signature stamp on the document before signing.');
+      }
       $('ds-sign-status').textContent = state.mode === 'pdf' ? 'Stamping PDF...' : 'Stamping image...';
       stampedBytes = state.mode === 'pdf'
-        ? await buildStampedPdf(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint)
-        : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
+        ? await buildStampedPdf(state.doc.bytes, state.stamps, state.signer.name, dateStr, fingerprint)
+        : await buildStampedImage(state.doc.bytes, state.stamps, state.signer.name, dateStr, fingerprint, state.imageType);
       const origHash = sha3_256(state.doc.bytes);
       const stampedHash = sha3_256(stampedBytes);
-      const coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage };
-      const coordsBytes = new TextEncoder().encode(JSON.stringify(coords));
-      messageBytes = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
+      // Sign-message commits to the FULL stamps array so adding/removing a
+      // stamp invalidates the signature. Verify reconstructs the same bytes.
+      const stampsForEnvelope = state.stamps.map(s => ({
+        pageIndex: s.pageIndex,
+        x: s.x, y: s.y, w: s.w, h: s.h,
+        isImage: !!s.isImage,
+        name: state.signer.name,
+        date: dateStr,
+      }));
+      const stampsBytes = new TextEncoder().encode(JSON.stringify(stampsForEnvelope));
+      messageBytes = new Uint8Array(origHash.length + stampedHash.length + stampsBytes.length);
       messageBytes.set(origHash, 0);
       messageBytes.set(stampedHash, origHash.length);
-      messageBytes.set(coordsBytes, origHash.length + stampedHash.length);
+      messageBytes.set(stampsBytes, origHash.length + stampedHash.length);
       $('ds-sign-status').textContent = 'Signing in browser (ML-DSA-65)...';
       const signature = ml_dsa65.sign(state.signer.key.secretKey, messageBytes);
       const stampedName = state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name;
@@ -1238,7 +1341,7 @@ async function doSign() {
         stamped_filename: stampedName,
         original_hash: toHex(origHash),
         stamped_hash:  toHex(stampedHash),
-        coords,
+        stamps: stampsForEnvelope,
         signature_style: state.signer.sigStyle,
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: toB64(state.signer.key.publicKey),
@@ -1440,8 +1543,8 @@ function showDone() {
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;
   $('ds-done-mode').textContent =
-    state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
-    state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
+    state.mode === 'pdf'   ? describePdfStamps() :
+    state.mode === 'image' ? state.stamps.length + ' stamp' + (state.stamps.length === 1 ? '' : 's') + ' baked into the image (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only attestation (SHA3-256)';
 
   // Notary line: only show when something happened, frame failure as
@@ -1582,8 +1685,9 @@ async function renderSignedPreview() {
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
-  const idxs = [state.stamp.pageIndex];
-  if (state.stamp.pageIndex + 1 < pdf.numPages) idxs.push(state.stamp.pageIndex + 1);
+  // Show every page that has a stamp.
+  const idxs = [...new Set(state.stamps.map(s => s.pageIndex))].sort((a, b) => a - b);
+  if (idxs.length === 0) idxs.push(0);
   for (const idx of idxs) {
     const page = await pdf.getPage(idx + 1);
     const baseViewport = page.getViewport({ scale: 1 });
@@ -1686,7 +1790,7 @@ function wireLiveStampUpdates() {
   // will end up in the stamp. Attached once at init.
   let pending = null;
   $('ds-signer-name').addEventListener('input', () => {
-    if ((state.mode !== 'pdf' && state.mode !== 'image') || !state.stamp) return;
+    if ((state.mode !== 'pdf' && state.mode !== 'image') || state.stamps.length === 0) return;
     // Debounce so we don't redraw on every keystroke
     if (pending) clearTimeout(pending);
     pending = setTimeout(async () => {
@@ -1711,7 +1815,19 @@ function init() {
   wireLiveStampUpdates();
   initApiKeyPersistence();
   wireThemeToggle();
+  wireClearAllStamps();
   setActive('step-doc');
+}
+
+function wireClearAllStamps() {
+  const btn = $('ds-place-clear-all');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    state.stamps = [];
+    document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
+    updatePlaceHint();
+    $('ds-place-continue').disabled = true;
+  });
 }
 
 function wireThemeToggle() {

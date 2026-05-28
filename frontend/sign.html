@@ -83,12 +83,20 @@
 .ds-theme-btn{padding:8px 16px;border:0;background:transparent;color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-left:1px solid var(--ink-hair)}
 .ds-theme-btn.active{background:var(--cobalt);color:#fff}
 .ds-theme-btn:hover:not(.active){color:var(--navy)}
+.ds-stamp-x{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;background:#fff;color:rgba(180,20,20,1);border:2px solid rgba(180,20,20,1);font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;pointer-events:auto;box-shadow:0 1px 3px rgba(0,0,0,.15);z-index:5}
+.ds-stamp-x:hover{background:rgba(180,20,20,1);color:#fff}
 .ds-api-status{margin:6px 0 0;padding:6px 10px;background:var(--bone);border:1px solid var(--ink-hair);font-size:11px}
 .ds-api-status.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,.04)}
 .ds-api-status.warn{border-color:#d4a017;color:#7a5300;background:#fff4d6}
 .ds-zoom-btn.active{background:var(--cobalt) !important;color:#fff !important;border-color:var(--cobalt) !important}
 .ds-zoom-btn:hover:not(.active){border-color:var(--cobalt) !important;color:var(--navy) !important}
 .ds-review-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.ds-review-doc-block{margin-bottom:24px}
+.ds-review-sig-block{margin-bottom:18px;max-width:480px}
+.ds-review-doc-pane{min-height:480px}
+.ds-review-doc-pane.has-pdf{max-height:720px !important}
+.ds-review-sig-pane{min-height:120px;max-height:200px}
+.ds-wrap:has(#step-sign:not([hidden])){max-width:1100px}
 .ds-review-h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);font-weight:700;margin:0 0 8px}
 .ds-review-pane{background:var(--bone);border:1px solid var(--ink-hair);min-height:140px;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
 .ds-review-pane.has-pdf{padding:0;background:#fff;align-items:flex-start;max-height:380px;overflow-y:auto}
@@ -337,7 +345,8 @@
     <h2>Place your signature</h2>
     <p class="ds-sub">Click anywhere on a page to drop the stamp. Click another spot to move it. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
     <div class="ds-place-toolbar">
-      <p class="ds-hint" id="ds-place-hint" style="margin:0">Click a page to drop the signature stamp.</p>
+      <p class="ds-hint" id="ds-place-hint" style="margin:0;flex:1">Click a page to drop the signature stamp.</p>
+      <button class="btn btn-tertiary" id="ds-place-clear-all" type="button" hidden style="min-width:auto;padding:6px 14px;font-size:11px">Remove all stamps</button>
       <div class="ds-theme-toggle" role="radiogroup" aria-label="Seal style">
         <span class="ds-theme-label">Seal style</span>
         <button class="ds-theme-btn active" data-theme="dark" type="button" aria-pressed="true">Dark</button>
@@ -456,17 +465,15 @@
     <h2>Review and sign</h2>
     <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. The signature is created locally the moment you click Sign now.</p>
 
-    <div class="ds-review-grid">
-      <div class="ds-review-col">
-        <h3 class="ds-review-h">Document preview - visual seal</h3>
-        <p class="ds-review-cap">The stamp on the document is the visible Paramant seal. Drag it during placement; this is what readers see.</p>
-        <div id="ds-review-doc-preview" class="ds-review-pane"></div>
-      </div>
-      <div class="ds-review-col">
-        <h3 class="ds-review-h">Your signature mark</h3>
-        <p class="ds-review-cap">Typed name, drawn line, or uploaded image - this is what sits inside the seal.</p>
-        <div id="ds-review-sig-preview" class="ds-review-pane"></div>
-      </div>
+    <div class="ds-review-doc-block">
+      <h3 class="ds-review-h">Document preview - visual seal</h3>
+      <p class="ds-review-cap">This is exactly what readers will see. Pan + zoom to inspect at full resolution. The cobalt rectangle is where your seal lands.</p>
+      <div id="ds-review-doc-preview" class="ds-review-pane ds-review-doc-pane"></div>
+    </div>
+    <div class="ds-review-sig-block">
+      <h3 class="ds-review-h">Your signature mark</h3>
+      <p class="ds-review-cap">Typed name, drawn line, or uploaded image - this is what sits inside the seal.</p>
+      <div id="ds-review-sig-preview" class="ds-review-pane ds-review-sig-pane"></div>
     </div>
 
     <div class="ds-proof-card">
@@ -617,6 +624,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=15"></script>
+<script type="module" src="/sign-flow.js?v=17"></script>
 </body>
 </html>
