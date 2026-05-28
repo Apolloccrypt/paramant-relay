@@ -474,19 +474,22 @@ function parseCookies(req) {
 }
 
 // Call relay internal endpoint (with X-Internal-Auth)
-async function callRelay(endpoint, body) {
+async function callRelay(endpoint, body, method = "POST") {
   const relayUrl = SECTORS.health;
-  const res = await fetch(`${relayUrl}${endpoint}`, {
-    method: "POST",
+  const opts = {
+    method,
     headers: {
       "Content-Type": "application/json",
       "X-Admin-Token": ADMIN_TOKEN,
       "Authorization": `Bearer ${ADMIN_TOKEN}`,
       "X-Internal-Auth": INTERNAL_TOKEN,
     },
-    body: JSON.stringify(body),
     keepalive: false,
-  });
+  };
+  if (method !== "GET" && method !== "HEAD") {
+    opts.body = JSON.stringify(body || {});
+  }
+  const res = await fetch(`${relayUrl}${endpoint}`, opts);
   return res;
 }
 
@@ -1189,6 +1192,56 @@ function maskIp(ip) {
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
   res.json({ api_key: req.userSession.user_id });
+});
+
+// ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
+// The browser talks to admin (session-cookie); admin forwards to relay with
+// the internal-auth token. user_id is taken from the session, never from the
+// request body — so a logged-in attacker cannot enroll a pubkey for someone else.
+
+// POST /api/user/account/signing-key — enroll a new pubkey (body: { pk_b64, label, totp })
+api.post("/user/account/signing-key", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const { pk_b64, label, totp } = req.body || {};
+  if (!pk_b64 || typeof pk_b64 !== "string") return res.status(400).json({ error: "missing_pk_b64" });
+  if (!totp || !/^\d{6}$/.test(String(totp))) return res.status(400).json({ error: "totp_required" });
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key", { user_id, pk_b64, label, totp }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/signing-key POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// GET /api/user/account/signing-key — list this user's enrolled keys
+api.get("/user/account/signing-key", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay(`/v2/user/signing-key?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/signing-key GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// DELETE /api/user/account/signing-key — revoke a pubkey (body: { pk_hash_sha3, totp })
+api.delete("/user/account/signing-key", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const { pk_hash_sha3, totp } = req.body || {};
+  if (!pk_hash_sha3 || !/^[0-9a-f]{64}$/.test(pk_hash_sha3)) return res.status(400).json({ error: "invalid_pk_hash" });
+  if (!totp || !/^\d{6}$/.test(String(totp))) return res.status(400).json({ error: "totp_required" });
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key", { user_id, pk_hash_sha3, totp }, "DELETE");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/signing-key DELETE]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
 });
 
 // POST /api/user/account/backup-codes/regenerate
