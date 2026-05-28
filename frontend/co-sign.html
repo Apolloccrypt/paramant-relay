@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Co-sign envelope - PARAMANT</title>
+<meta name="description" content="Sign a multi-party envelope. Post-quantum (ML-DSA-65), zero-knowledge: the relay never sees the document or your private key.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="canonical" href="https://paramant.app/co-sign">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=19">
+<link rel="stylesheet" href="/nav.css?v=13">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
+main{max-width:640px;margin:0 auto;padding:60px 24px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.sub{font-size:13px;color:var(--ink-dim);margin-bottom:24px;line-height:1.7}
+.card{background:var(--bone);border:1px solid var(--ink-hair);margin-bottom:16px}
+.card-head{padding:12px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
+.card-head-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
+.card-body{padding:18px}
+.dot{width:6px;height:6px;background:var(--lime);border:1px solid var(--navy)}
+.dot.amber{background:#f59e0b}
+.dot.red{background:rgba(255,80,80,1)}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:12px;line-height:1.6}
+.kv dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding-top:1px}
+.kv dd{font-family:var(--mono);font-size:11px;color:var(--ink);word-break:break-all}
+.party-row{display:grid;grid-template-columns:32px 1fr auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--ink-hair);font-size:12px;align-items:center}
+.party-row:last-child{border-bottom:0}
+.party-row.me{background:rgba(178,255,63,0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
+.party-idx{font-family:var(--mono);font-size:10px;color:var(--ink-dim);text-align:center}
+.party-label{font-weight:600}
+.party-status{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.party-status.signed{color:var(--cobalt)}
+.party-status.pending{color:#888}
+.party-status.viewed{color:#d4a017}
+.field{margin-bottom:14px}
+.label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.input,.select,.file-cta{width:100%;padding:10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:12px}
+.file-cta{display:inline-block;text-align:center;cursor:pointer;border-style:dashed}
+.file-cta:hover{border-color:var(--cobalt);color:var(--cobalt)}
+.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-decoration:none;text-align:center}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
+.btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
+.banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:14px;line-height:1.5}
+.banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,0.04)}
+.banner.err{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1);background:rgba(255,80,80,0.06)}
+.banner.warn{border-color:#d4a017;background:#fff4d6;color:#5a3f00}
+.disclaimer{background:#fff4d6;border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:#5a3f00;margin-bottom:14px;line-height:1.5}
+.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px}
+.tag.green{border-color:var(--cobalt);color:var(--cobalt)}
+.tag.red{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1)}
+.step{display:none;animation:fadeIn .2s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+</nav>
+
+<main id="main-content">
+
+<div class="step" id="step-loading">
+  <h1>Opening envelope</h1>
+  <p class="sub">Fetching envelope metadata from the relay. The relay does not have the document itself - only the SHA3-256 hash and your signature slot.</p>
+  <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Loading...</div></div></div>
+</div>
+
+<div class="step" id="step-error">
+  <h1>Could not open envelope</h1>
+  <p class="sub">The link is invalid, expired, or the relay refused to serve it.</p>
+  <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Unknown error.</div></div></div>
+  <a href="/" class="btn btn-outline">Back to home</a>
+</div>
+
+<div class="step" id="step-cosign">
+  <h1>Co-sign envelope</h1>
+  <p class="sub">Sign your acknowledgement for this multi-party document. The signature is produced locally in your browser (ML-DSA-65). The relay only learns your public key and the resulting signature - never your private key, never the document bytes.</p>
+
+  <div class="disclaimer">
+    <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
+    This is a cryptographic acknowledgement, not a notarised legal signature.
+    Verify the document hash below against the file you received separately.
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">Status: ...</div></div>
+    <div class="card-body">
+      <dl class="kv">
+        <dt>Envelope id</dt><dd id="env-id">-</dd>
+        <dt>Document SHA3-256</dt><dd id="env-hash">-</dd>
+        <dt>Filename hint</dt><dd id="env-filename">-</dd>
+        <dt>Created</dt><dd id="env-created">-</dd>
+        <dt>Expires</dt><dd id="env-expires">-</dd>
+        <dt>Progress</dt><dd id="env-progress">-</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Parties</div></div>
+    <div class="card-body" id="parties-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Verify the document (optional but recommended)</div></div>
+    <div class="card-body">
+      <p class="sub" style="margin-bottom:12px">Pick the file you received out-of-band. We hash it locally (SHA3-256) and compare it against the envelope hash above. The file is never uploaded.</p>
+      <label class="file-cta" for="verify-file">Choose a file (or drop here) - never uploaded</label>
+      <input type="file" id="verify-file" hidden>
+      <div class="banner" id="verify-result" hidden></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Sign as <span id="me-label">party</span></div></div>
+    <div class="card-body">
+      <div class="field">
+        <label class="label" for="signer-name">Your name (optional, baked into the signed acknowledgement)</label>
+        <input type="text" class="input" id="signer-name" maxlength="80" placeholder="e.g. Mick Beer" autocomplete="name">
+      </div>
+      <div class="field">
+        <label class="label" for="signer-key-src">Signing key</label>
+        <select class="select" id="signer-key-src">
+          <option value="ephemeral">Generate one-time key for this signature</option>
+        </select>
+      </div>
+      <button class="btn" id="sign-confirm" type="button" disabled>Sign acknowledgement</button>
+      <div class="banner" id="sign-status" hidden></div>
+    </div>
+  </div>
+</div>
+
+<div class="step" id="step-done">
+  <h1>Acknowledgement signed</h1>
+  <p class="sub">Your ML-DSA-65 signature has been submitted. The relay logged it to the public CT log and updated the envelope status.</p>
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Result</div></div>
+    <div class="card-body">
+      <dl class="kv">
+        <dt>Envelope</dt><dd id="done-env-id">-</dd>
+        <dt>Status</dt><dd id="done-status">-</dd>
+        <dt>Progress</dt><dd id="done-progress">-</dd>
+        <dt>Your public key</dt><dd id="done-pk">-</dd>
+      </dl>
+      <div style="margin-top:14px">
+        <span class="tag green">Signed locally</span>
+        <span class="tag green">ML-DSA-65</span>
+        <span class="tag green">Zero-knowledge</span>
+      </div>
+    </div>
+  </div>
+  <a href="/" class="btn btn-outline">Back to home</a>
+</div>
+
+</main>
+
+<script type="module" src="/vendor/parasign-bridge.js"></script>
+<script>
+const RELAY = 'https://health.paramant.app';
+
+// ---------- helpers ----------
+function $(id) { return document.getElementById(id); }
+function showStep(id) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); $(id).classList.add('active'); }
+function showError(m) { $('error-msg').textContent = m; showStep('step-error'); }
+function toHex(u8) { let s=''; for (let i=0;i<u8.length;i++) s+=u8[i].toString(16).padStart(2,'0'); return s; }
+function toB64(u8) { let s=''; for (let i=0;i<u8.length;i++) s+=String.fromCharCode(u8[i]); return btoa(s); }
+function fromHex(s) { const out = new Uint8Array(s.length/2); for (let i=0;i<out.length;i++) out[i] = parseInt(s.slice(i*2,i*2+2),16); return out; }
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+async function waitForParasign() {
+  if (window.__parasign) return window.__parasign;
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('Signing library failed to load')), 10000);
+    window.addEventListener('parasign:ready', () => { clearTimeout(t); resolve(window.__parasign); }, { once: true });
+  });
+}
+
+// ---------- state ----------
+let __envelope = null;
+let __partyIndex = -1;
+let __signerKey = null;
+let __hashMatches = null;
+
+// Reproduce the relay's sign-message: sha3_256(envelope.id || doc_hash || party_index_as_decimal)
+async function buildSignMessage(envId, docHash, partyIndex) {
+  const p = await waitForParasign();
+  const idBytes = new TextEncoder().encode(envId);
+  const hashBytes = fromHex(docHash);
+  const piBytes = new TextEncoder().encode(String(partyIndex));
+  const combined = new Uint8Array(idBytes.length + hashBytes.length + piBytes.length);
+  combined.set(idBytes, 0);
+  combined.set(hashBytes, idBytes.length);
+  combined.set(piBytes, idBytes.length + hashBytes.length);
+  return p.sha3_256(combined);
+}
+
+// ---------- boot ----------
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const envId = (params.get('env') || '').trim();
+  const partyIndex = parseInt(params.get('p') || '', 10);
+  if (!envId || !Number.isInteger(partyIndex) || partyIndex < 0) {
+    return showError('Missing or invalid env / p query parameter.');
+  }
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(envId)) {
+    return showError('Envelope id is malformed.');
+  }
+  __partyIndex = partyIndex;
+
+  showStep('step-loading');
+  $('loading-msg').textContent = 'Fetching envelope...';
+
+  try {
+    const r = await fetch(RELAY + '/v2/envelopes/' + encodeURIComponent(envId));
+    if (r.status === 404) return showError('Envelope not found, expired, or already burned.');
+    if (r.status === 429) return showError('Rate-limited - too many requests from this address. Try again in a minute.');
+    if (!r.ok) return showError('Relay error: HTTP ' + r.status);
+    const data = await r.json();
+    __envelope = data.envelope;
+    if (__partyIndex >= __envelope.party_count) return showError('Party index out of range for this envelope.');
+
+    // Best-effort viewed-receipt; ignore failures so the rest of the page still loads.
+    try { await fetch(RELAY + '/v2/envelopes/' + encodeURIComponent(envId) + '/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ party_index: partyIndex }) }); } catch {}
+
+    renderEnvelope();
+    showStep('step-cosign');
+  } catch (e) {
+    showError(e.message || 'Network error');
+  }
+}
+
+function renderEnvelope() {
+  const e = __envelope;
+  $('env-id').textContent = e.id;
+  $('env-hash').textContent = e.doc_hash;
+  $('env-filename').textContent = e.original_filename || '(not provided)';
+  $('env-created').textContent = e.created_at || '-';
+  $('env-expires').textContent = e.expires_at || '-';
+  $('env-progress').textContent = e.signed_count + ' / ' + e.party_count + ' signed';
+  $('env-status').textContent = 'Status: ' + (e.status || '-');
+  const dot = $('env-status-dot');
+  dot.className = 'dot ' + (e.status === 'complete' ? '' : e.status === 'sent' ? 'amber' : '');
+
+  const list = $('parties-list');
+  list.innerHTML = '';
+  for (const p of e.parties) {
+    const row = document.createElement('div');
+    row.className = 'party-row' + (p.index === __partyIndex ? ' me' : '');
+    const label = escapeHtml(p.label || ('Party ' + (p.index + 1)));
+    const status = p.status === 'signed' ? 'SIGNED' : p.status === 'viewed' ? 'VIEWED' : 'PENDING';
+    row.innerHTML =
+      '<div class="party-idx">#' + p.index + '</div>' +
+      '<div class="party-label">' + label + (p.index === __partyIndex ? ' (you)' : '') + '</div>' +
+      '<div class="party-status ' + (p.status || 'pending') + '">' + status + '</div>';
+    list.appendChild(row);
+  }
+
+  const me = e.parties[__partyIndex] || {};
+  $('me-label').textContent = (me.label || 'party ' + (__partyIndex + 1));
+  if (me.status === 'signed') {
+    $('sign-status').hidden = false;
+    $('sign-status').className = 'banner ok';
+    $('sign-status').textContent = 'This slot has already been signed. Nothing to do.';
+    $('sign-confirm').disabled = true;
+    return;
+  }
+  $('sign-confirm').disabled = false;
+  $('sign-confirm').onclick = doSign;
+  $('verify-file').onchange = onVerifyFile;
+
+  // Populate vault keys if any.
+  populateVaultKeys().catch(() => {});
+}
+
+async function populateVaultKeys() {
+  const p = await waitForParasign();
+  if (!(await p.vaultAvailable())) return;
+  const items = await p.vaultList();
+  const sel = $('signer-key-src');
+  for (const it of items) {
+    const opt = document.createElement('option');
+    opt.value = 'vault:' + it.id;
+    opt.textContent = 'Vault: ' + (it.label || (it.pk_hash || '').slice(0, 12));
+    sel.appendChild(opt);
+  }
+}
+
+async function onVerifyFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const p = await waitForParasign();
+  const buf = new Uint8Array(await f.arrayBuffer());
+  const h = toHex(p.sha3_256(buf));
+  __hashMatches = (h === __envelope.doc_hash);
+  const b = $('verify-result');
+  b.hidden = false;
+  if (__hashMatches) {
+    b.className = 'banner ok';
+    b.textContent = 'Hash matches. This file is the same one the creator hashed.';
+  } else {
+    b.className = 'banner err';
+    b.textContent = 'Hash mismatch. The file you chose is different from the one in this envelope. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';
+  }
+}
+
+async function ensureSignerKey() {
+  const p = await waitForParasign();
+  const sel = $('signer-key-src').value;
+  if (sel === 'ephemeral') {
+    const seed = crypto.getRandomValues(new Uint8Array(32));
+    const kp = p.ml_dsa65.keygen(seed);
+    __signerKey = { secretKey: kp.secretKey, publicKey: kp.publicKey };
+    return __signerKey;
+  }
+  if (sel.startsWith('vault:')) {
+    const id = parseInt(sel.slice('vault:'.length), 10);
+    const pass = prompt('Passphrase to unlock the vault key:');
+    if (!pass) throw new Error('Vault unlock cancelled');
+    const unlocked = await p.vaultUnlock(id, pass);
+    __signerKey = { secretKey: unlocked.secretKey, publicKey: unlocked.publicKey };
+    return __signerKey;
+  }
+  throw new Error('Unsupported key source');
+}
+
+async function doSign() {
+  if (__hashMatches === false) {
+    if (!confirm('The file you uploaded does not match the envelope hash. Sign anyway? You will be signing a hash that does not match your local document.')) return;
+  }
+  $('sign-confirm').disabled = true;
+  $('sign-status').hidden = false;
+  $('sign-status').className = 'banner';
+  $('sign-status').textContent = 'Signing in browser...';
+
+  try {
+    const p = await waitForParasign();
+    const key = await ensureSignerKey();
+    const msg = await buildSignMessage(__envelope.id, __envelope.doc_hash, __partyIndex);
+    const signature = p.ml_dsa65.sign(key.secretKey, msg);
+
+    $('sign-status').textContent = 'Submitting signature to relay...';
+    const r = await fetch(RELAY + '/v2/envelopes/' + encodeURIComponent(__envelope.id) + '/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        party_index: __partyIndex,
+        signer_public_key: toB64(key.publicKey),
+        signature: toB64(signature),
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 429) { throw new Error('Rate-limited. Wait a minute before retrying.'); }
+    if (r.status === 410) { throw new Error('Envelope is already complete; no more signatures accepted.'); }
+    if (r.status === 409) { throw new Error('This slot already holds a different signature.'); }
+    if (r.status === 400) { throw new Error(data.error || 'Bad request'); }
+    if (r.status === 404) { throw new Error('Envelope or party slot not found.'); }
+    if (!r.ok) { throw new Error('Relay error: HTTP ' + r.status); }
+
+    $('done-env-id').textContent = __envelope.id;
+    $('done-status').textContent = data.status + (data.idempotent ? ' (idempotent re-submit)' : '');
+    $('done-progress').textContent = data.signed_count + ' / ' + data.party_count + ' signed';
+    $('done-pk').textContent = toHex(p.sha3_256(key.publicKey)).slice(0, 32) + '...';
+    showStep('step-done');
+  } catch (e) {
+    $('sign-status').className = 'banner err';
+    $('sign-status').textContent = e.message || 'Signing failed';
+    $('sign-confirm').disabled = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

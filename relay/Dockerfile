@@ -51,6 +51,7 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY relay.js ./
 COPY parasign.js ./
+COPY envelope.js ./
 COPY lib/ ./lib/
 COPY crypto/ ./crypto/
 
