@@ -1,8 +1,19 @@
 // ParaSign /verify page logic.
-// The document NEVER leaves the browser: only its SHA3-256 hash + the .psign
-// envelope are sent to /v2/verify (which runs the verification math).
-// The deployed /v2/verify requires X-Api-Key, so a key field is shown.
-import { sha3_256 } from '/vendor/paramant-pqc.js';
+//
+// Two verification paths:
+//
+//   1) Envelopes produced by the new /sign flow (parasign-visual-1,
+//      parasign-image-1, parasign-hash-1) are verified FULLY CLIENT-SIDE.
+//      We hash the user's document, compare to envelope.stamped_hash
+//      (or original_hash for hash-only), reconstruct the exact same
+//      sign-message bytes the signer used, and run ml-dsa-65.verify
+//      locally. No relay call, no API key needed.
+//
+//   2) Legacy parasign-v1 envelopes still go through /v2/verify on the
+//      relay, which requires an X-Api-Key.
+//
+// The document never leaves the browser in either case.
+import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
 
 const RELAY_URL = 'https://relay.paramant.app';
 let documentBuffer = null, envelope = null;
@@ -21,8 +32,23 @@ function fromB64(s) {
 }
 
 function update() {
-  const apiKey = ($('vf-api-key').value || '').trim();
-  $('vf-verify').disabled = !(documentBuffer && envelope && apiKey);
+  // Client-side capable envelopes do not require an API key.
+  if (envelope && isClientSideVersion(envelope.version)) {
+    $('vf-verify').disabled = !(documentBuffer && envelope);
+  } else {
+    const apiKey = ($('vf-api-key').value || '').trim();
+    $('vf-verify').disabled = !(documentBuffer && envelope && apiKey);
+  }
+}
+
+function isClientSideVersion(v) {
+  return v === 'parasign-visual-1' || v === 'parasign-image-1' || v === 'parasign-hash-1';
+}
+
+function hexToBytes(s) {
+  const out = new Uint8Array(s.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(s.slice(i * 2, i * 2 + 2), 16);
+  return out;
 }
 
 async function onDoc(file) {
@@ -37,21 +63,87 @@ async function onEnv(file) {
   try {
     envelope = JSON.parse(await file.text());
     if (envelope.envelope) envelope = envelope.envelope;
-    const info = ['algorithm: ' + (envelope.algorithm || '?'), 'signed_at: ' + (envelope.signed_at || '?')];
+    const info = ['version: ' + (envelope.version || '?'), 'algorithm: ' + (envelope.algorithm || '?'), 'signed_at: ' + (envelope.signed_at || '?')];
+    if (envelope.signer_name) info.push('signer: ' + envelope.signer_name);
     if (envelope.signer && envelope.signer.label) info.push('signer: ' + envelope.signer.label);
     const idx = (envelope.notary && envelope.notary.ct_log_index);
     if (idx != null) info.push('ct_log_index: ' + idx);
+    if (isClientSideVersion(envelope.version)) {
+      info.push('verified locally (no API key needed)');
+    }
     $('vf-envelope-info').textContent = info.join('  |  ');
+    // Hide API-key requirement for client-side envelopes
+    const apiSection = document.querySelector('.vf-api-section');
+    if (apiSection) apiSection.style.opacity = isClientSideVersion(envelope.version) ? '0.5' : '1';
   } catch (e) { $('vf-envelope-info').textContent = 'Invalid envelope: ' + e.message; envelope = null; }
   update();
+}
+
+// Client-side verification for envelopes produced by the new /sign flow.
+// Returns { valid, errors, mode } or null if version is unknown (caller
+// should fall through to the relay /v2/verify endpoint).
+async function clientSideVerify() {
+  const docBytes = new Uint8Array(documentBuffer);
+  const docHashBytes = sha3_256(docBytes);
+  const docHashHex = toHex(docHashBytes);
+  const errors = [];
+
+  if (envelope.version === 'parasign-hash-1') {
+    // User uploads the original file. document_hash binds to it directly.
+    if (envelope.document_hash !== docHashHex) {
+      errors.push('Document hash mismatch: computed ' + docHashHex.slice(0, 24) + '... vs envelope ' + (envelope.document_hash || '(missing)').slice(0, 24) + '...');
+    }
+    try {
+      const sig = fromB64(envelope.signature);
+      const pk  = fromB64(envelope.signer_public_key);
+      const ok = ml_dsa65.verify(pk, docHashBytes, sig);
+      if (!ok) errors.push('ML-DSA-65 signature failed verification');
+    } catch (e) {
+      errors.push('Signature decode failed: ' + e.message);
+    }
+    return { valid: errors.length === 0, errors, mode: 'client-side (hash-only)' };
+  }
+
+  if (envelope.version === 'parasign-visual-1' || envelope.version === 'parasign-image-1') {
+    // User must upload the SIGNED file (signed-<name>.pdf or .png/.jpg),
+    // not the original - the signature is over the stamped output.
+    if (envelope.stamped_hash !== docHashHex) {
+      errors.push('Stamped-hash mismatch: computed ' + docHashHex.slice(0, 24) + '... vs envelope ' + (envelope.stamped_hash || '(missing)').slice(0, 24) + '... - make sure you uploaded the signed-<name> file, not the original.');
+    }
+    try {
+      const origHash = hexToBytes(envelope.original_hash || '');
+      if (origHash.length !== 32) errors.push('original_hash missing or wrong length');
+      const stampedHash = docHashBytes;
+      const coordsBytes = new TextEncoder().encode(JSON.stringify(envelope.coords || {}));
+      const msg = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
+      msg.set(origHash, 0);
+      msg.set(stampedHash, origHash.length);
+      msg.set(coordsBytes, origHash.length + stampedHash.length);
+      const sig = fromB64(envelope.signature);
+      const pk  = fromB64(envelope.signer_public_key);
+      const ok = ml_dsa65.verify(pk, msg, sig);
+      if (!ok) errors.push('ML-DSA-65 signature failed verification');
+    } catch (e) {
+      errors.push('Signature reconstruction failed: ' + e.message);
+    }
+    return { valid: errors.length === 0, errors, mode: 'client-side (' + envelope.version + ')' };
+  }
+
+  return null;   // unknown version, fall back to relay
 }
 
 async function verify() {
   $('vf-verify').disabled = true;
   $('vf-result').hidden = false;
-  $('vf-result').innerHTML = '<div class="ps-banner info">Hashing locally + verifying via relay...</div>';
   try {
-    const docHash = sha3_256(new Uint8Array(documentBuffer)); // local
+    if (isClientSideVersion(envelope.version)) {
+      $('vf-result').innerHTML = '<div class="ps-banner info">Verifying locally (no API key, no relay round-trip)...</div>';
+      const r = await clientSideVerify();
+      await renderResult(r);
+      return;
+    }
+    $('vf-result').innerHTML = '<div class="ps-banner info">Hashing locally + verifying via relay...</div>';
+    const docHash = sha3_256(new Uint8Array(documentBuffer));
     const res = await fetch(RELAY_URL + '/v2/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Api-Key': $('vf-api-key').value.trim() },
@@ -101,8 +193,8 @@ async function lookupSignerHtml(envelope) {
 async function renderResult(r) {
   const out = [];
   out.push(r.valid
-    ? '<div class="ps-banner ok"><strong>Signature valid.</strong> Document matches the signed hash.</div>'
-    : '<div class="ps-banner err"><strong>Signature INVALID.</strong></div>');
+    ? '<div class="ps-banner ok"><strong>Signature valid.</strong> Document matches the signed hash.' + (r.mode ? ' <small style="opacity:.7">(' + esc(r.mode) + ')</small>' : '') + '</div>'
+    : '<div class="ps-banner err"><strong>Signature INVALID.</strong>' + (r.mode ? ' <small style="opacity:.7">(' + esc(r.mode) + ')</small>' : '') + '</div>');
   if (r.errors && r.errors.length) {
     out.push('<ul style="margin-top:var(--space-3)">');
     r.errors.forEach(e => out.push('<li class="ps-help">' + esc(e) + '</li>'));
