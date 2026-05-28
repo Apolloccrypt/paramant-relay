@@ -660,15 +660,21 @@ async function doSign() {
       };
     }
 
-    // Optional notary call (only when an API key was supplied).
+    // Optional notary call (only when an API key was supplied). If the user
+    // explicitly asked for counter-signing, treat a failure as a HARD STOP:
+    // we will NOT hand back an envelope that says 'notary requested but
+    // failed', because that mixes two outcomes and quietly produces an
+    // unsigned-by-relay artefact the user thought was witnessed.
+    // The user stays in step-sign so they can fix the API key or clear it.
     if (state.signer.apiKey) {
       $('ds-sign-status').textContent = 'Requesting notary signature from relay...';
+      let r, body;
       try {
         const docHashForNotary = state.mode === 'pdf' ? toHex(sha3_256(stampedBytes)) : envelope.document_hash;
         const sigForNotary = state.mode === 'pdf'
           ? toB64(ml_dsa65.sign(state.signer.key.secretKey, sha3_256(stampedBytes)))
           : envelope.signature;
-        const r = await fetch(RELAY + '/v2/sign', {
+        r = await fetch(RELAY + '/v2/sign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Api-Key': state.signer.apiKey },
           body: JSON.stringify({
@@ -678,15 +684,19 @@ async function doSign() {
             signer_label: state.signer.name,
           }),
         });
-        if (r.ok) {
-          const d = await r.json();
-          envelope.notary = d.envelope.notary || d.envelope;
-        } else {
-          envelope.notary_error = 'Notary call failed: HTTP ' + r.status;
-        }
-      } catch (e) {
-        envelope.notary_error = 'Notary call failed: ' + (e.message || e);
+        body = await r.json().catch(() => null);
+      } catch (netErr) {
+        throw new Error('Counter-sign aborted: the relay was unreachable (' + (netErr.message || netErr) + '). Either fix your network or remove the API key under Advanced and sign locally.');
       }
+      if (!r.ok) {
+        const reason =
+          r.status === 401 ? 'the API key was not accepted by the relay (check it under Advanced, or clear the field to sign without a counter-signature)' :
+          r.status === 403 ? 'the API key does not have notary permission on this relay' :
+          r.status === 429 ? 'the relay rate-limited the notary endpoint - retry in a minute' :
+          'the relay returned HTTP ' + r.status + (body && body.error ? ' (' + body.error + ')' : '');
+        throw new Error('Counter-sign aborted: ' + reason + '. No envelope was produced - the document was not signed.');
+      }
+      envelope.notary = body.envelope && body.envelope.notary ? body.envelope.notary : body.envelope;
     }
 
     state.result = { stampedBytes, envelope, fingerprint };
