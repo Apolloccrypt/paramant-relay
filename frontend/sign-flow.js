@@ -643,11 +643,15 @@ function hexToBytes(s) {
   return out;
 }
 
+function stripSignedPrefix(name) {
+  return (name || '').replace(/^signed-/i, '');
+}
 function signedImageName() {
   const ext = state.imageType === 'jpg' ? 'jpg' : 'png';
-  const dotIdx = state.doc.name.lastIndexOf('.');
-  if (dotIdx < 0) return 'signed-' + state.doc.name + '.' + ext;
-  return 'signed-' + state.doc.name.slice(0, dotIdx) + '.' + ext;
+  const base = stripSignedPrefix(state.doc.name);
+  const dotIdx = base.lastIndexOf('.');
+  if (dotIdx < 0) return 'signed-' + base + '.' + ext;
+  return 'signed-' + base.slice(0, dotIdx) + '.' + ext;
 }
 
 function describePdfStamps() {
@@ -658,7 +662,7 @@ function describePdfStamps() {
 }
 
 function signedDocName() {
-  if (state.mode === 'pdf')   return 'signed-' + state.doc.name;
+  if (state.mode === 'pdf')   return 'signed-' + stripSignedPrefix(state.doc.name);
   if (state.mode === 'image') return signedImageName();
   return state.doc.name;
 }
@@ -751,7 +755,7 @@ function fillReview() {
     algorithm: 'ML-DSA-65',
     hash_algorithm: 'SHA3-256',
     original_filename: state.doc.name,
-    stamped_filename: 'signed-' + state.doc.name,
+    stamped_filename: 'signed-' + stripSignedPrefix(state.doc.name),
     original_hash: docHashHex,
     stamped_hash: '<computed when the PDF is stamped>',
     stamps: state.stamps.map(s => ({ pageIndex: s.pageIndex, x: Math.round(s.x), y: Math.round(s.y), w: s.w, h: s.h, isImage: !!s.isImage, name: state.signer.name, date: '<set on sign>' })),
@@ -833,9 +837,12 @@ async function renderDocPreview() {
       const scale = targetW / baseViewport.width;
       const viewport = page.getViewport({ scale });
       const wrap = document.createElement('div');
+      wrap.className = 'ds-page-clickable';
       wrap.style.cssText = 'position:relative;display:block;margin:0 auto 14px';
+      wrap.dataset.pageIdx = String(pageIdx);
+      wrap.title = 'Click to enlarge page ' + (pageIdx + 1);
       const label = document.createElement('div');
-      label.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--ink-dim);padding:4px 0';
+      label.style.cssText = 'font-family:var(--mono);font-size:10px;color:var(--ink-dim);padding:4px 0;cursor:default';
       label.textContent = 'Page ' + (pageIdx + 1);
       wrap.appendChild(label);
       const canvas = document.createElement('canvas');
@@ -847,7 +854,7 @@ async function renderDocPreview() {
       const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
       for (const stamp of state.stamps.filter(s => s.pageIndex === pageIdx)) {
         const left = stamp.x / ratio;
-        const top  = (baseViewport.height - stamp.y - stamp.h) / ratio + 18;  // +18 for label
+        const top  = (baseViewport.height - stamp.y - stamp.h) / ratio + 18;
         const w = stamp.w / ratio;
         const h = stamp.h / ratio;
         try {
@@ -856,6 +863,8 @@ async function renderDocPreview() {
           wrap.appendChild(stampCanvas);
         } catch {}
       }
+      // Click to open this page in the modal at higher resolution
+      wrap.addEventListener('click', () => openPageModal(pageIdx));
     }
     await appendStampDetail(pane);
     return;
@@ -1332,7 +1341,7 @@ async function doSign() {
       messageBytes.set(stampsBytes, origHash.length + stampedHash.length);
       $('ds-sign-status').textContent = 'Signing in browser (ML-DSA-65)...';
       const signature = ml_dsa65.sign(state.signer.key.secretKey, messageBytes);
-      const stampedName = state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name;
+      const stampedName = state.mode === 'image' ? signedImageName() : 'signed-' + stripSignedPrefix(state.doc.name);
       envelope = {
         version: state.mode === 'pdf' ? 'parasign-visual-1' : 'parasign-image-1',
         algorithm: 'ML-DSA-65',
@@ -1392,7 +1401,7 @@ async function doSign() {
           body: JSON.stringify({
             doc_hash: docHashForEnvelope,
             parties: allParties,
-            original_filename: state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name,
+            original_filename: state.mode === 'pdf' ? 'signed-' + stripSignedPrefix(state.doc.name) : state.doc.name,
             creator_public_key: envelope.signer_public_key,
           }),
         });
@@ -1560,7 +1569,7 @@ function showDone() {
     $('ds-done-notary').textContent = 'Skipped (no API key provided) - the local signature is still fully valid';
   }
 
-  const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
+  const psignName = (state.mode === 'pdf' ? 'signed-' + stripSignedPrefix(state.doc.name) : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
   $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
   if (r.stampedBytes) {
     $('ds-dl-pdf').hidden = false;
@@ -1816,7 +1825,92 @@ function init() {
   initApiKeyPersistence();
   wireThemeToggle();
   wireClearAllStamps();
+  wirePageModal();
   setActive('step-doc');
+}
+
+// Lightbox modal for inspecting a single PDF page at full resolution +
+// adjustable zoom. Renders the page on-demand at the requested scale and
+// overlays the same stamp mockups as the inline review preview.
+let _modalCurrentPageIdx = null;
+let _modalCurrentScale = 1.5;   // default zoom in modal (relative to natural)
+
+async function openPageModal(pageIdx) {
+  _modalCurrentPageIdx = pageIdx;
+  $('ds-modal-title').textContent = 'Page ' + (pageIdx + 1) + ' (of ' + state.doc.name + ')';
+  $('ds-page-modal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  // Mark the default zoom button as active
+  document.querySelectorAll('.ds-modal-zoom').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.zoom) === _modalCurrentScale);
+  });
+  await renderModalPage();
+}
+
+async function renderModalPage() {
+  const scroll = $('ds-modal-scroll');
+  scroll.innerHTML = '<div style="padding:40px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--ink-dim)">Rendering...</div>';
+  try {
+    const pdfjs = await waitForPdfjs();
+    const copy = new Uint8Array(state.doc.bytes);
+    const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+    const page = await pdf.getPage(_modalCurrentPageIdx + 1);
+    const baseViewport = page.getViewport({ scale: 1 });
+    // Apply user's zoom factor to a base render width that targets the modal
+    const baseTarget = Math.min(1100, window.innerWidth - 80);
+    const baseScale = baseTarget / baseViewport.width;
+    const scale = baseScale * _modalCurrentScale;
+    const viewport = page.getViewport({ scale });
+    const wrap = document.createElement('div');
+    wrap.className = 'ds-modal-canvas-wrap';
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    wrap.appendChild(canvas);
+    scroll.innerHTML = '';
+    scroll.appendChild(wrap);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    // Overlay every stamp that lives on this page at the modal's render scale.
+    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
+    for (const stamp of state.stamps.filter(s => s.pageIndex === _modalCurrentPageIdx)) {
+      const left = stamp.x / ratio;
+      const top  = (baseViewport.height - stamp.y - stamp.h) / ratio;
+      const w = stamp.w / ratio;
+      const h = stamp.h / ratio;
+      try {
+        const stampCanvas = await createStampPreviewCanvas(w, h);
+        stampCanvas.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none`;
+        wrap.appendChild(stampCanvas);
+      } catch {}
+    }
+  } catch (err) {
+    scroll.innerHTML = '<div style="padding:40px;color:rgba(180,20,20,1);font-family:var(--mono);font-size:12px">Render failed: ' + escapeHtml(err.message || String(err)) + '</div>';
+  }
+}
+
+function closePageModal() {
+  $('ds-page-modal').hidden = true;
+  document.body.style.overflow = '';
+  _modalCurrentPageIdx = null;
+}
+
+function wirePageModal() {
+  const modal = $('ds-page-modal');
+  if (!modal) return;
+  modal.addEventListener('click', (e) => {
+    if (e.target.dataset && e.target.dataset.close === '1') closePageModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closePageModal();
+  });
+  modal.querySelectorAll('.ds-modal-zoom').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      _modalCurrentScale = parseFloat(btn.dataset.zoom);
+      modal.querySelectorAll('.ds-modal-zoom').forEach(b => b.classList.toggle('active', b === btn));
+      await renderModalPage();
+    });
+  });
 }
 
 function wireClearAllStamps() {

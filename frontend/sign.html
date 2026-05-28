@@ -85,6 +85,23 @@
 .ds-theme-btn:hover:not(.active){color:var(--navy)}
 .ds-stamp-x{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:50%;background:#fff;color:rgba(180,20,20,1);border:2px solid rgba(180,20,20,1);font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;pointer-events:auto;box-shadow:0 1px 3px rgba(0,0,0,.15);z-index:5}
 .ds-stamp-x:hover{background:rgba(180,20,20,1);color:#fff}
+.ds-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}
+.ds-modal[hidden]{display:none}
+.ds-modal-backdrop{position:absolute;inset:0;background:rgba(11,58,106,.65);backdrop-filter:blur(2px)}
+.ds-modal-content{position:relative;background:#fff;width:100%;max-width:1200px;max-height:calc(100vh - 48px);display:flex;flex-direction:column;border:1px solid var(--ink-hair);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.ds-modal-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--ink-hair);background:var(--bone)}
+.ds-modal-title{font-family:var(--mono);font-size:12px;color:var(--navy);font-weight:700}
+.ds-modal-zoom{padding:6px 12px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink-dim);font-family:var(--mono);font-size:10px;letter-spacing:.04em;cursor:pointer}
+.ds-modal-zoom:hover{border-color:var(--cobalt);color:var(--cobalt)}
+.ds-modal-zoom.active{background:var(--cobalt);color:#fff;border-color:var(--cobalt)}
+.ds-modal-close{padding:6px 12px;border:1px solid var(--ink-hair);background:transparent;color:var(--ink-dim);font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;line-height:1}
+.ds-modal-close:hover{color:rgba(180,20,20,1);border-color:rgba(180,20,20,1)}
+.ds-modal-scroll{flex:1;overflow:auto;padding:14px;background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 8px,#eaeef3 8px,#eaeef3 16px)}
+.ds-modal-canvas-wrap{position:relative;display:inline-block;background:#fff}
+.ds-page-clickable{position:relative;cursor:zoom-in;transition:opacity 100ms ease}
+.ds-page-clickable:hover{opacity:.95}
+.ds-page-clickable::after{content:'click to enlarge';position:absolute;top:6px;right:6px;background:rgba(11,58,106,.85);color:#fff;font-family:var(--mono);font-size:9px;letter-spacing:.04em;padding:3px 7px;border-radius:2px;opacity:0;transition:opacity 120ms ease;pointer-events:none}
+.ds-page-clickable:hover::after{opacity:1}
 .ds-api-status{margin:6px 0 0;padding:6px 10px;background:var(--bone);border:1px solid var(--ink-hair);font-size:11px}
 .ds-api-status.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,.04)}
 .ds-api-status.warn{border-color:#d4a017;color:#7a5300;background:#fff4d6}
@@ -566,6 +583,22 @@
 </div>
 </main>
 
+<!-- Lightbox modal for inspecting a single page at full resolution -->
+<div id="ds-page-modal" class="ds-modal" hidden role="dialog" aria-modal="true" aria-label="Page detail">
+  <div class="ds-modal-backdrop" data-close="1"></div>
+  <div class="ds-modal-content">
+    <div class="ds-modal-bar">
+      <span class="ds-modal-title" id="ds-modal-title">Page</span>
+      <span style="flex:1"></span>
+      <button class="ds-modal-zoom" data-zoom="1" type="button">100%</button>
+      <button class="ds-modal-zoom" data-zoom="1.5" type="button">150%</button>
+      <button class="ds-modal-zoom" data-zoom="2" type="button">200%</button>
+      <button class="ds-modal-close" type="button" data-close="1" aria-label="Close">x</button>
+    </div>
+    <div class="ds-modal-scroll" id="ds-modal-scroll"></div>
+  </div>
+</div>
+
 <footer>
   <div class="container-lg">
     <div class="footer-grid">
@@ -624,6 +657,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=17"></script>
+<script type="module" src="/sign-flow.js?v=18"></script>
 </body>
 </html>
