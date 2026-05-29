@@ -63,3 +63,7 @@ CLAUDE.md
 package-lock.json.bak-*
 package.json.bak-*
 *.zip
+
+# Retired/rotated secrets — never re-commit
+deploy/token
+.env.bak*
