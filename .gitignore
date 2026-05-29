@@ -63,3 +63,9 @@ CLAUDE.md
 package-lock.json.bak-*
 package.json.bak-*
 *.zip
+
+# secret-bearing files — never commit (retire-leaked-admin-token 2026-05-29)
+deploy/token
+deploy/*token*
+.env.bak
+.env.bak.*
