@@ -208,7 +208,7 @@
   const submitBtn = document.getElementById('submit-btn');
 
   const params = new URLSearchParams(window.location.search);
-  const returnUrl = params.get('return') || '/account';
+  const returnUrl = params.get('return') || '/dashboard';
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
