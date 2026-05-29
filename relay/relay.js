@@ -4791,7 +4791,7 @@ python3 paramant-receiver.py \\
       if (!out.ok) {
         const code = out.code === 'not_found' ? 404
           : out.code === 'bad_signature' ? 400
-          : out.code === 'closed' ? 410
+          : (out.code === 'closed' || out.code === 'invite_expired') ? 410
           : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
           : 409;
         res.writeHead(code, { 'Content-Type': 'application/json' });

@@ -26,9 +26,31 @@ const MAX_PARTIES = 20;          // sanity cap; CT-log/Redis can handle more
 const MAX_LABEL_LEN = 80;
 const DEFAULT_TTL_DAYS = 30;
 const MAX_TTL_DAYS = 365;
+// Signing-invite window for EMAIL-bound envelopes (R018): how long an invite
+// link can actually be USED to sign, deliberately shorter than and independent
+// of the 30-day envelope record retention (DEFAULT_TTL_DAYS). Measured from the
+// envelope's created_at (= when the sender created it and sent the invites).
+// The record is still kept 30d for verification; only the signable window is 7d.
+const SIGN_INVITE_TTL_DAYS = 7;
 // Domain-separation label for ParaSign document signatures (recipe v3, R018 /
 // pentest H3). MUST stay byte-identical across relay + SDK + core.
 const SIGN_DOMAIN_DOC = 'paramant/parasign/doc/v1';
+
+// True when an email-bound invite's signing window (created_at + 7d) has closed.
+// Open/legacy envelopes have no invite window (only the 30d hash TTL), so callers
+// apply this in email mode only. Missing/unparseable created_at -> not closed
+// (real envelopes always store it; the 30d hash TTL remains the backstop).
+function signInviteClosed(createdAtIso, nowMs) {
+  const t = Date.parse(createdAtIso || '');
+  if (!Number.isFinite(t)) return false;
+  return (nowMs - t) > SIGN_INVITE_TTL_DAYS * 86400_000;
+}
+// ISO timestamp when an email-bound invite stops being signable, or null.
+function signInviteExpiresAt(createdAtIso) {
+  const t = Date.parse(createdAtIso || '');
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + SIGN_INVITE_TTL_DAYS * 86400_000).toISOString();
+}
 
 function newEnvelopeId() {
   return crypto.randomBytes(ID_BYTES).toString('base64url');
@@ -303,6 +325,9 @@ class EnvelopeStore {
       binding_mode: mode,
       recipe_version: parseInt(h.recipe_version, 10) || 1,
       expires_at: h.expires_at,
+      // When this email-bound invite stops being signable (created_at + 7d);
+      // null for open envelopes. Lets the admin gate fail early before the PRF.
+      sign_expires_at: mode === 'email' ? signInviteExpiresAt(h.created_at) : null,
       party: {
         index: pi,
         label: h['p' + pi + '_label'] || null,
@@ -352,6 +377,10 @@ class EnvelopeStore {
     // so they can never fill an email-bound slot. Fail-closed: a party with no
     // bound email (empty hash) cannot be signed in email mode.
     if (mode === 'email') {
+      // Signing-invite window: an email-bound invite is signable for 7 days from
+      // creation, independent of the 30-day record retention. Past that, the
+      // slot is closed even though the envelope record still exists.
+      if (signInviteClosed(h.created_at, Date.now())) return { ok: false, code: 'invite_expired' };
       if (!opts.internalTrusted) return { ok: false, code: 'email_binding_required' };
       if (!safeHexEqual(opts.verifiedEmailHash, emailHash)) return { ok: false, code: 'email_mismatch' };
     }
@@ -397,4 +426,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS, SIGN_INVITE_TTL_DAYS };

@@ -133,6 +133,39 @@ async function main() {
     assert.strictEqual(await store.checkInviteToken(ID, 0, 'nope'), false, 'checkInviteToken false on miss');
     ok('getForParty token gating + no token leak');
   }
+
+  // 9. sign(): the 7-day signing-invite window (email mode only). A fresh invite
+  //    still signs; one created >7d ago is rejected with 'invite_expired'; an
+  //    open/legacy envelope ignores the window (only the 30d hash TTL bounds it).
+  //    getForParty exposes sign_expires_at (created_at + 7d) for email mode.
+  {
+    const day = 86400_000;
+    const old = new Date(Date.now() - 8 * day).toISOString();
+    const fresh = new Date(Date.now() - 1 * day).toISOString();
+    const emailHashAt = (createdAt) => ({
+      id: ID, doc_hash: DOC, status: 'sent', binding_mode: 'email', recipe_version: '3',
+      party_count: '1', signed_count: '0', p0_email_hash: EMAIL_HASH, p0_status: 'pending', created_at: createdAt,
+    });
+    const opts = { internalTrusted: true, verifiedEmailHash: EMAIL_HASH };
+
+    const expired = new EnvelopeStore(fakeRedis(emailHashAt(old)), { sigVerify: () => true });
+    assert.strictEqual((await expired.sign(ID, 0, 'cHVi', 'c2ln', opts)).code, 'invite_expired', 'email invite past 7d rejected');
+
+    const within = new EnvelopeStore(fakeRedis(emailHashAt(fresh)), { sigVerify: () => true });
+    assert.strictEqual((await within.sign(ID, 0, 'cHVi', 'c2ln', opts)).ok, true, 'email invite within 7d still signs');
+
+    // open/legacy envelope with an OLD created_at is NOT subject to the invite window
+    const openOld = { id: ID, doc_hash: DOC, status: 'sent', party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending', created_at: old };
+    const open = new EnvelopeStore(fakeRedis(openOld), { sigVerify: () => true });
+    assert.strictEqual((await open.sign(ID, 0, 'cHVi', 'c2ln')).ok, true, 'open/legacy envelope ignores the 7d invite window');
+
+    // getForParty exposes sign_expires_at for email mode (created_at + 7d), in the future for a fresh invite
+    const TOKEN = crypto.randomBytes(32).toString('base64url');
+    const vstore = new EnvelopeStore(fakeRedis({ ...emailHashAt(fresh), p0_invite_token: TOKEN }), {});
+    const view = await vstore.getForParty(ID, 0, TOKEN);
+    assert.ok(view.sign_expires_at && Date.parse(view.sign_expires_at) > Date.now(), 'sign_expires_at set + in the future for a fresh email invite');
+    ok('sign() enforces the 7-day signing-invite window (email mode; open unaffected)');
+  }
 }
 
 main()

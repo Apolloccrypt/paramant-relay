@@ -1436,6 +1436,9 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
   const sessionEmailHash = partyEmailHashAdmin(email);
   if (!env || env.doc_hash !== doc_hash) return res.status(403).json({ error: "doc_hash_mismatch" });
   if (!env.party || !sessionEmailHash || env.party.email_hash !== sessionEmailHash) return res.status(403).json({ error: "not_authorized" });
+  // Signing-invite window (7d from creation, != 30d record retention): fail here,
+  // before the client runs the passkey-PRF, when the invite is no longer signable.
+  if (env.sign_expires_at && Date.parse(env.sign_expires_at) < Date.now()) return res.status(410).json({ error: "invite_expired" });
 
   // ── ISSUE: one-shot record, server-side binding only, EX 300s.
   const activation_id = crypto.randomBytes(32).toString("base64url");

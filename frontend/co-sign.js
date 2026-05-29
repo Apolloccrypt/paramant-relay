@@ -235,6 +235,7 @@ async function doSign() {
     let msg = (e && e.message) ? e.message : String(e);
     if (e && e.status === 401) msg = 'Your session expired. Sign in again as the invited recipient, then retry.';
     else if (e && e.status === 403) msg = 'This invite is bound to a different email address. Sign in with the address the invite was sent to.';
+    else if (e && e.status === 410) msg = 'This signing invite has expired (invites are valid for 7 days). Ask the sender for a new link.';
     else if (e && e.status === 409) msg = 'That signing authorization was already used or expired. Reload the page and try again.';
     setStatus('err', msg);
     $('sign-confirm').disabled = false;

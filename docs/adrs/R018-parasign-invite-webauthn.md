@@ -76,6 +76,15 @@ ActivatedSigner.dispose()                            // zeroize key material
   (32 random bytes). The emailed link is `/co-sign?env=<id>&p=<i>&t=<token>`.
   The token gates per-party detail and `markViewed`. Forwarding the email =
   forwarding the capability (documented residual risk, same as any e-sign link).
+- **Signing-invite TTL — 7 days, distinct from the 30-day record retention.** An
+  email-bound invite is *signable* only for `SIGN_INVITE_TTL_DAYS = 7` from the
+  envelope's `created_at` (≈ invite-send time). This is a separate, shorter window
+  than the 30-day envelope hash retention (`DEFAULT_TTL_DAYS`): the record stays
+  for 30d so a completed signature remains verifiable, but the *signable* window
+  closes at 7d. Enforced authoritatively in the relay `sign()` (`invite_expired`
+  → HTTP 410) and pre-checked in the admin activation gate via the
+  `sign_expires_at` field (fails before the passkey-PRF). Open/legacy envelopes
+  have no invite window — they are bounded only by the 30-day hash TTL.
 - **Authenticated-email binding (the ParaSign-grade layer):** the relay `/sign`
   endpoint is public and stateless, so it cannot know the caller's verified
   email. Binding-critical signs route through a new **admin proxy**
