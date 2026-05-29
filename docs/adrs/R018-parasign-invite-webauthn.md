@@ -149,6 +149,33 @@ stores opaque credential records, so it gets no new dependency.
 - `p{i}_email_hash` is an unsalted low-entropy identifier; namespaced but still
   dictionary-guessable — accepted/documented privacy property.
 
+## Lockout prevention (mandatory gate before PR-A)
+
+Introducing passkeys must never strand a user. This gate is a hard
+prerequisite for PR-A and is enforced in code, not prose.
+
+Two lockout dimensions:
+
+1. **Account login (PR-A).** Independent login factors are TOTP, backup codes,
+   and registered passkeys; the email recovery channel (the `/auth` reset flow)
+   is the backstop. Guard: `admin/lib/account-recovery.js`
+   (`assertCanRemoveFactor`, `assertNotLockedOut`), tested in
+   `admin/test/account-recovery.test.js`. Every factor-mutating PR-A route MUST
+   call it. The decisive rule: the email reset flow MUST be able to enrol a
+   **fresh passkey** before a passkey is allowed to become an account's sole
+   factor — otherwise a lost device is terminal. Until that capability exists,
+   removing the last passkey from a passkey-only account is refused
+   (`lockout_passkey_only_no_reenrol`).
+
+2. **Vault key (PR-B).** The passphrase wrap stays the always-present primary
+   wrap; the `webauthn-prf` wrap is strictly additive. PR-B MUST assert the
+   vault never leaves a key with zero non-PRF wraps, and MUST probe PRF support
+   (`prf.enabled`) before offering biometric unlock — a non-PRF authenticator
+   may never become the only unlock path.
+
+Status: account-login guard + tests landed (this gate). The vault invariant is
+asserted within PR-B.
+
 ## Non-goals / boundary
 
 No HSM, no SAM, no SAP/SAD implementation, no eIDAS conformance work. This ADR
