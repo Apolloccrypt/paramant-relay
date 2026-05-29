@@ -218,6 +218,85 @@ export async function vaultUnlock(id, passphrase) {
   };
 }
 
+// --- WebAuthn-PRF wrap (R018 / "PR 2"). The passkey's PRF output derives a KEK
+//     (HKDF-SHA256, domain-separated, per-wrap random salt) that unwraps the
+//     same ML-DSA secret key. ADDITIVE: the passphrase wrap is never touched, so
+//     it remains the recovery floor (lockout invariant). PRF is never the sole
+//     wrap. Per-wrap salt (not a fixed per-RP salt) so KEKs are independent.
+async function _deriveKekFromPrf(prfOutput, hkdfSalt) {
+  const ikm = await crypto.subtle.importKey('raw', prfOutput, { name: 'HKDF' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: hkdfSalt, info: new TextEncoder().encode('paramant/parasign/vault-kek/v1') },
+    ikm,
+    { name: KEK_NAME, length: KEK_BITS },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+// Return the prf wrap's { credentialId, prfSalt(b64) } so the caller can run the
+// WebAuthn PRF eval with the SAME salt that was used at enrol (the PRF output is
+// only reproducible for an identical (credential, salt)). Null if no prf wrap.
+export async function vaultGetPrfWrapInfo(id, credentialId) {
+  if (!id) throw new Error('vaultGetPrfWrapInfo: id required');
+  const db = await vaultOpen();
+  const entry = await _toPromise(_tx(db, 'readonly').get(id));
+  db.close();
+  if (!entry) return null;
+  const matches = (entry.wraps || []).filter(w => w.kekSource === 'webauthn-prf' && (!credentialId || w.credentialId === credentialId));
+  if (!matches.length) return null;
+  const w = matches[matches.length - 1];
+  return { credentialId: w.credentialId, prfSalt: w.prfSalt };
+}
+
+// Add (or replace, per credential) a webauthn-prf wrap. Requires the unlocked
+// secretKeyBytes (caller obtained it during enrol or via a passphrase unlock)
+// AND the SAME prfSalt the caller fed to the WebAuthn PRF eval to obtain
+// prfOutput (the salt is stored so unlock can reproduce the PRF output).
+export async function vaultAddPrfWrap({ pk_hash, secretKeyBytes, credentialId, prfSalt, prfOutput }) {
+  if (!pk_hash || !(secretKeyBytes instanceof Uint8Array) || secretKeyBytes.length === 0) throw new Error('vaultAddPrfWrap: pk_hash + secretKeyBytes required');
+  if (!credentialId || !(prfOutput instanceof Uint8Array) || prfOutput.length < 16) throw new Error('vaultAddPrfWrap: credentialId + prfOutput required');
+  if (!(prfSalt instanceof Uint8Array) || prfSalt.length < 16) throw new Error('vaultAddPrfWrap: prfSalt (>=16 bytes, the WebAuthn PRF eval salt) required');
+  const iv      = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const kek     = await _deriveKekFromPrf(prfOutput, prfSalt);
+  const ct      = new Uint8Array(await crypto.subtle.encrypt({ name: KEK_NAME, iv }, kek, secretKeyBytes));
+  const wrap = {
+    kekSource: 'webauthn-prf', credentialId, hkdf: 'HKDF-SHA256',
+    info: 'paramant/parasign/vault-kek/v1',
+    prfSalt: b64Encode(prfSalt), iv: b64Encode(iv), ciphertext: b64Encode(ct),
+  };
+  const db = await vaultOpen();
+  const store = _tx(db, 'readwrite');
+  const entry = await _toPromise(store.get(pk_hash));
+  if (!entry) { db.close(); throw new Error('no such key'); }
+  entry.wraps = (entry.wraps || []).filter(w => !(w.kekSource === 'webauthn-prf' && w.credentialId === credentialId));
+  entry.wraps.push(wrap);   // passphrase wrap left intact
+  await _toPromise(store.put(entry));
+  db.close();
+  return { id: pk_hash, kekSources: entry.wraps.map(w => w.kekSource) };
+}
+
+// Unlock via the webauthn-prf wrap. Returns raw secretKeyBytes. The caller must
+// zeroize them after signing (see parasign-signer.js dispose()).
+export async function vaultUnlockPrf(id, { prfOutput, credentialId } = {}) {
+  if (!id) throw new Error('vaultUnlockPrf: id required');
+  if (!(prfOutput instanceof Uint8Array)) throw new Error('vaultUnlockPrf: prfOutput required');
+  const db = await vaultOpen();
+  const entry = await _toPromise(_tx(db, 'readonly').get(id));
+  if (!entry) { db.close(); throw new Error('no such key'); }
+  const matches = (entry.wraps || []).filter(w => w.kekSource === 'webauthn-prf' && (!credentialId || w.credentialId === credentialId));
+  if (!matches.length) { db.close(); throw new Error('no prf wrap'); }
+  const wrap = matches[matches.length - 1];
+  const kek = await _deriveKekFromPrf(prfOutput, b64Decode(wrap.prfSalt));
+  let plain;
+  try {
+    plain = new Uint8Array(await crypto.subtle.decrypt({ name: KEK_NAME, iv: b64Decode(wrap.iv) }, kek, b64Decode(wrap.ciphertext)));
+  } catch (e) { db.close(); throw new Error('prf unwrap failed'); }
+  try { const rw = _tx(db, 'readwrite'); const fresh = await _toPromise(rw.get(id)); if (fresh) { fresh.last_used_at = new Date().toISOString(); await _toPromise(rw.put(fresh)); } } catch {}
+  db.close();
+  return { secretKeyBytes: plain, pk_b64: entry.pk_b64, pk_hash: entry.pk_hash, label: entry.label };
+}
+
 // --- Delete an entry. Used when the user revokes locally (server-side
 //     revocation is a separate DELETE /api/user/account/signing-key call).
 export async function vaultDelete(id) {

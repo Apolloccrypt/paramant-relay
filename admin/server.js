@@ -1356,6 +1356,94 @@ api.get("/user/account/webauthn/credentials", authUser, async (req, res) => {
 });
 
 
+// ── Per-document signing activation (R018: per-document PRF activation) ───────
+// A signature requires a fresh, server-issued, ONE-SHOT activation bound to
+// EXACTLY (account, envelope, party, doc-hash). Issuance authorizes BEFORE the
+// client unlocks its key (no token -> no unlock). Consumption at submit is
+// ATOMIC via GETDEL, so two concurrent submits with the same token cannot both
+// pass (no TOCTOU). The relay never holds this token; the admin proxy verifies
+// + consumes it and forwards to the relay sign with PR-0's verified_email_hash.
+const SIGN_ACTIVATION_TTL = 300;   // 5 min: room for the human PRF gesture (Face ID, hesitation)
+
+// Canonical party-email hash — byte-identical to relay/envelope.js partyEmailHash.
+function partyEmailHashAdmin(email) {
+  const norm = (email || "").toString().trim().toLowerCase();
+  if (!norm) return "";
+  return crypto.createHash("sha3-256").update("paramant/party-email/v1\x00", "utf8").update(norm, "utf8").digest("hex");
+}
+
+// POST /api/user/sign/activation (authUser) — AUTHORIZE + ISSUE (pre-unlock gate).
+api.post("/user/sign/activation", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;          // identity from the session, never the client
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `act:ip:${ip}`, 20, 900))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `act:acct:${webauthn.scopeHash(user_id)}`, 30, 900))) return res.status(429).json({ error: "rate_limited" });
+
+  const envelope_id = (req.body?.envelope_id || "").toString();
+  const party_index = parseInt(req.body?.party_index, 10);
+  const doc_hash = (req.body?.doc_hash || "").toString().trim().toLowerCase();
+  const invite_token = (req.body?.invite_token || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(envelope_id)) return res.status(400).json({ error: "invalid_envelope_id" });
+  if (!Number.isInteger(party_index) || party_index < 0) return res.status(400).json({ error: "invalid_party_index" });
+  if (!/^[0-9a-f]{64}$/.test(doc_hash)) return res.status(400).json({ error: "invalid_doc_hash" });
+
+  // ── AUTHORIZE before issuing (no token -> the client cannot proceed to unlock).
+  // The party view is token-gated (PR-0). Bind to: the invite capability (token),
+  // the signer's verified session email == the party's bound email, and the
+  // exact document hash == the envelope's doc_hash.
+  let env;
+  try {
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
+    if (r.status !== 200) return res.status(403).json({ error: "not_authorized" });
+    env = (await r.json()).envelope;
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+  const sessionEmailHash = partyEmailHashAdmin(email);
+  if (!env || env.doc_hash !== doc_hash) return res.status(403).json({ error: "doc_hash_mismatch" });
+  if (!env.party || !sessionEmailHash || env.party.email_hash !== sessionEmailHash) return res.status(403).json({ error: "not_authorized" });
+
+  // ── ISSUE: one-shot record, server-side binding only, EX 300s.
+  const activation_id = crypto.randomBytes(32).toString("base64url");
+  await redis().set(`paramant:sign:activation:${activation_id}`,
+    JSON.stringify({ account_id: user_id, envelope_id, party_index, doc_hash, email_hash: sessionEmailHash, issued_at: Date.now() }),
+    { EX: SIGN_ACTIVATION_TTL });
+  res.json({ activation_id, email_hash: sessionEmailHash, recipe_version: env.recipe_version || 3, sign_domain: "paramant/parasign/doc/v1" });
+});
+
+// POST /api/user/sign/submit (authUser) — ATOMIC CONSUME + forward to relay sign.
+api.post("/user/sign/submit", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const { activation_id, signer_public_key, signature } = req.body || {};
+  if (!activation_id || typeof activation_id !== "string") return res.status(400).json({ error: "activation_id_required" });
+  if (!signer_public_key || !signature) return res.status(400).json({ error: "signature_required" });
+
+  // ── ATOMIC one-shot consume. GETDEL returns the record AND deletes it in one
+  // round-trip: of two concurrent submits with the same activation_id, exactly
+  // one receives the record; the other gets null and is rejected. No TOCTOU.
+  let raw;
+  try { raw = await redis().getDel(`paramant:sign:activation:${activation_id}`); }
+  catch (e) { return res.status(502).json({ error: "store_unavailable" }); }
+  if (!raw) return res.status(409).json({ error: "activation_invalid_or_used" });
+  let act; try { act = JSON.parse(raw); } catch { return res.status(409).json({ error: "activation_invalid_or_used" }); }
+
+  // The submit must come from the same account the activation was issued to.
+  if (act.account_id !== user_id) return res.status(403).json({ error: "account_mismatch" });
+
+  // Forward to the relay sign with PR-0's internal-auth email binding. The relay
+  // recomputes the v3 domain-prefixed message from its OWN stored envelope fields
+  // (doc_hash, party_index, email_hash) and verifies the ML-DSA-65 signature —
+  // doc/party/email are bound both by the consumed activation and by the message.
+  try {
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(act.envelope_id)}/sign`, {
+      party_index: act.party_index, signer_public_key, signature, verified_email_hash: act.email_hash,
+    }, "POST");
+    const body = await r.json().catch(() => ({}));
+    if (r.status !== 200) return res.status(r.status).json({ error: body.error || "sign_failed" });
+    try { logAuditEvent("parasign_doc_signed", { account: String(user_id).slice(0, 12) + "…", envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
+    return res.json({ ok: true, signed_count: body.signed_count, party_count: body.party_count, status: body.status });
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+});
+
+
 // POST /api/user/auth/request-totp-reset (public — two-stage: sends confirmation first)
 api.post("/user/auth/request-totp-reset", async (req, res) => {
   const { email, challenge_id, nonce } = req.body || {};

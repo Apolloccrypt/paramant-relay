@@ -26,6 +26,9 @@ const MAX_PARTIES = 20;          // sanity cap; CT-log/Redis can handle more
 const MAX_LABEL_LEN = 80;
 const DEFAULT_TTL_DAYS = 30;
 const MAX_TTL_DAYS = 365;
+// Domain-separation label for ParaSign document signatures (recipe v3, R018 /
+// pentest H3). MUST stay byte-identical across relay + SDK + core.
+const SIGN_DOMAIN_DOC = 'paramant/parasign/doc/v1';
 
 function newEnvelopeId() {
   return crypto.randomBytes(ID_BYTES).toString('base64url');
@@ -75,12 +78,21 @@ function safeTokenEqual(stored, provided) {
 // picks the recipe from the envelope's stored recipe_version. This only defines
 // the MESSAGE -- it is orthogonal to how the message is signed, so the
 // activation<->key-use seam (R018) is unaffected.
+//   recipeVersion 3 (per-document PRF activation, R018): a domain-separation
+//     label is PREPENDED so a ParaSign document signature can never be replayed
+//     as any other signed message (pentest H3). The label is byte-identical
+//     across relay + SDK + core; the NUL terminator delimits it from the id.
+//       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash)
 function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion) {
-  const h = crypto.createHash('sha3-256')
-    .update(Buffer.from(envelopeId, 'utf8'))
-    .update(Buffer.from(docHashHex, 'hex'))
-    .update(Buffer.from(String(partyIndex), 'utf8'));
-  if (Number(recipeVersion) >= 2) {
+  const v = Number(recipeVersion) || 1;
+  const h = crypto.createHash('sha3-256');
+  if (v >= 3) {
+    h.update(Buffer.from(SIGN_DOMAIN_DOC, 'utf8')).update(Buffer.from([0]));
+  }
+  h.update(Buffer.from(envelopeId, 'utf8'))
+   .update(Buffer.from(docHashHex, 'hex'))
+   .update(Buffer.from(String(partyIndex), 'utf8'));
+  if (v >= 2) {
     // Decoded email-hash bytes: 32 bytes when present, 0 bytes when the party
     // has no email -- deterministic either way.
     h.update(Buffer.from(partyEmailHashHex || '', 'hex'));
@@ -380,4 +392,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, newEnvelopeId, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
