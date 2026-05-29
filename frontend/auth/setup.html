@@ -184,6 +184,13 @@
   <div class="cta-row" style="margin-top:24px">
     <button type="button" class="btn btn-primary" id="start-btn">Start setup</button>
   </div>
+
+  <div style="margin-top:28px">
+    <p class="small">Prefer a passkey? Use Face ID, Touch ID, Windows Hello, or a
+       security key &mdash; no authenticator app, and nothing to type at login.</p>
+    <button type="button" class="btn btn-secondary" id="passkey-register-btn">Set up a passkey instead</button>
+    <p id="passkey-status" class="small" aria-live="polite"></p>
+  </div>
 </section>
 
 <!-- Connecting state -->
@@ -322,6 +329,29 @@
   <button type="button" class="btn btn-primary mt-3" id="finish-btn" disabled>
     Continue to account
   </button>
+</section>
+
+<!-- Passkey success + backup codes (separate from the TOTP success section) -->
+<section id="state-passkey-success" class="section hidden">
+  <div class="marker">
+    <div class="num">&#10003;</div>
+    <h2>Passkey registered. Save your backup codes.</h2>
+    <div class="tag">one-time<br>display</div>
+  </div>
+
+  <div class="warning-box">
+    <strong>Shown once. Save them now.</strong>
+    <p>Each code signs you in once if you lose access to your passkey device.</p>
+  </div>
+
+  <div id="passkey-backup-codes" class="backup-grid"></div>
+
+  <div class="cta-row mt-3">
+    <button type="button" class="btn btn-secondary" id="passkey-copy-codes">Copy all</button>
+    <button type="button" class="btn btn-secondary" id="passkey-download-codes">Download .txt</button>
+  </div>
+
+  <button type="button" class="btn btn-primary mt-3" id="passkey-finish-btn">Continue to account</button>
 </section>
 
 </main>
@@ -464,6 +494,7 @@
   });
 })();
 </script>
+<script type="module" src="/js/passkey.js"></script>
 
 </body>
 </html>

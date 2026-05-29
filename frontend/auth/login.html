@@ -185,6 +185,11 @@
     <div id="error" class="error"></div>
   </form>
 
+  <div class="cta-row mt-3">
+    <button type="button" class="btn btn-secondary" id="passkey-login-btn">Sign in with a passkey</button>
+  </div>
+  <p id="passkey-login-status" class="small" aria-live="polite"></p>
+
   <p class="footer-text mt-4">
     Lost your authenticator? <a href="/auth/backup">Use a backup code</a><br>
     No backup codes? <a href="/auth/request-reset">Request a reset email</a><br>
@@ -249,6 +254,7 @@
   });
 })();
 </script>
+<script type="module" src="/js/passkey.js"></script>
 
 </body>
 </html>
