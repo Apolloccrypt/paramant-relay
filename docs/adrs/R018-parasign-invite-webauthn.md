@@ -201,6 +201,74 @@ Two lockout dimensions:
 Status: account-login guard + tests landed (this gate). The vault invariant is
 asserted within PR-B.
 
+## Signing-identity model (definitive — one level, per-document PRF activation)
+
+This is the binding acceptance criterion for the signing layer. It is distinct
+from the *login* factor model above: login authenticates a session; signing is a
+separate, per-document act.
+
+### Invariant
+Producing a ParaSign signature ALWAYS requires, together, every time, all four:
+1. a **verified email address** (the account, mailbox-proven);
+2. a **device-bound passkey** (WebAuthn, `userVerification: required`);
+3. a **per-document PRF activation** (fresh, for exactly this document); and
+4. an **ML-DSA-65** post-quantum signing key.
+
+There is NO email-only and NO TOTP-only signing path. **One strength level — no
+tiers** in signature strength.
+
+### Login ≠ signing (sole control; eIDAS SAP/SAM seam)
+A logged-in passkey *session* does NOT unlock the signing key. The key is
+activated only at the moment of deliberate signing, for exactly one document,
+and is **zeroized immediately after**. Authentication and signature-activation
+are distinct ceremonies; a session conveys no signing capability. This preserves
+the activation⇄key-use seam so an HSM-backed SAM can later sit between activation
+and key-use without reworking the flow.
+
+### Mail is a channel, not proof
+Invitations and per-document sign-requests are delivered by email (binding the
+request to an address), but email never authorizes a signature. The
+cryptographic activation is always the passkey-PRF for that specific document.
+
+### TOFU enrolment
+An invitee with no passkey registers one as part of the first signing: prove
+mailbox control (invite token) → register a passkey → that passkey-PRF activates
+the signature. No passkey ⇒ no signature.
+
+### Recovery / lockout (the vault-wrap invariant stays)
+The vault key carries two wraps: `passphrase` (PBKDF2, ALWAYS present) and
+`webauthn-prf` (added at passkey enrolment).
+- The signing *flow* is ALWAYS passkey-PRF-activation; the PRF wrap is what the
+  activation uses. The passphrase wrap is **not a second signing path**.
+- The passphrase is **break-glass for key material, not a weaker signature**: the
+  owner can always decrypt/export their own key bytes (sole control), so a
+  passkey/PRF failure on a device that still holds the vault never permanently
+  destroys the key. A signature produced that way is still full-strength
+  ML-DSA-65 — the model never weakens a signature, it only guarantees the owner
+  cannot lose their key.
+- **Device loss** (the IndexedDB vault is device-local): recover by importing the
+  passphrase-encrypted backup key file (downloadable at `/sign`) into the new
+  device's vault and re-wrapping with a new passkey; or enrol a fresh signing key
+  (new keypair + new passkey), with old signatures staying verifiable (revoke
+  keeps history — the user-signing.js model).
+- **Account/login recovery is separate** (another passkey, TOTP, or backup codes)
+  and never by itself yields a signature.
+- Forward: when the HSM-backed SAM lands, the key moves server-side under SAM
+  sole control; the client passphrase-export no longer applies and recovery
+  becomes SAM/operator-managed. The seam already accommodates that swap.
+
+### Build acceptance criteria (applied during implementation, not yet built)
+- `/v2/user/signing-key` use moves behind a **per-document PRF activation** (a
+  server-issued, one-shot, short-TTL activation token bound to doc-hash +
+  envelope-id + party-index + account_id), replacing pure-TOTP gating for the
+  *signing* act. (TOTP step-up remains for adding a login passkey.)
+- Every signed message carries a unique **domain-separation prefix**
+  (e.g. `paramant/parasign/doc/v1`), byte-identical across relay + SDK + core, to
+  close cross-context signature reuse (pentest H3).
+- **Enforce a strong passphrase at key enrolment**: the passphrase wrap is the
+  recovery floor, so the break-glass is only as strong as that passphrase. A weak
+  passphrase must be rejected at enrol time.
+
 ## Non-goals / boundary
 
 No HSM, no SAM, no SAP/SAD implementation, no eIDAS conformance work. This ADR
