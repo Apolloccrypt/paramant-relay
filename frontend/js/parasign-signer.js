@@ -5,7 +5,7 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf } from '/vendor/vault.js';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap } from '/vendor/vault.js';
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -29,6 +29,16 @@ function b64urlToBytes(s) {
   const u = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
   return u;
+}
+function b64EncodeStd(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+}
+function toHex(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0');
+  return s;
 }
 
 // Reconstruct EXACTLY the relay's recipe-v3 sign-message:
@@ -109,4 +119,43 @@ export async function signDocumentWithPasskey({ vaultId, rpId, envelopeId, docHa
   } finally {
     active.dispose();
   }
+}
+
+// ── TOFU enrol-as-needed — a SEPARATE sub-step (ADR R018) ────────────────────
+// Runs ONCE for a first-time signer who has no passkey/PRF wrap yet, BEFORE the
+// per-document activation-gate. It is deliberately NOT fused with activate()/
+// sign(): this moment combines passkey registration + ML-DSA key enrolment, so
+// it must be auditable as one distinct block. Three explicit stages; the signing
+// of an actual document is a separate act (signDocumentWithPasskey) afterwards.
+//
+// WebAuthn create()/get() and the server enrol call are injected as callbacks so
+// the ceremony plumbing stays out of this orchestration:
+//   registerPasskey()              -> { credentialId }              (WebAuthn create + server store)
+//   evalNewPrf({credentialId,prfSalt}) -> Uint8Array prfOutput      (WebAuthn get, prf eval=salt)
+//   enrolPublicKey({pk_b64,pk_hash,label})                         (server: bind pubkey to account)
+export async function enrolSigningPasskey({ label, passphrase, registerPasskey, evalNewPrf, enrolPublicKey }) {
+  // ── stage 1: key material + recovery floor (passphrase wrap; enforced strong) ──
+  const seed = crypto.getRandomValues(new Uint8Array(32));
+  const kp = ml_dsa65.keygen(seed);
+  const pk_b64 = b64EncodeStd(kp.publicKey);
+  const pk_hash = toHex(sha3_256(kp.publicKey));
+  try {
+    await vaultStore({ alg: 'ML-DSA-65', label: label || null, pk_b64, pk_hash, secretKeyBytes: kp.secretKey, passphrase });
+
+    // ── stage 2: register the passkey, run PRF with a fresh salt, add prf wrap ──
+    const { credentialId } = await registerPasskey();
+    const prfSalt = crypto.getRandomValues(new Uint8Array(16));   // the eval salt; stored in the wrap
+    const prfOutput = await evalNewPrf({ credentialId, prfSalt });
+    try {
+      await vaultAddPrfWrap({ pk_hash, secretKeyBytes: kp.secretKey, credentialId, prfSalt, prfOutput });
+    } finally {
+      prfOutput.fill(0);
+    }
+
+    // ── stage 3: bind the public key to the account (server) ──
+    await enrolPublicKey({ pk_b64, pk_hash, label: label || null });
+  } finally {
+    kp.secretKey.fill(0);   // zeroize the plaintext key once both wraps + enrol are done
+  }
+  return { pk_hash, pk_b64 };
 }

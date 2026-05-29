@@ -269,6 +269,28 @@ The vault key carries two wraps: `passphrase` (PBKDF2, ALWAYS present) and
   recovery floor, so the break-glass is only as strong as that passphrase. A weak
   passphrase must be rejected at enrol time.
 
+### v3 sign-message wire format (BYTE-EXACT — relay + SDK + core MUST match)
+Any implementation that signs a ParaSign document MUST hash exactly these bytes,
+in this order, with NO separators other than the single NUL after the label.
+A one-byte deviation = a silent signature mismatch (cf. the SDK conformity
+report). Recipe v3:
+
+    message = SHA3-256(
+        utf8("paramant/parasign/doc/v1")   // domain label, 24 bytes, NO trailing slash/version drift
+      ‖ 0x00                                // single NUL separator
+      ‖ utf8(envelope_id)                   // base64url id string, as-is (NOT decoded)
+      ‖ hex_decode(doc_hash)                // 32 bytes (SHA3-256 of the document)
+      ‖ utf8(decimal(party_index))          // e.g. "0", "10" — ASCII decimal, no padding
+      ‖ hex_decode(party_email_hash)        // 32 bytes, or 0 bytes when the party has no email
+    )
+
+Reference implementations (this PR): `relay/envelope.js signMessageBytes(...,3)`
+and `frontend/js/parasign-signer.js buildDocSignMessage(...)` — verified to
+produce identical digests. `party_email_hash` itself is
+`SHA3-256("paramant/party-email/v1" ‖ 0x00 ‖ lower(trim(email)))` (see
+`partyEmailHash`). When the SDK/core gain signing, they take these two formats
+1:1; do not "improve" the byte layout.
+
 ## Non-goals / boundary
 
 No HSM, no SAM, no SAP/SAD implementation, no eIDAS conformance work. This ADR

@@ -108,6 +108,25 @@ async function _deriveKekFromPassphrase(passphrase, salt) {
   return kek;
 }
 
+// Reject weak passphrases at enrol. The passphrase wrap is the recovery floor
+// (R018): the break-glass is only as strong as this passphrase, so enforce it
+// here, not just in the UI. >=12 chars; if <16, require >=3 character classes;
+// reject all-one-character and a small common-word blocklist. No external dep.
+export function assertStrongPassphrase(passphrase) {
+  const s = String(passphrase == null ? '' : passphrase);
+  if (s.length < 12) throw new Error('passphrase too weak: use at least 12 characters');
+  if (/^(.)\1+$/.test(s)) throw new Error('passphrase too weak: not all the same character');
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(re => re.test(s)).length;
+  if (s.length < 16 && classes < 3) {
+    throw new Error('passphrase too weak: use 16+ characters, or mix upper/lower/digits/symbols');
+  }
+  const lc = s.toLowerCase();
+  if (['password', 'paramant', '123456789012', 'qwertyuiop', 'aaaaaaaaaaaa'].some(w => lc.includes(w))) {
+    throw new Error('passphrase too weak: contains a common word/sequence');
+  }
+  return true;
+}
+
 // --- Store an entry. If id already exists, the new passphrase-wrap REPLACES
 //     the existing passphrase-wrap on that entry (so the user can change
 //     passphrases). Other wraps (e.g. PR 2's prf wrap) are left intact.
@@ -116,9 +135,7 @@ export async function vaultStore({ alg, label, pk_b64, pk_hash, secretKeyBytes, 
   if (!(secretKeyBytes instanceof Uint8Array) || secretKeyBytes.length === 0) {
     throw new Error('vaultStore: secretKeyBytes (Uint8Array) required');
   }
-  if (!passphrase || String(passphrase).length < 8) {
-    throw new Error('vaultStore: passphrase of at least 8 chars required');
-  }
+  assertStrongPassphrase(passphrase);   // recovery floor — fail closed on weak input
 
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
   const iv   = crypto.getRandomValues(new Uint8Array(IV_BYTES));

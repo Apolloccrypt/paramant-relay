@@ -153,7 +153,7 @@ class EnvelopeStore {
     return this._signScriptSha;
   }
 
-  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode }) {
+  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
@@ -178,7 +178,12 @@ class EnvelopeStore {
     // signed via the trusted admin proxy (verified_email_hash + X-Internal-Auth);
     // 'open' = the legacy public flow (any holder of env_id+party_index signs).
     const mode = bindingMode === 'email' ? 'email' : 'open';
-    const recipeVersion = mode === 'email' ? 2 : 1;
+    // Explicit recipeVersion (1-3) wins; else default by binding mode. The
+    // per-document PRF activation flow (R018) creates v3 (domain-prefixed)
+    // envelopes; open=1, email=2 stay the defaults for existing flows.
+    const recipeVersion = (Number.isInteger(recipeVersionArg) && recipeVersionArg >= 1 && recipeVersionArg <= 3)
+      ? recipeVersionArg
+      : (mode === 'email' ? 2 : 1);
 
     const hash = {
       id,
