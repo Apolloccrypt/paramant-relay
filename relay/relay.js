@@ -28,6 +28,7 @@ const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
 const userSigning   = require('./lib/user-signing');
+const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
 const quota         = require('./lib/quota');
 
@@ -2440,6 +2441,164 @@ const server = http.createServer(async (req, res) => {
       return res.end(J({ ok: true, revoked_at: result.entry.revoked_at, ct_index: ctEntry.index }));
     } catch (err) {
       console.error("[user/signing-key DELETE]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // ── WebAuthn / passkey credential storage (ADR R018, PR-A) ───────────────────
+  // Durable storage only. The WebAuthn ceremony (challenge issue + attestation/
+  // assertion verification, rpId/origin checks) lives in the admin server and
+  // calls these endpoints over X-Internal-Auth. The relay never issues a
+  // session and never verifies an assertion here — it only persists public
+  // credential material so passkeys are as durable as TOTP/signing keys.
+
+  // POST /v2/user/webauthn/handle — get-or-create the account's WebAuthn user
+  // handle (random, no PII). Admin needs it to build registration options.
+  if (req.method === "POST" && path === "/v2/user/webauthn/handle") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const handle = await userWebauthn.getOrCreateUserHandle(redisClient, user_id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, handle }));
+    } catch (err) {
+      console.error("[user/webauthn/handle]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/webauthn/credential — persist a credential the admin has
+  // already verified. Idempotent on credId; rejects a credId bound elsewhere.
+  if (req.method === "POST" && path === "/v2/user/webauthn/credential") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const b = JSON.parse((await readBody(req, 16384)).toString());
+      if (!b.user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      let result;
+      try {
+        result = await userWebauthn.storeCredential(redisClient, b.user_id, {
+          credId: b.credId, publicKey: b.publicKey, counter: b.counter,
+          transports: b.transports, prfSupported: b.prfSupported, aaguid: b.aaguid, label: b.label,
+        });
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));
+      }
+      log("info", "webauthn_credential_stored", {
+        user_id: String(b.user_id).slice(0, 12) + "…",
+        cred_id: String(result.entry.credId).slice(0, 12) + "…",
+        prf: result.entry.prfSupported, reenrolled: result.reenrolled,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, reenrolled: result.reenrolled, credId: result.entry.credId }));
+    } catch (err) {
+      console.error("[user/webauthn/credential POST]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // GET /v2/user/webauthn/credentials?user_id= — list active credentials (public
+  // material only; admin uses this for exclude/allowCredentials and verify).
+  if (req.method === "GET" && path === "/v2/user/webauthn/credentials") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const user_id = query.user_id;
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const arr = await userWebauthn.getActiveCredentials(redisClient, user_id);
+      const creds = arr.map(e => ({
+        credId: e.credId, publicKey: e.publicKey, counter: e.counter,
+        transports: e.transports, prfSupported: e.prfSupported, label: e.label,
+        created_at: e.created_at, last_used_at: e.last_used_at,
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, credentials: creds, total: creds.length }));
+    } catch (err) {
+      console.error("[user/webauthn/credentials GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // GET /v2/user/webauthn/lookup?cred_id= — resolve a credential id to its
+  // account + stored verification material (for assertion verification). Revoked
+  // credentials do not resolve.
+  if (req.method === "GET" && path === "/v2/user/webauthn/lookup") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const found = await userWebauthn.lookupByCredId(redisClient, query.cred_id);
+      if (!found) { res.writeHead(404); return res.end(J({ found: false })); }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({
+        found: true, user_id: found.userId,
+        credId: found.entry.credId, publicKey: found.entry.publicKey,
+        counter: found.entry.counter, prfSupported: found.entry.prfSupported,
+      }));
+    } catch (err) {
+      console.error("[user/webauthn/lookup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // GET /v2/user/webauthn/by-handle?handle= — resolve a WebAuthn userHandle (from
+  // a discoverable-credential assertion) back to the account (usernameless login).
+  if (req.method === "GET" && path === "/v2/user/webauthn/by-handle") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const found = await userWebauthn.lookupByHandle(redisClient, query.handle);
+      if (!found) { res.writeHead(404); return res.end(J({ found: false })); }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ found: true, user_id: found.userId }));
+    } catch (err) {
+      console.error("[user/webauthn/by-handle]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // POST /v2/user/webauthn/counter — persist a new signature counter after a
+  // successful assertion. Counter-regression policy is the admin's decision.
+  if (req.method === "POST" && path === "/v2/user/webauthn/counter") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, cred_id, counter } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !cred_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const updated = await userWebauthn.updateCounter(redisClient, user_id, cred_id, counter);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, updated }));
+    } catch (err) {
+      console.error("[user/webauthn/counter]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // DELETE /v2/user/webauthn/credential — revoke a passkey. Keeps history, drops
+  // the auth index. Returns remaining_active so the admin's lockout guard can
+  // refuse a removal that would strand the account.
+  if (req.method === "DELETE" && path === "/v2/user/webauthn/credential") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, cred_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !cred_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      let result;
+      try {
+        result = await userWebauthn.revokeCredential(redisClient, user_id, cred_id);
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));
+      }
+      if (!result.revoked) {
+        const code = result.reason === "not_found" ? 404 : 409;
+        res.writeHead(code, { "Content-Type": "application/json" });
+        return res.end(J({ error: result.reason, remaining_active: result.remaining_active }));
+      }
+      log("info", "webauthn_credential_revoked", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        cred_id: String(cred_id).slice(0, 12) + "…",
+        remaining_active: result.remaining_active,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, remaining_active: result.remaining_active }));
+    } catch (err) {
+      console.error("[user/webauthn/credential DELETE]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
   }
