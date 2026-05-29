@@ -149,6 +149,31 @@ stores opaque credential records, so it gets no new dependency.
 - `p{i}_email_hash` is an unsalted low-entropy identifier; namespaced but still
   dictionary-guessable — accepted/documented privacy property.
 
+## Authentication-factor model (deliberate choice)
+
+Passkey login issues a session **without** a TOTP step. This is a deliberate
+factor decision, not a side effect of reusing the TOTP login path: the TOTP
+path is *email + TOTP* (two server-visible factors); a passkey is *possession
+of the device + a local user-verification gesture (biometric/PIN)* resolved on
+the device. We accept passkey as a **sufficient, sole login factor**, and a
+passkey-authenticated session is allowed to reach ML-DSA document signing.
+
+Why this is acceptable: a discoverable passkey with `userVerification:
+'required'` is phishing-resistant (origin-bound, cannot be replayed to another
+RP), hardware/device-bound, and gated by a local gesture — it is at least as
+strong as email+TOTP against the realistic threats (phishing, credential
+stuffing, shared-secret theft), and it removes the shared-secret class entirely
+(the server stores only a public key). The residual risk — physical device loss
+— is covered by the lockout gate below (email recovery must be able to enrol a
+fresh passkey before a passkey may become an account's sole factor).
+
+Consequence for sensitive relay ops: `/v2/user/signing-key` POST/DELETE are
+TOTP-gated today, so a passkey-only account cannot enrol a signing key (and thus
+cannot sign). PR-A/PR-C must let a **fresh passkey assertion act as a
+TOTP-equivalent step-up** for those ops; until then, signing enrolment for
+passkey-only accounts is blocked rather than bypassed. (Tracked as a PR-A/PR-C
+acceptance item; not built in the login work itself.)
+
 ## Lockout prevention (mandatory gate before PR-A)
 
 Introducing passkeys must never strand a user. This gate is a hard
