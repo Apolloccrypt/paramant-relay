@@ -26,6 +26,31 @@ const MAX_PARTIES = 20;          // sanity cap; CT-log/Redis can handle more
 const MAX_LABEL_LEN = 80;
 const DEFAULT_TTL_DAYS = 30;
 const MAX_TTL_DAYS = 365;
+// Signing-invite window for EMAIL-bound envelopes (R018): how long an invite
+// link can actually be USED to sign, deliberately shorter than and independent
+// of the 30-day envelope record retention (DEFAULT_TTL_DAYS). Measured from the
+// envelope's created_at (= when the sender created it and sent the invites).
+// The record is still kept 30d for verification; only the signable window is 7d.
+const SIGN_INVITE_TTL_DAYS = 7;
+// Domain-separation label for ParaSign document signatures (recipe v3, R018 /
+// pentest H3). MUST stay byte-identical across relay + SDK + core.
+const SIGN_DOMAIN_DOC = 'paramant/parasign/doc/v1';
+
+// True when an email-bound invite's signing window (created_at + 7d) has closed.
+// Open/legacy envelopes have no invite window (only the 30d hash TTL), so callers
+// apply this in email mode only. Missing/unparseable created_at -> not closed
+// (real envelopes always store it; the 30d hash TTL remains the backstop).
+function signInviteClosed(createdAtIso, nowMs) {
+  const t = Date.parse(createdAtIso || '');
+  if (!Number.isFinite(t)) return false;
+  return (nowMs - t) > SIGN_INVITE_TTL_DAYS * 86400_000;
+}
+// ISO timestamp when an email-bound invite stops being signable, or null.
+function signInviteExpiresAt(createdAtIso) {
+  const t = Date.parse(createdAtIso || '');
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + SIGN_INVITE_TTL_DAYS * 86400_000).toISOString();
+}
 
 function newEnvelopeId() {
   return crypto.randomBytes(ID_BYTES).toString('base64url');
@@ -75,12 +100,21 @@ function safeTokenEqual(stored, provided) {
 // picks the recipe from the envelope's stored recipe_version. This only defines
 // the MESSAGE -- it is orthogonal to how the message is signed, so the
 // activation<->key-use seam (R018) is unaffected.
+//   recipeVersion 3 (per-document PRF activation, R018): a domain-separation
+//     label is PREPENDED so a ParaSign document signature can never be replayed
+//     as any other signed message (pentest H3). The label is byte-identical
+//     across relay + SDK + core; the NUL terminator delimits it from the id.
+//       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash)
 function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion) {
-  const h = crypto.createHash('sha3-256')
-    .update(Buffer.from(envelopeId, 'utf8'))
-    .update(Buffer.from(docHashHex, 'hex'))
-    .update(Buffer.from(String(partyIndex), 'utf8'));
-  if (Number(recipeVersion) >= 2) {
+  const v = Number(recipeVersion) || 1;
+  const h = crypto.createHash('sha3-256');
+  if (v >= 3) {
+    h.update(Buffer.from(SIGN_DOMAIN_DOC, 'utf8')).update(Buffer.from([0]));
+  }
+  h.update(Buffer.from(envelopeId, 'utf8'))
+   .update(Buffer.from(docHashHex, 'hex'))
+   .update(Buffer.from(String(partyIndex), 'utf8'));
+  if (v >= 2) {
     // Decoded email-hash bytes: 32 bytes when present, 0 bytes when the party
     // has no email -- deterministic either way.
     h.update(Buffer.from(partyEmailHashHex || '', 'hex'));
@@ -141,7 +175,7 @@ class EnvelopeStore {
     return this._signScriptSha;
   }
 
-  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode }) {
+  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
@@ -166,7 +200,12 @@ class EnvelopeStore {
     // signed via the trusted admin proxy (verified_email_hash + X-Internal-Auth);
     // 'open' = the legacy public flow (any holder of env_id+party_index signs).
     const mode = bindingMode === 'email' ? 'email' : 'open';
-    const recipeVersion = mode === 'email' ? 2 : 1;
+    // Explicit recipeVersion (1-3) wins; else default by binding mode. The
+    // per-document PRF activation flow (R018) creates v3 (domain-prefixed)
+    // envelopes; open=1, email=2 stay the defaults for existing flows.
+    const recipeVersion = (Number.isInteger(recipeVersionArg) && recipeVersionArg >= 1 && recipeVersionArg <= 3)
+      ? recipeVersionArg
+      : (mode === 'email' ? 2 : 1);
 
     const hash = {
       id,
@@ -286,6 +325,9 @@ class EnvelopeStore {
       binding_mode: mode,
       recipe_version: parseInt(h.recipe_version, 10) || 1,
       expires_at: h.expires_at,
+      // When this email-bound invite stops being signable (created_at + 7d);
+      // null for open envelopes. Lets the admin gate fail early before the PRF.
+      sign_expires_at: mode === 'email' ? signInviteExpiresAt(h.created_at) : null,
       party: {
         index: pi,
         label: h['p' + pi + '_label'] || null,
@@ -335,6 +377,10 @@ class EnvelopeStore {
     // so they can never fill an email-bound slot. Fail-closed: a party with no
     // bound email (empty hash) cannot be signed in email mode.
     if (mode === 'email') {
+      // Signing-invite window: an email-bound invite is signable for 7 days from
+      // creation, independent of the 30-day record retention. Past that, the
+      // slot is closed even though the envelope record still exists.
+      if (signInviteClosed(h.created_at, Date.now())) return { ok: false, code: 'invite_expired' };
       if (!opts.internalTrusted) return { ok: false, code: 'email_binding_required' };
       if (!safeHexEqual(opts.verifiedEmailHash, emailHash)) return { ok: false, code: 'email_mismatch' };
     }
@@ -380,4 +426,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, newEnvelopeId, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS, SIGN_INVITE_TTL_DAYS };
