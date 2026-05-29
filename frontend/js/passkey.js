@@ -84,7 +84,7 @@ function wireSetupPasskey() {
     document.querySelectorAll('section[id^="state-"]').forEach((s) => s.classList.add('hidden'));
     const section = document.getElementById('state-passkey-success');
     const grid = document.getElementById('passkey-backup-codes');
-    if (!section || !grid) { window.location = '/account'; return; }
+    if (!section || !grid) { window.location = '/dashboard'; return; }
     grid.innerHTML = '';
     codes.forEach((c) => {
       const d = document.createElement('div');
@@ -107,7 +107,7 @@ function wireSetupPasskey() {
       a.click();
     });
     const finishBtn = document.getElementById('passkey-finish-btn');
-    if (finishBtn) finishBtn.addEventListener('click', () => { window.location = '/account'; });
+    if (finishBtn) finishBtn.addEventListener('click', () => { window.location = '/dashboard'; });
   }
 }
 
@@ -124,7 +124,7 @@ function wireLoginPasskey() {
     return;
   }
 
-  const returnUrl = new URLSearchParams(window.location.search).get('return') || '/account';
+  const returnUrl = new URLSearchParams(window.location.search).get('return') || '/dashboard';
 
   btn.addEventListener('click', async () => {
     const email = (emailEl && emailEl.value || '').trim();
