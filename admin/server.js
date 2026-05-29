@@ -1356,6 +1356,42 @@ api.get("/user/account/webauthn/credentials", authUser, async (req, res) => {
 });
 
 
+// POST /api/user/envelopes (authUser) — create a signing envelope SAME-ORIGIN
+// (replaces the old direct browser -> health.paramant.app POST, audit #2).
+// recipe_version 3 (domain-prefixed). Party 0 is the signer themselves (their
+// session email), so a self-sign (no recipients) still gets an envelope and
+// goes through the per-document activation gate (R018: every signature is a
+// passkey-PRF activation; no separate weaker self-sign route). The relay is
+// reached with the session's own pgp_ key as X-Api-Key.
+api.post("/user/envelopes", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `env:ip:${ip}`, 30, 900))) return res.status(429).json({ error: "rate_limited" });
+  const docHash = (req.body?.doc_hash || "").toString().trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(docHash)) return res.status(400).json({ error: "invalid_doc_hash" });
+  const recipients = Array.isArray(req.body?.recipients) ? req.body.recipients : [];
+  const originalFilename = (req.body?.original_filename || "").toString().slice(0, 200);
+  const creatorPublicKey = (req.body?.creator_public_key || "").toString();
+  // Party 0 = the signer (self), bound to their verified session email.
+  const parties = [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }];
+  for (const r of recipients) {
+    if (r && r.email) parties.push({ label: (r.label || "").toString().slice(0, 80), email: r.email.toString() });
+  }
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": user_id },
+      body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 3, creator_public_key: creatorPublicKey }),
+    });
+    const body = await rr.json().catch(() => ({}));
+    if (rr.status !== 200) return res.status(rr.status).json({ error: body.error || "envelope_create_failed" });
+    return res.json(body);   // { ok, envelope: { id, party_links:[{party_index, sign_path, invite_token}], ... } }
+  } catch (e) {
+    console.error("[user/envelopes POST]", e.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // ── Per-document signing activation (R018: per-document PRF activation) ───────
 // A signature requires a fresh, server-issued, ONE-SHOT activation bound to
 // EXACTLY (account, envelope, party, doc-hash). Issuance authorizes BEFORE the
@@ -1676,6 +1712,27 @@ api.post("/user/account/signing-key", authUser, async (req, res) => {
     return res.status(relayRes.status).json(body);
   } catch (err) {
     console.error("[user/signing-key POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// POST /api/user/account/signing-key/tofu — TOFU enrol for a first-time invitee
+// (no TOTP), gated by an email-bound invite token instead. We forward the
+// SESSION's user_id (never a client-supplied id) + the invite context; the
+// relay self-verifies the token, that the party email == this account's email,
+// the one-shot, and the cross-account conflict. No invite context here means the
+// relay rejects — there is no TOTP-free enrol path without a valid invite.
+api.post("/user/account/signing-key/tofu", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const { pk_b64, label, envelope_id, party_index, invite_token } = req.body || {};
+  if (!pk_b64 || typeof pk_b64 !== "string") return res.status(400).json({ error: "missing_pk_b64" });
+  if (!envelope_id || !invite_token) return res.status(400).json({ error: "missing_invite_context" });
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key/tofu", { user_id, pk_b64, label, envelope_id, party_index, invite_token }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/signing-key/tofu POST]", err.message);
     return res.status(502).json({ error: "relay_unreachable" });
   }
 });

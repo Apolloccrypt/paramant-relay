@@ -2445,6 +2445,74 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /v2/user/signing-key/tofu — enrol a signing pubkey gated by an EMAIL-
+  // BOUND invite token + the account's own email, INSTEAD of TOTP, for a
+  // first-time (TOFU) invitee who has no TOTP. The relay self-verifies as
+  // strictly as the TOTP gate it replaces — it does NOT merely trust the caller:
+  //   GATE 1  the invite token must match this envelope party (PR-0, email-bound);
+  //   GATE 2  the party's bound email MUST equal THIS account's own email
+  //           (so a pubkey can only land on the account the invite was for —
+  //           no path to set a key on someone else's account);
+  //   GATE 3  one-shot per party slot (a single TOFU enrol per invite);
+  //   + the cross-account-conflict check inside storeSigningPk still applies.
+  // No valid invite token -> no enrol. Internal-auth only (admin proxy).
+  if (req.method === "POST" && path === "/v2/user/signing-key/tofu") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, pk_b64, label, envelope_id, party_index, invite_token } = JSON.parse((await readBody(req, 16384)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      if (!pk_b64 || typeof pk_b64 !== "string") { res.writeHead(400); return res.end(J({ error: "missing_pk_b64" })); }
+      if (!envelope_id || !invite_token) { res.writeHead(400); return res.end(J({ error: "missing_invite_context" })); }
+      const pi = parseInt(party_index, 10);
+      if (!Number.isInteger(pi) || pi < 0) { res.writeHead(400); return res.end(J({ error: "invalid_party_index" })); }
+
+      const store = _envStore();
+      if (!store) { res.writeHead(503); return res.end(J({ error: "envelope_store_unavailable" })); }
+
+      // GATE 1 — invite token must match this envelope party (timing-safe, PR-0).
+      if (!(await store.checkInviteToken(envelope_id, pi, invite_token))) {
+        res.writeHead(403); return res.end(J({ error: "invalid_invite_token" }));
+      }
+      // GATE 2 — the party's bound email MUST equal THIS account's email.
+      const view = await store.getForParty(envelope_id, pi, invite_token);
+      const partyEmailHash = view && view.party ? (view.party.email_hash || "") : "";
+      let acctEmail = "";
+      try { acctEmail = (JSON.parse((await redisClient.get(`paramant:user:meta:${user_id}`)) || "{}").email) || ""; } catch {}
+      const acctEmailHash = envelopeMod.partyEmailHash(acctEmail);
+      // Timing-safe hex compare (the same helper envelope.js sign() uses) — for
+      // consistency, so the unsafe `!==` pattern is never copied to a spot where
+      // it would matter. safeHexEqual returns false for empty/length-mismatch too.
+      if (!envelopeMod.safeHexEqual(partyEmailHash, acctEmailHash)) {
+        res.writeHead(403); return res.end(J({ error: "account_email_mismatch" }));
+      }
+      // GATE 3 — one-shot per party slot (NX). Released on store failure below.
+      const enrolKey = `paramant:tofu_enrol:${envelope_id}:${pi}`;
+      const firstEnrol = await redisClient.set(enrolKey, String(user_id), { NX: true, EX: 30 * 86400 });
+      if (firstEnrol === null) { res.writeHead(409); return res.end(J({ error: "already_enrolled" })); }
+
+      // Store (server-side pk_hash; cross-account-conflict check inside).
+      let result;
+      try {
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+      } catch (e) {
+        await redisClient.del(enrolKey).catch(() => {});
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));   // e.g. 'pubkey already enrolled to a different account'
+      }
+      const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled_tofu", user_id, result.entry.pk_hash_sha3);
+      log("info", "signing_pk_enrolled_tofu", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        pk_hash: result.entry.pk_hash_sha3.slice(0, 16) + "…",
+        envelope: String(envelope_id).slice(0, 10) + "…", party: pi, ct_index: ctEntry.index,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, pk_hash_sha3: result.entry.pk_hash_sha3, enrolled_at: result.entry.enrolled_at, ct_index: ctEntry.index }));
+    } catch (err) {
+      console.error("[user/signing-key/tofu]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ── WebAuthn / passkey credential storage (ADR R018, PR-A) ───────────────────
   // Durable storage only. The WebAuthn ceremony (challenge issue + attestation/
   // assertion verification, rpId/origin checks) lives in the admin server and
@@ -4627,7 +4695,7 @@ python3 paramant-receiver.py \\
         ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
-      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode });
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: out }));

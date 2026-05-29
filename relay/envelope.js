@@ -397,4 +397,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };

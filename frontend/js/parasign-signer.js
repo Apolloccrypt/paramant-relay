@@ -5,7 +5,7 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap } from '/vendor/vault.js';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap, vaultAvailable, vaultList } from '/vendor/vault.js';
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -54,6 +54,27 @@ export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash
     enc.encode(String(partyIndex)),
     hexToBytes(emailHash || ''),
   ]));
+}
+
+// v3-only signing-key resolution — the SINGLE definition of "what a signing key
+// is", shared by /sign (self-sign) and /co-sign (recipient). The signing key is
+// the account's passkey-protected ML-DSA-65 key in the vault. We read its PUBLIC
+// half (pk_b64/pk_hash) from vault metadata WITHOUT unlocking; the secret is only
+// unlocked by the per-document passkey-PRF activation (LocalVaultSigner.activate,
+// the explicit step-2 action). No ephemeral/file/passphrase key source. If no
+// passkey signing key is enrolled, this throws with code 'no_signing_passkey' so
+// the caller can branch to the TOFU enrol sub-step (stuk 2 UI / enrolSigningPasskey).
+export async function resolvePasskeySigningKey() {
+  if (!(await vaultAvailable())) throw new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
+  const keys = await vaultList();
+  const usable = keys.filter((k) => (k.kekSources || []).includes('webauthn-prf'));
+  if (usable.length === 0) {
+    const e = new Error('No passkey signing key on this device yet. Enrol a passkey for signing first.');
+    e.code = 'no_signing_passkey';
+    throw e;
+  }
+  const k = usable[0];   // single signing identity for now
+  return { vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16) };
 }
 
 // Reproduce the PRF output by running a WebAuthn get() with the SAME salt that
@@ -158,4 +179,26 @@ export async function enrolSigningPasskey({ label, passphrase, registerPasskey, 
     kp.secretKey.fill(0);   // zeroize the plaintext key once both wraps + enrol are done
   }
   return { pk_hash, pk_b64 };
+}
+
+// ── Same-origin admin calls for the per-document signing chain (R018) ────────
+async function _postJSON(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), credentials: 'include' });
+  let data = null; try { data = await r.json(); } catch { /* non-JSON */ }
+  if (!r.ok) { const e = new Error((data && data.error) || ('http_' + r.status)); e.status = r.status; e.data = data; throw e; }
+  return data;
+}
+// Create the envelope (party 0 = self). Returns { envelope: { id, party_links, ... } }.
+export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey }) {
+  return _postJSON('/api/user/envelopes', { doc_hash: docHash, recipients: recipients || [], original_filename: originalFilename, signer_label: signerLabel, creator_public_key: creatorPublicKey });
+}
+// Authorize + issue the per-document activation (pre-unlock gate). Returns
+// { activation_id, email_hash, recipe_version }.
+export function requestSignActivation({ envelopeId, partyIndex, docHash, inviteToken }) {
+  return _postJSON('/api/user/sign/activation', { envelope_id: envelopeId, party_index: partyIndex, doc_hash: docHash, invite_token: inviteToken });
+}
+// Submit the signature; the admin consumes the activation atomically + forwards
+// to the relay. Returns { ok, signed_count, party_count, status }.
+export function submitSignature({ activationId, signerPublicKey, signature }) {
+  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature });
 }

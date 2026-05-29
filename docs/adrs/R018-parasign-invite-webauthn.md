@@ -291,6 +291,19 @@ produce identical digests. `party_email_hash` itself is
 `partyEmailHash`). When the SDK/core gain signing, they take these two formats
 1:1; do not "improve" the byte layout.
 
+### Non-ASCII canonicalization (cross-SDK signature safety)
+Surfaced by the SDK↔relay conformance suite: sdk-js serializes JSON strings as
+raw UTF-8 while sdk-py emits `\uXXXX` escapes, so any signed/canonicalized JSON
+payload containing non-ASCII (e.g. a signer label "José", "Müller") yields a
+**cross-SDK signature mismatch** — the same byte-identity class as the v3 domain
+prefix. Rule: anything that is signed or cross-SDK-canonicalized
+(sign-messages, receipts, envelope canonical forms) is **ASCII-only**, OR the
+single canonicalization divergence is resolved first. The v3 sign-message above
+is already safe by construction (it contains only the ASCII domain label, the
+base64url envelope id, ASCII decimal party index, and raw hash BYTES — never a
+raw name; emails are hashed, not embedded). Keep it that way: never fold a raw
+display string into a signed message; carry such fields outside the signature.
+
 ## Non-goals / boundary
 
 No HSM, no SAM, no SAP/SAD implementation, no eIDAS conformance work. This ADR

@@ -7,10 +7,16 @@
 // /vendor/pdfjs (preview render) and /vendor/pdf-lib (stamp baking). All
 // same-origin; CSP script-src 'self' remains intact.
 
-import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultAvailable, vaultList, vaultUnlock } from '/vendor/vault.js';
+// v3-only signing: ml_dsa65.sign + the passphrase vaultUnlock are GONE from the
+// sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
+// in parasign-signer.js); sha3_256 stays for document hashing only.
+import { sha3_256 } from '/vendor/paramant-pqc.js';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js';
 
-const RELAY = 'https://health.paramant.app';
+// Read-only public relay host, used ONLY for the "view envelope status" link on
+// the done screen. The signing path itself is same-origin via the admin
+// (/api/user/sign/*, /api/user/envelopes) — no relay host hardcoded there.
+const RELAY_PUBLIC = 'https://health.paramant.app';
 
 // ====================================================================
 // State
@@ -27,9 +33,7 @@ const state = {
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
   signer: {
     name: '',
-    keySrc: 'ephemeral',
-    key: null,           // { secretKey, publicKey }
-    apiKey: '',
+    fingerprint: '',       // public passkey-key fingerprint, resolved before sign (display only)
     sigStyle: 'typed',     // 'typed' | 'drawn' | 'image'
     sigImageBytes: null,   // Uint8Array (PNG for drawn, PNG/JPG for image)
     sigImageType: null,    // 'png' | 'jpg'
@@ -38,7 +42,7 @@ const state = {
   },
   recipients: [],        // [{label, email}]; if empty -> single-party local sign only
   envelope: null,        // populated when recipients.length > 0 after POST /v2/envelopes
-  result: null,          // { stampedBytes?, envelope, fingerprint, notary? }
+  result: null,          // { stampedBytes?, envelope, fingerprint }
 };
 
 // ====================================================================
@@ -316,19 +320,32 @@ async function initStepIdentity() {
   initDrawCanvas();
   initImageUpload();
 
-  // Populate vault keys if available.
+  // No key-source dropdown any more: signing is always the account's passkey-PRF
+  // key (resolved at sign time). Show the enrolled key's fingerprint (or a "set
+  // up a passkey" hint) so the signer knows which identity will sign.
+  showSigningIdentity().catch(() => {});
+}
+
+// Display the passkey signing identity in the identity step (read-only, public
+// metadata only — no unlock). If none is enrolled, point at the enrol path
+// (stuk 2 wires an inline enrol button here).
+async function showSigningIdentity() {
+  const el = $('ds-signing-identity');
+  if (!el) return;
   try {
-    if (await vaultAvailable()) {
-      const items = await vaultList();
-      const sel = $('ds-key-src');
-      for (const it of items) {
-        const opt = document.createElement('option');
-        opt.value = 'vault:' + it.id;
-        opt.textContent = 'Vault: ' + (it.label || (it.pk_hash || '').slice(0, 12));
-        sel.appendChild(opt);
-      }
+    const k = await resolvePasskeySigningKey();
+    state.signer.fingerprint = k.fingerprint;
+    el.className = 'ds-hint';
+    el.innerHTML = 'You will sign with your passkey-protected key (Face ID / Touch ID / security key). ' +
+      'Key fingerprint <code>' + escapeHtml(k.fingerprint) + '</code>.';
+  } catch (e) {
+    el.className = 'ds-hint';
+    if (e && e.code === 'no_signing_passkey') {
+      el.innerHTML = 'No signing passkey on this device yet. Set one up at <a href="/account">your account</a> before signing.';
+    } else {
+      el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
     }
-  } catch {}
+  }
 }
 
 function refreshIdentityValid() {
@@ -445,46 +462,9 @@ function initImageUpload() {
   });
 }
 
-async function resolveSignerKey() {
-  const src = $('ds-key-src').value;
-  state.signer.keySrc = src;
-  if (src === 'ephemeral') {
-    const seed = crypto.getRandomValues(new Uint8Array(32));
-    const kp = ml_dsa65.keygen(seed);
-    return { secretKey: kp.secretKey, publicKey: kp.publicKey, kind: 'ephemeral' };
-  }
-  if (src === 'file') {
-    return await pickKeyFile();
-  }
-  if (src.startsWith('vault:')) {
-    const id = parseInt(src.slice('vault:'.length), 10);
-    const pass = prompt('Passphrase to unlock the vault key:');
-    if (!pass) throw new Error('Vault unlock cancelled');
-    const u = await vaultUnlock(id, pass);
-    return { secretKey: u.secretKey, publicKey: u.publicKey, kind: 'vault' };
-  }
-  throw new Error('Unknown key source');
-}
-
-function pickKeyFile() {
-  return new Promise((resolve, reject) => {
-    const inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = '.json,application/json';
-    inp.onchange = async () => {
-      try {
-        const f = inp.files[0];
-        if (!f) return reject(new Error('No file picked'));
-        const d = JSON.parse(await f.text());
-        if (!d.secretKey || !d.publicKey) return reject(new Error('Invalid key file (missing secretKey/publicKey)'));
-        const secretKey = hexToBytes(d.secretKey);
-        const publicKey = hexToBytes(d.publicKey);
-        resolve({ secretKey, publicKey, kind: 'file' });
-      } catch (e) { reject(e); }
-    };
-    inp.click();
-  });
-}
+// resolvePasskeySigningKey() now lives in parasign-signer.js (the single
+// definition of "what a signing key is"), shared with /co-sign so the two flows
+// can never drift on key selection.
 
 function hexToBytes(s) {
   const out = new Uint8Array(s.length / 2);
@@ -511,30 +491,15 @@ function signedDocMime() {
   return 'application/octet-stream';
 }
 
-// Matches the recipe the relay's Lua script reproduces server-side
-// (see relay/envelope.js: signMessageBytes). Used to sign as party 0 when
-// the user creates a multi-party envelope, and read by /co-sign for parties
-// 1..N when they sign their own slot.
-function buildEnvelopeSignMessage(envId, docHashHex, partyIndex) {
-  const idBytes = new TextEncoder().encode(envId);
-  const hashBytes = hexToBytes(docHashHex);
-  const piBytes = new TextEncoder().encode(String(partyIndex));
-  const combined = new Uint8Array(idBytes.length + hashBytes.length + piBytes.length);
-  combined.set(idBytes, 0);
-  combined.set(hashBytes, idBytes.length);
-  combined.set(piBytes, idBytes.length + hashBytes.length);
-  return sha3_256(combined);
-}
+// (v2 buildEnvelopeSignMessage removed — the signed message is now the v3
+//  domain-prefixed buildDocSignMessage() in parasign-signer.js, byte-identical
+//  to relay/envelope.js signMessageBytes(...,3).)
 
 // ====================================================================
 // Step 4: review + sign
 // ====================================================================
 
 function fillReview() {
-  // Sync keySrc from the dropdown into state (was only set inside resolveSignerKey,
-  // which only runs after Sign is clicked - too late for the review card).
-  state.signer.keySrc = $('ds-key-src').value;
-
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
   $('ds-review-mode').textContent =
     state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
@@ -545,28 +510,19 @@ function fillReview() {
     state.signer.sigStyle === 'typed'  ? 'Typed name in the stamp' :
     state.signer.sigStyle === 'drawn'  ? 'Drawn signature (' + formatSize(state.signer.sigImageBytes.length) + ' PNG)' :
                                          'Uploaded image (' + formatSize(state.signer.sigImageBytes.length) + ' ' + state.signer.sigImageType.toUpperCase() + ')';
-  $('ds-review-key-src').textContent =
-    state.signer.keySrc === 'ephemeral' ? 'One-time key generated in this browser' :
-    state.signer.keySrc === 'file'      ? 'Key file from disk' :
-                                          'Saved key from this browser';
-  const apiKey = $('ds-api-key').value.trim();
-  state.signer.apiKey = apiKey;
-  $('ds-review-notary').textContent = apiKey
-    ? 'Yes - relay will counter-sign + write to CT log'
-    : 'No - envelope is self-contained (still verifiable)';
+  // Signing key: always the account's passkey-protected ML-DSA-65 key. The
+  // fingerprint is filled async (public vault metadata, no unlock) below.
+  $('ds-review-key-src').textContent = 'Passkey-protected ML-DSA-65 key';
 
-  // Recipients summary; warn if recipients but no API key (envelope creation will fail).
+  // Recipients summary. Multi-party envelopes are created same-origin via your
+  // logged-in session (no manual API key); each recipient signs at /co-sign
+  // with their own passkey.
   const recCell = $('ds-review-recipients');
   if (state.recipients.length === 0) {
     recCell.textContent = 'None - personal signature only';
   } else {
     const list = state.recipients.map(r => r.label + (r.email ? ' (' + r.email + ')' : '')).join(', ');
     recCell.innerHTML = state.recipients.length + ' co-signer' + (state.recipients.length === 1 ? '' : 's') + ': ' + escapeHtml(list);
-    if (!apiKey) {
-      recCell.innerHTML += '<br><span style="color:rgba(180,20,20,1);font-size:11px">Multi-party envelope needs your X-Api-Key in the Advanced section. Get one at <a href="/dashboard#api-keys" target="_blank" style="color:rgba(180,20,20,1);text-decoration:underline">Dashboard &gt; API Keys</a>.</span>';
-    } else if (!/^pgp_/.test(apiKey)) {
-      recCell.innerHTML += '<br><span style="color:rgba(180,20,20,1);font-size:11px">The API key in Advanced does not start with <code>pgp_</code>. Paramant keys look like <code>pgp_...</code> - check at <a href="/dashboard#api-keys" target="_blank" style="color:rgba(180,20,20,1);text-decoration:underline">Dashboard &gt; API Keys</a>.</span>';
-    }
   }
 
   // Cryptographic proof card: the mathematical evidence that backs the
@@ -574,38 +530,37 @@ function fillReview() {
   // the key source.
   const docHashHex = toHex(sha3_256(state.doc.bytes));
   $('ds-proof-doc-hash').textContent = docHashHex;
-  if (state.signer.key && state.signer.key.publicKey) {
-    $('ds-proof-fp').textContent = toHex(sha3_256(state.signer.key.publicKey));
-  } else if (state.signer.keySrc === 'ephemeral') {
-    $('ds-proof-fp').textContent = '(generated when you click Sign - the key never existed before this moment)';
-  } else {
-    $('ds-proof-fp').textContent = '(resolved when you click Sign)';
-  }
-  $('ds-proof-notary').textContent = state.signer.apiKey ? 'Yes (will fail-stop if the relay rejects the key)' : 'No (envelope is self-contained)';
-  $('ds-proof-version').textContent =
-    state.mode === 'pdf'   ? 'parasign-visual-1' :
-    state.mode === 'image' ? 'parasign-image-1'  :
-                             'parasign-hash-1';
+  $('ds-proof-fp').textContent = '(your passkey key fingerprint)';   // filled async below
+  $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version 3)';
 
-  // Envelope-structure preview (placeholders where post-sign data lives).
-  const previewEnv = state.mode === 'pdf' ? {
-    version: 'parasign-visual-1',
+  // Envelope-structure preview — the v3 .psign receipt (parasign-doc-3). The
+  // signed_message line shows the EXACT v3 domain-prefixed message the passkey
+  // will sign (byte-identical to relay/envelope.js signMessageBytes(...,3)), so
+  // the review reflects what is actually signed — not the old v2 message.
+  const previewEnv = (state.mode === 'pdf' || state.mode === 'image') ? {
+    version: 'parasign-doc-3',
+    recipe_version: 3,
+    sign_domain: 'paramant/parasign/doc/v1',
     algorithm: 'ML-DSA-65',
     hash_algorithm: 'SHA3-256',
     original_filename: state.doc.name,
-    stamped_filename: 'signed-' + state.doc.name,
+    stamped_filename: state.mode === 'image' ? '<signed image>' : 'signed-' + state.doc.name,
     original_hash: docHashHex,
-    stamped_hash: '<computed when the PDF is stamped>',
+    stamped_hash: '<computed when the document is stamped>',
     coords: { pageIndex: state.stamp.pageIndex, x: Math.round(state.stamp.x), y: Math.round(state.stamp.y), w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: '<set on sign>' },
     signature_style: state.signer.sigStyle,
     signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
     signer_public_key: '<base64 of your ML-DSA-65 public key>',
     signer_pk_fingerprint: '<sha3_256(pubkey)[..16]>',
-    signature: '<base64 of ML-DSA-65 signature over (origHash || stampedHash || coords)>',
+    signed_message: 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope_id || stamped_hash || party_index || party_email_hash)',
+    signature: '<base64 of ML-DSA-65 signature over signed_message>',
+    multiparty: { envelope_id: '<set on sign>', party_index: 0 },
     signed_at: '<set on sign>',
     disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
   } : {
-    version: 'parasign-hash-1',
+    version: 'parasign-doc-3',
+    recipe_version: 3,
+    sign_domain: 'paramant/parasign/doc/v1',
     algorithm: 'ML-DSA-65',
     hash_algorithm: 'SHA3-256',
     original_filename: state.doc.name,
@@ -613,7 +568,9 @@ function fillReview() {
     signer_name: state.signer.name,
     signer_public_key: '<base64 of your ML-DSA-65 public key>',
     signer_pk_fingerprint: '<sha3_256(pubkey)[..16]>',
-    signature: '<base64 of ML-DSA-65 signature over document_hash>',
+    signed_message: 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope_id || document_hash || party_index || party_email_hash)',
+    signature: '<base64 of ML-DSA-65 signature over signed_message>',
+    multiparty: { envelope_id: '<set on sign>', party_index: 0 },
     signed_at: '<set on sign>',
     disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
   };
@@ -622,6 +579,22 @@ function fillReview() {
   // Render visual previews of doc + signature so the signer sees exactly
   // what they are about to commit to before clicking Sign now.
   renderReviewPreviews().catch(err => console.warn('review preview failed', err));
+  // Fill the passkey key fingerprint (async, public vault metadata only).
+  fillReviewKeyFingerprint().catch(() => {});
+}
+
+// Fill the signing-key fingerprint into the review card from PUBLIC vault
+// metadata (no unlock). On a device with no signing passkey, say so plainly.
+async function fillReviewKeyFingerprint() {
+  try {
+    const k = await resolvePasskeySigningKey();
+    state.signer.fingerprint = k.fingerprint;
+    const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = k.fingerprint;
+    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = 'Passkey-protected ML-DSA-65 key (' + k.fingerprint + ')';
+  } catch (e) {
+    const fpEl = $('ds-proof-fp');
+    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? '(set up a signing passkey first)' : '(unavailable)';
+  }
 }
 
 async function renderReviewPreviews() {
@@ -751,9 +724,7 @@ function stampInnerHtml() {
 function stampMockupHtml() {
   const name = (state.signer.name || 'Signer').slice(0, 40);
   const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  const fp = (state.signer.key && state.signer.key.publicKey)
-    ? toHex(sha3_256(state.signer.key.publicKey)).slice(0, 8)
-    : 'pending';
+  const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : 'pending';
   let mid = '';
   if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
     mid = `<img class="ds-sm-sig-img" src="${state.signer.sigImageDataUrl}" alt="">`;
@@ -962,190 +933,109 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
 }
 
 async function doSign() {
+  // STEP 2 of the two-step flow: this explicit action triggers the per-document
+  // passkey-PRF activation (the Face ID / Touch ID / security-key prompt fires
+  // here, bound to THIS document) — step 1 was the review/preview.
   $('ds-sign-now').disabled = true;
   $('ds-sign-status').hidden = false;
   $('ds-sign-status').className = 'ds-banner';
-  $('ds-sign-status').textContent = 'Resolving signing key...';
+  const status = (t) => { $('ds-sign-status').textContent = t; };
 
   try {
-    state.signer.key = await resolveSignerKey();
-    const fingerprint = toHex(sha3_256(state.signer.key.publicKey)).slice(0, 16);
+    // The signing key is the account's PASSKEY-protected ML-DSA-65 key. Read ONLY
+    // its public half from vault metadata here (for the stamp fingerprint); the
+    // secret is unlocked solely by the per-document PRF activation below.
+    status('Locating your passkey signing key...');
+    const signKey = await resolvePasskeySigningKey();   // { vaultId, pk_b64, fingerprint } — public only
+    const fingerprint = signKey.fingerprint;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
 
-    let stampedBytes = null;
-    let messageBytes;
-    let envelope;
-
+    // 1) STAMP (PDF/image) + HASH — unchanged. The stamp shows the PUBLIC fingerprint.
+    let stampedBytes = null, origHashHex = null, stampedHashHex = null, coords = null, docHashForEnvelope;
     if (state.mode === 'pdf' || state.mode === 'image') {
-      $('ds-sign-status').textContent = state.mode === 'pdf' ? 'Stamping PDF...' : 'Stamping image...';
+      status(state.mode === 'pdf' ? 'Stamping PDF...' : 'Stamping image...');
       stampedBytes = state.mode === 'pdf'
         ? await buildStampedPdf(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint)
         : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
-      const origHash = sha3_256(state.doc.bytes);
-      const stampedHash = sha3_256(stampedBytes);
-      const coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage };
-      const coordsBytes = new TextEncoder().encode(JSON.stringify(coords));
-      messageBytes = new Uint8Array(origHash.length + stampedHash.length + coordsBytes.length);
-      messageBytes.set(origHash, 0);
-      messageBytes.set(stampedHash, origHash.length);
-      messageBytes.set(coordsBytes, origHash.length + stampedHash.length);
-      $('ds-sign-status').textContent = 'Signing in browser (ML-DSA-65)...';
-      const signature = ml_dsa65.sign(state.signer.key.secretKey, messageBytes);
-      const stampedName = state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name;
+      origHashHex = toHex(sha3_256(state.doc.bytes));
+      stampedHashHex = toHex(sha3_256(stampedBytes));
+      coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage };
+      docHashForEnvelope = stampedHashHex;
+    } else {
+      docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
+    }
+
+    // 2) Create the signing envelope SAME-ORIGIN (party 0 = you; + any recipients),
+    //    recipe_version 3. A self-sign (no recipients) STILL gets an envelope, so
+    //    every signature goes through the per-document activation gate (R018) —
+    //    no separate weaker self-sign route.
+    status('Preparing this document for signing...');
+    const created = await createSigningEnvelope({
+      docHash: docHashForEnvelope,
+      recipients: state.recipients,
+      originalFilename: state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name,
+      signerLabel: state.signer.name,
+      creatorPublicKey: signKey.pk_b64,
+    });
+    const env = created.envelope;
+    state.envelope = env;
+    const myLink = (env.party_links || []).find((p) => p.party_index === 0) || {};
+
+    // 3) Per-document activation (authorize -> one-shot token), THEN the passkey-PRF
+    //    unlock + sign of the v3 domain-prefixed message, THEN submit. The secret
+    //    key lives ONLY inside the ActivatedSigner and is zeroized by dispose().
+    status('Requesting signing authorization...');
+    const act = await requestSignActivation({ envelopeId: env.id, partyIndex: 0, docHash: docHashForEnvelope, inviteToken: myLink.invite_token });
+
+    status('Confirm with your passkey (Face ID / Touch ID / security key)...');
+    const signer = await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
+    let sigB64;
+    try {
+      const message = buildDocSignMessage({ envelopeId: env.id, docHash: docHashForEnvelope, partyIndex: 0, emailHash: act.email_hash });
+      sigB64 = toB64(await signer.sign(message));
+    } finally {
+      signer.dispose();   // zeroize — the secret never outlives this block
+    }
+
+    status('Recording your signature...');
+    const submitted = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64 });
+
+    // 4) v3 .psign receipt. The authoritative, CT-logged signature record is the
+    //    relay envelope; this file points at it (envelope_id + party 0).
+    const mp = { envelope_id: env.id, party_index: 0, party_count: env.party_count, party_links: env.party_links, expires_at: env.expires_at, signed_count: submitted.signed_count };
+    let envelope;
+    if (state.mode === 'pdf' || state.mode === 'image') {
       envelope = {
-        version: state.mode === 'pdf' ? 'parasign-visual-1' : 'parasign-image-1',
-        algorithm: 'ML-DSA-65',
-        hash_algorithm: 'SHA3-256',
-        original_filename: state.doc.name,
-        stamped_filename: stampedName,
-        original_hash: toHex(origHash),
-        stamped_hash:  toHex(stampedHash),
-        coords,
+        version: 'parasign-doc-3', recipe_version: 3, sign_domain: 'paramant/parasign/doc/v1',
+        algorithm: 'ML-DSA-65', hash_algorithm: 'SHA3-256',
+        original_filename: state.doc.name, stamped_filename: state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name,
+        original_hash: origHashHex, stamped_hash: stampedHashHex, coords,
         signature_style: state.signer.sigStyle,
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
-        signer_public_key: toB64(state.signer.key.publicKey),
-        signer_pk_fingerprint: fingerprint,
-        signature: toB64(signature),
-        signed_at: dateStr,
+        signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
+        signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };
     } else {
-      // Hash-only path: sign the SHA3-256 of the original file.
-      const docHash = sha3_256(state.doc.bytes);
-      $('ds-sign-status').textContent = 'Signing in browser (ML-DSA-65)...';
-      const signature = ml_dsa65.sign(state.signer.key.secretKey, docHash);
       envelope = {
-        version: 'parasign-hash-1',
-        algorithm: 'ML-DSA-65',
-        hash_algorithm: 'SHA3-256',
-        original_filename: state.doc.name,
-        document_hash: toHex(docHash),
+        version: 'parasign-doc-3', recipe_version: 3, sign_domain: 'paramant/parasign/doc/v1',
+        algorithm: 'ML-DSA-65', hash_algorithm: 'SHA3-256',
+        original_filename: state.doc.name, document_hash: docHashForEnvelope,
         signer_name: state.signer.name,
-        signer_public_key: toB64(state.signer.key.publicKey),
-        signer_pk_fingerprint: fingerprint,
-        signature: toB64(signature),
-        signed_at: dateStr,
+        signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
+        signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };
-    }
-
-    // Multi-party envelope: if the user added recipients, create the envelope
-    // on the relay with the (possibly stamped) document hash, then auto-sign
-    // as party 0. The recipients then sign via /co-sign?env=...&p=<i>.
-    // Requires an API key (the /v2/envelopes endpoint is auth-gated).
-    if (state.recipients.length > 0) {
-      if (!state.signer.apiKey) {
-        throw new Error('Adding recipients requires your Paramant X-Api-Key. Open the Advanced section in step 4 and paste it there. You can find or create one at Dashboard > API Keys (https://paramant.app/dashboard#api-keys). Alternatively, remove the recipients to sign only for yourself.');
-      }
-      if (!/^pgp_[A-Za-z0-9_-]{16,}$/.test(state.signer.apiKey)) {
-        throw new Error('The X-Api-Key you entered does not look like a Paramant API key (expected format: pgp_... with at least 16 chars after). Double-check the value at Dashboard > API Keys (https://paramant.app/dashboard#api-keys).');
-      }
-      $('ds-sign-status').textContent = 'Creating multi-party envelope on the relay...';
-      const docHashForEnvelope = state.mode === 'pdf' || state.mode === 'image' ? envelope.stamped_hash : envelope.document_hash;
-      const allParties = [{ label: state.signer.name + ' (sender)' }, ...state.recipients];
-      let createR, createBody;
-      try {
-        createR = await fetch(RELAY + '/v2/envelopes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': state.signer.apiKey },
-          body: JSON.stringify({
-            doc_hash: docHashForEnvelope,
-            parties: allParties,
-            original_filename: state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name,
-            creator_public_key: envelope.signer_public_key,
-          }),
-        });
-        createBody = await createR.json().catch(() => null);
-      } catch (netErr) {
-        throw new Error('Envelope creation aborted: the relay was unreachable (' + (netErr.message || netErr) + ').');
-      }
-      if (!createR.ok) {
-        const reason = createR.status === 401
-          ? 'the API key was not accepted by the relay. Verify the value at Dashboard > API Keys (https://paramant.app/dashboard#api-keys), or remove recipients to sign only for yourself'
-          : createR.status === 429 ? 'the relay rate-limited envelope creation - try again in an hour'
-          : 'the relay returned HTTP ' + createR.status + (createBody && createBody.error ? ' (' + createBody.error + ')' : '');
-        throw new Error('Envelope creation aborted: ' + reason + '. No envelope was produced; recipients have not been notified.');
-      }
-      state.envelope = createBody.envelope;
-
-      // Auto-sign as party 0 with the same ML-DSA-65 key
-      $('ds-sign-status').textContent = 'Auto-signing as party 0 (sender)...';
-      const envMsg = buildEnvelopeSignMessage(state.envelope.id, docHashForEnvelope, 0);
-      const envSig = ml_dsa65.sign(state.signer.key.secretKey, envMsg);
-      let signR, signBody;
-      try {
-        signR = await fetch(RELAY + '/v2/envelopes/' + state.envelope.id + '/sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            party_index: 0,
-            signer_public_key: envelope.signer_public_key,
-            signature: toB64(envSig),
-          }),
-        });
-        signBody = await signR.json().catch(() => null);
-      } catch (netErr) {
-        throw new Error('Envelope ' + state.envelope.id + ' was created but auto-signing as party 0 failed (' + (netErr.message || netErr) + '). Recipients cannot proceed until this is resolved.');
-      }
-      if (!signR.ok) {
-        throw new Error('Envelope ' + state.envelope.id + ' was created but auto-signing as party 0 returned HTTP ' + signR.status + (signBody && signBody.error ? ' (' + signBody.error + ')' : '') + '. Recipients cannot proceed.');
-      }
-
-      // Bake multi-party info into the .psign envelope so recipients of the
-      // file can also see which envelope it belongs to.
-      envelope.multiparty = {
-        envelope_id: state.envelope.id,
-        party_count: state.envelope.party_count,
-        party_links: state.envelope.party_links,
-        expires_at: state.envelope.expires_at,
-        sender_signed_at: signBody.signed_count >= 1,
-      };
-    }
-
-    // Optional notary call (only when an API key was supplied). If the user
-    // explicitly asked for counter-signing, treat a failure as a HARD STOP:
-    // we will NOT hand back an envelope that says 'notary requested but
-    // failed', because that mixes two outcomes and quietly produces an
-    // unsigned-by-relay artefact the user thought was witnessed.
-    // The user stays in step-sign so they can fix the API key or clear it.
-    if (state.signer.apiKey) {
-      $('ds-sign-status').textContent = 'Requesting notary signature from relay...';
-      let r, body;
-      try {
-        const docHashForNotary = state.mode === 'pdf' ? toHex(sha3_256(stampedBytes)) : envelope.document_hash;
-        const sigForNotary = state.mode === 'pdf'
-          ? toB64(ml_dsa65.sign(state.signer.key.secretKey, sha3_256(stampedBytes)))
-          : envelope.signature;
-        r = await fetch(RELAY + '/v2/sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': state.signer.apiKey },
-          body: JSON.stringify({
-            document_hash: docHashForNotary,
-            signature: sigForNotary,
-            signer_public_key: envelope.signer_public_key,
-            signer_label: state.signer.name,
-          }),
-        });
-        body = await r.json().catch(() => null);
-      } catch (netErr) {
-        throw new Error('Counter-sign aborted: the relay was unreachable (' + (netErr.message || netErr) + '). Either fix your network or remove the API key under Advanced and sign locally.');
-      }
-      if (!r.ok) {
-        const reason =
-          r.status === 401 ? 'the API key was not accepted by the relay (check it under Advanced, or clear the field to sign without a counter-signature)' :
-          r.status === 403 ? 'the API key does not have notary permission on this relay' :
-          r.status === 429 ? 'the relay rate-limited the notary endpoint - retry in a minute' :
-          'the relay returned HTTP ' + r.status + (body && body.error ? ' (' + body.error + ')' : '');
-        throw new Error('Counter-sign aborted: ' + reason + '. No envelope was produced - the document was not signed.');
-      }
-      envelope.notary = body.envelope && body.envelope.notary ? body.envelope.notary : body.envelope;
     }
 
     state.result = { stampedBytes, envelope, fingerprint };
     showDone();
   } catch (e) {
     $('ds-sign-status').className = 'ds-banner err';
-    $('ds-sign-status').textContent = (e.message || String(e));
+    let msg = (e && e.message) ? e.message : String(e);
+    if (e && e.status === 401) msg = 'Please sign in to sign documents. Open /auth/login, then return here.';
+    else if (e && e.code === 'no_signing_passkey') msg = 'No signing passkey on this device yet. Set one up at /account, then sign.';
+    $('ds-sign-status').textContent = msg;
     $('ds-sign-now').disabled = false;
   }
 }
@@ -1163,9 +1053,8 @@ function showDone() {
   setActive('step-done');
   const r = state.result;
 
-  // Success banner: signature was produced locally regardless of the optional
-  // notary outcome. Soften the wording so a failed/skipped notary call does
-  // not look like 'signing failed'.
+  // Success banner: the signature was produced locally (the private key never
+  // left the browser); the relay only recorded the public signature + CT entry.
   const sb = $('ds-success-banner');
   if (sb) {
     sb.hidden = false;
@@ -1183,18 +1072,10 @@ function showDone() {
     state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only attestation (SHA3-256)';
 
-  // Notary line: only show when something happened, frame failure as
-  // 'optional step skipped' rather than an error.
-  if (r.envelope.notary) {
-    $('ds-done-notary').textContent = 'Yes - relay co-signed and added a CT-log entry';
-  } else if (r.envelope.notary_error) {
-    const reason = /401/.test(r.envelope.notary_error) ? 'API key was not accepted by the relay'
-                 : /403/.test(r.envelope.notary_error) ? 'API key has no notary permission'
-                 : 'relay was unreachable';
-    $('ds-done-notary').textContent = 'Skipped (' + reason + ') - the local signature is still fully valid';
-  } else {
-    $('ds-done-notary').textContent = 'Skipped (no API key provided) - the local signature is still fully valid';
-  }
+  // v3: the signature was submitted to the relay (same-origin, via the
+  // per-document activation) which recorded it on the envelope and wrote it to
+  // the public CT log. There is no optional "notary" step any more.
+  if ($('ds-done-notary')) $('ds-done-notary').textContent = 'Yes - recorded on the relay and the public CT log';
 
   const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
   $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
@@ -1227,9 +1108,7 @@ function showDone() {
   }
   const notaryLine = $('ds-usage-notary-line');
   if (notaryLine) {
-    notaryLine.textContent = r.envelope.notary
-      ? 'Paramant\'s relay counter-signed the envelope, and the signature is logged in the public CT log - recipients see independent witness of when this signing happened.'
-      : 'No relay witness on this signature - that is fine for self-attestation but means there is no independent third-party timestamp.';
+    notaryLine.textContent = 'Your signature is recorded on the Paramant relay and written to the public CT log, so recipients get an independent witness of when this signing happened.';
   }
 
   // Multi-party: render share-links for the recipients (party 1..N).
@@ -1280,10 +1159,13 @@ function renderPartyLinks(mp) {
     list.appendChild(row);
   }
 
-  // Status-page link points at the relay's redacted envelope view.
+  // Status-page link points at the relay's redacted (public) envelope view.
+  // This is the ONLY relay-host reference left in the sign path, and it is a
+  // read-only status link; the signing itself routes same-origin via the admin
+  // (/api/user/sign/*). The relay GET /v2/envelopes/:id is public.
   const statusLink = $('ds-envelope-status-link');
   if (statusLink) {
-    statusLink.href = RELAY + '/v2/envelopes/' + mp.envelope_id;
+    statusLink.href = RELAY_PUBLIC + '/v2/envelopes/' + mp.envelope_id;
     statusLink.textContent = 'envelope ' + mp.envelope_id.slice(0, 10) + '... on the relay';
   }
 }
