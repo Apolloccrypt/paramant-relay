@@ -33,8 +33,10 @@ function counterIsAcceptable(stored, next) {
 // Exact limits are exported so callers (and reviewers) can see them; they are
 // enforced on BOTH /login/options and /login/verify.
 const LIMITS = {
-  loginOptions: { ip: 30, account: 15, windowSec: 900 },   // 15-min window
-  loginVerify:  { ip: 10, account: 5,  windowSec: 900 },
+  loginOptions:    { ip: 30, account: 15, windowSec: 900 },   // 15-min window
+  loginVerify:     { ip: 10, account: 5,  windowSec: 900 },
+  registerOptions: { ip: 20, account: 10, windowSec: 900 },
+  registerVerify:  { ip: 10, account: 5,  windowSec: 900 },
 };
 
 // Returns true if this hit is within the limit. `bucket` already encodes scope
@@ -70,9 +72,25 @@ async function takeAuthFlow(redisClient, flowId) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+// Registration flow store (separate namespace from auth). Same one-shot
+// semantics: the record holds the expected challenge and the verified-email
+// binding (user_id + email + the setup_token it was derived from).
+async function putRegFlow(redisClient, flowId, data) {
+  await redisClient.set(`paramant:webauthn:reg:${flowId}`, JSON.stringify(data), { EX: 300 });
+}
+
+async function takeRegFlow(redisClient, flowId) {
+  if (typeof flowId !== 'string' || !/^[0-9a-f]{32}$/.test(flowId)) return null;
+  const k = `paramant:webauthn:reg:${flowId}`;
+  const raw = await redisClient.get(k);
+  if (!raw) return null;
+  await redisClient.del(k);                 // one-shot: consume before verifying
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
 module.exports = {
   RP_ID, RP_NAME, EXPECTED_ORIGIN,
   counterIsAcceptable,
   LIMITS, rateHit, scopeHash,
-  newFlowId, putAuthFlow, takeAuthFlow,
+  newFlowId, putAuthFlow, takeAuthFlow, putRegFlow, takeRegFlow,
 };

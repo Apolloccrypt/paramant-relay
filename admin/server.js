@@ -13,7 +13,7 @@ const cliAudit = require('./lib/cli-audit');
 const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
-const { generateAuthenticationOptions, verifyAuthenticationResponse } = require('@simplewebauthn/server');
+const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -1088,6 +1088,157 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   setUserCookie(res, sessionToken);
   try { logAuditEvent("webauthn_login", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
   res.json({ success: true, email: flow.email });
+});
+
+
+// ── Passkey (WebAuthn) registration (ADR R018, PR-A) — TOFU moment ──────────
+// First passkey on an account: the foundation of the identity claim. The ONLY
+// accepted proof of mailbox possession is a valid setup_token from the email-
+// verification signup path (paramant:user:setup_token:*, created only after the
+// user clicked the verification link in signup stage 2). So a passkey can NOT
+// be registered for an arbitrary email, and there is NO "logged-in implies may
+// register" shortcut. The invite-token binding (PR-0, email-bound) is
+// deliberately NOT accepted here yet — that path is wired in PR-C with the
+// envelope email-hash check.
+
+// POST /api/user/auth/webauthn/register/options
+api.post("/user/auth/webauthn/register/options", async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.registerOptions;
+  if (!(await webauthn.rateHit(redis(), `ro:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // TOFU binding: a valid setup_token is the only accepted proof here.
+  const setupToken = (req.body?.setup_token || "").toString();
+  if (!/^[0-9a-f]{64}$/.test(setupToken)) return res.status(400).json({ error: "setup_token_required" });
+  const raw = await redis().get(`paramant:user:setup_token:${setupToken}`);
+  if (!raw) return res.status(401).json({ error: "invalid_setup_token" });
+  let pending; try { pending = JSON.parse(raw); } catch { return res.status(401).json({ error: "invalid_setup_token" }); }
+  const { user_id, email } = pending;
+  if (!user_id || !email) return res.status(401).json({ error: "invalid_setup_token" });
+  if (!(await webauthn.rateHit(redis(), `ro:acct:${webauthn.scopeHash(email)}`, L.account, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // Per-account user handle (random, no PII) + already-registered creds to exclude.
+  let handle, excludeCredentials = [];
+  try {
+    const hr = await callRelay("/v2/user/webauthn/handle", { user_id });
+    handle = (await hr.json()).handle;
+    const cr = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    if (cr.status === 200) excludeCredentials = ((await cr.json()).credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+  } catch (e) { console.error("[webauthn/register/options]", e.message); return res.status(502).json({ error: "relay_unreachable" }); }
+  if (!handle) return res.status(500).json({ error: "internal" });
+
+  let options;
+  try {
+    options = await generateRegistrationOptions({
+      rpName: webauthn.RP_NAME,
+      rpID: webauthn.RP_ID,
+      userName: email,
+      userID: new Uint8Array(Buffer.from(handle, "base64url")),
+      userDisplayName: email,
+      attestationType: "none",
+      excludeCredentials,
+      authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+      extensions: { prf: {} },   // probe PRF support (consumed by PR-B vault unlock)
+    });
+  } catch (e) { console.error("[webauthn/register/options]", e.message); return res.status(500).json({ error: "internal" }); }
+
+  const flowId = webauthn.newFlowId();
+  await webauthn.putRegFlow(redis(), flowId, { challenge: options.challenge, user_id, email, setup_token: setupToken });
+  res.json({ flowId, options });
+});
+
+// POST /api/user/auth/webauthn/register/verify
+// Verifies the attestation, stores the credential, and (TOFU onboarding) issues
+// the session. Identity comes from the one-shot reg-flow (bound to the verified
+// email via the setup_token), never from client fields.
+api.post("/user/auth/webauthn/register/verify", async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.registerVerify;
+  if (!(await webauthn.rateHit(redis(), `rv:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  const { flowId, response } = req.body || {};
+  const flow = await webauthn.takeRegFlow(redis(), flowId);   // one-shot: consumed before any crypto
+  if (!flow || !response) return res.status(401).json({ error: "invalid_registration" });
+  if (!(await webauthn.rateHit(redis(), `rv:acct:${webauthn.scopeHash(flow.email)}`, L.account, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // Re-confirm the setup_token still binds this email (mailbox proof) and is
+  // unconsumed; it is deleted on success below (one-shot onboarding).
+  if (!(await redis().get(`paramant:user:setup_token:${flow.setup_token}`)))
+    return res.status(401).json({ error: "invalid_setup_token" });
+
+  // Verify the attestation. expectedOrigin/expectedRPID are config constants.
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response,
+      expectedChallenge: flow.challenge,
+      expectedOrigin: webauthn.EXPECTED_ORIGIN,
+      expectedRPID: webauthn.RP_ID,
+      requireUserVerification: true,
+    });
+  } catch (e) { return res.status(400).json({ error: "verification_failed" }); }
+  if (!verification.verified || !verification.registrationInfo) return res.status(400).json({ error: "verification_failed" });
+
+  // Counter-init: persist the authenticator's reported initial counter so the
+  // login counter-check is correct from the very first login (0 is allowed;
+  // a non-zero counter must strictly increase thereafter).
+  const info = verification.registrationInfo;
+  const cred = info.credential;   // { id, publicKey: Uint8Array, counter, transports? }
+  try {
+    const sr = await callRelay("/v2/user/webauthn/credential", {
+      user_id: flow.user_id,
+      credId: cred.id,
+      publicKey: Buffer.from(cred.publicKey).toString("base64url"),
+      counter: cred.counter | 0,
+      transports: (response.response && response.response.transports) || cred.transports || [],
+      prfSupported: !!(response.clientExtensionResults && response.clientExtensionResults.prf && response.clientExtensionResults.prf.enabled),
+      aaguid: info.aaguid || "",
+      label: (req.body?.label || "").toString().slice(0, 64) || null,
+    });
+    if (sr.status !== 200) return res.status(502).json({ error: "credential_store_failed" });
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+
+  // Lockout invariant: a passkey-onboarded account has no TOTP, so this single
+  // passkey would be its only factor. Mint backup codes (existing relay infra)
+  // so the account stays recoverable via /api/user/login-with-backup -> re-enrol
+  // a passkey, even before the email-reset-can-enrol-passkey path exists. The
+  // codes are returned ONCE for the user to save. (The IndexedDB vault is not
+  // touched here, so the PR-B passphrase-wrap invariant is unaffected.)
+  //
+  // HARD BOUNDARY: regenerate-backup WIPES existing codes, so it must run ONLY
+  // on a fresh onboarding account. That is guaranteed here because a still-valid
+  // setup_token means TOTP setup (the only other path that mints codes) has not
+  // completed -- so there are no codes to wipe. NEVER move this call outside the
+  // setup_token-gated path (e.g. into an add-passkey-to-existing-account flow),
+  // or it would destroy a live account's recovery codes.
+  let recoveryCodes = [];
+  try {
+    const br = await callRelay("/v2/user/regenerate-backup", { user_id: flow.user_id });
+    if (br.status === 200) recoveryCodes = (await br.json()).backup_codes || [];
+  } catch (e) { /* best-effort; surfaced below as recovery_codes: [] */ }
+
+  // One-shot: consume the setup_token so it cannot be reused for another
+  // registration or for TOTP setup.
+  await redis().del(`paramant:user:setup_token:${flow.setup_token}`).catch(() => {});
+
+  // Issue the session — TOFU onboarding. Passkey is now this account's factor
+  // (R018); NO TOTP step. Lax cookie. via:'webauthn-register'.
+  // NB: a passkey session does NOT unlock ML-DSA signing — /v2/user/signing-key
+  // stays TOTP-gated until the passkey step-up (R018) is built, so signing is
+  // blocked (not bypassed) for a passkey-only account.
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:session:${sessionToken}`,
+    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register" }),
+    { EX: 3600 }
+  );
+  setUserCookie(res, sessionToken);
+  try { logAuditEvent("webauthn_register", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
+  res.json({ success: true, email: flow.email, recovery_codes: recoveryCodes });
 });
 
 

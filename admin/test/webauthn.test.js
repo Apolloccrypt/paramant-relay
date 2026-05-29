@@ -76,6 +76,25 @@ async function main() {
   assert.strictEqual(typeof wa.RP_ID, 'string', 'RP_ID set');
   assert.strictEqual(typeof wa.EXPECTED_ORIGIN, 'string', 'EXPECTED_ORIGIN set');
   ok('rpId/origin are configured constants');
+
+  // registration limits exist (enforced on register/options AND register/verify)
+  assert.strictEqual(wa.LIMITS.registerVerify.ip, 10, 'register/verify per-IP limit');
+  assert.strictEqual(wa.LIMITS.registerVerify.account, 5, 'register/verify per-account limit');
+  assert.strictEqual(wa.LIMITS.registerOptions.ip, 20, 'register/options per-IP limit');
+  ok('registration rate limits are concrete values');
+
+  // registration flow is a separate one-shot namespace from auth
+  {
+    const r = fakeRedis();
+    const flowId = wa.newFlowId();
+    await wa.putRegFlow(r, flowId, { challenge: 'rc', user_id: 'pgp_x', email: 'a@b.com', setup_token: 'f'.repeat(64) });
+    // an auth-flow read must NOT see a reg-flow (separate key namespace)
+    assert.strictEqual(await wa.takeAuthFlow(r, flowId), null, 'reg flow not visible to takeAuthFlow');
+    const got = await wa.takeRegFlow(r, flowId);
+    assert.ok(got && got.user_id === 'pgp_x' && got.setup_token.length === 64, 'reg flow retrieved once');
+    assert.strictEqual(await wa.takeRegFlow(r, flowId), null, 'reg flow consumed -> no replay');
+    ok('registration flow one-shot + namespace-isolated');
+  }
 }
 
 main()
