@@ -29,6 +29,12 @@ function setStatus(el, text, isError) {
   el.style.display = '';
 }
 
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
 // ── Registration: account-setup page (/auth/setup/<setup_token>) ─────────────
 function wireSetupPasskey() {
   const btn = document.getElementById('passkey-register-btn');
@@ -150,5 +156,80 @@ function wireLoginPasskey() {
   });
 }
 
+// ── Account dashboard: add a passkey to an existing logged-in account ────────
+// authUser + TOTP step-up (the server gates the ceremony on a valid TOTP).
+function wireAccountPasskey() {
+  const btn = document.getElementById('account-passkey-btn');
+  if (!btn) return;                                  // not the account page
+  const status = document.getElementById('account-passkey-status');
+  const totpEl = document.getElementById('account-passkey-totp');
+  const listEl = document.getElementById('account-passkey-list');
+  const emptyEl = document.getElementById('account-passkey-empty');
+
+  async function refresh() {
+    try {
+      const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
+      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = 'Could not load passkeys (HTTP ' + r.status + ').'; } return; }
+      const d = await r.json();
+      const pk = d.passkeys || [];
+      if (!pk.length) {
+        if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = 'No passkey on your account yet.'; }
+        if (listEl) listEl.innerHTML = '';
+        return;
+      }
+      if (emptyEl) emptyEl.hidden = true;
+      if (listEl) listEl.innerHTML = pk.map((c) => {
+        const lbl = c.label ? esc(c.label) : 'passkey';
+        const when = c.created_at ? esc(new Date(c.created_at).toLocaleString()) : '';
+        return '<li style="padding:8px 0;border-bottom:1px solid var(--ink-hair,#e5e7eb)">'
+          + '<strong>' + lbl + '</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; active'
+          + (when ? ' &middot; added ' + when : '') + '</span></li>';
+      }).join('');
+    } catch { /* leave existing UI */ }
+  }
+
+  if (!browserSupportsWebAuthn()) {
+    btn.disabled = true;
+    setStatus(status, 'This browser does not support passkeys.', true);
+    refresh();
+    return;
+  }
+
+  btn.addEventListener('click', async () => {
+    const totp = (totpEl && totpEl.value || '').trim();
+    if (!/^\d{6}$/.test(totp)) { setStatus(status, 'Enter your current 6-digit TOTP code first.', true); if (totpEl) totpEl.focus(); return; }
+    btn.disabled = true;
+    setStatus(status, 'Verifying your code…', false);
+    try {
+      const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
+      if (opt.status === 403) throw new Error('That TOTP code was not accepted. Try the current code from your authenticator.');
+      if (!opt.ok) throw new Error(opt.data && opt.data.error ? opt.data.error : 'could_not_start (' + opt.status + ')');
+
+      setStatus(status, 'Follow your device prompt to create the passkey…', false);
+      let attResp;
+      try {
+        attResp = await startRegistration({ optionsJSON: opt.data.options });
+      } catch (e) {
+        throw new Error(e && e.name === 'InvalidStateError'
+          ? 'A passkey for this account already exists on this device.'
+          : 'Passkey creation was cancelled.');
+      }
+
+      const ver = await postJSON('/api/user/account/webauthn/register/verify', { flowId: opt.data.flowId, response: attResp });
+      if (!ver.ok) throw new Error(ver.data && ver.data.error ? ver.data.error : 'verification_failed (' + ver.status + ')');
+
+      setStatus(status, 'Passkey activated. You can now sign in with it.', false);
+      if (totpEl) totpEl.value = '';
+      refresh();
+    } catch (e) {
+      setStatus(status, e.message || 'Could not activate passkey.', true);
+      btn.disabled = false;
+    }
+  });
+
+  refresh();
+}
+
 wireSetupPasskey();
 wireLoginPasskey();
+wireAccountPasskey();
