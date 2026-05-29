@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=2';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 

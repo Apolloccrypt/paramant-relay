@@ -5,7 +5,7 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap, vaultAvailable, vaultList } from '/vendor/vault.js';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap, vaultAvailable, vaultList } from '/vendor/vault.js?v=2';
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
