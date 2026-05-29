@@ -31,15 +31,61 @@ function newEnvelopeId() {
   return crypto.randomBytes(ID_BYTES).toString('base64url');
 }
 
+// Canonical party-email hash. Namespaced + case-normalized so the value is
+// computed identically at envelope creation (here), at the admin-side binding
+// check, and at the client when it recomputes the v2 sign-message. Being
+// unsalted over a low-entropy email space is an accepted/documented privacy
+// property -- see ADR R018.
+function partyEmailHash(email) {
+  const norm = (email || '').toString().trim().toLowerCase();
+  if (!norm) return '';
+  return crypto.createHash('sha3-256')
+    .update('paramant/party-email/v1\x00', 'utf8')
+    .update(norm, 'utf8')
+    .digest('hex');
+}
+
+// Constant-time compare of two equal-length hex strings (e.g. email hashes).
+// Returns false for empty / mismatched-length / non-string inputs.
+function safeHexEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length === 0 || a.length !== b.length) return false;
+  try { return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex')); }
+  catch { return false; }
+}
+
+// Constant-time compare for an invite token against its stored value.
+function safeTokenEqual(stored, provided) {
+  if (!stored || typeof provided !== 'string' || provided.length === 0) return false;
+  const a = Buffer.from(stored);
+  const b = Buffer.from(provided);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 // Sign-message construction. Public so the recipient client can recompute
 // the same bytes locally before calling ml_dsa65.sign().
-function signMessageBytes(envelopeId, docHashHex, partyIndex) {
-  const idBytes = Buffer.from(envelopeId, 'utf8');
-  const hashBytes = Buffer.from(docHashHex, 'hex');
-  const piBytes = Buffer.from(String(partyIndex), 'utf8');
-  // Hash the concatenation so the message has a fixed 32-byte shape.
-  return crypto.createHash('sha3-256')
-    .update(idBytes).update(hashBytes).update(piBytes).digest();
+//
+//   recipeVersion 1 (default; legacy / open envelopes):
+//     sha3_256(id || doc_hash || party_index)
+//   recipeVersion 2 (email-bound envelopes):
+//     sha3_256(id || doc_hash || party_index || party_email_hash_bytes)
+//
+// v2 makes the signature itself commit to "party i, whose invited email hashes
+// to H". v1 stays valid for already-deployed and open envelopes; the relay
+// picks the recipe from the envelope's stored recipe_version. This only defines
+// the MESSAGE -- it is orthogonal to how the message is signed, so the
+// activation<->key-use seam (R018) is unaffected.
+function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion) {
+  const h = crypto.createHash('sha3-256')
+    .update(Buffer.from(envelopeId, 'utf8'))
+    .update(Buffer.from(docHashHex, 'hex'))
+    .update(Buffer.from(String(partyIndex), 'utf8'));
+  if (Number(recipeVersion) >= 2) {
+    // Decoded email-hash bytes: 32 bytes when present, 0 bytes when the party
+    // has no email -- deterministic either way.
+    h.update(Buffer.from(partyEmailHashHex || '', 'hex'));
+  }
+  return h.digest();
 }
 
 // Lua script: idempotent party-sign + completion transition.
@@ -95,7 +141,7 @@ class EnvelopeStore {
     return this._signScriptSha;
   }
 
-  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays }) {
+  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
@@ -116,10 +162,18 @@ class EnvelopeStore {
     }
     if (!ok) throw new Error('could not allocate envelope id');
 
+    // 'email' = each party slot is bound to its invited email and may only be
+    // signed via the trusted admin proxy (verified_email_hash + X-Internal-Auth);
+    // 'open' = the legacy public flow (any holder of env_id+party_index signs).
+    const mode = bindingMode === 'email' ? 'email' : 'open';
+    const recipeVersion = mode === 'email' ? 2 : 1;
+
     const hash = {
       id,
       status: 'sent',
       doc_hash: docHash,
+      binding_mode: mode,
+      recipe_version: String(recipeVersion),
       creator_pk_hash: creatorPkHash || '',
       creator_api_hash: creatorApiKeyHash || '',
       original_filename: (originalFilename || '').toString().slice(0, 200),
@@ -128,27 +182,41 @@ class EnvelopeStore {
       created_at: now.toISOString(),
       expires_at: expires.toISOString(),
     };
+    // Per-party capability token: the secret embedded in the invite link.
+    // Stored server-side, returned to the creator ONCE below so it can build
+    // the invite emails, and NEVER exposed via getRedacted/getForParty output.
+    const inviteTokens = [];
     for (let i = 0; i < parties.length; i++) {
       const p = parties[i] || {};
       hash['p' + i + '_label'] = (p.label || '').toString().slice(0, MAX_LABEL_LEN);
-      // We store sha3_256(email) only, never the email itself - the
-      // creator's client keeps the address and emails the co-sign link.
-      hash['p' + i + '_email_hash'] = p.email
-        ? crypto.createHash('sha3-256').update(p.email.toString()).digest('hex')
-        : '';
+      // We store the canonical party-email hash only, never the email itself -
+      // the creator (or admin) keeps the address and emails the invite link.
+      hash['p' + i + '_email_hash'] = partyEmailHash(p.email);
       hash['p' + i + '_status'] = 'pending';
+      const token = crypto.randomBytes(32).toString('base64url');
+      hash['p' + i + '_invite_token'] = token;
+      inviteTokens.push(token);
     }
     await this.redis.hSet(key, hash);
     await this.redis.expire(key, ttlDays * 86400);
 
-    try { this.ctAppend('envelope_create', id, { doc_hash: docHash, party_count: parties.length }); } catch {}
+    try { this.ctAppend('envelope_create', id, { doc_hash: docHash, party_count: parties.length, binding_mode: mode }); } catch {}
 
     return {
       id,
       created_at: hash.created_at,
       expires_at: hash.expires_at,
+      binding_mode: mode,
+      recipe_version: recipeVersion,
       party_count: parties.length,
-      party_links: parties.map((_, i) => ({ party_index: i, sign_path: '/co-sign?env=' + id + '&p=' + i })),
+      // For 'email' envelopes the invite token is part of the link and is also
+      // returned raw so the caller can email it. For 'open' envelopes the link
+      // is the legacy token-free path (byte-identical to before).
+      party_links: parties.map((_, i) => ({
+        party_index: i,
+        sign_path: '/co-sign?env=' + id + '&p=' + i + (mode === 'email' ? '&t=' + inviteTokens[i] : ''),
+        invite_token: mode === 'email' ? inviteTokens[i] : null,
+      })),
     };
   }
 
@@ -175,6 +243,8 @@ class EnvelopeStore {
       id: h.id,
       status: h.status,
       doc_hash: h.doc_hash,
+      binding_mode: h.binding_mode || 'open',
+      recipe_version: parseInt(h.recipe_version, 10) || 1,
       original_filename: h.original_filename || null,
       created_at: h.created_at,
       expires_at: h.expires_at,
@@ -182,6 +252,47 @@ class EnvelopeStore {
       party_count: partyCount,
       signed_count: parseInt(h.signed_count, 10) || 0,
       parties,
+    };
+  }
+
+  // Constant-time check of a per-party invite token against the stored value.
+  async checkInviteToken(id, partyIndex, token) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const stored = await this.redis.hGet('env:' + id, 'p' + parseInt(partyIndex, 10) + '_invite_token');
+    return safeTokenEqual(stored, token);
+  }
+
+  // Party-scoped view for the co-signer: exactly what the client needs to
+  // recompute the sign-message (doc_hash, recipe_version, this party's
+  // email_hash) plus presentation fields. For email-bound envelopes the
+  // per-party invite token MUST match, else this returns null (a generic miss,
+  // so a wrong/absent token is indistinguishable from a non-existent envelope).
+  // For open envelopes the token is not required -- the slot is public by design.
+  async getForParty(id, partyIndex, token) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    const partyCount = parseInt(h.party_count, 10) || 0;
+    const pi = parseInt(partyIndex, 10);
+    if (!Number.isInteger(pi) || pi < 0 || pi >= partyCount) return null;
+    const mode = h.binding_mode || 'open';
+    if (mode === 'email' && !safeTokenEqual(h['p' + pi + '_invite_token'], token)) return null;
+    const sig = h['p' + pi + '_sig'] || '';
+    return {
+      id: h.id,
+      doc_hash: h.doc_hash,
+      original_filename: h.original_filename || null,
+      status: h.status,
+      binding_mode: mode,
+      recipe_version: parseInt(h.recipe_version, 10) || 1,
+      expires_at: h.expires_at,
+      party: {
+        index: pi,
+        label: h['p' + pi + '_label'] || null,
+        email_hash: h['p' + pi + '_email_hash'] || '',
+        status: sig ? 'signed' : (h['p' + pi + '_status'] || 'pending'),
+        signed_at: h['p' + pi + '_signed_at'] || null,
+      },
     };
   }
 
@@ -205,7 +316,7 @@ class EnvelopeStore {
   // Sign a party slot. Idempotent: re-submitting the same (sig, pubkey)
   // returns 'idem'. Submitting a different one with the slot already
   // signed returns 'conflict' and is rejected.
-  async sign(id, partyIndex, signerPubB64, signatureB64) {
+  async sign(id, partyIndex, signerPubB64, signatureB64, opts = {}) {
     if (!this.available()) throw new Error('redis unavailable');
     const key = 'env:' + id;
     const h = await this.redis.hGetAll(key);
@@ -215,10 +326,25 @@ class EnvelopeStore {
     if (!Number.isInteger(pi) || pi < 0 || pi >= partyCount) return { ok: false, code: 'not_found' };
     if (h.status === 'complete') return { ok: false, code: 'closed' };
 
+    const mode = h.binding_mode || 'open';
+    const emailHash = h['p' + pi + '_email_hash'] || '';
+    // Email-bound envelopes (R018): accept the signature ONLY when a trusted
+    // internal caller (the admin proxy, which already checked the signer's
+    // authenticated session email) asserts a verified_email_hash equal to this
+    // party's bound hash. Anonymous/public callers cannot set internalTrusted,
+    // so they can never fill an email-bound slot. Fail-closed: a party with no
+    // bound email (empty hash) cannot be signed in email mode.
+    if (mode === 'email') {
+      if (!opts.internalTrusted) return { ok: false, code: 'email_binding_required' };
+      if (!safeHexEqual(opts.verifiedEmailHash, emailHash)) return { ok: false, code: 'email_mismatch' };
+    }
+
     // Verify the signature server-side. The relay only sees doc_hash, id,
-    // and party_index - so the recipient signs over their hash, not the
-    // document. This binds the signature to this envelope slot.
-    const msg = signMessageBytes(id, h.doc_hash, pi);
+    // party_index (and, for v2, the party's email hash) - so the recipient
+    // signs over their hash, not the document. This binds the signature to
+    // this envelope slot. The recipe is chosen by the stored recipe_version.
+    const recipeVersion = parseInt(h.recipe_version, 10) || 1;
+    const msg = signMessageBytes(id, h.doc_hash, pi, emailHash, recipeVersion);
     let verified = false;
     try {
       verified = !!this.sigVerify(Buffer.from(signatureB64, 'base64'), msg, Buffer.from(signerPubB64, 'base64'));
@@ -254,4 +380,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, newEnvelopeId, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, newEnvelopeId, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS };
