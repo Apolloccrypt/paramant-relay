@@ -12,6 +12,8 @@ const cliCommands = require('./lib/cli-commands');
 const cliAudit = require('./lib/cli-audit');
 const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
+const webauthn = require('./lib/webauthn');
+const { generateAuthenticationOptions, verifyAuthenticationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -584,15 +586,24 @@ async function authUser(req, res, next) {
   }
 }
 
+// Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
+// the invite/co-sign flow lands a recipient via a top-level navigation from an
+// emailed link (cross-site, from their mail client). A Strict cookie is NOT
+// sent on that first cross-site navigation, so an already-logged-in recipient
+// would be bounced to re-authenticate on exactly the flow this is built for.
+// Lax sends the cookie on top-level GET navigations only -- NOT on cross-site
+// POST/DELETE -- so CSRF protection for the state-changing endpoints is
+// preserved. HttpOnly + Secure are unchanged. NOTE: this also moves the
+// existing email+TOTP login to Lax (one shared cookie).
 function setUserCookie(res, token) {
   res.setHeader("Set-Cookie",
-    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600`
+    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600`
   );
 }
 
 function clearUserCookie(res) {
   res.setHeader("Set-Cookie",
-    "paramant_user_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0"
+    "paramant_user_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
   );
 }
 
@@ -952,6 +963,131 @@ api.post("/user/login-with-backup", async (req, res) => {
 
   setUserCookie(res, sessionToken);
   res.json({ success: true, email: user.email });
+});
+
+
+// ── Passkey (WebAuthn) login (ADR R018, PR-A) ───────────────────────────────
+// Two-step ceremony. rpId/origin are config constants (webauthn.RP_ID /
+// EXPECTED_ORIGIN), never derived from the request. Challenges are one-shot.
+// Passkey is a sufficient sole login factor (no TOTP step) -- see R018.
+
+// POST /api/user/auth/webauthn/login/options
+// Issues an authentication challenge. Uniform response shape regardless of
+// whether the email exists / has passkeys (unknown -> stable decoy credential),
+// so it is not an account-existence oracle. Rate-limited per IP AND per account.
+api.post("/user/auth/webauthn/login/options", async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginOptions;
+  if (!(await webauthn.rateHit(redis(), `lo:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+  const email = (req.body?.email || "").toString().toLowerCase().trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+  if (!(await webauthn.rateHit(redis(), `lo:acct:${webauthn.scopeHash(email)}`, L.account, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // Resolve the account's passkeys (email-first). Any failure / no-passkey /
+  // unknown email falls through to a stable decoy so verify fails identically.
+  let userId = null, allowCredentials = [];
+  try {
+    const user = await findUserByEmail(email);
+    if (user) {
+      userId = user.key;
+      const r = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(userId)}`, null, "GET");
+      if (r.status === 200) {
+        const body = await r.json().catch(() => ({}));
+        allowCredentials = (body.credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+      }
+    }
+  } catch (e) { /* fall through to decoy */ }
+  // Residual: a populated allowCredentials reveals "this account has >=1
+  // passkey" (not "exists" -- an account without passkeys also gets the decoy).
+  if (allowCredentials.length === 0) {
+    allowCredentials = [{ id: Buffer.from(webauthn.scopeHash("decoy:" + email), "hex").toString("base64url") }];
+  }
+
+  let options;
+  try {
+    options = await generateAuthenticationOptions({
+      rpID: webauthn.RP_ID,
+      allowCredentials,
+      userVerification: "required",
+    });
+  } catch (e) {
+    console.error("[webauthn/login/options]", e.message);
+    return res.status(500).json({ error: "internal" });
+  }
+  const flowId = webauthn.newFlowId();
+  await webauthn.putAuthFlow(redis(), flowId, { challenge: options.challenge, email, user_id: userId });
+  res.json({ flowId, options });
+});
+
+// POST /api/user/auth/webauthn/login/verify
+// Verifies the assertion and, on success, issues the session. Identity comes
+// ONLY from the assertion (never a client-supplied user id). Rate-limited per
+// IP AND per account.
+api.post("/user/auth/webauthn/login/verify", async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginVerify;
+  if (!(await webauthn.rateHit(redis(), `lv:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  const { flowId, response } = req.body || {};
+  const flow = await webauthn.takeAuthFlow(redis(), flowId);   // one-shot: consumed before any crypto
+  if (!flow || !response) return res.status(401).json({ error: "invalid_credentials" });
+  if (flow.email && !(await webauthn.rateHit(redis(), `lv:acct:${webauthn.scopeHash(flow.email)}`, L.account, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // Identity from the assertion only: resolve its credential id to an account
+  // via the relay, and require it to match the account the challenge was bound
+  // to. A decoy flow (unknown email) has user_id=null -> always rejected here.
+  let lookup;
+  try {
+    const r = await callRelay(`/v2/user/webauthn/lookup?cred_id=${encodeURIComponent(String(response.id || ""))}`, null, "GET");
+    if (r.status !== 200) return res.status(401).json({ error: "invalid_credentials" });
+    lookup = await r.json();
+  } catch (e) { return res.status(401).json({ error: "invalid_credentials" }); }
+  if (!flow.user_id || lookup.user_id !== flow.user_id) return res.status(401).json({ error: "invalid_credentials" });
+
+  // Verify the assertion. expectedOrigin/expectedRPID are config constants.
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: flow.challenge,
+      expectedOrigin: webauthn.EXPECTED_ORIGIN,
+      expectedRPID: webauthn.RP_ID,
+      credential: {
+        id: lookup.credId,
+        publicKey: new Uint8Array(Buffer.from(lookup.publicKey, "base64url")),
+        counter: lookup.counter | 0,
+      },
+      requireUserVerification: true,
+    });
+  } catch (e) { return res.status(401).json({ error: "invalid_credentials" }); }
+  if (!verification.verified) return res.status(401).json({ error: "invalid_credentials" });
+
+  // Cloned-authenticator guard (the exact rule, in webauthn.counterIsAcceptable):
+  //   stored or new counter == 0 -> allowed, not compared (iCloud Keychain = 0)
+  //   both non-zero -> new MUST be strictly higher, else refuse with NO session.
+  const newCounter = verification.authenticationInfo.newCounter;
+  if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
+    try { logAuditEvent("webauthn_counter_regression", { user_id: String(flow.user_id).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
+    return res.status(401).json({ error: "invalid_credentials" });
+  }
+  // Persist the advanced counter (auth already succeeded; best-effort).
+  try { await callRelay("/v2/user/webauthn/counter", { user_id: flow.user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}
+
+  // Issue the session. Passkey is a sufficient sole factor (ADR R018) -- NO TOTP
+  // step. Same shape/TTL/cookie as the email+TOTP path; marked via:'webauthn'.
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  await redis().set(
+    `paramant:user:session:${sessionToken}`,
+    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn" }),
+    { EX: 3600 }
+  );
+  setUserCookie(res, sessionToken);
+  try { logAuditEvent("webauthn_login", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
+  res.json({ success: true, email: flow.email });
 });
 
 
