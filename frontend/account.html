@@ -354,7 +354,7 @@
       <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
       <p class="small mt-2">
-        Public keys are bound to your account so verifiers can attribute signatures. Private keys never leave your browser. <a href="/sign">Manage at /sign</a>.
+        Public keys are bound to your account so verifiers can attribute signatures. Private keys never leave your browser.
       </p>
     </div>
 
@@ -364,9 +364,30 @@
       </div>
       <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
       <p class="small mt-2">
-        <strong>Your passphrase encrypts your signing key in this browser. We never see it and we cannot reset it. If you forget it, this key is gone.</strong> Download a backup key file at <a href="/sign">/sign</a>.
+        <strong>Your passphrase encrypts your signing key in this browser. We never see it and we cannot reset it. If you forget it, this key is gone.</strong>
       </p>
     </div>
+  </div>
+
+  <div class="card" style="margin-top:var(--space-4)">
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+      Set up a signing passkey
+    </div>
+    <p style="margin:0 0 12px" class="small">
+      Creates your ML-DSA-65 signing key in this browser, protected by your passkey
+      (Face ID / Touch ID / security key). The passphrase is your recovery floor &mdash;
+      we never see it and cannot reset it, so store it safely. Adding a signing key needs
+      your authenticator code.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:420px">
+      <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
+      <input type="password" id="signing-enrol-pass" placeholder="Recovery passphrase (min 12 characters)" autocomplete="new-password">
+      <input type="password" id="signing-enrol-pass2" placeholder="Confirm passphrase" autocomplete="new-password">
+      <div>
+        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Set up signing passkey</button>
+      </div>
+    </div>
+    <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
   </div>
 </section>
 
@@ -721,7 +742,7 @@ async function loadEnrolledKeys() {
     const data = await res.json();
     const keys = (data.keys || []);
     if (!keys.length) {
-      emptyEl.textContent = 'No signing keys enrolled on your account yet. Visit /sign to generate one and enroll it.';
+      emptyEl.textContent = 'No signing keys enrolled yet. Use "Set up a signing passkey" below to create one.';
       listEl.innerHTML = '';
       return;
     }
@@ -770,13 +791,13 @@ async function revokeKey(pkHash) {
 async function loadVaultStatus() {
   const el = document.getElementById('vault-status');
   if (!(await vaultAvailable())) {
-    el.textContent = 'IndexedDB or WebCrypto not available in this browser. You can still generate a key at /sign and download a backup file.';
+    el.textContent = 'IndexedDB or WebCrypto is unavailable in this browser (private/incognito mode can cause this), so a signing key cannot be stored here.';
     return;
   }
   try {
     const list = await vaultList();
     if (!list.length) {
-      el.textContent = 'No keys saved in this browser yet. Go to /sign to generate one and save it here.';
+      el.textContent = 'No signing key in this browser yet. Use "Set up a signing passkey" below.';
       return;
     }
     const fmt = e => (e.label ? e.label : '(no label)') + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
@@ -791,8 +812,10 @@ async function loadVaultStatus() {
 
 loadEnrolledKeys();
 loadVaultStatus();
+document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js"></script>
+<script type="module" src="/js/signing-enrol.js?v=1"></script>
 
 </body>
 </html>
