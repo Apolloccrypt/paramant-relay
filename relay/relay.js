@@ -4468,8 +4468,8 @@ python3 paramant-receiver.py \\
         ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
-      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays });
-      log('info', 'envelope_created', { id: out.id, parties: out.party_count });
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode });
+      log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: out }));
     } catch (e) {
@@ -4485,11 +4485,26 @@ python3 paramant-receiver.py \\
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     const id = path.slice('/v2/envelopes/'.length).split('/')[0];
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+    const recipeFor = (v) => v >= 2
+      ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
+      : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)';
     try {
+      // ?p=<i>&t=<invite_token> -> party-scoped view. For email-bound envelopes
+      // the token must match (getForParty returns null otherwise); for open
+      // envelopes the token is not required. This gives the co-signer exactly
+      // what it needs to recompute the (possibly v2) sign-message locally.
+      if (query.p !== undefined) {
+        const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
+        const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+        const view = await store.getForParty(id, pi, token);
+        if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, envelope: view, sign_message_recipe: recipeFor(view.recipe_version) }));
+      }
       const env = await store.getRedacted(id);
       if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, envelope: env, sign_message_recipe: 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)' }));
+      return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version) }));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
@@ -4507,6 +4522,11 @@ python3 paramant-receiver.py \\
       const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
       const pi = parseInt(d.party_index, 10);
       if (!Number.isInteger(pi) || pi < 0) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+      // For email-bound envelopes the per-party invite token must match before
+      // we record a view; getForParty returns null on a bad/absent token (and
+      // does not require one for open envelopes).
+      const gate = await store.getForParty(id, pi, (d.token || '').toString());
+      if (!gate) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       const ok = await store.markViewed(id, pi);
       if (!ok) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4533,9 +4553,20 @@ python3 paramant-receiver.py \\
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
       }
-      const out = await store.sign(id, pi, signerPub, sig);
+      // Email-bound envelopes (R018): the store accepts the signature only when
+      // a trusted internal caller (the admin proxy, which verified the signer's
+      // authenticated session email) asserts a matching verified_email_hash.
+      // _internalOk() gates that trust on the X-Internal-Auth header; a public
+      // caller cannot set it, so it can never satisfy an email-bound slot.
+      const internalTrusted = _internalOk();
+      const verifiedEmailHash = (d.verified_email_hash || '').toString();
+      const out = await store.sign(id, pi, signerPub, sig, { internalTrusted, verifiedEmailHash });
       if (!out.ok) {
-        const code = out.code === 'not_found' ? 404 : out.code === 'bad_signature' ? 400 : out.code === 'closed' ? 410 : 409;
+        const code = out.code === 'not_found' ? 404
+          : out.code === 'bad_signature' ? 400
+          : out.code === 'closed' ? 410
+          : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
+          : 409;
         res.writeHead(code, { 'Content-Type': 'application/json' });
         return res.end(J({ error: out.code }));
       }
