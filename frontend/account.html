@@ -370,6 +370,32 @@
   </div>
 </section>
 
+<section class="section" id="passkey-section">
+  <div class="marker">
+    <div class="num">04</div>
+    <h2>Passkey sign-in.</h2>
+    <div class="tag">WebAuthn<br>device-bound</div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
+      Your passkeys
+    </div>
+    <p style="margin:0 0 12px" id="account-passkey-empty" class="small">Checking your account...</p>
+    <ul id="account-passkey-list" style="margin:0 0 12px;padding:0;list-style:none"></ul>
+    <p class="small">
+      Sign in with Face ID, Touch ID, Windows Hello, or a security key &mdash; no code to type.
+      Adding a passkey is a security change, so it needs your current 6-digit TOTP code.
+    </p>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="text" id="account-passkey-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+             placeholder="TOTP code" autocomplete="one-time-code" style="max-width:150px">
+      <button type="button" class="btn btn-primary btn-small" id="account-passkey-btn">Activate passkey</button>
+    </div>
+    <p id="account-passkey-status" class="small" aria-live="polite" style="margin-top:8px"></p>
+  </div>
+</section>
+
 <section class="section">
   <div class="marker">
     <div class="num">04</div>
@@ -766,6 +792,7 @@ async function loadVaultStatus() {
 loadEnrolledKeys();
 loadVaultStatus();
 </script>
+<script type="module" src="/js/passkey.js"></script>
 
 </body>
 </html>

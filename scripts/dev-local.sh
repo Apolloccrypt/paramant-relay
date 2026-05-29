@@ -17,6 +17,10 @@ EMAIL="${DEV_EMAIL:-dev@localhost}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 export ADMIN_TOKEN="${ADMIN_TOKEN:-dev-admin-$(openssl rand -hex 8)}"
 export INTERNAL_AUTH_TOKEN="${INTERNAL_AUTH_TOKEN:-dev-internal-$(openssl rand -hex 8)}"
+# Required by the relay to encrypt user-TOTP secrets (AES-256-GCM, 32-byte key).
+# Without it, TOTP setup/verify throws — and the add-passkey step-up needs a
+# TOTP-enabled account to test against. Per-run dev key (fresh account each run).
+export PARAMANT_TOTP_MASTER_KEY="${PARAMANT_TOTP_MASTER_KEY:-$(openssl rand -base64 32)}"
 
 say() { printf '\n\033[1m[dev]\033[0m %s\n' "$1"; }
 
@@ -29,6 +33,7 @@ node -e "const{createClient}=require('./admin/node_modules/redis');(async()=>{tr
 say "starting relay-health on :3001 ..."
 ( cd relay && PORT=3001 SECTOR=health RELAY_MODE=ghost_pipe \
     ADMIN_TOKEN="$ADMIN_TOKEN" INTERNAL_AUTH_TOKEN="$INTERNAL_AUTH_TOKEN" REDIS_URL="$REDIS_URL" \
+    PARAMANT_TOTP_MASTER_KEY="$PARAMANT_TOTP_MASTER_KEY" \
     node relay.js >/tmp/paramant-dev-relay.log 2>&1 ) & RELAY_PID=$!
 
 # 2. admin: BASE_PATH='' so /api/* is direct; rpId/origin pinned to the proxy --

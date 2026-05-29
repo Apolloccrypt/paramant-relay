@@ -1091,6 +1091,49 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
 });
 
 
+// Shared WebAuthn registration core (ADR R018). Verifies the attestation
+// against the one-shot reg-flow's challenge (rpId/origin are config constants,
+// never request-derived) and persists the credential with its initial counter
+// (counter-init). Used by BOTH the setup_token onboarding flow and the
+// authUser+TOTP add-passkey flow — one implementation, different gates in front.
+// The relay's storeCredential keeps the cross-account-conflict check (a credId
+// already bound to another account is rejected -> surfaced here as 409).
+// Returns { ok:true } or { ok:false, status, error }.
+async function webauthnVerifyAndStore(flow, response, label) {
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response,
+      expectedChallenge: flow.challenge,
+      expectedOrigin: webauthn.EXPECTED_ORIGIN,
+      expectedRPID: webauthn.RP_ID,
+      requireUserVerification: true,
+    });
+  } catch (e) { return { ok: false, status: 400, error: "verification_failed" }; }
+  if (!verification.verified || !verification.registrationInfo) return { ok: false, status: 400, error: "verification_failed" };
+  const info = verification.registrationInfo;
+  const cred = info.credential;   // { id, publicKey: Uint8Array, counter, transports? }
+  try {
+    const sr = await callRelay("/v2/user/webauthn/credential", {
+      user_id: flow.user_id,
+      credId: cred.id,
+      publicKey: Buffer.from(cred.publicKey).toString("base64url"),
+      counter: cred.counter | 0,                       // counter-init
+      transports: (response.response && response.response.transports) || cred.transports || [],
+      prfSupported: !!(response.clientExtensionResults && response.clientExtensionResults.prf && response.clientExtensionResults.prf.enabled),
+      aaguid: info.aaguid || "",
+      label: (label || "").toString().slice(0, 64) || null,
+    });
+    if (sr.status !== 200) {
+      // 400 from the relay = storeCredential rejected (e.g. cross-account
+      // credential conflict) -> 409; anything else -> 502.
+      const body = await sr.json().catch(() => ({}));
+      return { ok: false, status: sr.status === 400 ? 409 : 502, error: body.error || "credential_store_failed" };
+    }
+  } catch (e) { return { ok: false, status: 502, error: "relay_unreachable" }; }
+  return { ok: true };
+}
+
 // ── Passkey (WebAuthn) registration (ADR R018, PR-A) — TOFU moment ──────────
 // First passkey on an account: the foundation of the identity claim. The ONLY
 // accepted proof of mailbox possession is a valid setup_token from the email-
@@ -1170,37 +1213,10 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   if (!(await redis().get(`paramant:user:setup_token:${flow.setup_token}`)))
     return res.status(401).json({ error: "invalid_setup_token" });
 
-  // Verify the attestation. expectedOrigin/expectedRPID are config constants.
-  let verification;
-  try {
-    verification = await verifyRegistrationResponse({
-      response,
-      expectedChallenge: flow.challenge,
-      expectedOrigin: webauthn.EXPECTED_ORIGIN,
-      expectedRPID: webauthn.RP_ID,
-      requireUserVerification: true,
-    });
-  } catch (e) { return res.status(400).json({ error: "verification_failed" }); }
-  if (!verification.verified || !verification.registrationInfo) return res.status(400).json({ error: "verification_failed" });
-
-  // Counter-init: persist the authenticator's reported initial counter so the
-  // login counter-check is correct from the very first login (0 is allowed;
-  // a non-zero counter must strictly increase thereafter).
-  const info = verification.registrationInfo;
-  const cred = info.credential;   // { id, publicKey: Uint8Array, counter, transports? }
-  try {
-    const sr = await callRelay("/v2/user/webauthn/credential", {
-      user_id: flow.user_id,
-      credId: cred.id,
-      publicKey: Buffer.from(cred.publicKey).toString("base64url"),
-      counter: cred.counter | 0,
-      transports: (response.response && response.response.transports) || cred.transports || [],
-      prfSupported: !!(response.clientExtensionResults && response.clientExtensionResults.prf && response.clientExtensionResults.prf.enabled),
-      aaguid: info.aaguid || "",
-      label: (req.body?.label || "").toString().slice(0, 64) || null,
-    });
-    if (sr.status !== 200) return res.status(502).json({ error: "credential_store_failed" });
-  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+  // Verify the attestation + persist the credential (shared core: rpId/origin
+  // config constants, counter-init, cross-account-conflict check inside).
+  const stored = await webauthnVerifyAndStore(flow, response, req.body && req.body.label);
+  if (!stored.ok) return res.status(stored.status).json({ error: stored.error });
 
   // Lockout invariant: a passkey-onboarded account has no TOTP, so this single
   // passkey would be its only factor. Mint backup codes (existing relay infra)
@@ -1239,6 +1255,104 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   setUserCookie(res, sessionToken);
   try { logAuditEvent("webauthn_register", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
   res.json({ success: true, email: flow.email, recovery_codes: recoveryCodes });
+});
+
+
+// ── Add a passkey to an EXISTING logged-in account (authUser + TOTP step-up) ──
+// Same WebAuthn ceremony as onboarding, but gated by a live session AND a fresh
+// TOTP code instead of a setup_token. Adding a login method is a factor
+// mutation, so a valid session ALONE is not enough — a valid TOTP is required
+// before the ceremony is released. This flow issues NO new session (already
+// logged in) and does NOT touch backup codes (the account already has recovery;
+// running regenerate-backup would wipe it). Passkey is purely additive, so the
+// lockout invariant trivially holds. /v2/user/signing-key stays TOTP-gated, so
+// this does NOT unlock ML-DSA signing.
+
+// POST /api/user/account/webauthn/register/options  (authUser + TOTP step-up)
+api.post("/user/account/webauthn/register/options", authUser, async (req, res) => {
+  const { user_id, email } = req.userSession;          // identity from the session, never the client
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.registerOptions;
+  if (!(await webauthn.rateHit(redis(), `aro:ip:${ip}`, L.ip, L.windowSec))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `aro:acct:${webauthn.scopeHash(user_id)}`, L.account, L.windowSec))) return res.status(429).json({ error: "rate_limited" });
+
+  // ── TOTP STEP-UP GATE ──────────────────────────────────────────────────────
+  // No valid TOTP -> no registration ceremony, no passkey. The ceremony
+  // (options) is released ONLY past this check.
+  const totp = (req.body && req.body.totp || "").toString();
+  if (!/^\d{6}$/.test(totp)) return res.status(400).json({ error: "totp_required" });
+  let totpOk = false;
+  try {
+    const vr = await callRelay("/v2/user/verify-totp", { user_id, totp });
+    const vb = await vr.json().catch(() => ({}));
+    totpOk = vr.ok && vb.valid === true;
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+  if (!totpOk) return res.status(403).json({ error: "invalid_totp" });
+  // ── ceremony released past here ─────────────────────────────────────────────
+
+  let handle, excludeCredentials = [];
+  try {
+    const hr = await callRelay("/v2/user/webauthn/handle", { user_id });
+    handle = (await hr.json()).handle;
+    const cr = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    if (cr.status === 200) excludeCredentials = ((await cr.json()).credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+  } catch (e) { console.error("[account/webauthn/register/options]", e.message); return res.status(502).json({ error: "relay_unreachable" }); }
+  if (!handle) return res.status(500).json({ error: "internal" });
+
+  let options;
+  try {
+    options = await generateRegistrationOptions({
+      rpName: webauthn.RP_NAME,
+      rpID: webauthn.RP_ID,
+      userName: email,
+      userID: new Uint8Array(Buffer.from(handle, "base64url")),
+      userDisplayName: email,
+      attestationType: "none",
+      excludeCredentials,
+      authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+      extensions: { prf: {} },
+    });
+  } catch (e) { console.error("[account/webauthn/register/options]", e.message); return res.status(500).json({ error: "internal" }); }
+
+  const flowId = webauthn.newFlowId();
+  await webauthn.putRegFlow(redis(), flowId, { challenge: options.challenge, user_id, email, via: "account-stepup" });
+  res.json({ flowId, options });
+});
+
+// POST /api/user/account/webauthn/register/verify  (authUser)
+api.post("/user/account/webauthn/register/verify", authUser, async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.registerVerify;
+  if (!(await webauthn.rateHit(redis(), `arv:ip:${ip}`, L.ip, L.windowSec))) return res.status(429).json({ error: "rate_limited" });
+
+  const { flowId, response } = req.body || {};
+  const flow = await webauthn.takeRegFlow(redis(), flowId);            // one-shot
+  if (!flow || !response) return res.status(401).json({ error: "invalid_registration" });
+  // ── authUser-binding: the ceremony MUST belong to the same session that did
+  //    the TOTP step-up (flow.via marks the account path, flow.user_id is the
+  //    step-up's account). Identity is the session's user_id, never a client field.
+  if (flow.via !== "account-stepup" || flow.user_id !== req.userSession.user_id)
+    return res.status(403).json({ error: "session_mismatch" });
+
+  const stored = await webauthnVerifyAndStore(flow, response, req.body && req.body.label);
+  if (!stored.ok) return res.status(stored.status).json({ error: stored.error });
+
+  // No new session (already logged in). No backup-code regeneration (would wipe
+  // the account's existing recovery). Additive factor -> lockout-safe.
+  try { logAuditEvent("webauthn_account_passkey_added", { user_id: String(req.userSession.user_id).slice(0, 12) + "…" }); } catch {}
+  res.json({ success: true });
+});
+
+// GET /api/user/account/webauthn/credentials  (authUser) — dashboard listing.
+api.get("/user/account/webauthn/credentials", authUser, async (req, res) => {
+  try {
+    const cr = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(req.userSession.user_id)}`, null, "GET");
+    const body = await cr.json().catch(() => ({}));
+    const passkeys = (body.credentials || []).map(c => ({
+      credId: c.credId, label: c.label, created_at: c.created_at, last_used_at: c.last_used_at, prfSupported: c.prfSupported,
+    }));
+    res.json({ passkeys, total: passkeys.length });
+  } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
 });
 
 
