@@ -75,6 +75,7 @@ NEW_NAV = '''\
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/status" role="menuitem">Status</a></li>
         <li role="none"><a href="/security" role="menuitem">Security</a></li>
+        <li role="none"><a href="/pararules" role="menuitem">ParaRules</a></li>
         <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
         <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
         <li role="none"><a href="/license" role="menuitem">License</a></li>
@@ -157,6 +158,7 @@ NEW_MOBILE = '''\
     <div class="nav-mobile-group-items">
       <a href="/status">Status</a>
       <a href="/security">Security</a>
+      <a href="/pararules">ParaRules</a>
       <a href="/sla">SLA</a>
       <a href="/partners">Partners</a>
       <a href="/license">License</a>
