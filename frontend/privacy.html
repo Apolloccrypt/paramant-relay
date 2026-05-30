@@ -277,7 +277,7 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: April 2, 2026</p>
+<p class="updated">Last updated: May 30, 2026</p>
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account.</strong></p>
@@ -309,7 +309,13 @@ footer a{color:var(--ink);text-decoration:none}
 <li>Run advertising or tracking scripts</li>
 <li>Share any data with third parties</li>
 <li>Write file data to disk at any point</li>
+<li>Load fonts, scripts, styles, or any other resource from a third party &mdash; everything is self-hosted on paramant.app</li>
 </ul>
+
+<h2>No third-party requests</h2>
+<p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page &mdash; every request goes to one origin, and nowhere else.</p>
+<p>This is deliberate. A single request to a third party leaks your IP address and the page you are viewing to that party before you have agreed to anything. So we self-host everything: fonts (a plain system font stack &mdash; zero font files downloaded), scripts, styles, and images all come from paramant.app.</p>
+<p>Two parties remain in the path and are operational rather than tracking: Cloudflare terminates TLS and absorbs DDoS <em>in transit</em> (see below), and our payment processor handles Pro/Enterprise billing on its own pages. Neither is loaded into the site, and neither follows you across it.</p>
 
 <h2>Local storage in your browser</h2>
 <p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
@@ -318,6 +324,8 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>Nonce registry</strong> &mdash; replay-attack protection (SDK sessions)</li>
 <li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>) &mdash; today's date and upload count, used to enforce the 10/day limit client-side</li>
 <li><strong>Docs access key</strong> (<code>pm_docs_key</code>) &mdash; stored if you authenticate to the Docs with a paid API key</li>
+<li><strong>Passkey / WebAuthn credentials</strong> &mdash; your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
+<li><strong>ParaSign signing vault</strong> (IndexedDB) &mdash; if you use in-browser signing, your signing key is encrypted with PBKDF2 + AES-GCM and kept in your browser&rsquo;s IndexedDB. It never leaves your device.</li>
 </ul>
 <p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
 
@@ -367,6 +375,7 @@ footer a{color:var(--ink);text-decoration:none}
       <div>
         <div class="footer-col-label">Legal</div>
         <div class="footer-links">
+          <a href="/privacy">Privacy Policy</a>
           <a href="/dpa">Data Processing Agreement</a>
           <a href="/sla">SLA</a>
           <a href="/compliance/nis2">Compliance overview</a>

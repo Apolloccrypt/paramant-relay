@@ -1257,9 +1257,9 @@ async function initGlobe() {
 
   // Globe.gl instantiëren
   globeInstance = Globe({ animateIn: true })
-    .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg')
-    .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
-    .backgroundImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png')
+    .globeImageUrl('/images/globe/earth-night.jpg')
+    .bumpImageUrl('/images/globe/earth-topology.png')
+    .backgroundImageUrl('/images/globe/night-sky.png')
     .showAtmosphere(true)
     .atmosphereColor('#B2FF3F')
     .atmosphereAltitude(0.18)
@@ -1519,6 +1519,7 @@ function updateGlobeTransfer(userLat, userLng) {
         <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
         <a href="/compliance/iec62443">IEC 62443</a>
         <a href="/compliance/nen7510">NEN 7510</a>
+        <a href="/privacy">Privacy Policy</a>
         <a href="/dpa">Data Processing Agreement</a>
         <a href="/government">Government</a>
         <a href="/ot">OT guide</a>
