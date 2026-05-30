@@ -72,7 +72,7 @@
 .ds-success-icon{flex:0 0 28px;height:28px;width:28px;background:var(--lime);color:var(--navy);border:1px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;border-radius:50%}
 #ds-signed-preview canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);margin-bottom:12px;background:#fff}
 .ds-sig-tabs{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--ink-hair)}
-.ds-tab{padding:9px 16px;border:0;background:transparent;color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ds-tab{padding:13px 18px;border:0;background:transparent;color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .ds-tab:hover{color:var(--navy)}
 .ds-tab.active{color:var(--cobalt);border-bottom-color:var(--cobalt)}
 .ds-sig-panel{padding:6px 0 0}
@@ -117,6 +117,7 @@
 .ds-party-link-row .ds-pl-copy{padding:6px 14px;background:var(--cobalt);color:#fff;border:0;font-family:var(--mono);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700}
 .ds-party-link-row .ds-pl-copy.copied{background:var(--lime);color:var(--navy)}
 @media(max-width:640px){.ds-recipient-row,.ds-party-link-row{grid-template-columns:1fr}}
+@media(max-width:640px){.ds-party-link-row .ds-pl-url{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-all}.ds-party-link-row .ds-pl-copy{width:100%;padding:12px 14px}.ds-recipient-row .ds-rm{padding:10px 12px}}
 @media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
 @media(max-width:640px){
@@ -604,6 +605,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=12"></script>
+<script type="module" src="/sign-flow.js?v=13"></script>
 </body>
 </html>
