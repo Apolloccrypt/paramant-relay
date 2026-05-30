@@ -735,7 +735,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   <div class="arch-inner">
     <div class="section-num">08</div>
     <h2 class="section-title">Components</h2>
-    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare, ParaDrop). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
 
     <table class="modes-table">
       <thead>
@@ -765,11 +765,6 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
           <td><strong>ParaShare (webapp)</strong></td>
           <td>Verified, authenticated transfers from the browser.</td>
           <td>Hybrid ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, client-side. Pre-v1 blob layout. Migration to v1 in progress.</td>
-        </tr>
-        <tr>
-          <td><strong>ParaDrop (webapp)</strong></td>
-          <td>Device-to-device transfer over the relay, browser-to-browser.</td>
-          <td>Same WASM bridge as ParaShare. Pre-v1 layout. Migration to v1 in progress.</td>
         </tr>
         <tr>
           <td><strong>Chromium extension</strong></td>
