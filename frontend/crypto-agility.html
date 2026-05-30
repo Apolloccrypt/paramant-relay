@@ -5,14 +5,14 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT — Crypto Agility</title>
-<meta name="description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
-<meta property="og:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
+<meta name="description" content="Paramant's crypto agility: ML-KEM-768 and ML-DSA-65 (NIST FIPS 203/204) run by default; a full registry of 3 KEMs and 18 signatures is available as opt-in extended mode. Clients pick, the relay validates, nothing is hardcoded.">
+<meta property="og:description" content="Paramant's crypto agility: ML-KEM-768 and ML-DSA-65 (NIST FIPS 203/204) run by default; a full registry of 3 KEMs and 18 signatures is available as opt-in extended mode. Clients pick, the relay validates, nothing is hardcoded.">
 <meta property="og:url" content="https://paramant.app/crypto-agility">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PARAMANT — Crypto Agility">
-<meta name="twitter:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
+<meta name="twitter:description" content="Paramant's crypto agility: ML-KEM-768 and ML-DSA-65 (NIST FIPS 203/204) run by default; a full registry of 3 KEMs and 18 signatures is available as opt-in extended mode. Clients pick, the relay validates, nothing is hardcoded.">
 <link rel="canonical" href="https://paramant.app/crypto-agility">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
@@ -316,7 +316,8 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   <p class="subtitle">
     The history of cryptography is a history of algorithms being broken.
     Paramant is built so that the next one does not break Paramant.
-    The relay supports the full NIST post-quantum standard suite today.
+    By default the relay runs ML-KEM-768 and ML-DSA-65; the full NIST
+    post-quantum registry is available as an opt-in extended mode.
   </p>
 </div>
 
@@ -376,8 +377,17 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 04 What is loaded today ── -->
   <section>
-    <h2>04 — What is loaded today</h2>
-    <p class="section-sub">3 KEMs plus 18 signatures, covering FIPS 203, 204, 205, and 206.</p>
+    <h2>04 — The algorithm registry</h2>
+    <p class="section-sub">ML-KEM-768 and ML-DSA-65 run by default (FIPS 203/204). The full registry below, 3 KEMs and 18 signatures, is available as opt-in extended mode.</p>
+    <p style="font-size:13px;color:var(--ink-dim);line-height:1.7;margin:10px 0 4px">
+      Production relays run <strong>core mode</strong>: only ML-KEM-768 and
+      ML-DSA-65 are registered (the two marked <em>default</em> below). The other
+      algorithms are registered only when an operator sets
+      <code>CRYPTO_MODE=extended</code> (see ADR R006). Falcon is on draft FIPS 206
+      and not yet finalised; the SLH-DSA entries are SPHINCS+-family hash
+      signatures (FIPS 205 family) and are not claimed byte-equivalent to a
+      certified FIPS 205 implementation.
+    </p>
 
     <h3 style="font-size:13px;font-weight:600;margin-top:26px;margin-bottom:6px;color:var(--ink)">KEM registry (FIPS 203, ML-KEM)</h3>
     <table class="algo-table">
@@ -385,9 +395,9 @@ FLAGS    1 byte    reserved for future features</pre>
         <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
       </thead>
       <tbody>
-        <tr><td>0x0001</td><td>ML-KEM-512</td><td>1</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0001</td><td>ML-KEM-512</td><td>1</td><td class="safe">available (extended)</td></tr>
         <tr><td>0x0002</td><td>ML-KEM-768</td><td>3</td><td class="safe">loaded (default)</td></tr>
-        <tr><td>0x0003</td><td>ML-KEM-1024</td><td>5</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0003</td><td>ML-KEM-1024</td><td>5</td><td class="safe">available (extended)</td></tr>
       </tbody>
     </table>
 
@@ -398,41 +408,41 @@ FLAGS    1 byte    reserved for future features</pre>
       </thead>
       <tbody>
         <tr><td>0x0000</td><td>none</td><td>anonymous</td><td class="safe">valid (no signature)</td></tr>
-        <tr><td>0x0001</td><td>ML-DSA-44</td><td>cat 2</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0001</td><td>ML-DSA-44</td><td>cat 2</td><td class="safe">available (extended)</td></tr>
         <tr><td>0x0002</td><td>ML-DSA-65</td><td>cat 3</td><td class="safe">loaded (default)</td></tr>
-        <tr><td>0x0003</td><td>ML-DSA-87</td><td>cat 5</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0003</td><td>ML-DSA-87</td><td>cat 5</td><td class="safe">available (extended)</td></tr>
       </tbody>
     </table>
 
-    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">Falcon signatures (FIPS 206)</h3>
+    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">Falcon signatures (draft FIPS 206, not yet finalised) — extended mode</h3>
     <table class="algo-table">
       <thead>
         <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
       </thead>
       <tbody>
-        <tr><td>0x0100</td><td>Falcon-512</td><td>cat 1</td><td class="safe">loaded (compact, fast)</td></tr>
-        <tr><td>0x0101</td><td>Falcon-1024</td><td>cat 5</td><td class="safe">loaded (compact, fast)</td></tr>
+        <tr><td>0x0100</td><td>Falcon-512</td><td>cat 1</td><td class="safe">available (extended) · compact</td></tr>
+        <tr><td>0x0101</td><td>Falcon-1024</td><td>cat 5</td><td class="safe">available (extended) · compact</td></tr>
       </tbody>
     </table>
 
-    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">SLH-DSA signatures (FIPS 205, stateless hash-based)</h3>
+    <h3 style="font-size:13px;font-weight:600;margin-top:32px;margin-bottom:6px;color:var(--ink)">SLH-DSA / SPHINCS+ signatures (FIPS 205 family, stateless hash-based) — extended mode</h3>
     <table class="algo-table">
       <thead>
         <tr><th>ID</th><th>Algorithm</th><th>NIST category</th><th>Status</th></tr>
       </thead>
       <tbody>
-        <tr><td>0x0200</td><td>SLH-DSA-SHA2-128s</td><td>cat 1</td><td class="safe">loaded · slow signing</td></tr>
-        <tr><td>0x0201</td><td>SLH-DSA-SHA2-128f</td><td>cat 1</td><td class="safe">loaded</td></tr>
-        <tr><td>0x0202</td><td>SLH-DSA-SHA2-192s</td><td>cat 3</td><td class="safe">loaded · slow signing</td></tr>
-        <tr><td>0x0203</td><td>SLH-DSA-SHA2-192f</td><td>cat 3</td><td class="safe">loaded</td></tr>
-        <tr><td>0x0204</td><td>SLH-DSA-SHA2-256s</td><td>cat 5</td><td class="safe">loaded · slow signing</td></tr>
-        <tr><td>0x0205</td><td>SLH-DSA-SHA2-256f</td><td>cat 5</td><td class="safe">loaded</td></tr>
-        <tr><td>0x0206</td><td>SLH-DSA-SHAKE-128s</td><td>cat 1</td><td class="safe">loaded · slow signing</td></tr>
-        <tr><td>0x0207</td><td>SLH-DSA-SHAKE-128f</td><td>cat 1</td><td class="safe">loaded</td></tr>
-        <tr><td>0x0208</td><td>SLH-DSA-SHAKE-192s</td><td>cat 3</td><td class="safe">loaded · slow signing</td></tr>
-        <tr><td>0x0209</td><td>SLH-DSA-SHAKE-192f</td><td>cat 3</td><td class="safe">loaded</td></tr>
-        <tr><td>0x020A</td><td>SLH-DSA-SHAKE-256s</td><td>cat 5</td><td class="safe">loaded · slow signing</td></tr>
-        <tr><td>0x020B</td><td>SLH-DSA-SHAKE-256f</td><td>cat 5</td><td class="safe">loaded</td></tr>
+        <tr><td>0x0200</td><td>SLH-DSA-SHA2-128s</td><td>cat 1</td><td class="safe">available (extended) · slow signing</td></tr>
+        <tr><td>0x0201</td><td>SLH-DSA-SHA2-128f</td><td>cat 1</td><td class="safe">available (extended)</td></tr>
+        <tr><td>0x0202</td><td>SLH-DSA-SHA2-192s</td><td>cat 3</td><td class="safe">available (extended) · slow signing</td></tr>
+        <tr><td>0x0203</td><td>SLH-DSA-SHA2-192f</td><td>cat 3</td><td class="safe">available (extended)</td></tr>
+        <tr><td>0x0204</td><td>SLH-DSA-SHA2-256s</td><td>cat 5</td><td class="safe">available (extended) · slow signing</td></tr>
+        <tr><td>0x0205</td><td>SLH-DSA-SHA2-256f</td><td>cat 5</td><td class="safe">available (extended)</td></tr>
+        <tr><td>0x0206</td><td>SLH-DSA-SHAKE-128s</td><td>cat 1</td><td class="safe">available (extended) · slow signing</td></tr>
+        <tr><td>0x0207</td><td>SLH-DSA-SHAKE-128f</td><td>cat 1</td><td class="safe">available (extended)</td></tr>
+        <tr><td>0x0208</td><td>SLH-DSA-SHAKE-192s</td><td>cat 3</td><td class="safe">available (extended) · slow signing</td></tr>
+        <tr><td>0x0209</td><td>SLH-DSA-SHAKE-192f</td><td>cat 3</td><td class="safe">available (extended)</td></tr>
+        <tr><td>0x020A</td><td>SLH-DSA-SHAKE-256s</td><td>cat 5</td><td class="safe">available (extended) · slow signing</td></tr>
+        <tr><td>0x020B</td><td>SLH-DSA-SHAKE-256f</td><td>cat 5</td><td class="safe">available (extended)</td></tr>
       </tbody>
     </table>
 
@@ -444,7 +454,7 @@ FLAGS    1 byte    reserved for future features</pre>
     </p>
 
     <div class="summary" style="margin-top:24px">
-      <p><strong>Total</strong>: 3 KEMs plus 18 signatures loaded in production.</p>
+      <p><strong>Default (core mode)</strong>: ML-KEM-768 + ML-DSA-65. <strong>Extended mode (opt-in)</strong>: 3 KEMs plus 18 signatures, the full registry above.</p>
     </div>
   </section>
 
@@ -453,22 +463,18 @@ FLAGS    1 byte    reserved for future features</pre>
     <h2>05 — See for yourself</h2>
     <p class="section-sub">The live capabilities endpoint is the source of truth.</p>
     <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
-    <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Excerpt (full response lists all 21 entries):</p>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Default (core mode) response — the production relays return exactly this:</p>
     <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:'IBM Plex Mono',ui-monospace,monospace">{
   "wire_version": 1,
   "kem": [
-    { "id": 1, "name": "ML-KEM-512",  "loaded": true },
-    { "id": 2, "name": "ML-KEM-768",  "loaded": true },
-    { "id": 3, "name": "ML-KEM-1024", "loaded": true }
+    { "id": 2, "name": "ML-KEM-768", "loaded": true }
   ],
   "sig": [
-    { "id": 0,   "name": "none",              "loaded": true },
-    { "id": 2,   "name": "ML-DSA-65",         "loaded": true },
-    { "id": 256, "name": "Falcon-512",        "loaded": true },
-    { "id": 512, "name": "SLH-DSA-SHA2-128s", "loaded": true, "performance_hint": "slow_signing" },
-    ...
+    { "id": 0, "name": "none",      "loaded": true },
+    { "id": 2, "name": "ML-DSA-65", "loaded": true }
   ]
 }</pre>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:10px;margin-bottom:10px">With <code>CRYPTO_MODE=extended</code> the same endpoint additionally advertises ML-KEM-512/1024, ML-DSA-44/87, Falcon-512/1024 and the 12 SLH-DSA variants (21 entries total).</p>
     <p style="font-size:13px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
       What the relay advertises is what it accepts. Blobs with an unadvertised
       algorithm ID are rejected with HTTP 415 UnsupportedAlgorithm before
