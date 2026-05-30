@@ -21,18 +21,21 @@
 <link rel="stylesheet" href="/parapear.css">
 <link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
-/* Hero pointing peer. Points at the primary 'Open your dashboard' CTA so
-   the work-model is obvious: this is where you start. Tokens only. */
-.home-cta-pointer { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-4); }
-.home-cta-pointer .ppp-mascot { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
-.home-cta-pointer .ppp-mascot img { width: clamp(160px, 20vw, 240px); height: auto; user-select: none; -webkit-user-drag: none; }
-.home-cta-pointer .ppp-label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); white-space: nowrap; }
-.home-cta-pointer .ppp-arrow { font-family: var(--mono); color: var(--ink-dim); font-size: 18px; line-height: 1; }
-.home-cta-pointer .home-cta { margin: 0; }
-@media (max-width: 720px) {
-  .home-cta-pointer { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
-  .home-cta-pointer .ppp-mascot img { width: 160px; }
-}
+/* Homepage — compact 50/50 launchpad. Existing design tokens + classes only;
+   design-system.css, nav.css and nav.js are untouched. */
+.home-hero { text-align: center; max-width: 64ch; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-3); }
+.home-hero h1 { font-size: clamp(30px, 5.2vw, 50px); line-height: 1.05; letter-spacing: -0.025em; color: var(--navy); margin: 0 0 var(--space-3); }
+.home-hero .lede { font-size: 16px; line-height: 1.55; color: var(--ink-dim); max-width: 58ch; margin: 0 auto; }
+.hero-badges { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0; margin: var(--space-4) 0 0; }
+.hero-badges li { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 999px; padding: 5px 11px; background: var(--bone); }
+.home-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 1040px; margin: var(--space-5) auto var(--space-6); padding: 0 var(--space-4); }
+.path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); min-height: 220px; }
+.path-dev { background: var(--bone); }
+.path h2 { font-size: clamp(20px, 2.5vw, 27px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0 0 var(--space-3); max-width: 18ch; }
+.path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); max-width: 34ch; }
+.path-cta { margin-top: auto; }
+.path-pear { position: absolute; top: var(--space-4); right: var(--space-4); width: clamp(56px, 8vw, 84px); height: auto; opacity: .92; user-select: none; -webkit-user-drag: none; }
+@media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } .path { min-height: 0; } }
 </style>
 </head>
 <body>
@@ -202,165 +205,32 @@
 <main id="main-content" role="main">
 
 <section class="home-hero">
-  <span class="eyebrow">post-quantum &middot; eu sovereign &middot; zero-knowledge</span>
-  <h1>Your encrypted workspace for files and signatures.</h1>
-  <p class="lede">Sign in to your dashboard with an API key and TOTP to send encrypted files, sign documents with post-quantum signatures, and share device-to-device. Everything client-side encrypted, burn on read, bound to your account. EU/DE only.</p>
-  <div class="home-cta-pointer">
-    <div class="ppp-mascot" aria-hidden="true">
-      <img src="/assets/parapear/parapear-point.png" alt="" decoding="async" width="120" height="120">
-      <span class="ppp-arrow">&rarr;</span>
-      <span class="ppp-label">Start here</span>
-    </div>
-    <div class="home-cta">
+  <h1>Sign it. Send it. We never even had it.</h1>
+  <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
+  <ul class="hero-badges" aria-label="At a glance">
+    <li>Open source</li>
+    <li>Free</li>
+    <li>Fully auditable</li>
+    <li>EU-sovereign</li>
+    <li>Post-quantum</li>
+  </ul>
+</section>
+
+<section class="home-split" id="products" aria-label="Two ways to use Paramant">
+  <div class="path path-human">
+    <h2>For people who sign things that matter.</h2>
+    <p>Documents and files, in your browser. Nothing to install, nothing left behind.</p>
+    <img class="path-pear" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="84" height="84">
+    <div class="path-cta">
       <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
-      <a class="btn btn-secondary" href="/signup">Create account</a>
-      <a class="btn btn-tertiary" href="/docs#self-hosting">Self-host guide</a>
     </div>
   </div>
-</section>
-
-<section class="home-section" aria-labelledby="howwork-h">
-  <header class="home-section-head"><span class="eyebrow">How Paramant works</span><h2 id="howwork-h">One dashboard. Every tool.</h2><p>Paramant is account-bound. You work from a single dashboard; the people you send to need nothing at all.</p></header>
-  <ol class="steps">
-    <li><h3>Sign in</h3><p>Your API key plus a TOTP code. No password to phish, no shared secret in your inbox.</p></li>
-    <li><h3>Work from your dashboard</h3><p>Send, share, drop, and sign &mdash; all in one place, every transfer bound to your account and your audit log.</p></li>
-    <li><h3>Recipients need no account</h3><p>They open your link or verify your .psign signature with just the valid info you sent them. Zero-knowledge for them, full audit trail for you.</p></li>
-  </ol>
-</section>
-
-<aside class="trust-bar" aria-label="Trust signals">
-  <span><strong>FIPS 203 / 204</strong> ML-KEM-768 &middot; ML-DSA-65</span>
-  <span><strong>Hetzner DE</strong> no US CLOUD Act</span>
-  <span><strong>RAM-only</strong> no disk writes</span>
-  <span><strong>BUSL-1.1</strong> source-available</span>
-</aside>
-
-<section class="home-section" id="products" aria-labelledby="prod-h">
-  <header class="home-section-head">
-    <span class="eyebrow">Products</span>
-    <h2 id="prod-h">Four ways to use Paramant.</h2>
-    <p>Send, ParaShare, ParaDrop, ParaSign &mdash; all from your dashboard, all client-side encrypted, all burn-on-read.</p>
-  </header>
-  <div class="home-center">
-    <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
-  </div>
-</section>
-
-<section class="home-section alt" aria-labelledby="sec-h">
-  <header class="home-section-head"><span class="eyebrow">For your sector</span><h2 id="sec-h">Built for regulated industries.</h2><p>Sector relays on the identical Ghost Pipe protocol, with sector-specific compliance documentation.</p></header>
-  <div class="sgrid">
-    <article class="scard"><span class="slabel">Healthcare</span><h3>DICOM, referrals, lab results</h3><p class="suse">Send scans and patient records between care providers, designed for NEN 7510 with per-access CT log proof.</p><div class="schips"><a class="schip" href="/compliance/nen7510">NEN 7510</a><a class="schip" href="/sovereignty">GDPR</a></div><div class="slink"><a href="https://health.paramant.app">health.paramant.app &rarr;</a></div></article>
-    <article class="scard"><span class="slabel">Finance</span><h3>Settlement files, payment data</h3><p class="suse">Payment files with per-transaction Merkle proofs. EU jurisdiction, no US Cloud Act, no metadata retention.</p><div class="schips"><a class="schip" href="/compliance/nis2">NIS2</a><a class="schip" href="/banken">Banking</a></div><div class="slink"><a href="https://finance.paramant.app">finance.paramant.app &rarr;</a></div></article>
-    <article class="scard"><span class="slabel">Legal &amp; notary</span><h3>Court documents, deeds</h3><p class="suse">Signed documents cryptographically destroyed after receipt. Tamper-evident proof of delivery without storing content.</p><div class="schips"><a class="schip" href="/sovereignty">Sovereignty</a><a class="schip" href="/dashboard">ParaSign</a></div><div class="slink"><a href="https://legal.paramant.app">legal.paramant.app &rarr;</a></div></article>
-    <article class="scard"><span class="slabel">Industrial IoT</span><h3>PLC telemetry, SCADA data</h3><p class="suse">Quantum-safe data diode. PLCs push outbound only, no inbound port, no VPN. Works on a Raspberry Pi.</p><div class="schips"><a class="schip" href="/compliance/iec62443">IEC 62443</a><a class="schip" href="/ot">OT guide</a></div><div class="slink"><a href="https://iot.paramant.app">iot.paramant.app &rarr;</a></div></article>
-    <article class="scard"><span class="slabel">Government &amp; public</span><h3>Sovereign data routing</h3><p class="suse">EU-only infrastructure. No US parent company, no CLOUD Act jurisdiction. For ministries and agencies.</p><div class="schips"><a class="schip" href="/government">Government brief</a><a class="schip" href="/sovereignty">Sovereignty</a></div></article>
-    <article class="scard"><span class="slabel">Supply chain</span><h3>Firmware, SBOM, code-signing</h3><p class="suse">Distribute firmware and signed artifacts with CT-log proof. Toward EU CRA readiness.</p><div class="schips"><a class="schip" href="/hndl">CRA</a><a class="schip" href="/dashboard">ParaSign</a></div></article>
-  </div>
-</section>
-
-<section class="home-section" aria-labelledby="how-h">
-  <header class="home-section-head"><span class="eyebrow">How it works</span><h2 id="how-h">Four steps. Nothing stored.</h2><p>Client-side encryption, ciphertext-only transit, RAM-only storage, burn after one read.</p></header>
-  <ol class="steps">
-    <li><h3>Encrypt client-side</h3><p>Your file is encrypted in the browser before it leaves your device. The relay never sees plaintext.</p></li>
-    <li><h3>Transit via Ghost Pipe</h3><p>Ciphertext moves through the relay and is hashed into the CT Merkle log.</p></li>
-    <li><h3>One-time download</h3><p>The recipient decrypts locally. On download the blob is overwritten in RAM.</p></li>
-    <li><h3>Cryptographic proof</h3><p>The Merkle root updates. The transfer is provable without storing what was transferred.</p></li>
-  </ol>
-  <div class="callout" role="note">
-    <h4>Burn-on-read</h4>
-    <p>The relay holds ciphertext in RAM only, never on disk. The moment a recipient downloads, the blob is overwritten and the slot is gone. There is no second copy to subpoena and nothing on disk for an operator or attacker to recover.</p>
-  </div>
-</section>
-
-<section class="section-dark" aria-labelledby="crypto-h">
-  <div class="home-section">
-    <header class="home-section-head"><span class="eyebrow">Under the hood</span><h2 id="crypto-h">Post-quantum, hybrid, audited.</h2><p>Default core stack is ML-KEM-768 (FIPS 203) and ML-DSA-65 (FIPS 204), with ECDH P-256 hybrid. Extended algorithm sets are opt-in (ADR R006).</p></header>
-    <ul class="crypto-strip" aria-label="Algorithm stack">
-      <li><span class="alg-tag">FIPS 203</span><strong>ML-KEM-768</strong></li>
-      <li><span class="alg-tag">FIPS 204</span><strong>ML-DSA-65</strong></li>
-      <li><span class="alg-tag">Classical hybrid</span><strong>ECDH P-256</strong></li>
-      <li><span class="alg-tag">AEAD</span><strong>AES-256-GCM</strong></li>
-    </ul>
-    <div class="pgrid">
-      <div class="pcard"><span class="ptag">kem</span><h3>ML-KEM-768</h3><p>FIPS 203 key encapsulation. Default in core mode, hybrid with ECDH P-256.</p></div>
-      <div class="pcard"><span class="ptag">signature</span><h3>ML-DSA-65</h3><p>FIPS 204 signatures. Relay identity, CT log STH, and ParaSign envelopes.</p></div>
-      <div class="pcard"><span class="ptag">crypto core</span><h3>paramant-core</h3><p>Audit-ready Rust binding the relay uses for all PQ primitives since v3.0.0 (M5b).</p></div>
-      <a class="pcard" href="/security"><span class="ptag">details</span><h3>Cryptography &amp; audits</h3><p>Full algorithm choices, threat model, and the independent security audits.</p><span class="pcta">Read the spec</span></a>
+  <div class="path path-dev">
+    <h2>For builders who don&rsquo;t trust servers either.</h2>
+    <p>Post-quantum encryption and signing as a pipe. Drop it into your stack, or self-host the whole thing.</p>
+    <div class="path-cta">
+      <a class="btn btn-lime" href="/docs">Read the docs</a>
     </div>
-    <div class="callout" role="note">
-      <h4>Why post-quantum now</h4>
-      <p>Adversaries can capture ciphertext today and decrypt it later once a cryptographically relevant quantum computer arrives. Files that need to stay private past 2030 need post-quantum keys today. Paramant ships ML-KEM-768 + ML-DSA-65 in the default core stack, hybrid with ECDH P-256 so classical security is preserved.</p>
-    </div>
-  </div>
-</section>
-
-<section class="section-dark" aria-labelledby="ct-h">
-  <div class="home-section">
-    <header class="home-section-head"><span class="eyebrow">Verifiable</span><h2 id="ct-h">Public Merkle proof of every transfer.</h2><p>Every transfer is hashed into a public Merkle tree whose root updates on every write. Prove a transfer occurred without learning what it was.</p></header>
-    <div class="ctw" role="region" aria-label="Live CT log">
-      <div class="ctw-stats">
-        <div class="ctw-stat">
-          <div class="ctw-num" id="ct-transfers">742</div>
-          <div class="ctw-lbl">Log entries</div>
-        </div>
-        <div class="ctw-stat">
-          <div class="ctw-num" id="ct-relays">5</div>
-          <div class="ctw-lbl">Registered relays</div>
-        </div>
-        <div class="ctw-stat">
-          <div class="ctw-num ctw-num-sm" id="ct-sth-status">ML-DSA-65</div>
-          <div class="ctw-lbl">STH signature</div>
-        </div>
-      </div>
-      <div class="ctw-root">
-        <span class="ctw-root-lbl">Latest Merkle root (SHA3-256)</span>
-        <code class="ctw-root-val" id="ct-root">syncing&hellip;</code>
-      </div>
-      <div class="ctw-foot">
-        <span class="ctw-status"><span class="ctw-dot" id="ct-dot" aria-hidden="true"></span> Live &middot; Hetzner DE &middot; Signed with ML-DSA-65 (FIPS 204)</span>
-        <a class="btn btn-lime" href="/ct-log">View live CT log</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="selfhost">
-  <span class="eyebrow" style="display:block;margin-bottom:var(--space-2)">Self-host</span>
-  <h2>Run your own relay.</h2>
-  <p>Source-available under BUSL-1.1. Works on a Raspberry Pi. If our managed service ever closes, every self-hosted relay keeps running.</p>
-  <code>curl -fsSL https://paramant.app/install.sh | bash</code>
-  <div class="home-cta" style="margin-top:var(--space-4)"><a class="btn btn-secondary" href="/docs#self-hosting">Deploy guide</a><a class="btn btn-tertiary" href="/setup">Setup wizard</a></div>
-</section>
-
-<section class="home-section" aria-labelledby="dev-h">
-  <header class="home-section-head"><span class="eyebrow">For builders</span><h2 id="dev-h">Integrate Paramant.</h2><p>SDKs in Python and JavaScript, plus a direct HTTP/WebSocket API. Wire format v1, byte-compatible across implementations.</p></header>
-  <div class="pgrid">
-    <a class="pcard" href="/docs#quickstart"><span class="ptag">python</span><h3>paramant-sdk (Python)</h3><p>Python 3.10+. ML-KEM-768 + ML-DSA-65 by default. <code>pip install paramant-sdk</code></p><span class="pcta">Quick start</span></a>
-    <a class="pcard" href="/docs#quickstart"><span class="ptag">javascript</span><h3>paramant-sdk (Node)</h3><p>Node 18+. Same wire format as the Python SDK. <code>npm install paramant-sdk</code></p><span class="pcta">Quick start</span></a>
-    <a class="pcard" href="/docs#api"><span class="ptag">http api</span><h3>REST / WebSocket</h3><p>Full /v2 API: WebSocket push, signed receipts, DID-based device identity.</p><span class="pcta">API reference</span></a>
-    <a class="pcard" href="https://github.com/Apolloccrypt/paramant-relay"><span class="ptag">source</span><h3>GitHub</h3><p>BUSL-1.1 source. Verify the code running on your relay against the public repo.</p><span class="pcta">View on GitHub</span></a>
-  </div>
-</section>
-
-<section class="home-section" aria-labelledby="free-h">
-  <header class="home-section-head">
-    <span class="eyebrow">Free</span>
-    <h2 id="free-h">Start free. Full Paramant.</h2>
-    <p>Same post-quantum cryptography, same zero-knowledge architecture, same EU jurisdiction. No stripped-down version. No credit card.</p>
-  </header>
-  <div style="max-width:72ch;margin:0 auto var(--space-5)">
-    <div class="callout" role="note" style="max-width:none;margin:0">
-      <h4>What you get on the free tier</h4>
-      <ul style="margin:0;padding-left:18px">
-        <li style="font-size:14px;line-height:1.6;color:var(--ink);margin-bottom:10px"><strong>Same crypto as paid tiers.</strong> ML-KEM-768 hybrid with ECDH P-256, ML-DSA-65 signed receipts, AES-256-GCM, all client-side. No encryption paywall.</li>
-        <li style="font-size:14px;line-height:1.6;color:var(--ink);margin-bottom:10px"><strong>Account-bound.</strong> Sign up with email and TOTP. Every transfer in your audit log. Recipients still need no account.</li>
-        <li style="font-size:14px;line-height:1.6;color:var(--ink);margin:0"><strong>Fair-use limits.</strong> 5 MB per file, 1-hour link expiry, 10 uploads per hour per IP, up to 5 registered devices for ParaShare. Full breakdown on the <a href="/pricing" style="color:var(--cobalt)">pricing page</a>.</li>
-      </ul>
-    </div>
-  </div>
-  <div class="home-center" style="display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap">
-    <a class="btn btn-lime" href="/signup">Create your free account</a>
-    <a class="btn btn-tertiary" href="/pricing">See pricing</a>
   </div>
 </section>
 
@@ -421,6 +291,5 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js" defer></script>
-<script src="/ct-stats.js?v=2" defer></script>
 </body>
 </html>
