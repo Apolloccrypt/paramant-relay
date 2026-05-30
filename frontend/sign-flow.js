@@ -506,13 +506,15 @@ function initDrawCanvas() {
     }, 'image/png');
   }
 
+  // Pointer Events cover mouse, touch and pen on every modern browser (iOS 13+).
+  // Using ONLY pointer events avoids the double-fire you get when touch* and
+  // pointer* listeners both run on a touch device. The canvas has touch-action:none,
+  // so panning/zooming never hijacks a stroke.
   cv.addEventListener('pointerdown', start);
   cv.addEventListener('pointermove', move);
   cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
   cv.addEventListener('pointerleave', end);
-  cv.addEventListener('touchstart', start, { passive: false });
-  cv.addEventListener('touchmove',  move,  { passive: false });
-  cv.addEventListener('touchend',   end);
 
   $('ds-sig-clear').addEventListener('click', () => {
     ctx.fillStyle = '#ffffff';
