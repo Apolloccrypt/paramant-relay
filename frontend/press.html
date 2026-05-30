@@ -313,8 +313,8 @@ td{color:var(--cobalt)}
     <p style="margin-top:10px">The system is built around three hard guarantees. First, encryption is purely client-side: files are encrypted using ML-KEM-768 key encapsulation and AES-256-GCM symmetric encryption inside a Rust/WASM module that runs in the browser, before any data leaves the device. Second, the relay is RAM-only: encrypted blobs are never written to disk, making forensic recovery impossible. Third, burn-on-read: each blob is destroyed immediately after the first successful download. The relay cannot be compelled to hand over content it no longer holds.</p>
     <p style="margin-top:10px">PARAMANT runs five sector relays, each tuned to its compliance domain: health (NEN 7510, HL7 FHIR, DICOM), legal (eIDAS, KNB), finance (NIS2, DORA, ISO 20022), industrial IoT (IEC 62443, EU CRA), and general. Each sector is a separate container — a breach in one does not expose another.</p>
     <p style="margin-top:10px">Deployment takes two minutes: one docker compose command on any Ubuntu 22.04+ server. A Raspberry Pi installer and a bootable NixOS image (paramantOS) are available for dedicated hardware. The community edition is permanently free for up to 5 API keys per relay instance.</p>
-    <p style="margin-top:10px">PARAMANT was independently security-audited in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. Twenty findings across two audits — including 4 critical — were fully resolved before public release. All findings are publicly documented.</p>
-    <p style="margin-top:10px">Incorporated in the Netherlands. Infrastructure on Hetzner Frankfurt, DE. EU/GDPR jurisdiction only, no US CLOUD Act exposure.</p>
+    <p style="margin-top:10px">PARAMANT's relay code received independent, voluntary security reviews in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. These were source-code reviews, not a certified third-party audit. Findings are tracked publicly in SECURITY.md; critical and high findings have been addressed or carry a documented remediation status.</p>
+    <p style="margin-top:10px">Incorporated in the Netherlands. Infrastructure on Hetzner, Germany (DE). EU/GDPR jurisdiction only, no US CLOUD Act exposure.</p>
   </div>
 
   <h2>Key facts</h2>
@@ -323,7 +323,7 @@ td{color:var(--cobalt)}
     <dl class="facts">
       <dt>Founded</dt>        <dd>2025</dd>
       <dt>HQ</dt>            <dd>Netherlands / EU</dd>
-      <dt>Infrastructure</dt><dd>Hetzner Frankfurt, DE — EU only</dd>
+      <dt>Infrastructure</dt><dd>Hetzner, Germany (DE) — EU only</dd>
       <dt>Jurisdiction</dt>  <dd>EU/DE &middot; GDPR &middot; no US CLOUD Act</dd>
       <dt>Version</dt>       <dd>v3.0.0 (May 2026)</dd>
       <dt>Live relays</dt>   <dd>5 (relay &middot; health &middot; finance &middot; legal &middot; iot)</dd>
@@ -339,7 +339,7 @@ td{color:var(--cobalt)}
   <ul class="bullet-list">
     <li><strong>No plaintext, ever.</strong> Encryption happens client-side in Rust/WASM before upload. The relay cannot read your file — even under court order, because it never had it.</li>
     <li><strong>Burn-on-read, not expiry.</strong> Blobs are destroyed on download, not on a timer. You cannot re-download a file, and neither can an attacker who compromises the relay after delivery.</li>
-    <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner Frankfurt DE. No US entity in the chain. No CLOUD Act exposure. GDPR-compliant by architecture, not by policy.</li>
+    <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner, Germany (DE). No US entity in the chain. No CLOUD Act exposure. GDPR-compliant by architecture, not by policy.</li>
     <li><strong>Sector compartmentalisation.</strong> Five separate relay containers — healthcare, legal, finance, IoT, general. A breach or subpoena targeting the finance relay cannot reach health data.</li>
     <li><strong>Post-quantum now, not later.</strong> ML-KEM-768 (NIST FIPS 203) protects against store-now-decrypt-later attacks. Healthcare data sent today cannot be decrypted by a quantum computer in 2030.</li>
   </ul>

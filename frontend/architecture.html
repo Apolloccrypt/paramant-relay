@@ -642,9 +642,9 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
     <p class="section-desc">One jurisdiction. One data center. No CDN caching your files. No US entity in the chain.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:24px">HETZNER · GERMANY · EU</div>
 
-      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Nuremberg, Germany">
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Germany">
         <!-- Concentric circles -->
         <circle cx="180" cy="140" r="130" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
         <circle cx="180" cy="140" r="100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
@@ -748,8 +748,8 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
       <tbody>
         <tr>
           <td><strong>Relay</strong></td>
-          <td>Node.js, Hetzner Nuremberg. Validates inbound v1 blobs, advertises 3 KEMs and 18 signatures via <code>/v2/capabilities</code>, rejects unsupported algorithm IDs with HTTP 415.</td>
-          <td>Wire format v1. Full NIST suite (FIPS 203, 204, 205, 206) loaded.</td>
+          <td>Node.js, Hetzner, Germany. Validates inbound v1 blobs, advertises ML-KEM-768 and ML-DSA-65 by default (full 3-KEM / 18-signature registry in extended mode) via <code>/v2/capabilities</code>, rejects unsupported algorithm IDs with HTTP 415.</td>
+          <td>Wire format v1. ML-KEM-768 + ML-DSA-65 by default (FIPS 203/204); full NIST registry available in extended mode.</td>
         </tr>
         <tr>
           <td><strong>sdk-py 3.0.0</strong></td>

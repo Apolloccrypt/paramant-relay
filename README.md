@@ -172,7 +172,7 @@ paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg
 
 ---
 
-### Legal & Notary — eIDAS compatible
+### Legal & e-signature (not a qualified eIDAS signature)
 
 ```bash
 # Send signed deed — cryptographically gone after receipt, CT log proof preserved
@@ -475,7 +475,7 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Storage | RAM only — never written to disk |
 | Padding | 5 MB fixed — all transfers look identical (DPI masking) |
 | Audit log | SHA3-256 Merkle tree — tamper-evident, public |
-| Infrastructure | Hetzner Frankfurt DE — EU jurisdiction only, no US CLOUD Act |
+| Infrastructure | Hetzner, Germany (DE) — EU jurisdiction only, no US CLOUD Act |
 | Docker | cap_drop ALL, no-new-privileges, read-only rootfs |
 
 **Security audits (April 2026):**
