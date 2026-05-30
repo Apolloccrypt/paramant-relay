@@ -10,15 +10,6 @@ updates:
       - "dependencies"
       - "relay"
 
-  # pip – sdk-py (pyproject.toml)
-  - package-ecosystem: "pip"
-    directory: "/sdk-py"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "sdk-py"
-
   # Docker – fly-relay
   - package-ecosystem: "docker"
     directory: "/fly-relay"

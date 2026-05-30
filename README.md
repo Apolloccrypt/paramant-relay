@@ -427,7 +427,7 @@ pip install paramant-sdk
 ```
 
 ```python
-from paramant_sdk import GhostPipe
+from paramant import GhostPipe
 
 gp = GhostPipe(api_key="pgp_xxx", device="device-001", sector="health")
 
