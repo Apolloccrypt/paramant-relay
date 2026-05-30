@@ -7,6 +7,7 @@
 // 'self'); no-ops if the page lacks the enrol elements.
 import { enrolSigningPasskey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=2';
 import { startRegistration, browserSupportsWebAuthn } from '/vendor/simplewebauthn-browser/index.js';
+import { vaultList, vaultDelete } from '/vendor/vault.js?v=2';
 
 // base64url -> bytes (WebAuthn credential id / PRF salt). Same idiom as
 // parasign-signer.js so the credentialId we store round-trips at sign time.
@@ -34,6 +35,20 @@ function askTotp(message) {
   const t = (window.prompt(message) || '').trim();
   if (!/^\d{6}$/.test(t)) throw new Error('A 6-digit authenticator code is required.');
   return t;
+}
+
+// enrolSigningPasskey() stores the passphrase wrap FIRST, so an abort after that
+// (cancelled Face ID, wrong code, no PRF) leaves a passphrase-only vault entry
+// that can never sign — v3 needs a webauthn-prf wrap. These are dead weight, so
+// sweep them after every attempt. A real signing key always ends up with BOTH
+// wraps, so this only ever removes orphans.
+async function cleanupOrphans() {
+  try {
+    for (const k of await vaultList()) {
+      const s = k.kekSources || [];
+      if (s.length === 1 && s[0] === 'passphrase') await vaultDelete(k.id);
+    }
+  } catch { /* best-effort hygiene */ }
 }
 
 function wireSigningEnrol() {
@@ -68,38 +83,41 @@ function wireSigningEnrol() {
     try {
       // One signing-key enrolment (ADR R018): passphrase (recovery floor) ->
       // passkey-PRF wrap -> bind the public key to the account. The private key
-      // is generated and wrapped entirely in the browser.
+      // (ML-DSA-65, post-quantum) is generated and wrapped entirely in the browser.
       const { pk_hash } = await enrolSigningPasskey({
         label,
         passphrase,
 
-        // (1) A PRF-capable passkey. Reuse an existing account passkey if there
-        //     is one — every account passkey is registered with extensions.prf
-        //     (server enables it), and reuse avoids both the
-        //     exclude-credentials InvalidStateError and a redundant TOTP
-        //     step-up. Only register a fresh passkey when the account has none.
+        // (1) A PRF-CAPABLE passkey. Reuse an existing passkey ONLY if it
+        //     genuinely supports PRF — a non-PRF credential (e.g. one created
+        //     before PRF support) can never unlock the vault, and silently
+        //     reusing it is exactly what broke before. If there is no
+        //     PRF-capable passkey, register a FRESH one: the server enables
+        //     extensions.prf, and we strip excludeCredentials client-side so the
+        //     device will mint a PRF-capable passkey even when a pre-PRF passkey
+        //     already exists for this account (TOTP step-up still gates it).
         registerPasskey: async () => {
+          let list = [];
           try {
             const cr = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
-            if (cr.ok) {
-              const d = await cr.json();
-              const list = d.passkeys || [];
-              const chosen = list.find(c => c.prfSupported) || list[0];
-              if (chosen && chosen.credId) return { credentialId: chosen.credId };
-            }
-          } catch { /* fall through to registering a fresh passkey */ }
+            if (cr.ok) list = (await cr.json()).passkeys || [];
+          } catch { /* treat as no usable passkey */ }
+          const prfCapable = list.find(c => c.prfSupported && c.credId);
+          if (prfCapable) return { credentialId: prfCapable.credId };
 
           const totp = askTotp('Add a signing passkey — enter your current 6-digit authenticator code:');
           setStatus('Verifying code, then follow your device prompt to create the passkey…', false);
           const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
           if (opt.status === 403) throw new Error('That authenticator code was not accepted.');
           if (!opt.ok) throw new Error((opt.data && opt.data.error) || ('register_options_failed_' + opt.status));
+          // Allow a new (PRF-capable) passkey even if a non-PRF one exists.
+          if (opt.data && opt.data.options) delete opt.data.options.excludeCredentials;
           let attResp;
           try {
             attResp = await startRegistration({ optionsJSON: opt.data.options });
           } catch (e) {
             throw new Error(e && e.name === 'InvalidStateError'
-              ? 'A passkey already exists on this device — reload the page and try again so it is reused.'
+              ? 'Your device blocked creating a new passkey. Remove this site’s passkey in your device settings, then try again.'
               : 'Passkey creation was cancelled.');
           }
           const ver = await postJSON('/api/user/account/webauthn/register/verify', { flowId: opt.data.flowId, response: attResp, label });
@@ -122,7 +140,7 @@ function wireSigningEnrol() {
             },
           });
           const first = assertion.getClientExtensionResults()?.prf?.results?.first;
-          if (!first) throw new Error('This passkey returned no PRF result (PRF unsupported on this authenticator).');
+          if (!first) throw new Error('This passkey can’t produce a PRF result. Use a device/browser with passkey-PRF (iOS 18+ or a recent Chrome), or remove an old non-PRF passkey for this site and retry.');
           return new Uint8Array(first);
         },
 
@@ -137,6 +155,8 @@ function wireSigningEnrol() {
         },
       });
 
+      await cleanupOrphans();   // clear any passphrase-only leftovers from prior aborted attempts
+
       // Close the loop: resolvePasskeySigningKey() is the EXACT call /sign makes.
       // If it returns here, the vault now holds a webauthn-prf-wrapped key under
       // id = pk_hash, and /sign will find it. Show the fingerprint as proof.
@@ -146,6 +166,7 @@ function wireSigningEnrol() {
       if (pass2El) pass2El.value = '';
       document.dispatchEvent(new CustomEvent('signing-key-enrolled'));
     } catch (e) {
+      await cleanupOrphans();   // don't leave a half-finished passphrase-only entry behind
       setStatus((e && e.message) ? e.message : 'Could not set up signing passkey.', true);
     } finally {
       btn.disabled = false;
