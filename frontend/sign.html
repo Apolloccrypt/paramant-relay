@@ -126,6 +126,11 @@
   .ds-stepper li::before{display:block;margin:0 auto 4px}
   .ds-info-card dl{grid-template-columns:1fr}
 }
+.ds-modes{display:grid;gap:12px;margin-top:8px}
+.ds-mode-card{display:flex;flex-direction:column;gap:4px;text-align:left;padding:18px 20px;border:1px solid var(--ink-hair);background:var(--bone);cursor:pointer;transition:all 140ms ease;width:100%;font-family:inherit}
+.ds-mode-card:hover{border-color:var(--cobalt);background:rgba(11,58,106,.04)}
+.ds-mode-t{font-size:16px;font-weight:700;color:var(--navy)}
+.ds-mode-d{font-size:13px;color:var(--ink-dim);line-height:1.5}
 </style>
 </head>
 <body>
@@ -309,8 +314,28 @@
     <li data-step="sign">Sign</li>
   </ol>
 
+  <!-- Step 0: choose a signing setup -->
+  <section class="ds-step" id="step-mode">
+    <h2>What do you want to do?</h2>
+    <p class="ds-sub">Choose how this document gets signed. You can start over anytime.</p>
+    <div class="ds-modes">
+      <button type="button" class="ds-mode-card" data-mode="alone">
+        <span class="ds-mode-t">Sign it myself</span>
+        <span class="ds-mode-d">Just my signature. Nothing to send.</span>
+      </button>
+      <button type="button" class="ds-mode-card" data-mode="cosign">
+        <span class="ds-mode-t">Sign together</span>
+        <span class="ds-mode-d">I sign, and I invite others to add their signatures too.</span>
+      </button>
+      <button type="button" class="ds-mode-card" data-mode="invite">
+        <span class="ds-mode-t">Request signatures</span>
+        <span class="ds-mode-d">Send this document for others to sign. I’m not signing it myself.</span>
+      </button>
+    </div>
+  </section>
+
   <!-- Step 1: pick document -->
-  <section class="ds-step" id="step-doc">
+  <section class="ds-step" id="step-doc" hidden>
     <h2>Pick the document you want to sign</h2>
     <p class="ds-sub">PDFs get a visual signature stamp you can place on any page. Other file types get a hash-only attestation that recipients verify by re-hashing the file.</p>
     <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Pick or drop a file">
@@ -579,6 +604,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=11"></script>
+<script type="module" src="/sign-flow.js?v=12"></script>
 </body>
 </html>

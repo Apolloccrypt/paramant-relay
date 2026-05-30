@@ -27,6 +27,7 @@ const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
 
 const state = {
+  signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
   mode: null,            // 'pdf' | 'image' | 'hash'
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
@@ -124,6 +125,87 @@ async function waitForPdfLib() {
 }
 
 // ====================================================================
+// Step 0: choose a signing setup (sign-alone / co-sign / invite)
+// ====================================================================
+
+function initStepMode() {
+  document.querySelectorAll('.ds-mode-card').forEach(card => {
+    card.addEventListener('click', () => {
+      state.signingMode = card.dataset.mode;
+      setStepperForMode(state.signingMode);
+      setActive('step-doc');
+    });
+  });
+}
+
+// Show only the stepper items this mode uses, and label the last one 'Send'
+// for the invite (request-signatures) flow.
+function setStepperForMode(mode) {
+  const steps = {
+    alone:  ['doc', 'place', 'identity', 'sign'],
+    cosign: ['doc', 'place', 'recipients', 'identity', 'sign'],
+    invite: ['doc', 'recipients', 'sign'],
+  }[mode] || ['doc', 'place', 'recipients', 'identity', 'sign'];
+  document.querySelectorAll('.ds-stepper li').forEach(li => { li.hidden = !steps.includes(li.dataset.step); });
+  const signLi = document.querySelector('.ds-stepper li[data-step="sign"]');
+  if (signLi) signLi.textContent = (mode === 'invite') ? 'Send' : 'Sign';
+}
+
+function enterRecipients() {
+  setActive('step-recipients');
+  const cont = $('ds-recipients-continue');
+  if (cont) { cont.textContent = (state.signingMode === 'invite') ? 'Send for signature' : 'Continue'; cont.disabled = false; }
+  const hint = $('ds-recipients-hint'); if (hint) hint.hidden = true;
+  renderRecipients();
+}
+
+function showRecipientsHint(msg, isErr) {
+  const el = $('ds-recipients-hint');
+  if (!el) return;
+  el.textContent = msg; el.hidden = false; el.className = isErr ? 'ds-banner err' : 'ds-banner';
+}
+
+// Invite-to-sign: create the envelope WITHOUT the requester signing (party 0 is
+// the requester; they never run the activation). Recipients (parties 1..N) sign
+// at their own /co-sign links, shown on the done screen.
+async function sendForSignature() {
+  const cont = $('ds-recipients-continue');
+  if (cont) cont.disabled = true;
+  showRecipientsHint('Creating the signing request…', false);
+  try {
+    const docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
+    const created = await createSigningEnvelope({
+      docHash: docHashForEnvelope,
+      recipients: state.recipients,
+      originalFilename: state.doc.name,
+      signerLabel: 'Requester',
+      creatorPublicKey: '',   // the requester does not sign
+    });
+    state.envelope = created.envelope;
+    state.result = {
+      stampedBytes: null,
+      fingerprint: '',
+      envelope: {
+        version: 'parasign-request-1',
+        original_filename: state.doc.name,
+        document_hash: docHashForEnvelope,
+        multiparty: {
+          envelope_id: created.envelope.id,
+          party_count: created.envelope.party_count,
+          party_links: created.envelope.party_links,
+          expires_at: created.envelope.expires_at,
+        },
+        disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+      },
+    };
+    showDone();
+  } catch (e) {
+    if (cont) cont.disabled = false;
+    showRecipientsHint((e && e.status === 401) ? 'Please sign in first (open /auth/login), then return here.' : ((e && e.message) ? e.message : 'Could not create the request.'), true);
+  }
+}
+
+// ====================================================================
 // Step 1: pick a document
 // ====================================================================
 
@@ -162,7 +244,10 @@ async function onDocChosen(file) {
     try { state.signer.docImageDataUrl = await bytesToDataUrl(bytes, mimeGuess); } catch {}
   }
 
-  if (canPlaceVisually) {
+  if (state.signingMode === 'invite') {
+    // Requester doesn't stamp/sign — go straight to choosing who must sign.
+    enterRecipients();
+  } else if (canPlaceVisually) {
     setActive('step-place');
     if (isPdf) await renderPdfForPlacement();
     else       await renderImageForPlacement();
@@ -1052,6 +1137,7 @@ function downloadBytes(bytes, name, mime) {
 function showDone() {
   setActive('step-done');
   const r = state.result;
+  if (state.signingMode === 'invite') { showDoneInvite(r); return; }
 
   // Success banner: the signature was produced locally (the private key never
   // left the browser); the relay only recorded the public signature + CT entry.
@@ -1119,6 +1205,24 @@ function showDone() {
 
   // Render the signed result so the user can see their stamp before downloading.
   renderSignedPreview().catch(() => {});
+}
+
+// Invite-to-sign done screen: there is no signed document (the requester didn't
+// sign) — show the per-recipient signing links to share.
+function showDoneInvite(r) {
+  const sb = $('ds-success-banner');
+  if (sb) {
+    sb.hidden = false; sb.className = 'ds-success';
+    sb.innerHTML = '<div class="ds-success-icon" aria-hidden="true">&#10003;</div>' +
+      '<div><strong>Signing request created.</strong> <span>Send each person their link below — they verify the document hash and sign on the relay. Nothing is uploaded.</span></div>';
+  }
+  const h = document.querySelector('#step-done h2'); if (h) h.textContent = 'Sent for signature';
+  const sub = document.querySelector('#step-done .ds-sub'); if (sub) sub.textContent = 'Each signer below gets a personal link. Share it with them; follow progress on the envelope status page.';
+  const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
+  ['ds-dl-pdf', 'ds-dl-psign'].forEach(id => { const el = $(id); if (el) el.hidden = true; });
+  const info = document.querySelector('#step-done .ds-info-card'); if (info) info.hidden = true;
+  document.querySelectorAll('#step-done .ds-usage-card').forEach(c => { if (c.id !== 'ds-party-links-card') c.hidden = true; });
+  if (r.envelope.multiparty && r.envelope.multiparty.party_links) renderPartyLinks(r.envelope.multiparty);
 }
 
 function renderPartyLinks(mp) {
@@ -1224,17 +1328,30 @@ async function renderSignedPreview() {
 // ====================================================================
 
 function wireNav() {
-  $('ds-place-continue').addEventListener('click', () => { setActive('step-recipients'); renderRecipients(); });
-  $('ds-hash-only-continue').addEventListener('click', () => { setActive('step-recipients'); renderRecipients(); });
+  // After the document: co-sign/invite go to recipients; sign-alone skips to identity.
+  const afterDoc = () => { if (state.signingMode === 'alone') setActive('step-identity'); else enterRecipients(); };
+  $('ds-place-continue').addEventListener('click', afterDoc);
+  $('ds-hash-only-continue').addEventListener('click', afterDoc);
   $('ds-place-back').addEventListener('click', () => setActive('step-doc'));
   $('ds-hash-only-back').addEventListener('click', () => setActive('step-doc'));
-  $('ds-recipients-back').addEventListener('click', () => setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only'));
+  $('ds-recipients-back').addEventListener('click', () => {
+    if (state.signingMode === 'invite') setActive('step-doc');
+    else setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only');
+  });
   $('ds-recipients-continue').addEventListener('click', () => {
     commitRecipientsFromDom();
-    setActive('step-identity');
+    if (state.signingMode === 'invite') {
+      if (state.recipients.length === 0) { showRecipientsHint('Add at least one person to send this to.', true); return; }
+      sendForSignature();
+    } else {
+      setActive('step-identity');
+    }
   });
   $('ds-add-recipient').addEventListener('click', addRecipientRow);
-  $('ds-identity-back').addEventListener('click', () => setActive('step-recipients'));
+  $('ds-identity-back').addEventListener('click', () => {
+    if (state.signingMode === 'alone') setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only');
+    else setActive('step-recipients');
+  });
   $('ds-identity-continue').addEventListener('click', () => {
     fillReview();
     setActive('step-sign');
@@ -1254,7 +1371,9 @@ function renderRecipients() {
   if (state.recipients.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'ds-recipient-empty';
-    empty.innerHTML = 'No recipients yet. Click <strong>+ Add recipient</strong> if this needs to be co-signed by someone else, or click <strong>Continue</strong> to sign only for yourself.';
+    empty.innerHTML = (state.signingMode === 'invite')
+      ? 'Add the people who need to sign this document. Each one gets their own link to sign.'
+      : 'No co-signers yet. Click <strong>+ Add recipient</strong> to invite someone, or <strong>Continue</strong> to sign just for yourself.';
     list.appendChild(empty);
     return;
   }
@@ -1311,11 +1430,12 @@ function wireLiveStampUpdates() {
 }
 
 function init() {
+  initStepMode();
   initStepDoc();
   initStepIdentity();
   wireNav();
   wireLiveStampUpdates();
-  setActive('step-doc');
+  setActive('step-mode');
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
