@@ -327,8 +327,8 @@ async function initStepIdentity() {
 }
 
 // Display the passkey signing identity in the identity step (read-only, public
-// metadata only — no unlock). If none is enrolled, point at the enrol path
-// (stuk 2 wires an inline enrol button here).
+// metadata only — no unlock). If none is enrolled, deep-link to the enrol
+// flow on /account (the "Set up a signing passkey" card).
 async function showSigningIdentity() {
   const el = $('ds-signing-identity');
   if (!el) return;
@@ -341,7 +341,7 @@ async function showSigningIdentity() {
   } catch (e) {
     el.className = 'ds-hint';
     if (e && e.code === 'no_signing_passkey') {
-      el.innerHTML = 'No signing passkey on this device yet. Set one up at <a href="/account">your account</a> before signing.';
+      el.innerHTML = 'You don\'t have a signing passkey on this device yet — you need one to sign. <a href="/account#signing-identity-section" class="btn btn-primary btn-small" style="margin-top:8px;display:inline-block">Set up a signing passkey →</a>';
     } else {
       el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
     }
