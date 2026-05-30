@@ -287,7 +287,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>How Ghost Pipe &amp; ParaShare work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. The only data persisted to disk is cryptographic hashes in the public Certificate Transparency log — no file content, no keys, no plaintext.</p>
+<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. The only data persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext.</p>
 <p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
 <h2>What we process</h2>
@@ -311,23 +311,23 @@ footer a{color:var(--ink);text-decoration:none}
 <li>Run advertising or tracking scripts</li>
 <li>Share any data with third parties</li>
 <li>Write file data to disk at any point</li>
-<li>Load fonts, scripts, styles, or any other resource from a third party &mdash; everything is self-hosted on paramant.app</li>
+<li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
 
 <h2>No third-party requests</h2>
-<p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page &mdash; every request goes to one origin, and nowhere else.</p>
-<p>This is deliberate. A single request to a third party leaks your IP address and the page you are viewing to that party before you have agreed to anything. So we self-host everything: fonts (a plain system font stack &mdash; zero font files downloaded), scripts, styles, and images all come from paramant.app.</p>
+<p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page: every request goes to one origin, and nowhere else.</p>
+<p>This is deliberate. A single request to a third party leaks your IP address and the page you are viewing to that party before you have agreed to anything. So we self-host everything: fonts (a plain system font stack, zero font files downloaded), scripts, styles, and images all come from paramant.app.</p>
 <p>Two parties remain in the path and are operational rather than tracking: Cloudflare terminates TLS and absorbs DDoS <em>in transit</em> (see below), and our payment processor handles Pro/Enterprise billing on its own pages. Neither is loaded into the site, and neither follows you across it.</p>
 
 <h2>Local storage in your browser</h2>
 <p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
 <ul>
-<li><strong>ECDH + ML-KEM key pairs</strong> &mdash; generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
-<li><strong>Nonce registry</strong> &mdash; replay-attack protection (SDK sessions)</li>
-<li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>) &mdash; today's date and upload count, used to enforce the 10/day limit client-side</li>
-<li><strong>Docs access key</strong> (<code>pm_docs_key</code>) &mdash; stored if you authenticate to the Docs with a paid API key</li>
-<li><strong>Passkey / WebAuthn credentials</strong> &mdash; your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
-<li><strong>ParaSign signing vault</strong> (IndexedDB) &mdash; if you use in-browser signing, your signing key is encrypted with PBKDF2 + AES-GCM and kept in your browser&rsquo;s IndexedDB. It never leaves your device.</li>
+<li><strong>ECDH + ML-KEM key pairs</strong>: generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
+<li><strong>Nonce registry</strong>: replay-attack protection (SDK sessions)</li>
+<li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>): today's date and upload count, used to enforce the 10/day limit client-side</li>
+<li><strong>Docs access key</strong> (<code>pm_docs_key</code>): stored if you authenticate to the Docs with a paid API key</li>
+<li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
+<li><strong>ParaSign signing vault</strong> (IndexedDB): if you use in-browser signing, your signing key is encrypted with PBKDF2 + AES-GCM and kept in your browser&rsquo;s IndexedDB. It never leaves your device.</li>
 </ul>
 <p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
 
