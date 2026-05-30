@@ -36,7 +36,7 @@ def send_welcome_mail(to_email, api_key, plan):
   <p style="color:#555;font-size:13px;margin-bottom:8px">Get started:</p>
   <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888">pip install paramant-sdk
 
-from paramant_sdk import GhostPipe
+from paramant import GhostPipe
 gp = GhostPipe(api_key="{api_key}", device="device-001")
 hash_ = gp.send(b"hello world")
 data  = gp.receive(hash_)</pre>
