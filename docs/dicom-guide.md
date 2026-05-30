@@ -29,7 +29,7 @@ Legacy solutions fail at least one of these. Email fails all of them. Even SFTP 
 paramant-sender.py
   │
   ▼  Ghost Pipe relay — RAM only, no disk write
-health.paramant.app  (Hetzner Frankfurt DE)
+health.paramant.app  (Hetzner, Germany)
   │
   ▼  decrypt client-side
 paramant-receiver.py
