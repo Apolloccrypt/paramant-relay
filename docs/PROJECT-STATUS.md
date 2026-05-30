@@ -42,7 +42,7 @@ Recently merged: #34 (Sg1 ml-dsa crypto-wasm), #35 (M5b login-fixes), #36
 
 ## Production state
 
-- Live host: 116.203.86.81 (Hetzner Frankfurt)
+- Live host: 116.203.86.81 (Hetzner, Germany)
 - Build: v2.5.0 marketing
 - Soak: M5b 7-day acceptance window, started 2026-05-27 18:10 (day 1 of 7)
 - Main HEAD: 7b6ce29 (Merge PR #40)

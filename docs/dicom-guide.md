@@ -192,7 +192,7 @@ The `leaf_hash` proves the transfer happened at `ts` without storing any patient
 | Encryption algorithm | ML-KEM-768 (FIPS 203) + AES-256-GCM | NCSC PQC roadmap |
 | Key exchange | Client-side, relay has zero plaintext access | NEN 7510-2 A.10.1 |
 | Storage | 0 bytes on relay — RAM only, destroyed after read | AVG Art. 5(1)(e) |
-| Jurisdiction | Hetzner Falkenstein, Germany — EU only | AVG Art. 46 |
+| Jurisdiction | Hetzner, Germany — EU only | AVG Art. 46 |
 | Audit trail | Merkle CT log, SHA-256 leaf hashes | NEN 7510-1 §9.4 |
 | Identity | ML-DSA-65 relay identity certificate | FIPS 204 |
 | Agreement | Verwerkersovereenkomst (GDPR Art. 28) | AVG Art. 28 |

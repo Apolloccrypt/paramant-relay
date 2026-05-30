@@ -7,7 +7,7 @@ Last updated: 2026-05-27T21:00:05+02:00 (auto-maintained by overseer session)
 
 ## Current production state
 
-- Live: 116.203.86.81 (Hetzner Frankfurt), 5 sector relays + admin (docker compose)
+- Live: 116.203.86.81 (Hetzner, Germany), 5 sector relays + admin (docker compose)
 - Build: v2.5.0 marketing. NOTE: relay.js emits VERSION='3.0.0' via /health while
   commit 77bb8d3 reserves 3.0.0 for ParaSign GA -- see PROJECT-STATUS.md findings.
 - Users: ~100 community + enterprise pilots

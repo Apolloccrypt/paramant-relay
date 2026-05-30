@@ -22,7 +22,7 @@ I am writing because Paramant addresses something that is almost entirely absent
 
 Paramant is a post-quantum encrypted file relay built on the Ghost Pipe protocol. Files are encrypted fully client-side using ML-KEM-768 + ECDH P-256 (hybrid), transmitted over AES-256-GCM, and destroyed after the first authorised download — burn-on-read. There is no persistent storage. A Merkle-based CT log records every transfer without retaining the content.
 
-Five live relay sectors (healthcare, legal, finance, industrial IoT, general) run on Hetzner Frankfurt. Source code: https://github.com/Apolloccrypt/paramant-relay
+Five live relay sectors (healthcare, legal, finance, industrial IoT, general) run on Hetzner, Germany. Source code: https://github.com/Apolloccrypt/paramant-relay
 
 **Why this is relevant to ACQuA**
 
