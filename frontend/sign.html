@@ -304,7 +304,7 @@
   <ol class="ds-stepper" aria-label="Sign progress">
     <li data-step="doc" class="active">Document</li>
     <li data-step="place">Place</li>
-    <li data-step="recipients">Recipients</li>
+    <li data-step="recipients">Co-signers</li>
     <li data-step="identity">Identity</li>
     <li data-step="sign">Sign</li>
   </ol>
@@ -351,8 +351,8 @@
 
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
-    <h2>Recipients (optional)</h2>
-    <p class="ds-sub">If this is for someone else to co-sign or acknowledge, add them here. Each recipient gets their own co-sign link that you share with them out-of-band (you mail the signed PDF + their link separately). Leave empty to sign only for yourself.</p>
+    <h2>Add co-signers (optional)</h2>
+    <p class="ds-sub">Adding someone here makes this a multi-party signature. <strong>After you sign, you'll get a personal co-sign link for each person</strong> to send them yourself (along with the signed file). The email is a label for your reference only. Leave empty to sign just for yourself.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -579,6 +579,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=10"></script>
+<script type="module" src="/sign-flow.js?v=11"></script>
 </body>
 </html>
