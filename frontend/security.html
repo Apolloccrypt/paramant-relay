@@ -324,7 +324,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <hr class="divider">
 
   <h2>Cryptography</h2>
-  <p>All algorithms are from NIST post-quantum standards (FIPS 203, 204, 205, 206) or established symmetric primitives. Nothing custom. No proprietary key exchange. The relay loads 3 KEMs and 18 signatures; clients choose, the relay validates, and the live registry is at <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. See <a href="/crypto-agility">crypto agility</a> for the wire format and full algorithm table.</p>
+  <p>All algorithms are NIST post-quantum standards or established symmetric primitives. Nothing custom. No proprietary key exchange. By default the relay runs ML-KEM-768 and ML-DSA-65 (FIPS 203/204); a full registry of 3 KEMs and 18 signatures, including FIPS 205-family and draft FIPS 206 algorithms, is available as opt-in extended mode. Clients choose, the relay validates, and the live registry is at <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. See <a href="/crypto-agility">crypto agility</a> for the wire format and full algorithm table.</p>
 
   <table class="table" style="margin-top:20px">
     <thead>
@@ -332,7 +332,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </thead>
     <tbody>
       <tr><td>ML-KEM-768</td><td>Key encapsulation — post-quantum KEM</td><td>NIST FIPS 203</td></tr>
-      <tr><td>ECDH P-256</td><td>Classical key exchange (hybrid)</td><td>NIST SP 800-56A</td></tr>
+      <tr><td>ECDH P-256</td><td>Classical key exchange (browser ParaShare hybrid path)</td><td>NIST SP 800-56A</td></tr>
       <tr><td>HKDF-SHA256</td><td>Key derivation from shared secrets</td><td>RFC 5869</td></tr>
       <tr><td>AES-256-GCM</td><td>Symmetric encryption + authentication</td><td>NIST SP 800-38D</td></tr>
       <tr><td>ML-DSA-65</td><td>Digital signatures — relay identity</td><td>NIST FIPS 204</td></tr>
@@ -341,8 +341,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </tbody>
   </table>
 
-  <h3>Hybrid key exchange</h3>
-  <p>ParaShare authenticated transfers use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
+  <h3>Hybrid key exchange (browser ParaShare path)</h3>
+  <p>The in-browser ParaShare path combines ML-KEM-768 <em>and</em> ECDH P-256, deriving one shared secret from both via HKDF, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure. The official SDKs and the relay's server-side envelope path use ML-KEM-768 on its own; the hybrid is specific to the browser ParaShare client.</p>
 
   <p style="margin-top:10px;font-size:var(--text-sm);color:var(--ink-dim)">See also: <a href="/hndl">Harvest Now, Decrypt Later &rarr;</a> — why data collected today can be decrypted at Q-Day, and how RAM-only transfer removes the target.</p>
 

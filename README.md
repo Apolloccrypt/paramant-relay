@@ -172,7 +172,7 @@ paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg
 
 ---
 
-### Legal & Notary — eIDAS compatible
+### Legal & e-signature (not a qualified eIDAS signature)
 
 ```bash
 # Send signed deed — cryptographically gone after receipt, CT log proof preserved

@@ -287,12 +287,12 @@ a:hover{opacity:.8}
 </div>
 
 <div class="wrap">
-  <div class="eyebrow">Legal &mdash; effective 1 January 2025</div>
+  <div class="eyebrow">Legal &middot; service targets</div>
   <h1>Service Level Agreement</h1>
-  <p class="sub">Uptime commitments, downtime credits, and support response times for all PARAMANT relay plans.</p>
+  <p class="sub">Uptime targets, downtime credits, and support response times for the managed PARAMANT relay service. The percentages below are service targets, not an externally measured contractual guarantee.</p>
 
   <div class="toc">
-    <a href="#uptime">1. Uptime commitments</a>
+    <a href="#uptime">1. Uptime targets</a>
     <a href="#credits">2. Downtime credits</a>
     <a href="#support">3. Support tiers</a>
     <a href="#exclusions">4. Exclusions</a>
@@ -302,7 +302,7 @@ a:hover{opacity:.8}
   </div>
 
   <!-- 1. Uptime -->
-  <h2 id="uptime">1. Uptime commitments</h2>
+  <h2 id="uptime">1. Uptime targets</h2>
   <p>Monthly uptime percentage is calculated as: <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">(total minutes &minus; downtime minutes) / total minutes &times; 100</code></p>
 
   <div class="sla-grid">
@@ -401,7 +401,7 @@ a:hover{opacity:.8}
 
   <!-- 5. Measurement -->
   <h2 id="measurement">5. Measurement methodology</h2>
-  <p>PARAMANT measures availability using automated HTTP health checks against <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on each relay sector endpoint, from multiple EU locations, every 60 seconds. An endpoint is considered unavailable when three consecutive checks fail with a non-2xx response or a TCP timeout.</p>
+  <p>PARAMANT exposes per-sector relay health at <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on each relay sector endpoint and publishes a status overview at <a href="/status">/status</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint. A formal multi-region uptime measurement programme is not yet in place; until it is, the percentages above are service targets rather than externally measured figures.</p>
   <p>Historical uptime data is published in the Certificate Transparency log and available at <a href="/ct-log">/ct-log</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
 
   <!-- 6. Changes -->
