@@ -9,6 +9,18 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+- **SDK extracted to its own repository.** `sdk-js/` and `sdk-py/` now live in
+  [Apolloccrypt/paramant-sdk](https://github.com/Apolloccrypt/paramant-sdk)
+  (Apache-2.0), together with the cross-implementation conformance suite. The
+  published packages keep the same names (`paramant-sdk` on PyPI and npm), so
+  installs are unaffected. The Python import path is now `from paramant import
+  GhostPipe`; the old `from paramant_sdk import ...` still works via a shim that
+  is deprecated and will be removed in 4.0. The relay keeps the canonical
+  wire-format v1 spec (`docs/wire-format-v1.md`), which the SDK conformance
+  suite cites. CI and dependabot entries for the SDK moved with it; the dangling
+  `scripts/paramant-receipt` symlink was removed.
+
 ### Added
 - ParaSign Sg1 step 3 (issue #49): document signing where the relay is a
   NOTARY, not a key holder. `POST /v2/sign` (auth) verifies a client-made
