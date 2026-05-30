@@ -35,6 +35,26 @@ function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
+// Honest, case-split message for a failed passkey assertion. The DOMException /
+// WebAuthnError name is the only reliable signal: AbortError is a real cancel,
+// SecurityError is an origin/rpId problem, and NotAllowedError is the genuinely
+// ambiguous bucket (cancel OR timeout OR no passkey for this account on THIS
+// device) that the platform refuses to disambiguate. We therefore never assert
+// "you cancelled" for the ambiguous case — we offer the recovery paths instead.
+function passkeyAuthErrorMessage(e) {
+  const name = e && e.name;
+  if (name === 'AbortError') {
+    return 'Passkey sign-in was cancelled.';
+  }
+  if (name === 'SecurityError') {
+    return 'Passkey sign-in could not start on this site. If this keeps happening, contact support.';
+  }
+  // NotAllowedError and anything else: ambiguous. Give the actionable options.
+  return 'No passkey was used on this device. Sign in with your email and code above, '
+    + 'or tap “Use a passkey on another device” to sign in with the passkey on your phone. '
+    + 'If you cancelled, just try again.';
+}
+
 // ── Registration: account-setup page (/auth/setup/<setup_token>) ─────────────
 function wireSetupPasskey() {
   const btn = document.getElementById('passkey-register-btn');
@@ -139,7 +159,13 @@ function wireLoginPasskey() {
       try {
         asseResp = await startAuthentication({ optionsJSON: opt.data.options });
       } catch (e) {
-        throw new Error('Passkey sign-in was cancelled, or no passkey is available for this account on this device.');
+        // WebAuthn deliberately makes "user cancelled" and "no matching passkey
+        // on this device" indistinguishable for NotAllowedError (a privacy
+        // property of the platform). So we do NOT claim a single cause: we name
+        // only what the error reliably tells us, and for the ambiguous case we
+        // point to the real recovery paths (email+code, or the passkey on your
+        // phone via "another device").
+        throw new Error(passkeyAuthErrorMessage(e));
       }
 
       const ver = await postJSON('/api/user/auth/webauthn/login/verify', {
@@ -230,6 +256,52 @@ function wireAccountPasskey() {
   refresh();
 }
 
+// ── Login: cross-device passkey (usernameless / discoverable, ADR R018) ──────
+// The guaranteed cross-device path: ask the server for options with an EMPTY
+// allowCredentials list, so the browser MUST offer its account-chooser + the
+// "use a phone or tablet" QR (WebAuthn hybrid transport). No email is typed —
+// identity comes from the discoverable credential the user proves possession of
+// on their phone (Face/Touch ID). This does not depend on what `transports` a
+// device happened to report at registration, so cross-device works on any
+// desktop whose browser supports hybrid (Chrome/Edge/Safari/Firefox).
+function wireDiscoverablePasskey() {
+  const btn = document.getElementById('passkey-crossdevice-btn');
+  if (!btn) return;                                  // not the login page
+  const status = document.getElementById('passkey-login-status');
+
+  if (!browserSupportsWebAuthn()) { btn.disabled = true; return; }
+
+  const returnUrl = new URLSearchParams(window.location.search).get('return') || '/dashboard';
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    setStatus(status, 'Your browser will show a QR code — scan it with your phone to sign in…', false);
+    try {
+      const opt = await postJSON('/api/user/auth/webauthn/login/discoverable/options', {});
+      if (!opt.ok) throw new Error('could_not_start (' + opt.status + ')');
+
+      let asseResp;
+      try {
+        asseResp = await startAuthentication({ optionsJSON: opt.data.options });
+      } catch (e) {
+        throw new Error(passkeyAuthErrorMessage(e));
+      }
+
+      const ver = await postJSON('/api/user/auth/webauthn/login/verify', {
+        flowId: opt.data.flowId,
+        response: asseResp,
+      });
+      if (!ver.ok) throw new Error('We could not verify that passkey.');
+
+      window.location = returnUrl;
+    } catch (e) {
+      setStatus(status, e.message || 'Cross-device passkey sign-in failed.', true);
+      btn.disabled = false;
+    }
+  });
+}
+
 wireSetupPasskey();
 wireLoginPasskey();
+wireDiscoverablePasskey();
 wireAccountPasskey();

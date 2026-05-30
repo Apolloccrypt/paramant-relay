@@ -514,6 +514,18 @@ async function findUserByEmail(email) {
   return keys.find(k => k.email && k.email.toLowerCase() === lower && k.active !== false) || null;
 }
 
+// Find API key entry by its key id (reverse of findUserByEmail). Used by the
+// usernameless/discoverable passkey login to resolve the email for the session
+// record after identity has been proven by the credential. Same source/cost as
+// findUserByEmail (one /v2/admin/keys read). Returns null if not found.
+async function findUserById(userId) {
+  if (!userId) return null;
+  const r = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  if (r.status !== 200) return null;
+  const keys = r.body?.keys || [];
+  return keys.find(k => k.key === userId && k.active !== false) || null;
+}
+
 // Send setup email via Resend
 async function sendSetupEmail(email, setupToken, isReset = false) {
   const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset });
@@ -1021,6 +1033,35 @@ api.post("/user/auth/webauthn/login/options", async (req, res) => {
   res.json({ flowId, options });
 });
 
+// POST /api/user/auth/webauthn/login/discoverable/options
+// Usernameless / cross-device login. Returns options with an EMPTY
+// allowCredentials list so the browser offers its account-chooser + the QR
+// "use a phone" path (WebAuthn hybrid transport). No email is bound to the
+// flow: identity is established at verify from the discoverable credential the
+// user proves possession of (credId -> account, cross-checked against the
+// assertion's userHandle). Rate-limited per IP only (no account scope to leak).
+api.post("/user/auth/webauthn/login/discoverable/options", async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginOptions;
+  if (!(await webauthn.rateHit(redis(), `lo:disc:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  let options;
+  try {
+    options = await generateAuthenticationOptions({
+      rpID: webauthn.RP_ID,
+      allowCredentials: [],          // discoverable: browser shows QR + account chooser
+      userVerification: "required",
+    });
+  } catch (e) {
+    console.error("[webauthn/login/discoverable/options]", e.message);
+    return res.status(500).json({ error: "internal" });
+  }
+  const flowId = webauthn.newFlowId();
+  await webauthn.putAuthFlow(redis(), flowId, { challenge: options.challenge, discoverable: true });
+  res.json({ flowId, options });
+});
+
 // POST /api/user/auth/webauthn/login/verify
 // Verifies the assertion and, on success, issues the session. Identity comes
 // ONLY from the assertion (never a client-supplied user id). Rate-limited per
@@ -1038,15 +1079,39 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
     return res.status(429).json({ error: "rate_limited" });
 
   // Identity from the assertion only: resolve its credential id to an account
-  // via the relay, and require it to match the account the challenge was bound
-  // to. A decoy flow (unknown email) has user_id=null -> always rejected here.
+  // via the relay. For an email-first flow the account MUST match the one the
+  // challenge was bound to (a decoy flow has user_id=null -> always rejected).
+  // For a discoverable (usernameless) flow there is no bound account: identity
+  // IS whatever the proven credential resolves to, additionally cross-checked
+  // against the assertion's userHandle so the credential and its claimed handle
+  // must agree before a session is issued.
   let lookup;
   try {
     const r = await callRelay(`/v2/user/webauthn/lookup?cred_id=${encodeURIComponent(String(response.id || ""))}`, null, "GET");
     if (r.status !== 200) return res.status(401).json({ error: "invalid_credentials" });
     lookup = await r.json();
   } catch (e) { return res.status(401).json({ error: "invalid_credentials" }); }
-  if (!flow.user_id || lookup.user_id !== flow.user_id) return res.status(401).json({ error: "invalid_credentials" });
+  if (!lookup || !lookup.user_id) return res.status(401).json({ error: "invalid_credentials" });
+
+  let authedUserId, authedEmail;
+  if (flow.discoverable) {
+    // Usernameless: cross-check the assertion's userHandle resolves to the SAME
+    // account as the credential id (defence in depth against a mismatched pair).
+    const handleB64 = response.response && response.response.userHandle;
+    if (!handleB64) return res.status(401).json({ error: "invalid_credentials" });
+    try {
+      const hr = await callRelay(`/v2/user/webauthn/by-handle?handle=${encodeURIComponent(String(handleB64))}`, null, "GET");
+      if (hr.status !== 200) return res.status(401).json({ error: "invalid_credentials" });
+      const hb = await hr.json();
+      if (!hb.user_id || hb.user_id !== lookup.user_id) return res.status(401).json({ error: "invalid_credentials" });
+    } catch (e) { return res.status(401).json({ error: "invalid_credentials" }); }
+    authedUserId = lookup.user_id;
+    authedEmail = (await findUserById(authedUserId).catch(() => null))?.email || null;
+  } else {
+    if (!flow.user_id || lookup.user_id !== flow.user_id) return res.status(401).json({ error: "invalid_credentials" });
+    authedUserId = flow.user_id;
+    authedEmail = flow.email;
+  }
 
   // Verify the assertion. expectedOrigin/expectedRPID are config constants.
   let verification;
@@ -1071,23 +1136,25 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   //   both non-zero -> new MUST be strictly higher, else refuse with NO session.
   const newCounter = verification.authenticationInfo.newCounter;
   if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
-    try { logAuditEvent("webauthn_counter_regression", { user_id: String(flow.user_id).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
+    try { logAuditEvent("webauthn_counter_regression", { user_id: String(authedUserId).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
     return res.status(401).json({ error: "invalid_credentials" });
   }
   // Persist the advanced counter (auth already succeeded; best-effort).
-  try { await callRelay("/v2/user/webauthn/counter", { user_id: flow.user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}
+  try { await callRelay("/v2/user/webauthn/counter", { user_id: authedUserId, cred_id: lookup.credId, counter: newCounter }); } catch {}
 
   // Issue the session. Passkey is a sufficient sole factor (ADR R018) -- NO TOTP
-  // step. Same shape/TTL/cookie as the email+TOTP path; marked via:'webauthn'.
+  // step. Same shape/TTL/cookie as the email+TOTP path. via marks how the
+  // passkey was presented: 'webauthn' (email-first) or 'webauthn_xdev'
+  // (usernameless / cross-device).
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn" }),
+    JSON.stringify({ user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn" }),
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
-  try { logAuditEvent("webauthn_login", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
-  res.json({ success: true, email: flow.email });
+  try { logAuditEvent("webauthn_login", { user_id: String(authedUserId).slice(0, 12) + "…" }); } catch {}
+  res.json({ success: true, email: authedEmail });
 });
 
 
