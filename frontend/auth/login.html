@@ -20,6 +20,13 @@
 .auth-or { display: flex; align-items: center; gap: 10px; margin: var(--space-3) 0; color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--ink-hair); }
 .auth-foot { text-align: center; margin-top: var(--space-4); }
+[hidden] { display: none !important; }
+.auth-sub { text-align: center; color: var(--ink-dim); font-size: 14px; margin: var(--space-2) 0 0; }
+.auth-hint { text-align: center; color: var(--ink-dim); font-size: 12px; margin: 8px 0 0; line-height: 1.5; }
+.auth-altline { text-align: center; margin-top: var(--space-4); }
+.auth-link { background: none; border: none; color: var(--navy); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+.auth-link:hover { opacity: .75; }
+#code-fields { margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -177,26 +184,33 @@
 <div class="auth-head">
   <div class="eyebrow"><span class="bar"></span>sign in</div>
   <h1>Welcome <em>back</em>.</h1>
+  <p class="auth-sub">Choose how you want to sign in.</p>
 </div>
 
-<form id="login-form" class="form-card auth-card">
+<form id="login-form" class="form-card auth-card" novalidate>
   <label for="email">Email address</label>
   <input type="email" id="email" name="email" required autocomplete="username" autofocus>
 
-  <label for="totp" class="mt-3">6-digit code</label>
-  <input type="text" id="totp" name="totp" required inputmode="numeric"
-         pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
-         placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
-
-  <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Sign in</button>
-
-  <div id="error" class="error"></div>
+  <button type="button" class="btn btn-primary mt-3" id="passkey-login-btn">Sign in with a passkey</button>
+  <p class="auth-hint">Face ID, Touch ID, Windows Hello, or a security key. Nothing to type.</p>
 
   <div class="auth-or"><span>or</span></div>
 
-  <button type="button" class="btn btn-secondary" id="passkey-login-btn">Sign in with a passkey</button>
-  <button type="button" class="btn btn-secondary" id="passkey-crossdevice-btn" style="margin-top:8px">Use a passkey on another device</button>
+  <button type="button" class="btn btn-secondary" id="show-code-btn" aria-expanded="false" aria-controls="code-fields">Sign in with a 6-digit code</button>
+  <div id="code-fields" hidden>
+    <label for="totp" class="mt-3">6-digit code</label>
+    <input type="text" id="totp" name="totp" inputmode="numeric"
+           pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+           placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
+    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Sign in</button>
+  </div>
+
+  <div id="error" class="error"></div>
   <p id="passkey-login-status" class="small" aria-live="polite" style="margin:8px 0 0"></p>
+
+  <div class="auth-altline">
+    <button type="button" class="auth-link" id="passkey-crossdevice-btn">Use a passkey on another device</button>
+  </div>
 </form>
 
 <p class="footer-text auth-foot">
@@ -260,6 +274,20 @@
     submitBtn.disabled = false;
     submitBtn.textContent = 'Sign in';
   });
+
+  // Progressive disclosure: the 6-digit code field stays hidden until the user
+  // chooses the code path, so the default view is just "email + pick a method".
+  const showCodeBtn = document.getElementById('show-code-btn');
+  const codeFields = document.getElementById('code-fields');
+  if (showCodeBtn && codeFields) {
+    showCodeBtn.addEventListener('click', function() {
+      codeFields.hidden = false;
+      showCodeBtn.hidden = true;
+      showCodeBtn.setAttribute('aria-expanded', 'true');
+      const t = document.getElementById('totp');
+      if (t) t.focus();
+    });
+  }
 })();
 </script>
 <script type="module" src="/js/passkey.js?v=2"></script>

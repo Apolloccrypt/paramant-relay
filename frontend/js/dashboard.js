@@ -12,6 +12,7 @@
   'use strict';
 
   var ONBOARDING_KEY = 'paramant.onboarding.dismissed.v1';
+  var KEYSETUP_KEY = 'paramant.keysetup.dismissed.v1';
   var LOGIN_URL = '/auth/login?next=' + encodeURIComponent('/dashboard');
 
   var loading = document.getElementById('dh-loading');
@@ -101,6 +102,8 @@
     hide(errBox);
     show(root);
     root.classList.add('dh-loaded');
+
+    checkKeySetup();
   }
 
   function wireActions() {
@@ -127,6 +130,64 @@
         if (hint) hint.hidden = true;
         try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
       }
+    });
+  }
+
+  // One-time nudge: if the account is missing a signing key and/or a sign-in
+  // passkey, surface a dismissible popup that links into /account. Best-effort
+  // and tolerant -- we only flag something as missing when the endpoint answers
+  // cleanly with an empty list, never on a fetch error (so we never false-nag).
+  function checkKeySetup() {
+    try { if (localStorage.getItem(KEYSETUP_KEY) === '1') return; } catch (_) {}
+
+    var modal = document.getElementById('dh-passkey-modal');
+    var itemsBox = document.getElementById('dh-pm-items');
+    var dismissBtn = document.getElementById('dh-pm-dismiss');
+    if (!modal || !itemsBox) return;
+
+    function getJSON(url) {
+      return fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });
+    }
+
+    Promise.all([
+      getJSON('/api/user/account/signing-key'),
+      getJSON('/api/user/account/webauthn/credentials')
+    ]).then(function (res) {
+      var signing = res[0], passkeys = res[1];
+      var items = [];
+      if (signing && Array.isArray(signing.keys) && signing.keys.length === 0) {
+        items.push({
+          href: '/account#signing-identity-section',
+          title: 'Set up document signing',
+          body: 'Create your ML-DSA-65 signing key so you can sign and co-sign documents.'
+        });
+      }
+      if (passkeys && Array.isArray(passkeys.passkeys) && passkeys.passkeys.length === 0) {
+        items.push({
+          href: '/account#passkey-section',
+          title: 'Add a sign-in passkey',
+          body: 'Use Face ID, Touch ID, or a security key to sign in without a code.'
+        });
+      }
+      if (!items.length) return;
+
+      // Titles/bodies are static literals (no user input) -> safe innerHTML.
+      itemsBox.innerHTML = items.map(function (it) {
+        return '<a class="dh-pm-item" href="' + it.href + '">'
+          + '<strong>' + it.title + '</strong>'
+          + '<span>' + it.body + '</span></a>';
+      }).join('');
+      modal.hidden = false;
+
+      function dismiss() {
+        modal.hidden = true;
+        try { localStorage.setItem(KEYSETUP_KEY, '1'); } catch (_) {}
+      }
+      if (dismissBtn) dismissBtn.addEventListener('click', dismiss);
+      modal.addEventListener('click', function (ev) { if (ev.target === modal) dismiss(); });
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !modal.hidden) dismiss(); });
     });
   }
 
