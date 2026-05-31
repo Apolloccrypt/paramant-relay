@@ -235,7 +235,7 @@ See [API reference — Device Identity](api.md#device-identity) for the full enr
 
 ## Latency characteristics
 
-Round-trip latency for the managed relay at `iot.paramant.app` (Hetzner Falkenstein DE):
+Round-trip latency for the managed relay at `iot.paramant.app` (Hetzner, Germany):
 
 | Payload | p50 | p95 | p99 |
 |---|---|---|---|

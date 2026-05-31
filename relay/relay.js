@@ -2855,7 +2855,7 @@ session = client.create_session('recipient@example.com')</pre>
               <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
               <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${version}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner DE (FSN1)</td></tr>
+              <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
             </table>
           </div>
           <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/verwerkersovereenkomst" style="color:#888">paramant.app/verwerkersovereenkomst</a>. Keep this email and the reference number for your records.</p>
