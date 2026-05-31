@@ -122,5 +122,6 @@ not at startup.
 ADMIN_TOKEN=xxx INTERNAL_AUTH_TOKEN=yyy ./tests/e2e-auth-flow.sh
 ```
 
-The post-deploy hook at `scripts/post-deploy.sh` runs this automatically after
-`deploy/deploy.sh` restarts services.
+Run `scripts/post-deploy.sh` after a deploy to catch auth-stack regressions
+(it exits non-zero on failure). The canonical deploy is `docker compose` — see
+`docs/RUNBOOK-DEPLOY-3.0.0.md`.
