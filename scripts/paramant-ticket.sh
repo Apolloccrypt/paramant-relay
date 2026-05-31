@@ -10,6 +10,10 @@ RECEIVER=${PARAMANT_RECEIVER:-paramant-receiver}
 CFG="${HOME}/.config/paramant/config.json"
 API_KEY="${PARAMANT_API_KEY:-$(python3 -c "import json; print(json.load(open('${CFG}')).get('api_key',''))" 2>/dev/null)}"
 
+# Private temp dir — prefer RAM-backed /run (0700), fall back for non-root hosts.
+PTMP_DIR="${PARAMANT_TMPDIR:-/run/paramant-tmp}"
+{ mkdir -p "$PTMP_DIR" && chmod 700 "$PTMP_DIR"; } 2>/dev/null || PTMP_DIR="$(mktemp -d)"
+
 usage() {
   echo -e "${BOLD}paramant-ticket${RESET} — one-time transit ticket issuer/verifier (burn-on-read)
 Usage (issuer): paramant-ticket --issue --route 'AMS-RTD' --valid 'FROM/TO' --device <id>
@@ -45,7 +49,7 @@ if [[ "$MODE" == "issue" ]]; then
   [[ -z "$ROUTE" || -z "$VALID" ]] && { echo -e "${RED}ERROR: --route and --valid required${RESET}" >&2; exit 1; }
   VALID_FROM="${VALID%%/*}"; VALID_UNTIL="${VALID##*/}"
   SIG=$(printf '%s:%s:%s:%s' "$DEVICE" "$ROUTE" "$VALID_FROM" "$VALID_UNTIL" | sha256sum | cut -c1-64)
-  TMPFILE=$(mktemp /tmp/ticket-XXXXXX.json)
+  TMPFILE=$(mktemp "$PTMP_DIR/ticket-XXXXXX.json")
   printf '{"device":"%s","route":"%s","valid_from":"%s","valid_until":"%s","sig":"%s","issued":"%s"}\n' \
     "$DEVICE" "$ROUTE" "$VALID_FROM" "$VALID_UNTIL" "$SIG" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$TMPFILE"
   OUTPUT=$($SENDER --key "$API_KEY" --relay "$SECTOR" --file "$TMPFILE" 2>&1)
@@ -55,7 +59,7 @@ if [[ "$MODE" == "issue" ]]; then
   echo -e "${GREEN}Ticket issued.${RESET} Route: ${ROUTE} | Device: ${DEVICE} | Hash: ${HASH}"
   echo -e "Receive command: paramant-ticket --verify --device ${DEVICE}"
 else
-  TMPDIR=$(mktemp -d /tmp/ticket-verify-XXXXXX)
+  TMPDIR=$(mktemp -d "$PTMP_DIR/ticket-verify-XXXXXX")
   OUTPUT=$($RECEIVER --key "$API_KEY" --relay "$SECTOR" --listen --output "$TMPDIR/" 2>&1)
   TICKET_FILE=$(ls -t "$TMPDIR"/*.json 2>/dev/null | head -1)
   if [[ -n "$TICKET_FILE" && -f "$TICKET_FILE" ]]; then

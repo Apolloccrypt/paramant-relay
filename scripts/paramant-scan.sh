@@ -54,7 +54,9 @@ echo -e "  ${CYAN}Scanning for open port 3000 (relay-main)...${RESET}"
 echo -e "  ${YELLOW}This may take 30–60 seconds depending on subnet size.${RESET}\n"
 
 # ── nmap scan ─────────────────────────────────────────────────────────────────
-TMPFILE=$(mktemp /tmp/paramant-scan-XXXXXX)
+PTMP_DIR="${PARAMANT_TMPDIR:-/run/paramant-tmp}"
+{ mkdir -p "$PTMP_DIR" && chmod 700 "$PTMP_DIR"; } 2>/dev/null || PTMP_DIR="$(mktemp -d)"
+TMPFILE=$(mktemp "$PTMP_DIR/paramant-scan-XXXXXX")
 nmap -p 3000 --open -T4 -oG "$TMPFILE" "$SUBNET" 2>/dev/null || {
   echo -e "${RED}nmap failed. Is nmap installed?${RESET}"
   rm -f "$TMPFILE"

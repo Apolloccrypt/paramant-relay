@@ -8,7 +8,9 @@ YELLOW='\033[0;33m'; CYAN='\033[0;36m'; DIM='\033[2m'; RESET='\033[0m'
 SCAN_DATE=$(date '+%Y-%m-%d')
 HOSTNAME_FQDN=$(hostname -f 2>/dev/null || hostname)
 REMOTE=""; REPORT_FORMAT="text"; DO_COMPARE=0; LOCAL_MODE=0
-FINDINGS_FILE=$(mktemp /tmp/crypto-audit-XXXXXX.tsv)
+PTMP_DIR="${PARAMANT_TMPDIR:-/run/paramant-tmp}"
+{ mkdir -p "$PTMP_DIR" && chmod 700 "$PTMP_DIR"; } 2>/dev/null || PTMP_DIR="$(mktemp -d)"
+FINDINGS_FILE=$(mktemp "$PTMP_DIR/crypto-audit-XXXXXX.tsv")
 REPORT_FILE="crypto-audit-${SCAN_DATE}.json"
 trap 'rm -f "$FINDINGS_FILE"' EXIT
 

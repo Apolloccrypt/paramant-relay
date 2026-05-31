@@ -51,7 +51,9 @@ fi
 
 SEND_FILE="$ARTIFACT"
 if [[ -n "$SBOM" ]]; then
-  BUNDLE=$(mktemp /tmp/cra-bundle-XXXXXX.tar.gz)
+  PTMP_DIR="${PARAMANT_TMPDIR:-/run/paramant-tmp}"
+  { mkdir -p "$PTMP_DIR" && chmod 700 "$PTMP_DIR"; } 2>/dev/null || PTMP_DIR="$(mktemp -d)"
+  BUNDLE=$(mktemp "$PTMP_DIR/cra-bundle-XXXXXX.tar.gz")
   tar -czf "$BUNDLE" -C "$(dirname "$ARTIFACT")" "$(basename "$ARTIFACT")" -C "$(dirname "$SBOM")" "$(basename "$SBOM")" 2>/dev/null
   SEND_FILE="$BUNDLE"
   echo -e "  Bundled with SBOM: $(basename "$SBOM")"
