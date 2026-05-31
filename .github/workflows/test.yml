@@ -56,3 +56,30 @@ jobs:
       - name: Relay crypto suite
         working-directory: relay
         run: node --test $(find crypto -name '*.test.js')
+
+  relay-unit-tests:
+    name: relay - unit suite (no native deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Pure-JS units: account-split schema (keys-table), static-serve, envelope
+      # binding, webauthn helpers. No @paramant/core build and no Redis, so the
+      # relay/test suite that previously had zero CI coverage now gates here.
+      - name: Relay unit suite
+        working-directory: relay
+        run: node --test test/*.test.js
+
+  admin-unit-tests:
+    name: admin - unit suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Admin unit suite
+        working-directory: admin
+        run: node --test test/*.test.js
