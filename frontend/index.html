@@ -38,6 +38,70 @@
 .path-cta-sub:hover { color: var(--navy); }
 .path-pear { position: absolute; top: var(--space-4); right: var(--space-4); width: clamp(56px, 8vw, 84px); height: auto; opacity: .92; transform: scaleX(-1); user-select: none; -webkit-user-drag: none; }
 @media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } .path { min-height: 0; } }
+
+/* ── Homepage panel animations — replace the corner mascot on both panels.
+   Pure CSS keyframes (no JS, CSP-safe), ~10s synchronised loops, deep-navy base
+   with lime (#B2FF3F) on the "it works" beats. prefers-reduced-motion shows a
+   static completed frame (the elements' base state). design-system.css and
+   nav.css are untouched — everything here is scoped to .path-anim / .cli. ── */
+.path-anim { position: absolute; top: var(--space-4); right: var(--space-4);
+  width: clamp(116px, 17vw, 154px); aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+  background: #0a1626; box-shadow: 0 3px 14px rgba(11,58,106,.22), inset 0 0 0 1px rgba(178,255,63,.10);
+  user-select: none; --lime: #B2FF3F; --doc: #e7edf6; --ln: #56789f; --dim: #88a6cb; }
+.path-anim svg { display: block; width: 100%; height: 100%; }
+.path-anim text { font-family: var(--mono); font-weight: 600; letter-spacing: -.02em; }
+/* keep the panel text clear of the corner box (no grid/spacing change) */
+.path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: clamp(0px, 18vw, 124px); }
+@media (max-width: 760px) {
+  .path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: 0; }
+  .path-anim { position: static; order: -1; margin: 0 0 var(--space-3); width: clamp(160px, 50vw, 200px); }
+}
+
+/* LEFT — sign → send. Base state (reduced-motion / no animation) = signed document. */
+.l-sig { stroke-dasharray: 64; stroke-dashoffset: 0; }
+.l-badge, .l-signed { opacity: 1; }
+.l-recv { opacity: .35; }
+.l-cloud, .l-delivered { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .l-doc       { animation: l-doc 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+  .l-sig       { animation: l-sig 10s ease-in-out infinite; }
+  .l-badge     { animation: l-badge 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+  .l-signed    { animation: l-signed 10s ease-in-out infinite; }
+  .l-recv      { animation: l-recv 10s ease-in-out infinite; }
+  .l-cloud     { animation: l-cloud 10s steps(1, end) infinite; }
+  .l-delivered { animation: l-delivered 10s ease-in-out infinite; }
+}
+@keyframes l-doc { 0% { opacity: 0; transform: translateX(0) scale(.9); } 4% { opacity: 1; transform: translateX(0) scale(1); }
+  40% { opacity: 1; transform: translateX(0) scale(1); } 58% { opacity: 1; transform: translateX(58px) scale(.82); }
+  64% { opacity: 0; transform: translateX(58px) scale(.82); } 92% { opacity: 0; transform: translateX(58px) scale(.82); }
+  100% { opacity: 0; transform: translateX(0) scale(.9); } }
+@keyframes l-sig { 0%, 8% { stroke-dashoffset: 64; opacity: 1; } 24% { stroke-dashoffset: 0; } 52% { stroke-dashoffset: 0; opacity: 1; } 60% { opacity: 0; } 100% { opacity: 0; stroke-dashoffset: 64; } }
+@keyframes l-badge { 0%, 24% { opacity: 0; transform: scale(.5); } 32% { opacity: 1; transform: scale(1); } 50% { opacity: 1; } 58% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-signed { 0%, 30% { opacity: 0; } 38% { opacity: 1; } 50% { opacity: 1; } 57% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-recv { 0%, 40% { opacity: .18; } 58% { opacity: .18; } 61% { opacity: 1; } 74% { opacity: 1; } 92% { opacity: .45; } 100% { opacity: .18; } }
+@keyframes l-cloud { 0%, 43% { opacity: 0; } 46% { opacity: .9; } 49% { opacity: .35; } 52% { opacity: .95; } 55% { opacity: .45; } 58% { opacity: .9; } 63% { opacity: .55; } 66% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-delivered { 0%, 65% { opacity: 0; transform: translateY(2px); } 73% { opacity: 1; transform: translateY(0); } 92% { opacity: 1; } 100% { opacity: 0; } }
+
+/* RIGHT — CLI terminal. Base state = fully typed (reduced-motion friendly). */
+.cli { font-family: var(--mono); font-size: clamp(5.4px, 0.83vw, 6.8px); line-height: 1.62; color: #cfe0f2; padding: 9px 9px; height: 100%; box-sizing: border-box; letter-spacing: -.02em; }
+.cli .c-line { white-space: nowrap; overflow: hidden; clip-path: inset(0 0 0 0); }
+.cli .c-cmd { color: #e7edf6; } .cli .c-key { color: #9db8d6; } .cli .c-ok { color: var(--lime); } .cli .c-dots { color: var(--dim); } .cli .c-prompt { color: var(--lime); }
+.c-caret { display: inline-block; width: .55ch; background: var(--lime); color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .c-l1 { animation: c-l1 10s steps(40, end) infinite; }
+  .c-l2 { animation: c-rev 10s ease infinite; }
+  .c-l3 { animation: c-rev 10s ease infinite; }
+  .c-l4 { animation: c-rev 10s ease infinite; }
+  .c-l5 { animation: c-rev5 10s ease infinite; }
+  .c-caret { animation: c-blink 1.05s steps(1, end) infinite; }
+  .c-l2 { animation-name: c-r2; } .c-l3 { animation-name: c-r3; } .c-l4 { animation-name: c-r4; }
+}
+@keyframes c-l1 { 0% { clip-path: inset(0 100% 0 0); } 18% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes c-r2 { 0%, 24% { clip-path: inset(0 100% 0 0); } 34% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes c-r3 { 0%, 38% { clip-path: inset(0 100% 0 0); } 48% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes c-r4 { 0%, 52% { clip-path: inset(0 100% 0 0); } 62% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes c-rev5 { 0%, 66% { clip-path: inset(0 100% 0 0); } 76% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes c-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -224,7 +288,31 @@
   <div class="path path-human">
     <h2>For people who sign things that matter.</h2>
     <p>Documents and files, in your browser. Nothing to install, nothing left behind.</p>
-    <img class="path-pear" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="84" height="84">
+    <div class="path-anim" role="img" aria-label="A contract is signed with a post-quantum ML-DSA-65 signature, then sent through memory and burned after one read.">
+      <svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g class="l-recv">
+          <rect x="112" y="46" width="30" height="34" rx="3" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.4"/>
+          <path d="M120 62 h14 M120 68 h10" stroke="#88a6cb" stroke-width="1.4" stroke-linecap="round"/>
+        </g>
+        <g class="l-doc">
+          <rect x="22" y="34" width="40" height="50" rx="3" fill="#e7edf6" stroke="#cdd9e8" stroke-width="1"/>
+          <path d="M30 44 h24 M30 51 h24 M30 58 h18" stroke="#56789f" stroke-width="1.6" stroke-linecap="round"/>
+          <path class="l-sig" d="M30 73 q5 -7 9 0 t9 0 q4 -5 6 -2" stroke="#B2FF3F" stroke-width="1.8" stroke-linecap="round"/>
+          <g class="l-badge">
+            <circle cx="57" cy="40" r="7" fill="#0a1626" stroke="#B2FF3F" stroke-width="1.3"/>
+            <rect x="54.4" y="39.2" width="5.2" height="4" rx="1" fill="#B2FF3F"/>
+            <path d="M55.4 39.2 v-1.5 a1.6 1.6 0 0 1 3.2 0 V39.2" stroke="#B2FF3F" stroke-width="1"/>
+          </g>
+        </g>
+        <g class="l-cloud">
+          <circle cx="80" cy="56" r="2" fill="#B2FF3F"/><circle cx="88" cy="62" r="1.6" fill="#88a6cb"/>
+          <circle cx="84" cy="68" r="2" fill="#B2FF3F"/><circle cx="92" cy="56" r="1.6" fill="#88a6cb"/>
+          <circle cx="78" cy="64" r="1.4" fill="#B2FF3F"/>
+        </g>
+        <text class="l-signed" x="42" y="99" fill="#B2FF3F" font-size="9" text-anchor="middle">&#10003; signed</text>
+        <text class="l-delivered" x="119" y="99" fill="#B2FF3F" font-size="7.5" text-anchor="middle">&#10003; delivered &#183; burn</text>
+      </svg>
+    </div>
     <div class="path-cta">
       <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
     </div>
@@ -232,6 +320,16 @@
   <div class="path path-dev">
     <h2>For builders who don&rsquo;t trust servers either.</h2>
     <p>Post-quantum encryption and signing as a pipe. Drop it into your stack, or self-host the whole thing.</p>
+    <div class="path-anim path-anim-cli" role="img" aria-label="Terminal: paramant send report.pdf to alice@team — encrypting with ML-KEM-768, signing with ML-DSA-65, uploading in 5MB chunks, delivered and burned after one read.">
+      <div class="cli" aria-hidden="true">
+        <div class="c-line c-l1"><span class="c-prompt">$</span> <span class="c-cmd">paramant send report.pdf</span></div>
+        <div class="c-line c-l2">&nbsp;&nbsp;encrypting <span class="c-dots">......</span> <span class="c-key">ML-KEM-768</span></div>
+        <div class="c-line c-l3">&nbsp;&nbsp;signing <span class="c-dots">.........</span> <span class="c-key">ML-DSA-65</span></div>
+        <div class="c-line c-l4">&nbsp;&nbsp;uploading <span class="c-dots">.......</span> <span class="c-key">5MB chunks</span></div>
+        <div class="c-line c-l5">&nbsp;&nbsp;<span class="c-ok">&#10003; delivered</span> &nbsp;<span class="c-key">burn-on-read</span></div>
+        <div class="c-line"><span class="c-prompt">$</span> <span class="c-caret">_</span></div>
+      </div>
+    </div>
     <div class="path-cta">
       <a class="btn btn-lime" href="/developer">Open developer dashboard</a>
       <a class="path-cta-sub" href="/docs">or read the docs</a>
