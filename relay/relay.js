@@ -1893,7 +1893,7 @@ const server = http.createServer(async (req, res) => {
       webhooks: [...webhooks.values()].flat().length, stats,
       quantum_ready: true, protocol: 'ghost-pipe-v2',
       encryption: 'ML-KEM-768 + ECDH P-256 + AES-256-GCM',
-      signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ECDSA P-256 (ML-DSA fallback)',
+      signatures: mlDsa ? 'ML-DSA-65 (NIST FIPS 204)' : 'ML-DSA-65 unavailable: signing disabled',
       audit: 'Merkle hash chain',
       storage: 'RAM-only, zero plaintext, burn-on-read',
       padding: '5MB fixed (DPI-masking)',
