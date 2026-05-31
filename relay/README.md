@@ -95,7 +95,7 @@ System nginx handles TLS and routes subdomains to these ports.
 - **W3C DID registry** — `POST /v2/did/register`, `GET /v2/did/:did`
 - **WebSocket streaming** — `/v2/stream` for live transfer signaling
 - **NATS JetStream** — optional push transport (set `NATS_URL`)
-- **Argon2id** — password-protected blob drops (`/v2/drop`)
+- **Argon2id** — passwords on access-policy-protected blobs
 - **Pre-shared secrets (PSS)** — relay-MITM prevention via `/v2/session`
 - **Hardware attestation** — TPM 2.0 / Apple Secure Enclave via `/v2/attest`
 - **Rate limiting** — per-key hourly limits (free: 50/h, pro: 500/h, enterprise: unlimited)
