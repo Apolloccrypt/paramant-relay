@@ -67,7 +67,7 @@ Why a separate repo:
 - **Compliance:** 325 KAT vectors, 21 ADRs, byte-equivalence proven across three
   implementations (oqs server-side, RustCrypto browser-side, `@noble` reference).
 
-Browser-side crypto (parashare, paradrop, ontvang) lives vendored in
+Browser-side crypto (parashare, ontvang) lives vendored in
 [`crypto-wasm/`](crypto-wasm/) (RustCrypto, compiled to wasm32). It is validated
 against paramant-core via the cross-impl-validator crate there (ADR-0020,
 ADR-0021). See
@@ -128,7 +128,7 @@ Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 | Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Thunderbird FileLink extension | Source in repo |
 
-**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the WebApp tools (ParaShare, ParaDrop), and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished — until that lands, treat extension uploads as relay-side, not zero-knowledge.
+**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the WebApp tools (ParaShare), and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished — until that lands, treat extension uploads as relay-side, not zero-knowledge.
 
 ---
 

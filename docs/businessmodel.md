@@ -45,7 +45,6 @@ For professionals who send sensitive documents regularly.
 - Send history (last 30 transfers)
 - Custom expiry message
 - Delivery confirmation email to sender
-- ParaDrop included
 
 **OT kant:**
 - Unlimited transfers
@@ -134,15 +133,6 @@ Paramant is published under BUSL-1.1. If the managed service shuts down, every s
 ### OT pricing rationale
 OT customers (regulated industrial) buy Enterprise — dedicated relay, compliance docs, human contact.
 Free + Pro OT tiers exist for engineer evaluation before procurement.
-
----
-
-## ParaDrop
-
-ParaDrop is the AirDrop alternative product.
-Encrypted local transfer. No Apple, no cloud, no account.
-Share files with nearby devices over your local network. Burn-on-read.
-Available on Pro and above via /drop.
 
 ---
 
