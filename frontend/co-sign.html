@@ -59,6 +59,14 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .step{display:none;animation:fadeIn .2s ease}
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.doc-preview{margin-top:12px;border:1px solid var(--ink-hair);background:#fff;max-height:72vh;overflow:auto;padding:10px}
+.doc-page{margin:0 auto 12px;max-width:100%}
+.doc-page:last-child{margin-bottom:0}
+.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#fff}
+.doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
+.review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
+.blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
+.blind-link:hover{color:#b91c1c}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
 </style>
 </head>
@@ -114,12 +122,13 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </div>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Verify the document (optional but recommended)</div></div>
+    <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Review what you are signing</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">Pick the file you received out-of-band. We hash it locally (SHA3-256) and compare it against the envelope hash above. The file is never uploaded.</p>
-      <label class="file-cta" for="verify-file">Choose a file (or drop here) - never uploaded</label>
+      <p class="sub" style="margin-bottom:12px">The relay never received this document - by design it only holds the hash. Open the copy you were sent out-of-band so you can read exactly what you are about to sign. It is hashed locally (SHA3-256), matched against the envelope hash above, and rendered here in your browser. The file is never uploaded.</p>
+      <label class="file-cta" for="verify-file" id="verify-file-cta">Open the document (PDF, PNG or JPG) - never uploaded</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
+      <div class="doc-preview" id="doc-preview" hidden></div>
     </div>
   </div>
 
@@ -130,6 +139,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Sign this document</button>
+      <div class="review-gate" id="review-gate" hidden></div>
     </div>
   </div>
 </div>
@@ -158,6 +168,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 </main>
 
-<script type="module" src="/co-sign.js?v=1"></script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
+<script type="module" src="/co-sign.js?v=2"></script>
 </body>
 </html>
