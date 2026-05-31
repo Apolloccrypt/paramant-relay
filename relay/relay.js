@@ -156,7 +156,7 @@ const ALLOWED = {
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
@@ -164,7 +164,7 @@ const ALLOWED = {
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/drop','/v2/session',
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
@@ -1412,48 +1412,6 @@ function statusRateOk(ip) {
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of statusRateLimits) if (now > v.resetAt + 60000) statusRateLimits.delete(k); }, 120_000);
 
-// Per-token rate limits for /v2/drop/pickup (10/min) and /v2/drop/status
-// (30/min). Closes pentest H1: without these limits a mnemonic-spray
-// attacker can probe blobStore far faster than the human-typing model the
-// BIP-39 mnemonic was designed for. Token = apiKey when authed, else IP.
-const dropPickupLimits = new Map();
-function dropPickupRateOk(token) {
-  const now = Date.now();
-  const b = dropPickupLimits.get(token) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 10) return false;
-  b.count++; dropPickupLimits.set(token, b); return true;
-}
-setInterval(() => { const now = Date.now(); for (const [k, v] of dropPickupLimits) if (now > v.resetAt + 60000) dropPickupLimits.delete(k); }, 120_000);
-
-const dropStatusLimits = new Map();
-function dropStatusRateOk(token) {
-  const now = Date.now();
-  const b = dropStatusLimits.get(token) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 30) return false;
-  b.count++; dropStatusLimits.set(token, b); return true;
-}
-setInterval(() => { const now = Date.now(); for (const [k, v] of dropStatusLimits) if (now > v.resetAt + 60000) dropStatusLimits.delete(k); }, 120_000);
-
-// Per-lookupHash password-fail counter with exponential backoff. After 5
-// failed Argon2id verifies on the same hash, refuse for an expanding window
-// (60s, 2m, 4m, ... cap 1h). Defends pw-protected drops against guessing.
-const dropPwFails = new Map();
-function dropPwBackoffMs(lookupHash) {
-  const e = dropPwFails.get(lookupHash);
-  if (!e || e.fails < 5) return 0;
-  const elapsed = Date.now() - e.lastAt;
-  const wait = Math.min(60000 * Math.pow(2, e.fails - 5), 3_600_000);
-  return Math.max(0, wait - elapsed);
-}
-function dropPwRecordFail(lookupHash) {
-  const e = dropPwFails.get(lookupHash) || { fails: 0, lastAt: 0 };
-  e.fails++; e.lastAt = Date.now();
-  dropPwFails.set(lookupHash, e);
-}
-function dropPwClear(lookupHash) { dropPwFails.delete(lookupHash); }
-setInterval(() => { const now = Date.now(); for (const [k, v] of dropPwFails) if (now - v.lastAt > 3_600_000) dropPwFails.delete(k); }, 300_000);
 
 const pubkeys    = new Map();  // device:key → {ecdh_pub, kyber_pub, dsa_pub, ts}
 const webhooks   = new Map();  // device:key → [{url, secret}]
@@ -4424,153 +4382,6 @@ python3 paramant-receiver.py \\
         avg_latency_ms: 0,
       },
     }));
-  }
-
-  // ── POST /v2/drop/create — Anonieme burn-on-read drop met BIP39 + Argon2id ────
-  if (path === '/v2/drop/create' && req.method === 'POST') {
-    if (!ramOk()) {
-      const r = ramStatus();
-      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '10' });
-      return res.end(J({ ok: false, error: 'Relay at capacity', retry_after_s: 10, slots_available: r.available_slots }));
-    }
-    inFlightInbound++;
-    try {
-      const d = JSON.parse((await readBody(req)).toString());
-      const { hash, payload, ttl_ms, password, private: isPrivate } = d;
-      if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash en payload verplicht' })); }
-      // Private drops require an authenticated creator so pickup/status can
-      // tenant-check. Drops without an apiKey cannot be private (no owner).
-      if (isPrivate && !apiKey) { res.writeHead(400); return res.end(J({ error: 'private drop requires X-Api-Key' })); }
-      if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash moet SHA-256 hex zijn' })); }
-      if (blobStore.has(hash)) { res.writeHead(409); return res.end(J({ error: 'Hash al in gebruik' })); }
-      const blob = Buffer.from(payload, 'base64');
-      if (blob.length > MAX_BLOB) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(MAX_BLOB/1048576)}MB` })); }
-      try { peekInboundBlob(blob); }
-      catch(e) {
-        const mapped = mapCryptoErrorToHttp(e);
-        if (mapped) {
-          log('warn', 'drop_create_wire_v1_reject', { status: mapped.status, err: e.code || e.name });
-          res.writeHead(mapped.status, { 'Content-Type': 'application/json' });
-          return res.end(J(mapped.body));
-        }
-        throw e;
-      }
-      const _planDropTtl = { free: 3_600_000, pro: 86_400_000, enterprise: 604_800_000 };
-      const ttl = Math.min(parseInt(ttl_ms || 3_600_000) || 3_600_000, _planDropTtl[keyData?.plan || 'pro']);
-      // Argon2id password protection
-      let pw_hash = null;
-      if (password) {
-        if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
-        pw_hash = await argon2Lib.hash(password, {
-          type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1,
-        });
-      }
-      // Drops zijn altijd burn-on-read. `private` binds the drop to its
-      // creator: pickup/status from a different key are refused.
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
-        sig_valid: false, apiKey, max_views: 1, views_remaining: 1, pw_hash,
-        is_drop: true, is_private: !!isPrivate });
-      setTimeout(() => {
-        const e = blobStore.get(hash);
-        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
-      }, ttl);
-      incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
-      stats.inbound++; stats.bytes_in += blob.length;
-      auditAppend(apiKey, 'drop_created', { hash: hash.slice(0,16)+'...', bytes: blob.length, pw_protected: !!pw_hash, private: !!isPrivate });
-      log('info', 'drop_created', { hash: hash.slice(0,16), size: blob.length, pw: !!pw_hash, ttl, private: !!isPrivate });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, pw_protected: !!pw_hash, private: !!isPrivate }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-    finally { inFlightInbound--; }
-  }
-
-  // ── POST /v2/drop/pickup — Haal drop op via BIP39 mnemonic + optioneel wachtwoord ──
-  if (path === '/v2/drop/pickup' && req.method === 'POST') {
-    // Rate-limit by api key when present, by IP otherwise. Pentest H1.
-    const rlToken = apiKey || clientIp;
-    if (!dropPickupRateOk(rlToken)) {
-      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
-      return res.end(J({ error: 'Too many drop pickups. Retry after 60 seconds.' }));
-    }
-    try {
-      const d = JSON.parse((await readBody(req, 8192)).toString());
-      const { mnemonic, password } = d;
-      if (!mnemonic) { res.writeHead(400); return res.end(J({ error: 'mnemonic verplicht' })); }
-      let lookupHash;
-      try { lookupHash = mnemonicToLookupHash(mnemonic.trim()); }
-      catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-      const entry = blobStore.get(lookupHash);
-      if (!entry) {
-        res.writeHead(404); return res.end(J({ error: 'Drop not found. Expired, already retrieved, or invalid mnemonic.' }));
-      }
-      // Tenant-scope on private drops: only the creator may pickup. Returns
-      // 404 (not 403) so a non-owner cannot distinguish private-existing
-      // from absent.
-      if (entry.is_private && entry.apiKey && entry.apiKey !== apiKey) {
-        res.writeHead(404); return res.end(J({ error: 'Drop not found. Expired, already retrieved, or invalid mnemonic.' }));
-      }
-      // Argon2id password verification with per-hash backoff.
-      if (entry.pw_hash) {
-        const backoff = dropPwBackoffMs(lookupHash);
-        if (backoff > 0) {
-          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(backoff/1000)) });
-          return res.end(J({ error: 'Too many failed password attempts. Retry later.', retry_after_s: Math.ceil(backoff/1000) }));
-        }
-        if (!password) { res.writeHead(401); return res.end(J({ error: 'Password required (password field)' })); }
-        if (!argon2Lib) { res.writeHead(503); return res.end(J({ error: 'Argon2id not available' })); }
-        const pwOk = await argon2Lib.verify(entry.pw_hash, password);
-        if (!pwOk) {
-          dropPwRecordFail(lookupHash);
-          res.writeHead(403); return res.end(J({ error: 'Incorrect password' }));
-        }
-        dropPwClear(lookupHash);
-      }
-      // Burn-on-read
-      const blob = entry.blob;
-      blobStore.delete(lookupHash);
-      incMetric('blobs_burned'); incMetric('bytes_out_total', blob.length);
-      stats.outbound++; stats.burned++; stats.bytes_out += blob.length;
-      auditAppend(apiKey, 'drop_pickup', { hash: lookupHash.slice(0,16)+'...', bytes: blob.length });
-      log('info', 'drop_pickup', { hash: lookupHash.slice(0,16), size: blob.length });
-      res.writeHead(200, {
-        'Content-Type':     'application/octet-stream',
-        'Content-Length':   blob.length,
-        'X-Paramant-Burned': 'true',
-        'X-Paramant-Hash':   lookupHash,
-      });
-      return res.end(blob, () => { try { blob.fill(0); } catch {} });
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-  }
-
-  // ── POST /v2/drop/status — Controleer drop beschikbaarheid zonder te branden ─
-  if (path === '/v2/drop/status' && req.method === 'POST') {
-    // Rate-limit by api key when present, by IP otherwise. Pentest H1.
-    const rlToken = apiKey || clientIp;
-    if (!dropStatusRateOk(rlToken)) {
-      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
-      return res.end(J({ error: 'Too many drop status checks. Retry after 60 seconds.' }));
-    }
-    try {
-      const d = JSON.parse((await readBody(req, 4096)).toString());
-      if (!d.mnemonic) { res.writeHead(400); return res.end(J({ error: 'mnemonic verplicht' })); }
-      let lookupHash;
-      try { lookupHash = mnemonicToLookupHash(d.mnemonic.trim()); }
-      catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-      const entry = blobStore.get(lookupHash);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      if (!entry) return res.end(J({ available: false }));
-      // Tenant-scope on private drops: leak nothing to a non-owner. Same
-      // response shape as "not found" so existence is undetectable.
-      if (entry.is_private && entry.apiKey && entry.apiKey !== apiKey) {
-        return res.end(J({ available: false }));
-      }
-      return res.end(J({
-        available:        true,
-        size:             entry.size,
-        ttl_remaining_ms: Math.max(0, entry.ttl - (Date.now() - entry.ts)),
-        pw_protected:     !!entry.pw_hash,
-      }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/sign — ParaSign notary (R017) ───────────────────────────────────

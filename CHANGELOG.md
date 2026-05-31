@@ -10,6 +10,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Removed
+- **ParaDrop feature removed (relay side).** The anonymous burn-on-read drop
+  webapp and its endpoints are gone: `frontend/drop.html`, the `/sw.js`
+  ParaDrop service worker, the `/drop` sitemap entry and crypto-agility table
+  row, and the relay routes `POST /v2/drop/create|pickup|status` with their
+  rate-limit/backoff helpers and allowlist entries. The general receive page
+  (`ontvang.html`) and ParaShare are unaffected. The `/drop` navigation links
+  and remaining ParaDrop mentions in content pages are scrubbed separately; the
+  Rust `para_drop.rs` in paramant-core is removed in its own PR.
 - **SDK extracted to its own repository.** `sdk-js/` and `sdk-py/` now live in
   [Apolloccrypt/paramant-sdk](https://github.com/Apolloccrypt/paramant-sdk)
   (Apache-2.0), together with the cross-implementation conformance suite. The

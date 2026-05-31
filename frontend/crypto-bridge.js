@@ -1,6 +1,6 @@
 /**
  * crypto-bridge.js — wraps the Rust/WASM hybrid KEM (ML-KEM-768 + ECDH P-256 + AES-256-GCM)
- * and re-exports the same API that parashare.html, drop.html, and ontvang.html use.
+ * and re-exports the same API that parashare.html and ontvang.html use.
  *
  * Wire format produced by WASM (current — magic 0x03, AAD-bound):
  *   0x03 | u32be(ctKemLen) | ctKem | u32be(senderPubLen) | senderPub | nonce(12) | u32be(ctLen) | ct
