@@ -31,6 +31,7 @@ const userSigning   = require('./lib/user-signing');
 const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
 const quota         = require('./lib/quota');
+const keysTable     = require('./lib/keys-table');
 
 const VERSION    = '3.0.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -1315,7 +1316,10 @@ setInterval(() => {
 
 // ── RAM_GUARD marker
 // ── RAM-only stores ───────────────────────────────────────────────────────────
-const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub}
+const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub, account_id, is_primary, scope, kid}
+const accounts   = new Map();  // account_id → {account_id, plan, email, primary_api_key, label}  (stap 1: account_id == key)
+const accountKeys = new Map(); // account_id → Set<api_key>  (reverse index for per-account cap + listing)
+const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/listings)
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
 // Trial key request rate limiting (in-memory)
@@ -1558,7 +1562,7 @@ function _mutateUsersJson(fn) {
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
-    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true}); }); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
+    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
   }
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
@@ -1569,8 +1573,10 @@ function loadUsers() {
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
         uploads_today: 0, last_upload_day: '',
+        ...keysTable.parseAccountFields(k),
       });
     });
+    keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
   } catch(e) { log('warn', 'no_users_file'); }
 }
@@ -1590,12 +1596,13 @@ function loadTrialKeys() {
             daily_uploads: 0, daily_reset_ts: Date.now() + 86_400_000,
             is_trial: true, trial_created: k.created || Date.now(),
             uploads_today: 0, last_upload_day: '',
+            ...keysTable.parseAccountFields(k),
           });
           loaded++;
         }
       } catch {}
     }
-    if (loaded > 0) log('info', 'trial_keys_loaded', { count: loaded });
+    if (loaded > 0) { keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log); log('info', 'trial_keys_loaded', { count: loaded }); }
   } catch(e) { /* file may not exist yet */ }
 }
 
@@ -3356,6 +3363,7 @@ session = client.create_session('recipient@example.com')</pre>
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
         uploads_today: 0, last_upload_day: '',
+        ...keysTable.parseAccountFields(k),
       });
     }
 
@@ -3369,6 +3377,7 @@ session = client.create_session('recipient@example.com')</pre>
     // Atomic swap.
     apiKeys.clear();
     candidate.forEach((v, k) => apiKeys.set(k, v));
+    keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
 
     applyKeyLimitEnforcement();
     log('info', 'reload_users', { prev: prevCount, now: apiKeys.size, delta: apiKeys.size - prevCount });
