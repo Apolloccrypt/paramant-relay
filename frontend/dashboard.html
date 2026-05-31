@@ -101,6 +101,20 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-loaded > *:nth-child(5) { animation-delay: .16s; }
 @keyframes dh-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .dh-loaded > * { animation: none; } .dh-flag-card, .dh-tool { transition: none; } }
+
+/* Passkey/signing-key setup nudge -- a one-time popup when keys are missing */
+.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(11,22,34,0.55); backdrop-filter: blur(3px); animation: dh-fade .2s ease-out both; }
+.dh-modal-card { background: var(--bone); border-radius: 20px; max-width: 460px; width: 100%; padding: var(--space-6) var(--space-5) var(--space-5); box-shadow: 0 10px 40px rgba(11,22,34,0.25); text-align: center; }
+.dh-modal-img { display: block; margin: 0 auto var(--space-3); }
+.dh-modal-card h2 { font-family: var(--sans); font-size: 22px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 var(--space-2); }
+.dh-modal-sub { font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); }
+.dh-pm-item { display: block; text-align: left; text-decoration: none; padding: var(--space-3) var(--space-4); border-radius: 14px; border: 1px solid rgba(11,58,106,0.10); background: var(--bone); margin-bottom: var(--space-3); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.dh-pm-item:hover { transform: translateY(-1px); border-color: var(--lime); box-shadow: 0 4px 14px rgba(11,58,106,0.08); }
+.dh-pm-item:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.dh-pm-item strong { display: block; font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.dh-pm-item span { display: block; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
+.dh-modal-dismiss { margin-top: var(--space-2); background: transparent; border: none; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; padding: 8px 10px; border-radius: 8px; }
+.dh-modal-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
 </style>
 </head>
 <body>
@@ -349,6 +363,18 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
+
+<!-- One-time setup nudge. Shown by dashboard.js only when a signing key and/or a
+     sign-in passkey is missing, and not previously dismissed. -->
+<div id="dh-passkey-modal" class="dh-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dh-pm-title">
+  <div class="dh-modal-card">
+    <img class="dh-modal-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="72" height="72">
+    <h2 id="dh-pm-title">Finish setting up your account</h2>
+    <p class="dh-modal-sub">A couple of one-time steps make signing in faster and let you sign documents.</p>
+    <div id="dh-pm-items"></div>
+    <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Maybe later</button>
+  </div>
+</div>
 
 <footer>
   <div class="container-lg">

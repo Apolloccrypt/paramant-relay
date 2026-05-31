@@ -81,6 +81,30 @@
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
+
+/* ---- Modern account surface: dashboard-style soft cards, design tokens only ---- */
+main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
+.acct-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding-bottom: var(--space-4); border-bottom: 1px solid var(--ink-hair); margin-bottom: var(--space-5); }
+.acct-hero h1 { font-family: var(--sans); font-size: clamp(24px, 3.2vw, 32px); font-weight: 600; letter-spacing: -.018em; color: var(--ink); margin: 0; line-height: 1.1; }
+.acct-hero h1 em { font-style: normal; color: var(--cobalt); }
+.acct-session { font-family: var(--sans); font-size: 13px; color: var(--ink-dim); margin-top: 8px; }
+.acct-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 5px 12px; border: 1px solid var(--ink-hair); border-radius: 999px; white-space: nowrap; }
+.acct-plan strong { color: var(--ink); font-weight: 600; }
+
+.acct-card { background: var(--bone); border: 1px solid rgba(11,58,106,0.06); border-radius: 16px; box-shadow: 0 1px 2px rgba(11,58,106,0.05), 0 4px 14px rgba(11,58,106,0.04); padding: var(--space-5); margin-bottom: var(--space-4); }
+.acct-card.danger { border-color: rgba(200,30,30,0.22); box-shadow: 0 1px 2px rgba(200,30,30,0.05); }
+.acct-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
+.acct-card > h2 { font-family: var(--sans); font-size: 18px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 4px; }
+.acct-lead { font-family: var(--sans); font-size: 13.5px; line-height: 1.6; color: var(--ink-dim); margin: 0 0 var(--space-4); max-width: 70ch; }
+.acct-block h3 { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+.acct-block p { font-family: var(--sans); font-size: 13px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 12px; }
+.acct-grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-5); }
+.acct-divider { border: 0; border-top: 1px solid var(--ink-hair); margin: var(--space-4) 0; }
+.acct-field { display: flex; flex-direction: column; gap: 8px; max-width: 440px; margin-top: var(--space-3); }
+.acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+.acct-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: var(--space-2); }
+.acct-card .info-row:first-of-type { border-top: 0; }
+@media (max-width: 680px) { .acct-grid2 { grid-template-columns: 1fr; gap: var(--space-4); } main.acct { padding: var(--space-5) var(--space-3) var(--space-6); } }
 </style>
 </head>
 <body>
@@ -243,7 +267,7 @@
   <a href="/help" class="nav-mobile-standalone">Help</a>
 </div>
 
-<main id="main-content" class="container-lg">
+<main id="main-content" class="acct">
 
 <section id="state-loading" class="section-lg">
   <p class="lede">Loading your account...</p>
@@ -255,133 +279,101 @@
 
 <div id="state-account" class="hidden">
 
-<section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>account</div>
-  <h1>Welcome, <em id="account-email">&mdash;</em>.</h1>
-  <p class="lede">
-    Session ends in <span id="session-timer">&mdash;</span>. Renew by signing out and back in.
+<header class="acct-hero">
+  <div>
+    <h1>Welcome, <em id="account-email">&mdash;</em></h1>
+    <div class="acct-session">Session ends in <span id="session-timer">&mdash;</span>. Renew by signing out and back in.</div>
+  </div>
+  <span class="acct-plan"><strong id="plan-chip">&mdash;</strong><span>plan</span></span>
+</header>
+
+<section class="acct-card">
+  <div class="acct-kicker">API key &middot; for automation</div>
+  <h2>Your API key.</h2>
+  <div class="info-row">
+    <div class="info-label">Key</div>
+    <div class="info-value">
+      <code class="secret-display" id="api-key">&mdash;</code>
+      <button type="button" class="btn btn-small btn-secondary" id="copy-key">Copy</button>
+      <button type="button" class="btn btn-small btn-secondary" id="show-key">Show</button>
+    </div>
+  </div>
+  <div class="info-row"><div class="info-label">Plan</div><div class="info-value" id="plan">&mdash;</div></div>
+  <div class="info-row"><div class="info-label">Label</div><div class="info-value" id="label">&mdash;</div></div>
+  <div class="info-row"><div class="info-label">Created</div><div class="info-value" id="created">&mdash;</div></div>
+  <p class="small mt-3">
+    Use this key in scripts, SDKs, and IoT devices: send it in the <code>X-Api-Key</code> HTTP header. See <a href="/docs">API documentation</a>.
   </p>
 </section>
 
-<section class="section">
-  <div class="marker">
-    <div class="num">01</div>
-    <h2>Your API key.</h2>
-    <div class="tag">use for<br>automation</div>
-  </div>
-
-  <div class="card">
-    <div class="info-row">
-      <div class="info-label">Key</div>
-      <div class="info-value">
-        <code class="secret-display" id="api-key">&mdash;</code>
-        <button type="button" class="btn btn-small btn-secondary" id="copy-key">Copy</button>
-        <button type="button" class="btn btn-small btn-secondary" id="show-key">Show</button>
-      </div>
+<section class="acct-card">
+  <div class="acct-kicker">Security &middot; authenticator and backups</div>
+  <h2>Security.</h2>
+  <div class="acct-grid2">
+    <div class="acct-block">
+      <h3>Authenticator app</h3>
+      <p>Connected. Algorithm: SHA-1, 30 seconds, 6 digits.</p>
+      <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Set up a new authenticator</button>
+      <p class="small mt-2">Invalidates current TOTP. You will need to scan a new QR code.</p>
     </div>
-
-    <div class="info-row">
-      <div class="info-label">Plan</div>
-      <div class="info-value" id="plan">&mdash;</div>
-    </div>
-
-    <div class="info-row">
-      <div class="info-label">Label</div>
-      <div class="info-value" id="label">&mdash;</div>
-    </div>
-
-    <div class="info-row">
-      <div class="info-label">Created</div>
-      <div class="info-value" id="created">&mdash;</div>
-    </div>
-
-    <p class="small mt-3">
-      Use this key in scripts, SDKs, and IoT devices: send it in the <code>X-Api-Key</code> HTTP header. See <a href="/docs">API documentation</a>.
-    </p>
-  </div>
-</section>
-
-<section class="section">
-  <div class="marker">
-    <div class="num">02</div>
-    <h2>Security.</h2>
-    <div class="tag">authenticator<br>and backups</div>
-  </div>
-
-  <div class="grid2">
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        Authenticator app
-      </div>
-      <p style="margin:0 0 12px">
-        Connected. Algorithm: SHA-1, 30 seconds, 6 digits.
-      </p>
-      <button type="button" class="btn btn-secondary btn-small" id="reset-totp">
-        Set up a new authenticator
-      </button>
-      <p class="small mt-2">
-        Invalidates current TOTP. You will need to scan a new QR code.
-      </p>
-    </div>
-
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        Backup codes
-      </div>
-      <p style="margin:0 0 12px">
-        <span id="backup-count">&mdash;</span> remaining of 10.
-      </p>
-      <button type="button" class="btn btn-secondary btn-small" id="regen-backup">
-        Regenerate all codes
-      </button>
-      <p class="small mt-2">
-        Current codes become invalid. New codes shown once.
-      </p>
+    <div class="acct-block">
+      <h3>Backup codes</h3>
+      <p><span id="backup-count">&mdash;</span> remaining of 10.</p>
+      <button type="button" class="btn btn-secondary btn-small" id="regen-backup">Regenerate all codes</button>
+      <p class="small mt-2">Current codes become invalid. New codes shown once.</p>
     </div>
   </div>
 </section>
 
-<section class="section" id="signing-identity-section">
-  <div class="marker">
-    <div class="num">03</div>
-    <h2>Signing identity.</h2>
-    <div class="tag">ML-DSA-65<br>persistent</div>
+<section class="acct-card" id="passkey-section">
+  <div class="acct-kicker">Passkey sign-in &middot; WebAuthn, device-bound</div>
+  <h2>Passkey sign-in.</h2>
+  <p class="acct-lead">
+    Sign in with Face ID, Touch ID, Windows Hello, or a security key &mdash; no code to type.
+    Adding a passkey is a security change, so it needs your current 6-digit TOTP code.
+  </p>
+  <div class="acct-block">
+    <h3>Your passkeys</h3>
+    <p style="margin:0 0 12px" id="account-passkey-empty" class="small">Checking your account...</p>
+    <ul id="account-passkey-list" style="margin:0;padding:0;list-style:none"></ul>
   </div>
+  <div class="acct-inline">
+    <input type="text" id="account-passkey-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+           placeholder="TOTP code" autocomplete="one-time-code" style="max-width:150px">
+    <button type="button" class="btn btn-primary btn-small" id="account-passkey-btn">Activate passkey</button>
+  </div>
+  <p id="account-passkey-status" class="small" aria-live="polite" style="margin-top:8px"></p>
+</section>
 
-  <div class="grid2">
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        Enrolled keys
-      </div>
+<section class="acct-card" id="signing-identity-section">
+  <div class="acct-kicker">Signing identity &middot; ML-DSA-65, persistent</div>
+  <h2>Signing identity.</h2>
+  <p class="acct-lead">
+    Your signing key signs documents, separate from signing in. Public keys are bound to your
+    account so verifiers can attribute signatures; private keys never leave your browser.
+  </p>
+  <div class="acct-grid2">
+    <div class="acct-block">
+      <h3>Enrolled keys</h3>
       <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
-      <p class="small mt-2">
-        Public keys are bound to your account so verifiers can attribute signatures. Private keys never leave your browser.
-      </p>
     </div>
-
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        Browser vault
-      </div>
+    <div class="acct-block">
+      <h3>Browser vault</h3>
       <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
-      <p class="small mt-2">
-        <strong>Your passphrase encrypts your signing key in this browser. We never see it and we cannot reset it. If you forget it, this key is gone.</strong>
-      </p>
+      <p class="small"><strong>Your passphrase encrypts your signing key in this browser. We never see it and we cannot reset it. If you forget it, this key is gone.</strong></p>
     </div>
   </div>
-
-  <div class="card" style="margin-top:var(--space-4)">
-    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-      Set up a signing passkey
-    </div>
-    <p style="margin:0 0 12px" class="small">
+  <hr class="acct-divider">
+  <div class="acct-block">
+    <h3>Set up a signing passkey</h3>
+    <p class="small">
       Creates your ML-DSA-65 signing key in this browser, protected by your passkey
       (Face ID / Touch ID / security key). The passphrase is your recovery floor &mdash;
       we never see it and cannot reset it, so store it safely. Adding a signing key needs
       your authenticator code.
     </p>
-    <div style="display:flex;flex-direction:column;gap:8px;max-width:420px">
+    <div class="acct-field">
       <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
       <input type="password" id="signing-enrol-pass" placeholder="Recovery passphrase (min 12 characters)" autocomplete="new-password">
       <input type="password" id="signing-enrol-pass2" placeholder="Confirm passphrase" autocomplete="new-password">
@@ -393,115 +385,61 @@
   </div>
 </section>
 
-<section class="section" id="passkey-section">
-  <div class="marker">
-    <div class="num">04</div>
-    <h2>Passkey sign-in.</h2>
-    <div class="tag">WebAuthn<br>device-bound</div>
+<section class="acct-card">
+  <div class="acct-kicker">Active sessions &middot; devices signed in</div>
+  <h2>Active sessions.</h2>
+  <div id="sessions-list"></div>
+  <div class="acct-actions">
+    <button type="button" class="btn btn-secondary btn-small" id="sign-out-all">Sign out everywhere except this session</button>
+    <button type="button" class="btn btn-secondary btn-small" id="sign-out">Sign out (this browser)</button>
   </div>
-
-  <div class="card">
-    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-      Your passkeys
-    </div>
-    <p style="margin:0 0 12px" id="account-passkey-empty" class="small">Checking your account...</p>
-    <ul id="account-passkey-list" style="margin:0 0 12px;padding:0;list-style:none"></ul>
-    <p class="small">
-      Sign in with Face ID, Touch ID, Windows Hello, or a security key &mdash; no code to type.
-      Adding a passkey is a security change, so it needs your current 6-digit TOTP code.
-    </p>
-    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input type="text" id="account-passkey-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-             placeholder="TOTP code" autocomplete="one-time-code" style="max-width:150px">
-      <button type="button" class="btn btn-primary btn-small" id="account-passkey-btn">Activate passkey</button>
-    </div>
-    <p id="account-passkey-status" class="small" aria-live="polite" style="margin-top:8px"></p>
-  </div>
-</section>
-
-<section class="section">
-  <div class="marker">
-    <div class="num">05</div>
-    <h2>Active sessions.</h2>
-    <div class="tag">devices<br>signed in</div>
-  </div>
-
-  <div class="card">
-    <div id="sessions-list"></div>
-    <button type="button" class="btn btn-secondary mt-3" id="sign-out-all">
-      Sign out everywhere except this session
-    </button>
-  </div>
+  <p class="small mt-2">Signing out clears the session on that device. Your account stays active.</p>
 </section>
 
 
-<section class="section" id="billing-section">
-  <div class="marker">
-    <div class="num">06</div>
-    <h2>Plan &amp; billing.</h2>
-    <div class="tag">subscription<br>and history</div>
-  </div>
+<section class="acct-card" id="billing-section">
+  <div class="acct-kicker">Plan &amp; billing &middot; subscription and history</div>
+  <h2>Plan &amp; billing.</h2>
 
   <div id="billing-loading" style="color:var(--ink-dim);font-size:var(--text-sm)">Loading billing status…</div>
 
   <div id="billing-content" class="hidden">
-    <div class="billing-card" style="margin-bottom:var(--space-4)">
-      <div class="stub-banner" style="margin-bottom:var(--space-5)">
-        <strong>Stub mode.</strong> No real payments are charged. Stripe integration pending.
-      </div>
-      <div class="info-row">
-        <div class="info-label">Current plan</div>
-        <div class="info-value">
-          <span id="billing-plan">&mdash;</span>
-          <span id="billing-active-badge" class="plan-tier-active hidden">Active</span>
-        </div>
-      </div>
-      <div class="info-row" id="billing-next-row" style="display:none">
-        <div class="info-label">Next billing date</div>
-        <div class="info-value" id="billing-next">&mdash;</div>
-      </div>
-      <div class="info-row" id="billing-cancel-row" style="display:none">
-        <div class="info-label">Cancellation</div>
-        <div class="info-value" id="billing-cancel-date" style="color:#d97706">&mdash;</div>
-      </div>
-      <div style="margin-top:var(--space-5);display:flex;gap:var(--space-3);flex-wrap:wrap">
-        <a href="/pricing" class="btn btn-secondary btn-small">View plans</a>
-        <button id="billing-cancel-btn" class="btn btn-danger btn-small hidden">Cancel plan</button>
+    <div class="stub-banner" style="margin-bottom:var(--space-4)">
+      <strong>Stub mode.</strong> No real payments are charged. Stripe integration pending.
+    </div>
+    <div class="info-row">
+      <div class="info-label">Current plan</div>
+      <div class="info-value">
+        <span id="billing-plan">&mdash;</span>
+        <span id="billing-active-badge" class="plan-tier-active hidden">Active</span>
       </div>
     </div>
+    <div class="info-row" id="billing-next-row" style="display:none">
+      <div class="info-label">Next billing date</div>
+      <div class="info-value" id="billing-next">&mdash;</div>
+    </div>
+    <div class="info-row" id="billing-cancel-row" style="display:none">
+      <div class="info-label">Cancellation</div>
+      <div class="info-value" id="billing-cancel-date" style="color:#d97706">&mdash;</div>
+    </div>
+    <div class="acct-actions">
+      <a href="/pricing" class="btn btn-secondary btn-small">View plans</a>
+      <button id="billing-cancel-btn" class="btn btn-danger btn-small hidden">Cancel plan</button>
+    </div>
 
+    <hr class="acct-divider">
     <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Billing history</h3>
     <div id="billing-history" style="font-size:var(--text-sm);color:var(--ink-dim)">No billing events yet.</div>
   </div>
 </section>
 
-<section class="section">
-  <div class="marker">
-    <div class="num">07</div>
-    <h2>Session.</h2>
-    <div class="tag">this browser<br>right now</div>
-  </div>
-
-  <button type="button" class="btn btn-secondary" id="sign-out">Sign out</button>
-  <p class="small mt-2">
-    Clears the session on this browser. Your account remains active.
-  </p>
-</section>
-
-<section class="section">
-  <div class="marker">
-    <div class="num">08</div>
-    <h2>Delete account.</h2>
-    <div class="tag">permanent<br>cannot undo</div>
-  </div>
-
-  <p style="max-width:72ch;color:var(--ink-dim);line-height:1.7;margin-bottom:16px">
+<section class="acct-card danger">
+  <div class="acct-kicker">Delete account &middot; permanent, cannot undo</div>
+  <h2>Delete account.</h2>
+  <p class="acct-lead">
     Deletes your account, revokes your API key, and removes your TOTP secret. Any in-flight transfers are immediately invalidated.
   </p>
-
-  <button type="button" class="btn btn-danger" id="delete-account">
-    Delete account permanently
-  </button>
+  <button type="button" class="btn btn-danger" id="delete-account">Delete account permanently</button>
 </section>
 
 </div><!-- /state-account -->
@@ -530,6 +468,8 @@
       document.getElementById('account-email').textContent = data.email;
       document.getElementById('api-key').textContent = data.api_key_masked;
       document.getElementById('plan').textContent = data.plan;
+      var planChip = document.getElementById('plan-chip');
+      if (planChip) planChip.textContent = data.plan;
       document.getElementById('label').textContent = data.label || '—';
       document.getElementById('created').textContent = data.created_at ? new Date(data.created_at).toLocaleDateString() : 'Unknown';
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
