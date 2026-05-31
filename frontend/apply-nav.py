@@ -14,7 +14,6 @@ NEW_NAV = '''\
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/drop" role="menuitem">ParaDrop</a></li>
         <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
       </ul>
     </li>
@@ -102,7 +101,6 @@ NEW_MOBILE = '''\
     <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
     <div class="nav-mobile-group-items">
       <a href="/parashare">ParaShare</a>
-      <a href="/drop">ParaDrop</a>
       <a href="/dashboard">Dashboard</a>
     </div>
   </div>
