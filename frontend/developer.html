@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Developer dashboard — Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=19">
+<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="canonical" href="https://paramant.app/developer">
+<style>
+.dev-top { display: flex; align-items: center; justify-content: space-between; max-width: 1040px; margin: 0 auto; padding: 18px var(--space-4); border-bottom: 1px solid var(--ink-hair); }
+.dev-top a.brand { font-weight: 700; letter-spacing: -0.02em; color: var(--navy); text-decoration: none; font-size: 18px; }
+.dev-top .dev-top-links a { font-size: 13px; color: var(--ink-dim); text-decoration: none; margin-left: 18px; }
+.dev-top .dev-top-links a:hover { color: var(--navy); text-decoration: underline; }
+.dev-wrap { max-width: 1040px; margin: var(--space-5) auto var(--space-6); padding: 0 var(--space-4); }
+.dev-wrap h1 { font-size: clamp(26px, 3.4vw, 38px); line-height: 1.1; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-2); }
+.dev-wrap .lede { font-size: 16px; line-height: 1.55; color: var(--ink-dim); max-width: 60ch; margin: 0 0 var(--space-4); }
+.wip { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono, IBM Plex Mono, monospace); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 999px; padding: 6px 13px; margin-bottom: var(--space-4); }
+.dev-note { border-left: 3px solid var(--ink-hair); padding: 4px 0 4px 16px; color: var(--ink-dim); font-size: 14px; line-height: 1.6; margin: 0 0 var(--space-5); max-width: 70ch; }
+.dev-auth { background: var(--bone, #F1F5F9); border: 1px solid var(--ink-hair); padding: var(--space-4); margin: 0 0 var(--space-5); }
+.dev-auth h2 { font-size: 15px; margin: 0 0 10px; color: var(--navy); letter-spacing: -0.01em; }
+pre.code { background: #0B1B2B; color: #E2E8F0; font-family: var(--mono, IBM Plex Mono, monospace); font-size: 13px; line-height: 1.55; padding: 14px 16px; overflow-x: auto; margin: 0; border-radius: 4px; }
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.tool { border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-4); display: flex; flex-direction: column; }
+.tool h3 { font-family: var(--mono, IBM Plex Mono, monospace); font-size: 15px; color: var(--navy); margin: 0 0 6px; }
+.tool p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 12px; }
+.tool pre.code { font-size: 12px; margin-top: auto; }
+.dev-foot { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--ink-hair); font-size: 13px; color: var(--ink-dim); }
+.dev-foot a { color: var(--navy); }
+@media (max-width: 760px) { .tools { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<header class="dev-top">
+  <a class="brand" href="/">Paramant</a>
+  <nav class="dev-top-links" aria-label="Developer">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/docs">Docs</a>
+    <a href="/account">Account</a>
+  </nav>
+</header>
+
+<main id="main-content" class="dev-wrap">
+  <span class="wip">⚠ Work in progress</span>
+  <h1>Developer dashboard</h1>
+  <p class="lede">Command-line tools that ship their result through the Paramant post-quantum relay
+  (ML-KEM-768 + ML-DSA-65, ciphertext-only, burn-on-read) using only the public
+  <code>paramant-sdk</code> API.</p>
+
+  <p class="dev-note">This page is provisional. The tools below are starter / POC and are not yet
+  published to a package index. The install and usage lines are placeholders that mirror the
+  intended shape (one-line install, three-line usage) and will be replaced as each tool ships.</p>
+
+  <section class="dev-auth">
+    <h2>Authenticate once</h2>
+    <pre class="code"># 1. https://paramant.app/signup  →  2. Dashboard → Developer → copy pgp_ key
+export PARAMANT_API_KEY=pgp_...
+export PARAMANT_DEVICE=my-laptop          # optional, stable device id</pre>
+  </section>
+
+  <div class="tools">
+    <article class="tool">
+      <h3>paramant-dev-transfer</h3>
+      <p>WeTransfer for the terminal. Send a file, get a token; the other side receives it by token. The relay only ever holds ciphertext, in RAM, and burns it on first read.</p>
+      <pre class="code">pipx install paramant-dev-transfer
+paramant-dev-transfer ./build.zip
+# → token: pdt_… (share it)</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-s3-migrate</h3>
+      <p>Move an S3 object to a device, encrypted, without leaving a copy behind. Bytes are encrypted on your machine; the relay holds only ciphertext.</p>
+      <pre class="code">pipx install paramant-s3-migrate
+paramant-s3-migrate s3://bucket/key --to ops@host</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-db-backup</h3>
+      <p>One-command off-site database backups that are encrypted before they leave the box. Hands a <code>pg_dump</code>/<code>mysqldump</code> straight to the relay.</p>
+      <pre class="code">pipx install paramant-db-backup
+paramant-db-backup --pg "postgres://…" --to backup@vault</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-git-archive</h3>
+      <p>Send a snapshot of a repo at any ref, encrypted, without a remote. <code>git archive</code> the tree; the other side picks it up by hash.</p>
+      <pre class="code">pipx install paramant-git-archive
+paramant-git-archive HEAD --to teammate@laptop</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-docker-migrate</h3>
+      <p>Move a Docker volume to another host, encrypted, without a shared registry or a cleartext SSH pipe. Export, ship, untar on the far side.</p>
+      <pre class="code">pipx install paramant-docker-migrate
+paramant-docker-migrate my-volume --to operator@host2</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-secrets-sync</h3>
+      <p>Team secrets sync without a cloud vault. Push <code>.env.prod</code> to a teammate; they pull it back by hash. Burned on first read.</p>
+      <pre class="code">pipx install paramant-secrets-sync
+paramant-secrets-sync push .env.prod --to alice@laptop</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-ci-artifact</h3>
+      <p>Ship CI/CD build artifacts to a destination, encrypted, straight from the pipeline. No public artifact store, no plaintext copy in a bucket.</p>
+      <pre class="code">pipx install paramant-ci-artifact
+paramant-ci-artifact ./dist --to deploy@prod</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-log-ship</h3>
+      <p>Tamper-evident log shipping for the SOC. Tail a log and ship each batch to your SIEM as an ML-DSA-65-signed blob the auditor can verify.</p>
+      <pre class="code">pipx install paramant-log-ship
+paramant-log-ship /var/log/app.log --to siem@collector</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-package-sign</h3>
+      <p>Code-sign a release artifact with post-quantum ML-DSA-65, and catch a swap. Produces a detached <code>.psign</code> sidecar (SHA-256 + signature + public key).</p>
+      <pre class="code">pipx install paramant-package-sign
+paramant-package-sign dist/app-1.0.tar.gz
+# → dist/app-1.0.tar.gz.psign</pre>
+    </article>
+
+    <article class="tool">
+      <h3>paramant-db-replicate</h3>
+      <p>Cross-region database replication, post-quantum encrypted. Continuously feed new rows of a Postgres table to another region as encrypted batches.</p>
+      <pre class="code">pipx install paramant-db-replicate
+paramant-db-replicate --table orders --to eu-west@replica</pre>
+    </article>
+  </div>
+
+  <p class="dev-foot">Tools are documented in <code>paramant-solutions/tools/</code>. Each ships only
+  ciphertext through the relay and uses the public <a href="/docs#api">paramant-sdk</a> API.
+  Questions: <a href="/docs">read the docs</a>.</p>
+</main>
+
+</body>
+</html>

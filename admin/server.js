@@ -598,6 +598,36 @@ async function authUser(req, res, next) {
   }
 }
 
+// ── Developer dashboard allowlist ───────────────────────────────────────────
+// Extra gate ON TOP OF authUser for the hidden /developer dashboard. The email
+// allowlist comes from env only (DEVELOPER_ALLOWLIST, comma-separated) — never
+// hardcoded. The pure logic lives in ./lib/developer-gate (unit-tested in
+// admin/test/developer-gate.test.js).
+const { isDeveloper } = require("./lib/developer-gate");
+// Gate for /api/user/developer/* data endpoints. Runs after authUser (which
+// 401s on no session). A valid session that is not on the allowlist gets a
+// 404 — indistinguishable from "this route does not exist", so the developer
+// surface stays hidden from logged-in non-developers (never 403).
+function developerGate(req, res, next) {
+  if (!isDeveloper(req.userSession && req.userSession.email))
+    return res.status(404).json({ error: "not_found" });
+  next();
+}
+// Provisional CLI catalogue surfaced by /api/user/developer/tools. Source of
+// truth for the descriptions is paramant-solutions/tools/. WIP — not published.
+const DEVELOPER_TOOLS = [
+  { name: "paramant-dev-transfer",  tagline: "WeTransfer for the terminal — send a file, get a token." },
+  { name: "paramant-s3-migrate",    tagline: "Move an S3 object to a device, encrypted, no copy left behind." },
+  { name: "paramant-db-backup",     tagline: "Off-site database backups, encrypted before they leave the box." },
+  { name: "paramant-git-archive",   tagline: "Send a repo snapshot at any ref, encrypted, without a remote." },
+  { name: "paramant-docker-migrate",tagline: "Move a Docker volume to another host, encrypted." },
+  { name: "paramant-secrets-sync",  tagline: "Team secrets sync without a cloud vault." },
+  { name: "paramant-ci-artifact",   tagline: "Ship CI/CD build artifacts, encrypted, from the pipeline." },
+  { name: "paramant-log-ship",      tagline: "Tamper-evident log shipping — ML-DSA-65-signed batches to the SIEM." },
+  { name: "paramant-package-sign",  tagline: "Code-sign a release artifact with post-quantum ML-DSA-65." },
+  { name: "paramant-db-replicate",  tagline: "Cross-region database replication, post-quantum encrypted." },
+];
+
 // Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
 // the invite/co-sign flow lands a recipient via a top-level navigation from an
 // emailed link (cross-site, from their mail client). A Strict cookie is NOT
@@ -1715,6 +1745,26 @@ api.get("/user/dashboard-fragment", (req, res) => {
 // and returns 401 on miss; this handler only fires on hit.
 api.get("/user/check", authUser, (req, res) => {
   res.status(200).end();
+});
+
+// GET /api/user/developer/check
+// nginx auth_request probe for the /developer page (mirrors /user/check, with
+// the allowlist layer). authUser returns 401 on no session -> nginx redirects
+// to login. A valid session that is NOT on the developer allowlist gets 403,
+// which nginx remaps to 404 so the page's existence stays hidden. Allowlisted
+// session -> 200 and nginx serves /developer.html.
+api.get("/user/developer/check", authUser, (req, res) => {
+  if (!isDeveloper(req.userSession.email)) return res.status(403).end();
+  res.status(200).end();
+});
+
+// GET /api/user/developer/tools
+// Developer-only data endpoint behind authUser + developerGate (404 for
+// non-allowlisted). Provisional: the page renders the tool list statically;
+// this endpoint exists so the gated /api/user/developer/* surface is wired and
+// testable from day one.
+api.get("/user/developer/tools", authUser, developerGate, (req, res) => {
+  res.json({ status: "wip", tools: DEVELOPER_TOOLS });
 });
 
 // GET /api/user/account
