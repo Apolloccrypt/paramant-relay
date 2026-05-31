@@ -34,6 +34,8 @@
 .path h2 { font-size: clamp(20px, 2.5vw, 27px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0 0 var(--space-3); max-width: 18ch; }
 .path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); max-width: 34ch; }
 .path-cta { margin-top: auto; }
+.path-cta-sub { display: inline-block; margin-top: var(--space-2); font-size: 13px; color: var(--ink-dim); text-decoration: underline; }
+.path-cta-sub:hover { color: var(--navy); }
 .path-pear { position: absolute; top: var(--space-4); right: var(--space-4); width: clamp(56px, 8vw, 84px); height: auto; opacity: .92; transform: scaleX(-1); user-select: none; -webkit-user-drag: none; }
 @media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } .path { min-height: 0; } }
 </style>
@@ -231,7 +233,8 @@
     <h2>For builders who don&rsquo;t trust servers either.</h2>
     <p>Post-quantum encryption and signing as a pipe. Drop it into your stack, or self-host the whole thing.</p>
     <div class="path-cta">
-      <a class="btn btn-lime" href="/docs">Read the docs</a>
+      <a class="btn btn-lime" href="/developer">Open developer dashboard</a>
+      <a class="path-cta-sub" href="/docs">or read the docs</a>
     </div>
   </div>
 </section>
