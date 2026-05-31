@@ -613,20 +613,11 @@ function developerGate(req, res, next) {
     return res.status(404).json({ error: "not_found" });
   next();
 }
-// Provisional CLI catalogue surfaced by /api/user/developer/tools. Source of
-// truth for the descriptions is paramant-solutions/tools/. WIP — not published.
-const DEVELOPER_TOOLS = [
-  { name: "paramant-dev-transfer",  tagline: "WeTransfer for the terminal — send a file, get a token." },
-  { name: "paramant-s3-migrate",    tagline: "Move an S3 object to a device, encrypted, no copy left behind." },
-  { name: "paramant-db-backup",     tagline: "Off-site database backups, encrypted before they leave the box." },
-  { name: "paramant-git-archive",   tagline: "Send a repo snapshot at any ref, encrypted, without a remote." },
-  { name: "paramant-docker-migrate",tagline: "Move a Docker volume to another host, encrypted." },
-  { name: "paramant-secrets-sync",  tagline: "Team secrets sync without a cloud vault." },
-  { name: "paramant-ci-artifact",   tagline: "Ship CI/CD build artifacts, encrypted, from the pipeline." },
-  { name: "paramant-log-ship",      tagline: "Tamper-evident log shipping — ML-DSA-65-signed batches to the SIEM." },
-  { name: "paramant-package-sign",  tagline: "Code-sign a release artifact with post-quantum ML-DSA-65." },
-  { name: "paramant-db-replicate",  tagline: "Cross-region database replication, post-quantum encrypted." },
-];
+// Operations-dashboard data libs (CLI catalogue + snapshot builder). Source of
+// truth for the descriptions is paramant-solutions/tools/. Unit-tested in
+// admin/test/developer-snapshot.test.js.
+const { DEVELOPER_TOOLS } = require('./lib/developer-tools');
+const { buildSnapshot } = require('./lib/developer-snapshot');
 
 // Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
 // the invite/co-sign flow lands a recipient via a top-level navigation from an
@@ -1764,7 +1755,57 @@ api.get("/user/developer/check", authUser, (req, res) => {
 // this endpoint exists so the gated /api/user/developer/* surface is wired and
 // testable from day one.
 api.get("/user/developer/tools", authUser, developerGate, (req, res) => {
-  res.json({ status: "wip", tools: DEVELOPER_TOOLS });
+  res.json({ status: "live", tools: DEVELOPER_TOOLS });
+});
+
+// GET /api/user/developer/snapshot — one call for the initial dashboard render:
+// {email, plan, key_masked, quota:{transfers,signs,caps}, audit:[last 50],
+//  tools_status:{per tool}}. 3s in-memory cache per account so a refresh storm
+// cannot hammer Redis.
+const _snapCache = new Map(); // uid -> { at, data }
+api.get("/user/developer/snapshot", authUser, developerGate, async (req, res) => {
+  const uid = req.userSession.user_id;
+  const hit = _snapCache.get(uid);
+  if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
+  let plan = "community";
+  try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
+  try {
+    const data = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
+    _snapCache.set(uid, { at: Date.now(), data });
+    if (_snapCache.size > 500) _snapCache.clear();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "snapshot_failed" });
+  }
+});
+
+// GET /api/user/developer/stream — Server-Sent Events. Pushes new audit events
+// for this account as they land. SSE (not WebSocket): simpler, rides the
+// existing HTTP/auth/cookie stack, no upgrade handshake. Server-side 2s poll of
+// the account's audit zset; pushes deltas + a heartbeat. Closes on disconnect.
+api.get("/user/developer/stream", authUser, developerGate, async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.write("retry: 4000\n");
+  res.write('event: hello\ndata: {"ok":true}\n\n');
+  const uid = req.userSession.user_id;
+  let lastTs = Date.now();
+  let alive = true;
+  const tick = async () => {
+    if (!alive) return;
+    try {
+      const events = await getAuditEvents(uid, { limit: 20 });
+      const fresh = events.filter((e) => (e.ts || 0) > lastTs).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      for (const ev of fresh) { lastTs = Math.max(lastTs, ev.ts || 0); res.write(`event: audit\ndata: ${JSON.stringify(ev)}\n\n`); }
+      res.write(`event: ping\ndata: ${Date.now()}\n\n`);
+    } catch {}
+  };
+  const iv = setInterval(tick, 2000);
+  req.on("close", () => { alive = false; clearInterval(iv); try { res.end(); } catch {} });
 });
 
 // GET /api/user/account
