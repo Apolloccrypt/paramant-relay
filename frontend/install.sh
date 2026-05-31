@@ -359,7 +359,7 @@ case "\${1:-help}" in
     docker compose -f "\${INSTALL_DIR}/docker-compose.yml" ps
     echo ""
     echo "=== Health ==="
-    for port in 3005 3002 3003 3004; do
+    for port in 3000 3001 3002 3003 3004; do
       resp=\$(curl -s http://127.0.0.1:\$port/health 2>/dev/null || echo '{}')
       ok=\$(echo "\$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ok','?'))" 2>/dev/null)
       ver=\$(echo "\$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null)
@@ -378,7 +378,7 @@ case "\${1:-help}" in
     ;;
   reload)
     echo "Reloading API keys (zero downtime)..."
-    for port in 3005 3002 3003 3004; do
+    for port in 3000 3001 3002 3003 3004; do
       resp=\$(curl -s -X POST http://127.0.0.1:\$port/v2/reload-users \
         -H "X-Api-Key: \${ADMIN_TOKEN}" \
         -H "Content-Type: application/json" -d '{}' 2>/dev/null || echo '{"error":"unreachable"}')
