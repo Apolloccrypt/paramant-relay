@@ -232,11 +232,11 @@ initNats();
 
 // Fix B: per-device delivery queue — stream-next returns real blob hashes
 // deviceQueues[apiKey:deviceId] = [sha256_hash, ...]
-const deviceQueues = new Map(); // `${apiKey}:${deviceId}` → string[]
+const deviceQueues = new Map(); // `${acctOf(apiKey)}:${deviceId}` → string[]
 
 function deviceQueuePush(apiKey, deviceId, hash) {
   if (!deviceId) return;
-  const k = `${apiKey}:${deviceId}`;
+  const k = `${acctOf(apiKey)}:${deviceId}`;
   if (!deviceQueues.has(k)) deviceQueues.set(k, []);
   const q = deviceQueues.get(k);
   if (!q.includes(hash)) q.push(hash); // dedup
@@ -1320,6 +1320,11 @@ const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub, account
 const accounts   = new Map();  // account_id → {account_id, plan, email, primary_api_key, label}  (stap 1: account_id == key)
 const accountKeys = new Map(); // account_id → Set<api_key>  (reverse index for per-account cap + listing)
 const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/listings)
+// Resolve a key to its account_id. For every loaded key account_id is preset
+// (stap 1); for a legacy 1:1 key account_id === apiKey, so device/pubkey/webhook
+// keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
+// ones — behaviour-neutral now, account-shared once a second key is added.
+function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
 // Trial key request rate limiting (in-memory)
@@ -1562,7 +1567,7 @@ function _mutateUsersJson(fn) {
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
-    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
+    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
   }
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
@@ -1573,6 +1578,7 @@ function loadUsers() {
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
         uploads_today: 0, last_upload_day: '',
+        created: k.created || null,
         ...keysTable.parseAccountFields(k),
       });
     });
@@ -1723,7 +1729,7 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 
 // ── Webhook push ──────────────────────────────────────────────────────────────
 async function pushWebhooks(apiKey, deviceId, event, data) {
-  const hooks = webhooks.get(`${deviceId}:${apiKey}`) || [];
+  const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
     const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
@@ -3363,6 +3369,7 @@ session = client.create_session('recipient@example.com')</pre>
         is_trial: !!(k.plan === 'community' && k.trial_metadata),
         trial_created: k.created ? new Date(k.created).getTime() : null,
         uploads_today: 0, last_upload_day: '',
+        created: k.created || null,
         ...keysTable.parseAccountFields(k),
       });
     }
@@ -3427,13 +3434,13 @@ session = client.create_session('recipient@example.com')</pre>
       const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
-      const existingPubkey = pubkeys.get(`${d.device_id}:${apiKey}`);
+      const existingPubkey = pubkeys.get(`${d.device_id}:${acctOf(apiKey)}`);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
         res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' }));
       }
       const fp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
       const regAt = new Date().toISOString();
-      pubkeys.set(`${d.device_id}:${apiKey}`, {
+      pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
         dsa_pub:  d.dsa_pub  || '',
         fingerprint: fp, ct_index: ctEntry.index,
@@ -3453,7 +3460,7 @@ session = client.create_session('recipient@example.com')</pre>
     try { deviceId = decodeURIComponent(pkm[1]); }
     catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
     // Invite sessions: stored and retrieved without API key
-    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
+    const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
     const entry = pubkeys.get(_pkKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device. Start receiver first.' })); }
     if (entry.expires && Date.now() > entry.expires) {
@@ -3472,7 +3479,7 @@ session = client.create_session('recipient@example.com')</pre>
     let deviceId;
     try { deviceId = decodeURIComponent(fpm[1]); }
     catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
-    const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${apiKey}`;
+    const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
     const entry = pubkeys.get(_fKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
     if (entry.expires && Date.now() > entry.expires) {
@@ -3489,7 +3496,7 @@ session = client.create_session('recipient@example.com')</pre>
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.fingerprint) { res.writeHead(400); return res.end(J({ error: 'device_id and fingerprint required' })); }
-      const _vKey = INVITE_RE.test(d.device_id) ? d.device_id : `${d.device_id}:${apiKey}`;
+      const _vKey = INVITE_RE.test(d.device_id) ? d.device_id : `${d.device_id}:${acctOf(apiKey)}`;
       const entry = pubkeys.get(_vKey);
       if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
       const storedFp = entry.fingerprint || computeFingerprint(entry.kyber_pub || '', entry.ecdh_pub);
@@ -3976,7 +3983,7 @@ session = client.create_session('recipient@example.com')</pre>
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
-      const k = `${d.device_id}:${apiKey}`;
+      const k = `${d.device_id}:${acctOf(apiKey)}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
       webhooks.get(k).push({ url: d.url, secret: d.secret || '' });
       log('info', 'webhook_registered', { device: d.device_id });
@@ -3999,7 +4006,7 @@ session = client.create_session('recipient@example.com')</pre>
   if (path === '/v2/stream-next') {
     const device = query.device || '';
     // Fix B: return next real blob hash from per-device delivery queue
-    const qKey = `${apiKey}:${device}`;
+    const qKey = `${acctOf(apiKey)}:${device}`;
     const queue = deviceQueues.get(qKey) || [];
     // Pop only hashes whose blob is still in store (TTL may have expired)
     let hash = null;
@@ -4054,7 +4061,7 @@ session = client.create_session('recipient@example.com')</pre>
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
       didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
       const _didPlan = keyData?.plan || 'pro';
-      pubkeys.set(`${d.device_id}:${apiKey}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
+      pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
       auditAppend(apiKey, 'did_registered', { did, device: d.device_id });
@@ -4075,7 +4082,7 @@ session = client.create_session('recipient@example.com')</pre>
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.device_id || !d.attestation) { res.writeHead(400); return res.end(J({ error: 'device_id and attestation required' })); }
-      const pk = pubkeys.get(`${d.device_id}:${apiKey}`);
+      const pk = pubkeys.get(`${d.device_id}:${acctOf(apiKey)}`);
       if (!pk) { res.writeHead(404); return res.end(J({ error: 'Device not registered' })); }
       const result = verifyAttestation(pk.ecdh_pub, d.device_id, d.attestation);
       auditAppend(apiKey, 'attestation', { device: d.device_id, method: d.attestation.method, valid: result.valid });
@@ -4129,22 +4136,10 @@ session = client.create_session('recipient@example.com')</pre>
 
   // ── POST /v2/admin/keys — Key aanmaken ────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'POST') {
-    // Enforce key limit (community = 5 hard cap; licensed = LICENSE_MAX_KEYS or Infinity)
-    if (LICENSE_MAX_KEYS !== Infinity) {
-      const activeCount = [...apiKeys.values()].filter(v => v.active !== false).length;
-      if (activeCount >= LICENSE_MAX_KEYS) {
-        res.writeHead(402, { 'Content-Type': 'application/json' });
-        return res.end(J({
-          error: EDITION === 'community'
-            ? `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`
-            : `License limit reached (${LICENSE_MAX_KEYS} keys). Contact Paramant to upgrade your license.`,
-          current_keys: activeCount,
-          max_keys: LICENSE_MAX_KEYS,
-          upgrade_url: 'https://paramant.app/pricing'
-        }));
-      }
-    }
     try {
+      // Parse FIRST, then do the cap check + insert in one synchronous tick (no
+      // await between the count and the set) so two concurrent creates cannot
+      // both pass a stale count — closes the prior check-before-await TOCTOU.
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
       // Fix 13: validate plan against allowlist
@@ -4158,14 +4153,53 @@ session = client.create_session('recipient@example.com')</pre>
         return res.end(J({ error: 'Invalid email address' }));
       }
       const email = rawEmail;
-      apiKeys.set(newKey, { plan, label, email, active: true });
-      _mutateUsersJson(d => {
-        d.api_keys.push({ key: newKey, plan, label, email, active: true, created: new Date().toISOString() });
-        d.updated = new Date().toISOString();
-      }).then(() => log('info', 'key_created_via_admin', { label, plan, persisted: true }))
+      // Account binding: explicit account_id adds a key to an existing account
+      // (non-primary); otherwise this key opens its own account (1:1, the stap-1
+      // default) as its primary.
+      const account_id = (d.account_id && String(d.account_id)) || newKey;
+      const is_primary = !d.account_id;
+      const scope = keysTable.VALID_SCOPES.has(d.scope) ? d.scope : 'full';
+
+      // Per-account cap (and the self-host relay-total cap) — checked atomically
+      // with the insert below.
+      const acctPlan = tiers.normalisePlan((accounts.get(account_id) && accounts.get(account_id).plan) || plan);
+      const acctCap = ACCOUNT_KEY_LIMIT[acctPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const acctActive = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+      if (acctActive >= acctCap) {
+        res.writeHead(402, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `Account key limit reached (${acctCap} keys on the ${acctPlan} plan).`, current_keys: acctActive, max_keys: acctCap, upgrade_url: 'https://paramant.app/pricing' }));
+      }
+      if (EDITION !== 'licensed' && LICENSE_MAX_KEYS !== Infinity) {
+        const relayActive = [...apiKeys.values()].filter((v) => v.active !== false).length;
+        if (relayActive >= LICENSE_MAX_KEYS) {
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({
+            error: EDITION === 'community'
+              ? `Community Edition limit reached (${COMMUNITY_KEY_LIMIT} keys). Add a plk_ license key to unlock unlimited users.`
+              : `License limit reached (${LICENSE_MAX_KEYS} keys). Contact Paramant to upgrade your license.`,
+            current_keys: relayActive, max_keys: LICENSE_MAX_KEYS, upgrade_url: 'https://paramant.app/pricing'
+          }));
+        }
+      }
+
+      const created = new Date().toISOString();
+      apiKeys.set(newKey, { plan, label, email, active: true, account_id, is_primary, scope, created });
+      if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan, email, primary_api_key: null, label });
+      if (is_primary || !accounts.get(account_id).primary_api_key) accounts.get(account_id).primary_api_key = newKey;
+      if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
+      accountKeys.get(account_id).add(newKey);
+      const kid = keysTable.assignKid(kidIndex, newKey, log);
+      apiKeys.get(newKey).kid = kid;
+      kidIndex.set(kid, newKey);
+
+      _mutateUsersJson(ud => {
+        ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true }))
         .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      applyKeyLimitEnforcement();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, key: newKey, plan, label }));
+      return res.end(J({ ok: true, key: newKey, kid, account_id, plan, label }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -4268,11 +4302,15 @@ session = client.create_session('recipient@example.com')</pre>
       if (!key || !VALID_PLANS.has(plan)) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
       if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
       apiKeys.get(key).plan = plan;
+      // Keep the account's plan in step so the per-account cap re-evaluates.
+      const _aid = apiKeys.get(key).account_id;
+      if (_aid && accounts.has(_aid)) accounts.get(_aid).plan = plan;
       _mutateUsersJson(ud => {
         const entry = ud.api_keys.find(k => k.key === key);
         if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
         ud.updated = new Date().toISOString();
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
+      applyKeyLimitEnforcement();
       res.writeHead(200); return res.end(J({ ok: true, key, plan }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
@@ -4778,6 +4816,14 @@ const _ED25519_DER_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 
 let EDITION          = 'community';
 let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by checkLicense()
+// Per-account key cap (SaaS product dimension). Orthogonal to the BUSL-fixed
+// per-relay COMMUNITY_KEY_LIMIT: a key is over_limit if it busts EITHER (F).
+// Community is env-tunable within 3..5; pro/enterprise are uncapped.
+const ACCOUNT_KEY_LIMIT = Object.freeze({
+  community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
+  pro: Infinity,
+  enterprise: Infinity,
+});
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 
 // ── Ed25519 base64url decoder ─────────────────────────────────────────────────
@@ -4850,38 +4896,26 @@ function checkLicense() {
 // Licensed (plk_*): no limit. Set PARAMANT_LICENSE=plk_... in .env to unlock.
 // ─────────────────────────────────────────────────────────────────────────────
 function applyKeyLimitEnforcement() {
-  if (EDITION === 'licensed') {
-    for (const v of apiKeys.values()) v.over_limit = false;
-    log('info', 'edition', { edition: 'licensed', active_keys: [...apiKeys.values()].filter(k => k.active !== false).length, max_keys: LICENSE_MAX_KEYS === Infinity ? 'unlimited' : LICENSE_MAX_KEYS });
-    return;
-  }
-
-  const entries = [...apiKeys.entries()];
-  const active  = entries.filter(([, v]) => v.active !== false);
-
-  if (active.length <= LICENSE_MAX_KEYS) {
-    for (const [, v] of entries) v.over_limit = false;
-    log('info', 'edition', { edition: EDITION, active_keys: active.length, limit: LICENSE_MAX_KEYS });
-    return;
-  }
-
-  // Keys beyond LICENSE_MAX_KEYS are flagged over_limit
-  let n = 0;
-  for (const [, v] of entries) {
-    if (v.active === false) continue;
-    n++;
-    v.over_limit = n > LICENSE_MAX_KEYS;
-    if (v.over_limit) log('warn', 'key_over_limit', {
-      label: v.label,
-      hint: 'Add PLK_KEY=plk_... to .env to unlock unlimited users — https://paramant.app/pricing'
-    });
-  }
-  log('warn', 'community_limit_exceeded', {
-    active_keys: active.length,
-    limit: LICENSE_MAX_KEYS,
-    blocked: active.length - LICENSE_MAX_KEYS,
-    operator_upgrade: 'https://paramant.app/pricing'
+  // Per-account cap (ACCOUNT_KEY_LIMIT) OR'd with the self-host relay-total cap
+  // (LICENSE_MAX_KEYS, only when edition !== 'licensed'); see lib/keys-table
+  // computeOverLimit. Flags v.over_limit but never deactivates a key — reversible
+  // on upgrade, mirroring the prior community-edition behaviour.
+  const over = keysTable.computeOverLimit(apiKeys, accounts, accountKeys, {
+    capForPlan: (p) => ACCOUNT_KEY_LIMIT[tiers.normalisePlan(p)] ?? ACCOUNT_KEY_LIMIT.community,
+    licenseMaxKeys: LICENSE_MAX_KEYS,
+    edition: EDITION,
   });
+  let flagged = 0;
+  for (const [key, v] of apiKeys) {
+    const was = v.over_limit;
+    v.over_limit = over.has(key);
+    if (v.over_limit) {
+      flagged += 1;
+      if (!was) log('warn', 'key_over_limit', { label: v.label, account: String(v.account_id || key).slice(0, 12) });
+    }
+  }
+  const active = [...apiKeys.values()].filter((v) => v.active !== false).length;
+  log('info', 'edition', { edition: EDITION, active_keys: active, relay_limit: LICENSE_MAX_KEYS === Infinity ? 'unlimited' : LICENSE_MAX_KEYS, account_cap_community: ACCOUNT_KEY_LIMIT.community, over_limit: flagged });
 }
 
 

@@ -93,4 +93,51 @@ function migrateUsersV2(data) {
   return { ...data, schema_version: 2, accounts, api_keys };
 }
 
-module.exports = { VALID_SCOPES, computeKid, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2 };
+// Decide which keys are over a limit. Returns a Set<key> of over-limit keys
+// (keys NOT in the set are within limits). Two orthogonal dimensions, OR'd
+// (decision F):
+//   per-account  — within each account, active keys are sorted primary-first
+//                  then created-asc (missing created = oldest), insertion-order
+//                  tiebreak; those at index >= the account's plan cap are over.
+//   relay-total  — self-host community only (edition !== 'licensed'): active
+//                  keys beyond licenseMaxKeys in insertion order are over.
+// Pure: reads the Maps, mutates nothing. `capForPlan(plan)` returns the numeric
+// per-account cap (Infinity for uncapped plans).
+function computeOverLimit(apiKeys, accounts, accountKeys, opts) {
+  const { capForPlan, licenseMaxKeys = Infinity, edition = 'community' } = opts || {};
+  const over = new Set();
+
+  const order = new Map();
+  let i = 0;
+  for (const key of apiKeys.keys()) order.set(key, i++);
+
+  for (const [accountId, keySet] of accountKeys) {
+    const acct = accounts.get(accountId);
+    const cap = capForPlan ? capForPlan(acct ? acct.plan : 'community') : Infinity;
+    if (!(cap < Infinity)) continue;
+    const active = [...keySet].filter((k) => { const v = apiKeys.get(k); return v && v.active !== false; });
+    active.sort((a, b) => {
+      const va = apiKeys.get(a), vb = apiKeys.get(b);
+      const pa = va.is_primary ? 0 : 1, pb = vb.is_primary ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      const ca = va.created ? (Date.parse(va.created) || 0) : 0;
+      const cb = vb.created ? (Date.parse(vb.created) || 0) : 0;
+      if (ca !== cb) return ca - cb;
+      return order.get(a) - order.get(b);
+    });
+    active.forEach((k, idx) => { if (idx >= cap) over.add(k); });
+  }
+
+  if (edition !== 'licensed' && licenseMaxKeys !== Infinity) {
+    let n = 0;
+    for (const [key, v] of apiKeys) {
+      if (v.active === false) continue;
+      n += 1;
+      if (n > licenseMaxKeys) over.add(key);
+    }
+  }
+
+  return over;
+}
+
+module.exports = { VALID_SCOPES, computeKid, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit };
