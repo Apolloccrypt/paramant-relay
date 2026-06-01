@@ -5,7 +5,7 @@
 // (registerPasskey / evalNewPrf / enrolPublicKey), then proves the result is
 // resolvable so /sign can find it. Self-hosted deps only (CSP script-src
 // 'self'); no-ops if the page lacks the enrol elements.
-import { enrolSigningPasskey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=2';
+import { enrolSigningPasskey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=3';
 import { startRegistration, browserSupportsWebAuthn } from '/vendor/simplewebauthn-browser/index.js';
 import { vaultList, vaultDelete } from '/vendor/vault.js?v=2';
 
@@ -96,14 +96,19 @@ function wireSigningEnrol() {
         //     extensions.prf, and we strip excludeCredentials client-side so the
         //     device will mint a PRF-capable passkey even when a pre-PRF passkey
         //     already exists for this account (TOTP step-up still gates it).
-        registerPasskey: async () => {
-          let list = [];
-          try {
-            const cr = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
-            if (cr.ok) list = (await cr.json()).passkeys || [];
-          } catch { /* treat as no usable passkey */ }
-          const prfCapable = list.find(c => c.prfSupported && c.credId);
-          if (prfCapable) return { credentialId: prfCapable.credId };
+        registerPasskey: async ({ forceFresh } = {}) => {
+          // Fast path: reuse an existing PRF-capable passkey — UNLESS the caller
+          // forces a fresh one (the fallback when a reused credential turned out
+          // not to actually produce a PRF result, which is what caused the loop).
+          if (!forceFresh) {
+            let list = [];
+            try {
+              const cr = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
+              if (cr.ok) list = (await cr.json()).passkeys || [];
+            } catch { /* treat as no usable passkey */ }
+            const prfCapable = list.find(c => c.prfSupported && c.credId);
+            if (prfCapable) return { credentialId: prfCapable.credId, reused: true };
+          }
 
           const totp = askTotp('Add a signing passkey — enter your current 6-digit authenticator code:');
           setStatus('Verifying code, then follow your device prompt to create the passkey…', false);
@@ -122,7 +127,7 @@ function wireSigningEnrol() {
           }
           const ver = await postJSON('/api/user/account/webauthn/register/verify', { flowId: opt.data.flowId, response: attResp, label });
           if (!ver.ok) throw new Error((ver.data && ver.data.error) || ('register_verify_failed_' + ver.status));
-          return { credentialId: attResp.id };
+          return { credentialId: attResp.id, reused: false };
         },
 
         // (2) Evaluate the passkey PRF with the per-wrap salt. This is the SAME
@@ -140,7 +145,11 @@ function wireSigningEnrol() {
             },
           });
           const first = assertion.getClientExtensionResults()?.prf?.results?.first;
-          if (!first) throw new Error('This passkey can’t produce a PRF result. Use a device/browser with passkey-PRF (iOS 18+ or a recent Chrome), or remove an old non-PRF passkey for this site and retry.');
+          if (!first) {
+            const e = new Error('This passkey can’t produce a PRF result. Use a device/browser with passkey-PRF (iOS 18+ or a recent Chrome), or remove an old non-PRF passkey for this site and retry.');
+            e.code = 'no_prf';   // signals enrolSigningPasskey to retry with a FRESH passkey when this one was reused
+            throw e;
+          }
           return new Uint8Array(first);
         },
 
