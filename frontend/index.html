@@ -28,6 +28,9 @@
 .home-hero .lede { font-size: 16px; line-height: 1.55; color: var(--ink-dim); max-width: 58ch; margin: 0 auto; }
 .hero-badges { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0; margin: var(--space-4) 0 0; }
 .hero-badges li { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 999px; padding: 5px 11px; background: var(--bone); }
+.hero-badges a { display: block; margin: -5px -11px; padding: 5px 11px; border-radius: 999px; color: inherit; text-decoration: none; }
+.hero-badges li:hover { border-color: var(--navy); }
+.hero-badges li:hover a { color: var(--navy); }
 .home-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 1040px; margin: var(--space-5) auto var(--space-6); padding: 0 var(--space-4); }
 .path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); min-height: 220px; }
 .path-dev { background: var(--bone); }
@@ -304,11 +307,11 @@
   <h1>Sign it. Send it. We never even had it.</h1>
   <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
   <ul class="hero-badges" aria-label="At a glance">
-    <li>Open source</li>
-    <li>Free</li>
-    <li>Fully auditable</li>
-    <li>EU-sovereign</li>
-    <li>Post-quantum</li>
+    <li><a href="https://github.com/Apolloccrypt/paramant-relay">Open source</a></li>
+    <li><a href="/pricing">Free</a></li>
+    <li><a href="/security">Fully auditable</a></li>
+    <li><a href="/sovereignty">EU-sovereign</a></li>
+    <li><a href="/crypto-agility">Post-quantum</a></li>
   </ul>
 </section>
 
@@ -348,7 +351,7 @@
       </svg>
     </div>
     <div class="path-cta">
-      <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
+      <a class="btn btn-lime" href="/signup?next=%2Fdashboard">Open your dashboard</a>
     </div>
   </div>
   <div class="path path-dev">
