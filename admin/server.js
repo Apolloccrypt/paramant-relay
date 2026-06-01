@@ -619,6 +619,7 @@ function developerGate(req, res, next) {
 // admin/test/developer-snapshot.test.js.
 const { DEVELOPER_TOOLS } = require('./lib/developer-tools');
 const { buildSnapshot } = require('./lib/developer-snapshot');
+const developerConfig = require('./lib/developer-config');
 
 // Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
 // the invite/co-sign flow lands a recipient via a top-level navigation from an
@@ -1758,6 +1759,40 @@ api.get("/user/developer/check", authUser, (req, res) => {
 // testable from day one.
 api.get("/user/developer/tools", authUser, developerGate, (req, res) => {
   res.json({ status: "live", tools: DEVELOPER_TOOLS });
+});
+
+// ── Per-account saved tool config (cross-device). All three are gated by
+// authUser + developerGate and scoped to the session's user_id (no IDOR). Pure
+// validation lives in lib/developer-config (unit-tested). The config is data
+// only -- never executed; a literal key is refused (defence in depth).
+api.get("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    let configs = {};
+    if (raw) { try { configs = JSON.parse(raw) || {}; } catch {} }
+    res.json({ configs });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.post("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const { tool, command } = req.body || {};
+  const v = developerConfig.validateConfig(tool, command);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    const m = developerConfig.mergeConfig(raw, v.tool, v.command);
+    if (!m.ok) return res.status(400).json({ error: m.error });
+    await redis().set(developerConfig.KEY(req.userSession.user_id), m.json);
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.delete("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const tool = (req.body && req.body.tool) || req.query.tool;
+  if (typeof tool !== "string" || !developerConfig.TOOL_NAMES.has(tool)) return res.status(400).json({ error: "unknown_tool" });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    await redis().set(developerConfig.KEY(req.userSession.user_id), developerConfig.removeConfig(raw, tool));
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
 });
 
 // GET /api/user/developer/snapshot — one call for the initial dashboard render:
