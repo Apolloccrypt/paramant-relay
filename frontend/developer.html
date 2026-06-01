@@ -96,6 +96,9 @@ main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) va
 .dev-pre,.dev-run{font-family:var(--mono);font-size:11.5px;background:#0a1626;color:#cfe0f2;border:none;border-radius:8px;padding:11px 13px;width:100%;box-sizing:border-box;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:0}
 .dev-run{resize:vertical;line-height:1.5}
 .dev-modal-src{font-family:var(--mono);font-size:11px;color:#1D4ED8;text-decoration:none}
+.dev-step-btns{display:flex;gap:6px}
+.dev-saved{font-size:10px;color:var(--ink-dim);margin:6px 0 0;font-family:var(--mono)}
+.dev-reset{border:none;background:none;color:#1D4ED8;font-family:var(--mono);font-size:10px;cursor:pointer;text-decoration:underline;padding:0}
 
 /* Section 4: Operations */
 .ops{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-4);align-items:start}
@@ -214,13 +217,14 @@ main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) va
       <pre class="dev-pre" data-m="key"></pre>
     </div>
     <div class="dev-step">
-      <div class="dev-step-h"><span>3 &middot; Run (edit the parameters)</span><button type="button" class="dev-copy" data-copy="run">copy</button></div>
+      <div class="dev-step-h"><span>3 &middot; Run (edit the parameters)</span><span class="dev-step-btns"><button type="button" class="dev-copy" data-m="save">save</button><button type="button" class="dev-copy" data-copy="run">copy</button></span></div>
       <textarea class="dev-run" data-m="run" rows="2" spellcheck="false" aria-label="Run command"></textarea>
+      <p class="dev-saved" data-m="saved" hidden>Saved on this device (params only, never your key). <button type="button" class="dev-reset" data-m="reset">Reset to default</button></p>
     </div>
     <a class="dev-modal-src" data-m="source" href="#" target="_blank" rel="noopener">View source &#8599;</a>
   </div>
 </div>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/developer.js?v=2" defer></script>
+<script src="/js/developer.js?v=3" defer></script>
 </body>
 </html>
