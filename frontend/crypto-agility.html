@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Crypto Agility</title>
+<title>Crypto agility · Paramant</title>
 <meta name="description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
 <meta property="og:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
 <meta property="og:url" content="https://paramant.app/crypto-agility">
@@ -143,6 +143,22 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 @media (max-width: 900px) {
   .nav-help { display: none; }
 }
+</style>
+<style>
+/* brand-life refresh (pilot): lime eyebrow, hero stat-strip, section number
+   chips, loaded-dots. Petrol/navy + lime, existing tokens only. */
+.hero-eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px}
+.hero-eyebrow span{display:inline-block;width:22px;height:2px;background:var(--lime)}
+.hero-stats{list-style:none;display:flex;flex-wrap:wrap;margin:28px 0 0;padding:0;border:1px solid var(--ink-hair)}
+.hero-stats li{flex:1;min-width:150px;padding:16px 20px;border-right:1px solid var(--ink-hair)}
+.hero-stats li:last-child{border-right:none}
+.hero-stats b{display:flex;align-items:center;gap:9px;font-size:27px;font-weight:700;letter-spacing:-.02em;color:var(--navy);line-height:1}
+.hero-stats b::before{content:"";width:8px;height:8px;background:var(--lime);flex:none}
+.hero-stats li span{display:block;font-size:11px;color:var(--ink-dim);line-height:1.45;margin-top:8px}
+section h2{display:flex;align-items:baseline;gap:11px}
+.s-num{flex:none;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--navy);background:var(--lime);padding:2px 7px;line-height:1.5}
+.algo-table td.safe::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lime);margin-right:7px}
+@media(max-width:640px){.hero-stats li{min-width:100%;border-right:none;border-bottom:1px solid var(--ink-hair)}.hero-stats li:last-child{border-bottom:none}}
 </style>
 </head>
 <body>
@@ -312,32 +328,38 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 </div>
 
 <div class="hero">
-  <div class="hero-tag">Security architecture</div>
-  <h1>Crypto agility —<br><em>algorithms you can swap without rebuilding</em></h1>
+  <div class="hero-eyebrow"><span></span>Security architecture</div>
+  <h1>Algorithms you can swap <em>without rebuilding</em>.</h1>
   <p class="subtitle">
     The history of cryptography is a history of algorithms being broken.
-    Paramant is built so that the next one does not break Paramant.
-    The relay supports the full NIST post-quantum standard suite today.
+    Paramant is built so the next break does not break Paramant: the relay
+    runs the full NIST post-quantum suite today, and nothing about it is
+    hardcoded.
   </p>
+  <ul class="hero-stats">
+    <li><b>3</b><span>ML-KEM key encapsulations (FIPS 203)</span></li>
+    <li><b>18</b><span>signature algorithms (FIPS 204 / 205 / 206)</span></li>
+    <li><b>21</b><span>algorithm IDs live in /v2/capabilities</span></li>
+  </ul>
 </div>
 
 <main id="main-content">
 
   <!-- ── 01 What crypto agility actually means ── -->
   <section>
-    <h2>01 — What crypto agility actually means</h2>
+    <h2><span class="s-num">01</span>What crypto agility actually means</h2>
     <p class="section-sub">Identifiers in the header, not algorithms in the code path.</p>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
       Each blob carries a header identifying the algorithms that produced it:
       a 2-byte <code>KEM_ID</code> and a 2-byte <code>SIG_ID</code>, integrity-bound
       via GCM AAD. Clients choose. The relay validates. Both sides negotiate via
-      the capabilities endpoint — no hidden defaults, no protocol guessing.
+      the capabilities endpoint. No hidden defaults, no protocol guessing.
     </p>
   </section>
 
   <!-- ── 02 Wire format v1 ── -->
   <section>
-    <h2>02 — The wire format (v1)</h2>
+    <h2><span class="s-num">02</span>The wire format (v1)</h2>
     <p class="section-sub">A 10-byte fixed header, length-prefixed variable fields after.</p>
     <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:'IBM Plex Mono',ui-monospace,monospace">MAGIC    4 bytes   PQHB
 VERSION  1 byte    0x01
@@ -354,13 +376,13 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 03 Who produces, who validates ── -->
   <section>
-    <h2>03 — Who produces, who validates</h2>
+    <h2><span class="s-num">03</span>Who produces, who validates</h2>
     <p class="section-sub">The relay never touches the byte layout.</p>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
       A v1-capable client produces a blob with its chosen KEM and SIG IDs.
       The relay validates the header and rejects unsupported combinations
       with HTTP 415. The relay stores verbatim, serves byte-for-byte. That
-      is what preserves zero knowledge — the relay never touches the byte
+      is what preserves zero knowledge: the relay never touches the byte
       layout. The recipient client decodes using the algorithms declared in
       the header.
     </p>
@@ -377,7 +399,7 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 04 What is loaded today ── -->
   <section>
-    <h2>04 — What is loaded today</h2>
+    <h2><span class="s-num">04</span>What is loaded today</h2>
     <p class="section-sub">3 KEMs plus 18 signatures, covering FIPS 203, 204, 205, and 206.</p>
 
     <h3 style="font-size:13px;font-weight:600;margin-top:26px;margin-bottom:6px;color:var(--ink)">KEM registry (FIPS 203, ML-KEM)</h3>
@@ -451,7 +473,7 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 05 See for yourself ── -->
   <section>
-    <h2>05 — See for yourself</h2>
+    <h2><span class="s-num">05</span>See for yourself</h2>
     <p class="section-sub">The live capabilities endpoint is the source of truth.</p>
     <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
     <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Excerpt (full response lists all 21 entries):</p>
@@ -479,7 +501,7 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 06 Client implementations ── -->
   <section>
-    <h2>06 — Client implementations</h2>
+    <h2><span class="s-num">06</span>Client implementations</h2>
     <p class="section-sub">Per-client status. Verified from source, not assumed.</p>
     <p style="font-size:13px;color:var(--ink-dim);line-height:1.75;margin-top:6px">
       The relay accepts wire format v1 from any client that produces it.
@@ -557,7 +579,7 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 07 Adding an algorithm ── -->
   <section>
-    <h2>07 — Adding an algorithm</h2>
+    <h2><span class="s-num">07</span>Adding an algorithm</h2>
     <p class="section-sub">Three steps. No schema changes, no in-flight blobs affected.</p>
     <div class="agility-row">
       <div class="ar-step">
@@ -587,7 +609,7 @@ FLAGS    1 byte    reserved for future features</pre>
 
   <!-- ── 08 What is not yet built ── -->
   <section>
-    <h2>08 — What is not yet built</h2>
+    <h2><span class="s-num">08</span>What is not yet built</h2>
     <p class="section-sub">Honest delta between the header format and what ships.</p>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
       The <code>FLAGS</code> byte reserves space for options not currently shipping:
