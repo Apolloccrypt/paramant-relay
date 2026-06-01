@@ -2720,17 +2720,11 @@ async function verifyCliTotp(totp) {
 // Curated environment for handler scripts. We do NOT inherit the full process
 // env: only PATH/HOME plus paramant-relevant variables, and computed relay
 // locators. This bounds what `config show` can ever surface.
-function cliChildEnv() {
-  const env = { PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME || '/tmp' };
-  for (const [k, v] of Object.entries(process.env)) {
-    if (/^(PORT|BASE_PATH|NODE_ENV|RELAY_|SECTOR|ADMIN_|PARAMANT_|NATS_|REDIS_|RESEND_|COMPOSE_|BACKUP_)/.test(k)) {
-      env[k] = v;
-    }
-  }
-  env.RELAY_URL = SECTORS.health;
-  env.RELAY_SECTORS = Object.entries(SECTORS).map(([n, u]) => `${n}=${u}`).join(',');
-  env.ADMIN_TOKEN = ADMIN_TOKEN;
-  return env;
+function cliChildEnv(cmd) {
+  // Delegates to the pure, unit-tested builder (lib/cli-commands.buildChildEnv).
+  // Least-privilege: ADMIN_TOKEN is added only for cmd.needsAdminToken; the
+  // REDIS_/RESEND_/PARAMANT_ secrets are never broadcast to handler scripts.
+  return cliCommands.buildChildEnv(cmd, process.env, SECTORS, ADMIN_TOKEN);
 }
 
 // GET /api/admin/cli/commands -- whitelist metadata for completion/help.
@@ -2812,7 +2806,7 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   try {
     child = spawn(handlerPath, argv, {
       cwd: cliCommands.SCRIPTS_DIR,
-      env: cliChildEnv(),
+      env: cliChildEnv(cmd),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
