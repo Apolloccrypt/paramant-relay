@@ -4205,8 +4205,12 @@ session = client.create_session('recipient@example.com')</pre>
 
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
   if (path === '/v2/admin/keys' && req.method === 'GET') {
+    // Account fields (kid/account_id/is_primary/scope/created) are ADDITIVE —
+    // existing consumers read key/plan/label/email/active; stap-4 self-service
+    // and the account-aware admin view use the account grouping.
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
-      key: k, plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false
+      key: k, plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
+      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4312,6 +4316,47 @@ session = client.create_session('recipient@example.com')</pre>
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
       applyKeyLimitEnforcement();
       res.writeHead(200); return res.end(J({ ok: true, key, plan }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── GET /v2/admin/keys/primary/:account_id — read an account's primary + members ──
+  // Read-only; path-param (mirrors /v2/admin/usage/:account_id) so no query parse.
+  const primaryGet = path.match(/^\/v2\/admin\/keys\/primary\/(.+)$/);
+  if (primaryGet && req.method === 'GET') {
+    const accountId = decodeURIComponent(primaryGet[1]);
+    const acct = accounts.get(accountId);
+    const members = [...(accountKeys.get(accountId) || [])].map((k) => {
+      const v = apiKeys.get(k) || {};
+      return { kid: v.kid || null, is_primary: !!v.is_primary, scope: v.scope || 'full', active: v.active !== false, label: v.label || '' };
+    });
+    const primaryKey = acct && acct.primary_api_key;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, account_id: accountId, known: !!acct,
+      primary_kid: primaryKey ? ((apiKeys.get(primaryKey) || {}).kid || null) : null, keys: members }));
+  }
+
+  // ── POST /v2/admin/keys/primary — designate {key} as {account_id}'s primary ──
+  // Promotes the chosen key, demotes the previous primary within the account
+  // (keysTable.designatePrimary), then persists. Mismatched account_id => 400, so
+  // a key can never be moved into an account it does not belong to.
+  if (path === '/v2/admin/keys/primary' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const accountId = (d.account_id || '').toString();
+      const key = (d.key || '').toString();
+      if (!accountId || !key) { res.writeHead(400); return res.end(J({ error: 'account_id and key required' })); }
+      let result;
+      try { result = keysTable.designatePrimary(apiKeys, accounts, accountKeys, accountId, key); }
+      catch (ke) { res.writeHead(ke.code === 'key_not_found' ? 404 : 400); return res.end(J({ error: ke.code || 'invalid_request' })); }
+      _mutateUsersJson(ud => {
+        for (const entry of ud.api_keys) {
+          if ((entry.account_id || entry.key) === accountId) entry.is_primary = (entry.key === key);
+        }
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'primary_designated_via_admin', { account: accountId.slice(0, 12), persisted: true }))
+        .catch(we => log('warn', 'primary_persist_failed', { err: we.message }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, account_id: accountId, primary_key: key, previous_primary: result.previous }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
