@@ -26,6 +26,20 @@
 
   var STATE = { tools: [], status: {}, key: '', filter: '', feed: [] };
 
+  // Which tools can genuinely run in the browser: those whose input is a local
+  // file (transfer + sign). The rest need server-side data (an S3 object, your
+  // database, a Docker volume), so an in-browser run is impossible -- we say so
+  // honestly and point at Configure for the ready-to-run command.
+  function browserFlow(cat) {
+    if (cat === 'transfer') return { url: '/parashare', label: 'Send a file in your browser' };
+    if (cat === 'sign')     return { url: '/sign',      label: 'Sign a file in your browser' };
+    return null;
+  }
+  function serverReason(cat) {
+    var needs = { migrate: 'an S3 object or a Docker volume on your host', backup: 'your database', replicate: 'your database', sync: 'your local secrets', archive: 'your git repo', ship: 'your build output or logs' };
+    return 'Runs on your machine: it needs ' + (needs[cat] || 'access to your infrastructure') + '. Use Configure for the ready-to-run command.';
+  }
+
   /* ---------- render ---------- */
   function renderHeader(d) {
     var e = document.querySelector('[data-dv="email"]'); if (e) e.textContent = d.email || '—';
@@ -67,14 +81,18 @@
         : '<div class="tool-stats"><span>last <b>' + fmtAgo(st.last_run) + '</b></span>' +
             (st.success_rate != null ? '<span><b>' + st.success_rate + '%</b> ok/wk</span>' : '') +
             (st.avg_ms != null ? '<span>avg <b>' + fmtDur(st.avg_ms) + '</b></span>' : '') + '</div>';
+      var flow = browserFlow(t.category);
+      var runBtn = flow
+        ? '<button class="dev-btn dev-btn-go" data-run="' + esc(flow.url) + '" title="' + esc(flow.label) + '">Run in browser</button>'
+        : '<button class="dev-btn" disabled title="' + esc(serverReason(t.category)) + '">Run in browser</button>';
       return '<div class="dev-card tool">' +
         '<div class="tool-top"><div class="tool-icon">' + toolIcon(t.category) + '</div>' +
         '<div><div class="tool-name">' + esc(t.name) + '</div>' +
         '<span class="tool-status ' + (st.state === 'never_used' ? '' : st.state) + '"><span class="sd"></span>' + statusTxt + '</span></div></div>' +
         '<p class="tool-tag">' + esc(t.tagline) + '</p>' + statsHtml +
         '<div class="tool-actions">' +
-          '<button class="dev-btn" disabled title="Available with self-service keys (coming)">Run in browser</button>' +
-          '<button class="dev-btn" disabled title="Available with self-service keys (coming)">Configure</button>' +
+          runBtn +
+          '<button class="dev-btn dev-btn-go" data-config="' + esc(t.name) + '">Configure</button>' +
           '<a class="dev-link" href="' + esc(t.source) + '" target="_blank" rel="noopener">View source ↗</a>' +
         '</div></div>';
     }).join('');
@@ -157,6 +175,50 @@
 
   /* filter */
   var fi = $('#tl-filter'); if (fi) fi.addEventListener('input', function () { STATE.filter = fi.value; getJSON('/api/user/developer/snapshot').then(function (d) { renderTimeline(d.audit || []); }).catch(function () {}); });
+
+  /* ---------- tool actions: run-in-browser + the configure modal ---------- */
+  if (elTools) {
+    elTools.addEventListener('click', function (ev) {
+      var run = ev.target.closest && ev.target.closest('[data-run]');
+      if (run) { window.location.href = run.getAttribute('data-run'); return; }
+      var cfg = ev.target.closest && ev.target.closest('[data-config]');
+      if (cfg) { openConfig(cfg.getAttribute('data-config')); }
+    });
+  }
+  function openConfig(name) {
+    var t = null, i;
+    for (i = 0; i < STATE.tools.length; i++) { if (STATE.tools[i].name === name) { t = STATE.tools[i]; break; } }
+    var modal = document.getElementById('dev-modal');
+    if (!t || !modal) return;
+    var key = STATE.key || '';
+    var run = (t.usage || '').replace('{KEY}', key || 'pgp_YOUR_KEY');
+    modal.querySelector('[data-m="title"]').textContent = 'Configure ' + t.name;
+    modal.querySelector('[data-m="tag"]').textContent = t.tagline || '';
+    modal.querySelector('[data-m="install"]').textContent = t.install || '';
+    modal.querySelector('[data-m="key"]').textContent = 'export PARAMANT_API_KEY=' + (key || '<reveal it in the API keys panel>');
+    modal.querySelector('[data-m="run"]').value = run;
+    modal.querySelector('[data-m="source"]').setAttribute('href', t.source || '#');
+    var bf = browserFlow(t.category), rib = modal.querySelector('[data-m="browser"]');
+    if (rib) { if (bf) { rib.hidden = false; rib.setAttribute('href', bf.url); rib.textContent = '▶ ' + bf.label + ' →'; } else { rib.hidden = true; } }
+    modal.hidden = false;
+  }
+  (function wireModal() {
+    var modal = document.getElementById('dev-modal');
+    if (!modal) return;
+    function close() { modal.hidden = true; }
+    modal.addEventListener('click', function (ev) {
+      if (ev.target === modal || (ev.target.closest && ev.target.closest('[data-m="close"]'))) { close(); return; }
+      var c = ev.target.closest && ev.target.closest('[data-copy]');
+      if (!c) return;
+      var src = modal.querySelector('[data-m="' + c.getAttribute('data-copy') + '"]');
+      if (!src) return;
+      var text = (src.tagName === 'TEXTAREA' || src.tagName === 'INPUT') ? src.value : src.textContent;
+      if (navigator.clipboard && text) {
+        navigator.clipboard.writeText(text).then(function () { var o = c.textContent; c.textContent = 'copied'; setTimeout(function () { c.textContent = o; }, 1200); }).catch(function () {});
+      }
+    });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !modal.hidden) close(); });
+  })();
 
   /* ---------- boot ---------- */
   function boot() {
