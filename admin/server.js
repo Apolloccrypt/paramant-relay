@@ -13,6 +13,7 @@ const cliAudit = require('./lib/cli-audit');
 const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
+const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -898,7 +899,7 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "" }),
+    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }),
     { EX: 3600 }
   );
 
@@ -959,7 +960,7 @@ api.post("/user/login", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "" }),
+    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }),
     { EX: 3600 }
   );
 
@@ -990,7 +991,7 @@ api.post("/user/login-with-backup", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code" }),
+    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }),
     { EX: 3600 }
   );
 
@@ -1170,7 +1171,7 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn" }),
+    JSON.stringify({ user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn", ...sessionKeyFields(authedUserId) }),
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
@@ -1337,7 +1338,7 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register" }),
+    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register", ...sessionKeyFields(flow.user_id) }),
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
@@ -1853,7 +1854,10 @@ function maskIp(ip) {
 
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
-  res.json({ api_key: req.userSession.user_id });
+  // stap 3: reveal the account's PRIMARY api-key (== user_id today), and only
+  // when the account is legacy_revealable. The `revealable` field is additive;
+  // existing callers read `.api_key`, unchanged while every account is 1:1.
+  res.json(revealKey(req.userSession));
 });
 
 // GET /api/user/dashboard/overview — read-only Operations data for the normal
@@ -2033,7 +2037,7 @@ api.all("/relay/:sector/*path", authUser, async (req, res) => {
   const fetchOpts = {
     method: req.method,
     headers: {
-      "X-Api-Key": req.userSession.user_id,
+      "X-Api-Key": proxyApiKey(req.userSession),
       "Content-Type": "application/json",
     },
   };
