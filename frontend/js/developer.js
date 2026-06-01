@@ -31,10 +31,26 @@
   // database, a Docker volume), so an in-browser run is impossible -- we say so
   // honestly and point at Configure for the ready-to-run command.
   function browserFlow(cat) {
-    if (cat === 'transfer') return { url: '/parashare', label: 'Send a file in your browser' };
-    if (cat === 'sign')     return { url: '/sign',      label: 'Sign a file in your browser' };
-    return null;
+    if (cat === 'sign') return { url: '/sign', label: 'Sign a file in your browser' };
+    // file-input tools: the browser does the encrypt-and-send half (a transfer);
+    // the server-side prep (git archive, collecting artifacts) stays on you.
+    if (cat === 'transfer' || cat === 'archive' || cat === 'ship' || cat === 'sync')
+      return { url: '/parashare', label: 'Send a file in your browser' };
+    return null; // migrate, backup, replicate need server-side data
   }
+  // Hardening: only ever navigate to a known internal path. Defence in depth
+  // against an open redirect, even though data-run is set by our own code.
+  function safeInternalPath(u) {
+    return typeof u === 'string' && u.charAt(0) === '/' && u.indexOf('//') === -1 &&
+           u.indexOf(':') === -1 && /^[A-Za-z0-9/_.?=&#-]+$/.test(u);
+  }
+  // Per-user (per-browser) tool config: remembers your edited command per tool.
+  // localStorage only -- no server, no new attack surface. Holds non-sensitive
+  // params (bucket, recipient); never the key (the command uses $PARAMANT_API_KEY).
+  var CFG_PREFIX = 'paramant.devcfg.v1.';
+  function loadCfg(tool) { try { return localStorage.getItem(CFG_PREFIX + tool); } catch (e) { return null; } }
+  function saveCfg(tool, val) { try { localStorage.setItem(CFG_PREFIX + tool, String(val).slice(0, 2000)); return true; } catch (e) { return false; } }
+  function clearCfg(tool) { try { localStorage.removeItem(CFG_PREFIX + tool); } catch (e) {} }
   function serverReason(cat) {
     var needs = { migrate: 'an S3 object or a Docker volume on your host', backup: 'your database', replicate: 'your database', sync: 'your local secrets', archive: 'your git repo', ship: 'your build output or logs' };
     return 'Runs on your machine: it needs ' + (needs[cat] || 'access to your infrastructure') + '. Use Configure for the ready-to-run command.';
@@ -180,7 +196,7 @@
   if (elTools) {
     elTools.addEventListener('click', function (ev) {
       var run = ev.target.closest && ev.target.closest('[data-run]');
-      if (run) { window.location.href = run.getAttribute('data-run'); return; }
+      if (run) { var u = run.getAttribute('data-run'); if (safeInternalPath(u)) window.location.assign(u); return; }
       var cfg = ev.target.closest && ev.target.closest('[data-config]');
       if (cfg) { openConfig(cfg.getAttribute('data-config')); }
     });
@@ -191,12 +207,19 @@
     var modal = document.getElementById('dev-modal');
     if (!t || !modal) return;
     var key = STATE.key || '';
-    var run = (t.usage || '').replace('{KEY}', key || 'pgp_YOUR_KEY');
+    // The command relies on the PARAMANT_API_KEY env var (step 2), so the key is
+    // never inlined -> nothing sensitive ever reaches localStorage.
+    var def = (t.usage || '').replace(/^PARAMANT_API_KEY=\{KEY\}\s+/, '').replace('{KEY}', '$PARAMANT_API_KEY');
+    var saved = loadCfg(t.name);
     modal.querySelector('[data-m="title"]').textContent = 'Configure ' + t.name;
     modal.querySelector('[data-m="tag"]').textContent = t.tagline || '';
     modal.querySelector('[data-m="install"]').textContent = t.install || '';
     modal.querySelector('[data-m="key"]').textContent = 'export PARAMANT_API_KEY=' + (key || '<reveal it in the API keys panel>');
-    modal.querySelector('[data-m="run"]').value = run;
+    var runEl = modal.querySelector('[data-m="run"]');
+    runEl.value = saved != null ? saved : def;
+    runEl.setAttribute('data-default', def);
+    modal.setAttribute('data-tool', t.name);
+    var savedNote = modal.querySelector('[data-m="saved"]'); if (savedNote) savedNote.hidden = (saved == null);
     modal.querySelector('[data-m="source"]').setAttribute('href', t.source || '#');
     var bf = browserFlow(t.category), rib = modal.querySelector('[data-m="browser"]');
     if (rib) { if (bf) { rib.hidden = false; rib.setAttribute('href', bf.url); rib.textContent = '▶ ' + bf.label + ' →'; } else { rib.hidden = true; } }
@@ -208,6 +231,21 @@
     function close() { modal.hidden = true; }
     modal.addEventListener('click', function (ev) {
       if (ev.target === modal || (ev.target.closest && ev.target.closest('[data-m="close"]'))) { close(); return; }
+      var save = ev.target.closest && ev.target.closest('[data-m="save"]');
+      if (save) {
+        var tool = modal.getAttribute('data-tool'), ta = modal.querySelector('[data-m="run"]');
+        if (tool && ta && saveCfg(tool, ta.value)) {
+          var sn = modal.querySelector('[data-m="saved"]'); if (sn) sn.hidden = false;
+          var os = save.textContent; save.textContent = 'saved'; setTimeout(function () { save.textContent = os; }, 1200);
+        }
+        return;
+      }
+      var reset = ev.target.closest && ev.target.closest('[data-m="reset"]');
+      if (reset) {
+        var tool2 = modal.getAttribute('data-tool'), ta2 = modal.querySelector('[data-m="run"]');
+        if (tool2 && ta2) { clearCfg(tool2); ta2.value = ta2.getAttribute('data-default') || ''; var sn2 = modal.querySelector('[data-m="saved"]'); if (sn2) sn2.hidden = true; }
+        return;
+      }
       var c = ev.target.closest && ev.target.closest('[data-copy]');
       if (!c) return;
       var src = modal.querySelector('[data-m="' + c.getAttribute('data-copy') + '"]');
