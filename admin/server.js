@@ -893,7 +893,11 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
   const result = await verifyRes.json();
   if (!result.valid) return res.status(401).json({ error: "invalid_code" });
 
-  await callRelay("/v2/user/activate-totp", { user_id });
+  // Activation mints the backup codes and returns them exactly once. This is the
+  // only place the plaintext codes exist, so we read them straight from the
+  // activate response — no separate (and previously non-existent) lookup.
+  const activateRes = await callRelay("/v2/user/activate-totp", { user_id });
+  const { backup_codes } = activateRes.ok ? await activateRes.json() : { backup_codes: [] };
   await redis().del(`paramant:user:setup_token:${token}`);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
@@ -904,9 +908,6 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
   );
 
   setUserCookie(res, sessionToken);
-
-  const codesRes = await callRelay("/v2/user/get-backup-codes-plaintext", { user_id });
-  const { backup_codes } = codesRes.ok ? await codesRes.json() : { backup_codes: [] };
 
   res.json({ success: true, email, backup_codes });
 });
