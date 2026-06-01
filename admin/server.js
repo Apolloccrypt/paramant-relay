@@ -1856,6 +1856,28 @@ api.get("/user/account/key", authUser, async (req, res) => {
   res.json({ api_key: req.userSession.user_id });
 });
 
+// GET /api/user/dashboard/overview — read-only Operations data for the normal
+// (non-developer) dashboard: plan, masked key, this-month quota, recent audit.
+// authUser only (NO developer gate). Reuses buildSnapshot minus the tools
+// catalogue. 3s per-account cache so the dashboard's 5s poll can't hammer Redis.
+const _ovCache = new Map(); // uid -> { at, data }
+api.get("/user/dashboard/overview", authUser, async (req, res) => {
+  const uid = req.userSession.user_id;
+  const hit = _ovCache.get(uid);
+  if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
+  let plan = "community";
+  try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
+  try {
+    const snap = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
+    const data = { plan: snap.plan, key_masked: snap.key_masked, quota: snap.quota, audit: snap.audit };
+    _ovCache.set(uid, { at: Date.now(), data });
+    if (_ovCache.size > 500) _ovCache.clear();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "overview_failed" });
+  }
+});
+
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
 // The browser talks to admin (session-cookie); admin forwards to relay with
 // the internal-auth token. user_id is taken from the session, never from the

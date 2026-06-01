@@ -115,6 +115,33 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-pm-item span { display: block; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
 .dh-modal-dismiss { margin-top: var(--space-2); background: transparent; border: none; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; padding: 8px 10px; border-radius: 8px; }
 .dh-modal-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
+
+/* Operations -- read-only live cards (keys, usage, activity) */
+.dh-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
+.dh-ops-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: 14px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.03); }
+.dh-ops-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
+.dh-ops-dim { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.dh-ops-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
+.dh-ops-row:last-child { border-bottom: none; }
+.dh-ops-row .mono { font-family: var(--mono); font-size: 12px; color: var(--ink); word-break: break-all; }
+.dh-ops-row .dim { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
+.dh-usage-row { margin-bottom: var(--space-3); }
+.dh-usage-lab { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--ink); margin-bottom: 6px; }
+.dh-bar { height: 6px; border-radius: 999px; background: var(--ink-hair); overflow: hidden; }
+.dh-bar > i { display: block; height: 100%; width: 0; background: var(--cobalt, #0B3A6A); border-radius: 999px; transition: width .4s ease; }
+.dh-bar.warn > i { background: var(--lime); }
+.dh-usage-upsell { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--cobalt, #0B3A6A); text-decoration: none; }
+.dh-usage-upsell:hover { text-decoration: underline; }
+.dh-ops-filter { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--ink-hair); border-radius: 8px; font-family: var(--mono); font-size: 12px; background: var(--bone); color: var(--ink); }
+.dh-ops-filter:focus { outline: none; border-color: var(--cobalt, #0B3A6A); }
+.dh-ops-tl { display: flex; flex-direction: column; max-height: 196px; overflow-y: auto; }
+.dh-tl-row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
+.dh-tl-row:last-child { border-bottom: none; }
+.dh-tl-row .t { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
+.dh-tl-row .e { font-family: var(--mono); font-size: 11px; color: var(--ink); word-break: break-all; }
+.dh-ops-note { font-family: var(--sans); font-size: 12px; line-height: 1.55; color: var(--ink-dim); border: 1px dashed var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); margin-bottom: var(--space-7); }
+.dh-ops-note strong { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .dh-bar > i { transition: none; } }
 </style>
 </head>
 <body>
@@ -332,6 +359,26 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       <a class="dh-tool" href="/parashare"><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
       <a class="dh-tool" href="/verify"><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
     </section>
+
+    <div class="dh-tools-head"><h2>Operations</h2></div>
+    <section class="dh-ops" id="dh-ops" aria-label="Operations">
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">API keys</div>
+        <div id="dh-ops-keys"><div class="dh-ops-dim">Loading...</div></div>
+        <div><button type="button" class="dh-btn" disabled title="Available with self-service keys (coming)">+ New key</button></div>
+      </div>
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">Usage &middot; this month</div>
+        <div id="dh-ops-usage"><div class="dh-ops-dim">Loading...</div></div>
+      </div>
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">Activity timeline</div>
+        <input id="dh-ops-filter" class="dh-ops-filter" type="text" placeholder="Filter events..." aria-label="Filter activity">
+        <div id="dh-ops-timeline" class="dh-ops-tl"><div class="dh-ops-dim">Loading...</div></div>
+        <div><button type="button" class="dh-btn" disabled title="Full history coming soon">View all</button></div>
+      </div>
+    </section>
+    <p class="dh-ops-note"><strong>Operations &middot; read-only.</strong> Live usage and activity from your account. Action controls (new keys, run, configure) arrive with self-service keys.</p>
 
     <details class="dh-acct" aria-label="Account details">
       <summary class="dh-acct-head" id="dh-acct-toggle">
