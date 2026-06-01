@@ -82,6 +82,17 @@
   .nav-help { display: none; }
 }
 </style>
+<style>
+/* Readability fix: the ownership table sits inside .section-cobalt (cobalt
+   background). The shared table classes (.strong, .cobalt-text, td, th) use
+   dark / cobalt text meant for a light background, so they are unreadable on
+   blue. Force light text here; jurisdiction column goes lime so it pops.
+   design-system.css is untouched. */
+.section-cobalt .ownership-table th { color: rgba(248,250,252,.72); border-bottom-color: rgba(248,250,252,.26); }
+.section-cobalt .ownership-table td { color: rgba(248,250,252,.88); border-bottom-color: rgba(248,250,252,.16); }
+.section-cobalt .ownership-table td.strong { color: var(--bone); }
+.section-cobalt .ownership-table td.cobalt-text { color: var(--lime); }
+</style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
