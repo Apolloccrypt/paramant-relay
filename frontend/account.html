@@ -358,6 +358,14 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
       <h3>Enrolled keys</h3>
       <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
+      <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair,#E2E8F0);border-radius:6px">
+        <p class="small" style="margin:0 0 8px">Enter your 6-digit authenticator code to revoke this signing key.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
+          <button type="button" class="btn btn-small" id="revoke-totp-confirm">Confirm revoke</button>
+          <button type="button" class="btn btn-small btn-secondary" id="revoke-totp-cancel">Cancel</button>
+        </div>
+      </div>
     </div>
     <div class="acct-block">
       <h3>Browser vault</h3>
@@ -369,17 +377,27 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
   <div class="acct-block">
     <h3>Set up your signing key</h3>
     <p class="small">
-      Creates your ML-DSA-65 signing key in this browser, unlocked with Face ID /
-      Touch ID / a security key when you sign. The passphrase is your recovery floor &mdash;
-      we never see it and cannot reset it, so store it safely. Adding a signing key needs
-      your authenticator code.
+      A signing key is what makes your signature legally yours. It is created here, in this
+      browser, with ML-DSA-65 (post-quantum), and only you hold it. It is separate from how
+      you sign in. You confirm with Face ID, Touch ID, or a security key when you sign.
     </p>
     <div class="acct-field">
       <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
-      <input type="password" id="signing-enrol-pass" placeholder="Recovery passphrase (min 12 characters)" autocomplete="new-password">
+      <input type="password" id="signing-enrol-pass" placeholder="Choose a passphrase (min 12 characters)" autocomplete="new-password">
+      <div id="signing-enrol-strength" class="small" aria-live="polite" style="margin:2px 0 0"></div>
       <input type="password" id="signing-enrol-pass2" placeholder="Confirm passphrase" autocomplete="new-password">
-      <div>
-        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Set up signing</button>
+      <p class="small" style="margin:6px 0 0"><strong>Write this down.</strong> If you forget this passphrase and lose this browser, your signing key is gone for good. We can't reset it.</p>
+
+      <div id="signing-enrol-totp-wrap" hidden style="margin-top:12px;padding:12px 14px;border:1px solid var(--ink-hair,#E2E8F0);border-radius:6px">
+        <p id="signing-enrol-totp-prompt" class="small" style="margin:0 0 8px"></p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="signing-enrol-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
+          <button type="button" class="btn btn-primary btn-small" id="signing-enrol-totp-confirm">Confirm</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Create my signing key</button>
       </div>
     </div>
     <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
@@ -714,10 +732,24 @@ async function loadEnrolledKeys() {
   }
 }
 
+function askRevokeTotp() {
+  return new Promise((resolve) => {
+    const wrap = document.getElementById('revoke-totp-wrap');
+    const input = document.getElementById('revoke-totp');
+    const ok = document.getElementById('revoke-totp-confirm');
+    const cancel = document.getElementById('revoke-totp-cancel');
+    if (!wrap || !input || !ok || !cancel) { resolve((window.prompt('Enter your 6-digit authenticator code to revoke this signing key.') || '').trim()); return; }
+    input.value = ''; wrap.hidden = false; input.focus();
+    const done = (v) => { ok.removeEventListener('click', onOk); cancel.removeEventListener('click', onCancel); input.removeEventListener('keydown', onKey); wrap.hidden = true; resolve(v); };
+    const onOk = () => { const t = (input.value || '').trim(); if (!/^\d{6}$/.test(t)) { input.focus(); return; } done(t); };
+    const onCancel = () => done('');
+    const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } if (e.key === 'Escape') onCancel(); };
+    ok.addEventListener('click', onOk); cancel.addEventListener('click', onCancel); input.addEventListener('keydown', onKey);
+  });
+}
 async function revokeKey(pkHash) {
-  const totp = window.prompt('Revoke this signing key?\n\nEnter your 6-digit TOTP code to confirm.');
+  const totp = await askRevokeTotp();
   if (!totp) return;
-  if (!/^\d{6}$/.test(totp)) { alert('TOTP must be 6 digits.'); return; }
   try {
     const res = await fetch('/api/user/account/signing-key', {
       method: 'DELETE',
@@ -758,7 +790,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js?v=3"></script>
-<script type="module" src="/js/signing-enrol.js?v=4"></script>
+<script type="module" src="/js/signing-enrol.js?v=5"></script>
 
 </body>
 </html>

@@ -31,10 +31,41 @@ async function postJSON(url, body) {
   return { ok: r.ok, status: r.status, data };
 }
 
+// Inline TOTP entry (replaces window.prompt). The enrol makes TWO TOTP-gated
+// server calls (register-options, then bind-public-key) with the passkey
+// ceremony between them, and the relay replay-protects codes (relay.js
+// _usedTotpCodes + replayKey, 90s), so ONE code cannot gate both — the user
+// enters a fresh code each time, in this one inline field, no browser pop-ups.
+// Returns a Promise of the 6-digit string; a bad value re-prompts inline rather
+// than throwing.
 function askTotp(message) {
-  const t = (window.prompt(message) || '').trim();
-  if (!/^\d{6}$/.test(t)) throw new Error('A 6-digit authenticator code is required.');
-  return t;
+  return new Promise((resolve) => {
+    const wrap = document.getElementById('signing-enrol-totp-wrap');
+    const input = document.getElementById('signing-enrol-totp');
+    const confirmBtn = document.getElementById('signing-enrol-totp-confirm');
+    const promptEl = document.getElementById('signing-enrol-totp-prompt');
+    if (!wrap || !input || !confirmBtn || !promptEl) {
+      throw new Error('A 6-digit authenticator code is required.');   // rejects the promise
+    }
+    promptEl.textContent = message;
+    input.value = '';
+    wrap.hidden = false;
+    input.focus();
+    const finish = (val) => {
+      confirmBtn.removeEventListener('click', onConfirm);
+      input.removeEventListener('keydown', onKey);
+      wrap.hidden = true;
+      resolve(val);
+    };
+    const onConfirm = () => {
+      const t = (input.value || '').trim();
+      if (!/^\d{6}$/.test(t)) { promptEl.textContent = 'Enter the 6-digit code from your authenticator app.'; input.focus(); return; }
+      finish(t);
+    };
+    const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); onConfirm(); } };
+    confirmBtn.addEventListener('click', onConfirm);
+    input.addEventListener('keydown', onKey);
+  });
 }
 
 // enrolSigningPasskey() stores the passphrase wrap FIRST, so an abort after that
@@ -58,6 +89,26 @@ function wireSigningEnrol() {
   const passEl = document.getElementById('signing-enrol-pass');
   const pass2El = document.getElementById('signing-enrol-pass2');
   const labelEl = document.getElementById('signing-enrol-label');
+
+  // Live passphrase strength hint (length + character variety). Cosmetic guide;
+  // the vault still enforces real strength server-side in vaultStore.
+  const strengthEl = document.getElementById('signing-enrol-strength');
+  if (passEl && strengthEl) {
+    passEl.addEventListener('input', () => {
+      const v = passEl.value || '';
+      if (!v) { strengthEl.textContent = ''; return; }
+      let label, color = 'var(--ink-dim, #6b7280)';
+      if (v.length < 12) { label = 'Too short (needs 12+ characters)'; color = 'var(--danger, #b91c1c)'; }
+      else {
+        const variety = (/[a-z]/.test(v) ? 1 : 0) + (/[A-Z]/.test(v) ? 1 : 0) + (/\d/.test(v) ? 1 : 0) + (/[^a-zA-Z0-9]/.test(v) ? 1 : 0);
+        if (v.length >= 20 && variety >= 3) label = 'Strong';
+        else if (v.length >= 16 || variety >= 3) label = 'Good';
+        else label = 'OK (longer is stronger)';
+      }
+      strengthEl.textContent = label;
+      strengthEl.style.color = color;
+    });
+  }
 
   const setStatus = (t, isErr) => {
     if (!status) return;
@@ -110,7 +161,7 @@ function wireSigningEnrol() {
             if (prfCapable) return { credentialId: prfCapable.credId, reused: true };
           }
 
-          const totp = askTotp('Set up your signing key — enter your current 6-digit authenticator code:');
+          const totp = await askTotp('Enter the 6-digit code from your authenticator app to start.');
           setStatus('Verifying code, then follow your device prompt…', false);
           const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
           if (opt.status === 403) throw new Error('That authenticator code was not accepted.');
@@ -157,7 +208,7 @@ function wireSigningEnrol() {
         //     recomputes pk_hash from pk_b64 server-side; the secret never
         //     leaves the browser.
         enrolPublicKey: async ({ pk_b64, label: keyLabel }) => {
-          const totp = askTotp('Finish enrolling your signing key — enter a fresh 6-digit code:');
+          const totp = await askTotp('Almost done. Your last code is used up, so enter a fresh 6-digit code to finish.');
           setStatus('Binding your public key to your account…', false);
           const r = await postJSON('/api/user/account/signing-key', { pk_b64, label: keyLabel, totp });
           if (!r.ok) throw new Error((r.data && r.data.error) || ('signing_key_enrol_failed_' + r.status));
