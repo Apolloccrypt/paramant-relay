@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Certificate Transparency Log</title>
+<title>PARAMANT · Certificate Transparency Log</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -16,13 +16,13 @@
 <link rel="stylesheet" href="/nav.css?v=13">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <meta property="og:title" content="PARAMANT · Certificate Transparency Log">
-<meta property="og:description" content="PARAMANT — Certificate Transparency Log">
+<meta property="og:description" content="PARAMANT: Certificate Transparency Log">
 <meta property="og:url" content="https://paramant.app/ct-log">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PARAMANT · Certificate Transparency Log">
-<meta name="twitter:description" content="PARAMANT — Certificate Transparency Log">
+<meta name="twitter:description" content="PARAMANT: Certificate Transparency Log">
 <link rel="canonical" href="https://paramant.app/ct-log">
   <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -376,7 +376,7 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Public Audit Log</div>
   <h1>Certificate <span>Transparency</span></h1>
-  <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered — without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
+  <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered: without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
 </div>
 
 <div class="tabs">
@@ -387,9 +387,9 @@ body { min-height:100vh; }
 <div id="pane-log">
 <div class="notice" id="persistence-notice">
   <div class="body">
-    <strong>Persistent log — survives relay restarts</strong>
+    <strong>Persistent log: survives relay restarts</strong>
     <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
-    and reloaded on startup. No payload content is ever stored — only cryptographic hashes.
+    and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
     The log resets only when the relay volume is deleted.</span>
   </div>
 </div>
@@ -653,7 +653,7 @@ function verifyHash() {
   el.className = 'verify-result found';
   var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
              : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
-  el.innerHTML = '<strong>✓ Verified — found at index ' + esc(String(match.index)) + '</strong>'
+  el.innerHTML = '<strong>✓ Verified: found at index ' + esc(String(match.index)) + '</strong>'
     + '<pre>'
     + 'Matched field : ' + esc(field) + '\n'
     + 'Index         : ' + esc(String(match.index)) + '\n'
