@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Set up authenticator — Paramant</title>
+<title>Set up your account · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -166,32 +166,34 @@
 <main class="container-lg">
 
 <section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>account setup</div>
-  <h1>Scan the <em>QR code</em>.</h1>
+  <div class="eyebrow"><span class="bar"></span>step 3 of 5</div>
+  <h1>Choose how you <em>sign in</em>.</h1>
   <p class="lede">
-    One-time setup. Your authenticator app will generate 6-digit codes every 30 seconds.
+    Pick one. You can add the other later. This is the only real choice in setup.
   </p>
 </section>
 
-<!-- Start state (scanner-safe: no POST until user clicks) -->
+<!-- Step 3: pick a sign-in method. Passkey is recommended; the authenticator
+     route stays scanner-safe (no POST until the user clicks "instead"). -->
 <section id="state-loading" class="section">
-  <div class="marker">
-    <div class="num">&#8594;</div>
-    <h2>Ready to set up.</h2>
-    <div class="tag">starts<br>here</div>
-  </div>
-  <p class="lede" style="margin-top:16px">
-    Click the button below to generate your QR code and begin setup.
-  </p>
-  <div class="cta-row" style="margin-top:24px">
-    <button type="button" class="btn btn-primary" id="start-btn">Start setup</button>
+  <div class="card" style="border-left:3px solid #B2FF3F">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use a passkey &middot; Recommended</div>
+    <p style="margin:0 0 16px">
+      A passkey is like a key only your device has. You unlock it with your
+      fingerprint, face, or device PIN. Nothing to remember, nothing to type.
+      Best if you mostly use one phone or laptop.
+    </p>
+    <button type="button" class="btn btn-primary" id="passkey-register-btn">Set up a passkey</button>
+    <p id="passkey-status" class="small" aria-live="polite"></p>
   </div>
 
-  <div style="margin-top:28px">
-    <p class="small">Prefer a passkey? Use Face ID, Touch ID, Windows Hello, or a
-       security key &mdash; no authenticator app, and nothing to type at login.</p>
-    <button type="button" class="btn btn-secondary" id="passkey-register-btn">Set up a passkey instead</button>
-    <p id="passkey-status" class="small" aria-live="polite"></p>
+  <div class="card mt-3">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use an authenticator app</div>
+    <p style="margin:0 0 16px">
+      An app on your phone shows a fresh 6-digit code every 30 seconds. You type
+      that code to sign in. Good if you switch between many devices.
+    </p>
+    <button type="button" class="btn btn-secondary" id="start-btn">Use an authenticator app instead</button>
   </div>
 </section>
 
@@ -219,42 +221,25 @@
 
 <!-- Active setup -->
 <section id="state-active" class="section hidden">
-<div class="app-warning" role="alert">
-  <div class="app-warning__title">Google Authenticator, Microsoft Authenticator, and iCloud Keychain will NOT work.</div>
-  <p class="app-warning__body">Paramant uses SHA-256 TOTP. These apps only support SHA-1. If you scan this QR with them, every code you enter will fail at login &mdash; even when the code looks correct.</p>
-  <div class="app-warning__grid">
-    <div class="app-warning__no">Google Authenticator</div>
-    <div class="app-warning__yes">Authy</div>
-    <div class="app-warning__no">Microsoft Authenticator</div>
-    <div class="app-warning__yes">1Password</div>
-    <div class="app-warning__no">iCloud Keychain</div>
-    <div class="app-warning__yes">Aegis (Android)</div>
-    <div></div>
-    <div class="app-warning__yes">Raivo (iOS)</div>
-    <div></div>
-    <div class="app-warning__yes">Bitwarden &middot; Ente Auth &middot; 2FAS</div>
-  </div>
-  <a class="app-warning__link" href="/help/authenticator-apps">Why we use SHA-256 &rarr;</a>
-</div>
-
+  <div class="eyebrow"><span class="bar"></span>step 4 of 5</div>
   <div class="marker">
     <div class="num">01</div>
-    <h2>Scan with your authenticator.</h2>
-    <div class="tag">one-time<br>setup</div>
+    <h2>Add Paramant to your authenticator app.</h2>
+    <div class="tag">scan or<br>type the key</div>
   </div>
 
   <div class="setup-grid">
     <div class="qr-card">
       <div id="qr-code"></div>
       <p class="qr-caption">
-        Point your authenticator app at this code.
+        Open your authenticator app and scan this code.
       </p>
     </div>
 
     <div class="setup-info">
       <div class="info-row">
         <div class="info-label">Account</div>
-        <div class="info-value" id="setup-email">&mdash;</div>
+        <div class="info-value" id="setup-email">your account</div>
       </div>
 
       <div class="info-row">
@@ -263,17 +248,28 @@
       </div>
 
       <div class="info-row">
-        <div class="info-label">Manual entry</div>
+        <div class="info-label">Can't scan?</div>
         <div class="info-value">
-          <code class="secret-display" id="secret-display">&mdash;</code>
+          <code class="secret-display" id="secret-display">your key</code>
           <button type="button" class="btn btn-small btn-secondary" id="copy-secret">Copy</button>
         </div>
         <p class="small mt-2">
-          Use this if scanning fails. Enter it manually in your authenticator app.
+          Enter this key by hand in your authenticator app instead.
         </p>
       </div>
     </div>
   </div>
+
+  <details class="mt-4" style="border:1px solid var(--ink-hair,#E2E8F0);border-radius:6px;padding:14px 18px">
+    <summary style="cursor:pointer;font-weight:600;color:var(--navy)">Which apps work?</summary>
+    <p class="small mt-2" style="margin-bottom:0">
+      Paramant uses the stronger SHA-256 standard, so a few popular apps won't work. These do:
+      Raivo or 2FAS (iPhone), Aegis (Android), 1Password, Bitwarden, Authy, or Ente Auth.
+      Google Authenticator and Microsoft Authenticator do <strong>not</strong> work yet,
+      because they only support the older SHA-1 standard. If you have one of those, pick any app above instead.
+      <a href="/help/authenticator-apps">Why we use SHA-256</a>.
+    </p>
+  </details>
 </section>
 
 <!-- Verify -->
@@ -300,36 +296,39 @@
 
 <!-- Success + backup codes -->
 <section id="state-success" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>step 5 of 5</div>
   <div class="marker">
-    <div class="num">03</div>
-    <h2>Save your backup codes.</h2>
-    <div class="tag">one-time<br>display</div>
+    <div class="num">02</div>
+    <h2>Save your emergency codes.</h2>
+    <div class="tag">shown<br>once</div>
   </div>
 
   <div class="warning-box">
     <strong>Shown once. Save them now.</strong>
     <p>
-      Each code can be used exactly once to sign in without your authenticator. Save them in a password manager, print them, or store in a secure note.
+      These one-time codes get you back in if you ever lose your authenticator or your phone. We can't recover them for you, so keep them safe.
     </p>
   </div>
 
   <div id="backup-codes" class="backup-grid"></div>
 
   <div class="cta-row mt-3">
-    <button type="button" class="btn btn-secondary" id="copy-codes">Copy all</button>
-    <button type="button" class="btn btn-secondary" id="download-codes">Download .txt</button>
-    <button type="button" class="btn btn-secondary" id="print-codes">Print</button>
+    <button type="button" class="btn btn-primary" id="download-codes">Download my codes</button>
   </div>
+  <p class="small mt-2">
+    or <button type="button" id="copy-codes" style="background:none;border:none;color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">copy them</button>
+    &middot; <button type="button" id="print-codes" style="background:none;border:none;color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">print</button>
+  </p>
 
   <div class="form-checkbox mt-4">
     <input type="checkbox" id="saved-confirm">
     <label for="saved-confirm">
-      I have saved my backup codes in a safe place.
+      I have saved my codes somewhere safe.
     </label>
   </div>
 
   <button type="button" class="btn btn-primary mt-3" id="finish-btn" disabled>
-    Continue to dashboard
+    Finish setup
   </button>
 </section>
 
@@ -354,6 +353,27 @@
   </div>
 
   <button type="button" class="btn btn-primary mt-3" id="passkey-finish-btn">Continue to dashboard</button>
+</section>
+
+<!-- Welcome: a finish line, not another task. Shown after the TOTP route's
+     "Finish setup". (The passkey route's Continue still lands on /dashboard via
+     passkey.js; aligning it to this screen is a small follow-up: a passkey.js
+     edit + a site-wide passkey.js ?v= bump.) -->
+<section id="state-welcome" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>all set</div>
+  <h2>You're all set.</h2>
+  <p class="lede">What would you like to do first?</p>
+  <div class="grid2 mt-3">
+    <a href="/parashare" class="card" style="border-left:3px solid #B2FF3F;text-decoration:none;display:block">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Send a file</div>
+      <p class="small" style="margin:0">Encrypt and send something, private end to end.</p>
+    </a>
+    <a href="/sign" class="card" style="text-decoration:none;display:block">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Sign a document</div>
+      <p class="small" style="margin:0">Add your legally-binding signature to a PDF.</p>
+    </a>
+  </div>
+  <p class="small mt-3">You can always come back to this from your <a href="/dashboard">dashboard</a>.</p>
 </section>
 
 </main>
@@ -489,7 +509,8 @@
   });
 
   document.getElementById('finish-btn').addEventListener('click', function() {
-    window.location = '/dashboard';
+    show('state-welcome');
+    window.scrollTo(0, 0);
   });
 
   document.getElementById('start-btn').addEventListener('click', function() {

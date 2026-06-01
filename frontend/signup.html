@@ -4,16 +4,16 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Create account — Paramant</title>
-<meta name="description" content="Create a Paramant account. No password. Authenticator app required.">
+<title>Create account · Paramant</title>
+<meta name="description" content="Create a Paramant account. No password. Sign in with a passkey or an authenticator app.">
 <meta property="og:title" content="Create account · Paramant">
-<meta property="og:description" content="Create a Paramant account. No password. Authenticator app required.">
+<meta property="og:description" content="Create a Paramant account. No password. Sign in with a passkey or an authenticator app.">
 <meta property="og:url" content="https://paramant.app/signup">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Create account · Paramant">
-<meta name="twitter:description" content="Create a Paramant account. No password. Authenticator app required.">
+<meta name="twitter:description" content="Create a Paramant account. No password. Sign in with a passkey or an authenticator app.">
 <link rel="canonical" href="https://paramant.app/signup">
 <meta name="robots" content="index, follow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -131,7 +131,7 @@
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -214,7 +214,7 @@
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -270,98 +270,39 @@
 </div>
 
 <section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>create account</div>
-  <h1>Set up your <em>Paramant</em> account.</h1>
+  <div class="eyebrow"><span class="bar"></span>step 1 of 5</div>
+  <h1>Let's create your <em>account</em>.</h1>
   <p class="lede">
-    Three minutes. No password to create or remember.
+    We'll send a link to confirm it's you. No password to invent.
   </p>
 </section>
 
 <section class="section">
-  <div class="marker">
-    <div class="num">01</div>
-    <h2>What you get.</h2>
-    <div class="tag">three things<br>in one account</div>
-  </div>
-
-  <div class="grid2">
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        Email + authenticator login
-      </div>
-      <p style="margin:0">
-        Sign in with your email address and a 6-digit code from your authenticator app. One hour session. Works on paramant.app and in the Gmail/Outlook extensions.
-      </p>
-    </div>
-
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        API key for automation
-      </div>
-      <p style="margin:0">
-        Same account can be used from scripts, SDKs, and IoT devices. Your API key is visible in your account after setup. No TOTP required for headless use.
-      </p>
-    </div>
-
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        10 backup codes
-      </div>
-      <p style="margin:0">
-        Single-use recovery codes in case you lose your authenticator app. Shown once during setup. Save them in a password manager or print them.
-      </p>
-    </div>
-
-    <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px;color:var(--navy)">
-        No password
-      </div>
-      <p style="margin:0">
-        We do not store passwords. There is nothing to forget, reset, or phish. What we do not have, we cannot leak.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section class="section">
-  <div class="marker">
-    <div class="num">02</div>
-    <h2>Create your account.</h2>
-    <div class="tag">one field<br>to start</div>
-  </div>
-
   <div id="already-signed-in" hidden style="margin:24px 0;padding:16px;background:rgba(178,255,63,0.1);border-left:3px solid #B2FF3F;">
-  <p style="margin:0;">
-    You are already signed in as <strong id="already-email"></strong>.
-    <a href="/account" style="color:#1D4ED8;font-weight:600;">Go to your account</a>
-    or <button type="button" id="already-signout" style="background:none;border:none;color:#991b1b;font-weight:600;cursor:pointer;text-decoration:underline;">sign out first</button>.
-  </p>
-</div>
+    <p style="margin:0;">
+      You are already signed in as <strong id="already-email"></strong>.
+      <a href="/account" style="color:#1D4ED8;font-weight:600;">Go to your account</a>
+      or <button type="button" id="already-signout" style="background:none;border:none;color:#991b1b;font-weight:600;cursor:pointer;text-decoration:underline;">sign out first</button>.
+    </p>
+  </div>
 
-<form id="signup-form" class="form-card" novalidate>
+  <form id="signup-form" class="form-card" novalidate>
     <label for="email">Email address</label>
     <input type="email" id="email" name="email" required autocomplete="email"
-           placeholder="you@example.com">
+           placeholder="you@work.com">
 
-    <label for="label" class="mt-3">Label (optional)</label>
+    <label for="label" class="mt-3">Label <span style="font-weight:400;color:var(--ink-dim,#64748b)">(optional)</span></label>
     <input type="text" id="label" name="label" autocomplete="organization"
-           placeholder="Acme Legal, Ward 3A, Home Lab, etc.">
-    <p class="small mt-2">
-      A short descriptor that appears in your account. Not shown to recipients.
+           placeholder="Acme Legal, Ward 3A, Home Lab">
+    <p class="small mt-2">A short name for this account. Only you see it.</p>
+
+    <p class="small mt-3">
+      By continuing you agree to our <a href="/dpa" target="_blank">Data Processing Agreement</a>
+      and <a href="/privacy" target="_blank">privacy policy</a>. We store as little as possible and never sell data.
     </p>
 
-    <div class="form-checkbox mt-3">
-      <input type="checkbox" id="dpa-accept" required>
-      <label for="dpa-accept">
-        I accept the
-        <a href="/dpa" target="_blank">Data Processing Agreement</a>
-        and
-        <a href="/privacy" target="_blank">privacy policy</a>.
-      </label>
-    </div>
-
     <button type="submit" class="btn btn-primary mt-3" id="submit-btn">
-      Send setup email
+      Continue
     </button>
 
     <div id="error" class="error"></div>
@@ -369,36 +310,23 @@
   </form>
 
   <p class="footer-text mt-4">
-    Already have an account? <a href="/auth/login">Sign in</a><br>
-    
+    Already have an account? <a href="/auth/login">Sign in</a>
   </p>
 </section>
 
-<section class="section">
-  <div class="marker">
-    <div class="num">03</div>
-    <h2>What happens next.</h2>
-    <div class="tag">four steps<br>three minutes</div>
-  </div>
-
-  <ol class="numbered-list">
-    <li>
-      <strong>We email you a setup link.</strong>
-      Valid for 14 days, one time use. Check your inbox within a minute.
-    </li>
-    <li>
-      <strong>Click the link, scan a QR code.</strong>
-      In your authenticator app: Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth, or 2FAS. <strong>Not</strong> Google or Microsoft Authenticator &mdash; those only support SHA-1.
-    </li>
-    <li>
-      <strong>Enter the first 6-digit code to confirm.</strong>
-      Your account becomes active.
-    </li>
-    <li>
-      <strong>Save your backup codes.</strong>
-      10 single-use codes for recovery. Shown once.
-    </li>
-  </ol>
+<section class="section" id="step2" hidden>
+  <div class="eyebrow"><span class="bar"></span>step 2 of 5</div>
+  <h2>Check your inbox.</h2>
+  <p class="lede">
+    We sent a confirmation link to <strong id="step2-email"></strong>. Open it to continue.
+    If you can, open it on this device so setup stays in one place.
+  </p>
+  <p class="small mt-3">
+    Didn't get it? Check spam, or
+    <button type="button" id="resend-btn" style="background:none;border:none;color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit;">resend the link</button>.
+  </p>
+  <p class="small mt-2" id="resend-status" aria-live="polite"></p>
+  <p class="small mt-3" style="color:var(--ink-dim,#64748b)">The link works for 14 days.</p>
 </section>
 
 </main>
@@ -410,78 +338,68 @@
 (function() {
   const form = document.getElementById('signup-form');
   const errorDiv = document.getElementById('error');
-  const successDiv = document.getElementById('success');
   const submitBtn = document.getElementById('submit-btn');
+  const step2 = document.getElementById('step2');
+
+  // Shared signup call: invisible PoW, then POST. Throws {kind,...} on failure;
+  // callers own their own button/status so both the email form and the Step-2
+  // "resend" reuse it. dpa_accepted is true because continuing IS the agreement
+  // (the DPA is a line-with-link now, not a blocking checkbox).
+  async function doSignup(email, label, onProgress) {
+    let proof;
+    try { proof = await ParamantCaptcha.getCaptchaProof(onProgress || function(){}); }
+    catch (_) { throw { kind: 'captcha' }; }
+    const res = await fetch('/api/user/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, label, dpa_accepted: true, challenge_id: proof.challenge_id, nonce: proof.nonce }),
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw { kind: 'http', status: res.status, err }; }
+  }
+
+  function showError(e) {
+    if (e && e.kind === 'captcha') { errorDiv.textContent = 'Verification failed. Please try again.'; }
+    else if (e && e.kind === 'http') {
+      if (e.status === 403) errorDiv.textContent = 'Verification failed. Please refresh and try again.';
+      else if (e.status === 409) errorDiv.innerHTML = 'An account with this email already exists. <a href="/auth/login">Sign in</a>.';
+      else if (e.status === 422) errorDiv.textContent = 'This email domain is not accepted. Please use a real email address.';
+      else if (e.status === 429) errorDiv.textContent = 'Too many attempts. Please try again later.';
+      else errorDiv.textContent = (e.err && e.err.message) || 'Something went wrong. Please try again.';
+    } else { errorDiv.textContent = 'Network error. Please check your connection.'; }
+    errorDiv.classList.add('visible');
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorDiv.classList.remove('visible');
-    successDiv.classList.remove('visible');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending...';
-
     const email = document.getElementById('email').value.trim();
     const label = document.getElementById('label').value.trim();
-    const dpa = document.getElementById('dpa-accept').checked;
-
-    if (!email || !dpa) {
-      errorDiv.textContent = 'Please fill in email and accept the DPA.';
-      errorDiv.classList.add('visible');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Send setup email';
-      return;
-    }
-
+    if (!email) { errorDiv.textContent = 'Please enter your email address.'; errorDiv.classList.add('visible'); return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Verifying…';
     try {
-      // Solve PoW challenge (invisible to user, ~1-2s)
-      let proof;
-      try {
-        submitBtn.textContent = 'Verifying…';
-        proof = await ParamantCaptcha.getCaptchaProof(n => {
-          submitBtn.textContent = 'Verifying… (' + (n / 1000).toFixed(0) + 'k)';
-        });
-      } catch (_) {
-        errorDiv.textContent = 'Verification failed. Please try again.';
-        errorDiv.classList.add('visible');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Send setup email';
-        return;
-      }
-
-      const res = await fetch('/api/user/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, label, dpa_accepted: true, challenge_id: proof.challenge_id, nonce: proof.nonce }),
-      });
-
-      if (res.ok) {
-        successDiv.innerHTML = '<strong>Check your inbox.</strong> We sent a verification link to ' +
-          email + '. Click it to activate your account. The link expires in 24 hours.';
-        successDiv.classList.add('visible');
-        form.style.display = 'none';
-      } else {
-        const err = await res.json().catch(() => ({}));
-        if (res.status === 403) {
-          errorDiv.textContent = 'Verification failed. Please refresh and try again.';
-        } else if (res.status === 409) {
-          errorDiv.innerHTML = 'An account with this email already exists. <a href="/auth/login">Sign in</a>.';
-        } else if (res.status === 422) {
-          errorDiv.textContent = 'This email domain is not accepted. Please use a real email address.';
-        } else if (res.status === 429) {
-          errorDiv.textContent = 'Too many attempts. Please try again later.';
-        } else {
-          errorDiv.textContent = err.message || 'Something went wrong. Please try again.';
-        }
-        errorDiv.classList.add('visible');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Send setup email';
-      }
-    } catch (err) {
-      errorDiv.textContent = 'Network error. Please check your connection.';
-      errorDiv.classList.add('visible');
+      await doSignup(email, label, n => { submitBtn.textContent = 'Verifying… (' + (n / 1000).toFixed(0) + 'k)'; });
+      document.getElementById('step2-email').textContent = email;
+      form.style.display = 'none';
+      step2.hidden = false;
+      step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e2) {
+      showError(e2);
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Send setup email';
+      submitBtn.textContent = 'Continue';
     }
+  });
+
+  const resendBtn = document.getElementById('resend-btn');
+  if (resendBtn) resendBtn.addEventListener('click', async () => {
+    const status = document.getElementById('resend-status');
+    const email = document.getElementById('email').value.trim();
+    if (!email) return;
+    resendBtn.disabled = true;
+    status.style.color = ''; status.textContent = 'Sending…';
+    try { await doSignup(email, document.getElementById('label').value.trim()); status.textContent = 'Sent. Check your inbox again.'; }
+    catch (_) { status.style.color = 'var(--danger, #b91c1c)'; status.textContent = 'Could not resend. Try again in a moment.'; }
+    finally { resendBtn.disabled = false; }
   });
 })();
 </script>
@@ -516,7 +434,7 @@
   var map = {
     expired_token: {
       t: 'Your account is already active',
-      m: 'You\'ve already verified this email. <a href="/auth/login" style="background:#1D4ED8;color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-weight:600;display:inline-block;margin:6px 0">Sign in &rarr;</a> <br><span style="color:#78350F;font-size:13px">Need to finish authenticator setup? Look for the email <code>Complete your Paramant account setup</code> in your inbox. Use a SHA-256 app like Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth, or 2FAS &mdash; <strong>not</strong> Google or Microsoft Authenticator.</span>'
+      m: 'You\'ve already verified this email. <a href="/auth/login" style="background:#1D4ED8;color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-weight:600;display:inline-block;margin:6px 0">Sign in</a> <br><span style="color:#78350F;font-size:13px">Still finishing setup? Look for the email <code>Complete your Paramant account setup</code> in your inbox and open the link to continue.</span>'
     },
     invalid_token: {
       t: 'Verification link not recognised',
