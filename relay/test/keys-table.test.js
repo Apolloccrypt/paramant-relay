@@ -125,3 +125,40 @@ test('integration: migrate v1 file -> load -> rebuild produces consistent indexe
   assert.equal(kidIndex.size, 2);
   assert.equal(apiKeys.get('pgp_bob').account_id, 'pgp_bob');
 });
+
+// ── designatePrimary (stap 4) ────────────────────────────────────────────────
+function buildAccount() {
+  const apiKeys = new Map();
+  const set = (key, raw) => apiKeys.set(key, { plan: raw.plan || 'pro', label: raw.label || '', email: raw.email || '', active: raw.active !== false, ...kt.parseAccountFields({ ...raw, key }) });
+  set('pgp_primary', {});                                               // own account, seeded primary
+  set('pgp_second',  { account_id: 'pgp_primary', is_primary: false }); // a second key under that account
+  const accounts = new Map(), accountKeys = new Map(), kidIndex = new Map();
+  kt.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex);
+  return { apiKeys, accounts, accountKeys };
+}
+
+test('designatePrimary: promotes the chosen key, demotes the old, repoints the account', () => {
+  const { apiKeys, accounts, accountKeys } = buildAccount();
+  assert.equal(accounts.get('pgp_primary').primary_api_key, 'pgp_primary');
+
+  const r = kt.designatePrimary(apiKeys, accounts, accountKeys, 'pgp_primary', 'pgp_second');
+  assert.deepEqual(r, { previous: 'pgp_primary', current: 'pgp_second' });
+  assert.equal(apiKeys.get('pgp_second').is_primary, true);            // promoted
+  assert.equal(apiKeys.get('pgp_primary').is_primary, false);          // demoted
+  assert.equal(accounts.get('pgp_primary').primary_api_key, 'pgp_second');
+});
+
+test('designatePrimary: refuses a key from another account (no cross-account move)', () => {
+  const { apiKeys, accounts, accountKeys } = buildAccount();
+  assert.throws(() => kt.designatePrimary(apiKeys, accounts, accountKeys, 'pgp_other', 'pgp_second'),
+    (e) => e.code === 'key_account_mismatch');
+});
+
+test('designatePrimary: rejects unknown and inactive keys', () => {
+  const { apiKeys, accounts, accountKeys } = buildAccount();
+  assert.throws(() => kt.designatePrimary(apiKeys, accounts, accountKeys, 'pgp_primary', 'pgp_nope'),
+    (e) => e.code === 'key_not_found');
+  apiKeys.get('pgp_second').active = false;
+  assert.throws(() => kt.designatePrimary(apiKeys, accounts, accountKeys, 'pgp_primary', 'pgp_second'),
+    (e) => e.code === 'key_inactive');
+});
