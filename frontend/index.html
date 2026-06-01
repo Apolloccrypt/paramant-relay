@@ -138,6 +138,26 @@
 @keyframes cout2 { 0%, 47% { opacity: 0; } 52% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
 @keyframes cout3 { 0%, 80% { opacity: 0; } 85% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
 @keyframes c-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* ── ParaRules band: our policy, stated as the differentiator. Existing tokens
+   only; light ground, hairline grid, lime eyebrow + a "signature" underline on
+   the link. design-system.css / nav.css untouched. ── */
+.home-rules { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
+.rules-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
+.rules-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.rules-eyebrow span { display: inline-block; width: 22px; height: 2px; background: var(--lime); }
+.rules-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
+.rules-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
+.rules-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
+.rules-grid li { background: #fff; padding: var(--space-4); }
+.rules-grid .r-n { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--navy); opacity: .5; }
+.rules-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 6px 0 4px; }
+.rules-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+.rules-cta { text-align: center; margin-top: var(--space-5); }
+.rules-link { display: inline-block; font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 3px; }
+.rules-link:hover { color: var(--cobalt); }
+@media (max-width: 760px) { .rules-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .rules-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -386,6 +406,28 @@
       <a class="path-cta-sub" href="/docs">or read the docs</a>
       <p class="path-breadth">10 encrypted CLI tools &#183; backups, migrations, signing, CI</p>
     </div>
+  </div>
+</section>
+
+<section class="home-rules" aria-labelledby="rules-h">
+  <div class="rules-intro">
+    <p class="rules-eyebrow"><span></span>our policy</p>
+    <h2 id="rules-h">Everyone has a privacy policy. We have rules you can check.</h2>
+    <p class="rules-lede">The ParaRules are the principles we hold ourselves to, in the product and in the code. Not marketing copy: every one is something you can verify yourself.</p>
+  </div>
+  <ol class="rules-grid">
+    <li><span class="r-n">01</span><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p></li>
+    <li><span class="r-n">02</span><h3>Your browser talks only to us</h3><p>No third-party requests. No fonts, CDNs, analytics or pixels.</p></li>
+    <li><span class="r-n">03</span><h3>No surveillance</h3><p>No tracking cookies, no fingerprinting, no ad tech.</p></li>
+    <li><span class="r-n">04</span><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p></li>
+    <li><span class="r-n">05</span><h3>EU soil, EU law</h3><p>Hosted in Germany. No US CLOUD Act reach over your data.</p></li>
+    <li><span class="r-n">06</span><h3>Quantum-ready by default</h3><p>FIPS 203/204 today, not &ldquo;soon&rdquo;.</p></li>
+    <li><span class="r-n">07</span><h3>Honest by design</h3><p>No dark patterns. Real errors, never tidy lies.</p></li>
+    <li><span class="r-n">08</span><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, a relay that proves itself.</p></li>
+    <li><span class="r-n">09</span><h3>Only what&rsquo;s required</h3><p>An email, nothing more. Data we don&rsquo;t hold can&rsquo;t leak.</p></li>
+  </ol>
+  <div class="rules-cta">
+    <a class="rules-link" href="/pararules">Read all nine ParaRules <span aria-hidden="true">&rarr;</span></a>
   </div>
 </section>
 
