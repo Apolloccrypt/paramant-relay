@@ -10,6 +10,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Removed
+- **Thunderbird FileLink add-on retired.** `thunderbird-filelink/` removed from the
+  repo and the add-on unpublished from addons.thunderbird.net (it was status
+  `public` at v1.0.0, ~1 daily user). It shipped a base64 bug from 1.0.0 onward:
+  `toBase64` encoded in 8192-byte windows, so the relay's base64 decode truncated
+  every upload to ~8 KB and recipients could never decrypt. The ParaShare receiver
+  mode in `frontend/parashare.html` is kept: it serves the same burn-on-read link
+  format the Gmail and Outlook integrations produce.
 - **ParaDrop feature removed (relay side).** The anonymous burn-on-read drop
   webapp and its endpoints are gone: `frontend/drop.html`, the `/sw.js`
   ParaDrop service worker, the `/drop` sitemap entry and crypto-agility table

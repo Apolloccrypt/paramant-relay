@@ -126,7 +126,6 @@ Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 | Billing (Stripe integration) | Scaffold — Stripe connect pending |
 | Chromium browser extension | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
-| Thunderbird FileLink extension | Source in repo |
 
 **Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the WebApp tools (ParaShare), and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished — until that lands, treat extension uploads as relay-side, not zero-knowledge.
 
