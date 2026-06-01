@@ -5,7 +5,7 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B3A6A">
-<title>PARAMANT &mdash; Encrypted File Relay. Burn on Read.</title>
+<title>PARAMANT · Encrypted File Relay. Burn on Read.</title>
 <meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768 + ML-DSA-65. Burn-on-read. EU/DE. Send files, sign documents, deploy your own.">
 <meta property="og:title" content="Paramant · Encrypted file relay">
 <meta property="og:description" content="Post-quantum encrypted file relay. Burn on read. EU/DE.">
@@ -27,7 +27,7 @@
 <link rel="stylesheet" href="/parapear.css?v=1">
 <link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
-/* Homepage — compact 50/50 launchpad. Existing design tokens + classes only;
+/* Homepage: compact 50/50 launchpad. Existing design tokens + classes only;
    design-system.css, nav.css and nav.js are untouched. */
 .home-hero { text-align: center; max-width: 64ch; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-3); }
 .home-hero h1 { font-size: clamp(30px, 5.2vw, 50px); line-height: 1.05; letter-spacing: -0.025em; color: var(--navy); margin: 0 0 var(--space-3); }
@@ -56,7 +56,7 @@
 .home-act-ghost:hover { border-color: var(--navy); background: var(--bone); }
 .home-hi-name { color: var(--cobalt); }
 
-/* ── Homepage panel animations — now the centrepiece of each panel: a larger,
+/* ── Homepage panel animations: now the centrepiece of each panel: a larger,
    centred "screen" playing the loop, so the security is felt, not read. Pure
    CSS keyframes (no JS, CSP-safe), ~10s loops, deep-navy base with lime
    (#B2FF3F) on the "it works" beats. prefers-reduced-motion shows a static
@@ -69,8 +69,8 @@
 .path-anim text { font-family: var(--mono); font-weight: 600; letter-spacing: -.02em; }
 @media (max-width: 760px) { .path-anim { width: clamp(200px, 70vw, 280px); } }
 
-/* LEFT — two pillars in one loop: (1) SIGN the document (ML-DSA-65 curve →
-   "✓ signed"), then (2) SEND it — encrypt flicker → through the relay's RAM →
+/* LEFT: two pillars in one loop: (1) SIGN the document (ML-DSA-65 curve →
+   "✓ signed"), then (2) SEND it: encrypt flicker → through the relay's RAM →
    to the recipient → "✓ delivered · burn-on-read". ~10s. Base state
    (reduced-motion) = a signed document under the SIGN label. */
 .l-sig { stroke-dasharray: 66; stroke-dashoffset: 0; }
@@ -107,7 +107,7 @@
 @keyframes l-recv { 0%, 66% { opacity: .28; } 74% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: .28; } }
 @keyframes l-delivered { 0%, 76% { opacity: 0; transform: translateY(2px); } 84% { opacity: 1; transform: translateY(0); } 93% { opacity: 1; } 100% { opacity: 0; } }
 
-/* RIGHT — a terminal cycling through three of the ten CLI tools, ~10s loop,
+/* RIGHT: a terminal cycling through three of the ten CLI tools, ~10s loop,
    one tool block at a time: type the command, show the ✓ result, hold, next.
    Base state (reduced-motion) = the first tool block, no typing, static caret. */
 .cli { position: relative; font-family: var(--mono); font-size: clamp(5.6px, 0.86vw, 7px); line-height: 1.6; color: #cfe0f2; padding: 9px 9px; height: 100%; box-sizing: border-box; letter-spacing: -.02em; }

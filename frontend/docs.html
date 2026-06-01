@@ -423,7 +423,7 @@ curl -X POST https://health.paramant.app/v2/inbound \
   -H "Content-Type: application/json" \
   -d '{"hash":"sha256_of_payload","payload":"base64_5mb_blob","ttl_ms":3600000}'
 
-<span class="cm"># Retrieve (one-time — blob is burned after this)</span>
+<span class="cm"># Retrieve (one-time: blob is burned after this)</span>
 curl https://health.paramant.app/v2/outbound/abc123... \
   -H "X-Api-Key: pgp_your_key" -o received.bin</pre>
     </div>
@@ -470,10 +470,10 @@ gp = GhostPipe(
     sector  = "health",     <span class="cm"># routes to health.paramant.app</span>
 )
 
-<span class="cm"># Send — returns blob hash</span>
+<span class="cm"># Send: returns blob hash</span>
 hash_ = gp.send(open("scan.dcm", "rb").read(), ttl=3600)
 
-<span class="cm"># Receive — burn-on-read, returns plaintext bytes</span>
+<span class="cm"># Receive: burn-on-read, returns plaintext bytes</span>
 data = gp.receive(hash_)</pre>
     </div>
 
@@ -493,7 +493,7 @@ hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
     <h3><span class="sector-badge">legal</span>Legal &amp; Notary: eIDAS, KNB</h3>
     <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log provides tamper-evident proof of delivery without storing content.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
-    <pre><span class="cm"># Signed deed — burn-on-read, CT log entry as proof of delivery</span>
+    <pre><span class="cm"># Signed deed: burn-on-read, CT log entry as proof of delivery</span>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="notary-01", sector="legal")
 hash_, receipt = gp.send(open("deed.pdf","rb").read())
@@ -502,7 +502,7 @@ gp.verify_receipt(receipt)  <span class="cm"># ML-DSA-65 signed</span></pre></di
     <h3><span class="sector-badge">iot</span>Industrial IoT: IEC 62443</h3>
     <p>PLC and sensor data relay without VPN or direct OT internet exposure. Acts as a post-quantum data diode: OT side pushes outbound only, IT side receives. Fixed 5 MB padding defeats traffic analysis.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
-    <pre><span class="cm"># PLC telemetry — outbound only, no VPN, no inbound port</span>
+    <pre><span class="cm"># PLC telemetry: outbound only, no VPN, no inbound port</span>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="plc-factory-01", sector="iot")
 while True:
@@ -524,9 +524,9 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
     <h2 id="endpoints">All endpoints</h2>
     <table>
       <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth</th></tr>
-      <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>—</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob from an authenticated client (RAM-only)</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Deprecated. Anonymous upload retained for sdk-js 3.x backward compatibility; removed in a future major release. New integrations must use <code>/v2/inbound</code>.</td><td>—</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Deprecated. Anonymous upload retained for sdk-js 3.x backward compatibility; removed in a future major release. New integrations must use <code>/v2/inbound</code>.</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn: one retrieval only</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
@@ -535,11 +535,11 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket push: blob_ready events</td><td>Ticket / Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/webhook</td><td>Register delivery webhook URL</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/pubkey</td><td>Register ML-KEM + ECDH keypair</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/check-key</td><td>Verify key validity and plan</td><td>—</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/check-key</td><td>Verify key validity and plan</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/did/register</td><td>Register W3C Decentralized Identity</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>Resolve DID document</td><td>—</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency log (public)</td><td>—</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Registered relay nodes and status</td><td>—</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>Resolve DID document</td><td>n/a</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency log (public)</td><td>n/a</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Registered relay nodes and status</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain: JSON + CSV export</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>List team devices</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add device to team (Pro+)</td><td>Key</td></tr>
@@ -572,12 +572,12 @@ X-Api-Key: pgp_xxx
     <p>WebSocket endpoint for real-time <code>blob_ready</code> push notifications. Use a one-time ticket to avoid exposing the key in the URL.</p>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">javascript</span></div>
-      <pre><span class="cm">// Step 1 — get a one-time WebSocket ticket (30s TTL)</span>
+      <pre><span class="cm">// Step 1: get a one-time WebSocket ticket (30s TTL)</span>
 const { ticket } = await fetch('https://health.paramant.app/v2/ws-ticket', {
   method: 'POST', headers: { 'X-Api-Key': 'pgp_xxx' }
 }).then(r => r.json());
 
-<span class="cm">// Step 2 — connect with ticket (API key never appears in URL)</span>
+<span class="cm">// Step 2: connect with ticket (API key never appears in URL)</span>
 const ws = new WebSocket(`wss://health.paramant.app/v2/stream?ticket=${ticket}`);
 ws.onmessage = e => {
   const msg = JSON.parse(e.data);
@@ -645,7 +645,7 @@ curl http://localhost:3000/health
       <tr><td>relay-finance</td><td>127.0.0.1:3002</td><td>finance</td><td>finance.your-domain.com</td></tr>
       <tr><td>relay-legal</td><td>127.0.0.1:3003</td><td>legal</td><td>legal.your-domain.com</td></tr>
       <tr><td>relay-iot</td><td>127.0.0.1:3004</td><td>iot</td><td>iot.your-domain.com</td></tr>
-      <tr><td>admin</td><td>127.0.0.1:4200</td><td>—</td><td>your-domain.com/admin/</td></tr>
+      <tr><td>admin</td><td>127.0.0.1:4200</td><td>n/a</td><td>your-domain.com/admin/</td></tr>
     </table>
 
     <h3>Key .env variables</h3>
@@ -749,10 +749,10 @@ docker compose up -d --build
       <tr><td>paramant-admin</td><td>Manage users, keys, and relay config</td></tr>
       <tr><td>paramant-scan</td><td>Discover relay nodes on the network</td></tr>
     </table>
-    <pre><span class="cm"># Example — send a file and wait for ACK</span>
+    <pre><span class="cm"># Example: send a file and wait for ACK</span>
 paramant-send --key pgp_xxx --sector health --ack scan.dcm
 
-<span class="cm"># Example — stream mode (process persists, receives all blobs)</span>
+<span class="cm"># Example: stream mode (process persists, receives all blobs)</span>
 paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/api</pre>
 
     <!-- ── ParamantOS CLI tools ───────────────────────────────────── -->
