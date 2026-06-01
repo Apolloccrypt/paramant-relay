@@ -45,6 +45,20 @@ async function storeBackupCodes(redisClient, userId, codes) {
   if (hashes.length > 0) await redisClient.sAdd(key, hashes);
 }
 
+// Mint a fresh set of backup codes for a user: drop any existing set (codes are
+// single-use, so a replace is correct both on activation and on explicit
+// regenerate), generate a new batch, store the hashes, and return the plaintext
+// codes to the caller exactly once. This is the ONLY place plaintext codes are
+// produced, which is why activation can hand them straight to the user with no
+// separate lookup — and why a reloaded or re-issued setup page can never strand
+// the user on an empty set.
+async function regenerateBackupCodes(redisClient, userId, count = 10) {
+  await redisClient.del(`paramant:user:backup_codes:${userId}`);
+  const codes = generateBackupCodes(count);
+  await storeBackupCodes(redisClient, userId, codes);
+  return codes;
+}
+
 async function consumeBackupCode(redisClient, userId, providedCode) {
   const key = `paramant:user:backup_codes:${userId}`;
   const hashes = await redisClient.sMembers(key);
@@ -79,6 +93,7 @@ module.exports = {
   generateTotpSecret,
   generateBackupCodes,
   storeBackupCodes,
+  regenerateBackupCodes,
   consumeBackupCode,
   storeUserTotpSecret,
   getUserTotpSecret,

@@ -2200,11 +2200,12 @@ const server = http.createServer(async (req, res) => {
       } else {
         await redisClient.set(activeKey, "true");
       }
-      const backupCodes = userTotp.generateBackupCodes();
-      await userTotp.storeBackupCodes(redisClient, user_id, backupCodes);
-      // Backup codes returned once in the response; not stored in plaintext
+      // Backup codes are NOT minted here. They are generated once, at the moment
+      // activation succeeds (/v2/user/activate-totp), so a reloaded setup page, a
+      // second tab, or a re-issued setup link can never strand the user on an
+      // empty backup-code set. The setup step only provisions the TOTP secret.
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(J({ secret, backup_codes: backupCodes }));
+      return res.end(J({ secret, backup_codes: [] }));
     } catch (err) {
       console.error("[user/setup-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
@@ -2236,9 +2237,14 @@ const server = http.createServer(async (req, res) => {
     if (!_internalOk()) return _internalReject();
     const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
     await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
+    // Single source of truth for backup codes: mint them here, at the one moment
+    // activation succeeds, and return them exactly once. Generating them at
+    // activation (not at the QR/setup step) is what makes the whole flow robust
+    // against reloads, second tabs, and re-issued setup links.
     await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+    const backupCodes = await userTotp.regenerateBackupCodes(redisClient, user_id);
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ success: true }));
+    return res.end(J({ success: true, backup_codes: backupCodes }));
   }
 
   // POST /v2/user/consume-backup
@@ -2254,9 +2260,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && path === "/v2/user/regenerate-backup") {
     if (!_internalOk()) return _internalReject();
     const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    await redisClient.del(`paramant:user:backup_codes:${user_id}`);
-    const codes = userTotp.generateBackupCodes();
-    await userTotp.storeBackupCodes(redisClient, user_id, codes);
+    const codes = await userTotp.regenerateBackupCodes(redisClient, user_id);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(J({ backup_codes: codes }));
   }
