@@ -230,7 +230,10 @@
   const submitBtn = document.getElementById('submit-btn');
 
   const params = new URLSearchParams(window.location.search);
-  const returnUrl = params.get('return') || '/dashboard';
+  // Honour both the nginx gate's ?next= and legacy ?return= links. Local paths
+  // only (leading single slash, no // or /\) so it can't become an open redirect.
+  const _rv = params.get('next') || params.get('return') || '/dashboard';
+  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -290,7 +293,7 @@
   }
 })();
 </script>
-<script type="module" src="/js/passkey.js?v=2"></script>
+<script type="module" src="/js/passkey.js?v=3"></script>
 
 </body>
 </html>

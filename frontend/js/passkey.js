@@ -144,7 +144,9 @@ function wireLoginPasskey() {
     return;
   }
 
-  const returnUrl = new URLSearchParams(window.location.search).get('return') || '/dashboard';
+  const _rp = new URLSearchParams(window.location.search), _rv = _rp.get('next') || _rp.get('return') || '/dashboard';
+  // Local paths only (leading single slash) — never an off-site open redirect.
+  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
 
   btn.addEventListener('click', async () => {
     const email = (emailEl && emailEl.value || '').trim();
@@ -271,7 +273,9 @@ function wireDiscoverablePasskey() {
 
   if (!browserSupportsWebAuthn()) { btn.disabled = true; return; }
 
-  const returnUrl = new URLSearchParams(window.location.search).get('return') || '/dashboard';
+  const _rp = new URLSearchParams(window.location.search), _rv = _rp.get('next') || _rp.get('return') || '/dashboard';
+  // Local paths only (leading single slash) — never an off-site open redirect.
+  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
