@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Security — PARAMANT</title>
+<title>Security · Paramant</title>
 <meta name="description" content="How PARAMANT approaches security: post-quantum crypto, independent audit, responsible disclosure, relay architecture.">
 <meta property="og:title" content="Security · PARAMANT">
 <meta property="og:description" content="How PARAMANT approaches security: post-quantum crypto, independent audit, responsible disclosure, relay architecture.">
@@ -46,7 +46,7 @@ em{color:var(--cobalt)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .stat-n{font-size:32px;font-weight:600;color:var(--ink);margin-bottom:4px}
 .stat-l{font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.04em}
-.check{color:var(--ink);margin-right:8px}
+.check{color:var(--lime);margin-right:8px}
 .table{width:100%;border-collapse:collapse}
 .table th{text-align:left;padding:10px 14px;color:var(--ink-dim);font-weight:500;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--ink-hair)}
 .table td{padding:10px 14px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost);vertical-align:top;font-size:var(--text-sm)}
@@ -312,7 +312,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h3>Core principle</h3>
   <div class="card">
-    <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy — it is a cryptographic guarantee.</p>
+    <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy. It is a cryptographic guarantee.</p>
   </div>
 
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
@@ -332,11 +332,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tr><th>Algorithm</th><th>Role</th><th>Standard</th></tr>
     </thead>
     <tbody>
-      <tr><td>ML-KEM-768</td><td>Key encapsulation — post-quantum KEM</td><td>NIST FIPS 203</td></tr>
+      <tr><td>ML-KEM-768</td><td>Key encapsulation (post-quantum KEM)</td><td>NIST FIPS 203</td></tr>
       <tr><td>ECDH P-256</td><td>Classical key exchange (hybrid)</td><td>NIST SP 800-56A</td></tr>
       <tr><td>HKDF-SHA256</td><td>Key derivation from shared secrets</td><td>RFC 5869</td></tr>
       <tr><td>AES-256-GCM</td><td>Symmetric encryption + authentication</td><td>NIST SP 800-38D</td></tr>
-      <tr><td>ML-DSA-65</td><td>Digital signatures — relay identity</td><td>NIST FIPS 204</td></tr>
+      <tr><td>ML-DSA-65</td><td>Digital signatures (relay identity)</td><td>NIST FIPS 204</td></tr>
       <tr><td>Argon2id</td><td>Password-based blob encryption</td><td>RFC 9106</td></tr>
       <tr><td>SHA3-256</td><td>CT log Merkle hashing</td><td>NIST FIPS 202</td></tr>
     </tbody>
@@ -345,10 +345,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <h3>Hybrid key exchange</h3>
   <p>ParaShare authenticated transfers use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
 
-  <p style="margin-top:10px;font-size:var(--text-sm);color:var(--ink-dim)">See also: <a href="/hndl">Harvest Now, Decrypt Later &rarr;</a> — why data collected today can be decrypted at Q-Day, and how RAM-only transfer removes the target.</p>
+  <p style="margin-top:10px;font-size:var(--text-sm);color:var(--ink-dim)">See also: <a href="/hndl">Harvest Now, Decrypt Later &rarr;</a>. Why data collected today can be decrypted at Q-Day, and how RAM-only transfer removes the target.</p>
 
   <h3>Pre-shared secret (PSS)</h3>
-  <p>An optional out-of-band password added to HKDF input. Even a fully compromised relay cannot decrypt PSS-protected transfers — the relay would need to serve the correct ciphertext <em>and</em> know the PSS. Recommended for healthcare and legal workflows.</p>
+  <p>An optional out-of-band password added to HKDF input. Even a fully compromised relay cannot decrypt PSS-protected transfers: the relay would need to serve the correct ciphertext <em>and</em> know the PSS. Recommended for healthcare and legal workflows.</p>
 
   <hr class="divider">
 
@@ -369,20 +369,20 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">ML-DSA-65 relay identity</div>
-      <p style="margin:0">Each relay generates a post-quantum signing keypair on first boot. Registrations are signed and logged in the CT chain — verified_since proves continuous identity.</p>
+      <p style="margin:0">Each relay generates a post-quantum signing keypair on first boot. Registrations are signed and logged in the CT chain, and verified_since proves continuous identity.</p>
     </div>
   </div>
 
   <h3>What a compromised relay cannot do</h3>
   <div class="card">
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div><span class="check">&#10003;</span><span>Read file contents — relay holds only ciphertext, never keys</span></div>
+      <div><span class="check">&#10003;</span><span>Read file contents: relay holds only ciphertext, never keys</span></div>
       <div><span class="check">&#10003;</span><span>Substitute a registered public key (after TOFU or PSS is used)</span></div>
-      <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext — no key access</span></div>
-      <div><span class="check">&#10003;</span><span>Identify ParaShare transfer size — authenticated transfers look identical (fixed 5 MB padding)</span></div>
-      <div><span class="check">&#10003;</span><span>Recover burned blobs — memory is zeroed immediately on download</span></div>
-      <div><span class="check">&#10003;</span><span>Forge CT log entries — Merkle chain is append-only and tamper-evident</span></div>
-      <div><span class="check">&#10003;</span><span>Break ML-KEM-768 — NIST FIPS 203, post-quantum secure</span></div>
+      <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
+      <div><span class="check">&#10003;</span><span>Identify ParaShare transfer size: authenticated transfers look identical (fixed 5 MB padding)</span></div>
+      <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed immediately on download</span></div>
+      <div><span class="check">&#10003;</span><span>Forge CT log entries: Merkle chain is append-only and tamper-evident</span></div>
+      <div><span class="check">&#10003;</span><span>Break ML-KEM-768: NIST FIPS 203, post-quantum secure</span></div>
     </div>
   </div>
 
@@ -433,22 +433,22 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </thead>
     <tbody>
       <tr>
-        <td>1 — TOFU</td>
+        <td>1 · TOFU</td>
         <td>First-use fingerprint stored locally. Every subsequent fetch must match.</td>
         <td>Key swap after first contact</td>
       </tr>
       <tr>
-        <td>2 — Out-of-band</td>
+        <td>2 · Out-of-band</td>
         <td>Both parties compute the same SHA-256 fingerprint and compare via phone/Signal/QR.</td>
         <td>Relay MITM on first contact</td>
       </tr>
       <tr>
-        <td>3 — PSS</td>
+        <td>3 · PSS</td>
         <td>Pre-shared secret mixed into HKDF. Wrong key = undecryptable ciphertext.</td>
         <td>Relay MITM at any time</td>
       </tr>
       <tr>
-        <td>4 — CT log + ML-DSA-65</td>
+        <td>4 · CT log + ML-DSA-65</td>
         <td>Key registrations are signed and logged in Merkle chain. Retroactive injection is impossible.</td>
         <td>Key injection, timestamp fraud</td>
       </tr>
@@ -463,7 +463,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tbody>
         <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
-        <tr><td>US CLOUD Act</td><td>Not applicable — no US infrastructure, no US company</td></tr>
+        <tr><td>US CLOUD Act</td><td>Not applicable: no US infrastructure, no US company</td></tr>
         <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
         <tr><td>IP logging</td><td>Nginx access logs. Not linked to transfer content. Retention: 7 days.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
@@ -475,8 +475,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2 id="responsible-disclosure">Responsible disclosure</h2>
   <div class="card">
-    <p style="margin-bottom:16px">Report to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> &mdash; encrypted with our <a href="/.well-known/openpgp-key.asc">PGP key</a> if the details are sensitive. Do not open a public GitHub issue before coordinating.</p>
-    <p style="margin:0 0 16px;font-size:var(--text-sm);color:var(--ink-dim)">PGP key fingerprint &mdash; verify before encrypting:<br><code style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink);letter-spacing:.04em">09AA 452A 69DE F4A4 EB4B&nbsp;&nbsp;72DC 5A34 D82F DAF3 54CD</code></p>
+    <p style="margin-bottom:16px">Report to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, encrypted with our <a href="/.well-known/openpgp-key.asc">PGP key</a> if the details are sensitive. Do not open a public GitHub issue before coordinating.</p>
+    <p style="margin:0 0 16px;font-size:var(--text-sm);color:var(--ink-dim)">PGP key fingerprint, verify before encrypting:<br><code style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink);letter-spacing:.04em">09AA 452A 69DE F4A4 EB4B&nbsp;&nbsp;72DC 5A34 D82F DAF3 54CD</code></p>
     <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--ink-hair)">
       <div style="font-size:var(--text-base);line-height:1.8">
         <div><span style="color:var(--ink-dim);font-size:var(--text-xs);min-width:160px;display:inline-block">Acknowledgement</span>Within 48 hours</div>
@@ -505,9 +505,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <table class="table" style="margin-top:16px">
     <thead><tr><th>Component</th><th>Configuration</th></tr></thead>
     <tbody>
-      <tr><td>SSH KEX</td><td>mlkem768x25519-sha256 + curve25519 — ML-KEM FIPS 203</td></tr>
-      <tr><td>SSH host key</td><td>Ed25519 only — no RSA, no ECDSA</td></tr>
-      <tr><td>SSH auth</td><td>Public key only — no passwords, no GSSAPI, no forwarding</td></tr>
+      <tr><td>SSH KEX</td><td>mlkem768x25519-sha256 + curve25519 (ML-KEM FIPS 203)</td></tr>
+      <tr><td>SSH host key</td><td>Ed25519 only: no RSA, no ECDSA</td></tr>
+      <tr><td>SSH auth</td><td>Public key only: no passwords, no GSSAPI, no forwarding</td></tr>
       <tr><td>Kernel</td><td>unprivileged_bpf_disabled=1, kptr_restrict=2, bpf_jit_harden=2</td></tr>
       <tr><td>Firewall</td><td>Ports 22 + 3000–3004 only</td></tr>
       <tr><td>Service isolation</td><td>Dedicated system user, systemd NoNewPrivileges, ProtectSystem=strict</td></tr>
