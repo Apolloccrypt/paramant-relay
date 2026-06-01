@@ -186,15 +186,15 @@ async function prepareSigning() {
     __signKey = await resolvePasskeySigningKey();
   } catch (e) {
     if (e && e.code === 'no_signing_passkey') {
-      setStatus('warn', 'Signed in as ' + escapeHtml(__session.email || 'your account') + ', but this device has no signing passkey yet. Set one up, then return to this link.');
-      showCta('<a class="btn btn-outline" href="/account">Set up a signing passkey</a>');
+      setStatus('warn', 'Signed in as ' + escapeHtml(__session.email || 'your account') + ', but signing isn\'t set up on this device yet. Set it up, then return to this link.');
+      showCta('<a class="btn btn-outline" href="/account">Set up your signing key</a>');
     } else {
       setStatus('err', e.message || 'Could not check your signing key.');
     }
     return;
   }
 
-  setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You will sign with your passkey-protected key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
+  setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your signing key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
   $('sign-confirm').onclick = doSign;
   refreshSignGate();   // stays disabled until the document has been reviewed (or blind-signing is acknowledged)
 }
@@ -335,7 +335,7 @@ async function doSign() {
 
     // 2) Passkey-PRF unlock + sign of the v3 domain-prefixed message. The secret
     //    key lives ONLY inside the ActivatedSigner and is zeroized by dispose().
-    setStatus('', 'Confirm with your passkey (Face ID / Touch ID / security key)...');
+    setStatus('', 'Confirm to sign (Face ID / Touch ID / security key)...');
     const signer = await new LocalVaultSigner().activate({ vaultId: __signKey.vaultId, rpId: location.hostname });
     let sigB64;
     try {
