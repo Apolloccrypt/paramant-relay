@@ -29,6 +29,14 @@ jobs:
           | xargs -0 -n1 bash -n
           echo "All shell scripts parse OK."
 
+  frontend-cache-bust:
+    name: frontend — cache-bust guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: All local css/js links must carry a single ?v= cache-bust
+        run: scripts/check-cache-bust.sh
+
   relay-crypto-tests:
     name: relay - crypto suite (@paramant/core)
     runs-on: ubuntu-latest
