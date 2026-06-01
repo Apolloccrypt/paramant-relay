@@ -366,10 +366,10 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
   </div>
   <hr class="acct-divider">
   <div class="acct-block">
-    <h3>Set up a signing passkey</h3>
+    <h3>Set up your signing key</h3>
     <p class="small">
-      Creates your ML-DSA-65 signing key in this browser, protected by your passkey
-      (Face ID / Touch ID / security key). The passphrase is your recovery floor &mdash;
+      Creates your ML-DSA-65 signing key in this browser, unlocked with Face ID /
+      Touch ID / a security key when you sign. The passphrase is your recovery floor &mdash;
       we never see it and cannot reset it, so store it safely. Adding a signing key needs
       your authenticator code.
     </p>
@@ -378,7 +378,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
       <input type="password" id="signing-enrol-pass" placeholder="Recovery passphrase (min 12 characters)" autocomplete="new-password">
       <input type="password" id="signing-enrol-pass2" placeholder="Confirm passphrase" autocomplete="new-password">
       <div>
-        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Set up signing passkey</button>
+        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Set up signing</button>
       </div>
     </div>
     <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
@@ -684,7 +684,7 @@ async function loadEnrolledKeys() {
     const data = await res.json();
     const keys = (data.keys || []);
     if (!keys.length) {
-      emptyEl.textContent = 'No signing keys enrolled yet. Use "Set up a signing passkey" below to create one.';
+      emptyEl.textContent = 'No signing keys enrolled yet. Use "Set up your signing key" below to create one.';
       listEl.innerHTML = '';
       return;
     }
@@ -739,7 +739,7 @@ async function loadVaultStatus() {
   try {
     const list = await vaultList();
     if (!list.length) {
-      el.textContent = 'No signing key in this browser yet. Use "Set up a signing passkey" below.';
+      el.textContent = 'No signing key in this browser yet. Use "Set up your signing key" below.';
       return;
     }
     const fmt = e => (e.label ? e.label : '(no label)') + ' [' + (e.pk_hash || '').slice(0, 12) + '...]';
@@ -757,7 +757,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js"></script>
-<script type="module" src="/js/signing-enrol.js?v=3"></script>
+<script type="module" src="/js/signing-enrol.js?v=4"></script>
 
 </body>
 </html>
