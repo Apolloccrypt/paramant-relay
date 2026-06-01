@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=2';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=3';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -411,6 +411,22 @@ async function initStepIdentity() {
   showSigningIdentity().catch(() => {});
 }
 
+// Does this ACCOUNT have a signing key bound on the server, even though THIS
+// browser's vault has none? The signing key's private half + PRF wrap live
+// per-browser in IndexedDB; the server only holds the public binding. A key
+// enrolled on your phone is therefore NOT usable in a desktop browser — each
+// browser enrols once. This lets the hint say "set it up on this device too"
+// instead of the misleading "you don't have a signing passkey", which is what
+// made it feel like a loop when signing across devices.
+async function serverHasSigningKey() {
+  try {
+    const r = await fetch('/api/user/account/signing-key', { credentials: 'include' });
+    if (!r.ok) return false;
+    const body = await r.json().catch(() => ({}));
+    return Array.isArray(body.keys) && body.keys.some((k) => !k.revoked_at);
+  } catch { return false; }
+}
+
 // Display the passkey signing identity in the identity step (read-only, public
 // metadata only — no unlock). If none is enrolled, deep-link to the enrol
 // flow on /account (the "Set up a signing passkey" card).
@@ -426,7 +442,11 @@ async function showSigningIdentity() {
   } catch (e) {
     el.className = 'ds-hint';
     if (e && e.code === 'no_signing_passkey') {
-      el.innerHTML = 'You don\'t have a signing passkey on this device yet — you need one to sign. <a href="/account#signing-identity-section" class="btn btn-primary btn-small" style="margin-top:8px;display:inline-block">Set up a signing passkey →</a>';
+      const elsewhere = await serverHasSigningKey();
+      el.innerHTML = (elsewhere
+        ? 'Your signing key was set up in another browser or on another device. Signing keys live in the browser where you create them, so set one up here too. '
+        : 'You don\'t have a signing passkey on this device yet — you need one to sign. ') +
+        '<a href="/account#signing-identity-section" class="btn btn-primary btn-small" style="margin-top:8px;display:inline-block">Set up a signing passkey →</a>';
     } else {
       el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
     }
