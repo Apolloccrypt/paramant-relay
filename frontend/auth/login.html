@@ -20,6 +20,7 @@
 .auth-or { display: flex; align-items: center; gap: 10px; margin: var(--space-3) 0; color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--ink-hair); }
 .auth-foot { text-align: center; margin-top: var(--space-4); }
+.auth-recovery { max-width: 380px; margin: var(--space-4) auto 0; }
 [hidden] { display: none !important; }
 .auth-sub { text-align: center; color: var(--ink-dim); font-size: 14px; margin: var(--space-2) 0 0; }
 .auth-hint { text-align: center; color: var(--ink-dim); font-size: 12px; margin: 8px 0 0; line-height: 1.5; }
@@ -213,9 +214,16 @@
   </div>
 </form>
 
+<div class="auth-recovery">
+  <a href="/auth/request-reset" class="btn btn-secondary" style="width:100%">Email me a sign-in link</a>
+  <p class="small" style="margin:8px 0 0;color:var(--ink-dim);text-align:center">
+    For a new account that still needs setup, or if you have lost your authenticator.
+    If an account exists for that email, we send a link; nothing is shown either way.
+  </p>
+</div>
+
 <p class="footer-text auth-foot">
   Lost your authenticator? <a href="/auth/backup">Use a backup code</a><br>
-  No backup codes? <a href="/auth/request-reset">Request a reset email</a><br>
   Don&rsquo;t have an account? <a href="/signup">Create one</a>
 </p>
 
@@ -252,13 +260,19 @@
       if (res.ok) {
         window.location = returnUrl;
       } else if (res.status === 401) {
-        errorDiv.textContent = 'Invalid email or code.';
+        // Neutral, dual-path copy. The server returns an identical
+        // 401 invalid_credentials for every failed sign-in (wrong code, inactive
+        // account, admin-required setup, or no such account), so this single
+        // branch with one fixed string is all the user ever sees. The "if this
+        // account needs setup" phrasing is true in every case and reveals
+        // nothing: there is no status, body, or wording that varies by account
+        // state, so it cannot be used as an account-enumeration oracle. (The
+        // server-side setup email is sent fire-and-forget for the setup case;
+        // the on-screen result does not depend on whether it was sent.)
+        errorDiv.textContent = 'We could not sign you in. If this account still needs setup, we have emailed a sign-in link to that address, so check your inbox. Otherwise, check your code and try again, or use "Email me a sign-in link" below.';
         errorDiv.classList.add('visible');
-        document.getElementById('totp').value = '';
-        document.getElementById('totp').focus();
-      } else if (res.status === 403) {
-        errorDiv.innerHTML = 'No authenticator linked to this account. <a href="/auth/request-reset">Request a setup link</a> or <a href="/signup">create an account</a>.';
-        errorDiv.classList.add('visible');
+        var totpEl = document.getElementById('totp');
+        if (totpEl) { totpEl.value = ''; totpEl.focus(); }
       } else if (res.status === 429) {
         errorDiv.textContent = 'Too many attempts. Try again in 15 minutes.';
         errorDiv.classList.add('visible');
