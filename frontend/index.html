@@ -36,6 +36,7 @@
 .path-cta { margin-top: auto; }
 .path-cta-sub { display: inline-block; margin-top: var(--space-2); font-size: 13px; color: var(--ink-dim); text-decoration: underline; }
 .path-cta-sub:hover { color: var(--navy); }
+.path-breadth { margin: var(--space-2) 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: .02em; color: var(--ink-dim); }
 .path-pear { position: absolute; top: var(--space-4); right: var(--space-4); width: clamp(56px, 8vw, 84px); height: auto; opacity: .92; transform: scaleX(-1); user-select: none; -webkit-user-drag: none; }
 @media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } .path { min-height: 0; } }
 
@@ -45,62 +46,89 @@
    static completed frame (the elements' base state). design-system.css and
    nav.css are untouched — everything here is scoped to .path-anim / .cli. ── */
 .path-anim { position: absolute; top: var(--space-4); right: var(--space-4);
-  width: clamp(116px, 17vw, 154px); aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+  width: clamp(124px, 17vw, 164px); aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
   background: #0a1626; box-shadow: 0 3px 14px rgba(11,58,106,.22), inset 0 0 0 1px rgba(178,255,63,.10);
   user-select: none; --lime: #B2FF3F; --doc: #e7edf6; --ln: #56789f; --dim: #88a6cb; }
 .path-anim svg { display: block; width: 100%; height: 100%; }
 .path-anim text { font-family: var(--mono); font-weight: 600; letter-spacing: -.02em; }
 /* keep the panel text clear of the corner box (no grid/spacing change) */
-.path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: clamp(0px, 18vw, 124px); }
+.path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: clamp(0px, 19vw, 138px); }
 @media (max-width: 760px) {
   .path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: 0; }
   .path-anim { position: static; order: -1; margin: 0 0 var(--space-3); width: clamp(160px, 50vw, 200px); }
 }
 
-/* LEFT — sign → send. Base state (reduced-motion / no animation) = signed document. */
-.l-sig { stroke-dasharray: 64; stroke-dashoffset: 0; }
-.l-badge, .l-signed { opacity: 1; }
-.l-recv { opacity: .35; }
-.l-cloud, .l-delivered { opacity: 0; }
+/* LEFT — two pillars in one loop: (1) SIGN the document (ML-DSA-65 curve →
+   "✓ signed"), then (2) SEND it — encrypt flicker → through the relay's RAM →
+   to the recipient → "✓ delivered · burn-on-read". ~10s. Base state
+   (reduced-motion) = a signed document under the SIGN label. */
+.l-sig { stroke-dasharray: 66; stroke-dashoffset: 0; }
+.l-badge, .l-signed, .l-phase1 { opacity: 1; }
+.l-relay, .l-recv { opacity: .3; }
+.l-enc, .l-delivered, .l-phase2 { opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
+  .l-phase1    { animation: l-phase1 10s ease-in-out infinite; }
+  .l-phase2    { animation: l-phase2 10s ease-in-out infinite; }
   .l-doc       { animation: l-doc 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
   .l-sig       { animation: l-sig 10s ease-in-out infinite; }
   .l-badge     { animation: l-badge 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
   .l-signed    { animation: l-signed 10s ease-in-out infinite; }
+  .l-enc       { animation: l-enc 10s steps(1, end) infinite; }
+  .l-relay     { animation: l-relay 10s ease-in-out infinite; }
   .l-recv      { animation: l-recv 10s ease-in-out infinite; }
-  .l-cloud     { animation: l-cloud 10s steps(1, end) infinite; }
   .l-delivered { animation: l-delivered 10s ease-in-out infinite; }
 }
-@keyframes l-doc { 0% { opacity: 0; transform: translateX(0) scale(.9); } 4% { opacity: 1; transform: translateX(0) scale(1); }
-  40% { opacity: 1; transform: translateX(0) scale(1); } 58% { opacity: 1; transform: translateX(58px) scale(.82); }
-  64% { opacity: 0; transform: translateX(58px) scale(.82); } 92% { opacity: 0; transform: translateX(58px) scale(.82); }
-  100% { opacity: 0; transform: translateX(0) scale(.9); } }
-@keyframes l-sig { 0%, 8% { stroke-dashoffset: 64; opacity: 1; } 24% { stroke-dashoffset: 0; } 52% { stroke-dashoffset: 0; opacity: 1; } 60% { opacity: 0; } 100% { opacity: 0; stroke-dashoffset: 64; } }
-@keyframes l-badge { 0%, 24% { opacity: 0; transform: scale(.5); } 32% { opacity: 1; transform: scale(1); } 50% { opacity: 1; } 58% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes l-signed { 0%, 30% { opacity: 0; } 38% { opacity: 1; } 50% { opacity: 1; } 57% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes l-recv { 0%, 40% { opacity: .18; } 58% { opacity: .18; } 61% { opacity: 1; } 74% { opacity: 1; } 92% { opacity: .45; } 100% { opacity: .18; } }
-@keyframes l-cloud { 0%, 43% { opacity: 0; } 46% { opacity: .9; } 49% { opacity: .35; } 52% { opacity: .95; } 55% { opacity: .45; } 58% { opacity: .9; } 63% { opacity: .55; } 66% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes l-delivered { 0%, 65% { opacity: 0; transform: translateY(2px); } 73% { opacity: 1; transform: translateY(0); } 92% { opacity: 1; } 100% { opacity: 0; } }
+/* phase 1 = sign (≈0–48%) · phase 2 = send (≈48–100%) */
+@keyframes l-phase1 { 0% { opacity: 0; } 4% { opacity: 1; } 44% { opacity: 1; } 49% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-phase2 { 0%, 46% { opacity: 0; } 51% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes l-doc {
+  0%   { opacity: 0; transform: translate(0,0) scale(.9); }
+  4%   { opacity: 1; transform: translate(0,0) scale(1); }
+  56%  { opacity: 1; transform: translate(0,0) scale(1); }
+  74%  { opacity: 1; transform: translate(86px,6px) scale(.42); }
+  82%  { opacity: 0; transform: translate(86px,6px) scale(.42); }
+  100% { opacity: 0; transform: translate(0,0) scale(.9); } }
+@keyframes l-sig { 0%, 8% { stroke-dashoffset: 66; } 26% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
+@keyframes l-badge { 0%, 26% { opacity: 0; transform: scale(.4); } 34% { opacity: 1; transform: scale(1); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes l-signed { 0%, 30% { opacity: 0; transform: translateY(2px); } 38% { opacity: 1; transform: translateY(0); } 46% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-enc { 0%, 49% { opacity: 0; } 50% { opacity: .95; } 52% { opacity: .35; } 54% { opacity: .9; } 56% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-relay { 0%, 56% { opacity: .28; } 62% { opacity: 1; } 72% { opacity: 1; } 82% { opacity: .4; } 100% { opacity: .28; } }
+@keyframes l-recv { 0%, 66% { opacity: .28; } 74% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: .28; } }
+@keyframes l-delivered { 0%, 76% { opacity: 0; transform: translateY(2px); } 84% { opacity: 1; transform: translateY(0); } 93% { opacity: 1; } 100% { opacity: 0; } }
 
-/* RIGHT — CLI terminal. Base state = fully typed (reduced-motion friendly). */
-.cli { font-family: var(--mono); font-size: clamp(5.4px, 0.83vw, 6.8px); line-height: 1.62; color: #cfe0f2; padding: 9px 9px; height: 100%; box-sizing: border-box; letter-spacing: -.02em; }
-.cli .c-line { white-space: nowrap; overflow: hidden; clip-path: inset(0 0 0 0); }
-.cli .c-cmd { color: #e7edf6; } .cli .c-key { color: #9db8d6; } .cli .c-ok { color: var(--lime); } .cli .c-dots { color: var(--dim); } .cli .c-prompt { color: var(--lime); }
+/* RIGHT — a terminal cycling through three of the ten CLI tools, ~10s loop,
+   one tool block at a time: type the command, show the ✓ result, hold, next.
+   Base state (reduced-motion) = the first tool block, no typing, static caret. */
+.cli { position: relative; font-family: var(--mono); font-size: clamp(5.6px, 0.86vw, 7px); line-height: 1.6; color: #cfe0f2; padding: 9px 9px; height: 100%; box-sizing: border-box; letter-spacing: -.02em; }
+.cli .c-line { white-space: nowrap; overflow: hidden; }
+.cli .c-cmd { color: #e7edf6; } .cli .c-key { color: #9db8d6; } .cli .c-ok { color: var(--lime); } .cli .c-prompt { color: var(--lime); }
+.c-stack { position: relative; height: calc(2 * 1.6em); margin-bottom: .45em; }
+.c-block { position: absolute; inset: 0; }
+.c-b2, .c-b3 { opacity: 0; }                /* base: first tool block visible */
 .c-caret { display: inline-block; width: .55ch; background: var(--lime); color: transparent; }
 @media (prefers-reduced-motion: no-preference) {
-  .c-l1 { animation: c-l1 10s steps(40, end) infinite; }
-  .c-l2 { animation: c-rev 10s ease infinite; }
-  .c-l3 { animation: c-rev 10s ease infinite; }
-  .c-l4 { animation: c-rev 10s ease infinite; }
-  .c-l5 { animation: c-rev5 10s ease infinite; }
+  .c-b1 { animation: cb1 10s ease infinite; }
+  .c-b2 { animation: cb2 10s ease infinite; }
+  .c-b3 { animation: cb3 10s ease infinite; }
+  .c-b1 > .c-line:first-child { animation: ctype1 10s steps(28, end) infinite; }
+  .c-b2 > .c-line:first-child { animation: ctype2 10s steps(28, end) infinite; }
+  .c-b3 > .c-line:first-child { animation: ctype3 10s steps(28, end) infinite; }
+  .c-b1 .c-cout { animation: cout1 10s ease infinite; }
+  .c-b2 .c-cout { animation: cout2 10s ease infinite; }
+  .c-b3 .c-cout { animation: cout3 10s ease infinite; }
   .c-caret { animation: c-blink 1.05s steps(1, end) infinite; }
-  .c-l2 { animation-name: c-r2; } .c-l3 { animation-name: c-r3; } .c-l4 { animation-name: c-r4; }
 }
-@keyframes c-l1 { 0% { clip-path: inset(0 100% 0 0); } 18% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes c-r2 { 0%, 24% { clip-path: inset(0 100% 0 0); } 34% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes c-r3 { 0%, 38% { clip-path: inset(0 100% 0 0); } 48% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes c-r4 { 0%, 52% { clip-path: inset(0 100% 0 0); } 62% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes c-rev5 { 0%, 66% { clip-path: inset(0 100% 0 0); } 76% { clip-path: inset(0 0 0 0); } 92% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+/* block visibility windows: b1 ≈0–31%, b2 ≈34–64%, b3 ≈67–97% */
+@keyframes cb1 { 0% { opacity: 0; } 2% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cb2 { 0%, 33% { opacity: 0; } 35% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cb3 { 0%, 66% { opacity: 0; } 68% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
+/* command types in (clip-path reveal), then the ✓ result line appears */
+@keyframes ctype1 { 0% { clip-path: inset(0 100% 0 0); } 12% { clip-path: inset(0 0 0 0); } 34% { clip-path: inset(0 0 0 0); } 35% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes ctype2 { 0%, 34% { clip-path: inset(0 100% 0 0); } 45% { clip-path: inset(0 0 0 0); } 67% { clip-path: inset(0 0 0 0); } 68% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes ctype3 { 0%, 67% { clip-path: inset(0 100% 0 0); } 78% { clip-path: inset(0 0 0 0); } 98% { clip-path: inset(0 0 0 0); } 99% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes cout1 { 0%, 14% { opacity: 0; } 19% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cout2 { 0%, 47% { opacity: 0; } 52% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cout3 { 0%, 80% { opacity: 0; } 85% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
 @keyframes c-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 </style>
 </head>
@@ -287,30 +315,36 @@
 <section class="home-split" id="products" aria-label="Two ways to use Paramant">
   <div class="path path-human">
     <h2>For people who sign things that matter.</h2>
-    <p>Documents and files, in your browser. Nothing to install, nothing left behind.</p>
-    <div class="path-anim" role="img" aria-label="A contract is signed with a post-quantum ML-DSA-65 signature, then sent through memory and burned after one read.">
+    <p>Sign documents and send files, in your browser. Nothing to install, nothing left behind.</p>
+    <div class="path-anim" role="img" aria-label="Phase one: a document is signed with a post-quantum ML-DSA-65 signature. Phase two: the same document is encrypted, sent through the relay's memory and delivered to the recipient, then burned after one read.">
       <svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text class="l-phase l-phase1" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SIGN</text>
+        <text class="l-phase l-phase2" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SEND</text>
+        <g class="l-relay">
+          <rect x="71" y="50" width="20" height="20" rx="2.5" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.3"/>
+          <path d="M75 50v-3 M81 50v-3 M87 50v-3 M75 70v3 M81 70v3 M87 70v3" stroke="#B2FF3F" stroke-width="1" stroke-linecap="round"/>
+          <text x="81" y="63" fill="#B2FF3F" font-size="6" text-anchor="middle">RAM</text>
+        </g>
         <g class="l-recv">
-          <rect x="112" y="46" width="30" height="34" rx="3" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.4"/>
-          <path d="M120 62 h14 M120 68 h10" stroke="#88a6cb" stroke-width="1.4" stroke-linecap="round"/>
+          <rect x="116" y="48" width="30" height="32" rx="3" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.4"/>
+          <path d="M123 62 h16 M123 68 h11" stroke="#88a6cb" stroke-width="1.4" stroke-linecap="round"/>
         </g>
         <g class="l-doc">
-          <rect x="22" y="34" width="40" height="50" rx="3" fill="#e7edf6" stroke="#cdd9e8" stroke-width="1"/>
-          <path d="M30 44 h24 M30 51 h24 M30 58 h18" stroke="#56789f" stroke-width="1.6" stroke-linecap="round"/>
-          <path class="l-sig" d="M30 73 q5 -7 9 0 t9 0 q4 -5 6 -2" stroke="#B2FF3F" stroke-width="1.8" stroke-linecap="round"/>
+          <rect x="22" y="32" width="42" height="54" rx="3" fill="#e7edf6" stroke="#cdd9e8" stroke-width="1"/>
+          <path d="M30 43 h26 M30 50 h26 M30 57 h19" stroke="#56789f" stroke-width="1.6" stroke-linecap="round"/>
+          <path class="l-sig" d="M30 74 q5 -7 9 0 t9 0 q4 -5 7 -2" stroke="#B2FF3F" stroke-width="1.9" stroke-linecap="round"/>
           <g class="l-badge">
-            <circle cx="57" cy="40" r="7" fill="#0a1626" stroke="#B2FF3F" stroke-width="1.3"/>
-            <rect x="54.4" y="39.2" width="5.2" height="4" rx="1" fill="#B2FF3F"/>
-            <path d="M55.4 39.2 v-1.5 a1.6 1.6 0 0 1 3.2 0 V39.2" stroke="#B2FF3F" stroke-width="1"/>
+            <circle cx="57" cy="39" r="7" fill="#0a1626" stroke="#B2FF3F" stroke-width="1.3"/>
+            <path d="M53.6 39 l2.4 2.4 L60.6 36.2" stroke="#B2FF3F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <g class="l-enc">
+            <rect x="27" y="38" width="6" height="6" fill="#B2FF3F"/><rect x="41" y="50" width="6" height="6" fill="#B2FF3F"/>
+            <rect x="52" y="44" width="6" height="6" fill="#B2FF3F"/><rect x="34" y="64" width="6" height="6" fill="#B2FF3F"/>
+            <rect x="47" y="72" width="6" height="6" fill="#B2FF3F"/>
           </g>
         </g>
-        <g class="l-cloud">
-          <circle cx="80" cy="56" r="2" fill="#B2FF3F"/><circle cx="88" cy="62" r="1.6" fill="#88a6cb"/>
-          <circle cx="84" cy="68" r="2" fill="#B2FF3F"/><circle cx="92" cy="56" r="1.6" fill="#88a6cb"/>
-          <circle cx="78" cy="64" r="1.4" fill="#B2FF3F"/>
-        </g>
-        <text class="l-signed" x="42" y="99" fill="#B2FF3F" font-size="9" text-anchor="middle">&#10003; signed</text>
-        <text class="l-delivered" x="119" y="99" fill="#B2FF3F" font-size="7.5" text-anchor="middle">&#10003; delivered &#183; burn</text>
+        <text class="l-signed" x="43" y="104" fill="#B2FF3F" font-size="9" text-anchor="middle">&#10003; signed</text>
+        <text class="l-delivered" x="80" y="104" fill="#B2FF3F" font-size="7.5" text-anchor="middle">&#10003; delivered &#183; burn-on-read</text>
       </svg>
     </div>
     <div class="path-cta">
@@ -320,19 +354,29 @@
   <div class="path path-dev">
     <h2>For builders who don&rsquo;t trust servers either.</h2>
     <p>Post-quantum encryption and signing as a pipe. Drop it into your stack, or self-host the whole thing.</p>
-    <div class="path-anim path-anim-cli" role="img" aria-label="Terminal: paramant send report.pdf to alice@team — encrypting with ML-KEM-768, signing with ML-DSA-65, uploading in 5MB chunks, delivered and burned after one read.">
+    <div class="path-anim path-anim-cli" role="img" aria-label="Terminal cycling through Paramant command-line tools: s3-migrate moves an S3 object encrypted with ML-KEM-768 and burned on read; db-backup ships an encrypted off-site database dump; package-sign signs a release with ML-DSA-65. Ten encrypted CLI tools in total.">
       <div class="cli" aria-hidden="true">
-        <div class="c-line c-l1"><span class="c-prompt">$</span> <span class="c-cmd">paramant send report.pdf</span></div>
-        <div class="c-line c-l2">&nbsp;&nbsp;encrypting <span class="c-dots">......</span> <span class="c-key">ML-KEM-768</span></div>
-        <div class="c-line c-l3">&nbsp;&nbsp;signing <span class="c-dots">.........</span> <span class="c-key">ML-DSA-65</span></div>
-        <div class="c-line c-l4">&nbsp;&nbsp;uploading <span class="c-dots">.......</span> <span class="c-key">5MB chunks</span></div>
-        <div class="c-line c-l5">&nbsp;&nbsp;<span class="c-ok">&#10003; delivered</span> &nbsp;<span class="c-key">burn-on-read</span></div>
-        <div class="c-line"><span class="c-prompt">$</span> <span class="c-caret">_</span></div>
+        <div class="c-stack">
+          <div class="c-block c-b1">
+            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant s3-migrate</span> <span class="c-key">s3://bucket</span></div>
+            <div class="c-line c-cout"><span class="c-ok">&#10003; migrated</span> <span class="c-key">&#183; ML-KEM-768 &#183; burn</span></div>
+          </div>
+          <div class="c-block c-b2">
+            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant db-backup</span> <span class="c-key">--pg &#8594; vault</span></div>
+            <div class="c-line c-cout"><span class="c-ok">&#10003; encrypted off-site</span></div>
+          </div>
+          <div class="c-block c-b3">
+            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant package-sign</span> <span class="c-key">app.tgz</span></div>
+            <div class="c-line c-cout"><span class="c-ok">&#10003; signed</span> <span class="c-key">&#183; ML-DSA-65</span></div>
+          </div>
+        </div>
+        <div class="c-line c-promptline"><span class="c-prompt">$</span> <span class="c-caret">_</span></div>
       </div>
     </div>
     <div class="path-cta">
       <a class="btn btn-lime" href="/developer">Open developer dashboard</a>
       <a class="path-cta-sub" href="/docs">or read the docs</a>
+      <p class="path-breadth">10 encrypted CLI tools &#183; backups, migrations, signing, CI</p>
     </div>
   </div>
 </section>
