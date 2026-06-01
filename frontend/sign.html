@@ -435,7 +435,7 @@
     <div class="ds-field">
       <label class="ds-label">Cryptographic key (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Checking your signing key...</p>
-      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your passkey-protected ML-DSA-65 key - unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. Recipients you add sign at <code>/co-sign</code> with their own passkey.</p>
+      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your signing key (ML-DSA-65) — unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Back</button>
@@ -446,7 +446,7 @@
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Review and sign</h2>
-    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, your passkey (Face ID / Touch ID / security key) unlocks the key for this one document and the signature is created locally.</p>
+    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, you confirm with Face ID / Touch ID / your security key — that unlocks your signing key for this one document and the signature is created locally.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
@@ -608,6 +608,6 @@
 <script src="/js/nav-auth.js" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=14"></script>
+<script type="module" src="/sign-flow.js?v=15"></script>
 </body>
 </html>

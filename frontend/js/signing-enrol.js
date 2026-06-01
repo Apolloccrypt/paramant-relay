@@ -1,4 +1,4 @@
-// Signing-passkey enrolment — wires the "Set up signing passkey" action on
+// Signing-key enrolment — wires the "Set up your signing key" action on
 // /account (ADR R018, the deferred "stuk 2"). This is the ONE place a signing
 // key is created; /sign points here. It runs the shared enrolSigningPasskey()
 // orchestration (parasign-signer.js) with the three ceremony callbacks
@@ -110,8 +110,8 @@ function wireSigningEnrol() {
             if (prfCapable) return { credentialId: prfCapable.credId, reused: true };
           }
 
-          const totp = askTotp('Add a signing passkey — enter your current 6-digit authenticator code:');
-          setStatus('Verifying code, then follow your device prompt to create the passkey…', false);
+          const totp = askTotp('Set up your signing key — enter your current 6-digit authenticator code:');
+          setStatus('Verifying code, then follow your device prompt…', false);
           const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
           if (opt.status === 403) throw new Error('That authenticator code was not accepted.');
           if (!opt.ok) throw new Error((opt.data && opt.data.error) || ('register_options_failed_' + opt.status));
@@ -134,7 +134,7 @@ function wireSigningEnrol() {
         //     get()+prf.eval that LocalVaultSigner.activate() runs at sign time,
         //     so a successful enrol guarantees a successful unlock later.
         evalNewPrf: async ({ credentialId, prfSalt }) => {
-          setStatus('Confirm with your passkey (Face ID / Touch ID / security key)…', false);
+          setStatus('Confirm with Face ID / Touch ID / your security key…', false);
           const assertion = await navigator.credentials.get({
             publicKey: {
               challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -170,13 +170,13 @@ function wireSigningEnrol() {
       // If it returns here, the vault now holds a webauthn-prf-wrapped key under
       // id = pk_hash, and /sign will find it. Show the fingerprint as proof.
       const k = await resolvePasskeySigningKey();
-      setStatus('Signing passkey ready — fingerprint ' + (k.fingerprint || pk_hash.slice(0, 16)) + '. You can now sign at /sign.', false);
+      setStatus('Signing key ready — fingerprint ' + (k.fingerprint || pk_hash.slice(0, 16)) + '. You can now sign at /sign.', false);
       if (passEl) passEl.value = '';
       if (pass2El) pass2El.value = '';
       document.dispatchEvent(new CustomEvent('signing-key-enrolled'));
     } catch (e) {
       await cleanupOrphans();   // don't leave a half-finished passphrase-only entry behind
-      setStatus((e && e.message) ? e.message : 'Could not set up signing passkey.', true);
+      setStatus((e && e.message) ? e.message : 'Could not set up your signing key.', true);
     } finally {
       btn.disabled = false;
     }
