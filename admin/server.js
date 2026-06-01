@@ -1469,7 +1469,7 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": user_id },
+      headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
       body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 3, creator_public_key: creatorPublicKey }),
     });
     const body = await rr.json().catch(() => ({}));
