@@ -404,12 +404,13 @@ npm install paramant-sdk</pre>
       <pre>from paramant_sdk import GhostPipe
 
 gp = GhostPipe(api_key="pgp_your_key", device="laptop-01")
+gp.receive_setup()  <span class="cm"># register this device's keys (once)</span>
 
-<span class="cm"># Send — returns blob hash; share with receiver</span>
-hash_ = gp.send(open("document.pdf", "rb").read(), ttl=3600)
+<span class="cm"># Send: returns (blob hash, inclusion proof). Share the hash with the receiver.</span>
+hash_, proof = gp.send(open("document.pdf", "rb").read(), ttl=3600)
 
-<span class="cm"># Receive — burn-on-read, one download only</span>
-data = gp.receive(hash_)</pre>
+<span class="cm"># Receive: burn-on-read, one download only.</span>
+data, proof = gp.receive(hash_)</pre>
     </div>
 
     <p>Or use the direct HTTP API — no SDK needed:</p>
@@ -485,7 +486,7 @@ data = gp.receive(hash_)</pre>
     <pre><span class="cm"># Send DICOM scan to specialist</span>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
-hash_ = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
+hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
     <p><a href="/compliance/nen7510" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">NEN 7510 compliance page →</a></p>
 
     <h3><span class="sector-badge">legal</span>Legal &amp; Notary — eIDAS, KNB</h3>
@@ -494,7 +495,7 @@ hash_ = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
     <pre><span class="cm"># Signed deed — burn-on-read, CT log entry as proof of delivery</span>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="notary-01", sector="legal")
-hash_, receipt = gp.send_with_receipt(open("deed.pdf","rb").read())
+hash_, receipt = gp.send(open("deed.pdf","rb").read())
 gp.verify_receipt(receipt)  <span class="cm"># ML-DSA-65 signed</span></pre></div>
 
     <h3><span class="sector-badge">iot</span>Industrial IoT — IEC 62443</h3>
@@ -514,10 +515,11 @@ while True:
     <pre><span class="cm"># Send ISO 20022 payment file with CT proof for DORA audit</span>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="bank-nl-01", sector="finance")
-hash_, receipt = gp.send_with_receipt(open("pacs008.xml","rb").read())
+hash_, receipt = gp.send(open("pacs008.xml","rb").read())
 <span class="cm"># receipt → tree_size, sha3_root, ML-DSA-65 signature</span></pre></div>
 
     <!-- ── API Reference ──────────────────────────────────────── -->
+    <span id="api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="endpoints">All endpoints</h2>
     <table>
       <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth</th></tr>
@@ -607,6 +609,7 @@ ws.onmessage = e => {
 }</span></pre>
 
     <!-- ── Self-hosting ─────────────────────────────────────────── -->
+    <span id="self-hosting" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="selfhost-docker">Self-hosting — Docker Compose</h2>
     <p>Community Edition is free forever for up to 5 users. One <code>docker compose up</code> starts 6 containers: five sector relays and an admin panel.</p>
 
