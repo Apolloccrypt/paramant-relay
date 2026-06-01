@@ -38,34 +38,36 @@
 .hero-badges li:hover { border-color: var(--navy); }
 .hero-badges li:hover a { color: var(--navy); }
 .home-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 1040px; margin: var(--space-5) auto var(--space-6); padding: 0 var(--space-4); }
-.path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); min-height: 220px; }
+.path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); }
 .path-dev { background: var(--bone); }
-.path h2 { font-size: clamp(20px, 2.5vw, 27px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0 0 var(--space-3); max-width: 18ch; }
-.path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); max-width: 34ch; }
+.path h2 { font-size: clamp(20px, 2.5vw, 26px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0; max-width: 22ch; }
+.path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: var(--space-3) 0 0; max-width: 34ch; }
 .path-cta { margin-top: auto; }
 .path-cta-sub { display: inline-block; margin-top: var(--space-2); font-size: 13px; color: var(--ink-dim); text-decoration: underline; }
 .path-cta-sub:hover { color: var(--navy); }
 .path-breadth { margin: var(--space-2) 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: .02em; color: var(--ink-dim); }
-.path-pear { position: absolute; top: var(--space-4); right: var(--space-4); width: clamp(56px, 8vw, 84px); height: auto; opacity: .92; transform: scaleX(-1); user-select: none; -webkit-user-drag: none; }
-@media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } .path { min-height: 0; } }
+@media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } }
 
-/* ── Homepage panel animations — replace the corner mascot on both panels.
-   Pure CSS keyframes (no JS, CSP-safe), ~10s synchronised loops, deep-navy base
-   with lime (#B2FF3F) on the "it works" beats. prefers-reduced-motion shows a
-   static completed frame (the elements' base state). design-system.css and
-   nav.css are untouched — everything here is scoped to .path-anim / .cli. ── */
-.path-anim { position: absolute; top: var(--space-4); right: var(--space-4);
-  width: clamp(124px, 17vw, 164px); aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
-  background: #0a1626; box-shadow: 0 3px 14px rgba(11,58,106,.22), inset 0 0 0 1px rgba(178,255,63,.10);
+/* State-aware hero: the logged-out pitch is the default (and what scrapers
+   see); js/home-auth.js reveals the logged-in welcome + quick actions. */
+.home-state[hidden] { display: none; }
+.home-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; margin: var(--space-4) 0 0; }
+.home-act-ghost { background: transparent; color: var(--navy); border: 1px solid var(--ink-hair); }
+.home-act-ghost:hover { border-color: var(--navy); background: var(--bone); }
+.home-hi-name { color: var(--cobalt); }
+
+/* ── Homepage panel animations — now the centrepiece of each panel: a larger,
+   centred "screen" playing the loop, so the security is felt, not read. Pure
+   CSS keyframes (no JS, CSP-safe), ~10s loops, deep-navy base with lime
+   (#B2FF3F) on the "it works" beats. prefers-reduced-motion shows a static
+   completed frame. design-system.css and nav.css are untouched. ── */
+.path-anim { margin: var(--space-4) auto var(--space-5); width: clamp(210px, 82%, 300px);
+  aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+  background: #0a1626; box-shadow: 0 4px 18px rgba(11,58,106,.22), inset 0 0 0 1px rgba(178,255,63,.10);
   user-select: none; --lime: #B2FF3F; --doc: #e7edf6; --ln: #56789f; --dim: #88a6cb; }
 .path-anim svg { display: block; width: 100%; height: 100%; }
 .path-anim text { font-family: var(--mono); font-weight: 600; letter-spacing: -.02em; }
-/* keep the panel text clear of the corner box (no grid/spacing change) */
-.path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: clamp(0px, 19vw, 138px); }
-@media (max-width: 760px) {
-  .path-human h2, .path-human > p, .path-dev h2, .path-dev > p { padding-right: 0; }
-  .path-anim { position: static; order: -1; margin: 0 0 var(--space-3); width: clamp(160px, 50vw, 200px); }
-}
+@media (max-width: 760px) { .path-anim { width: clamp(200px, 70vw, 280px); } }
 
 /* LEFT — two pillars in one loop: (1) SIGN the document (ML-DSA-65 curve →
    "✓ signed"), then (2) SEND it — encrypt flicker → through the relay's RAM →
@@ -330,21 +332,31 @@
 <main id="main-content" role="main">
 
 <section class="home-hero">
-  <h1>Sign it. Send it. We never even had it.</h1>
-  <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
-  <ul class="hero-badges" aria-label="At a glance">
-    <li><a href="https://github.com/Apolloccrypt/paramant-relay">Open source</a></li>
-    <li><a href="/pricing">Free</a></li>
-    <li><a href="/security">Fully auditable</a></li>
-    <li><a href="/sovereignty">EU-sovereign</a></li>
-    <li><a href="/crypto-agility">Post-quantum</a></li>
-  </ul>
+  <div class="home-state" data-home="out">
+    <h1>Sign it. Send it. We never even had it.</h1>
+    <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
+    <ul class="hero-badges" aria-label="At a glance">
+      <li><a href="https://github.com/Apolloccrypt/paramant-relay">Open source</a></li>
+      <li><a href="/pricing">Free</a></li>
+      <li><a href="/security">Fully auditable</a></li>
+      <li><a href="/sovereignty">EU-sovereign</a></li>
+      <li><a href="/crypto-agility">Post-quantum</a></li>
+    </ul>
+  </div>
+  <div class="home-state" data-home="in" hidden>
+    <h1>Welcome back<span class="home-hi-name" data-home-name></span>.</h1>
+    <p class="lede">Your relay is ready. Pick up where you left off, or start something new.</p>
+    <div class="home-actions">
+      <a class="btn btn-lime" href="/sign">Sign a document</a>
+      <a class="btn home-act-ghost" href="/dashboard">Your dashboard</a>
+      <a class="btn home-act-ghost" href="/developer">Developer dashboard</a>
+    </div>
+  </div>
 </section>
 
 <section class="home-split" id="products" aria-label="Two ways to use Paramant">
   <div class="path path-human">
-    <h2>For people who sign things that matter.</h2>
-    <p>Sign documents and send files, in your browser. Nothing to install, nothing left behind.</p>
+    <h2>Sign and send, right in your browser.</h2>
     <div class="path-anim" role="img" aria-label="Phase one: a document is signed with a post-quantum ML-DSA-65 signature. Phase two: the same document is encrypted, sent through the relay's memory and delivered to the recipient, then burned after one read.">
       <svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
         <text class="l-phase l-phase1" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SIGN</text>
@@ -378,11 +390,12 @@
     </div>
     <div class="path-cta">
       <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
+      <a class="path-cta-sub" href="/pararules">or read the ParaRules</a>
+      <p class="path-breadth">Sign &#183; co-sign &#183; send &#183; burn-on-read</p>
     </div>
   </div>
   <div class="path path-dev">
-    <h2>For builders who don&rsquo;t trust servers either.</h2>
-    <p>Post-quantum encryption and signing as a pipe. Drop it into your stack, or self-host the whole thing.</p>
+    <h2>Drop post-quantum crypto into your stack.</h2>
     <div class="path-anim path-anim-cli" role="img" aria-label="Terminal cycling through Paramant command-line tools: s3-migrate moves an S3 object encrypted with ML-KEM-768 and burned on read; db-backup ships an encrypted off-site database dump; package-sign signs a release with ML-DSA-65. Ten encrypted CLI tools in total.">
       <div class="cli" aria-hidden="true">
         <div class="c-stack">
@@ -490,5 +503,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=1" defer></script>
+<script src="/js/home-auth.js?v=1" defer></script>
 </body>
 </html>
