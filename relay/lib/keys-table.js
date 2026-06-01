@@ -140,4 +140,29 @@ function computeOverLimit(apiKeys, accounts, accountKeys, opts) {
   return over;
 }
 
-module.exports = { VALID_SCOPES, computeKid, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit };
+// Designate `key` as the primary api-key of account `accountId` (stap 4). Mutates
+// the live Maps in place: promotes the chosen key (is_primary=true), demotes every
+// other member of the account, and repoints accounts[accountId].primary_api_key.
+// Pure w.r.t. I/O — the caller persists to users.json and reads no globals.
+// Throws (caller maps to 4xx) when the key is unknown, inactive, or not a member
+// of the account, so a mismatched account_id can never silently move a primary.
+// Returns { previous, current } (previous may be null on a fresh account).
+function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
+  const v = apiKeys.get(key);
+  if (!v) { const e = new Error('key_not_found'); e.code = 'key_not_found'; throw e; }
+  if (v.active === false) { const e = new Error('key_inactive'); e.code = 'key_inactive'; throw e; }
+  const acctOf = v.account_id || key;
+  if (acctOf !== accountId) { const e = new Error('key_account_mismatch'); e.code = 'key_account_mismatch'; throw e; }
+  const members = accountKeys.get(accountId) || new Set([key]);
+  const previous = (accounts.get(accountId) && accounts.get(accountId).primary_api_key) || null;
+  for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.is_primary = (m === key); }
+  v.is_primary = true;
+  if (!accounts.has(accountId)) {
+    accounts.set(accountId, { account_id: accountId, plan: v.plan, email: v.email || '', primary_api_key: key, label: v.label || '' });
+  } else {
+    accounts.get(accountId).primary_api_key = key;
+  }
+  return { previous, current: key };
+}
+
+module.exports = { VALID_SCOPES, computeKid, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
