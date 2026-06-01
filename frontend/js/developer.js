@@ -24,7 +24,7 @@
   };
   function toolIcon(cat) { return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + (ICONS[cat] || ICONS.transfer) + '"/></svg>'; }
 
-  var STATE = { tools: [], status: {}, key: '', filter: '', feed: [] };
+  var STATE = { tools: [], status: {}, key: '', filter: '', feed: [], cfg: {} };
 
   // Which tools can genuinely run in the browser: those whose input is a local
   // file (transfer + sign). The rest need server-side data (an S3 object, your
@@ -51,6 +51,15 @@
   function loadCfg(tool) { try { return localStorage.getItem(CFG_PREFIX + tool); } catch (e) { return null; } }
   function saveCfg(tool, val) { try { localStorage.setItem(CFG_PREFIX + tool, String(val).slice(0, 2000)); return true; } catch (e) { return false; } }
   function clearCfg(tool) { try { localStorage.removeItem(CFG_PREFIX + tool); } catch (e) {} }
+  // Cross-device sync via the gated, account-scoped server store. Best-effort:
+  // the localStorage cache above keeps Configure working if the server is
+  // unreachable. The server refuses to persist anything that looks like a key.
+  function saveCfgServer(tool, command) {
+    return fetch('/api/user/developer/tool-config', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: tool, command: command }) }).catch(function () {});
+  }
+  function clearCfgServer(tool) {
+    return fetch('/api/user/developer/tool-config', { method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: tool }) }).catch(function () {});
+  }
   function serverReason(cat) {
     var needs = { migrate: 'an S3 object or a Docker volume on your host', backup: 'your database', replicate: 'your database', sync: 'your local secrets', archive: 'your git repo', ship: 'your build output or logs' };
     return 'Runs on your machine: it needs ' + (needs[cat] || 'access to your infrastructure') + '. Use Configure for the ready-to-run command.';
@@ -210,7 +219,7 @@
     // The command relies on the PARAMANT_API_KEY env var (step 2), so the key is
     // never inlined -> nothing sensitive ever reaches localStorage.
     var def = (t.usage || '').replace(/^PARAMANT_API_KEY=\{KEY\}\s+/, '').replace('{KEY}', '$PARAMANT_API_KEY');
-    var saved = loadCfg(t.name);
+    var saved = (STATE.cfg && STATE.cfg[t.name] != null) ? STATE.cfg[t.name] : loadCfg(t.name);
     modal.querySelector('[data-m="title"]').textContent = 'Configure ' + t.name;
     modal.querySelector('[data-m="tag"]').textContent = t.tagline || '';
     modal.querySelector('[data-m="install"]').textContent = t.install || '';
@@ -234,7 +243,8 @@
       var save = ev.target.closest && ev.target.closest('[data-m="save"]');
       if (save) {
         var tool = modal.getAttribute('data-tool'), ta = modal.querySelector('[data-m="run"]');
-        if (tool && ta && saveCfg(tool, ta.value)) {
+        if (tool && ta) {
+          saveCfg(tool, ta.value); STATE.cfg[tool] = ta.value; saveCfgServer(tool, ta.value);
           var sn = modal.querySelector('[data-m="saved"]'); if (sn) sn.hidden = false;
           var os = save.textContent; save.textContent = 'saved'; setTimeout(function () { save.textContent = os; }, 1200);
         }
@@ -243,7 +253,7 @@
       var reset = ev.target.closest && ev.target.closest('[data-m="reset"]');
       if (reset) {
         var tool2 = modal.getAttribute('data-tool'), ta2 = modal.querySelector('[data-m="run"]');
-        if (tool2 && ta2) { clearCfg(tool2); ta2.value = ta2.getAttribute('data-default') || ''; var sn2 = modal.querySelector('[data-m="saved"]'); if (sn2) sn2.hidden = true; }
+        if (tool2 && ta2) { clearCfg(tool2); delete STATE.cfg[tool2]; clearCfgServer(tool2); ta2.value = ta2.getAttribute('data-default') || ''; var sn2 = modal.querySelector('[data-m="saved"]'); if (sn2) sn2.hidden = true; }
         return;
       }
       var c = ev.target.closest && ev.target.closest('[data-copy]');
@@ -264,9 +274,10 @@
     Promise.all([
       getJSON('/api/user/developer/snapshot'),
       getJSON('/api/user/developer/tools').catch(function () { return { tools: [] }; }),
-      getJSON('/api/user/account/key').then(function (k) { return k.api_key || ''; }).catch(function () { return ''; })
+      getJSON('/api/user/account/key').then(function (k) { return k.api_key || ''; }).catch(function () { return ''; }),
+      getJSON('/api/user/developer/tool-config').then(function (c) { return c.configs || {}; }).catch(function () { return {}; })
     ]).then(function (res) {
-      STATE.tools = res[1].tools || []; STATE.key = res[2];
+      STATE.tools = res[1].tools || []; STATE.key = res[2]; STATE.cfg = res[3] || {};
       applySnapshot(res[0]);
       connectSSE();
     }).catch(function () { heartbeat('down'); elTools.innerHTML = '<div class="dim mono" style="font-size:12px">Could not load dashboard data.</div>'; });

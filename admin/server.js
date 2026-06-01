@@ -619,6 +619,7 @@ function developerGate(req, res, next) {
 // admin/test/developer-snapshot.test.js.
 const { DEVELOPER_TOOLS } = require('./lib/developer-tools');
 const { buildSnapshot } = require('./lib/developer-snapshot');
+const developerConfig = require('./lib/developer-config');
 
 // Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
 // the invite/co-sign flow lands a recipient via a top-level navigation from an
@@ -1760,6 +1761,40 @@ api.get("/user/developer/tools", authUser, developerGate, (req, res) => {
   res.json({ status: "live", tools: DEVELOPER_TOOLS });
 });
 
+// ── Per-account saved tool config (cross-device). All three are gated by
+// authUser + developerGate and scoped to the session's user_id (no IDOR). Pure
+// validation lives in lib/developer-config (unit-tested). The config is data
+// only -- never executed; a literal key is refused (defence in depth).
+api.get("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    let configs = {};
+    if (raw) { try { configs = JSON.parse(raw) || {}; } catch {} }
+    res.json({ configs });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.post("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const { tool, command } = req.body || {};
+  const v = developerConfig.validateConfig(tool, command);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    const m = developerConfig.mergeConfig(raw, v.tool, v.command);
+    if (!m.ok) return res.status(400).json({ error: m.error });
+    await redis().set(developerConfig.KEY(req.userSession.user_id), m.json);
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.delete("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const tool = (req.body && req.body.tool) || req.query.tool;
+  if (typeof tool !== "string" || !developerConfig.TOOL_NAMES.has(tool)) return res.status(400).json({ error: "unknown_tool" });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    await redis().set(developerConfig.KEY(req.userSession.user_id), developerConfig.removeConfig(raw, tool));
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+
 // GET /api/user/developer/snapshot — one call for the initial dashboard render:
 // {email, plan, key_masked, quota:{transfers,signs,caps}, audit:[last 50],
 //  tools_status:{per tool}}. 3s in-memory cache per account so a refresh storm
@@ -2720,17 +2755,11 @@ async function verifyCliTotp(totp) {
 // Curated environment for handler scripts. We do NOT inherit the full process
 // env: only PATH/HOME plus paramant-relevant variables, and computed relay
 // locators. This bounds what `config show` can ever surface.
-function cliChildEnv() {
-  const env = { PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME || '/tmp' };
-  for (const [k, v] of Object.entries(process.env)) {
-    if (/^(PORT|BASE_PATH|NODE_ENV|RELAY_|SECTOR|ADMIN_|PARAMANT_|NATS_|REDIS_|RESEND_|COMPOSE_|BACKUP_)/.test(k)) {
-      env[k] = v;
-    }
-  }
-  env.RELAY_URL = SECTORS.health;
-  env.RELAY_SECTORS = Object.entries(SECTORS).map(([n, u]) => `${n}=${u}`).join(',');
-  env.ADMIN_TOKEN = ADMIN_TOKEN;
-  return env;
+function cliChildEnv(cmd) {
+  // Delegates to the pure, unit-tested builder (lib/cli-commands.buildChildEnv).
+  // Least-privilege: ADMIN_TOKEN is added only for cmd.needsAdminToken; the
+  // REDIS_/RESEND_/PARAMANT_ secrets are never broadcast to handler scripts.
+  return cliCommands.buildChildEnv(cmd, process.env, SECTORS, ADMIN_TOKEN);
 }
 
 // GET /api/admin/cli/commands -- whitelist metadata for completion/help.
@@ -2812,7 +2841,7 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   try {
     child = spawn(handlerPath, argv, {
       cwd: cliCommands.SCRIPTS_DIR,
-      env: cliChildEnv(),
+      env: cliChildEnv(cmd),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
