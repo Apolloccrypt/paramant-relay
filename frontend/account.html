@@ -447,7 +447,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </main>
 
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
 <script>
 (function() {
   function show(id) {
@@ -756,7 +756,7 @@ loadEnrolledKeys();
 loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
-<script type="module" src="/js/passkey.js"></script>
+<script type="module" src="/js/passkey.js?v=3"></script>
 <script type="module" src="/js/signing-enrol.js?v=4"></script>
 
 </body>
