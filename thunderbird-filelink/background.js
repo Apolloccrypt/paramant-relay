@@ -21,11 +21,15 @@ function concat(...arrays) {
 }
 
 function toBase64(u8) {
-  let s = "";
-  for (let i = 0; i < u8.length; i += 8192) {
-    s += btoa(String.fromCharCode(...u8.subarray(i, i + 8192)));
+  // Build the binary string in windows, then encode once. Encoding per 8192-byte window
+  // and concatenating is WRONG: 8192 % 3 != 0, so every window emits a trailing '=' and the
+  // relay's Buffer.from(payload,'base64') stops at the first interior '=', truncating the
+  // upload to ~8 KB. One btoa at the end produces a single, valid padding run.
+  let binary = "";
+  for (let i = 0; i < u8.length; i += 0x8000) {
+    binary += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
   }
-  return s;
+  return btoa(binary);
 }
 
 // ── Encrypt one chunk → padded 5 MB blob ─────────────────────────────────────

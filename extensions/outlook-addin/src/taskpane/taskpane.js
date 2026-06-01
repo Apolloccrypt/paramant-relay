@@ -1,45 +1,33 @@
 import {
-  getCapabilities,
-  loginWithApiKey,
-  loginWithTotp,
-  verifySession,
-  logout,
-  uploadAttachment,
+  getCapabilities, loginWithApiKey, loginWithTotp, verifySession, logout, uploadAttachment,
 } from '../shared/paramant-api.js';
 import { getAttachments, removeAttachments, insertIntoBody } from '../shared/office-helpers.js';
+import { buildLinkHtml } from '../../../shared/link-block.js';
 
 Office.onReady(async (info) => {
   if (info.host !== Office.HostType.Outlook) return;
 
   const session = await verifySession();
   if (session.authenticated) {
-    showEmail(session.email);
+    showStatus(session);
     await refreshAttachments();
     return;
   }
 
   const caps = await getCapabilities();
-
-  if (caps.user_totp) {
-    document.getElementById('show-totp').classList.remove('hidden');
-    document.getElementById('banner-rolling-out').classList.add('hidden');
-  } else {
-    document.getElementById('show-totp').classList.add('hidden');
-    document.getElementById('banner-rolling-out').classList.remove('hidden');
-  }
-
+  const totpOn = !!caps.user_totp;
+  document.getElementById('show-totp').classList.toggle('hidden', !totpOn);
+  document.getElementById('banner-rolling-out').classList.toggle('hidden', totpOn);
   showLogin();
 });
 
-// ── Login state ───────────────────────────────────────────────────────────────
-
+// ── Login state ───────────────────────────────────────────────────────────────────
 function showLogin() {
   switchState('state-login');
   wireLoginForms();
 }
 
 let formsWired = false;
-
 function wireLoginForms() {
   if (formsWired) return;
   formsWired = true;
@@ -60,18 +48,12 @@ function wireLoginForms() {
     const apikey   = document.getElementById('apikey').value.trim();
     const errorDiv = document.getElementById('error-apikey');
     const btn      = e.target.querySelector('button[type="submit"]');
-    errorDiv.classList.remove('visible');
+    errorDiv.classList.remove('visible'); errorDiv.textContent = '';
     btn.disabled = true;
 
     const result = await loginWithApiKey(apikey);
-    if (result.success) {
-      showEmail(result.email);
-      await refreshAttachments();
-    } else {
-      errorDiv.textContent = result.message || 'Invalid API key.';
-      errorDiv.classList.add('visible');
-      btn.disabled = false;
-    }
+    if (result.success) { showStatus(result); await refreshAttachments(); }
+    else { showFormError(errorDiv, result.message || 'Invalid API key.'); btn.disabled = false; }
   });
 
   document.getElementById('form-totp').addEventListener('submit', async e => {
@@ -80,59 +62,50 @@ function wireLoginForms() {
     const totp     = document.getElementById('totp').value.trim();
     const errorDiv = document.getElementById('error-totp');
     const btn      = e.target.querySelector('button[type="submit"]');
-    errorDiv.classList.remove('visible');
+    errorDiv.classList.remove('visible'); errorDiv.textContent = '';
     btn.disabled = true;
 
     const result = await loginWithTotp(email, totp);
-    if (result.success) {
-      showEmail(result.email);
-      await refreshAttachments();
-    } else {
-      errorDiv.textContent = result.message || 'Invalid email or code.';
-      errorDiv.classList.add('visible');
-      document.getElementById('totp').value = '';
-      btn.disabled = false;
-    }
+    if (result.success) { showStatus(result); await refreshAttachments(); }
+    else { showFormError(errorDiv, result.message || 'Invalid email or code.'); document.getElementById('totp').value = ''; btn.disabled = false; }
   });
 }
 
-// ── Session helpers ───────────────────────────────────────────────────────────
+function showFormError(el, msg) { el.textContent = msg; el.classList.add('visible'); }
 
-function showEmail(email) {
+// ── Session status ──────────────────────────────────────────────────────────────────
+function showStatus(session) {
+  const label = session.email || (session.plan ? `Signed in · ${session.plan}` : 'Signed in');
   for (const id of ['status-email', 'status-email-2']) {
     const el = document.getElementById(id);
-    if (el) el.textContent = email || '—';
+    if (el) el.textContent = label;
   }
 }
 
-// ── Attachments ───────────────────────────────────────────────────────────────
-
+// ── Attachments ───────────────────────────────────────────────────────────────────
 async function refreshAttachments() {
-  const attachments = await getAttachments();
+  const attachments = (await getAttachments()).filter(a => a.attachmentType === 'file' || a.attachmentType === undefined);
 
   if (attachments.length === 0) {
     switchState('state-no-attachments');
-    document.getElementById('refresh-btn').addEventListener('click', refreshAttachments);
+    document.getElementById('refresh-btn').onclick = refreshAttachments;
   } else {
     switchState('state-has-attachments');
-
     const list = document.getElementById('attachment-list');
-    list.innerHTML = '';
+    list.textContent = '';
     for (const att of attachments) {
       const li = document.createElement('li');
-      li.innerHTML = `
-        <span class="attach-name">${escapeHtml(att.name)}</span>
-        <span class="attach-size">${formatSize(att.size)}</span>
-      `;
+      const name = document.createElement('span'); name.className = 'attach-name'; name.textContent = att.name;
+      const size = document.createElement('span'); size.className = 'attach-size'; size.textContent = formatSize(att.size);
+      li.append(name, size);
       list.appendChild(li);
     }
-
-    document.getElementById('encrypt-btn').addEventListener('click', () => encryptAll(attachments));
+    document.getElementById('encrypt-btn').onclick = () => encryptAll(attachments);
   }
 
   for (const id of ['logout-btn', 'logout-btn-2']) {
     const btn = document.getElementById(id);
-    if (btn) btn.addEventListener('click', doLogout);
+    if (btn) btn.onclick = doLogout;
   }
 }
 
@@ -141,62 +114,42 @@ async function encryptAll(attachments) {
   const progress = document.getElementById('encrypt-progress');
   const bar      = document.getElementById('progress-bar');
   const text     = document.getElementById('progress-text');
-  const expiry   = parseInt(document.getElementById('expiry').value);
+  const ttlMs    = parseInt(document.getElementById('expiry').value, 10) * 1000;
 
   btn.disabled = true;
   progress.classList.remove('hidden');
 
+  const n = attachments.length;
   const results = [];
 
-  for (let i = 0; i < attachments.length; i++) {
+  for (let i = 0; i < n; i++) {
     const att = attachments[i];
-    text.textContent = `Encrypting ${i + 1}/${attachments.length}: ${att.name}`;
-    bar.style.width = `${(i / attachments.length) * 100}%`;
+    text.textContent = `Encrypting ${i + 1}/${n}: ${att.name}`;
+    const setOverall = frac => { bar.style.width = `${Math.round(((i + frac) / n) * 100)}%`; };
+    setOverall(0);
 
-    const result = await uploadAttachment(att, { ttl_seconds: expiry });
-    if (result.success) {
-      results.push({ ...result, name: att.name });
-    } else {
-      text.textContent = `Failed to encrypt ${att.name}`;
+    const result = await uploadAttachment(att, { ttlMs, onProgress: p => setOverall(p.fraction || 0) });
+    if (!result.success) {
+      text.textContent = friendly(result.message, att.name);
+      text.classList.add('failed');
       btn.disabled = false;
       return;
     }
+    results.push({ ...result, name: att.name });
+    setOverall(1);
   }
 
-  bar.style.width = '100%';
-  text.textContent = 'Updating email...';
-
+  text.textContent = 'Updating email…';
   await insertParamantBlock(results);
   await removeAttachments(attachments.map(a => a.id));
-
   switchState('state-success');
 }
 
 async function insertParamantBlock(uploads) {
-  const html = `
-    <div style="border: 1px solid #0B3A6A; padding: 16px; margin: 16px 0; font-family: Arial, sans-serif;">
-      <div style="font-family: 'Courier New', monospace; font-size: 11px; color: #0B3A6A; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 12px;">
-        Encrypted attachments via Paramant
-      </div>
-      ${uploads.map(u => `
-        <div style="margin: 8px 0;">
-          <a href="${u.share_url}" style="color: #1D4ED8; font-weight: 600; text-decoration: none;">
-            ${escapeHtml(u.name)}
-          </a>
-          <div style="font-size: 11px; color: #6B7280;">
-            Expires ${new Date(u.expires_at).toLocaleString()}
-          </div>
-        </div>
-      `).join('')}
-      <div style="font-size: 10px; color: #9CA3AF; margin-top: 12px; border-top: 1px solid #E2E8F0; padding-top: 8px;">
-        End-to-end encrypted. Burn-on-read. Sent via
-        <a href="https://paramant.app" style="color: #9CA3AF;">paramant.app</a>
-      </div>
-    </div>
-    <p></p>
-  `;
-
-  await insertIntoBody(html);
+  const items = uploads.map(u =>
+    buildLinkHtml({ url: u.shareUrl, filename: u.name, expiresAt: u.expiresAt, format: 'block' })
+  ).join('');
+  await insertIntoBody(`${items}<p></p>`);
 }
 
 async function doLogout() {
@@ -205,21 +158,23 @@ async function doLogout() {
   showLogin();
 }
 
-// ── Util ──────────────────────────────────────────────────────────────────────
-
+// ── Util ──────────────────────────────────────────────────────────────────────────
 function switchState(stateId) {
   document.querySelectorAll('.state').forEach(el => el.classList.add('hidden'));
   document.getElementById(stateId).classList.remove('hidden');
 }
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]));
+function friendly(message, name) {
+  const m = String(message || '');
+  if (m === 'not_authenticated') return 'Session expired. Sign in again.';
+  if (!m) return `Failed to encrypt ${name}`;
+  return m; // relay messages are already human ("Max 5MB on trial", etc.)
 }
 
 function formatSize(bytes) {
+  if (bytes == null) return '';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
