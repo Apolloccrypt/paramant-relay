@@ -14,7 +14,7 @@
   <Description DefaultValue="Send encrypted attachments via Paramant's post-quantum file relay."/>
   <IconUrl DefaultValue="https://addin.paramant.app/assets/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://addin.paramant.app/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://paramant.app/help/outlook-addin"/>
+  <SupportUrl DefaultValue="https://paramant.app/help/outlook-extension"/>
 
   <AppDomains>
     <AppDomain>https://paramant.app</AppDomain>
