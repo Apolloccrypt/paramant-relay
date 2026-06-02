@@ -25,50 +25,51 @@
 
   <!-- State: not logged in -->
   <div id="state-login" class="state hidden">
-    <p class="lede">Sign in to encrypt attachments.</p>
+    <p class="lede" data-i18n="popup_lede">Sign in to encrypt attachments.</p>
 
     <div id="banner-rolling-out" class="banner banner-lime hidden">
-      <div class="banner-label">rolling out Q2 2026</div>
-      <p>Email + authenticator login is being rolled out to existing users. Use your API key for now.</p>
+      <div class="banner-label" data-i18n="rolling_label">rolling out Q2 2026</div>
+      <p data-i18n="rolling_text">Email + authenticator login is being rolled out to existing users. Use your API key for now.</p>
     </div>
 
     <!-- API key form (default) -->
     <form id="form-apikey" novalidate>
       <div class="mode-header">
-        <h3>Sign in with API key</h3>
-        <a id="show-totp" class="mode-switch hidden" href="#">Use TOTP instead</a>
+        <h3 data-i18n="signin_apikey">Sign in with API key</h3>
+        <a id="show-totp" class="mode-switch hidden" href="#" data-i18n="use_totp">Use TOTP instead</a>
       </div>
 
-      <label for="apikey">API key</label>
+      <label for="apikey" data-i18n="label_apikey">API key</label>
       <input type="password" id="apikey" required autocomplete="off"
-             placeholder="pgp_…" spellcheck="false">
+             placeholder="Paste your Paramant API key" spellcheck="false">
 
-      <button type="submit">Sign in</button>
+      <button type="submit" data-i18n="signin">Sign in</button>
       <div id="error-apikey" class="error" role="alert" aria-live="polite"></div>
     </form>
 
     <!-- TOTP form (shown only when capability is on) -->
     <form id="form-totp" class="hidden" novalidate>
       <div class="mode-header">
-        <h3>Sign in with authenticator</h3>
-        <a id="show-apikey" class="mode-switch" href="#">Use API key instead</a>
+        <h3 data-i18n="signin_totp">Sign in with authenticator</h3>
+        <a id="show-apikey" class="mode-switch" href="#" data-i18n="use_apikey">Use API key instead</a>
       </div>
 
-      <label for="email">Email</label>
+      <label for="email" data-i18n="label_email">Email</label>
       <input type="email" id="email" required autocomplete="username"
              placeholder="you@example.com">
 
-      <label for="totp">6-digit code</label>
+      <label for="totp" data-i18n="label_code">6-digit code</label>
       <input type="text" id="totp" required inputmode="numeric"
              pattern="[0-9]{6}" maxlength="6"
              autocomplete="one-time-code" placeholder="• • • • • •">
 
-      <button type="submit">Sign in</button>
+      <button type="submit" data-i18n="signin">Sign in</button>
       <div id="error-totp" class="error" role="alert" aria-live="polite"></div>
     </form>
 
     <p class="footer-text">
-      No account? <a href="https://paramant.app/request-key" target="_blank" rel="noopener">Request a key</a>
+      <span data-i18n="no_account">No account?</span>
+      <a href="https://paramant.app/request-key" target="_blank" rel="noopener" data-i18n="request_key">Request a key</a>
     </p>
   </div>
 
@@ -77,8 +78,10 @@
     <div class="status">
       <span class="status-dot" aria-hidden="true"></span>
       <div class="status-info">
-        <div class="status-email" id="status-email">—</div>
-        <div class="status-detail">Session active · <span id="session-timer">—</span></div>
+        <div class="status-email">
+          <span data-i18n="signed_in">Signed in</span><span class="plan-badge hidden" id="plan-badge"></span>
+        </div>
+        <div class="status-detail"><span data-i18n="session_active">Session active</span> · <span id="session-timer">—</span></div>
       </div>
     </div>
 
@@ -86,7 +89,14 @@
       Open Gmail or Outlook, then click the <strong>Paramant</strong> button next to "Attach files".
     </p>
 
-    <button id="logout-btn" class="btn-secondary">Sign out</button>
+    <div class="section-label" data-i18n="recent_transfers">Recent transfers</div>
+    <ul class="history-list" id="history-list"></ul>
+    <p class="history-empty hidden" id="history-empty" data-i18n="no_transfers">No transfers yet.</p>
+
+    <div class="action-row">
+      <button id="settings-btn" class="btn-secondary" data-i18n="settings">Settings</button>
+      <button id="logout-btn" class="btn-secondary" data-i18n="sign_out">Sign out</button>
+    </div>
   </div>
 </div>
 

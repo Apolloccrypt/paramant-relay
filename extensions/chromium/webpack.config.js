@@ -9,8 +9,8 @@ module.exports = (env, argv) => ({
     'background/service-worker': './src/background/service-worker.js',
     'content/gmail':             './src/content/gmail.js',
     'content/outlook':           './src/content/outlook.js',
-    'content/shared/banner':     './src/content/shared/banner.js',
     'popup/popup':               './src/popup/popup.js',
+    'options/options':           './src/options/options.js',
   },
 
   output: {
@@ -25,6 +25,8 @@ module.exports = (env, argv) => ({
         { from: 'manifest.json' },
         { from: 'src/popup/popup.html',          to: 'popup/popup.html' },
         { from: 'src/popup/popup.css',           to: 'popup/popup.css' },
+        { from: 'src/options/options.html',      to: 'options/options.html' },
+        { from: 'src/options/options.css',       to: 'options/options.css' },
         { from: 'src/content/shared/banner.css', to: 'content/shared/banner.css' },
         { from: 'icons',                         to: 'icons' },
         { from: '_locales',                      to: '_locales' },
@@ -32,5 +34,7 @@ module.exports = (env, argv) => ({
     }),
   ],
 
-  optimization: { runtimeChunk: false },
+  // Each entry must be a self-contained classic script: content scripts and the MV3
+  // service worker cannot pull in separate chunks at runtime.
+  optimization: { runtimeChunk: false, splitChunks: false },
 });

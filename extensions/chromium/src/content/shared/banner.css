@@ -122,6 +122,64 @@
   background: #7F1D1D;
 }
 
+.paramant-upload-success {
+  background: #064E3B;
+}
+
+/* Progress bar inside the upload toast */
+.paramant-upload-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.paramant-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.paramant-upload-name {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paramant-upload-pct {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #B2FF3F;
+}
+
+.paramant-upload-track {
+  height: 4px;
+  background: rgba(248, 250, 252, 0.22);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.paramant-upload-fill {
+  height: 100%;
+  width: 0;
+  background: #B2FF3F;
+  transition: width 0.2s ease;
+}
+
+.paramant-upload-cancel {
+  background: transparent;
+  border: none;
+  color: rgba(248, 250, 252, 0.7);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 0 0 4px;
+}
+
+.paramant-upload-cancel:hover { color: #F8FAFC; }
+
 @keyframes paramant-spin {
   to { transform: rotate(360deg); }
 }

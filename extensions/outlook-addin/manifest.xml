@@ -6,7 +6,7 @@
   xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
   xsi:type="MailApp">
 
-  <Id>paramant-outlook-addin-uuid-here</Id>
+  <Id>1344993b-490a-4d8a-969e-c5f819ffba25</Id>
   <Version>1.0.0</Version>
   <ProviderName>Paramant</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
@@ -14,10 +14,12 @@
   <Description DefaultValue="Send encrypted attachments via Paramant's post-quantum file relay."/>
   <IconUrl DefaultValue="https://addin.paramant.app/assets/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://addin.paramant.app/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://paramant.app/help/outlook-addin"/>
+  <SupportUrl DefaultValue="https://paramant.app/help/outlook-extension"/>
 
   <AppDomains>
     <AppDomain>https://paramant.app</AppDomain>
+    <AppDomain>https://addin.paramant.app</AppDomain>
+    <AppDomain>https://relay.paramant.app</AppDomain>
   </AppDomains>
 
   <Hosts>

@@ -84,7 +84,8 @@ label {
 }
 
 input[type="email"],
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
   display: block;
   width: 100%;
   padding: 10px 12px;
@@ -98,10 +99,13 @@ input[type="text"] {
 }
 
 input[type="email"]:focus,
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="password"]:focus {
   outline: none;
   border-color: var(--cobalt);
 }
+
+#apikey { font-family: var(--mono); font-size: 12px; }
 
 #totp {
   font-family: var(--mono);
@@ -288,3 +292,86 @@ button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
 .mode-switch:hover { text-decoration: underline; }
 
 .hidden { display: none !important; }
+
+/* ── Plan badge ─────────────────────────────────────────────────────────── */
+
+.plan-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--lime);
+  padding: 2px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ── Recent transfers ──────────────────────────────────────────────────── */
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-weight: 700;
+  margin: 4px 0 8px;
+}
+
+.history-list { list-style: none; margin: 0 0 16px; max-height: 168px; overflow-y: auto; }
+
+.history-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ink-hair);
+}
+
+.history-name {
+  font-size: 12px;
+  color: var(--navy);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.history-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.history-empty {
+  font-size: 12px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* ── Logged-in action row ──────────────────────────────────────────────── */
+
+.action-row { display: flex; gap: 8px; }
+.action-row .btn-secondary { flex: 1; }
+
+.linkish {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cobalt);
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.linkish:hover { text-decoration: underline; }
