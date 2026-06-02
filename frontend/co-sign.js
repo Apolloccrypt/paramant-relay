@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=3';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=4';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -180,21 +180,26 @@ async function prepareSigning() {
     return;
   }
 
-  // GATE 2 — has a passkey signing key (stuk 1). For a first-time invitee with no
-  // passkey, stuk 2 wires the inline TOFU enrol here; for now, point at /account.
+  // GATE 2 — a passkey signing key. We no longer dump a first-time recipient to
+  // /account: if this device has no signing key, doSign() sets one up inline with
+  // a single passkey tap (no passphrase, no TOTP) — the sign-in passkey becomes
+  // the signing key. Resolve now only to SHOW the fingerprint when one exists.
   try {
     __signKey = await resolvePasskeySigningKey();
   } catch (e) {
     if (e && e.code === 'no_signing_passkey') {
-      setStatus('warn', 'Signed in as ' + escapeHtml(__session.email || 'your account') + ', but signing isn\'t set up on this device yet. Set it up, then return to this link.');
-      showCta('<a class="btn btn-outline" href="/account">Set up your signing key</a>');
+      __signKey = null;   // doSign() will set it up with one tap before signing
     } else {
       setStatus('err', e.message || 'Could not check your signing key.');
+      return;
     }
-    return;
   }
 
-  setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your signing key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
+  if (__signKey) {
+    setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your signing key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
+  } else {
+    setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your sign-in passkey — set up with one tap when you sign (no passphrase, no code).');
+  }
   $('sign-confirm').onclick = doSign;
   refreshSignGate();   // stays disabled until the document has been reviewed (or blind-signing is acknowledged)
 }
@@ -286,9 +291,10 @@ function blindLinkHtml() {
 function refreshSignGate() {
   const btn = $('sign-confirm');
   const gate = $('review-gate');
-  // Login + passkey are handled by prepareSigning; until both exist the CTA there
-  // drives the flow and the sign button stays disabled.
-  if (!__session || !__signKey) { btn.disabled = true; gate.hidden = true; return; }
+  // Login is required; the signing key is NOT required up front — __signKey may be
+  // null for a first-time signer on this device, and doSign() sets it up with one
+  // passkey tap before signing. So gate only on the session here.
+  if (!__session) { btn.disabled = true; gate.hidden = true; return; }
 
   const reviewed = (__hashMatches === true) || __blindAck;
   btn.disabled = !reviewed;
@@ -322,6 +328,13 @@ async function doSign() {
   $('sign-cta').hidden = true;
 
   try {
+    // 0) Make sure this device has a passkey signing key — set one up inline with
+    //    a single passkey tap (no passphrase, no TOTP) if not. The sign-in passkey
+    //    becomes the signing key; no /account detour. Returns the existing key fast.
+    if (!__signKey) {
+      __signKey = await ensureSigningKey({ rpId: location.hostname, onStatus: (m) => setStatus('', m) });
+    }
+
     // 1) Per-document activation (authorize -> one-shot token). The admin checks
     //    the invited email == this party's email and the doc hash, then mints a
     //    300s one-shot activation. No token -> the client cannot proceed to unlock.
@@ -357,7 +370,10 @@ async function doSign() {
     showStep('step-done');
   } catch (e) {
     let msg = (e && e.message) ? e.message : String(e);
-    if (e && e.status === 401) msg = 'Your session expired. Sign in again as the invited recipient, then retry.';
+    if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link — your sign-in passkey becomes your signing key.';
+    else if (e && (e.code === 'no_prf' || e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
+    else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.';
+    else if (e && e.status === 401) msg = 'Your session expired. Sign in again as the invited recipient, then retry.';
     else if (e && e.status === 403) msg = 'This invite is bound to a different email address. Sign in with the address the invite was sent to.';
     else if (e && e.status === 410) msg = 'This signing invite has expired (invites are valid for 7 days). Ask the sender for a new link.';
     else if (e && e.status === 409) msg = 'That signing authorization was already used or expired. Reload the page and try again.';

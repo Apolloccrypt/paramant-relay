@@ -293,6 +293,50 @@ export async function vaultAddPrfWrap({ pk_hash, secretKeyBytes, credentialId, p
   return { id: pk_hash, kekSources: entry.wraps.map(w => w.kekSource) };
 }
 
+// --- Create a NEW entry wrapped by a passkey PRF ONLY (no passphrase wrap).
+//     This is the "your sign-in passkey IS your signing key" path (ADR R018):
+//     the ML-DSA-65 key is generated in the browser and the ONLY thing that can
+//     unwrap it is the account's passkey PRF — there is no separate signing
+//     passphrase to choose, lose, or be phished for. Recovery is the synced
+//     passkey itself (iCloud Keychain / Google Password Manager) plus the
+//     ability to enrol a fresh key on a new device (the relay keeps a
+//     multi-key, GitHub-SSH-style list, so old signatures stay verifiable). A
+//     passphrase wrap can still be ADDED later via vaultStore as an optional
+//     break-glass; this path just no longer REQUIRES one up front. Note this
+//     deliberately relaxes the earlier "PRF is never the sole wrap" invariant —
+//     it is a documented product choice, not an oversight.
+export async function vaultCreatePrfOnly({ alg, label, pk_b64, pk_hash, secretKeyBytes, credentialId, prfSalt, prfOutput }) {
+  if (!alg || !pk_b64 || !pk_hash) throw new Error('vaultCreatePrfOnly: alg, pk_b64, pk_hash required');
+  if (!(secretKeyBytes instanceof Uint8Array) || secretKeyBytes.length === 0) throw new Error('vaultCreatePrfOnly: secretKeyBytes required');
+  if (!credentialId || !(prfOutput instanceof Uint8Array) || prfOutput.length < 16) throw new Error('vaultCreatePrfOnly: credentialId + prfOutput required');
+  if (!(prfSalt instanceof Uint8Array) || prfSalt.length < 16) throw new Error('vaultCreatePrfOnly: prfSalt (>=16 bytes, the WebAuthn PRF eval salt) required');
+
+  const iv  = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const kek = await _deriveKekFromPrf(prfOutput, prfSalt);
+  const ct  = new Uint8Array(await crypto.subtle.encrypt({ name: KEK_NAME, iv }, kek, secretKeyBytes));
+  const wrap = {
+    kekSource: 'webauthn-prf', credentialId, hkdf: 'HKDF-SHA256',
+    info: 'paramant/parasign/vault-kek/v1',
+    prfSalt: b64Encode(prfSalt), iv: b64Encode(iv), ciphertext: b64Encode(ct),
+  };
+
+  const db = await vaultOpen();
+  const store = _tx(db, 'readwrite');
+  const existing = await _toPromise(store.get(pk_hash));
+  const entry = existing ? { ...existing } : {
+    id: pk_hash, alg, label: label || null, pk_b64, pk_hash,
+    enrolled_at: new Date().toISOString(), wraps: [], last_used_at: null,
+  };
+  if (label) entry.label = label;
+  // Replace any existing prf wrap for THIS credential; keep other wraps (incl.
+  // an optional passphrase break-glass) intact.
+  entry.wraps = (entry.wraps || []).filter(w => !(w.kekSource === 'webauthn-prf' && w.credentialId === credentialId));
+  entry.wraps.push(wrap);
+  await _toPromise(store.put(entry));
+  db.close();
+  return { id: entry.id, alg: entry.alg, label: entry.label, pk_hash: entry.pk_hash, enrolled_at: entry.enrolled_at, kekSources: entry.wraps.map(w => w.kekSource) };
+}
+
 // Unlock via the webauthn-prf wrap. Returns raw secretKeyBytes. The caller must
 // zeroize them after signing (see parasign-signer.js dispose()).
 export async function vaultUnlockPrf(id, { prfOutput, credentialId } = {}) {

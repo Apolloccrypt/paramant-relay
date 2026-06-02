@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=3';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=4';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -444,9 +444,8 @@ async function showSigningIdentity() {
     if (e && e.code === 'no_signing_passkey') {
       const elsewhere = await serverHasSigningKey();
       el.innerHTML = (elsewhere
-        ? 'Your signing key was set up in another browser or on another device. Signing keys live in the browser where you create them, so set one up here too. '
-        : 'You haven\'t set up signing on this device yet — you need to before you can sign. ') +
-        '<a href="/account#signing-identity-section" class="btn btn-primary btn-small" style="margin-top:8px;display:inline-block">Set up your signing key →</a>';
+        ? 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign — one Face ID / Touch ID tap, no passphrase, no code.'
+        : 'You\'ll sign with your sign-in passkey — this device sets up your signing key with one tap the first time you sign. No passphrase, no separate code.');
     } else {
       el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
     }
@@ -700,7 +699,7 @@ async function fillReviewKeyFingerprint() {
     const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = 'Your signing key (' + k.fingerprint + ')';
   } catch (e) {
     const fpEl = $('ds-proof-fp');
-    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? '(set up your signing key first)' : '(unavailable)';
+    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? '(set up with one passkey tap when you sign)' : '(unavailable)';
   }
 }
 
@@ -1053,7 +1052,10 @@ async function doSign() {
     // its public half from vault metadata here (for the stamp fingerprint); the
     // secret is unlocked solely by the per-document PRF activation below.
     status('Locating your signing key...');
-    const signKey = await resolvePasskeySigningKey();   // { vaultId, pk_b64, fingerprint } — public only
+    // Resolve the account's passkey signing key, or set one up inline with a
+    // single passkey tap (no passphrase, no TOTP) if this device has none yet —
+    // the sign-in passkey becomes the signing key. No /account detour.
+    const signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
     const fingerprint = signKey.fingerprint;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
 
@@ -1141,7 +1143,9 @@ async function doSign() {
     $('ds-sign-status').className = 'ds-banner err';
     let msg = (e && e.message) ? e.message : String(e);
     if (e && e.status === 401) msg = 'Please sign in to sign documents. Open /auth/login, then return here.';
-    else if (e && e.code === 'no_signing_passkey') msg = 'Signing isn\'t set up on this device yet. Set it up at /account, then sign.';
+    else if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then sign — your sign-in passkey becomes your signing key.';
+    else if (e && (e.code === 'no_prf' || e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
+    else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.';
     $('ds-sign-status').textContent = msg;
     $('ds-sign-now').disabled = false;
   }
