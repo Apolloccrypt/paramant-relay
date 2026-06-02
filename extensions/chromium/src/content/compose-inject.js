@@ -49,11 +49,34 @@ export function initCompose(config) {
 }
 
 function waitForAttachButton(composeWin, config, attempts = 0) {
-  const btn = composeWin.querySelector(config.attachSelector);
+  const btn = locateAttach(composeWin, config);
   if (btn) return injectButton(composeWin, btn, config);
   if (attempts < (config.attachAttempts ?? 25)) {
     setTimeout(() => waitForAttachButton(composeWin, config, attempts + 1), config.attachDelay ?? 180);
+  } else {
+    console.debug('[Paramant] attach button not found in compose window — selector may need updating for this UI language');
   }
+}
+
+// The exact-label selector is fast but English-only. The label-regex fallback makes the
+// integration locale-independent: it matches the attach button's localized tooltip/aria-label
+// (e.g. NL "Bestanden bijvoegen", DE "Datei anhängen") while deliberately NOT matching the
+// Drive insert button, whose verb is "insert/invoegen/einfügen/insérer/insertar".
+function locateAttach(composeWin, config) {
+  if (config.attachSelector) {
+    const el = composeWin.querySelector(config.attachSelector);
+    if (el) return el;
+  }
+  if (config.attachMatch) {
+    const test = typeof config.attachMatch === 'function'
+      ? config.attachMatch
+      : (s) => config.attachMatch.test(s);
+    for (const el of composeWin.querySelectorAll('[data-tooltip], [aria-label]')) {
+      const label = `${el.getAttribute('data-tooltip') || ''} ${el.getAttribute('aria-label') || ''}`;
+      if (test(label)) return el;
+    }
+  }
+  return null;
 }
 
 function injectButton(composeWin, attachBtn, config) {
@@ -137,6 +160,7 @@ async function uploadOne(composeWin, file, config) {
     ui.succeed(t('success_inserted'));
   } catch (err) {
     if (transferId) send({ type: 'TRANSFER_ABORT', transferId }).catch(() => {});
+    if (String(err?.message || err || '') === 'not_authenticated') send({ type: 'OPEN_POPUP' }).catch(() => {});
     ui.fail(friendlyError(err));
   }
 }
