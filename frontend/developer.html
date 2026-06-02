@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Developer dashboard — Paramant</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=19">
+<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<style>
+*{box-sizing:border-box}
+main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) var(--space-7)}
+.dev-h{font-family:var(--sans);font-size:clamp(24px,3vw,32px);font-weight:600;letter-spacing:-.02em;color:var(--ink);margin:0}
+.dev-sec{margin-top:var(--space-7)}
+.dev-sec:first-of-type{margin-top:var(--space-4)}
+.dev-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin:0 0 var(--space-3)}
+.dev-card{background:var(--bone);border:1px solid rgba(11,58,106,.08);border-radius:14px;box-shadow:0 1px 2px rgba(11,58,106,.04)}
+.mono{font-family:var(--mono)}
+.dim{color:var(--ink-dim)}
+
+/* Section 1: Pulse */
+.pulse{display:grid;grid-template-columns:minmax(220px,1fr) 2fr;gap:var(--space-4);align-items:stretch}
+.pulse-id{padding:var(--space-5)}
+.pulse-id .email{font-family:var(--mono);font-size:13px;color:var(--ink);word-break:break-all}
+.plan-badge{display:inline-flex;align-items:center;gap:7px;margin-top:var(--space-3);font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);border:1px solid var(--ink-hair);border-radius:999px;padding:5px 12px}
+.plan-badge strong{color:var(--ink);font-weight:600}
+.heartbeat{display:flex;align-items:center;gap:8px;margin-top:var(--space-4);font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.hb-dot{width:8px;height:8px;border-radius:50%;background:#9aa7b5}
+.hb-dot.up{background:#5fbf3f;animation:hb 2s ease-out infinite}
+.hb-dot.poll{background:#e8a33d}.hb-dot.down{background:#d7483b}
+@keyframes hb{0%{box-shadow:0 0 0 0 rgba(95,191,63,.5)}70%{box-shadow:0 0 0 7px rgba(95,191,63,0)}100%{box-shadow:0 0 0 0 rgba(95,191,63,0)}}
+.feed{padding:var(--space-4) var(--space-5);overflow:hidden}
+.feed h3{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin:0 0 10px}
+.feed-row{display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:baseline;font-family:var(--mono);font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--ink-hair);transition:opacity .4s}
+.feed-row:last-child{border-bottom:0}
+.feed-row .t{color:var(--ink-dim);font-size:10px;white-space:nowrap}
+.feed-row .ev{color:var(--ink);font-weight:600}
+.feed-row .tg{color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-row .rs{font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.feed-row .rs.ok{color:#1D4ED8}.feed-row .rs.fail{color:#d7483b}
+.feed-row.fresh{animation:slidein .45s ease}
+@keyframes slidein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* Section 2: Flow */
+.flow{padding:var(--space-5)}
+.flow svg{display:block;width:100%;height:auto;max-height:140px}
+.flow-node rect{fill:#fff;stroke:var(--ink-hair);stroke-width:1.4;transition:stroke .35s,fill .35s}
+.flow-node text{font-family:var(--mono);font-size:9px;fill:var(--ink-dim);transition:fill .35s}
+.flow-node.on rect{stroke:#B2FF3F;fill:#0a1626}
+.flow-node.on text{fill:#B2FF3F}
+.flow-arrow{stroke:var(--ink-hair);stroke-width:1.6;transition:stroke .35s}
+.flow-arrow.on{stroke:#B2FF3F}
+.flow-lbl{font-family:var(--mono);font-size:8px;fill:var(--ink-dim)}
+.flow-cap{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-top:10px;text-align:center}
+.flow-cap b{color:var(--ink)}
+
+/* Section 3: Tools */
+.tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:var(--space-4)}
+.tool{padding:var(--space-4) var(--space-5);display:flex;flex-direction:column;gap:8px}
+.tool-top{display:flex;align-items:flex-start;gap:12px}
+.tool-icon{width:34px;height:34px;flex-shrink:0;border-radius:9px;background:#0a1626;display:flex;align-items:center;justify-content:center}
+.tool-icon svg{width:18px;height:18px;stroke:#B2FF3F;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tool-name{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink)}
+.tool-tag{font-family:var(--sans);font-size:12.5px;line-height:1.5;color:var(--ink-dim);margin:0}
+.tool-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.tool-status .sd{width:6px;height:6px;border-radius:50%;background:#9aa7b5}
+.tool-status.idle .sd{background:#5fbf3f}.tool-status.running .sd{background:#e8a33d}
+.tool-stats{display:flex;gap:14px;font-family:var(--mono);font-size:10px;color:var(--ink-dim);flex-wrap:wrap}
+.tool-stats b{color:var(--ink);font-weight:600}
+.tool-install summary{font-family:var(--mono);font-size:11px;color:#1D4ED8;cursor:pointer;list-style:none}
+.tool-install summary::-webkit-details-marker{display:none}
+.tool-install pre{font-family:var(--mono);font-size:10px;line-height:1.5;color:#cfe0f2;background:#0a1626;border-radius:8px;padding:9px 10px;margin:8px 0 0;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.tool-actions{display:flex;gap:8px;margin-top:auto;padding-top:8px;flex-wrap:wrap;align-items:center}
+.dev-btn{font-family:var(--mono);font-size:11px;padding:7px 12px;border-radius:8px;border:1px solid var(--ink-hair);background:transparent;color:var(--ink-dim);cursor:not-allowed}
+.dev-btn[disabled]{opacity:.6}
+.dev-link{font-family:var(--mono);font-size:11px;color:#1D4ED8;text-decoration:none}
+.dev-link:hover{text-decoration:underline}
+/* enabled action buttons + the configure command-builder modal */
+.dev-btn-go{cursor:pointer;color:var(--navy);border-color:var(--ink-hair);background:#fff;transition:all .12s ease}
+.dev-btn-go:hover{border-color:#B2FF3F;background:rgba(178,255,63,.08);color:#0B3A6A}
+.dev-modal{position:fixed;inset:0;background:rgba(11,58,106,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}
+.dev-modal[hidden]{display:none}
+.dev-modal-card{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:24px 26px;position:relative;box-shadow:0 20px 60px rgba(11,58,106,.25);max-height:88vh;overflow:auto}
+.dev-modal-x{position:absolute;top:12px;right:15px;border:none;background:none;font-size:22px;line-height:1;color:var(--ink-dim);cursor:pointer}
+.dev-modal-card h3{font-size:15px;font-weight:700;color:var(--navy);margin:0 0 4px;font-family:var(--mono)}
+.dev-modal-tag{font-size:13px;color:var(--ink-dim);margin:0 0 14px}
+.dev-modal-run{display:inline-block;font-family:var(--mono);font-size:12px;color:#0B3A6A;background:#B2FF3F;padding:8px 14px;border-radius:8px;text-decoration:none;margin:0 0 16px}
+.dev-step{margin-bottom:13px}
+.dev-step-h{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-dim);margin-bottom:5px}
+.dev-copy{border:1px solid var(--ink-hair);background:#fff;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:6px;color:var(--navy);cursor:pointer}
+.dev-copy:hover{border-color:#B2FF3F}
+.dev-pre,.dev-run{font-family:var(--mono);font-size:11.5px;background:#0a1626;color:#cfe0f2;border:none;border-radius:8px;padding:11px 13px;width:100%;box-sizing:border-box;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+.dev-run{resize:vertical;line-height:1.5}
+.dev-modal-src{font-family:var(--mono);font-size:11px;color:#1D4ED8;text-decoration:none}
+.dev-step-btns{display:flex;gap:6px}
+.dev-saved{font-size:10px;color:var(--ink-dim);margin:6px 0 0;font-family:var(--mono)}
+.dev-reset{border:none;background:none;color:#1D4ED8;font-family:var(--mono);font-size:10px;cursor:pointer;text-decoration:underline;padding:0}
+
+/* Section 4: Operations */
+.ops{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-4);align-items:start}
+.ops-card{padding:var(--space-4) var(--space-5)}
+.ops-card h3{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin:0 0 12px}
+.key-row{font-family:var(--mono);font-size:11.5px;color:var(--ink);display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--ink-hair)}
+.bar{height:7px;border-radius:999px;background:var(--ink-ghost);overflow:hidden;margin:5px 0 2px}
+.bar > i{display:block;height:100%;background:#1D4ED8;border-radius:999px;transition:width .5s}
+.bar.warn > i{background:#B2FF3F}
+.usage-row{margin-bottom:14px}
+.usage-row .lab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.usage-row .lab b{color:var(--ink)}
+.upsell{margin-top:6px;font-family:var(--mono);font-size:10px;color:#0B3A6A;background:#B2FF3F;border-radius:6px;padding:5px 9px;display:inline-block}
+.tl-filter{width:100%;font-family:var(--mono);font-size:11px;padding:8px 10px;border:1px solid var(--ink-hair);border-radius:8px;background:#fff;color:var(--ink);margin-bottom:10px}
+.tl{max-height:260px;overflow-y:auto}
+.tl-row{font-family:var(--mono);font-size:10.5px;display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--ink-hair)}
+.tl-row .t{color:var(--ink-dim);white-space:nowrap}.tl-row .e{color:var(--ink)}
+
+/* Section 5: WIP strip */
+.wip{margin-top:var(--space-7);padding:var(--space-4) var(--space-5);border:1px dashed var(--ink-hair);border-radius:12px;font-family:var(--mono);font-size:11px;line-height:1.7;color:var(--ink-dim)}
+.wip b{color:var(--ink)}.wip a{color:#1D4ED8}
+
+@media(max-width:880px){.pulse{grid-template-columns:1fr}.ops{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.feed-row.fresh{animation:none}.hb-dot.up{animation:none}*{transition:none !important}}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+  <ul class="nav-links">
+    <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+    <li><a href="/developer" class="nav-link nav-link-strong">Developer</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
+  </ul>
+  <div class="nav-auth"><a href="/account" class="nav-signin">Account</a></div>
+</nav>
+
+<main id="main" class="dev">
+  <p class="dev-eyebrow">Operations dashboard · read-only</p>
+  <h1 class="dev-h">What happens when you ship.</h1>
+
+  <section class="dev-sec pulse" aria-label="Pulse">
+    <div class="dev-card pulse-id">
+      <div class="email" data-dv="email">—</div>
+      <span class="plan-badge"><strong data-dv="plan">—</strong><span>plan</span></span>
+      <div class="heartbeat"><span class="hb-dot" id="hb"></span><span id="hb-label">connecting…</span></div>
+    </div>
+    <div class="dev-card feed">
+      <h3>Live activity · newest first</h3>
+      <div id="feed"><div class="feed-row"><span class="t dim">—</span><span class="ev dim">waiting for events…</span><span class="tg"></span><span class="rs"></span></div></div>
+    </div>
+  </section>
+
+  <section class="dev-sec" aria-label="Transfer flow">
+    <p class="dev-eyebrow">What happens to a transfer</p>
+    <div class="dev-card flow">
+      <svg viewBox="0 0 640 90" role="img" aria-label="device, encrypt, relay RAM, deliver, recipient, read, burned">
+        <g class="flow-node" id="fn-device"><rect x="6" y="26" width="96" height="38" rx="7"/><text x="54" y="49" text-anchor="middle">device</text></g>
+        <line class="flow-arrow" id="fa-1" x1="104" y1="45" x2="178" y2="45"/><text class="flow-lbl" x="141" y="38" text-anchor="middle">encrypt</text>
+        <g class="flow-node" id="fn-relay"><rect x="180" y="26" width="110" height="38" rx="7"/><text x="235" y="49" text-anchor="middle">relay · RAM</text></g>
+        <line class="flow-arrow" id="fa-2" x1="292" y1="45" x2="366" y2="45"/><text class="flow-lbl" x="329" y="38" text-anchor="middle">deliver</text>
+        <g class="flow-node" id="fn-recv"><rect x="368" y="26" width="104" height="38" rx="7"/><text x="420" y="49" text-anchor="middle">recipient</text></g>
+        <line class="flow-arrow" id="fa-3" x1="474" y1="45" x2="548" y2="45"/><text class="flow-lbl" x="511" y="38" text-anchor="middle">read</text>
+        <g class="flow-node" id="fn-burn"><rect x="550" y="26" width="84" height="38" rx="7"/><text x="592" y="49" text-anchor="middle">burned</text></g>
+      </svg>
+      <div class="flow-cap" id="flow-cap">Idle — the last event animates here.</div>
+    </div>
+  </section>
+
+  <section class="dev-sec" aria-label="Tools">
+    <p class="dev-eyebrow">Tools · status from your activity</p>
+    <div class="tools" id="tools"><div class="dim mono" style="font-size:12px">Loading tools…</div></div>
+  </section>
+
+  <section class="dev-sec" aria-label="Operations">
+    <p class="dev-eyebrow">Operations</p>
+    <div class="ops">
+      <div class="dev-card ops-card">
+        <h3>API keys</h3>
+        <div id="keys"><div class="key-row"><span>—</span><span class="dim">loading</span></div></div>
+        <div class="tool-actions"><button class="dev-btn" disabled title="Available with self-service keys (coming)">+ New key</button></div>
+      </div>
+      <div class="dev-card ops-card">
+        <h3>Usage · this month</h3>
+        <div id="usage"><div class="dim mono" style="font-size:11px">loading…</div></div>
+      </div>
+      <div class="dev-card ops-card">
+        <h3>Activity timeline</h3>
+        <input class="tl-filter mono" id="tl-filter" placeholder="filter events…" aria-label="Filter activity">
+        <div class="tl" id="timeline"></div>
+        <div class="tool-actions"><button class="dev-btn" disabled title="Available with self-service keys (coming)">View all</button></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wip">
+    <b>Operations dashboard.</b> Configure builds a ready-to-run command for any tool; transfer and signing tools run in your browser. Generating additional self-service API keys arrives with account-schema steps 4 and 5.
+    Tools show live status from your activity; per-run stats appear once tool runs are logged to your audit trail.
+    Source: <a href="https://github.com/Apolloccrypt/paramant-solutions" target="_blank" rel="noopener">github.com/Apolloccrypt/paramant-solutions</a>
+  </div>
+</main>
+
+<div id="dev-modal" class="dev-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dev-m-title">
+  <div class="dev-modal-card">
+    <button type="button" class="dev-modal-x" data-m="close" aria-label="Close">&times;</button>
+    <h3 id="dev-m-title" data-m="title">Configure</h3>
+    <p class="dev-modal-tag" data-m="tag"></p>
+    <a class="dev-modal-run" data-m="browser" hidden href="#">Run in your browser</a>
+    <div class="dev-step">
+      <div class="dev-step-h"><span>1 &middot; Install</span><button type="button" class="dev-copy" data-copy="install">copy</button></div>
+      <pre class="dev-pre" data-m="install"></pre>
+    </div>
+    <div class="dev-step">
+      <div class="dev-step-h"><span>2 &middot; Your API key (as an env var)</span><button type="button" class="dev-copy" data-copy="key">copy</button></div>
+      <pre class="dev-pre" data-m="key"></pre>
+    </div>
+    <div class="dev-step">
+      <div class="dev-step-h"><span>3 &middot; Run (edit the parameters)</span><span class="dev-step-btns"><button type="button" class="dev-copy" data-m="save">save</button><button type="button" class="dev-copy" data-copy="run">copy</button></span></div>
+      <textarea class="dev-run" data-m="run" rows="2" spellcheck="false" aria-label="Run command"></textarea>
+      <p class="dev-saved" data-m="saved" hidden>Saved on this device (params only, never your key). <button type="button" class="dev-reset" data-m="reset">Reset to default</button></p>
+    </div>
+    <a class="dev-modal-src" data-m="source" href="#" target="_blank" rel="noopener">View source &#8599;</a>
+  </div>
+</div>
+<script src="/nav.js?v=12" defer></script>
+<script src="/js/developer.js?v=4" defer></script>
+</body>
+</html>

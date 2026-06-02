@@ -5,7 +5,7 @@
 BOLD='\033[1m'; GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m';
 CYAN='\033[0;36m'; DIM='\033[2m'; RESET='\033[0m'
 
-VERSION="2.4.5"
+VERSION="3.0.0"
 RELAY_URL="http://localhost:3000"
 PASS=0; FAIL=0; FAILURES=()
 

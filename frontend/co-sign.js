@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=2';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=3';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -30,13 +30,40 @@ function toHex(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += u8[i].
 function toB64(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s); }
 function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+// CSP here allows img-src 'self' data: (no blob:), so image previews go through a
+// data: URL. PDFs render to <canvas> via the self-hosted pdf.js (worker-src 'self').
+const MAX_PREVIEW_PAGES = 30;
+function bytesToDataUrl(bytes, mime) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('FileReader error'));
+    r.readAsDataURL(new Blob([bytes], { type: mime }));
+  });
+}
+function guessMimeFromMagic(bytes) {
+  if (bytes.length < 4) return null;
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return 'image/png';
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return 'image/jpeg';
+  return null;
+}
+function isPdfBytes(b) { return b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; }
+function waitForPdfjs() {
+  if (window.__pdfjsLib) return Promise.resolve(window.__pdfjsLib);
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('PDF.js failed to load')), 10000);
+    window.addEventListener('pdfjs:ready', () => { clearTimeout(t); resolve(window.__pdfjsLib); }, { once: true });
+  });
+}
+
 // ---------- state ----------
 let __envelope = null;
 let __partyIndex = -1;
 let __inviteToken = '';
 let __session = null;       // { email } when logged in as the invited recipient
 let __signKey = null;       // { vaultId, pk_b64, fingerprint } — PUBLIC metadata only
-let __hashMatches = null;
+let __hashMatches = null;   // null = no file opened yet, true/false after a local hash check
+let __blindAck = false;     // user explicitly opted to sign without opening the document
 
 // ---------- boot ----------
 async function init() {
@@ -159,17 +186,17 @@ async function prepareSigning() {
     __signKey = await resolvePasskeySigningKey();
   } catch (e) {
     if (e && e.code === 'no_signing_passkey') {
-      setStatus('warn', 'Signed in as ' + escapeHtml(__session.email || 'your account') + ', but this device has no signing passkey yet. Set one up, then return to this link.');
-      showCta('<a class="btn btn-outline" href="/account">Set up a signing passkey</a>');
+      setStatus('warn', 'Signed in as ' + escapeHtml(__session.email || 'your account') + ', but signing isn\'t set up on this device yet. Set it up, then return to this link.');
+      showCta('<a class="btn btn-outline" href="/account">Set up your signing key</a>');
     } else {
       setStatus('err', e.message || 'Could not check your signing key.');
     }
     return;
   }
 
-  setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You will sign with your passkey-protected key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
-  $('sign-confirm').disabled = false;
+  setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your signing key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
   $('sign-confirm').onclick = doSign;
+  refreshSignGate();   // stays disabled until the document has been reviewed (or blind-signing is acknowledged)
 }
 
 async function onVerifyFile(ev) {
@@ -178,21 +205,118 @@ async function onVerifyFile(ev) {
   const buf = new Uint8Array(await f.arrayBuffer());
   const h = toHex(sha3_256(buf));
   __hashMatches = (h === __envelope.doc_hash);
+  __blindAck = false;   // an opened file supersedes any earlier blind-sign override
   const b = $('verify-result');
   b.hidden = false;
   if (__hashMatches) {
     b.className = 'banner ok';
-    b.textContent = 'Hash matches. This file is the same one the creator hashed.';
+    b.textContent = 'Hash matches. This is the exact document in this envelope - what you see below is what you sign.';
   } else {
     b.className = 'banner err';
-    b.textContent = 'Hash mismatch. The file you chose is different from the one in this envelope. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';
+    b.textContent = 'Hash mismatch. The file you opened differs from the one in this envelope - do not sign it. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';
   }
+  await renderDocPreview(buf);
+  refreshSignGate();
+}
+
+// ---------- document preview (zero-knowledge: the bytes the signer holds, never the relay) ----------
+async function renderDocPreview(bytes) {
+  const host = $('doc-preview');
+  host.hidden = false;
+  host.innerHTML = '<div class="doc-preview-meta">Rendering document...</div>';
+  try {
+    if (isPdfBytes(bytes)) {
+      await renderPdfPreview(bytes, host);
+    } else {
+      const mime = guessMimeFromMagic(bytes);
+      if (mime && mime.startsWith('image/')) {
+        await renderImagePreview(bytes, mime, host);
+      } else {
+        host.innerHTML = '<div class="doc-preview-meta">This file type cannot be shown in the browser. The hash check above already proves it is the exact document in this envelope - open it in your own app to read it before you sign.</div>';
+      }
+    }
+  } catch (e) {
+    host.innerHTML = '<div class="doc-preview-meta">Could not render a preview (' + escapeHtml(e.message || 'error') + '). The hash check above still tells you whether this is the right file.</div>';
+  }
+}
+
+async function renderPdfPreview(bytes, host) {
+  const pdfjs = await waitForPdfjs();
+  const copy = new Uint8Array(bytes);   // pdf.js detaches the buffer it is handed
+  const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  host.innerHTML = '';
+  const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const base = page.getViewport({ scale: 1 });
+    const targetWidth = Math.min(820, Math.floor(((host.clientWidth || window.innerWidth) - 20) * 0.98)) || 600;
+    const viewport = page.getViewport({ scale: targetWidth / base.width });
+    const wrap = document.createElement('div');
+    wrap.className = 'doc-page';
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    wrap.appendChild(canvas);
+    host.appendChild(wrap);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  }
+  const meta = document.createElement('div');
+  meta.className = 'doc-preview-meta';
+  meta.textContent = pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
+    (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
+  host.appendChild(meta);
+}
+
+async function renderImagePreview(bytes, mime, host) {
+  const url = await bytesToDataUrl(bytes, mime);
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'doc-page';
+  const img = document.createElement('img');
+  img.alt = 'Document to sign';
+  img.src = url;
+  wrap.appendChild(img);
+  host.appendChild(wrap);
+}
+
+// ---------- WYSIWYS gate: you cannot sign until you have opened the document (or explicitly accept signing blind) ----------
+function blindLinkHtml() {
+  return ' <button type="button" class="blind-link" id="blind-ack">I do not have the file - sign the hash blind</button>';
+}
+function refreshSignGate() {
+  const btn = $('sign-confirm');
+  const gate = $('review-gate');
+  // Login + passkey are handled by prepareSigning; until both exist the CTA there
+  // drives the flow and the sign button stays disabled.
+  if (!__session || !__signKey) { btn.disabled = true; gate.hidden = true; return; }
+
+  const reviewed = (__hashMatches === true) || __blindAck;
+  btn.disabled = !reviewed;
+  gate.hidden = false;
+  if (__hashMatches === true) {
+    gate.innerHTML = '<span style="color:var(--cobalt)">You have opened and verified the document above.</span>';
+  } else if (__hashMatches === false && !__blindAck) {
+    gate.innerHTML = 'The file you opened does not match this envelope, so signing is blocked. Open the correct document, or' + blindLinkHtml();
+  } else if (__blindAck) {
+    gate.innerHTML = '<span style="color:#b45309">Signing blind - you have not opened the document. Your signature still covers its hash.</span> <button type="button" class="blind-link" id="blind-undo">Open the document instead</button>';
+  } else {
+    gate.innerHTML = 'Open the document above to review it before signing, or' + blindLinkHtml();
+  }
+  const ack = $('blind-ack'); if (ack) ack.onclick = () => { __blindAck = true; refreshSignGate(); };
+  const undo = $('blind-undo'); if (undo) undo.onclick = () => { __blindAck = false; refreshSignGate(); };
 }
 
 // ---------- the v3 passkey-PRF signing chain (same gate as /sign doSign) ----------
 async function doSign() {
-  if (__hashMatches === false) {
-    if (!confirm('The file you uploaded does not match the envelope hash. Sign anyway? You will be signing a hash that does not match your local document.')) return;
+  // The review gate keeps this button disabled until the document is verified or
+  // blind-signing is acknowledged; re-check here as defence in depth.
+  if (__hashMatches !== true && !__blindAck) {
+    setStatus('err', 'Open and review the document above before signing.');
+    refreshSignGate();
+    return;
+  }
+  if (__blindAck && __hashMatches !== true) {
+    if (!confirm('You have not opened the document - you would be signing its hash blind. Continue?')) return;
   }
   $('sign-confirm').disabled = true;
   $('sign-cta').hidden = true;
@@ -211,7 +335,7 @@ async function doSign() {
 
     // 2) Passkey-PRF unlock + sign of the v3 domain-prefixed message. The secret
     //    key lives ONLY inside the ActivatedSigner and is zeroized by dispose().
-    setStatus('', 'Confirm with your passkey (Face ID / Touch ID / security key)...');
+    setStatus('', 'Confirm to sign (Face ID / Touch ID / security key)...');
     const signer = await new LocalVaultSigner().activate({ vaultId: __signKey.vaultId, rpId: location.hostname });
     let sigB64;
     try {

@@ -6,18 +6,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DICOM via Paramant — NEN 7510 compliant file relay for healthcare</title>
 <meta name="description" content="Send DICOM files with post-quantum encryption. Burn-on-read relay, zero storage, Merkle audit trail. NEN 7510 · GDPR · EU only.">
-<meta property="og:title" content="DICOM via Paramant — NEN 7510 compliant file relay for healthcare">
+<meta property="og:title" content="DICOM via Paramant · NEN 7510 compliant file relay for healthcare">
 <meta property="og:description" content="Send DICOM files with post-quantum encryption. Burn-on-read relay, zero storage, Merkle audit trail. NEN 7510 · GDPR · EU only.">
 <meta property="og:url" content="https://paramant.app/dicom">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="DICOM via Paramant — NEN 7510 compliant file relay for healthcare">
+<meta name="twitter:title" content="DICOM via Paramant · NEN 7510 compliant file relay for healthcare">
 <meta name="twitter:description" content="Send DICOM files with post-quantum encryption. Burn-on-read relay, zero storage, Merkle audit trail. NEN 7510 · GDPR · EU only.">
 <link rel="canonical" href="https://paramant.app/dicom">
 
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -194,7 +195,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--black-hair);border:
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -277,7 +278,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--black-hair);border:
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -608,7 +609,7 @@ paramant-receiver.py \
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
@@ -633,6 +634,6 @@ paramant-receiver.py \
 </footer>
 
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
 </body>
 </html>

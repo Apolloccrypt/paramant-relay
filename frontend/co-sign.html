@@ -4,14 +4,27 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Co-sign envelope - PARAMANT</title>
+<title>Co-sign this envelope · Paramant</title>
 <meta name="description" content="Sign a multi-party envelope. Post-quantum (ML-DSA-65), zero-knowledge: the relay never sees the document or your private key.">
+<meta property="og:title" content="Co-sign this envelope · Paramant">
+<meta property="og:description" content="Someone has asked you to co-sign this document. Add your post-quantum signature in your browser. The relay never sees the file or your private key.">
+<meta property="og:url" content="https://paramant.app/co-sign">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-cosign.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Co-sign this envelope: a signed document with a post-quantum verified seal.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Co-sign this envelope · Paramant">
+<meta name="twitter:description" content="Someone has asked you to co-sign this document. Add your post-quantum signature in your browser. The relay never sees the file or your private key.">
+<meta name="twitter:image" content="https://paramant.app/og-cosign.png">
 <meta name="robots" content="noindex,nofollow">
 <link rel="canonical" href="https://paramant.app/co-sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
@@ -59,6 +72,14 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .step{display:none;animation:fadeIn .2s ease}
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.doc-preview{margin-top:12px;border:1px solid var(--ink-hair);background:#fff;max-height:72vh;overflow:auto;padding:10px}
+.doc-page{margin:0 auto 12px;max-width:100%}
+.doc-page:last-child{margin-bottom:0}
+.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#fff}
+.doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
+.review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
+.blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
+.blind-link:hover{color:#b91c1c}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
 </style>
 </head>
@@ -114,22 +135,24 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </div>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Verify the document (optional but recommended)</div></div>
+    <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Review what you are signing</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">Pick the file you received out-of-band. We hash it locally (SHA3-256) and compare it against the envelope hash above. The file is never uploaded.</p>
-      <label class="file-cta" for="verify-file">Choose a file (or drop here) - never uploaded</label>
+      <p class="sub" style="margin-bottom:12px">The relay never received this document - by design it only holds the hash. Open the copy you were sent out-of-band so you can read exactly what you are about to sign. It is hashed locally (SHA3-256), matched against the envelope hash above, and rendered here in your browser. The file is never uploaded.</p>
+      <label class="file-cta" for="verify-file" id="verify-file-cta">Open the document (PDF, PNG or JPG) - never uploaded</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
+      <div class="doc-preview" id="doc-preview" hidden></div>
     </div>
   </div>
 
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Sign as <span id="me-label">party</span></div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">You sign with your passkey-protected ML-DSA-65 key - unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. The signature is bound to the email address this invite was sent to.</p>
+      <p class="sub" style="margin-bottom:12px">You sign with your signing key (ML-DSA-65) — unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. The signature is bound to the email address this invite was sent to.</p>
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Sign this document</button>
+      <div class="review-gate" id="review-gate" hidden></div>
     </div>
   </div>
 </div>
@@ -158,6 +181,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 </main>
 
-<script type="module" src="/co-sign.js?v=1"></script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=1"></script>
+<script type="module" src="/co-sign.js?v=4"></script>
 </body>
 </html>

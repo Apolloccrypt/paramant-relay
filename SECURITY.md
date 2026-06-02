@@ -307,7 +307,7 @@ Additional fixes applied 2026-04-13:
 
 | Credential | Committed | Status |
 |------------|-----------|--------|
-| `RESEND_API_KEY` (`re_K1YQ…XvA`) | 2026-04-01 in `deploy/systemd/*.service` | Verified invalid via Resend API on 2026-04-15 |
+| `RESEND_API_KEY` (`re_K1YQ…XvA`) | 2026-04-01 in `deploy/systemd/*.service` (files since removed) | Verified invalid via Resend API on 2026-04-15 |
 | 3× demo API keys (`pgp_…`) | 2026-04-01 – 2026-04-07 in `frontend/index.html`, `poc/README.md` | Revoked via `/admin/` on 2026-04-15 |
 
 **Remediation:** Server `.env` permissions hardened to 600; gitleaks pre-commit hook installed.

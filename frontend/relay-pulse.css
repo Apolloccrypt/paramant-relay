@@ -1,0 +1,49 @@
+/* relay-pulse.css  ·  site-wide "relay signal"
+ *
+ * One lime pulse glides across the very top edge of every page on a slow loop:
+ * the signal passing through the relay, tying the whole site together. It is the
+ * connective motif that echoes the lime beats in the homepage panel animations.
+ *
+ * Self-contained on purpose: nav.css and design-system.css are NOT touched. The
+ * effect lives entirely on body::after, is fixed + 2px tall + pointer-events:none
+ * (zero layout impact), and is transform-driven (no layout thrash). It honours
+ * prefers-reduced-motion by disappearing entirely. Tunable in one place: the
+ * --rp-* custom properties below.
+ */
+:root {
+  --rp-lime: #B2FF3F;   /* brand lime */
+  --rp-width: 280px;    /* length of the travelling pulse */
+  --rp-period: 7s;      /* one pulse every N seconds */
+  --rp-thickness: 2px;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--rp-width);
+  height: var(--rp-thickness);
+  z-index: 100;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(178, 255, 63, 0) 0%,
+    var(--rp-lime) 50%,
+    rgba(178, 255, 63, 0) 100%);
+  transform: translateX(-320px);
+  animation: relay-pulse var(--rp-period) ease-in-out 0.5s infinite;
+  will-change: transform, opacity;
+}
+
+/* travel left -> right across the viewport, then rest off-screen until the next
+   beat. translateX(100vw) clears the right edge on any width; the gap between
+   16% and 100% is the quiet interval. */
+@keyframes relay-pulse {
+  0%        { transform: translateX(-320px); opacity: 1; }
+  16%       { transform: translateX(100vw);  opacity: 1; }
+  17%, 100% { transform: translateX(100vw);  opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; display: none; }
+}

@@ -5,37 +5,165 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B3A6A">
-<title>PARAMANT &mdash; Encrypted File Relay. Burn on Read.</title>
+<title>PARAMANT · Encrypted File Relay. Burn on Read.</title>
 <meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768 + ML-DSA-65. Burn-on-read. EU/DE. Send files, sign documents, deploy your own.">
-<meta property="og:title" content="PARAMANT &mdash; Encrypted File Relay">
+<meta property="og:title" content="Paramant · Encrypted file relay">
 <meta property="og:description" content="Post-quantum encrypted file relay. Burn on read. EU/DE.">
 <meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:url" content="https://paramant.app/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Paramant · Encrypted file relay">
+<meta name="twitter:description" content="Post-quantum encrypted file relay. Burn on read. EU/DE.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
-<link rel="stylesheet" href="/parapear.css">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/parapear.css?v=1">
 <link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
-/* Homepage — compact 50/50 launchpad. Existing design tokens + classes only;
+/* Homepage: compact 50/50 launchpad. Existing design tokens + classes only;
    design-system.css, nav.css and nav.js are untouched. */
 .home-hero { text-align: center; max-width: 64ch; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-3); }
 .home-hero h1 { font-size: clamp(30px, 5.2vw, 50px); line-height: 1.05; letter-spacing: -0.025em; color: var(--navy); margin: 0 0 var(--space-3); }
 .home-hero .lede { font-size: 16px; line-height: 1.55; color: var(--ink-dim); max-width: 58ch; margin: 0 auto; }
 .hero-badges { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0; margin: var(--space-4) 0 0; }
 .hero-badges li { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 999px; padding: 5px 11px; background: var(--bone); }
+.hero-badges a { display: block; margin: -5px -11px; padding: 5px 11px; border-radius: 999px; color: inherit; text-decoration: none; }
+.hero-badges li:hover { border-color: var(--navy); }
+.hero-badges li:hover a { color: var(--navy); }
 .home-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 1040px; margin: var(--space-5) auto var(--space-6); padding: 0 var(--space-4); }
-.path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); min-height: 220px; }
+.path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); }
 .path-dev { background: var(--bone); }
-.path h2 { font-size: clamp(20px, 2.5vw, 27px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0 0 var(--space-3); max-width: 18ch; }
-.path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); max-width: 34ch; }
+.path h2 { font-size: clamp(20px, 2.5vw, 26px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0; max-width: 22ch; }
+.path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: var(--space-3) 0 0; max-width: 34ch; }
 .path-cta { margin-top: auto; }
-.path-pear { position: absolute; top: var(--space-4); right: var(--space-4); width: clamp(56px, 8vw, 84px); height: auto; opacity: .92; transform: scaleX(-1); user-select: none; -webkit-user-drag: none; }
-@media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } .path { min-height: 0; } }
+.path-cta-sub { display: inline-block; margin-top: var(--space-2); font-size: 13px; color: var(--ink-dim); text-decoration: underline; }
+.path-cta-sub:hover { color: var(--navy); }
+.path-breadth { margin: var(--space-2) 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: .02em; color: var(--ink-dim); }
+@media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } }
+
+/* State-aware hero: the logged-out pitch is the default (and what scrapers
+   see); js/home-auth.js reveals the logged-in welcome + quick actions. */
+.home-state[hidden] { display: none; }
+.home-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; margin: var(--space-4) 0 0; }
+.home-act-ghost { background: transparent; color: var(--navy); border: 1px solid var(--ink-hair); }
+.home-act-ghost:hover { border-color: var(--navy); background: var(--bone); }
+.home-hi-name { color: var(--cobalt); }
+
+/* ── Homepage panel animations: now the centrepiece of each panel: a larger,
+   centred "screen" playing the loop, so the security is felt, not read. Pure
+   CSS keyframes (no JS, CSP-safe), ~10s loops, deep-navy base with lime
+   (#B2FF3F) on the "it works" beats. prefers-reduced-motion shows a static
+   completed frame. design-system.css and nav.css are untouched. ── */
+.path-anim { margin: var(--space-4) auto var(--space-5); width: clamp(210px, 82%, 300px);
+  aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+  background: #0a1626; box-shadow: 0 4px 18px rgba(11,58,106,.22), inset 0 0 0 1px rgba(178,255,63,.10);
+  user-select: none; --lime: #B2FF3F; --doc: #e7edf6; --ln: #56789f; --dim: #88a6cb; }
+.path-anim svg { display: block; width: 100%; height: 100%; }
+.path-anim text { font-family: var(--mono); font-weight: 600; letter-spacing: -.02em; }
+@media (max-width: 760px) { .path-anim { width: clamp(200px, 70vw, 280px); } }
+
+/* LEFT: two pillars in one loop: (1) SIGN the document (ML-DSA-65 curve →
+   "✓ signed"), then (2) SEND it: encrypt flicker → through the relay's RAM →
+   to the recipient → "✓ delivered · burn-on-read". ~10s. Base state
+   (reduced-motion) = a signed document under the SIGN label. */
+.l-sig { stroke-dasharray: 66; stroke-dashoffset: 0; }
+.l-badge, .l-signed, .l-phase1 { opacity: 1; }
+.l-relay, .l-recv { opacity: .3; }
+.l-enc, .l-delivered, .l-phase2 { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .l-phase1    { animation: l-phase1 10s ease-in-out infinite; }
+  .l-phase2    { animation: l-phase2 10s ease-in-out infinite; }
+  .l-doc       { animation: l-doc 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+  .l-sig       { animation: l-sig 10s ease-in-out infinite; }
+  .l-badge     { animation: l-badge 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+  .l-signed    { animation: l-signed 10s ease-in-out infinite; }
+  .l-enc       { animation: l-enc 10s steps(1, end) infinite; }
+  .l-relay     { animation: l-relay 10s ease-in-out infinite; }
+  .l-recv      { animation: l-recv 10s ease-in-out infinite; }
+  .l-delivered { animation: l-delivered 10s ease-in-out infinite; }
+}
+/* phase 1 = sign (≈0–48%) · phase 2 = send (≈48–100%) */
+@keyframes l-phase1 { 0% { opacity: 0; } 4% { opacity: 1; } 44% { opacity: 1; } 49% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-phase2 { 0%, 46% { opacity: 0; } 51% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes l-doc {
+  0%   { opacity: 0; transform: translate(0,0) scale(.9); }
+  4%   { opacity: 1; transform: translate(0,0) scale(1); }
+  56%  { opacity: 1; transform: translate(0,0) scale(1); }
+  74%  { opacity: 1; transform: translate(86px,6px) scale(.42); }
+  82%  { opacity: 0; transform: translate(86px,6px) scale(.42); }
+  100% { opacity: 0; transform: translate(0,0) scale(.9); } }
+@keyframes l-sig { 0%, 8% { stroke-dashoffset: 66; } 26% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
+@keyframes l-badge { 0%, 26% { opacity: 0; transform: scale(.4); } 34% { opacity: 1; transform: scale(1); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes l-signed { 0%, 30% { opacity: 0; transform: translateY(2px); } 38% { opacity: 1; transform: translateY(0); } 46% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-enc { 0%, 49% { opacity: 0; } 50% { opacity: .95; } 52% { opacity: .35; } 54% { opacity: .9; } 56% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes l-relay { 0%, 56% { opacity: .28; } 62% { opacity: 1; } 72% { opacity: 1; } 82% { opacity: .4; } 100% { opacity: .28; } }
+@keyframes l-recv { 0%, 66% { opacity: .28; } 74% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: .28; } }
+@keyframes l-delivered { 0%, 76% { opacity: 0; transform: translateY(2px); } 84% { opacity: 1; transform: translateY(0); } 93% { opacity: 1; } 100% { opacity: 0; } }
+
+/* RIGHT: a terminal cycling through three of the ten CLI tools, ~10s loop,
+   one tool block at a time: type the command, show the ✓ result, hold, next.
+   Base state (reduced-motion) = the first tool block, no typing, static caret. */
+.cli { position: relative; font-family: var(--mono); font-size: clamp(5.6px, 0.86vw, 7px); line-height: 1.6; color: #cfe0f2; padding: 9px 9px; height: 100%; box-sizing: border-box; letter-spacing: -.02em; }
+.cli .c-line { white-space: nowrap; overflow: hidden; }
+.cli .c-cmd { color: #e7edf6; } .cli .c-key { color: #9db8d6; } .cli .c-ok { color: var(--lime); } .cli .c-prompt { color: var(--lime); }
+.c-stack { position: relative; height: calc(2 * 1.6em); margin-bottom: .45em; }
+.c-block { position: absolute; inset: 0; }
+.c-b2, .c-b3 { opacity: 0; }                /* base: first tool block visible */
+.c-caret { display: inline-block; width: .55ch; background: var(--lime); color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .c-b1 { animation: cb1 10s ease infinite; }
+  .c-b2 { animation: cb2 10s ease infinite; }
+  .c-b3 { animation: cb3 10s ease infinite; }
+  .c-b1 > .c-line:first-child { animation: ctype1 10s steps(28, end) infinite; }
+  .c-b2 > .c-line:first-child { animation: ctype2 10s steps(28, end) infinite; }
+  .c-b3 > .c-line:first-child { animation: ctype3 10s steps(28, end) infinite; }
+  .c-b1 .c-cout { animation: cout1 10s ease infinite; }
+  .c-b2 .c-cout { animation: cout2 10s ease infinite; }
+  .c-b3 .c-cout { animation: cout3 10s ease infinite; }
+  .c-caret { animation: c-blink 1.05s steps(1, end) infinite; }
+}
+/* block visibility windows: b1 ≈0–31%, b2 ≈34–64%, b3 ≈67–97% */
+@keyframes cb1 { 0% { opacity: 0; } 2% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cb2 { 0%, 33% { opacity: 0; } 35% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cb3 { 0%, 66% { opacity: 0; } 68% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
+/* command types in (clip-path reveal), then the ✓ result line appears */
+@keyframes ctype1 { 0% { clip-path: inset(0 100% 0 0); } 12% { clip-path: inset(0 0 0 0); } 34% { clip-path: inset(0 0 0 0); } 35% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes ctype2 { 0%, 34% { clip-path: inset(0 100% 0 0); } 45% { clip-path: inset(0 0 0 0); } 67% { clip-path: inset(0 0 0 0); } 68% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes ctype3 { 0%, 67% { clip-path: inset(0 100% 0 0); } 78% { clip-path: inset(0 0 0 0); } 98% { clip-path: inset(0 0 0 0); } 99% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes cout1 { 0%, 14% { opacity: 0; } 19% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cout2 { 0%, 47% { opacity: 0; } 52% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes cout3 { 0%, 80% { opacity: 0; } 85% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes c-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* ── ParaRules band: our policy, stated as the differentiator. Existing tokens
+   only; light ground, hairline grid, lime eyebrow + a "signature" underline on
+   the link. design-system.css / nav.css untouched. ── */
+.home-compare { text-align: center; max-width: 1040px; margin: calc(-1 * var(--space-2)) auto var(--space-6); padding: 0 var(--space-4); font-size: 14px; color: var(--ink-dim); }
+.home-compare a { color: var(--navy); border-bottom: 1px solid var(--lime); padding-bottom: 2px; text-decoration: none; }
+.home-compare a:hover { color: var(--cobalt); }
+.home-rules { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
+.rules-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
+.rules-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.rules-eyebrow span { display: inline-block; width: 22px; height: 2px; background: var(--lime); }
+.rules-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
+.rules-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
+.rules-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
+.rules-grid li { background: #fff; padding: var(--space-4); }
+.rules-grid .r-n { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--navy); opacity: .5; }
+.rules-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 6px 0 4px; }
+.rules-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+.rules-cta { text-align: center; margin-top: var(--space-5); }
+.rules-link { display: inline-block; font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 3px; }
+.rules-link:hover { color: var(--cobalt); }
+@media (max-width: 760px) { .rules-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .rules-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -75,7 +203,7 @@
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -158,7 +286,7 @@
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -207,32 +335,118 @@
 <main id="main-content" role="main">
 
 <section class="home-hero">
-  <h1>Sign it. Send it. We never even had it.</h1>
-  <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
-  <ul class="hero-badges" aria-label="At a glance">
-    <li>Open source</li>
-    <li>Free</li>
-    <li>Fully auditable</li>
-    <li>EU-sovereign</li>
-    <li>Post-quantum</li>
-  </ul>
+  <div class="home-state" data-home="out">
+    <h1>Sign it. Send it. We never even had it.</h1>
+    <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
+    <ul class="hero-badges" aria-label="At a glance">
+      <li><a href="https://github.com/Apolloccrypt/paramant-relay">Open source</a></li>
+      <li><a href="/pricing">Free</a></li>
+      <li><a href="/security">Fully auditable</a></li>
+      <li><a href="/sovereignty">EU-sovereign</a></li>
+      <li><a href="/crypto-agility">Post-quantum</a></li>
+    </ul>
+  </div>
+  <div class="home-state" data-home="in" hidden>
+    <h1>Welcome back<span class="home-hi-name" data-home-name></span>.</h1>
+    <p class="lede">Your relay is ready. Pick up where you left off, or start something new.</p>
+    <div class="home-actions">
+      <a class="btn btn-lime" href="/sign">Sign a document</a>
+      <a class="btn home-act-ghost" href="/dashboard">Your dashboard</a>
+      <a class="btn home-act-ghost" href="/developer">Developer dashboard</a>
+    </div>
+  </div>
 </section>
 
 <section class="home-split" id="products" aria-label="Two ways to use Paramant">
   <div class="path path-human">
-    <h2>For people who sign things that matter.</h2>
-    <p>Documents and files, in your browser. Nothing to install, nothing left behind.</p>
-    <img class="path-pear" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="84" height="84">
+    <h2>Sign and send, right in your browser.</h2>
+    <div class="path-anim" role="img" aria-label="Phase one: a document is signed with a post-quantum ML-DSA-65 signature. Phase two: the same document is encrypted, sent through the relay's memory and delivered to the recipient, then burned after one read.">
+      <svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text class="l-phase l-phase1" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SIGN</text>
+        <text class="l-phase l-phase2" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SEND</text>
+        <g class="l-relay">
+          <rect x="71" y="50" width="20" height="20" rx="2.5" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.3"/>
+          <path d="M75 50v-3 M81 50v-3 M87 50v-3 M75 70v3 M81 70v3 M87 70v3" stroke="#B2FF3F" stroke-width="1" stroke-linecap="round"/>
+          <text x="81" y="63" fill="#B2FF3F" font-size="6" text-anchor="middle">RAM</text>
+        </g>
+        <g class="l-recv">
+          <rect x="116" y="48" width="30" height="32" rx="3" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.4"/>
+          <path d="M123 62 h16 M123 68 h11" stroke="#88a6cb" stroke-width="1.4" stroke-linecap="round"/>
+        </g>
+        <g class="l-doc">
+          <rect x="22" y="32" width="42" height="54" rx="3" fill="#e7edf6" stroke="#cdd9e8" stroke-width="1"/>
+          <path d="M30 43 h26 M30 50 h26 M30 57 h19" stroke="#56789f" stroke-width="1.6" stroke-linecap="round"/>
+          <path class="l-sig" d="M30 74 q5 -7 9 0 t9 0 q4 -5 7 -2" stroke="#B2FF3F" stroke-width="1.9" stroke-linecap="round"/>
+          <g class="l-badge">
+            <circle cx="57" cy="39" r="7" fill="#0a1626" stroke="#B2FF3F" stroke-width="1.3"/>
+            <path d="M53.6 39 l2.4 2.4 L60.6 36.2" stroke="#B2FF3F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <g class="l-enc">
+            <rect x="27" y="38" width="6" height="6" fill="#B2FF3F"/><rect x="41" y="50" width="6" height="6" fill="#B2FF3F"/>
+            <rect x="52" y="44" width="6" height="6" fill="#B2FF3F"/><rect x="34" y="64" width="6" height="6" fill="#B2FF3F"/>
+            <rect x="47" y="72" width="6" height="6" fill="#B2FF3F"/>
+          </g>
+        </g>
+        <text class="l-signed" x="43" y="104" fill="#B2FF3F" font-size="9" text-anchor="middle">&#10003; signed</text>
+        <text class="l-delivered" x="80" y="104" fill="#B2FF3F" font-size="7.5" text-anchor="middle">&#10003; delivered &#183; burn-on-read</text>
+      </svg>
+    </div>
     <div class="path-cta">
       <a class="btn btn-lime" href="/dashboard">Open your dashboard</a>
+      <a class="path-cta-sub" href="/pararules">or read the ParaRules</a>
+      <p class="path-breadth">Sign &#183; co-sign &#183; send &#183; burn-on-read</p>
     </div>
   </div>
   <div class="path path-dev">
-    <h2>For builders who don&rsquo;t trust servers either.</h2>
-    <p>Post-quantum encryption and signing as a pipe. Drop it into your stack, or self-host the whole thing.</p>
-    <div class="path-cta">
-      <a class="btn btn-lime" href="/docs">Read the docs</a>
+    <h2>Drop post-quantum crypto into your stack.</h2>
+    <div class="path-anim path-anim-cli" role="img" aria-label="Terminal cycling through Paramant command-line tools: s3-migrate moves an S3 object encrypted with ML-KEM-768 and burned on read; db-backup ships an encrypted off-site database dump; package-sign signs a release with ML-DSA-65. Ten encrypted CLI tools in total.">
+      <div class="cli" aria-hidden="true">
+        <div class="c-stack">
+          <div class="c-block c-b1">
+            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant s3-migrate</span> <span class="c-key">s3://bucket</span></div>
+            <div class="c-line c-cout"><span class="c-ok">&#10003; migrated</span> <span class="c-key">&#183; ML-KEM-768 &#183; burn</span></div>
+          </div>
+          <div class="c-block c-b2">
+            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant db-backup</span> <span class="c-key">--pg &#8594; vault</span></div>
+            <div class="c-line c-cout"><span class="c-ok">&#10003; encrypted off-site</span></div>
+          </div>
+          <div class="c-block c-b3">
+            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant package-sign</span> <span class="c-key">app.tgz</span></div>
+            <div class="c-line c-cout"><span class="c-ok">&#10003; signed</span> <span class="c-key">&#183; ML-DSA-65</span></div>
+          </div>
+        </div>
+        <div class="c-line c-promptline"><span class="c-prompt">$</span> <span class="c-caret">_</span></div>
+      </div>
     </div>
+    <div class="path-cta">
+      <a class="btn btn-lime" href="/developer">Open developer dashboard</a>
+      <a class="path-cta-sub" href="/docs">or read the docs</a>
+      <p class="path-breadth">10 encrypted CLI tools &#183; backups, migrations, signing, CI</p>
+    </div>
+  </div>
+</section>
+
+<p class="home-compare">Weighing the options? <a href="/vs">See how Paramant compares to Zivver, Tresorit, WeTransfer and SFTP &rarr;</a></p>
+
+<section class="home-rules" aria-labelledby="rules-h">
+  <div class="rules-intro">
+    <p class="rules-eyebrow"><span></span>our policy</p>
+    <h2 id="rules-h">Everyone has a privacy policy. We have rules you can check.</h2>
+    <p class="rules-lede">The ParaRules are the principles we hold ourselves to, in the product and in the code. Not marketing copy: every one is something you can verify yourself.</p>
+  </div>
+  <ol class="rules-grid">
+    <li><span class="r-n">01</span><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p></li>
+    <li><span class="r-n">02</span><h3>Your browser talks only to us</h3><p>No third-party requests. No fonts, CDNs, analytics or pixels.</p></li>
+    <li><span class="r-n">03</span><h3>No surveillance</h3><p>No tracking cookies, no fingerprinting, no ad tech.</p></li>
+    <li><span class="r-n">04</span><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p></li>
+    <li><span class="r-n">05</span><h3>EU soil, EU law</h3><p>Hosted in Germany. No US CLOUD Act reach over your data.</p></li>
+    <li><span class="r-n">06</span><h3>Quantum-ready by default</h3><p>FIPS 203/204 today, not &ldquo;soon&rdquo;.</p></li>
+    <li><span class="r-n">07</span><h3>Honest by design</h3><p>No dark patterns. Real errors, never tidy lies.</p></li>
+    <li><span class="r-n">08</span><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, a relay that proves itself.</p></li>
+    <li><span class="r-n">09</span><h3>Only what&rsquo;s required</h3><p>An email, nothing more. Data we don&rsquo;t hold can&rsquo;t leak.</p></li>
+  </ol>
+  <div class="rules-cta">
+    <a class="rules-link" href="/pararules">Read all nine ParaRules <span aria-hidden="true">&rarr;</span></a>
   </div>
 </section>
 
@@ -269,7 +483,7 @@
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
@@ -293,6 +507,7 @@
   </div>
 </footer>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
+<script src="/js/home-auth.js?v=1" defer></script>
 </body>
 </html>

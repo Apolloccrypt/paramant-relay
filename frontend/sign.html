@@ -4,14 +4,26 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign a document — PARAMANT</title>
+<title>Sign a document · Paramant</title>
 <meta name="description" content="Sign documents with ML-DSA-65 (FIPS 204). Private key and document never leave your browser.">
+<meta property="og:title" content="Sign a document · Paramant">
+<meta property="og:description" content="Sign a document with a post-quantum ML-DSA-65 signature, right in your browser. Your key and the document never leave your device.">
+<meta property="og:url" content="https://paramant.app/sign">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sign a document · Paramant">
+<meta name="twitter:description" content="Sign a document with a post-quantum ML-DSA-65 signature, right in your browser. Your key and the document never leave your device.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
-<link rel="stylesheet" href="/components-parasign.css?v=2">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
 .ds-wrap{max-width:880px;margin:48px auto;padding:0 24px}
 .ds-head{margin-bottom:28px}
@@ -171,7 +183,7 @@
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -254,7 +266,7 @@
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -435,7 +447,7 @@
     <div class="ds-field">
       <label class="ds-label">Cryptographic key (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Checking your signing key...</p>
-      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your passkey-protected ML-DSA-65 key - unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. Recipients you add sign at <code>/co-sign</code> with their own passkey.</p>
+      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your signing key (ML-DSA-65) — unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Back</button>
@@ -446,7 +458,7 @@
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Review and sign</h2>
-    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, your passkey (Face ID / Touch ID / security key) unlocks the key for this one document and the signature is created locally.</p>
+    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, you confirm with Face ID / Touch ID / your security key — that unlocks your signing key for this one document and the signature is created locally.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
@@ -581,7 +593,7 @@
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
@@ -605,9 +617,9 @@
   </div>
 </footer>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script type="module" src="/vendor/pdfjs/pdfjs-loader.js"></script>
-<script src="/vendor/pdf-lib/pdf-lib.min.js" defer></script>
-<script type="module" src="/sign-flow.js?v=13"></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=1"></script>
+<script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
+<script type="module" src="/sign-flow.js?v=15"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ const cliAudit = require('./lib/cli-audit');
 const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
+const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -598,6 +599,28 @@ async function authUser(req, res, next) {
   }
 }
 
+// ── Developer dashboard allowlist ───────────────────────────────────────────
+// Extra gate ON TOP OF authUser for the hidden /developer dashboard. The email
+// allowlist comes from env only (DEVELOPER_ALLOWLIST, comma-separated) — never
+// hardcoded. The pure logic lives in ./lib/developer-gate (unit-tested in
+// admin/test/developer-gate.test.js).
+const { isDeveloper } = require("./lib/developer-gate");
+// Gate for /api/user/developer/* data endpoints. Runs after authUser (which
+// 401s on no session). A valid session that is not on the allowlist gets a
+// 404 — indistinguishable from "this route does not exist", so the developer
+// surface stays hidden from logged-in non-developers (never 403).
+function developerGate(req, res, next) {
+  if (!isDeveloper(req.userSession && req.userSession.email))
+    return res.status(404).json({ error: "not_found" });
+  next();
+}
+// Operations-dashboard data libs (CLI catalogue + snapshot builder). Source of
+// truth for the descriptions is paramant-solutions/tools/. Unit-tested in
+// admin/test/developer-snapshot.test.js.
+const { DEVELOPER_TOOLS } = require('./lib/developer-tools');
+const { buildSnapshot } = require('./lib/developer-snapshot');
+const developerConfig = require('./lib/developer-config');
+
 // Session cookie is SameSite=Lax (was Strict). Deliberate choice (ADR R018):
 // the invite/co-sign flow lands a recipient via a top-level navigation from an
 // emailed link (cross-site, from their mail client). A Strict cookie is NOT
@@ -871,20 +894,21 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
   const result = await verifyRes.json();
   if (!result.valid) return res.status(401).json({ error: "invalid_code" });
 
-  await callRelay("/v2/user/activate-totp", { user_id });
+  // Activation mints the backup codes and returns them exactly once. This is the
+  // only place the plaintext codes exist, so we read them straight from the
+  // activate response — no separate (and previously non-existent) lookup.
+  const activateRes = await callRelay("/v2/user/activate-totp", { user_id });
+  const { backup_codes } = activateRes.ok ? await activateRes.json() : { backup_codes: [] };
   await redis().del(`paramant:user:setup_token:${token}`);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "" }),
+    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }),
     { EX: 3600 }
   );
 
   setUserCookie(res, sessionToken);
-
-  const codesRes = await callRelay("/v2/user/get-backup-codes-plaintext", { user_id });
-  const { backup_codes } = codesRes.ok ? await codesRes.json() : { backup_codes: [] };
 
   res.json({ success: true, email, backup_codes });
 });
@@ -938,7 +962,7 @@ api.post("/user/login", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "" }),
+    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }),
     { EX: 3600 }
   );
 
@@ -969,7 +993,7 @@ api.post("/user/login-with-backup", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code" }),
+    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }),
     { EX: 3600 }
   );
 
@@ -1149,7 +1173,7 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn" }),
+    JSON.stringify({ user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn", ...sessionKeyFields(authedUserId) }),
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
@@ -1316,7 +1340,7 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
     `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register" }),
+    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register", ...sessionKeyFields(flow.user_id) }),
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
@@ -1447,7 +1471,7 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": user_id },
+      headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
       body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 3, creator_public_key: creatorPublicKey }),
     });
     const body = await rr.json().catch(() => ({}));
@@ -1717,6 +1741,110 @@ api.get("/user/check", authUser, (req, res) => {
   res.status(200).end();
 });
 
+// GET /api/user/developer/check
+// nginx auth_request probe for the /developer page (mirrors /user/check, with
+// the allowlist layer). authUser returns 401 on no session -> nginx redirects
+// to login. A valid session that is NOT on the developer allowlist gets 403,
+// which nginx remaps to 404 so the page's existence stays hidden. Allowlisted
+// session -> 200 and nginx serves /developer.html.
+api.get("/user/developer/check", authUser, (req, res) => {
+  if (!isDeveloper(req.userSession.email)) return res.status(403).end();
+  res.status(200).end();
+});
+
+// GET /api/user/developer/tools
+// Developer-only data endpoint behind authUser + developerGate (404 for
+// non-allowlisted). Provisional: the page renders the tool list statically;
+// this endpoint exists so the gated /api/user/developer/* surface is wired and
+// testable from day one.
+api.get("/user/developer/tools", authUser, developerGate, (req, res) => {
+  res.json({ status: "live", tools: DEVELOPER_TOOLS });
+});
+
+// ── Per-account saved tool config (cross-device). All three are gated by
+// authUser + developerGate and scoped to the session's user_id (no IDOR). Pure
+// validation lives in lib/developer-config (unit-tested). The config is data
+// only -- never executed; a literal key is refused (defence in depth).
+api.get("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    let configs = {};
+    if (raw) { try { configs = JSON.parse(raw) || {}; } catch {} }
+    res.json({ configs });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.post("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const { tool, command } = req.body || {};
+  const v = developerConfig.validateConfig(tool, command);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    const m = developerConfig.mergeConfig(raw, v.tool, v.command);
+    if (!m.ok) return res.status(400).json({ error: m.error });
+    await redis().set(developerConfig.KEY(req.userSession.user_id), m.json);
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+api.delete("/user/developer/tool-config", authUser, developerGate, async (req, res) => {
+  const tool = (req.body && req.body.tool) || req.query.tool;
+  if (typeof tool !== "string" || !developerConfig.TOOL_NAMES.has(tool)) return res.status(400).json({ error: "unknown_tool" });
+  try {
+    const raw = await redis().get(developerConfig.KEY(req.userSession.user_id));
+    await redis().set(developerConfig.KEY(req.userSession.user_id), developerConfig.removeConfig(raw, tool));
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
+});
+
+// GET /api/user/developer/snapshot — one call for the initial dashboard render:
+// {email, plan, key_masked, quota:{transfers,signs,caps}, audit:[last 50],
+//  tools_status:{per tool}}. 3s in-memory cache per account so a refresh storm
+// cannot hammer Redis.
+const _snapCache = new Map(); // uid -> { at, data }
+api.get("/user/developer/snapshot", authUser, developerGate, async (req, res) => {
+  const uid = req.userSession.user_id;
+  const hit = _snapCache.get(uid);
+  if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
+  let plan = "community";
+  try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
+  try {
+    const data = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
+    _snapCache.set(uid, { at: Date.now(), data });
+    if (_snapCache.size > 500) _snapCache.clear();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "snapshot_failed" });
+  }
+});
+
+// GET /api/user/developer/stream — Server-Sent Events. Pushes new audit events
+// for this account as they land. SSE (not WebSocket): simpler, rides the
+// existing HTTP/auth/cookie stack, no upgrade handshake. Server-side 2s poll of
+// the account's audit zset; pushes deltas + a heartbeat. Closes on disconnect.
+api.get("/user/developer/stream", authUser, developerGate, async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.write("retry: 4000\n");
+  res.write('event: hello\ndata: {"ok":true}\n\n');
+  const uid = req.userSession.user_id;
+  let lastTs = Date.now();
+  let alive = true;
+  const tick = async () => {
+    if (!alive) return;
+    try {
+      const events = await getAuditEvents(uid, { limit: 20 });
+      const fresh = events.filter((e) => (e.ts || 0) > lastTs).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      for (const ev of fresh) { lastTs = Math.max(lastTs, ev.ts || 0); res.write(`event: audit\ndata: ${JSON.stringify(ev)}\n\n`); }
+      res.write(`event: ping\ndata: ${Date.now()}\n\n`);
+    } catch {}
+  };
+  const iv = setInterval(tick, 2000);
+  req.on("close", () => { alive = false; clearInterval(iv); try { res.end(); } catch {} });
+});
+
 // GET /api/user/account
 api.get("/user/account", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
@@ -1762,7 +1890,32 @@ function maskIp(ip) {
 
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
-  res.json({ api_key: req.userSession.user_id });
+  // stap 3: reveal the account's PRIMARY api-key (== user_id today), and only
+  // when the account is legacy_revealable. The `revealable` field is additive;
+  // existing callers read `.api_key`, unchanged while every account is 1:1.
+  res.json(revealKey(req.userSession));
+});
+
+// GET /api/user/dashboard/overview — read-only Operations data for the normal
+// (non-developer) dashboard: plan, masked key, this-month quota, recent audit.
+// authUser only (NO developer gate). Reuses buildSnapshot minus the tools
+// catalogue. 3s per-account cache so the dashboard's 5s poll can't hammer Redis.
+const _ovCache = new Map(); // uid -> { at, data }
+api.get("/user/dashboard/overview", authUser, async (req, res) => {
+  const uid = req.userSession.user_id;
+  const hit = _ovCache.get(uid);
+  if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
+  let plan = "community";
+  try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
+  try {
+    const snap = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
+    const data = { plan: snap.plan, key_masked: snap.key_masked, quota: snap.quota, audit: snap.audit };
+    _ovCache.set(uid, { at: Date.now(), data });
+    if (_ovCache.size > 500) _ovCache.clear();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "overview_failed" });
+  }
 });
 
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
@@ -1920,7 +2073,7 @@ api.all("/relay/:sector/*path", authUser, async (req, res) => {
   const fetchOpts = {
     method: req.method,
     headers: {
-      "X-Api-Key": req.userSession.user_id,
+      "X-Api-Key": proxyApiKey(req.userSession),
       "Content-Type": "application/json",
     },
   };
@@ -2602,17 +2755,11 @@ async function verifyCliTotp(totp) {
 // Curated environment for handler scripts. We do NOT inherit the full process
 // env: only PATH/HOME plus paramant-relevant variables, and computed relay
 // locators. This bounds what `config show` can ever surface.
-function cliChildEnv() {
-  const env = { PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME || '/tmp' };
-  for (const [k, v] of Object.entries(process.env)) {
-    if (/^(PORT|BASE_PATH|NODE_ENV|RELAY_|SECTOR|ADMIN_|PARAMANT_|NATS_|REDIS_|RESEND_|COMPOSE_|BACKUP_)/.test(k)) {
-      env[k] = v;
-    }
-  }
-  env.RELAY_URL = SECTORS.health;
-  env.RELAY_SECTORS = Object.entries(SECTORS).map(([n, u]) => `${n}=${u}`).join(',');
-  env.ADMIN_TOKEN = ADMIN_TOKEN;
-  return env;
+function cliChildEnv(cmd) {
+  // Delegates to the pure, unit-tested builder (lib/cli-commands.buildChildEnv).
+  // Least-privilege: ADMIN_TOKEN is added only for cmd.needsAdminToken; the
+  // REDIS_/RESEND_/PARAMANT_ secrets are never broadcast to handler scripts.
+  return cliCommands.buildChildEnv(cmd, process.env, SECTORS, ADMIN_TOKEN);
 }
 
 // GET /api/admin/cli/commands -- whitelist metadata for completion/help.
@@ -2694,7 +2841,7 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   try {
     child = spawn(handlerPath, argv, {
       cwd: cliCommands.SCRIPTS_DIR,
-      env: cliChildEnv(),
+      env: cliChildEnv(cmd),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {

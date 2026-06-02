@@ -163,12 +163,30 @@ export async function enrolSigningPasskey({ label, passphrase, registerPasskey, 
   try {
     await vaultStore({ alg: 'ML-DSA-65', label: label || null, pk_b64, pk_hash, secretKeyBytes: kp.secretKey, passphrase });
 
-    // ── stage 2: register the passkey, run PRF with a fresh salt, add prf wrap ──
-    const { credentialId } = await registerPasskey();
+    // ── stage 2: obtain a passkey-PRF output, with a one-shot fallback ──────────
+    // registerPasskey() may REUSE an existing PRF-capable passkey (fast path, no
+    // new credential). But a credential the server flagged prfSupported can still
+    // fail to actually produce a PRF result here (it was created before PRF, or
+    // the platform won't eval it) — that is the loop users hit: the enrolment
+    // dies, the orphan is swept, /sign keeps asking to "set up a signing passkey".
+    // So when PRF fails on a REUSED credential we don't give up: we mint a FRESH
+    // PRF-capable passkey and try once more. Only a FRESH passkey that STILL can't
+    // PRF is a genuine device/browser limitation (surfaced to the user).
     const prfSalt = crypto.getRandomValues(new Uint8Array(16));   // the eval salt; stored in the wrap
-    const prfOutput = await evalNewPrf({ credentialId, prfSalt });
+    let reg = await registerPasskey({ forceFresh: false });
+    let prfOutput;
     try {
-      await vaultAddPrfWrap({ pk_hash, secretKeyBytes: kp.secretKey, credentialId, prfSalt, prfOutput });
+      prfOutput = await evalNewPrf({ credentialId: reg.credentialId, prfSalt });
+    } catch (e) {
+      if (reg && reg.reused && e && e.code === 'no_prf') {
+        reg = await registerPasskey({ forceFresh: true });
+        prfOutput = await evalNewPrf({ credentialId: reg.credentialId, prfSalt });
+      } else {
+        throw e;
+      }
+    }
+    try {
+      await vaultAddPrfWrap({ pk_hash, secretKeyBytes: kp.secretKey, credentialId: reg.credentialId, prfSalt, prfOutput });
     } finally {
       prfOutput.fill(0);
     }

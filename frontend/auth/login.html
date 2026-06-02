@@ -3,13 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sign in — Paramant</title>
+<title>Sign in · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Sign in to Paramant: post-quantum encrypted file transfer and document signing.">
+<meta property="og:title" content="Sign in to Paramant">
+<meta property="og:description" content="Post-quantum encrypted file transfer and document signing. Sign in to continue. The server is blind by design, not by promise.">
+<meta property="og:url" content="https://paramant.app/auth/login">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sign in to Paramant">
+<meta name="twitter:description" content="Post-quantum encrypted file transfer and document signing. The server is blind by design, not by promise.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
 /* Compact auth layout — existing design tokens only; design-system.css untouched. */
 .auth-wrap { max-width: 380px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
@@ -20,6 +33,13 @@
 .auth-or { display: flex; align-items: center; gap: 10px; margin: var(--space-3) 0; color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--ink-hair); }
 .auth-foot { text-align: center; margin-top: var(--space-4); }
+[hidden] { display: none !important; }
+.auth-sub { text-align: center; color: var(--ink-dim); font-size: 14px; margin: var(--space-2) 0 0; }
+.auth-hint { text-align: center; color: var(--ink-dim); font-size: 12px; margin: 8px 0 0; line-height: 1.5; }
+.auth-altline { text-align: center; margin-top: var(--space-4); }
+.auth-link { background: none; border: none; color: var(--navy); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+.auth-link:hover { opacity: .75; }
+#code-fields { margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -177,26 +197,33 @@
 <div class="auth-head">
   <div class="eyebrow"><span class="bar"></span>sign in</div>
   <h1>Welcome <em>back</em>.</h1>
+  <p class="auth-sub">Choose how you want to sign in.</p>
 </div>
 
-<form id="login-form" class="form-card auth-card">
+<form id="login-form" class="form-card auth-card" novalidate>
   <label for="email">Email address</label>
   <input type="email" id="email" name="email" required autocomplete="username" autofocus>
 
-  <label for="totp" class="mt-3">6-digit code</label>
-  <input type="text" id="totp" name="totp" required inputmode="numeric"
-         pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
-         placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
-
-  <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Sign in</button>
-
-  <div id="error" class="error"></div>
+  <button type="button" class="btn btn-primary mt-3" id="passkey-login-btn">Sign in with a passkey</button>
+  <p class="auth-hint">Face ID, Touch ID, Windows Hello, or a security key. Nothing to type.</p>
 
   <div class="auth-or"><span>or</span></div>
 
-  <button type="button" class="btn btn-secondary" id="passkey-login-btn">Sign in with a passkey</button>
-  <button type="button" class="btn btn-secondary" id="passkey-crossdevice-btn" style="margin-top:8px">Use a passkey on another device</button>
+  <button type="button" class="btn btn-secondary" id="show-code-btn" aria-expanded="false" aria-controls="code-fields">Sign in with a 6-digit code</button>
+  <div id="code-fields" hidden>
+    <label for="totp" class="mt-3">6-digit code</label>
+    <input type="text" id="totp" name="totp" inputmode="numeric"
+           pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+           placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
+    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Sign in</button>
+  </div>
+
+  <div id="error" class="error"></div>
   <p id="passkey-login-status" class="small" aria-live="polite" style="margin:8px 0 0"></p>
+
+  <div class="auth-altline">
+    <button type="button" class="auth-link" id="passkey-crossdevice-btn">Use a passkey on another device</button>
+  </div>
 </form>
 
 <p class="footer-text auth-foot">
@@ -208,7 +235,7 @@
 </main>
 
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
 <script>
 (function() {
   const form = document.getElementById('login-form');
@@ -216,7 +243,10 @@
   const submitBtn = document.getElementById('submit-btn');
 
   const params = new URLSearchParams(window.location.search);
-  const returnUrl = params.get('return') || '/dashboard';
+  // Honour both the nginx gate's ?next= and legacy ?return= links. Local paths
+  // only (leading single slash, no // or /\) so it can't become an open redirect.
+  const _rv = params.get('next') || params.get('return') || '/dashboard';
+  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -260,9 +290,23 @@
     submitBtn.disabled = false;
     submitBtn.textContent = 'Sign in';
   });
+
+  // Progressive disclosure: the 6-digit code field stays hidden until the user
+  // chooses the code path, so the default view is just "email + pick a method".
+  const showCodeBtn = document.getElementById('show-code-btn');
+  const codeFields = document.getElementById('code-fields');
+  if (showCodeBtn && codeFields) {
+    showCodeBtn.addEventListener('click', function() {
+      codeFields.hidden = false;
+      showCodeBtn.hidden = true;
+      showCodeBtn.setAttribute('aria-expanded', 'true');
+      const t = document.getElementById('totp');
+      if (t) t.focus();
+    });
+  }
 })();
 </script>
-<script type="module" src="/js/passkey.js?v=2"></script>
+<script type="module" src="/js/passkey.js?v=3"></script>
 
 </body>
 </html>

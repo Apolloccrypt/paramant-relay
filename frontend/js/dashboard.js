@@ -12,6 +12,7 @@
   'use strict';
 
   var ONBOARDING_KEY = 'paramant.onboarding.dismissed.v1';
+  var KEYSETUP_KEY = 'paramant.keysetup.dismissed.v1';
   var LOGIN_URL = '/auth/login?next=' + encodeURIComponent('/dashboard');
 
   var loading = document.getElementById('dh-loading');
@@ -101,6 +102,9 @@
     hide(errBox);
     show(root);
     root.classList.add('dh-loaded');
+
+    checkKeySetup();
+    loadOperations();
   }
 
   function wireActions() {
@@ -128,6 +132,127 @@
         try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
       }
     });
+  }
+
+  // One-time nudge: if the account is missing a signing key and/or a sign-in
+  // passkey, surface a dismissible popup that links into /account. Best-effort
+  // and tolerant -- we only flag something as missing when the endpoint answers
+  // cleanly with an empty list, never on a fetch error (so we never false-nag).
+  function checkKeySetup() {
+    try { if (localStorage.getItem(KEYSETUP_KEY) === '1') return; } catch (_) {}
+
+    var modal = document.getElementById('dh-passkey-modal');
+    var itemsBox = document.getElementById('dh-pm-items');
+    var dismissBtn = document.getElementById('dh-pm-dismiss');
+    if (!modal || !itemsBox) return;
+
+    function getJSON(url) {
+      return fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });
+    }
+
+    Promise.all([
+      getJSON('/api/user/account/signing-key'),
+      getJSON('/api/user/account/webauthn/credentials')
+    ]).then(function (res) {
+      var signing = res[0], passkeys = res[1];
+      var items = [];
+      if (signing && Array.isArray(signing.keys) && signing.keys.length === 0) {
+        items.push({
+          href: '/account#signing-identity-section',
+          title: 'Set up document signing',
+          body: 'Create your ML-DSA-65 signing key so you can sign and co-sign documents.'
+        });
+      }
+      if (passkeys && Array.isArray(passkeys.passkeys) && passkeys.passkeys.length === 0) {
+        items.push({
+          href: '/account#passkey-section',
+          title: 'Add a sign-in passkey',
+          body: 'Use Face ID, Touch ID, or a security key to sign in without a code.'
+        });
+      }
+      if (!items.length) return;
+
+      // Titles/bodies are static literals (no user input) -> safe innerHTML.
+      itemsBox.innerHTML = items.map(function (it) {
+        return '<a class="dh-pm-item" href="' + it.href + '">'
+          + '<strong>' + it.title + '</strong>'
+          + '<span>' + it.body + '</span></a>';
+      }).join('');
+      modal.hidden = false;
+
+      function dismiss() {
+        modal.hidden = true;
+        try { localStorage.setItem(KEYSETUP_KEY, '1'); } catch (_) {}
+      }
+      if (dismissBtn) dismissBtn.addEventListener('click', dismiss);
+      modal.addEventListener('click', function (ev) { if (ev.target === modal) dismiss(); });
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !modal.hidden) dismiss(); });
+    });
+  }
+
+  // ---- Operations: read-only live keys / usage / activity cards ----
+  // Fed by GET /api/user/dashboard/overview (authUser). Polled every 5s so the
+  // usage bars stay current; the audit feed and key are refreshed on the same tick.
+  var opsAudit = [], opsFilter = '', opsPollTimer = 0;
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+  function fmtTime(ts) { if (!ts) return '--:--:--'; var d = new Date(ts); function p(n) { return (n < 10 ? '0' : '') + n; } return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  function opsBar(used, cap) {
+    var unlimited = (cap == null);
+    var pct = unlimited ? 4 : Math.min(100, Math.round(((used || 0) / Math.max(1, cap)) * 100));
+    return { pct: pct, warn: !unlimited && pct >= 80, capTxt: unlimited ? '&#8734;' : String(cap) };
+  }
+  function renderOpsTimeline() {
+    var el = document.getElementById('dh-ops-timeline');
+    if (!el) return;
+    var f = (opsFilter || '').toLowerCase();
+    var rows = opsAudit.filter(function (ev) {
+      if (!f) return true;
+      return (ev.event_type || '').toLowerCase().indexOf(f) >= 0 ||
+             JSON.stringify(ev.metadata || {}).toLowerCase().indexOf(f) >= 0;
+    });
+    el.innerHTML = rows.length
+      ? rows.slice(0, 50).map(function (ev) {
+          return '<div class="dh-tl-row"><span class="t">' + fmtTime(ev.ts) + '</span><span class="e">' + esc(ev.event_type || 'event') + '</span></div>';
+        }).join('')
+      : '<div class="dh-ops-dim">No activity' + (f ? ' matches "' + esc(opsFilter) + '"' : ' yet') + '.</div>';
+  }
+  function renderOps(d) {
+    var keysEl = document.getElementById('dh-ops-keys');
+    if (keysEl) {
+      keysEl.innerHTML =
+        '<div class="dh-ops-row"><span class="mono">' + esc(d.key_masked || '--') + '</span><span class="dim">primary</span></div>' +
+        '<div class="dh-ops-row"><span class="dim">last used</span><span class="dim">tracked via activity</span></div>';
+    }
+    var q = d.quota || { transfers: 0, signs: 0, caps: {} };
+    var caps = q.caps || {};
+    function usageRow(label, used, cap) {
+      var b = opsBar(used, cap);
+      return '<div class="dh-usage-row"><div class="dh-usage-lab"><span>' + label + '</span><span><b>' + (used || 0) + '</b> / ' + b.capTxt + '</span></div>' +
+        '<div class="dh-bar' + (b.warn ? ' warn' : '') + '"><i style="width:' + b.pct + '%"></i></div>' +
+        (b.warn ? '<a class="dh-usage-upsell" href="/pricing">Upgrade to Pro</a>' : '') + '</div>';
+    }
+    var usageEl = document.getElementById('dh-ops-usage');
+    if (usageEl) {
+      usageEl.innerHTML = usageRow('Transfers', q.transfers, caps.transfers) + usageRow('Signings', q.signs, caps.signs) +
+        '<div class="dh-ops-dim" style="font-size:10px">Live, refreshes every 5s.</div>';
+    }
+    opsAudit = d.audit || [];
+    renderOpsTimeline();
+  }
+  function loadOperations() {
+    if (!document.getElementById('dh-ops')) return;
+    var fi = document.getElementById('dh-ops-filter');
+    if (fi && !fi._wired) { fi._wired = 1; fi.addEventListener('input', function () { opsFilter = fi.value; renderOpsTimeline(); }); }
+    function pull() {
+      return fetch('/api/user/dashboard/overview', { credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { if (d) renderOps(d); })
+        .catch(function () {});
+    }
+    pull();
+    if (!opsPollTimer) opsPollTimer = setInterval(pull, 5000);
   }
 
   function start() {

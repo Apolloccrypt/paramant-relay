@@ -46,6 +46,7 @@ const COMMANDS = {
   'key list': {
     description: 'List active API keys (masked)',
     handler: 'paramant-key-list.sh',
+    needsAdminToken: true,
     args: [],
     class: 'read',
     totp: false,
@@ -53,6 +54,7 @@ const COMMANDS = {
   'key add': {
     description: 'Add new API key for a user',
     handler: 'paramant-key-add.sh',
+    needsAdminToken: true,
     args: [
       { name: 'email', type: 'email', required: true },
       { name: 'plan', type: 'enum', options: ['free', 'pro', 'enterprise'], default: 'free' },
@@ -63,6 +65,7 @@ const COMMANDS = {
   'key revoke': {
     description: 'Revoke an API key by hash-prefix',
     handler: 'paramant-key-revoke.sh',
+    needsAdminToken: true,
     args: [
       { name: 'key_prefix', type: 'string', minLength: 8, required: true },
     ],
@@ -86,6 +89,7 @@ const COMMANDS = {
   'audit recent': {
     description: 'Show recent audit-log entries',
     handler: 'paramant-audit-recent.sh',
+    needsAdminToken: true,
     args: [
       { name: 'limit', type: 'number', default: 50, min: 1, max: 500 },
     ],
@@ -111,6 +115,7 @@ const COMMANDS = {
   'backup create': {
     description: 'Create immediate backup',
     handler: 'paramant-backup.sh',
+    needsAdminToken: true,
     args: [],
     class: 'mutate',
     totp: true,
@@ -204,4 +209,24 @@ function maskArgs(values) {
   return out;
 }
 
-module.exports = { COMMANDS, SCRIPTS_DIR, validateArgs, buildArgv, maskArgs, SECRET_ARG_NAMES };
+// Least-privilege environment for a spawned handler. PATH/HOME + non-secret
+// operational vars only; the sensitive secrets (ADMIN_TOKEN, REDIS_*, RESEND_*,
+// PARAMANT_*) are NOT broadcast. ADMIN_TOKEN is added only for commands that
+// call the relay admin API (cmd.needsAdminToken). Pure + unit-tested.
+function buildChildEnv(cmd, processEnv, sectors, adminToken) {
+  processEnv = processEnv || {};
+  sectors = sectors || {};
+  const env = {
+    PATH: processEnv.PATH || '/usr/local/bin:/usr/bin:/bin',
+    HOME: processEnv.HOME || '/tmp',
+  };
+  for (const [k, v] of Object.entries(processEnv)) {
+    if (/^(PORT|BASE_PATH|NODE_ENV|RELAY_|SECTOR|NATS_|COMPOSE_|BACKUP_)/.test(k)) env[k] = v;
+  }
+  if (sectors.health) env.RELAY_URL = sectors.health;
+  env.RELAY_SECTORS = Object.entries(sectors).map(([n, u]) => `${n}=${u}`).join(',');
+  if (cmd && cmd.needsAdminToken && adminToken) env.ADMIN_TOKEN = adminToken;
+  return env;
+}
+
+module.exports = { COMMANDS, SCRIPTS_DIR, validateArgs, buildArgv, maskArgs, SECRET_ARG_NAMES, buildChildEnv };

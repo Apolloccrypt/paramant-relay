@@ -291,6 +291,10 @@ services:
       INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
       SITE_URL: "${SITE_URL:-https://paramant.app}"
       ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
+      # Comma-separated emails allowed into the hidden /developer dashboard.
+      # Empty by default; set in the production env-file. Empty allowlist with
+      # no NODE_ENV=development keeps the door closed for everyone.
+      DEVELOPER_ALLOWLIST: "${DEVELOPER_ALLOWLIST:-}"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4200/admin/ > /dev/null || exit 1"]
       interval: 30s

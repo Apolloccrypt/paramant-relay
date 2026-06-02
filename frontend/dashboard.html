@@ -8,9 +8,10 @@
 <meta name="theme-color" content="#0B1622">
 <link rel="icon" type="image/svg+xml" href="/assets/paramant-icon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
-<link rel="stylesheet" href="/design-system.css">
-<link rel="stylesheet" href="/nav.css">
-<link rel="stylesheet" href="/parapear.css">
+<link rel="stylesheet" href="/design-system.css?v=19">
+<link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/parapear.css?v=1">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
 <style>
 /* Dashboard. Client-side rendered from /api/user/me JSON. Auth-gate stays
@@ -101,6 +102,47 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-loaded > *:nth-child(5) { animation-delay: .16s; }
 @keyframes dh-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .dh-loaded > * { animation: none; } .dh-flag-card, .dh-tool { transition: none; } }
+
+/* Passkey/signing-key setup nudge -- a one-time popup when keys are missing */
+.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(11,22,34,0.55); backdrop-filter: blur(3px); animation: dh-fade .2s ease-out both; }
+.dh-modal-card { background: var(--bone); border-radius: 20px; max-width: 460px; width: 100%; padding: var(--space-6) var(--space-5) var(--space-5); box-shadow: 0 10px 40px rgba(11,22,34,0.25); text-align: center; }
+.dh-modal-img { display: block; margin: 0 auto var(--space-3); }
+.dh-modal-card h2 { font-family: var(--sans); font-size: 22px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 var(--space-2); }
+.dh-modal-sub { font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); }
+.dh-pm-item { display: block; text-align: left; text-decoration: none; padding: var(--space-3) var(--space-4); border-radius: 14px; border: 1px solid rgba(11,58,106,0.10); background: var(--bone); margin-bottom: var(--space-3); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.dh-pm-item:hover { transform: translateY(-1px); border-color: var(--lime); box-shadow: 0 4px 14px rgba(11,58,106,0.08); }
+.dh-pm-item:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.dh-pm-item strong { display: block; font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.dh-pm-item span { display: block; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
+.dh-modal-dismiss { margin-top: var(--space-2); background: transparent; border: none; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; padding: 8px 10px; border-radius: 8px; }
+.dh-modal-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
+
+/* Operations -- read-only live cards (keys, usage, activity) */
+.dh-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
+.dh-ops-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: 14px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.03); }
+.dh-ops-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
+.dh-ops-dim { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.dh-ops-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
+.dh-ops-row:last-child { border-bottom: none; }
+.dh-ops-row .mono { font-family: var(--mono); font-size: 12px; color: var(--ink); word-break: break-all; }
+.dh-ops-row .dim { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
+.dh-usage-row { margin-bottom: var(--space-3); }
+.dh-usage-lab { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--ink); margin-bottom: 6px; }
+.dh-bar { height: 6px; border-radius: 999px; background: var(--ink-hair); overflow: hidden; }
+.dh-bar > i { display: block; height: 100%; width: 0; background: var(--cobalt, #0B3A6A); border-radius: 999px; transition: width .4s ease; }
+.dh-bar.warn > i { background: var(--lime); }
+.dh-usage-upsell { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--cobalt, #0B3A6A); text-decoration: none; }
+.dh-usage-upsell:hover { text-decoration: underline; }
+.dh-ops-filter { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--ink-hair); border-radius: 8px; font-family: var(--mono); font-size: 12px; background: var(--bone); color: var(--ink); }
+.dh-ops-filter:focus { outline: none; border-color: var(--cobalt, #0B3A6A); }
+.dh-ops-tl { display: flex; flex-direction: column; max-height: 196px; overflow-y: auto; }
+.dh-tl-row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
+.dh-tl-row:last-child { border-bottom: none; }
+.dh-tl-row .t { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
+.dh-tl-row .e { font-family: var(--mono); font-size: 11px; color: var(--ink); word-break: break-all; }
+.dh-ops-note { font-family: var(--sans); font-size: 12px; line-height: 1.55; color: var(--ink-dim); border: 1px dashed var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); margin-bottom: var(--space-7); }
+.dh-ops-note strong { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .dh-bar > i { transition: none; } }
 </style>
 </head>
 <body>
@@ -139,7 +181,7 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -222,7 +264,7 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -319,6 +361,26 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       <a class="dh-tool" href="/verify"><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
     </section>
 
+    <div class="dh-tools-head"><h2>Operations</h2></div>
+    <section class="dh-ops" id="dh-ops" aria-label="Operations">
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">API keys</div>
+        <div id="dh-ops-keys"><div class="dh-ops-dim">Loading...</div></div>
+        <div><button type="button" class="dh-btn" disabled title="Available with self-service keys (coming)">+ New key</button></div>
+      </div>
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">Usage &middot; this month</div>
+        <div id="dh-ops-usage"><div class="dh-ops-dim">Loading...</div></div>
+      </div>
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">Activity timeline</div>
+        <input id="dh-ops-filter" class="dh-ops-filter" type="text" placeholder="Filter events..." aria-label="Filter activity">
+        <div id="dh-ops-timeline" class="dh-ops-tl"><div class="dh-ops-dim">Loading...</div></div>
+        <div><button type="button" class="dh-btn" disabled title="Full history coming soon">View all</button></div>
+      </div>
+    </section>
+    <p class="dh-ops-note"><strong>Operations &middot; read-only.</strong> Live usage and activity from your account. Action controls (new keys, run, configure) arrive with self-service keys.</p>
+
     <details class="dh-acct" aria-label="Account details">
       <summary class="dh-acct-head" id="dh-acct-toggle">
         <h2>Manage account</h2>
@@ -349,6 +411,18 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
+
+<!-- One-time setup nudge. Shown by dashboard.js only when a signing key and/or a
+     sign-in passkey is missing, and not previously dismissed. -->
+<div id="dh-passkey-modal" class="dh-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dh-pm-title">
+  <div class="dh-modal-card">
+    <img class="dh-modal-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="72" height="72">
+    <h2 id="dh-pm-title">Finish setting up your account</h2>
+    <p class="dh-modal-sub">A couple of one-time steps make signing in faster and let you sign documents.</p>
+    <div id="dh-pm-items"></div>
+    <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Maybe later</button>
+  </div>
+</div>
 
 <footer>
   <div class="container-lg">
@@ -382,7 +456,7 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
@@ -406,8 +480,8 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
   </div>
 </footer>
 
-<script src="/nav.js" defer></script>
-<script src="/js/nav-auth.js" defer></script>
-<script src="/js/dashboard.js" defer></script>
+<script src="/nav.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
+<script src="/js/dashboard.js?v=1" defer></script>
 </body>
 </html>

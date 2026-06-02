@@ -18,6 +18,7 @@
 
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 .nav-help {
@@ -119,7 +120,7 @@
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -202,7 +203,7 @@
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -524,6 +525,11 @@
           <td class="cobalt-text">Paramant</td>
           <td>BUSL-1.1, Docker, Raspberry Pi capable</td>
         </tr>
+        <tr>
+          <td class="strong">Post-quantum document signing and co-signing</td>
+          <td class="cobalt-text">Paramant</td>
+          <td>ML-DSA-65 signatures in the browser, multi-party co-sign, public CT log</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -537,7 +543,7 @@
       <div class="tag" style="color:rgba(248,250,252,.72)">architecture<br/>matters</div>
     </div>
 
-    <p style="color:var(--bone);max-width:720px">Paramant occupies a specific position. It is a post-quantum encrypted file relay with RAM-only storage, burn-on-read delivery, and public cryptographic transparency. It is not a cloud storage product, not an email plugin, and not a DLP platform.</p>
+    <p style="color:var(--bone);max-width:720px">Paramant occupies a specific position. It is a post-quantum encrypted file relay and document-signing service, with RAM-only storage, burn-on-read delivery, and public cryptographic transparency. It is not a cloud storage product, not an email plugin, and not a DLP platform.</p>
 
     <p style="color:var(--bone);max-width:720px;margin-top:16px">For organizations that need the combination of EU data sovereignty (without US ownership), post-quantum cryptography (today, not roadmap), zero-knowledge architecture (mathematically, not by policy), and the option to self-host, Paramant is presently the only option in this category.</p>
 
@@ -552,7 +558,7 @@
 </section>
 
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
 
 <footer>
   <div class="container-lg">
@@ -586,7 +592,7 @@
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>

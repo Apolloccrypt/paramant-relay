@@ -78,7 +78,7 @@ clear
 echo -e "${GREEN}"
 echo "  ╔══════════════════════════════════════════════════════╗"
 echo "  ║           ParamantOS Disk Installer                  ║"
-echo "  ║      Post-Quantum Ghost Pipe Relay — v2.4.5          ║"
+echo "  ║      Post-Quantum Ghost Pipe Relay — v3.0.0          ║"
 echo "  ╚══════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
 echo "  This wizard installs ParamantOS to a local disk."

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT - Legal discovery, attorney-client privileged delivery</title>
 <meta name="description" content="E-discovery document production over ML-KEM-768 encrypted, burn-on-read channels. ML-DSA-65 signed receipts for chain of custody. Zero-knowledge relay.">
-<meta property="og:title" content="PARAMANT - Legal discovery delivery, privilege intact">
+<meta property="og:title" content="PARAMANT · Legal discovery delivery, privilege intact">
 <meta property="og:description" content="Deliver discovery production sets to opposing counsel with cryptographic receipts. Zero-knowledge relay eliminates new custodian arguments. EU/DE hosting.">
 <meta property="og:url" content="https://paramant.app/legal-discovery">
 <meta property="og:type" content="website">
@@ -15,6 +15,7 @@
 <link rel="canonical" href="https://paramant.app/legal-discovery">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
@@ -106,7 +107,7 @@ section p+p{margin-top:14px}
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -189,7 +190,7 @@ section p+p{margin-top:14px}
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -320,7 +321,7 @@ section p+p{margin-top:14px}
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
@@ -344,6 +345,6 @@ section p+p{margin-top:14px}
   </div>
 </footer>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
 </body>
 </html>

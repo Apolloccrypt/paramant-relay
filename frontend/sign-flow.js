@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=2';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=3';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -411,6 +411,22 @@ async function initStepIdentity() {
   showSigningIdentity().catch(() => {});
 }
 
+// Does this ACCOUNT have a signing key bound on the server, even though THIS
+// browser's vault has none? The signing key's private half + PRF wrap live
+// per-browser in IndexedDB; the server only holds the public binding. A key
+// enrolled on your phone is therefore NOT usable in a desktop browser — each
+// browser enrols once. This lets the hint say "set it up on this device too"
+// instead of the misleading "you don't have a signing passkey", which is what
+// made it feel like a loop when signing across devices.
+async function serverHasSigningKey() {
+  try {
+    const r = await fetch('/api/user/account/signing-key', { credentials: 'include' });
+    if (!r.ok) return false;
+    const body = await r.json().catch(() => ({}));
+    return Array.isArray(body.keys) && body.keys.some((k) => !k.revoked_at);
+  } catch { return false; }
+}
+
 // Display the passkey signing identity in the identity step (read-only, public
 // metadata only — no unlock). If none is enrolled, deep-link to the enrol
 // flow on /account (the "Set up a signing passkey" card).
@@ -421,12 +437,16 @@ async function showSigningIdentity() {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
     el.className = 'ds-hint';
-    el.innerHTML = 'You will sign with your passkey-protected key (Face ID / Touch ID / security key). ' +
+    el.innerHTML = 'You\'ll sign with your signing key — unlocked with Face ID / Touch ID / a security key. ' +
       'Key fingerprint <code>' + escapeHtml(k.fingerprint) + '</code>.';
   } catch (e) {
     el.className = 'ds-hint';
     if (e && e.code === 'no_signing_passkey') {
-      el.innerHTML = 'You don\'t have a signing passkey on this device yet — you need one to sign. <a href="/account#signing-identity-section" class="btn btn-primary btn-small" style="margin-top:8px;display:inline-block">Set up a signing passkey →</a>';
+      const elsewhere = await serverHasSigningKey();
+      el.innerHTML = (elsewhere
+        ? 'Your signing key was set up in another browser or on another device. Signing keys live in the browser where you create them, so set one up here too. '
+        : 'You haven\'t set up signing on this device yet — you need to before you can sign. ') +
+        '<a href="/account#signing-identity-section" class="btn btn-primary btn-small" style="margin-top:8px;display:inline-block">Set up your signing key →</a>';
     } else {
       el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
     }
@@ -599,7 +619,7 @@ function fillReview() {
                                          'Uploaded image (' + formatSize(state.signer.sigImageBytes.length) + ' ' + state.signer.sigImageType.toUpperCase() + ')';
   // Signing key: always the account's passkey-protected ML-DSA-65 key. The
   // fingerprint is filled async (public vault metadata, no unlock) below.
-  $('ds-review-key-src').textContent = 'Passkey-protected ML-DSA-65 key';
+  $('ds-review-key-src').textContent = 'Your signing key (ML-DSA-65)';
 
   // Recipients summary. Multi-party envelopes are created same-origin via your
   // logged-in session (no manual API key); each recipient signs at /co-sign
@@ -617,7 +637,7 @@ function fillReview() {
   // the key source.
   const docHashHex = toHex(sha3_256(state.doc.bytes));
   $('ds-proof-doc-hash').textContent = docHashHex;
-  $('ds-proof-fp').textContent = '(your passkey key fingerprint)';   // filled async below
+  $('ds-proof-fp').textContent = '(your signing key fingerprint)';   // filled async below
   $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version 3)';
 
   // Envelope-structure preview — the v3 .psign receipt (parasign-doc-3). The
@@ -677,10 +697,10 @@ async function fillReviewKeyFingerprint() {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
     const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = k.fingerprint;
-    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = 'Passkey-protected ML-DSA-65 key (' + k.fingerprint + ')';
+    const ksEl = $('ds-review-key-src'); if (ksEl) ksEl.textContent = 'Your signing key (' + k.fingerprint + ')';
   } catch (e) {
     const fpEl = $('ds-proof-fp');
-    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? '(set up a signing passkey first)' : '(unavailable)';
+    if (fpEl) fpEl.textContent = (e && e.code === 'no_signing_passkey') ? '(set up your signing key first)' : '(unavailable)';
   }
 }
 
@@ -1032,7 +1052,7 @@ async function doSign() {
     // The signing key is the account's PASSKEY-protected ML-DSA-65 key. Read ONLY
     // its public half from vault metadata here (for the stamp fingerprint); the
     // secret is unlocked solely by the per-document PRF activation below.
-    status('Locating your passkey signing key...');
+    status('Locating your signing key...');
     const signKey = await resolvePasskeySigningKey();   // { vaultId, pk_b64, fingerprint } — public only
     const fingerprint = signKey.fingerprint;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
@@ -1074,7 +1094,7 @@ async function doSign() {
     status('Requesting signing authorization...');
     const act = await requestSignActivation({ envelopeId: env.id, partyIndex: 0, docHash: docHashForEnvelope, inviteToken: myLink.invite_token });
 
-    status('Confirm with your passkey (Face ID / Touch ID / security key)...');
+    status('Confirm to sign (Face ID / Touch ID / security key)...');
     const signer = await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
     let sigB64;
     try {
@@ -1121,7 +1141,7 @@ async function doSign() {
     $('ds-sign-status').className = 'ds-banner err';
     let msg = (e && e.message) ? e.message : String(e);
     if (e && e.status === 401) msg = 'Please sign in to sign documents. Open /auth/login, then return here.';
-    else if (e && e.code === 'no_signing_passkey') msg = 'No signing passkey on this device yet. Set one up at /account, then sign.';
+    else if (e && e.code === 'no_signing_passkey') msg = 'Signing isn\'t set up on this device yet. Set it up at /account, then sign.';
     $('ds-sign-status').textContent = msg;
     $('ds-sign-now').disabled = false;
   }

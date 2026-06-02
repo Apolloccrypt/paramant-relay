@@ -33,25 +33,36 @@ done
 
 echo -e "[paramant-payslip] → ${CYAN}${SECTOR}.paramant.app${RESET}"
 LOG="sent-$(date '+%Y-%m-%d').log"
+FAILED=0; SKIPPED=0
 
-tail -n +2 "$CSV" | while IFS=',' read -r _email device_id _rest; do
+# Process substitution (not a pipe) so the loop runs in THIS shell: a failed
+# send must propagate. A `tail | while` ran the loop in a subshell, so the
+# counters were lost and the script always exited 0 even when sends failed —
+# breaking the payroll audit trail.
+while IFS=',' read -r _email device_id _rest; do
   device_id=$(echo "$device_id" | tr -d ' \r\n')
   [[ -z "$device_id" ]] && continue
   PDF="${PAYDIR}/${device_id}.pdf"
   if [[ ! -f "$PDF" ]]; then
     echo -e "  ${RED}SKIP${RESET}: no payslip PDF for device: ${device_id}"
     echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') SKIP device=${device_id} reason=no_file" >> "$LOG"
+    SKIPPED=$((SKIPPED + 1))
     continue
   fi
-  OUT=$($SENDER --key "$API_KEY" --relay "$SECTOR" --file "$PDF" 2>&1)
-  if [[ $? -eq 0 ]]; then
+  if OUT=$($SENDER --key "$API_KEY" --relay "$SECTOR" --file "$PDF" 2>&1); then
     echo -e "  ${GREEN}Payslip sent to device: ${device_id}${RESET}"
     echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') SENT device=${device_id}" >> "$LOG"
   else
     echo -e "  ${RED}FAILED${RESET}: device=${device_id}"
     echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') FAILED device=${device_id}" >> "$LOG"
+    FAILED=$((FAILED + 1))
   fi
-done
+done < <(tail -n +2 "$CSV")
 
 echo -e "\nLog saved: ${LOG}"
 echo "No payslip content stored on relay. Burn-on-read. GDPR compliant."
+[[ "$SKIPPED" -gt 0 ]] && echo -e "${RED}${SKIPPED} device(s) skipped (no PDF) — see ${LOG}${RESET}" >&2
+if [[ "$FAILED" -gt 0 ]]; then
+  echo -e "${RED}${FAILED} payslip(s) failed to send — see ${LOG}${RESET}" >&2
+  exit 1
+fi

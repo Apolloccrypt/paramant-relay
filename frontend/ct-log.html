@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT — Certificate Transparency Log</title>
+<title>PARAMANT · Certificate Transparency Log</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -14,14 +14,15 @@
 
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
-<meta property="og:title" content="PARAMANT — Certificate Transparency Log">
-<meta property="og:description" content="PARAMANT — Certificate Transparency Log">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<meta property="og:title" content="PARAMANT · Certificate Transparency Log">
+<meta property="og:description" content="PARAMANT: Certificate Transparency Log">
 <meta property="og:url" content="https://paramant.app/ct-log">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PARAMANT — Certificate Transparency Log">
-<meta name="twitter:description" content="PARAMANT — Certificate Transparency Log">
+<meta name="twitter:title" content="PARAMANT · Certificate Transparency Log">
+<meta name="twitter:description" content="PARAMANT: Certificate Transparency Log">
 <link rel="canonical" href="https://paramant.app/ct-log">
   <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -242,7 +243,7 @@ body { min-height:100vh; }
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
       <ul class="nav-dropdown-menu" role="menu">
         <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Setup wizard</a></li>
+        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
         <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
@@ -325,7 +326,7 @@ body { min-height:100vh; }
     <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
     <div class="nav-mobile-group-items">
       <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Setup wizard</a>
+      <a href="/setup">Relay setup wizard</a>
       <a href="/install.sh">install.sh</a>
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
@@ -375,7 +376,7 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Public Audit Log</div>
   <h1>Certificate <span>Transparency</span></h1>
-  <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered — without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
+  <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered: without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
 </div>
 
 <div class="tabs">
@@ -386,36 +387,36 @@ body { min-height:100vh; }
 <div id="pane-log">
 <div class="notice" id="persistence-notice">
   <div class="body">
-    <strong>Persistent log — survives relay restarts</strong>
+    <strong>Persistent log: survives relay restarts</strong>
     <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
-    and reloaded on startup. No payload content is ever stored — only cryptographic hashes.
+    and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
     The log resets only when the relay volume is deleted.</span>
   </div>
 </div>
 
 <div class="stats">
   <div class="stat">
-    <div class="val" id="stat-total">—</div>
+    <div class="val" id="stat-total">n/a</div>
     <div class="lbl">Log entries</div>
   </div>
   <div class="stat">
-    <div class="val" id="stat-count">—</div>
+    <div class="val" id="stat-count">n/a</div>
     <div class="lbl">Registered relays</div>
   </div>
   <div class="stat">
-    <div class="val" id="stat-transfers">—</div>
+    <div class="val" id="stat-transfers">n/a</div>
     <div class="lbl">Transfer proofs</div>
   </div>
   <div class="stat">
-    <div class="val dim" id="stat-root">—</div>
+    <div class="val dim" id="stat-root">n/a</div>
     <div class="lbl">Merkle Root</div>
   </div>
   <div class="stat">
-    <div class="val green" id="stat-relay">—</div>
+    <div class="val green" id="stat-relay">n/a</div>
     <div class="lbl">Relay</div>
   </div>
   <div class="stat">
-    <div class="val dim" id="stat-last">—</div>
+    <div class="val dim" id="stat-last">n/a</div>
     <div class="lbl">Last Entry</div>
   </div>
 </div>
@@ -454,7 +455,7 @@ body { min-height:100vh; }
 
 <div class="pagination">
   <button id="prev-btn" onclick="changePage(-1)" disabled>&#8592; Prev</button>
-  <span id="page-info">—</span>
+  <span id="page-info">n/a</span>
   <button id="next-btn" onclick="changePage(1)" disabled>Next &#8594;</button>
 </div>
 
@@ -462,9 +463,9 @@ body { min-height:100vh; }
 
 <div id="pane-relays" style="display:none">
   <div class="stats" id="relay-stats">
-    <div class="stat"><div class="val" id="rstat-count">—</div><div class="lbl">Registered Relays</div></div>
-    <div class="stat"><div class="val green" id="rstat-sectors">—</div><div class="lbl">Sectors</div></div>
-    <div class="stat"><div class="val dim" id="rstat-last">—</div><div class="lbl">Last Registration</div></div>
+    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Registered Relays</div></div>
+    <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectors</div></div>
+    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Last Registration</div></div>
   </div>
   <div class="relay-table-wrap">
     <div class="relay-table-head">
@@ -499,7 +500,7 @@ async function load() {
     document.getElementById('stat-transfers').textContent = transferCount;
     const root = d.root || '';
     document.getElementById('stat-root').textContent =
-      root && root !== '0'.repeat(64) ? root.slice(0,16)+'…' : '—';
+      root && root !== '0'.repeat(64) ? root.slice(0,16)+'…' : 'n/a';
 
     if (hRes && hRes.ok) {
       const h = await hRes.json();
@@ -516,7 +517,7 @@ async function load() {
       const ts = allEntries[0].ts;
       document.getElementById('stat-last').textContent = ts
         ? new Date(ts).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
-        : '—';
+        : 'n/a';
     }
 
     // Update notice: check if persistent (file-backed) by seeing if log survived restart
@@ -559,7 +560,7 @@ function render() {
     var ts  = e.ts;
     var time = ts
       ? new Date(ts).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
-      : '—';
+      : 'n/a';
     var leaf   = trunc(e.leaf_hash   || e.hash || '');
     var tree   = trunc(e.tree_hash   || e.merkle_root || '');
     var device = trunc(e.device_hash || e.pubkey_hash  || '');
@@ -579,17 +580,17 @@ function render() {
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
       + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
-      + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+esc(e.leaf_hash||'—')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+esc(e.tree_hash||'—')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+esc(e.device_hash||'—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+esc(e.device_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
-      + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : '—')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
       + proofHtml
       + '</div>';
   }).join('');
 }
 
-function trunc(h) { return h ? h.slice(0,20)+'…' : '—'; }
+function trunc(h) { return h ? h.slice(0,20)+'…' : 'n/a'; }
 
 function toggle(i) {
   var el = document.getElementById('d-'+i);
@@ -652,14 +653,14 @@ function verifyHash() {
   el.className = 'verify-result found';
   var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
              : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
-  el.innerHTML = '<strong>✓ Verified — found at index ' + esc(String(match.index)) + '</strong>'
+  el.innerHTML = '<strong>✓ Verified: found at index ' + esc(String(match.index)) + '</strong>'
     + '<pre>'
     + 'Matched field : ' + esc(field) + '\n'
     + 'Index         : ' + esc(String(match.index)) + '\n'
-    + 'Leaf hash     : ' + esc(match.leaf_hash||'—') + '\n'
-    + 'Tree hash     : ' + esc(match.tree_hash||'—') + '\n'
-    + 'Device hash   : ' + esc(match.device_hash||'—') + '\n'
-    + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : '—') + '\n'
+    + 'Leaf hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
+    + 'Tree hash     : ' + esc(match.tree_hash||'n/a') + '\n'
+    + 'Device hash   : ' + esc(match.device_hash||'n/a') + '\n'
+    + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a') + '\n'
     + (match.proof && match.proof.length ? 'Merkle proof  : ' + esc(match.proof.join(' → ')) : '')
     + '</pre>';
 }
@@ -687,11 +688,11 @@ async function loadRelays() {
 
     document.getElementById('rstat-count').textContent = relays.length || '0';
     var sectors = [...new Set(relays.map(function(r){return r.sector;}))];
-    document.getElementById('rstat-sectors').textContent = sectors.join(', ') || '—';
+    document.getElementById('rstat-sectors').textContent = sectors.join(', ') || 'n/a';
     var latest = relays.reduce(function(a,b){ return (b.last_seen > a) ? b.last_seen : a; }, '');
     document.getElementById('rstat-last').textContent = latest
       ? new Date(latest).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})
-      : '—';
+      : 'n/a';
 
     if (relays.length === 0) {
       el.innerHTML = '<div class="empty-state"><div class="big">📡</div>'
@@ -704,14 +705,14 @@ async function loadRelays() {
     el.innerHTML = relays.map(function(relay) {
       var since = relay.verified_since
         ? new Date(relay.verified_since).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
-        : '—';
+        : 'n/a';
       var last = relay.last_seen
         ? new Date(relay.last_seen).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
-        : '—';
+        : 'n/a';
       var urlShort = esc(relay.url.replace(/^https?:\/\//, ''));
       return '<div class="relay-row">'
         + '<div class="url" title="' + esc(relay.url) + '">' + urlShort + '</div>'
-        + '<div class="cell green">' + esc(relay.sector || '—') + '</div>'
+        + '<div class="cell green">' + esc(relay.sector || 'n/a') + '</div>'
         + '<div class="cell">v' + esc(relay.version || '?') + '</div>'
         + '<div class="cell">' + esc(relay.edition || 'community') + '</div>'
         + '<div class="cell dim" title="CT log index ' + esc(String(relay.ct_index ?? '')) + '">' + since + '</div>'
@@ -758,7 +759,7 @@ setInterval(load, 30000);
         <div class="footer-col-label">Self-host</div>
         <div class="footer-links">
           <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/setup">Setup wizard</a>
+          <a href="/setup">Relay setup wizard</a>
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
@@ -782,6 +783,6 @@ setInterval(load, 30000);
   </div>
 </footer>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js" defer></script>
+<script src="/js/nav-auth.js?v=1" defer></script>
 </body>
 </html>
