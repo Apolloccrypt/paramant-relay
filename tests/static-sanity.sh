@@ -38,7 +38,10 @@ done
 # A file that uses redisClient must either:
 #   (a) initialize it: let redisClient = null + createClient(...)
 #   (b) import a redis module
-# Violation caused a relay crash when redisClient was undefined.
+#   (c) receive it as a function parameter (pure helpers like admin/lib/webauthn.js
+#       take (redisClient, ...) and never touch a free global — also safe)
+# Violation caused a relay crash when a free/global redisClient was undefined;
+# a parameter named redisClient is NOT that bug, so it must not trip this check.
 echo ""
 echo "2. redisClient initialization check..."
 for f in \
@@ -47,8 +50,8 @@ for f in \
   "$ROOT/relay/relay.js"; do
   [ -f "$f" ] || continue
   if grep -q 'redisClient' "$f" 2>/dev/null; then
-    if grep -qE 'let redisClient|const redisClient|redisClient = |require.*redis|from.*redis' "$f"; then
-      printf "   OK  %s  (redisClient initialized or imported)\n" "$(basename "$f")"
+    if grep -qE 'let redisClient|const redisClient|redisClient = |require.*redis|from.*redis|\(redisClient|, *redisClient' "$f"; then
+      printf "   OK  %s  (redisClient initialized, imported, or a parameter)\n" "$(basename "$f")"
     else
       printf "   FAIL  %s  — uses redisClient but no initialization/import found\n" "$(basename "$f")"
       FAIL=$((FAIL + 1))
