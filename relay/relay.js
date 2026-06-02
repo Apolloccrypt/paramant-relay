@@ -2488,6 +2488,61 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /v2/user/signing-key/attested — enrol a signing pubkey gated by a
+  // PASSKEY STEP-UP the admin already verified, INSTEAD of TOTP. This is the
+  // "your sign-in passkey IS your signing key" path: a logged-in user who has a
+  // passkey proves possession with a fresh WebAuthn assertion (verified in the
+  // admin server, which owns rpId/origin — the relay never verifies assertions,
+  // see the storage block below), and that step-up authorises the bind. It lets
+  // a passkey-only account (no TOTP) enrol a signing key at all, which the
+  // TOTP-gated route above cannot. The relay does NOT blindly trust the caller:
+  //   GATE 1  internal-auth only (admin proxy);
+  //   GATE 2  the account MUST already have >=1 active passkey credential — with
+  //           no passkey there is nothing the admin could have stepped up, so a
+  //           TOTP-less, passkey-less account can never reach a TOTP-free bind;
+  //   + the cross-account-conflict check inside storeSigningPk still applies, and
+  //   the server recomputes pk_hash (a client-supplied hash is never trusted).
+  // Mirrors /tofu's "as strict as the TOTP gate it replaces" property.
+  if (req.method === "POST" && path === "/v2/user/signing-key/attested") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, pk_b64, label } = JSON.parse((await readBody(req, 16384)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      if (!pk_b64 || typeof pk_b64 !== "string") { res.writeHead(400); return res.end(J({ error: "missing_pk_b64" })); }
+      // GATE 2 — the account must actually have a passkey (the factor the admin
+      // stepped up). No passkey -> no attested bind (fall back to the TOTP route).
+      const credCount = await userWebauthn.countActiveCredentials(redisClient, user_id);
+      if (!credCount) { res.writeHead(403); return res.end(J({ error: "no_passkey_enrolled" })); }
+      // Store (server-side pk_hash computation; cross-account-conflict check inside).
+      let result;
+      try {
+        result = await userSigning.storeSigningPk(redisClient, user_id, { pk_b64, label });
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(J({ error: e.message }));   // e.g. 'pubkey already enrolled to a different account'
+      }
+      const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled_attested", user_id, result.entry.pk_hash_sha3);
+      log("info", "signing_pk_enrolled_attested", {
+        user_id: String(user_id).slice(0, 12) + "…",
+        pk_hash: result.entry.pk_hash_sha3.slice(0, 16) + "…",
+        reenrolled: result.reenrolled,
+        ct_index: ctEntry.index,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({
+        ok: true,
+        pk_hash_sha3: result.entry.pk_hash_sha3,
+        label: result.entry.label,
+        enrolled_at: result.entry.enrolled_at,
+        reenrolled: result.reenrolled,
+        ct_index: ctEntry.index,
+      }));
+    } catch (err) {
+      console.error("[user/signing-key/attested]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ── WebAuthn / passkey credential storage (ADR R018, PR-A) ───────────────────
   // Durable storage only. The WebAuthn ceremony (challenge issue + attestation/
   // assertion verification, rpId/origin checks) lives in the admin server and

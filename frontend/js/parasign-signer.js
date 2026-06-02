@@ -5,7 +5,7 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap, vaultAvailable, vaultList } from '/vendor/vault.js?v=2';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList } from '/vendor/vault.js?v=3';
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -197,6 +197,147 @@ export async function enrolSigningPasskey({ label, passphrase, registerPasskey, 
     kp.secretKey.fill(0);   // zeroize the plaintext key once both wraps + enrol are done
   }
   return { pk_hash, pk_b64 };
+}
+
+// ── "Your sign-in passkey IS your signing key" — one-tap resolve-or-enrol ─────
+// The single entry point /sign and /co-sign call. If this device already has a
+// passkey-PRF signing key, return it. Otherwise enrol one WITHOUT a passphrase
+// and WITHOUT TOTP, reusing the very passkey the user signs in with:
+//   1. generate the ML-DSA-65 key in the browser;
+//   2. ask the admin for a step-up assertion challenge over THIS account's
+//      passkeys (POST .../step-up/options);
+//   3. run ONE navigator.credentials.get() with that challenge + a PRF eval —
+//      the platform offers the account's passkey (the sign-in passkey); the
+//      assertion proves possession AND yields the PRF output in a single tap;
+//   4. wrap the ML-DSA key with the PRF output locally (vaultCreatePrfOnly) —
+//      the PRF output never leaves the browser;
+//   5. send ONLY the assertion (no PRF) + the public key to the admin, which
+//      verifies the step-up and binds the pubkey via the relay attested route.
+// Reuses the sign-in passkey by allowCredentials, so it never mints a second
+// passkey and never depends on a registration-time prfSupported flag (the old
+// false-negative that spawned a duplicate passkey + the "set up a signing
+// passkey" loop). Respects the [[feedback_eidas_sam_seam]] seam: PRF only
+// UNLOCKS the stored ML-DSA key (activation) — key-use stays behind the signer.
+export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
+  const say = (m) => { try { if (onStatus) onStatus(m); } catch { /* status is best-effort */ } };
+
+  // Fast path: a passkey signing key already exists on this device.
+  try {
+    return await resolvePasskeySigningKey();
+  } catch (e) {
+    if (!e || e.code !== 'no_signing_passkey') throw e;   // a real error, not "needs enrol"
+  }
+
+  if (!(await vaultAvailable())) {
+    const err = new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
+    err.code = 'vault_unavailable';
+    throw err;
+  }
+  if (!(typeof PublicKeyCredential !== 'undefined' && navigator.credentials && navigator.credentials.get)) {
+    const err = new Error('This browser does not support passkeys, so it cannot set up signing.');
+    err.code = 'no_webauthn';
+    throw err;
+  }
+  rpId = rpId || location.hostname;
+
+  // 1) ML-DSA-65 keypair, generated + held only in the browser.
+  const seed = crypto.getRandomValues(new Uint8Array(32));
+  const kp = ml_dsa65.keygen(seed);
+  const pk_b64 = b64EncodeStd(kp.publicKey);
+  const pk_hash = toHex(sha3_256(kp.publicKey));
+  try {
+    // 2) Step-up challenge over THIS account's passkeys.
+    say('Setting up signing with your passkey…');
+    let opt;
+    try {
+      opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
+    } catch (e) {
+      if (e && e.status === 409 && e.data && e.data.error === 'no_passkey') {
+        const err = new Error('Add a passkey to your account first, then you can sign with it.');
+        err.code = 'no_passkey';
+        throw err;
+      }
+      throw e;
+    }
+    // opt: { flowId, options } — options.allowCredentials are the account's passkeys.
+
+    // 3) ONE WebAuthn get(): server challenge + per-wrap PRF eval salt. The
+    //    platform offers the account's sign-in passkey from allowCredentials.
+    const prfSalt = crypto.getRandomValues(new Uint8Array(16));
+    say('Confirm with Face ID / Touch ID / your security key…');
+    const cred = await navigator.credentials.get({
+      publicKey: {
+        challenge: b64urlToBytes(opt.options.challenge),
+        rpId,
+        allowCredentials: (opt.options.allowCredentials || []).map((c) => ({
+          type: 'public-key',
+          id: b64urlToBytes(c.id),
+          ...(c.transports ? { transports: c.transports } : {}),
+        })),
+        userVerification: 'required',
+        timeout: opt.options.timeout || 60000,
+        extensions: { prf: { eval: { first: prfSalt } } },
+      },
+    });
+    const prfFirst = cred.getClientExtensionResults()?.prf?.results?.first;
+    if (!prfFirst) {
+      const err = new Error('This passkey can’t produce a PRF result. Use a device/browser with passkey-PRF (iOS 18+, a recent Chrome/Edge, or a PRF-capable security key).');
+      err.code = 'no_prf';
+      throw err;
+    }
+    const prfOutput = new Uint8Array(prfFirst);
+
+    // 4) Wrap the ML-DSA key with the PRF output — PRF ONLY, no passphrase. The
+    //    PRF output stays in the browser; only the assertion goes to the server.
+    const credentialId = _b64urlFromBuffer(cred.rawId);
+    try {
+      await vaultCreatePrfOnly({ alg: 'ML-DSA-65', label: label || 'Signing key', pk_b64, pk_hash, secretKeyBytes: kp.secretKey, credentialId, prfSalt, prfOutput });
+    } finally {
+      prfOutput.fill(0);
+    }
+
+    // 5) Bind the PUBLIC key to the account: the admin verifies the step-up
+    //    assertion, then the relay records the pubkey (TOTP-free attested route).
+    say('Linking your signing key to your account…');
+    await _postJSON('/api/user/account/signing-key/step-up/bind', {
+      flowId: opt.flowId,
+      response: _serializeAssertion(cred),
+      pk_b64,
+      label: label || 'Signing key',
+    });
+  } finally {
+    kp.secretKey.fill(0);   // zeroize the plaintext key
+  }
+
+  // Closed loop: resolve the way /sign does, proving the key is usable now.
+  return await resolvePasskeySigningKey();
+}
+
+// Serialize a raw PublicKeyCredential assertion to the JSON shape
+// @simplewebauthn/server verifyAuthenticationResponse expects. The PRF result is
+// deliberately NOT included — it is key material and stays in the browser.
+function _serializeAssertion(cred) {
+  const r = cred.response;
+  const out = {
+    id: cred.id,
+    rawId: _b64urlFromBuffer(cred.rawId),
+    type: cred.type,
+    clientExtensionResults: {},
+    response: {
+      clientDataJSON:    _b64urlFromBuffer(r.clientDataJSON),
+      authenticatorData: _b64urlFromBuffer(r.authenticatorData),
+      signature:         _b64urlFromBuffer(r.signature),
+    },
+  };
+  if (r.userHandle) out.response.userHandle = _b64urlFromBuffer(r.userHandle);
+  return out;
+}
+
+function _b64urlFromBuffer(buf) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // ── Same-origin admin calls for the per-document signing chain (R018) ────────

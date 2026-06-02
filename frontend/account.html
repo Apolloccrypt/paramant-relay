@@ -370,34 +370,22 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
     <div class="acct-block">
       <h3>Browser vault</h3>
       <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
-      <p class="small"><strong>Your passphrase encrypts your signing key in this browser. We never see it and we cannot reset it. If you forget it, this key is gone.</strong></p>
+      <p class="small"><strong>Your signing key is encrypted in this browser and unlocked only by your passkey (Face ID / Touch ID / security key). We never see it. Lose this device? Set up signing again on a new one — your account keeps every public key, so old signatures stay verifiable.</strong></p>
     </div>
   </div>
   <hr class="acct-divider">
   <div class="acct-block">
     <h3>Set up your signing key</h3>
     <p class="small">
-      A signing key is what makes your signature legally yours. It is created here, in this
-      browser, with ML-DSA-65 (post-quantum), and only you hold it. It is separate from how
-      you sign in. You confirm with Face ID, Touch ID, or a security key when you sign.
+      Your signing key is created here, in this browser, with ML-DSA-65 (post-quantum), and
+      only you hold it. You set it up — and unlock it every time you sign — with the SAME
+      passkey you sign in with (Face ID, Touch ID, or a security key). No passphrase, no extra
+      code: your sign-in passkey is your signing key.
     </p>
     <div class="acct-field">
       <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
-      <input type="password" id="signing-enrol-pass" placeholder="Choose a passphrase (min 12 characters)" autocomplete="new-password">
-      <div id="signing-enrol-strength" class="small" aria-live="polite" style="margin:2px 0 0"></div>
-      <input type="password" id="signing-enrol-pass2" placeholder="Confirm passphrase" autocomplete="new-password">
-      <p class="small" style="margin:6px 0 0"><strong>Write this down.</strong> If you forget this passphrase and lose this browser, your signing key is gone for good. We can't reset it.</p>
-
-      <div id="signing-enrol-totp-wrap" hidden style="margin-top:12px;padding:12px 14px;border:1px solid var(--ink-hair,#E2E8F0);border-radius:6px">
-        <p id="signing-enrol-totp-prompt" class="small" style="margin:0 0 8px"></p>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="text" id="signing-enrol-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
-          <button type="button" class="btn btn-primary btn-small" id="signing-enrol-totp-confirm">Confirm</button>
-        </div>
-      </div>
-
       <div style="margin-top:10px">
-        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Create my signing key</button>
+        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Set up signing with my passkey</button>
       </div>
     </div>
     <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
@@ -790,7 +778,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js?v=3"></script>
-<script type="module" src="/js/signing-enrol.js?v=5"></script>
+<script type="module" src="/js/signing-enrol.js?v=6"></script>
 
 </body>
 </html>

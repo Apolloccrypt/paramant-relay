@@ -1960,6 +1960,112 @@ api.post("/user/account/signing-key/tofu", authUser, async (req, res) => {
   }
 });
 
+// ── Passkey step-up for binding a signing key (ADR R018) — the "your sign-in
+// passkey IS your signing key" gate. A logged-in user proves possession of one
+// of THEIR OWN passkeys with a fresh assertion; that step-up replaces TOTP for
+// the signing-key bind, so a passkey-only account (no authenticator app) can
+// enrol a signing key, and nobody needs a separate signing passphrase. rpId/
+// origin are config constants (never request-derived). The SAME WebAuthn get()
+// the client runs for this assertion also carries the PRF eval that wraps the
+// ML-DSA key locally — one Face ID / Touch ID tap both authorises and unlocks.
+
+// POST /api/user/account/signing-key/step-up/options (authUser) — issue a
+// one-shot assertion challenge over THIS account's own passkeys.
+api.post("/user/account/signing-key/step-up/options", authUser, async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginOptions;
+  if (!(await webauthn.rateHit(redis(), `su:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+  const { user_id } = req.userSession;
+  if (!(await webauthn.rateHit(redis(), `su:acct:${webauthn.scopeHash(user_id)}`, L.account, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  // Challenge is bound to THIS account's own passkeys only. No passkey -> tell
+  // the client to add one first (the attested relay bind would reject anyway).
+  let allowCredentials = [];
+  try {
+    const r = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    if (r.status === 200) allowCredentials = ((await r.json()).credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+  } catch (e) { console.error("[signing-key/step-up/options]", e.message); return res.status(502).json({ error: "relay_unreachable" }); }
+  if (allowCredentials.length === 0) return res.status(409).json({ error: "no_passkey" });
+
+  let options;
+  try {
+    options = await generateAuthenticationOptions({
+      rpID: webauthn.RP_ID,
+      allowCredentials,
+      userVerification: "required",
+    });
+  } catch (e) { console.error("[signing-key/step-up/options]", e.message); return res.status(500).json({ error: "internal" }); }
+  const flowId = webauthn.newFlowId();
+  await webauthn.putAuthFlow(redis(), flowId, { challenge: options.challenge, user_id, step_up: "signing-key" });
+  res.json({ flowId, options });
+});
+
+// POST /api/user/account/signing-key/step-up/bind (authUser) — verify the fresh
+// assertion (mirrors login/verify) and, on success, forward the pubkey bind to
+// the relay's TOTP-free attested route. The asserted credential MUST belong to
+// the logged-in account; the flow is one-shot (consumed before any crypto).
+api.post("/user/account/signing-key/step-up/bind", authUser, async (req, res) => {
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const L = webauthn.LIMITS.loginVerify;
+  if (!(await webauthn.rateHit(redis(), `sub:ip:${ip}`, L.ip, L.windowSec)))
+    return res.status(429).json({ error: "rate_limited" });
+
+  const { user_id } = req.userSession;
+  const { flowId, response, pk_b64, label } = req.body || {};
+  if (!pk_b64 || typeof pk_b64 !== "string") return res.status(400).json({ error: "missing_pk_b64" });
+  const flow = await webauthn.takeAuthFlow(redis(), flowId);   // one-shot
+  if (!flow || !response || flow.step_up !== "signing-key") return res.status(401).json({ error: "step_up_required" });
+  // The step-up MUST belong to the same session that is binding the key.
+  if (flow.user_id !== user_id) return res.status(401).json({ error: "step_up_required" });
+
+  // Resolve the asserted credential and confirm it is THIS account's passkey.
+  let lookup;
+  try {
+    const r = await callRelay(`/v2/user/webauthn/lookup?cred_id=${encodeURIComponent(String(response.id || ""))}`, null, "GET");
+    if (r.status !== 200) return res.status(401).json({ error: "step_up_required" });
+    lookup = await r.json();
+  } catch (e) { return res.status(401).json({ error: "step_up_required" }); }
+  if (!lookup || !lookup.user_id || lookup.user_id !== user_id) return res.status(401).json({ error: "step_up_required" });
+
+  // Verify the assertion. expectedOrigin/expectedRPID are config constants.
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: flow.challenge,
+      expectedOrigin: webauthn.EXPECTED_ORIGIN,
+      expectedRPID: webauthn.RP_ID,
+      credential: {
+        id: lookup.credId,
+        publicKey: new Uint8Array(Buffer.from(lookup.publicKey, "base64url")),
+        counter: lookup.counter | 0,
+      },
+      requireUserVerification: true,
+    });
+  } catch (e) { return res.status(401).json({ error: "step_up_required" }); }
+  if (!verification.verified) return res.status(401).json({ error: "step_up_required" });
+
+  // Cloned-authenticator guard (the same rule as login/verify).
+  const newCounter = verification.authenticationInfo.newCounter;
+  if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
+    try { logAuditEvent("webauthn_counter_regression", { user_id: String(user_id).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
+    return res.status(401).json({ error: "step_up_required" });
+  }
+  try { await callRelay("/v2/user/webauthn/counter", { user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}
+
+  // Step-up proven -> forward the bind to the relay's TOTP-free attested route.
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key/attested", { user_id, pk_b64, label }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[signing-key/step-up/bind]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // GET /api/user/account/signing-key — list this user's enrolled keys
 api.get("/user/account/signing-key", authUser, async (req, res) => {
   const { user_id } = req.userSession;

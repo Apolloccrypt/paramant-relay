@@ -318,3 +318,47 @@ display string into a signed message; carry such fields outside the signature.
 No HSM, no SAM, no SAP/SAD implementation, no eIDAS conformance work. This ADR
 only guarantees the activation⇄key-use seam stays intact so a SAM can be added
 later. No new product features beyond the invite flow above.
+
+## Addendum 2026-06-02 — the sign-in passkey IS the signing key
+
+Field reality: a passkey-first account has no TOTP, but every signing-key bind
+(`/v2/user/signing-key`) and every fresh-passkey mint was TOTP-gated, so a
+passkey-only user could not enrol a signing key at all; and the enrol that did
+work demanded a separate passphrase + 2× TOTP and, when a registration-time
+`prfSupported` flag read false-negative, minted a *second* passkey — the "two
+passkeys / set up a signing passkey" loop. Decision: collapse the two
+credentials. The passkey you sign in with becomes the passkey you sign with.
+
+What changed:
+- **Passkey step-up = TOTP-equivalent bind.** New admin
+  `POST /api/user/account/signing-key/step-up/{options,bind}`: a logged-in user
+  proves possession of one of *their own* passkeys with a fresh assertion (the
+  admin verifies it exactly like login/verify — challenge one-shot, credential
+  resolved to this account, counter rule), which authorises a TOTP-free bind via
+  new relay `POST /v2/user/signing-key/attested` (internal-auth, gated on
+  `countActiveCredentials >= 1`, server-side pk_hash, cross-account-conflict
+  check — "as strict as the TOTP it replaces", mirroring `/tofu`). The original
+  TOTP route is untouched (still used by the /account TOTP path + back-compat).
+- **One tap does both.** The SAME `navigator.credentials.get()` carries the
+  server challenge (→ step-up assertion, sent to the server) and a `prf.eval`
+  (→ PRF output, kept in the browser to wrap the ML-DSA key). `ensureSigningKey()`
+  in `parasign-signer.js` is the single resolve-or-enrol entry point /sign,
+  /co-sign and /account all call; it reuses the sign-in passkey via
+  `allowCredentials` and never trusts a stored `prfSupported` flag, so it cannot
+  spawn a duplicate passkey or loop.
+- **PRF may be the sole wrap.** `vaultCreatePrfOnly()` creates a vault entry with
+  only a `webauthn-prf` wrap — no passphrase. This deliberately relaxes the
+  earlier "PRF is never the sole wrap / passphrase is the recovery floor"
+  invariant. Rationale: a *signing* key is not a login factor — losing it just
+  means enrolling a fresh one (the relay keeps a multi-key list, old signatures
+  stay verifiable by their stored pubkey), and the synced passkey (iCloud
+  Keychain / Google Password Manager) is the real recovery. Account login keeps
+  its own recovery (backup codes), unaffected. A passphrase wrap can still be
+  *added* via `vaultStore` as an optional break-glass.
+
+Seam intact (the whole point of R018): PRF still only **unlocks** a stored,
+randomly-generated ML-DSA-65 key (activation); key-use stays behind
+`ActivatedSigner.sign()`. The key is NOT derived from the PRF output — that
+fusion would be the forbidden one (a SAM/HSM could never be slotted in later).
+`signMessageBytes(...,3)` / the v3 sign-message are untouched, so already-signed
+envelopes stay `valid:true`.
