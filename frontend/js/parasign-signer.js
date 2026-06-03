@@ -81,13 +81,19 @@ export async function resolvePasskeySigningKey() {
 // was stored in the wrap at enrol (PRF output is deterministic per
 // (credential, salt), independent of the challenge).
 async function evalPrf({ rpId, credentialIdB64url, prfSaltB64url }) {
+  const saltBytes = b64urlToBytes(prfSaltB64url);
+  // WebAuthn-PRF with a non-empty allowCredentials REQUIRES evalByCredential
+  // (keyed by the base64url credential id) on Chromium + Gecko; a plain `eval`
+  // yields NO prf result there (and on WebKit once >1 passkey is offered). Send
+  // both: evalByCredential (used when the credential matches) + eval (fallback),
+  // same salt either way so the PRF output is identical to enrol time.
   const assertion = await navigator.credentials.get({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
       rpId,
       allowCredentials: [{ type: 'public-key', id: b64urlToBytes(credentialIdB64url) }],
       userVerification: 'required',
-      extensions: { prf: { eval: { first: b64urlToBytes(prfSaltB64url) } } },
+      extensions: { prf: { eval: { first: saltBytes }, evalByCredential: { [credentialIdB64url]: { first: saltBytes } } } },
     },
   });
   const first = assertion.getClientExtensionResults()?.prf?.results?.first;
@@ -265,18 +271,30 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     //    platform offers the account's sign-in passkey from allowCredentials.
     const prfSalt = crypto.getRandomValues(new Uint8Array(16));
     say('Confirm with Face ID / Touch ID / your security key…');
+    const allowList = (opt.options.allowCredentials || []);
+    // WebAuthn-PRF with a non-empty allowCredentials needs evalByCredential
+    // (per-credential, keyed by the base64url id) on Chromium + Gecko — and on
+    // WebKit as soon as more than one passkey is offered — or NO prf result
+    // comes back (the "can't produce a PRF result" dead end). Same salt for
+    // every credential; whichever the user picks yields that credential's PRF,
+    // and we wrap with exactly that. eval stays as a single-credential fallback.
+    const prfExt = { eval: { first: prfSalt } };
+    if (allowList.length) {
+      prfExt.evalByCredential = {};
+      for (const c of allowList) prfExt.evalByCredential[c.id] = { first: prfSalt };
+    }
     const cred = await navigator.credentials.get({
       publicKey: {
         challenge: b64urlToBytes(opt.options.challenge),
         rpId,
-        allowCredentials: (opt.options.allowCredentials || []).map((c) => ({
+        allowCredentials: allowList.map((c) => ({
           type: 'public-key',
           id: b64urlToBytes(c.id),
           ...(c.transports ? { transports: c.transports } : {}),
         })),
         userVerification: 'required',
         timeout: opt.options.timeout || 60000,
-        extensions: { prf: { eval: { first: prfSalt } } },
+        extensions: { prf: prfExt },
       },
     });
     const prfFirst = cred.getClientExtensionResults()?.prf?.results?.first;
