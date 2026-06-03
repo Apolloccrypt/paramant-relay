@@ -88,6 +88,10 @@ export async function verifySession() {
   }
 
   if (s.auth_mode === 'apikey') {
+    // Must mirror getUploadCredentials' definition of "signed in": without the stored key,
+    // the popup would show "signed in" while every upload fails with not_authenticated. If a
+    // stale session is missing the key, clear it so the popup prompts a fresh sign-in.
+    if (!s.auth_apikey) { await clearAuth(); return { authenticated: false }; }
     return {
       authenticated: true, mode: 'apikey', plan: s.auth_plan || null, relay: s.auth_relay,
       expires_at: new Date(s.auth_until).toISOString(),
