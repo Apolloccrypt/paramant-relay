@@ -644,22 +644,12 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
   showStep('step-receiving');
   const tokens = msg.tokens.split(',');
   const totalChunks = parseInt(msg.total_chunks) || 1;
-  const fileName = msg.file_name || 'download';
+  let fileName = msg.file_name || 'download';
   const chunks = [];
   const burnedHashes = [];
   let fileWriter = null;  // File System Access API streaming writer
 
   try {
-    // Probeer File System Access API (Chrome/Edge) — true streaming, geen RAM limiet
-    if (window.showSaveFilePicker) {
-      try {
-        const handle = await window.showSaveFilePicker({ suggestedName: fileName, _startIn: 'downloads' });
-        fileWriter = await handle.createWritable();
-      } catch(e) {
-        // Gebruiker annuleerde of API niet beschikbaar — val terug op Blob
-        fileWriter = null;
-      }
-    }
     for (let i = 0; i < tokens.length; i++) {
       const pct = Math.round(10 + (i / tokens.length) * 75);
       $('recv-progress').style.width = pct + '%';
@@ -692,6 +682,19 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
         }
         doff += 4 + metaLen;
       }
+
+      // Bestandsnaam is nu bekend (uit chunk 0). Open de save-picker met de juiste
+      // suggestedName. showSaveFilePicker vereist user-activation; lukt dat niet dan
+      // valt het terug op Blob-assembly onderaan, nu met de correcte bestandsnaam.
+      if (i === 0 && window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({ suggestedName: fileName, _startIn: 'downloads' });
+          fileWriter = await handle.createWritable();
+        } catch(e) {
+          // Gebruiker annuleerde of geen user-activation — val terug op Blob
+          fileWriter = null;
+        }
+      }
       const decryptedChunk = plainPadded.slice(doff);
       if (fileWriter) {
         await fileWriter.write(decryptedChunk);
@@ -710,8 +713,9 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
       fileWriter = null;
       totalSize = chunks.length; // niet beschikbaar, gebruik 0
     } else {
-      // Blob assembly: geef chunks direct aan Blob (efficienter dan concat)
-      const blob = new Blob(chunks);
+      // Blob assembly: geef chunks direct aan Blob (efficienter dan concat).
+      // Expliciet octet-stream zodat de browser geen .txt-extensie afleidt.
+      const blob = new Blob(chunks, { type: 'application/octet-stream' });
       totalSize = blob.size;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
