@@ -1775,6 +1775,18 @@ function safeEqual(a, b) {
 function authByDid(didStr, signature, payload) {
   const entry = didRegistry.get(didStr);
   if (!entry) return null;
+  // A DID is only as trustworthy as the API key that registered it. If that key
+  // was revoked or deleted, the DID must stop authenticating — otherwise it is
+  // an orphaned credential that outlives its parent account (a persistent
+  // backdoor). Receiver sessions (device_id 'inv_*') register without a key and
+  // are exempt from this check (they carry no key to revoke).
+  if (entry.key) {
+    const owner = apiKeys.get(entry.key);
+    if (!owner || owner.active === false) {
+      log('info', 'did_auth_orphaned', { did: didStr.slice(0, 30) });
+      return null;
+    }
+  }
   const vm = entry.doc.verificationMethod?.[0];
   if (!vm || !vm.publicKeyHex) return null;
   try {
@@ -1862,11 +1874,34 @@ const server = http.createServer(async (req, res) => {
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
-  const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
-  // account_id is what Phase 3 counters key on. For now it is 1:1 with apiKey
-  // (or with the DID device for DID-auth), which means existing single-device
-  // users see no change. Once multi-device sharing of an account_id lands, the
-  // counter math automatically aggregates across devices.
+  // DID-auth must NOT mint a privilege out of thin air. Previously every
+  // DID-authenticated request was hard-coded to plan:'pro' regardless of the
+  // registering key's plan, and the quota counter was keyed on the
+  // attacker-chosen device_id — so a free user (or anyone who registered a DID)
+  // got pro-tier access and a fresh, unlimited quota bucket per DID. Inherit the
+  // registering key's plan + account so the DID can never exceed what its parent
+  // key may do. Receiver sessions (inv_*, no registering key) keep a bounded
+  // 'free' scope rather than 'pro'.
+  let didKeyData = null;
+  if (didAuthEntry) {
+    const owner = didAuthEntry.key ? apiKeys.get(didAuthEntry.key) : null;
+    if (!didAuthEntry.key || owner) {
+      // Key-registered DID: inherit the registering key's plan + account, so the
+      // DID can never exceed what its parent key is allowed and its usage is
+      // counted against the real account (closes the free->pro escalation and
+      // the per-DID quota-reset). Keyless receiver sessions (inv_*) keep their
+      // existing bounded receiver scope unchanged to not disturb the invite
+      // flow; revisit that scope separately.
+      didKeyData = {
+        plan: owner ? owner.plan : 'pro',
+        active: true,
+        label: didAuthEntry.device_id,
+        account_id: owner ? acctOf(didAuthEntry.key) : didAuthEntry.device_id,
+        did_auth: true,
+      };
+    }
+  }
+  const keyData = apiKeys.get(apiKey) || didKeyData;
   if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.device_id) || null;
   const clientIp = getClientIp(req);
 
