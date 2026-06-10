@@ -74,14 +74,30 @@ data  = gp.receive(hash_)</pre>
     return False
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SECTORS_DIR = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
-SECTORS = {
-    'health':  os.path.join(SECTORS_DIR, 'relay-health',   'users.json'),
-    'legal':   os.path.join(SECTORS_DIR, 'relay-legal',    'users.json'),
-    'finance': os.path.join(SECTORS_DIR, 'relay-finance',  'users.json'),
-    'iot':     os.path.join(SECTORS_DIR, 'relay-iot',      'users.json'),
-}
+# De compose-deploy bewaart /data van elke relay in een named docker volume
+# (paramant-relay_relay-<sector>-data). De /home/paramant/relay-*-bestanden
+# zijn een artefact van de oude systemd-topologie en worden niet meer
+# beschreven sinds de docker-migratie; daarop muteren is een stille no-op
+# richting de relays. Het volume-pad wint daarom altijd als het bestaat.
+SECTORS_DIR     = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
+VOLUMES_DIR     = os.environ.get('PARAMANT_DOCKER_VOLUMES_DIR', '/var/lib/docker/volumes')
+COMPOSE_PROJECT = os.environ.get('PARAMANT_COMPOSE_PROJECT', 'paramant-relay')
+
+SECTOR_NAMES = ('main', 'health', 'legal', 'finance', 'iot')
+
+def _users_json_path(sector):
+    vol = os.path.join(VOLUMES_DIR, f'{COMPOSE_PROJECT}_relay-{sector}-data', '_data', 'users.json')
+    if os.path.exists(vol):
+        return vol
+    legacy = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
+    if os.path.exists(legacy) and os.path.isdir(os.path.join(VOLUMES_DIR, f'{COMPOSE_PROJECT}_relay-{sector}-data')):
+        # niet warn(): die is hier nog niet gedefinieerd (module-level init)
+        print(f'\033[33m⚠\033[0m {sector}: docker volume bestaat maar users.json ontbreekt erin; val terug op legacy pad {legacy}', file=sys.stderr)
+    return legacy
+
+SECTORS = {s: _users_json_path(s) for s in SECTOR_NAMES}
 RELAY_URLS = {
+    'main':    'https://relay.paramant.app',
     'health':  'https://health.paramant.app',
     'legal':   'https://legal.paramant.app',
     'finance': 'https://finance.paramant.app',
@@ -123,7 +139,9 @@ def save_users(path, data):
         pass  # best-effort; systemd ExecStartPre also ensures this on next restart
 
 def gen_key():
-    return 'pgp_' + secrets.token_hex(16)
+    # 32 bytes, gelijk aan de signup-flow in admin/server.js (randomBytes(32));
+    # token_hex(16) gaf hier de helft van de serverside keysterkte.
+    return 'pgp_' + secrets.token_hex(32)
 
 def now_iso():
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
