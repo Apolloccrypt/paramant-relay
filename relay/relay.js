@@ -187,6 +187,11 @@ function escHtml(str) {
     .replace(/'/g, '&#x27;');
 }
 
+// Mailbox-canonical e-mail for rate-limit keys (closes #13 gmail dot/plus
+// farming). See relay/lib/email-normalize.js. Storage/sending always use the
+// raw address the user typed.
+const { normalizeEmailForRateLimit } = require('./lib/email-normalize');
+
 // ── NATS.io JetStream — push transport (vervangt polling) ────────────────────
 let natsClient = null;
 let natsJs = null;
@@ -2782,8 +2787,9 @@ const server = http.createServer(async (req, res) => {
         return res.end(J({ error: 'Too many requests' }));
       }
 
-      // Email rate limit: 1 per 7 days — generic 429 (no info disclosure about existing key)
-      const emailKey = rawEmail.toLowerCase();
+      // Email rate limit: 1 per 7 days — generic 429 (no info disclosure about existing key).
+      // Key on the normalized mailbox so gmail dot/plus aliases can't farm keys (#13).
+      const emailKey = normalizeEmailForRateLimit(rawEmail);
       if (trialRequests.has(emailKey) && now - trialRequests.get(emailKey) < 7 * DAY_MS) {
         res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '604800' });
         return res.end(J({ error: 'Too many requests' }));
