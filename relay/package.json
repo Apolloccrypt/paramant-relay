@@ -13,7 +13,6 @@
     "@noble/post-quantum": "^0.6.1",
     "@paramant/core": "file:../../paramant-core/crates/paramant-core-node",
     "argon2": "^0.44.0",
-    "bip39": "^3.1.0",
     "nats": "^2.29.3",
     "redis": "^5.12.1",
     "ws": "^8.20.1"
