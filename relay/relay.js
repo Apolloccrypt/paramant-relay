@@ -1336,6 +1336,17 @@ const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
 const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest (unauthenticated)
+// Sweep both per-IP rate-limit maps hourly so they cannot grow without bound
+// on attacker-rotated IPs (the limit windows already expire entries logically;
+// this reclaims the memory). Mirrors the dpaIpRequests sweep. Use each map's
+// own window: trial = 24h (DAY_MS at the call site), anon-inbound = 1h.
+setInterval(() => {
+  const now = Date.now();
+  const trialCut = now - 86_400_000; // 24h
+  const anonCut  = now - 3_600_000;  // 1h
+  for (const [k, times] of trialIpRequests) { const kept = times.filter(t => t > trialCut); if (kept.length) trialIpRequests.set(k, kept); else trialIpRequests.delete(k); }
+  for (const [k, times] of anonInboundIpRequests) { const kept = times.filter(t => t > anonCut); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
+}, 3_600_000);
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }

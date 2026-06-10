@@ -97,9 +97,12 @@ else
         TOKEN=$(openssl rand -hex 32)
         if [ ! -f .env ]; then cp .env.example .env; fi
         sed -i 's/^ADMIN_TOKEN=$//' .env; echo "ADMIN_TOKEN=${TOKEN}" >> .env
-        echo ""; echo -e "${GREEN}✓  ADMIN_TOKEN generated and saved to .env${NC}"
-        echo -e "${YELLOW}   Save this token securely — you need it to manage API keys:${NC}"; echo ""
-        echo "   ADMIN_TOKEN=${TOKEN}"; echo ""
+        chmod 600 .env 2>/dev/null || true
+        unset TOKEN
+        echo ""; echo -e "${GREEN}✓  ADMIN_TOKEN generated and saved to .env (chmod 600)${NC}"
+        # Do NOT echo the token to stdout — it would land in CI logs, shell
+        # scrollback and screen-shares. Tell the operator how to read it instead.
+        echo -e "${YELLOW}   Read it when you need it:${NC}  grep '^ADMIN_TOKEN=' .env"; echo ""
     fi
 fi
 echo ""
