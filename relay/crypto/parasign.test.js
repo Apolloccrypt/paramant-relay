@@ -28,7 +28,9 @@ function makeEnvelope(documentBytes, opts = {}) {
   const signer = sig.generateKeyPair();
   const relay = sig.generateKeyPair();
   const docHashHex = crypto.createHash("sha3-256").update(documentBytes).digest("hex");
-  const signature = sig.sign(Buffer.from(docHashHex, "hex"), signer.secretKey);
+  // v2 envelopes: the signer signs the domain-separated message (#3/#4), which
+  // is what buildEnvelope (default version '2') and verifyEnvelope now expect.
+  const signature = sig.sign(parasign.singleSignerMessage(docHashHex), signer.secretKey);
   const envelope = parasign.buildEnvelope(
     {
       documentHashHex: docHashHex,
