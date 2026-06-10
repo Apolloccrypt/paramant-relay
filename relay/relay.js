@@ -1649,38 +1649,8 @@ setInterval(() => {
 // Blocks: RFC1918, loopback, link-local, IPv6 ULA, cloud metadata,
 //         and all alternate IP representations (decimal, hex, octal, short-form,
 //         IPv4-mapped IPv6) that bypass naive string-based checks.
-function isSsrfSafeUrl(urlStr) {
-  try {
-    const u = new URL(urlStr);
-    if (u.protocol !== 'https:') return false;
-    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, ''); // strip IPv6 brackets
-    // Reject non-hostname forms: pure decimal (2130706433), hex (0x7f000001), short octal
-    if (/^\d+$/.test(h)) return false;                  // decimal IP
-    if (/^0x[0-9a-f]+$/i.test(h)) return false;          // hex IP
-    if (/^(0\d+\.){1,3}\d+$/.test(h)) return false;    // octal octets (0177.0.0.1)
-    if (/^\d+\.\d+$/.test(h)) return false;             // short-form (127.1)
-    // IPv4-mapped IPv6 ::ffff:x.x.x.x
-    if (/^::ffff:/i.test(h)) {
-      const v4part = h.replace(/^::ffff:/i, '');
-      return isSsrfSafeUrl('https://' + v4part + '/');
-    }
-    if (h === 'localhost' || h === '0.0.0.0' || h === '0') return false;
-    if (/^127\./.test(h)) return false;
-    if (/^::1$/.test(h)) return false;
-    if (/^169\.254\./.test(h)) return false;
-    if (/^fe80/i.test(h)) return false;
-    if (/^10\./.test(h)) return false;
-    if (/^192\.168\./.test(h)) return false;
-    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
-    if (/^f[cd]/i.test(h)) return false;                  // IPv6 ULA (fc00::/7)
-    if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return false;
-    if (h === 'metadata.google.internal' || h === 'metadata.aws.internal') return false;
-    // Fix 11: restrict to standard HTTPS ports only
-    const ALLOWED_PORTS = new Set(['', '443']);
-    if (!ALLOWED_PORTS.has(u.port)) return false;
-    return true;
-  } catch { return false; }
-}
+// URL-level SSRF guard, extracted to relay/lib/ssrf-guard.js for unit coverage.
+const { isSsrfSafeUrl } = require('./lib/ssrf-guard');
 
 // ── Safe outbound HTTPS request ───────────────────────────────────────────────
 // Single helper used by every outbound request the relay makes (gossip,
