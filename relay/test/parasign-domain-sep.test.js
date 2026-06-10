@@ -1,60 +1,62 @@
 'use strict';
-// Domain-separation for the single-signer notary (#3/#4): v2 envelopes bind the
-// signer signature to sha3_256("paramant/parasign/notary/v1" || 0x00 || hash);
-// v1 (bare hash) stays verifiable for already-issued envelopes; a signature
-// made over an unrelated 32-byte value can no longer be notarised as v2.
+// Domain-separation for the single-signer notary (#3/#4). parasign.js is a pure
+// module: the ML-DSA sign/verify are INJECTED, so we test the security-critical
+// logic -- which message bytes get signed/verified per envelope version -- with
+// a mock sig engine and no native crypto dep (so it runs in the deps-free relay
+// unit CI job). A real-ML-DSA end-to-end round-trip is exercised separately
+// against a live relay; this locks the byte-level contract.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
-const { ml_dsa65 } = require('@noble/post-quantum/ml-dsa.js');
 const parasign = require('../parasign');
 
-const sha3 = (buf) => crypto.createHash('sha3-256').update(buf).digest();
-const relayKp = ml_dsa65.keygen(crypto.randomBytes(32));
+// Mock signature scheme: a "signature" IS the exact bytes that were signed.
+//   sign(msg)            -> msg            (Buffer)
+//   verify(sig, msg, pk) -> sig === msg    (the signer signed exactly this message)
+// So an envelope verifies iff verifyEnvelope feeds sigVerify the SAME bytes the
+// signer committed to -- exactly what domain separation must get right.
 const deps = {
-  relaySign: (msg) => ml_dsa65.sign(msg, relayKp.secretKey),
+  relaySign: (msg) => Buffer.from(msg),
   relayPkHash: 'relaypkhash',
-  sigVerify: (sigBuf, msgBuf, pubBuf) => { try { return ml_dsa65.verify(sigBuf, msgBuf, pubBuf); } catch { return false; } },
-  relayPub: Buffer.from(relayKp.publicKey),
+  relayPub: Buffer.from('relay-pub'),
+  sigVerify: (sigBuf, msgBuf) => Buffer.compare(Buffer.from(sigBuf), Buffer.from(msgBuf)) === 0,
 };
+// A signer "signature" over `bytes`, as the base64 string buildEnvelope stores.
+const signOver = (bytes) => Buffer.from(bytes).toString('base64');
 
-const docHashHex = sha3(Buffer.from('a contract')).toString('hex');
+const docHashHex = crypto.createHash('sha3-256').update(Buffer.from('a contract')).digest('hex');
 
-function buildV2(signerKp, docHex = docHashHex) {
-  const sig = ml_dsa65.sign(parasign.singleSignerMessage(docHex), signerKp.secretKey);
-  return parasign.buildEnvelope({
-    documentHashHex: docHex,
-    signatureB64: Buffer.from(sig).toString('base64'),
-    signerPubB64: Buffer.from(signerKp.publicKey).toString('base64'),
-    signerLabel: 'tester', ttlDays: 365, ctLogIndex: 1, version: '2',
-  }, deps);
-}
-
-test('singleSignerMessage is the domain-prefixed digest, distinct from the bare hash', () => {
-  const m = parasign.singleSignerMessage(docHashHex);
+test('singleSignerMessage = sha3_256(domain || 0x00 || hash), distinct from the bare hash', () => {
   const expected = crypto.createHash('sha3-256')
     .update(Buffer.from('paramant/parasign/notary/v1', 'utf8'))
     .update(Buffer.from([0]))
     .update(Buffer.from(docHashHex, 'hex')).digest();
-  assert.deepEqual(m, expected);
-  assert.notDeepEqual(m, Buffer.from(docHashHex, 'hex'));
+  assert.deepEqual(parasign.singleSignerMessage(docHashHex), expected);
+  assert.notDeepEqual(parasign.singleSignerMessage(docHashHex), Buffer.from(docHashHex, 'hex'));
 });
 
-test('v2 envelope round-trips and verifies', () => {
-  const signerKp = ml_dsa65.keygen(crypto.randomBytes(32));
-  const env = buildV2(signerKp);
+test('signerVerifyBytes dispatches v2 -> domain-separated, v1 -> bare hash', () => {
+  assert.deepEqual(parasign.signerVerifyBytes(docHashHex, '2'), parasign.singleSignerMessage(docHashHex));
+  assert.deepEqual(parasign.signerVerifyBytes(docHashHex, '1'), Buffer.from(docHashHex, 'hex'));
+});
+
+test('v2 envelope: signer must have signed the domain-separated message', () => {
+  const env = parasign.buildEnvelope({
+    documentHashHex: docHashHex,
+    signatureB64: signOver(parasign.singleSignerMessage(docHashHex)), // correct v2 signer sig
+    signerPubB64: Buffer.from('signer-pub').toString('base64'),
+    signerLabel: 'tester', ttlDays: 365, ctLogIndex: 1, version: '2',
+  }, deps);
   assert.equal(env.version, '2');
   const r = parasign.verifyEnvelope({ envelope: env, documentHashHex: docHashHex }, deps);
   assert.equal(r.valid, true, JSON.stringify(r.errors));
 });
 
-test('legacy v1 (bare-hash) envelope still verifies', () => {
-  const signerKp = ml_dsa65.keygen(crypto.randomBytes(32));
-  const sig = ml_dsa65.sign(Buffer.from(docHashHex, 'hex'), signerKp.secretKey); // bare hash
+test('legacy v1 envelope (signer signed the bare hash) still verifies', () => {
   const env = parasign.buildEnvelope({
     documentHashHex: docHashHex,
-    signatureB64: Buffer.from(sig).toString('base64'),
-    signerPubB64: Buffer.from(signerKp.publicKey).toString('base64'),
+    signatureB64: signOver(Buffer.from(docHashHex, 'hex')), // bare-hash signer sig
+    signerPubB64: Buffer.from('signer-pub').toString('base64'),
     signerLabel: 'legacy', ttlDays: 365, ctLogIndex: 0, version: '1',
   }, deps);
   assert.equal(env.version, '1');
@@ -63,15 +65,11 @@ test('legacy v1 (bare-hash) envelope still verifies', () => {
 });
 
 test('cross-protocol replay: a signature over an unrelated 32-byte value is NOT a valid v2 envelope', () => {
-  // Attacker signs some unrelated 32-byte message (e.g. a co-sign digest) and
-  // tries to pass it off as a v2 single-signer signature over docHashHex.
-  const signerKp = ml_dsa65.keygen(crypto.randomBytes(32));
-  const unrelated = sha3(Buffer.from('a multi-party co-sign digest')); // 32 bytes
-  const sig = ml_dsa65.sign(unrelated, signerKp.secretKey);
+  const unrelated = crypto.createHash('sha3-256').update(Buffer.from('a multi-party co-sign digest')).digest();
   const env = parasign.buildEnvelope({
-    documentHashHex: docHashHex, // claims to be over docHashHex
-    signatureB64: Buffer.from(sig).toString('base64'),
-    signerPubB64: Buffer.from(signerKp.publicKey).toString('base64'),
+    documentHashHex: docHashHex,                 // claims to be over docHashHex...
+    signatureB64: signOver(unrelated),           // ...but the signer signed `unrelated`
+    signerPubB64: Buffer.from('attacker-pub').toString('base64'),
     signerLabel: 'attacker', ttlDays: 365, ctLogIndex: 2, version: '2',
   }, deps);
   const r = parasign.verifyEnvelope({ envelope: env }, deps);
@@ -79,12 +77,25 @@ test('cross-protocol replay: a signature over an unrelated 32-byte value is NOT 
   assert.ok(r.errors.some(e => /signer signature invalid/.test(e)), JSON.stringify(r.errors));
 });
 
-test('a v2 signature does not verify if relabelled as v1 (and vice versa)', () => {
-  const signerKp = ml_dsa65.keygen(crypto.randomBytes(32));
-  const env = buildV2(signerKp);
-  const downgraded = Object.assign({}, env, { version: '1' }); // tamper version
-  const r = parasign.verifyEnvelope({ envelope: downgraded }, deps);
-  // notary signature also breaks (version is inside the signed body), but the
-  // signer signature must independently fail too — the message bytes differ.
+test('a bare-hash signature does NOT verify as a v2 envelope (the closed attack)', () => {
+  const env = parasign.buildEnvelope({
+    documentHashHex: docHashHex,
+    signatureB64: signOver(Buffer.from(docHashHex, 'hex')), // bare-hash sig...
+    signerPubB64: Buffer.from('signer-pub').toString('base64'),
+    signerLabel: 'downgrade', ttlDays: 365, ctLogIndex: 3, version: '2', // ...labelled v2
+  }, deps);
+  const r = parasign.verifyEnvelope({ envelope: env }, deps);
   assert.equal(r.valid, false);
+  assert.ok(r.errors.some(e => /signer signature invalid/.test(e)), JSON.stringify(r.errors));
+});
+
+test('unsupported envelope version is rejected', () => {
+  const env = parasign.buildEnvelope({
+    documentHashHex: docHashHex, signatureB64: signOver(parasign.singleSignerMessage(docHashHex)),
+    signerPubB64: Buffer.from('p').toString('base64'), ttlDays: 365, ctLogIndex: 4, version: '2',
+  }, deps);
+  const tampered = Object.assign({}, env, { version: '9' });
+  const r = parasign.verifyEnvelope({ envelope: tampered }, deps);
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some(e => /unsupported envelope version/.test(e)), JSON.stringify(r.errors));
 });
