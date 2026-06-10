@@ -29,12 +29,16 @@ const BASE_PATH   = (process.env.BASE_PATH || '').replace(/\/$/, '');
 // every Object.keys(SECTORS) iteration in this file; add a sector here and
 // the rest follows. findUserByEmail() stays health-only on purpose: health
 // is the canonical admin-UI source and the lookup is hot-path.
+// Fallback ports are the container-internal listener, which is :3000 for
+// every sector (docker-compose.yml). The :3001-:3005 numbers exist only as
+// host-side port mappings and are unreachable on the compose network, so a
+// missing RELAY_* env would silently point the admin at a dead port.
 const SECTORS = {
   main:    process.env.RELAY_MAIN    || 'http://relay-main:3000',
-  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3005',
-  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3002',
-  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3003',
-  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3004',
+  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3000',
+  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3000',
+  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3000',
+  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3000',
 };
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
