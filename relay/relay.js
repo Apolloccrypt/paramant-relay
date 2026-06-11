@@ -1481,25 +1481,22 @@ function mnemonicToLookupHash(phrase) {
 }
 
 // ── Merkle audit chain ────────────────────────────────────────────────────────
-// Elke entry bevat hash van vorige entry — tamper-evident log
+// Tamper-evident log. chain_hash commits to EVERY field of the entry except
+// itself (canonical encoding, see relay/lib/audit-chain.js). The old preimage
+// covered only {ts,event,hash,bytes,prev_hash} so the richer fields (device,
+// views_left, sig, sig-validity) were unprotected, and verifyChain never
+// recomputed the hash at all — chain_valid was a false assurance (#19).
+const { auditEntryHash, verifyChain } = require('./lib/audit-chain');
+
 function auditAppend(key, event, data = {}) {
   if (!key) return;
   if (!auditChain.has(key)) auditChain.set(key, []);
   const chain    = auditChain.get(key);
   const prevHash = chain.length > 0 ? chain[chain.length - 1].chain_hash : '0'.repeat(64);
   const entry    = { ts: new Date().toISOString(), event, prev_hash: prevHash, ...data };
-  const entryStr = JSON.stringify({ ts: entry.ts, event, hash: data.hash||'', bytes: data.bytes||0, prev_hash: prevHash });
-  entry.chain_hash = crypto.createHash('sha3-256').update(entryStr).digest('hex');
+  entry.chain_hash = auditEntryHash(entry);
   chain.push(entry);
   if (chain.length > MAX_AUDIT) chain.shift();
-}
-
-function verifyChain(entries) {
-  // Verifieer integriteit van de audit chain
-  for (let i = 1; i < entries.length; i++) {
-    if (entries[i].prev_hash !== entries[i-1].chain_hash) return false;
-  }
-  return true;
 }
 
 // ── ML-DSA handtekening verificatie ──────────────────────────────────────────
