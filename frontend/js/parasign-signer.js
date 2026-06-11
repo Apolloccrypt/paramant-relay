@@ -77,6 +77,25 @@ export async function resolvePasskeySigningKey() {
   return { vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16) };
 }
 
+// One WebAuthn get() with PRF, portable across engines. Chromium + Gecko REQUIRE
+// prf.evalByCredential (keyed by the base64url credential id) whenever
+// allowCredentials is non-empty, or no PRF result comes back. WebKit (Safari)
+// is the mirror image: its PRF implementation only knows `eval` and throws
+// (NotSupportedError / SyntaxError / TypeError, before any UI is shown) as soon
+// as evalByCredential is present. So: try the full request first, and on such a
+// parse/support error retry ONCE with eval only — same salt, so the PRF output
+// is byte-identical either way. NotAllowedError (cancel/timeout) is never retried.
+async function getAssertionWithPrf(publicKey, prfExt) {
+  try {
+    return await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: prfExt } } });
+  } catch (e) {
+    const parseErr = e && (e.name === 'NotSupportedError' || e.name === 'SyntaxError' || e.name === 'TypeError');
+    if (!parseErr || !prfExt || !prfExt.evalByCredential) throw e;
+    const evalOnly = { eval: prfExt.eval || Object.values(prfExt.evalByCredential)[0] };
+    return await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: evalOnly } } });
+  }
+}
+
 // Reproduce the PRF output by running a WebAuthn get() with the SAME salt that
 // was stored in the wrap at enrol (PRF output is deterministic per
 // (credential, salt), independent of the challenge).
@@ -87,15 +106,12 @@ async function evalPrf({ rpId, credentialIdB64url, prfSaltB64url }) {
   // yields NO prf result there (and on WebKit once >1 passkey is offered). Send
   // both: evalByCredential (used when the credential matches) + eval (fallback),
   // same salt either way so the PRF output is identical to enrol time.
-  const assertion = await navigator.credentials.get({
-    publicKey: {
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rpId,
-      allowCredentials: [{ type: 'public-key', id: b64urlToBytes(credentialIdB64url) }],
-      userVerification: 'required',
-      extensions: { prf: { eval: { first: saltBytes }, evalByCredential: { [credentialIdB64url]: { first: saltBytes } } } },
-    },
-  });
+  const assertion = await getAssertionWithPrf({
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rpId,
+    allowCredentials: [{ type: 'public-key', id: b64urlToBytes(credentialIdB64url) }],
+    userVerification: 'required',
+  }, { eval: { first: saltBytes }, evalByCredential: { [credentialIdB64url]: { first: saltBytes } } });
   const first = assertion.getClientExtensionResults()?.prf?.results?.first;
   if (!first) throw new Error('passkey returned no PRF result (PRF unsupported on this authenticator)');
   return new Uint8Array(first);
@@ -283,20 +299,17 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       prfExt.evalByCredential = {};
       for (const c of allowList) prfExt.evalByCredential[c.id] = { first: prfSalt };
     }
-    const cred = await navigator.credentials.get({
-      publicKey: {
-        challenge: b64urlToBytes(opt.options.challenge),
-        rpId,
-        allowCredentials: allowList.map((c) => ({
-          type: 'public-key',
-          id: b64urlToBytes(c.id),
-          ...(c.transports ? { transports: c.transports } : {}),
-        })),
-        userVerification: 'required',
-        timeout: opt.options.timeout || 60000,
-        extensions: { prf: prfExt },
-      },
-    });
+    const cred = await getAssertionWithPrf({
+      challenge: b64urlToBytes(opt.options.challenge),
+      rpId,
+      allowCredentials: allowList.map((c) => ({
+        type: 'public-key',
+        id: b64urlToBytes(c.id),
+        ...(c.transports ? { transports: c.transports } : {}),
+      })),
+      userVerification: 'required',
+      timeout: opt.options.timeout || 60000,
+    }, prfExt);
     const prfFirst = cred.getClientExtensionResults()?.prf?.results?.first;
     if (!prfFirst) {
       const err = new Error('This passkey can’t produce a PRF result. Use a device/browser with passkey-PRF (iOS 18+, a recent Chrome/Edge, or a PRF-capable security key).');

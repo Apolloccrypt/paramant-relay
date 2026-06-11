@@ -7,7 +7,7 @@
 // (parasign-signer.js) — the EXACT path /sign and /co-sign use — so this file
 // just wires the button + status and can never drift from the sign flow.
 // Self-hosted deps only (CSP script-src 'self'); no-ops if the button is absent.
-import { ensureSigningKey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=5';
+import { ensureSigningKey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=6';
 
 function wireSigningEnrol() {
   const btn = document.getElementById('signing-enrol-btn');
