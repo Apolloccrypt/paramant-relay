@@ -389,6 +389,19 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
       </div>
     </div>
     <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
+    <!-- Passphrase fallback: shown only when the account's passkey provider can't
+         do WebAuthn-PRF (e.g. Proton Pass). The passkey still proves the account;
+         this passphrase protects the local signing key in place of the PRF. -->
+    <div id="en-pass-panel" class="acct-field" hidden style="margin-top:12px">
+      <p id="en-pass-prompt" class="small" style="margin-bottom:8px"></p>
+      <input type="password" id="en-pass-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Signing passphrase" aria-label="Signing passphrase">
+      <input type="password" id="en-pass-input2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Confirm passphrase" aria-label="Confirm signing passphrase" hidden style="margin-top:8px">
+      <p id="en-pass-err" class="small" hidden style="color:var(--danger,#b91c1c);margin-top:8px"></p>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button type="button" class="btn btn-small" id="en-pass-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary btn-small" id="en-pass-confirm">Continue</button>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -778,7 +791,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js?v=3"></script>
-<script type="module" src="/js/signing-enrol.js?v=11"></script>
+<script type="module" src="/js/signing-enrol.js?v=12"></script>
 
 </body>
 </html>
