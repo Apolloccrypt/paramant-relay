@@ -668,7 +668,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </script>
 
 <script type="module">
-import { vaultAvailable, vaultList } from '/vendor/vault.js?v=2';
+import { vaultAvailable, vaultList } from '/vendor/vault.js?v=3';
 
 const escHtml = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -778,7 +778,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js?v=3"></script>
-<script type="module" src="/js/signing-enrol.js?v=10"></script>
+<script type="module" src="/js/signing-enrol.js?v=11"></script>
 
 </body>
 </html>

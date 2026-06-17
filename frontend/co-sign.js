@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase, assertStrongPassphrase } from '/js/parasign-signer.js?v=8';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase, assertStrongPassphrase } from '/js/parasign-signer.js?v=9';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -428,9 +428,12 @@ async function doSign() {
     $('done-pk').textContent = __signKey.fingerprint;
     showStep('step-done');
   } catch (e) {
+    // Reset the cached passphrase so a wrong entry is never silently reused on the
+    // next attempt (the unlock prompt re-appears). __signKey stays cached.
+    __signPassphrase = null;
     let msg;
     if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link — your sign-in passkey becomes your signing key.';
-    else if (e && (e.code === 'no_prf' || e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
+    else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.';
     else if (e && e.status === 401) msg = 'Your session expired. Sign in again as the invited recipient, then retry.';
     else if (e && e.status === 403) msg = 'This invite is bound to a different email address. Sign in with the address the invite was sent to.';
