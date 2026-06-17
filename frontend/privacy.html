@@ -5,15 +5,15 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy Policy — PARAMANT</title>
-<meta name="description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
+<meta name="description" content="PARAMANT privacy policy. Minimal data: an email to run your account; the encrypted file relay stays RAM-only and burn-on-read. EU/Germany hosting, no trackers, no ads.">
 <meta property="og:title" content="Privacy Policy · PARAMANT">
-<meta property="og:description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
+<meta property="og:description" content="PARAMANT privacy policy. Minimal data: an email to run your account; the encrypted file relay stays RAM-only and burn-on-read. EU/Germany hosting, no trackers, no ads.">
 <meta property="og:url" content="https://paramant.app/privacy">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Privacy Policy · PARAMANT">
-<meta name="twitter:description" content="PARAMANT privacy policy. No personal data collected. RAM-only storage. GDPR/EU. No US CLOUD Act.">
+<meta name="twitter:description" content="PARAMANT privacy policy. Minimal data: an email to run your account; the encrypted file relay stays RAM-only and burn-on-read. EU/Germany hosting, no trackers, no ads.">
 <link rel="canonical" href="https://paramant.app/privacy">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -280,15 +280,15 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: May 30, 2026</p>
+<p class="updated">Last updated: June 17, 2026</p>
 
 <h2>Core principle</h2>
-<p><strong>PARAMANT collects only what is strictly required to operate your account.</strong></p>
-<p>An email address is required to create an account and recover access. No phone number. No IP logging (beyond what Cloudflare handles in transit). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements.</p>
+<p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling; an IP is processed only transiently, for security and abuse-prevention (rate limiting, the session record, an audit log, and the DPA signature record). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
 <h2>How Ghost Pipe &amp; ParaShare work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. The only data persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext.</p>
+<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
 <p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
 <h2>What we process</h2>
@@ -301,16 +301,21 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
 <tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
 <tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
+<tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend) for messages we send you</td></tr>
+<tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
+<tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
+<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Stripe) once billing is enabled</td></tr>
+<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Transient (session/rate-limit TTL; audit log volume-capped)</td><td>Never</td></tr>
 </tbody>
 </table>
 
 <h2>What we never do</h2>
 <ul>
-<li>Store personal data of any kind</li>
-<li>Log or store IP addresses beyond what Cloudflare handles in transit</li>
+<li>Sell your data, or use it for advertising or profiling</li>
+<li>Log or store IP addresses for analytics or profiling (an IP is used only transiently, for security and abuse-prevention)</li>
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
-<li>Share any data with third parties</li>
+<li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments when enabled, listed below)</li>
 <li>Write file data to disk at any point</li>
 <li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
@@ -318,7 +323,7 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>No third-party requests</h2>
 <p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page: every request goes to one origin, and nowhere else.</p>
 <p>This is deliberate. A single request to a third party leaks your IP address and the page you are viewing to that party before you have agreed to anything. So we self-host everything: fonts (a plain system font stack, zero font files downloaded), scripts, styles, and images all come from paramant.app.</p>
-<p>Two parties remain in the path and are operational rather than tracking: Cloudflare terminates TLS and absorbs DDoS <em>in transit</em> (see below), and our payment processor handles Pro/Enterprise billing on its own pages. Neither is loaded into the site, and neither follows you across it.</p>
+<p>What runs the service is operational, never tracking: our own edge (Caddy) terminates TLS directly on our server (see below); transactional email is sent server-side via our email provider; and a payment processor will handle billing on its own pages once that is enabled. None of these is loaded into the site, and none follows you across it.</p>
 
 <h2>Local storage in your browser</h2>
 <p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
@@ -328,21 +333,26 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>): today's date and upload count, used to enforce the 10/day limit client-side</li>
 <li><strong>Docs access key</strong> (<code>pm_docs_key</code>): stored if you authenticate to the Docs with a paid API key</li>
 <li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
-<li><strong>ParaSign signing vault</strong> (IndexedDB): if you use in-browser signing, your signing key is encrypted with PBKDF2 + AES-GCM and kept in your browser&rsquo;s IndexedDB. It never leaves your device.</li>
+<li><strong>ParaSign signing vault</strong> (IndexedDB): if you sign documents, your post-quantum signing key (ML-DSA-65) is generated and kept in your browser&rsquo;s IndexedDB, encrypted either with your passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) or, if your passkey provider cannot do that, with a passphrase (PBKDF2 &rarr; AES-256-GCM). The private key never leaves your device; only its public half is registered to your account.</li>
 </ul>
 <p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
 
 <h2>Servers &amp; jurisdiction</h2>
 <p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Frankfurt, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. No CLOUD Act exposure. All data is subject to EU/GDPR jurisdiction only.</p>
 
-<h2>Cloudflare</h2>
-<p>Incoming traffic passes through a <strong>Cloudflare Tunnel</strong> for DDoS protection and SSL termination. Cloudflare acts as a reverse proxy and may log connection metadata (IP address, timestamp, bytes transferred) in accordance with their own privacy policy. PARAMANT does not receive, store, or use this metadata. No Cloudflare analytics, Workers, or tracking products are in use.</p>
+<h2>Network edge</h2>
+<p>TLS is terminated by <strong>our own edge (Caddy)</strong>, running on the same Hetzner infrastructure in Germany, with post-quantum key exchange. There is no third-party reverse proxy or CDN in front of the site: your connection reaches our server and nowhere else. Short-lived connection metadata (IP, timestamp) is processed transiently for security and abuse-prevention as described above, never for analytics.</p>
 
-<h2>Payments (Pro / Enterprise)</h2>
-<p>Payment processing is handled by <strong>Stripe</strong>. PARAMANT never sees or stores full card numbers. Stripe's privacy policy governs the payment data they handle. Only your chosen plan and an anonymised customer reference are stored on our side.</p>
+<h2>Subprocessors</h2>
+<p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking:</p>
+<ul>
+<li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
+<li><strong>Resend</strong>: transactional email only (account verification, signing invites, billing notices). It receives the recipient address and the message we send; it is never used for marketing.</li>
+<li><strong>Stripe</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Stripe handles card data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
+</ul>
 
 <h2>GDPR / AVG</h2>
-<p>Because virtually no personal data is processed, standard heavy administrative obligations under GDPR do not apply to most interactions. For Pro and Enterprise customers, we provide a <strong>Data Processing Agreement (DPA)</strong> on request.</p>
+<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. For Pro and Enterprise customers we provide a <strong>Data Processing Agreement (DPA)</strong>.</p>
 <p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Free, 24 hours for Pro, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
 
 <h2>Children</h2>
