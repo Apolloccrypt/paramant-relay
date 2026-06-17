@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=6';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=7';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -1141,11 +1141,18 @@ async function doSign() {
     showDone();
   } catch (e) {
     $('ds-sign-status').className = 'ds-banner err';
-    let msg = (e && e.message) ? e.message : String(e);
+    // Map to an actionable message. A passkey/provider error (e.g. Firefox's
+    // opaque "AuthenticatorError" from a PRF assertion) has no e.status/e.code,
+    // so it lands in the final else with a recovery path — never the raw engine
+    // string, which leaked before and read as a crash to the user.
+    let msg;
     if (e && e.status === 401) msg = 'Please sign in to sign documents. Open /auth/login, then return here.';
     else if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then sign — your sign-in passkey becomes your signing key.';
     else if (e && (e.code === 'no_prf' || e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.';
+    else if (e && (e.status === 403 || e.status === 409 || e.status === 410)) msg = 'That signing authorization was already used or has expired. Tap Sign now to start a fresh one.';
+    else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
+    else msg = 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';
     $('ds-sign-status').textContent = msg;
     $('ds-sign-now').disabled = false;
   }

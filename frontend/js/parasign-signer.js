@@ -77,23 +77,64 @@ export async function resolvePasskeySigningKey() {
   return { vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16) };
 }
 
-// One WebAuthn get() with PRF, portable across engines. Chromium + Gecko REQUIRE
-// prf.evalByCredential (keyed by the base64url credential id) whenever
-// allowCredentials is non-empty, or no PRF result comes back. WebKit (Safari)
-// is the mirror image: its PRF implementation only knows `eval` and throws
-// (NotSupportedError / SyntaxError / TypeError, before any UI is shown) as soon
-// as evalByCredential is present. So: try the full request first, and on such a
-// parse/support error retry ONCE with eval only — same salt, so the PRF output
-// is byte-identical either way. NotAllowedError (cancel/timeout) is never retried.
-async function getAssertionWithPrf(publicKey, prfExt) {
+// One WebAuthn get() with PRF, portable across ALL engines. The PRF extension
+// shape that actually works differs by engine, and there is no capability flag
+// to read up front:
+//   • Chromium needs prf.evalByCredential (keyed by the base64url credential id)
+//     when allowCredentials has more than one entry, or it returns NO prf result.
+//   • Firefox (Gecko) and Safari (WebKit) reject evalByCredential — Firefox
+//     surfaces it as an opaque, post-UI "AuthenticatorError" (a rejected get()),
+//     Safari as a synchronous NotSupportedError/SyntaxError/TypeError — and both
+//     understand a plain `eval`.
+// So we send the shape the RUNNING engine prefers FIRST (no wasted prompt in the
+// common case) and keep the other as a fallback. We advance to the next shape on
+// ANY failure that is not a genuine user cancel/timeout, AND when a get() resolves
+// but carries no prf result (a mis-detected engine). The salt is identical in
+// every shape, so the derived PRF output is byte-identical regardless of which
+// shape ultimately succeeds — unlock stays deterministic. NotAllowedError and
+// AbortError (cancel/timeout) are final: re-prompting a user who backed out is
+// pointless and hostile, so they are never retried.
+function _isChromiumEngine() {
   try {
-    return await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: prfExt } } });
-  } catch (e) {
-    const parseErr = e && (e.name === 'NotSupportedError' || e.name === 'SyntaxError' || e.name === 'TypeError');
-    if (!parseErr || !prfExt || !prfExt.evalByCredential) throw e;
-    const evalOnly = { eval: prfExt.eval || Object.values(prfExt.evalByCredential)[0] };
-    return await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: evalOnly } } });
+    const brands = navigator.userAgentData && navigator.userAgentData.brands;
+    if (Array.isArray(brands)) return brands.some((b) => /Chrom|Edge|Opera/i.test((b && b.brand) || ''));
+  } catch { /* userAgentData unavailable — fall through to UA sniff */ }
+  try { return /Chrom(e|ium)\//.test(navigator.userAgent || ''); } catch { return false; }
+}
+function _prfFirstOf(assertion) {
+  try { return assertion && assertion.getClientExtensionResults && assertion.getClientExtensionResults()?.prf?.results?.first; }
+  catch { return undefined; }
+}
+async function getAssertionWithPrf(publicKey, prfExt) {
+  const hasByCred = !!(prfExt && prfExt.evalByCredential);
+  const evalOnly = (prfExt && prfExt.eval)
+    ? { eval: prfExt.eval }
+    : (hasByCred ? { eval: Object.values(prfExt.evalByCredential)[0] } : prfExt);
+  // Order the attempts by the running engine's preferred PRF shape. With nothing
+  // to vary (no evalByCredential), there is a single attempt.
+  const order = !hasByCred ? [prfExt]
+    : (_isChromiumEngine() ? [prfExt, evalOnly] : [evalOnly, prfExt]);
+
+  let lastErr = null, lastResolved = null;
+  for (let i = 0; i < order.length; i++) {
+    const ext = order[i];
+    if (!ext) continue;
+    let assertion;
+    try {
+      assertion = await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: ext } } });
+    } catch (e) {
+      if (e && (e.name === 'NotAllowedError' || e.name === 'AbortError')) throw e;   // real cancel/timeout — final
+      lastErr = e;                                                                    // else: try the next shape
+      continue;
+    }
+    if (_prfFirstOf(assertion)) return assertion;   // got the PRF result — done (the common 1-prompt path)
+    lastResolved = assertion;                        // resolved without PRF — try the other shape if any
   }
+  // Every shape either threw (non-cancel) or produced no PRF. Prefer a resolved
+  // assertion so the caller raises the clear "no PRF result" message; otherwise
+  // re-throw the last real error for the caller's error mapping.
+  if (lastResolved) return lastResolved;
+  throw lastErr;
 }
 
 // Reproduce the PRF output by running a WebAuthn get() with the SAME salt that
@@ -101,11 +142,11 @@ async function getAssertionWithPrf(publicKey, prfExt) {
 // (credential, salt), independent of the challenge).
 async function evalPrf({ rpId, credentialIdB64url, prfSaltB64url }) {
   const saltBytes = b64urlToBytes(prfSaltB64url);
-  // WebAuthn-PRF with a non-empty allowCredentials REQUIRES evalByCredential
-  // (keyed by the base64url credential id) on Chromium + Gecko; a plain `eval`
-  // yields NO prf result there (and on WebKit once >1 passkey is offered). Send
-  // both: evalByCredential (used when the credential matches) + eval (fallback),
-  // same salt either way so the PRF output is identical to enrol time.
+  // Build BOTH PRF shapes (evalByCredential keyed by the base64url credential id,
+  // and a plain eval) with the SAME salt. getAssertionWithPrf() then picks the
+  // shape the running engine accepts (Chromium wants evalByCredential; Firefox
+  // and Safari want eval) and falls back to the other. Same salt either way, so
+  // the PRF output is byte-identical to enrol time and the unlock stays deterministic.
   const assertion = await getAssertionWithPrf({
     challenge: crypto.getRandomValues(new Uint8Array(32)),
     rpId,
@@ -288,12 +329,13 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     const prfSalt = crypto.getRandomValues(new Uint8Array(16));
     say('Confirm with Face ID / Touch ID / your security key…');
     const allowList = (opt.options.allowCredentials || []);
-    // WebAuthn-PRF with a non-empty allowCredentials needs evalByCredential
-    // (per-credential, keyed by the base64url id) on Chromium + Gecko — and on
-    // WebKit as soon as more than one passkey is offered — or NO prf result
-    // comes back (the "can't produce a PRF result" dead end). Same salt for
-    // every credential; whichever the user picks yields that credential's PRF,
-    // and we wrap with exactly that. eval stays as a single-credential fallback.
+    // Build BOTH PRF shapes with one shared salt: a per-credential evalByCredential
+    // map (keyed by each passkey's base64url id, which Chromium needs when several
+    // are offered) plus a plain eval (which Firefox and Safari accept).
+    // getAssertionWithPrf() sends the shape the running engine prefers and falls
+    // back to the other, so the user's chosen credential yields its PRF on every
+    // engine. Same salt for every credential; whichever the user picks yields that
+    // credential's PRF and we wrap with exactly that.
     const prfExt = { eval: { first: prfSalt } };
     if (allowList.length) {
       prfExt.evalByCredential = {};
