@@ -5,7 +5,10 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList } from '/vendor/vault.js?v=3';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultUnlock, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList, assertStrongPassphrase } from '/vendor/vault.js?v=3';
+
+// Re-exported so the sign UIs can strength-check a new passphrase before enrol.
+export { assertStrongPassphrase };
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -56,44 +59,44 @@ export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash
   ]));
 }
 
-// v3-only signing-key resolution — the SINGLE definition of "what a signing key
-// is", shared by /sign (self-sign) and /co-sign (recipient). The signing key is
-// the account's passkey-protected ML-DSA-65 key in the vault. We read its PUBLIC
-// half (pk_b64/pk_hash) from vault metadata WITHOUT unlocking; the secret is only
-// unlocked by the per-document passkey-PRF activation (LocalVaultSigner.activate,
-// the explicit step-2 action). No ephemeral/file/passphrase key source. If no
-// passkey signing key is enrolled, this throws with code 'no_signing_passkey' so
-// the caller can branch to the TOFU enrol sub-step (stuk 2 UI / enrolSigningPasskey).
+// v3 signing-key resolution — the SINGLE definition of "what a signing key is",
+// shared by /sign (self-sign) and /co-sign (recipient). The signing key is the
+// account's ML-DSA-65 key in the vault, unlocked either by the passkey's PRF
+// (one tap, preferred) or by a passphrase (the fallback for passkey providers
+// without PRF, e.g. some password managers). We read its PUBLIC half
+// (pk_b64/pk_hash) from vault metadata WITHOUT unlocking, plus which KEK sources
+// it has so the caller knows whether to do a one-tap PRF unlock or to ask for the
+// passphrase. If no signing key is enrolled, throws code 'no_signing_passkey'.
 export async function resolvePasskeySigningKey() {
   if (!(await vaultAvailable())) throw new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
   const keys = await vaultList();
-  const usable = keys.filter((k) => (k.kekSources || []).includes('webauthn-prf'));
+  const usable = keys.filter((k) => (k.kekSources || []).some((s) => s === 'webauthn-prf' || s === 'passphrase'));
   if (usable.length === 0) {
-    const e = new Error('No passkey signing key on this device yet. Enrol a passkey for signing first.');
+    const e = new Error('No signing key on this device yet. Set one up when you sign.');
     e.code = 'no_signing_passkey';
     throw e;
   }
-  const k = usable[0];   // single signing identity for now
-  return { vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16) };
+  // Prefer a PRF-capable key (one tap) over a passphrase-only one.
+  const k = usable.find((x) => (x.kekSources || []).includes('webauthn-prf')) || usable[0];
+  const sources = k.kekSources || [];
+  return {
+    vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16),
+    kekSources: sources, hasPrf: sources.includes('webauthn-prf'), hasPassphrase: sources.includes('passphrase'),
+  };
 }
 
-// One WebAuthn get() with PRF, portable across ALL engines. The PRF extension
-// shape that actually works differs by engine, and there is no capability flag
-// to read up front:
+// One WebAuthn get() with PRF, portable across engines. The PRF extension shape
+// that works differs by engine and there is no capability flag to read up front:
 //   • Chromium needs prf.evalByCredential (keyed by the base64url credential id)
-//     when allowCredentials has more than one entry, or it returns NO prf result.
-//   • Firefox (Gecko) and Safari (WebKit) reject evalByCredential — Firefox
-//     surfaces it as an opaque, post-UI "AuthenticatorError" (a rejected get()),
-//     Safari as a synchronous NotSupportedError/SyntaxError/TypeError — and both
-//     understand a plain `eval`.
-// So we send the shape the RUNNING engine prefers FIRST (no wasted prompt in the
-// common case) and keep the other as a fallback. We advance to the next shape on
-// ANY failure that is not a genuine user cancel/timeout, AND when a get() resolves
-// but carries no prf result (a mis-detected engine). The salt is identical in
-// every shape, so the derived PRF output is byte-identical regardless of which
-// shape ultimately succeeds — unlock stays deterministic. NotAllowedError and
-// AbortError (cancel/timeout) are final: re-prompting a user who backed out is
-// pointless and hostile, so they are never retried.
+//     when allowCredentials has more than one entry, or it returns no prf result.
+//   • Firefox (Gecko) and Safari (WebKit) understand a plain `eval`; evalByCredential
+//     makes WebKit throw a synchronous NotSupportedError/SyntaxError/TypeError.
+// So we lead with the shape the RUNNING engine prefers (one prompt in the common
+// case). We retry the other shape ONLY on those synchronous parse errors, which
+// are thrown BEFORE any UI (free, no extra prompt). A cancel/timeout, or a post-UI
+// authenticator/provider failure (e.g. a passkey manager with no PRF extension
+// that engages then errors), is NOT retried — re-prompting is pointless; the
+// caller detects the failure and falls back to a passphrase-protected key.
 function _isChromiumEngine() {
   try {
     const brands = navigator.userAgentData && navigator.userAgentData.brands;
@@ -101,40 +104,20 @@ function _isChromiumEngine() {
   } catch { /* userAgentData unavailable — fall through to UA sniff */ }
   try { return /Chrom(e|ium)\//.test(navigator.userAgent || ''); } catch { return false; }
 }
-function _prfFirstOf(assertion) {
-  try { return assertion && assertion.getClientExtensionResults && assertion.getClientExtensionResults()?.prf?.results?.first; }
-  catch { return undefined; }
-}
 async function getAssertionWithPrf(publicKey, prfExt) {
   const hasByCred = !!(prfExt && prfExt.evalByCredential);
   const evalOnly = (prfExt && prfExt.eval)
     ? { eval: prfExt.eval }
     : (hasByCred ? { eval: Object.values(prfExt.evalByCredential)[0] } : prfExt);
-  // Order the attempts by the running engine's preferred PRF shape. With nothing
-  // to vary (no evalByCredential), there is a single attempt.
-  const order = !hasByCred ? [prfExt]
-    : (_isChromiumEngine() ? [prfExt, evalOnly] : [evalOnly, prfExt]);
-
-  let lastErr = null, lastResolved = null;
-  for (let i = 0; i < order.length; i++) {
-    const ext = order[i];
-    if (!ext) continue;
-    let assertion;
-    try {
-      assertion = await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: ext } } });
-    } catch (e) {
-      if (e && (e.name === 'NotAllowedError' || e.name === 'AbortError')) throw e;   // real cancel/timeout — final
-      lastErr = e;                                                                    // else: try the next shape
-      continue;
-    }
-    if (_prfFirstOf(assertion)) return assertion;   // got the PRF result — done (the common 1-prompt path)
-    lastResolved = assertion;                        // resolved without PRF — try the other shape if any
+  const primary   = (hasByCred && _isChromiumEngine()) ? prfExt : evalOnly;
+  const secondary = (primary === prfExt) ? evalOnly : prfExt;
+  try {
+    return await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: primary } } });
+  } catch (e) {
+    const parseErr = e && (e.name === 'NotSupportedError' || e.name === 'SyntaxError' || e.name === 'TypeError');
+    if (!parseErr || primary === secondary) throw e;   // cancel / post-UI failure: don't re-prompt
+    return await navigator.credentials.get({ publicKey: { ...publicKey, extensions: { prf: secondary } } });
   }
-  // Every shape either threw (non-cancel) or produced no PRF. Prefer a resolved
-  // assertion so the caller raises the clear "no PRF result" message; otherwise
-  // re-throw the last real error for the caller's error mapping.
-  if (lastResolved) return lastResolved;
-  throw lastErr;
 }
 
 // Reproduce the PRF output by running a WebAuthn get() with the SAME salt that
@@ -174,12 +157,23 @@ class ActivatedSigner {
 }
 
 export class LocalVaultSigner {
-  // ACTIVATION — the replaceable step. WebAuthn-PRF unlocks the vault key.
-  // Returns an ActivatedSigner; the caller signs exactly one document then
-  // calls dispose(). The PRF output (key-deriving material) is wiped here.
-  async activate({ vaultId, rpId }) {
+  // ACTIVATION — the replaceable step. Unlocks the vault's ML-DSA key for exactly
+  // one signature, then the caller disposes (zeroize). Two unlock sources:
+  //   • passphrase (when given): PBKDF2 -> AES-GCM unwrap, no WebAuthn.
+  //   • otherwise the passkey's PRF output (one tap).
+  // A passphrase-only key with no PRF wrap throws code 'need_passphrase' so the UI
+  // can ask for it and call again with { passphrase }.
+  async activate({ vaultId, rpId, passphrase } = {}) {
+    if (passphrase) {
+      const unlocked = await vaultUnlock(vaultId, passphrase);
+      return new ActivatedSigner(unlocked.secretKeyBytes, unlocked.pk_b64);
+    }
     const info = await vaultGetPrfWrapInfo(vaultId);
-    if (!info) throw new Error('no passkey-PRF wrap on this key — enrol a passkey first');
+    if (!info) {
+      const e = new Error('This signing key is protected by a passphrase on this browser.');
+      e.code = 'need_passphrase';
+      throw e;
+    }
     const prfOutput = await evalPrf({ rpId, credentialIdB64url: info.credentialId, prfSaltB64url: info.prfSalt });
     let unlocked;
     try {
@@ -341,21 +335,34 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       prfExt.evalByCredential = {};
       for (const c of allowList) prfExt.evalByCredential[c.id] = { first: prfSalt };
     }
-    const cred = await getAssertionWithPrf({
-      challenge: b64urlToBytes(opt.options.challenge),
-      rpId,
-      allowCredentials: allowList.map((c) => ({
-        type: 'public-key',
-        id: b64urlToBytes(c.id),
-        ...(c.transports ? { transports: c.transports } : {}),
-      })),
-      userVerification: 'required',
-      timeout: opt.options.timeout || 60000,
-    }, prfExt);
+    let cred;
+    try {
+      cred = await getAssertionWithPrf({
+        challenge: b64urlToBytes(opt.options.challenge),
+        rpId,
+        allowCredentials: allowList.map((c) => ({
+          type: 'public-key',
+          id: b64urlToBytes(c.id),
+          ...(c.transports ? { transports: c.transports } : {}),
+        })),
+        userVerification: 'required',
+        timeout: opt.options.timeout || 60000,
+      }, prfExt);
+    } catch (e) {
+      if (e && (e.name === 'NotAllowedError' || e.name === 'AbortError')) throw e;   // user cancelled / timed out
+      // The authenticator/provider engaged but could not complete a PRF assertion
+      // (e.g. a passkey manager like Proton Pass that implements passkeys but not
+      // the PRF extension). Signal the caller to fall back to a passphrase key.
+      const err = new Error('Your passkey provider can’t do the PRF unlock that one-tap signing needs.');
+      err.code = 'prf_unsupported'; err.cause = e;
+      throw err;
+    }
     const prfFirst = cred.getClientExtensionResults()?.prf?.results?.first;
     if (!prfFirst) {
-      const err = new Error('This passkey can’t produce a PRF result. Use a device/browser with passkey-PRF (iOS 18+, a recent Chrome/Edge, or a PRF-capable security key).');
-      err.code = 'no_prf';
+      // The assertion succeeded but produced no PRF result — same outcome: this
+      // passkey can't be a one-tap signing key. The caller falls back to a passphrase.
+      const err = new Error('This passkey doesn’t support the PRF extension that one-tap signing needs.');
+      err.code = 'prf_unsupported';
       throw err;
     }
     const prfOutput = new Uint8Array(prfFirst);
@@ -383,6 +390,79 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   }
 
   // Closed loop: resolve the way /sign does, proving the key is usable now.
+  return await resolvePasskeySigningKey();
+}
+
+// ── Passphrase-protected signing key — the fallback when the account's passkey
+// provider cannot do WebAuthn-PRF (e.g. a password manager such as Proton Pass
+// that implements passkeys but not the PRF extension). The passkey is STILL used
+// to prove account possession (a NORMAL step-up assertion, no PRF — exactly what
+// login does, so a non-PRF provider handles it); the local ML-DSA key is wrapped
+// with a user passphrase (PBKDF2 -> AES-256-GCM via vaultStore) instead of a PRF
+// KEK. Same account binding and same server route as the one-tap path; only the
+// local key-wrap differs. Signing later unlocks via LocalVaultSigner.activate
+// ({ passphrase }). Recovery floor is the passphrase, so it is enforced strong.
+export async function enrolSigningKeyWithPassphrase({ rpId, label, passphrase, onStatus } = {}) {
+  const say = (m) => { try { if (onStatus) onStatus(m); } catch { /* status is best-effort */ } };
+  assertStrongPassphrase(passphrase);   // fail closed on weak input (vaultStore re-checks)
+  if (!(await vaultAvailable())) {
+    const err = new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
+    err.code = 'vault_unavailable';
+    throw err;
+  }
+  rpId = rpId || location.hostname;
+
+  // 1) ML-DSA-65 keypair, generated + held only in the browser.
+  const seed = crypto.getRandomValues(new Uint8Array(32));
+  const kp = ml_dsa65.keygen(seed);
+  const pk_b64 = b64EncodeStd(kp.publicKey);
+  const pk_hash = toHex(sha3_256(kp.publicKey));
+  try {
+    // 2) Wrap the ML-DSA key with the passphrase locally (no PRF, no WebAuthn).
+    await vaultStore({ alg: 'ML-DSA-65', label: label || 'Signing key', pk_b64, pk_hash, secretKeyBytes: kp.secretKey, passphrase });
+
+    // 3) Prove account possession with a NORMAL passkey step-up (no PRF — this is
+    //    what login does, so a provider without PRF still handles it).
+    say('Confirm with your passkey to link this signing key…');
+    let opt;
+    try {
+      opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
+    } catch (e) {
+      if (e && e.status === 409 && e.data && e.data.error === 'no_passkey') {
+        const err = new Error('Add a passkey to your account first, then you can sign with it.');
+        err.code = 'no_passkey';
+        throw err;
+      }
+      throw e;
+    }
+    const allowList = (opt.options.allowCredentials || []);
+    const cred = await navigator.credentials.get({
+      publicKey: {
+        challenge: b64urlToBytes(opt.options.challenge),
+        rpId,
+        allowCredentials: allowList.map((c) => ({
+          type: 'public-key',
+          id: b64urlToBytes(c.id),
+          ...(c.transports ? { transports: c.transports } : {}),
+        })),
+        userVerification: 'required',
+        timeout: opt.options.timeout || 60000,
+      },
+    });
+
+    // 4) Bind the PUBLIC key to the account — same admin route as the one-tap path.
+    say('Linking your signing key to your account…');
+    await _postJSON('/api/user/account/signing-key/step-up/bind', {
+      flowId: opt.flowId,
+      response: _serializeAssertion(cred),
+      pk_b64,
+      label: label || 'Signing key',
+    });
+  } finally {
+    kp.secretKey.fill(0);   // zeroize the plaintext key
+  }
+
+  // Resolve the way /sign does, proving the key is usable now.
   return await resolvePasskeySigningKey();
 }
 

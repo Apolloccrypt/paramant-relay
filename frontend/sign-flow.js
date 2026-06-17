@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=7';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase, assertStrongPassphrase } from '/js/parasign-signer.js?v=8';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -53,6 +53,50 @@ const state = {
 const $ = id => document.getElementById(id);
 function show(id) { $(id).hidden = false; }
 function hide(id) { $(id).hidden = true; }
+
+// Passphrase prompt for the signing-key fallback (passkey providers without PRF).
+// Reveals the in-step panel and resolves with the entered passphrase, or null if
+// the user cancels. mode 'set' = create a new signing passphrase (two fields,
+// strength-checked); mode 'unlock' = enter an existing one (single field).
+function promptPassphrase(mode) {
+  return new Promise((resolve) => {
+    const panel = $('ds-pass-panel'), p1 = $('ds-pass-input'), p2 = $('ds-pass-input2');
+    const errEl = $('ds-pass-err'), promptEl = $('ds-pass-prompt');
+    const okBtn = $('ds-pass-confirm'), cancelBtn = $('ds-pass-cancel');
+    const setMode = mode === 'set';
+    promptEl.textContent = setMode
+      ? 'Your passkey provider can’t do the one-tap unlock signing uses, so set a signing passphrase. You enter it each time you sign on this browser. Keep it safe: it protects your signing key and cannot be reset.'
+      : 'Enter your signing passphrase to unlock your signing key.';
+    p1.value = ''; p2.value = '';
+    p1.placeholder = setMode ? 'New signing passphrase (min. 12 characters)' : 'Signing passphrase';
+    p2.hidden = !setMode;
+    errEl.hidden = true; errEl.textContent = '';
+    panel.hidden = false;
+    try { p1.focus(); } catch {}
+    const cleanup = () => {
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      p1.removeEventListener('keydown', onKey); p2.removeEventListener('keydown', onKey);
+      panel.hidden = true; p1.value = ''; p2.value = '';
+    };
+    const fail = (m) => { errEl.textContent = m; errEl.hidden = false; };
+    const onOk = () => {
+      const v1 = p1.value, v2 = p2.value;
+      if (setMode) {
+        try { assertStrongPassphrase(v1); } catch (e) { return fail(e.message || 'Passphrase too weak.'); }
+        if (v1 !== v2) return fail('The two passphrases don’t match.');
+      } else if (!v1) {
+        return fail('Enter your signing passphrase.');
+      }
+      cleanup(); resolve(v1);
+    };
+    const onCancel = () => { cleanup(); resolve(null); };
+    const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } };
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    p1.addEventListener('keydown', onKey); p2.addEventListener('keydown', onKey);
+  });
+}
 function setActive(stepId) {
   document.querySelectorAll('.ds-step').forEach(s => s.hidden = (s.id !== stepId));
   document.querySelectorAll('.ds-stepper li').forEach(li => {
@@ -1052,10 +1096,20 @@ async function doSign() {
     // its public half from vault metadata here (for the stamp fingerprint); the
     // secret is unlocked solely by the per-document PRF activation below.
     status('Locating your signing key...');
-    // Resolve the account's passkey signing key, or set one up inline with a
-    // single passkey tap (no passphrase, no TOTP) if this device has none yet —
-    // the sign-in passkey becomes the signing key. No /account detour.
-    const signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
+    // Resolve the account's signing key, or set one up inline. Happy path is one
+    // passkey tap (PRF). If the passkey provider can't do PRF (e.g. Proton Pass),
+    // ensureSigningKey throws prf_unsupported and we fall back to a passphrase-
+    // protected signing key — still bound to the account via the same passkey.
+    let signKey, signPassphrase = null;
+    try {
+      signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
+    } catch (e) {
+      if (!e || e.code !== 'prf_unsupported') throw e;
+      signPassphrase = await promptPassphrase('set');
+      if (signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
+      status('Setting up your signing key…');
+      signKey = await enrolSigningKeyWithPassphrase({ rpId: location.hostname, label: state.signer.name || 'Signing key', passphrase: signPassphrase, onStatus: status });
+    }
     const fingerprint = signKey.fingerprint;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
 
@@ -1097,7 +1151,13 @@ async function doSign() {
     const act = await requestSignActivation({ envelopeId: env.id, partyIndex: 0, docHash: docHashForEnvelope, inviteToken: myLink.invite_token });
 
     status('Confirm to sign (Face ID / Touch ID / security key)...');
-    const signer = await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
+    // PRF key: one tap. Passphrase key: unlock with the passphrase — reuse the one
+    // just set during enrol, or ask for it on an already-enrolled passphrase key.
+    if (!signKey.hasPrf && signPassphrase == null) {
+      signPassphrase = await promptPassphrase('unlock');
+      if (signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
+    }
+    const signer = await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname, passphrase: signKey.hasPrf ? undefined : signPassphrase });
     let sigB64;
     try {
       const message = buildDocSignMessage({ envelopeId: env.id, docHash: docHashForEnvelope, partyIndex: 0, emailHash: act.email_hash });
@@ -1150,6 +1210,9 @@ async function doSign() {
     else if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then sign — your sign-in passkey becomes your signing key.';
     else if (e && (e.code === 'no_prf' || e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.';
+    else if (e && e.code === 'cancelled') msg = 'Signing cancelled. Tap Sign now when you’re ready.';
+    else if (e && /wrong passphrase/i.test(e.message || '')) msg = 'That signing passphrase didn’t match. Tap Sign now and re-enter it.';
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passphrase')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign now to set or enter a signing passphrase instead.';
     else if (e && (e.status === 403 || e.status === 409 || e.status === 410)) msg = 'That signing authorization was already used or has expired. Tap Sign now to start a fresh one.';
     else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
     else msg = 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';
