@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "javascript-obfuscator": "^5.4.1",
+    "playwright": "^1.61.0",
     "terser": "^5.31.0"
   },
   "dependencies": {

@@ -1,0 +1,35 @@
+name: sign-e2e
+
+# Functional test of the ParaSign signing subsystem in real Chromium with a
+# WebAuthn virtual authenticator (tests/sign-full.test.mjs). Self-contained: it
+# serves frontend/ and stubs /api, so no backend/Redis is needed. Path-gated so it
+# only runs when the signing frontend (or the test) changes.
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - 'tests/sign-full.test.mjs'
+      - '.github/workflows/sign-e2e.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'tests/sign-full.test.mjs'
+      - '.github/workflows/sign-e2e.yml'
+
+jobs:
+  sign-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps (browsers installed separately)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run signing functional suite
+        run: node tests/sign-full.test.mjs

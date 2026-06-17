@@ -7,9 +7,6 @@
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
 import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultUnlock, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList, assertStrongPassphrase } from '/vendor/vault.js?v=3';
 
-// Re-exported so the sign UIs can strength-check a new passphrase before enrol.
-export { assertStrongPassphrase };
-
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
 export const SIGN_DOMAIN_DOC = 'paramant/parasign/doc/v1';

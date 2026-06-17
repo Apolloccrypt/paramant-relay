@@ -11,7 +11,8 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase, assertStrongPassphrase } from '/js/parasign-signer.js?v=9';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase } from '/js/parasign-signer.js?v=10';
+import { promptPassphrase } from '/js/passphrase-prompt.js?v=1';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -54,49 +55,6 @@ const $ = id => document.getElementById(id);
 function show(id) { $(id).hidden = false; }
 function hide(id) { $(id).hidden = true; }
 
-// Passphrase prompt for the signing-key fallback (passkey providers without PRF).
-// Reveals the in-step panel and resolves with the entered passphrase, or null if
-// the user cancels. mode 'set' = create a new signing passphrase (two fields,
-// strength-checked); mode 'unlock' = enter an existing one (single field).
-function promptPassphrase(mode) {
-  return new Promise((resolve) => {
-    const panel = $('ds-pass-panel'), p1 = $('ds-pass-input'), p2 = $('ds-pass-input2');
-    const errEl = $('ds-pass-err'), promptEl = $('ds-pass-prompt');
-    const okBtn = $('ds-pass-confirm'), cancelBtn = $('ds-pass-cancel');
-    const setMode = mode === 'set';
-    promptEl.textContent = setMode
-      ? 'Your passkey provider can’t do the one-tap unlock signing uses, so set a signing passphrase. You enter it each time you sign on this browser. Keep it safe: it protects your signing key and cannot be reset.'
-      : 'Enter your signing passphrase to unlock your signing key.';
-    p1.value = ''; p2.value = '';
-    p1.placeholder = setMode ? 'New signing passphrase (min. 12 characters)' : 'Signing passphrase';
-    p2.hidden = !setMode;
-    errEl.hidden = true; errEl.textContent = '';
-    panel.hidden = false;
-    try { p1.focus(); } catch {}
-    const cleanup = () => {
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
-      p1.removeEventListener('keydown', onKey); p2.removeEventListener('keydown', onKey);
-      panel.hidden = true; p1.value = ''; p2.value = '';
-    };
-    const fail = (m) => { errEl.textContent = m; errEl.hidden = false; };
-    const onOk = () => {
-      const v1 = p1.value, v2 = p2.value;
-      if (setMode) {
-        try { assertStrongPassphrase(v1); } catch (e) { return fail(e.message || 'Passphrase too weak.'); }
-        if (v1 !== v2) return fail('The two passphrases don’t match.');
-      } else if (!v1) {
-        return fail('Enter your signing passphrase.');
-      }
-      cleanup(); resolve(v1);
-    };
-    const onCancel = () => { cleanup(); resolve(null); };
-    const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', onCancel);
-    p1.addEventListener('keydown', onKey); p2.addEventListener('keydown', onKey);
-  });
-}
 function setActive(stepId) {
   document.querySelectorAll('.ds-step').forEach(s => s.hidden = (s.id !== stepId));
   document.querySelectorAll('.ds-stepper li').forEach(li => {
@@ -1105,7 +1063,7 @@ async function doSign() {
       signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
     } catch (e) {
       if (!e || e.code !== 'prf_unsupported') throw e;
-      signPassphrase = await promptPassphrase('set');
+      signPassphrase = await promptPassphrase('ds-pass', 'set');
       if (signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
       status('Setting up your signing key…');
       signKey = await enrolSigningKeyWithPassphrase({ rpId: location.hostname, label: state.signer.name || 'Signing key', passphrase: signPassphrase, onStatus: status });
@@ -1154,7 +1112,7 @@ async function doSign() {
     // PRF key: one tap. Passphrase key: unlock with the passphrase — reuse the one
     // just set during enrol, or ask for it on an already-enrolled passphrase key.
     if (!signKey.hasPrf && signPassphrase == null) {
-      signPassphrase = await promptPassphrase('unlock');
+      signPassphrase = await promptPassphrase('ds-pass', 'unlock');
       if (signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
     }
     const signer = await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname, passphrase: signKey.hasPrf ? undefined : signPassphrase });
