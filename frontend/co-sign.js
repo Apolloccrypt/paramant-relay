@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=6';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey } from '/js/parasign-signer.js?v=7';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -369,7 +369,7 @@ async function doSign() {
     $('done-pk').textContent = __signKey.fingerprint;
     showStep('step-done');
   } catch (e) {
-    let msg = (e && e.message) ? e.message : String(e);
+    let msg;
     if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link — your sign-in passkey becomes your signing key.';
     else if (e && (e.code === 'no_prf' || e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.';
@@ -377,6 +377,8 @@ async function doSign() {
     else if (e && e.status === 403) msg = 'This invite is bound to a different email address. Sign in with the address the invite was sent to.';
     else if (e && e.status === 410) msg = 'This signing invite has expired (invites are valid for 7 days). Ask the sender for a new link.';
     else if (e && e.status === 409) msg = 'That signing authorization was already used or expired. Reload the page and try again.';
+    else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
+    else msg = 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';
     setStatus('err', msg);
     $('sign-confirm').disabled = false;
   }
