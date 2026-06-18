@@ -115,13 +115,19 @@ def post_via_admin_container(sector: str, body: dict, admin_token: str) -> tuple
     """
     host = f"relay-{sector}"
     payload = json.dumps(body)
+    # Pass the admin token via the container ENV (docker exec -e), never
+    # interpolated into the shell string. As a literal argv element it is
+    # immune to shell metacharacters in the token; inside the sh it is only
+    # expanded as "$ADMIN_TOK" into a header value, never re-parsed as code.
     cmd = [
-        "docker", "exec", "-i", "paramant-relay-admin",
+        "docker", "exec", "-i",
+        "-e", f"ADMIN_TOK={admin_token}",
+        "paramant-relay-admin",
         "sh", "-c",
         (
             f"wget -qO- --timeout=8 "
             f"--header='Content-Type: application/json' "
-            f"--header='X-Admin-Token: {admin_token}' "
+            f'--header="X-Admin-Token: $ADMIN_TOK" '
             f"--server-response "
             f"--post-data=\"$(cat)\" "
             f"http://{host}:{RELAY_PORT}/v2/admin/keys 2>&1 | head -200"

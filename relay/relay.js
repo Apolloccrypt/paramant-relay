@@ -1331,6 +1331,17 @@ const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 const trialRequests   = new Map(); // email_lc → last_request_ts
 const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
+// Sweep both per-IP rate-limit maps hourly so they cannot grow without bound
+// on attacker-rotated IPs (the limit windows already expire entries logically;
+// this reclaims the memory). Mirrors the dpaIpRequests sweep. Use each map's
+// own window: trial = 24h (DAY_MS at the call site), anon-inbound = 1h.
+setInterval(() => {
+  const now = Date.now();
+  const trialCut = now - 86_400_000; // 24h
+  const anonCut  = now - 3_600_000;  // 1h
+  for (const [k, times] of trialIpRequests) { const kept = times.filter(t => t > trialCut); if (kept.length) trialIpRequests.set(k, kept); else trialIpRequests.delete(k); }
+  for (const [k, times] of anonInboundIpRequests) { const kept = times.filter(t => t > anonCut); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
+}, 3_600_000);
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
@@ -2168,7 +2179,9 @@ const server = http.createServer(async (req, res) => {
 
   function _internalOk() {
     const tok = process.env.INTERNAL_AUTH_TOKEN;
-    return tok && req.headers["x-internal-auth"] === tok;
+    // Constant-time compare (safeEqual length-guards + timingSafeEqual + dummy
+    // compare). A plain === leaks the token byte-by-byte via response timing.
+    return tok && safeEqual(req.headers["x-internal-auth"] || '', tok);
   }
   function _internalReject() {
     res.writeHead(401, { "Content-Type": "application/json" });
@@ -2926,7 +2939,7 @@ session = client.create_session('recipient@example.com')</pre>
               <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${version}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
             </table>
           </div>
