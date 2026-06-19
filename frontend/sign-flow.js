@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase } from '/js/parasign-signer.js?v=10';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase } from '/js/parasign-signer.js?v=11';
 import { promptPassphrase } from '/js/passphrase-prompt.js?v=1';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
