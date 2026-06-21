@@ -244,6 +244,42 @@ footer{border-top:1px solid rgba(11,58,106,.1);padding:40px 48px;display:flex;al
     </ul>
   </section>
 
+  <!-- ── 0.9.1-beta (2026-06-22): signing UX + security audit remediation ── -->
+  <section class="release">
+    <div class="release-header">
+      <h2>v0.9.1-beta</h2>
+      <span class="release-date">22 June 2026</span>
+    </div>
+    <p class="release-summary">Signing simplified to "sign in again", clearer free-for-community pricing, and a full security-audit remediation sweep.</p>
+
+    <h3><span class="badge badge-changed">Changed</span></h3>
+    <ul>
+      <li><strong>Signing is now "sign in again"</strong>: your sign-in passkey is your signing key — one Face ID / Touch ID / security-key tap. No separate signing passphrase to choose, remember, or reset.</li>
+      <li><strong>Authenticator-code fallback</strong>: no passkey on this browser? Sign with your 6-digit authenticator code instead. The old passphrase-based signing path has been removed.</li>
+      <li><strong>Pricing clarity</strong>: it is now explicit that everyday and community use is free forever; heavy users and businesses pay for higher limits, not to unlock features. The homepage badge reads "Free for community".</li>
+    </ul>
+
+    <h3><span class="badge badge-security">Security</span></h3>
+    <ul>
+      <li>Fixed an access-control issue in DID-based authentication: a DID now authenticates strictly as the API key it was registered under, so it can never be granted more privilege than that key holds.</li>
+      <li>Authenticator-code (TOTP) replay protection is now atomic and per-slot across login and signing-key enrolment, closing a concurrency race and a code-reuse window.</li>
+      <li>Removed an internal proxy route that forwarded an admin token to a third-party host over an unverified TLS connection.</li>
+      <li>Defense-in-depth crypto: stored authenticator secrets are bound to their account (AES-GCM AAD); public-key index writes fail closed; delivery-receipt proofs are bound to the asserted transfer.</li>
+      <li>Rate-limit hardening: bounded previously-unbounded limiter maps and added throttles to anonymous registration, the captcha challenge, and backup-code login.</li>
+      <li>Output-encoding / XSS sweep across the admin console and frontend (textContent + escaping, strict link-scheme checks, <code>rel="noopener"</code>); the admin relay proxy is now locked to an allowlist.</li>
+      <li>Client-side signing keys: key-generation seeds and ephemeral secrets are zeroized after use.</li>
+      <li>Constant-time internal-auth comparison; CI now pins the crypto byte-compatibility dependency to a fixed revision; backups no longer write key material world-readable.</li>
+    </ul>
+
+    <h3><span class="badge badge-fixed">Fixed</span></h3>
+    <ul>
+      <li>A malformed request to an internal endpoint could crash the relay; it now returns a clean error instead.</li>
+      <li>One corrupt stored record no longer breaks the entire account session list.</li>
+      <li>Accessibility on the signing flow: keyboard-activatable upload area, ARIA tablist for signature style, focus moved between wizard steps, and labelled inputs.</li>
+      <li>Removed a legacy quick-sign path that produced documents the verifier could not validate.</li>
+    </ul>
+  </section>
+
   <!-- ── 0.9.0-beta (session 4: 2026-04-20) ─────────────────── -->
   <section class="release">
     <div class="release-header">
