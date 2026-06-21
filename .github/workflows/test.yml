@@ -51,10 +51,16 @@ jobs:
       # byte-compatibility against the binding. Interim until publish.
       - name: Install liboqs build deps
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang libclang-dev
-      - name: Build @paramant/core (sibling checkout)
+      # Pin paramant-core to a fixed commit so the crypto byte-compat gate runs
+      # against a known revision, not a moving HEAD. Bump this SHA deliberately
+      # (and review the diff) when adopting a new paramant-core.
+      - name: Build @paramant/core (sibling checkout, pinned)
+        env:
+          PARAMANT_CORE_SHA: 45a3d3521adda7924692d58be5db60d5b094371f
         run: |
-          git clone --depth 1 https://github.com/Apolloccrypt/paramant-core.git "${GITHUB_WORKSPACE}/../paramant-core"
+          git clone --no-checkout https://github.com/Apolloccrypt/paramant-core.git "${GITHUB_WORKSPACE}/../paramant-core"
           cd "${GITHUB_WORKSPACE}/../paramant-core"
+          git checkout "${PARAMANT_CORE_SHA}"
           rustup show
           cargo build -p paramant-core-node --release
           cp target/release/libparamant_core_node.so crates/paramant-core-node/index.node
