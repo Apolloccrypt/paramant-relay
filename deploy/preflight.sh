@@ -37,8 +37,21 @@ if ! command -v docker &>/dev/null; then
     echo -e "${RED}✗  Docker not found${NC}"; echo ""
     read -p "   Install Docker now? [y/N]: " install_docker
     if [[ "$install_docker" =~ ^[Yy]$ ]]; then
-        echo "   Installing Docker..."; curl -fsSL https://get.docker.com | sh; sudo usermod -aG docker $USER
-        echo -e "${GREEN}✓  Docker installed — you may need to log out and back in${NC}"
+        # Download the vendor install script to a temp file first, then execute
+        # it (after the operator confirmation above) instead of piping the
+        # network stream straight into a shell. This makes the fetched script
+        # inspectable and avoids partial-download execution. (Ideally pin a
+        # SHA256 here too, but get.docker.com publishes no stable checksum.)
+        echo "   Installing Docker..."
+        DOCKER_INSTALL_SH=$(mktemp /tmp/get-docker.XXXXXX.sh)
+        if curl -fsSL https://get.docker.com -o "$DOCKER_INSTALL_SH"; then
+            sh "$DOCKER_INSTALL_SH"; rm -f "$DOCKER_INSTALL_SH"
+            sudo usermod -aG docker $USER
+            echo -e "${GREEN}✓  Docker installed — you may need to log out and back in${NC}"
+        else
+            rm -f "$DOCKER_INSTALL_SH"
+            echo -e "${RED}   Failed to download the Docker install script. Install from https://docs.docker.com/get-docker/${NC}"; exit 1
+        fi
     else
         echo -e "${RED}   Docker is required. Install from https://docs.docker.com/get-docker/${NC}"; exit 1
     fi
