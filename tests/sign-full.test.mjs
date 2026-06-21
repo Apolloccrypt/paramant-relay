@@ -1,18 +1,23 @@
 // Full functional test of the ParaSign signing subsystem, in real Chromium.
 //
 // Exercises the actual frontend modules (parasign-signer.js + vault.js +
-// paramant-pqc.js + passphrase-prompt.js) with real WebCrypto, real IndexedDB,
-// and a real WebAuthn virtual authenticator (CDP). Self-contained: it serves
-// frontend/ over http and stubs the same-origin /api/* calls, so it needs no
-// backend, Redis, or network.
+// paramant-pqc.js + totp-prompt.js) with real WebCrypto, real IndexedDB, and a
+// real WebAuthn virtual authenticator (CDP). Self-contained: it serves frontend/
+// over http and stubs the same-origin /api/* calls, so it needs no backend,
+// Redis, or network.
 //
-//   Phase 1  pure + vault round-trips (passphrase + PRF + dual-wrap)
-//   Phase 2  WebAuthn flows: enrol-with-passphrase, ensureSigningKey branching
-//   Phase 3  shared promptPassphrase against the real ds-/cs-/en- panels
+// R018 v4 model: signing = "log in again". Passkey-PRF is the only PERSISTED
+// unlock; the passphrase wrap is gone; the non-PRF fallback is a TOTP-gated
+// EPHEMERAL key (fresh ML-DSA-65, bound via the TOTP enrol route, secret in
+// memory only, zeroized after signing).
+//
+//   Phase 1  pure (buildDocSignMessage) + PRF vault round-trips + resolve
+//   Phase 2  WebAuthn flows: ensureSigningKey branching + ephemeral TOTP enrol
+//   Phase 3  shared promptTotp against the real ds-/cs- panels
 //
 // The one path a virtual authenticator can't simulate is live WebAuthn-PRF
 // *derivation* (needs PRF-capable hardware); everything our code does with a PRF
-// output is covered via the vault layer.
+// output is covered via the vault layer, and the ephemeral path needs no PRF.
 //
 // CI: `npx playwright install --with-deps chromium` then `node tests/sign-full.test.mjs`.
 // Local: PLAYWRIGHT_CHROMIUM_PATH=<chrome binary> node tests/sign-full.test.mjs
@@ -37,6 +42,8 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const ORIGIN = `http://localhost:${server.address().port}`;
 
 let CRED_ID = null, noPasskeyMode = false;
+// Response override for the TOTP enrol route (POST /api/user/account/signing-key).
+let totpResp = { status: 200, body: { ok: true } };
 const CHAL = 'A'.repeat(43);
 
 const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePath: EXE } : {}) });
@@ -54,6 +61,8 @@ await page.route('**/api/**', (route) => {
     return j({ flowId: 'f', options: { challenge: CHAL, allowCredentials: CRED_ID ? [{ id: CRED_ID, transports: ['internal'] }] : [], userVerification: 'required', timeout: 20000, rpId: 'localhost' } });
   }
   if (u.pathname.endsWith('/signing-key/step-up/bind')) return j({ ok: true });
+  // TOTP-gated ephemeral enrol route — response controlled by totpResp.
+  if (u.pathname.endsWith('/account/signing-key')) return j(totpResp.body, totpResp.status);
   return j({ ok: true });
 });
 
@@ -64,9 +73,9 @@ CRED_ID = await page.evaluate(async () => {
 });
 
 const phase1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=10');
+  const m = await import('/js/parasign-signer.js?v=11');
   const pqc = await import('/vendor/paramant-pqc.js');
-  const vault = await import('/vendor/vault.js?v=3');
+  const vault = await import('/vendor/vault.js?v=4');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const eqU8 = (a,b) => a.length===b.length && a.every((x,i)=>x===b[i]);
   const hex = (u8) => Array.from(u8).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -74,7 +83,6 @@ const phase1 = await page.evaluate(async () => {
   const rnd = (n) => crypto.getRandomValues(new Uint8Array(n));
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   const mk = () => { const s=rnd(32),k=pqc.ml_dsa65.keygen(s); return { k, pk:b64(k.publicKey), ph:hex(pqc.sha3_256(k.publicKey)), sk:k.secretKey.slice() }; };
-  const PASS = 'correct-horse-battery-staple-42';
   const base = { envelopeId:'env_test_000000000001', docHash:'a'.repeat(64), partyIndex:0, emailHash:'b'.repeat(64) };
   try {
     const h0 = hex(m.buildDocSignMessage(base));
@@ -83,23 +91,8 @@ const phase1 = await page.evaluate(async () => {
     ok('A3 binds docHash', h0!==hex(m.buildDocSignMessage({...base,docHash:'c'.repeat(64)})));
     ok('A4 binds partyIndex', h0!==hex(m.buildDocSignMessage({...base,partyIndex:1})));
     ok('A5 binds emailHash', h0!==hex(m.buildDocSignMessage({...base,emailHash:'d'.repeat(64)})));
-    const rej = (p) => { try { vault.assertStrongPassphrase(p); return false; } catch { return true; } };
-    const acc = (p) => { try { vault.assertStrongPassphrase(p); return true; } catch { return false; } };
-    ok('B1 reject empty', rej(''));
-    ok('B2 reject short', rej('short1'));
-    ok('B3 reject all-same-char', rej('aaaaaaaaaaaaaaaa'));
-    ok('B4 reject common-word', rej('mypasswordhere12'));
-    ok('B5 reject 12 lc-only', rej('abcdefghijkl'));
-    ok('B6 accept long passphrase', acc(PASS));
-    ok('B7 accept 16 mixed-classes', acc('Tr0ub4dour&3xtra'));
-    await delDB(); const C = mk();
-    await vault.vaultStore({ alg:'ML-DSA-65', label:'C', pk_b64:C.pk, pk_hash:C.ph, secretKeyBytes:C.k.secretKey, passphrase:PASS });
-    const uC = await vault.vaultUnlock(C.ph, PASS);
-    ok('C1 passphrase unlock returns the key', eqU8(uC.secretKeyBytes, C.sk));
     const msg = m.buildDocSignMessage(base);
-    ok('C2 unlocked key signs + verifies', pqc.ml_dsa65.verify(C.k.publicKey, msg, pqc.ml_dsa65.sign(uC.secretKeyBytes, msg)));
-    let w=false; try { await vault.vaultUnlock(C.ph,'wrong-pass-wrong-1'); } catch(e){ w=/wrong passphrase/.test(e.message); } ok('C3 wrong passphrase rejected', w);
-    let n=false; try { await vault.vaultUnlock('deadbeefdeadbeef','x'); } catch(e){ n=/no such key/.test(e.message); } ok('C4 unknown id rejected', n);
+    // D: PRF vault round-trip (the only persisted unlock).
     await delDB(); const D = mk(); const salt=rnd(16),out=rnd(32),cid='dGVzdGNyZWQ';
     await vault.vaultCreatePrfOnly({ alg:'ML-DSA-65', label:'D', pk_b64:D.pk, pk_hash:D.ph, secretKeyBytes:D.k.secretKey, credentialId:cid, prfSalt:salt, prfOutput:out.slice() });
     const info = await vault.vaultGetPrfWrapInfo(D.ph);
@@ -108,53 +101,69 @@ const phase1 = await page.evaluate(async () => {
     ok('D2 PRF unlock returns the key', eqU8(uD.secretKeyBytes, D.sk));
     ok('D3 PRF-unlocked key signs + verifies', pqc.ml_dsa65.verify(D.k.publicKey, msg, pqc.ml_dsa65.sign(uD.secretKeyBytes, msg)));
     let wp=false; try { await vault.vaultUnlockPrf(D.ph,{ prfOutput:rnd(32), credentialId:cid }); } catch(e){ wp=true; } ok('D4 wrong PRF output rejected', wp);
-    await delDB(); const E = mk(); const sE=rnd(16),oE=rnd(32);
-    await vault.vaultStore({ alg:'ML-DSA-65', label:'E', pk_b64:E.pk, pk_hash:E.ph, secretKeyBytes:E.k.secretKey, passphrase:PASS });
-    await vault.vaultAddPrfWrap({ pk_hash:E.ph, secretKeyBytes:E.sk.slice(), credentialId:'ZHVhbA', prfSalt:sE, prfOutput:oE.slice() });
+    // E: a SECOND PRF wrap (e.g. a second passkey) unlocks the SAME key.
+    await delDB(); const E = mk(); const o1=rnd(32),o2=rnd(32);
+    await vault.vaultCreatePrfOnly({ alg:'ML-DSA-65', label:'E', pk_b64:E.pk, pk_hash:E.ph, secretKeyBytes:E.k.secretKey, credentialId:'Y2E=', prfSalt:rnd(16), prfOutput:o1.slice() });
+    await vault.vaultAddPrfWrap({ pk_hash:E.ph, secretKeyBytes:E.sk.slice(), credentialId:'Y2I=', prfSalt:rnd(16), prfOutput:o2.slice() });
     const le = (await vault.vaultList()).find(k=>k.pk_hash===E.ph);
-    ok('E1 both kekSources present', le && le.kekSources.includes('passphrase') && le.kekSources.includes('webauthn-prf'));
-    const ep = await vault.vaultUnlock(E.ph, PASS), epr = await vault.vaultUnlockPrf(E.ph,{ prfOutput:oE.slice(), credentialId:'ZHVhbA' });
-    ok('E2 passphrase + PRF unlock the SAME key', eqU8(ep.secretKeyBytes,E.sk) && eqU8(epr.secretKeyBytes,E.sk));
+    ok('E1 two PRF wraps present', le && le.kekSources.filter(s=>s==='webauthn-prf').length===2);
+    const e1 = await vault.vaultUnlockPrf(E.ph,{ prfOutput:o1.slice(), credentialId:'Y2E=' }), e2 = await vault.vaultUnlockPrf(E.ph,{ prfOutput:o2.slice(), credentialId:'Y2I=' });
+    ok('E2 both PRF wraps unlock the SAME key', eqU8(e1.secretKeyBytes,E.sk) && eqU8(e2.secretKeyBytes,E.sk));
+    // F: resolvePasskeySigningKey.
     await delDB(); let f1=false; try { await m.resolvePasskeySigningKey(); } catch(e){ f1=e.code==='no_signing_passkey'; } ok('F1 empty vault -> no_signing_passkey', f1);
-    await delDB(); const Fa=mk(); await vault.vaultStore({ alg:'ML-DSA-65', label:'pp', pk_b64:Fa.pk, pk_hash:Fa.ph, secretKeyBytes:Fa.k.secretKey, passphrase:PASS });
-    let rf = await m.resolvePasskeySigningKey(); ok('F2 passphrase-only -> hasPassphrase', rf.hasPassphrase===true && rf.hasPrf===false);
-    await delDB(); const Fb=mk(); await vault.vaultCreatePrfOnly({ alg:'ML-DSA-65', label:'prf', pk_b64:Fb.pk, pk_hash:Fb.ph, secretKeyBytes:Fb.k.secretKey, credentialId:'Yg', prfSalt:rnd(16), prfOutput:rnd(32) });
-    let rf2 = await m.resolvePasskeySigningKey(); ok('F3 PRF-only -> hasPrf', rf2.hasPrf===true && rf2.hasPassphrase===false);
-    const Fc=mk(); await vault.vaultStore({ alg:'ML-DSA-65', label:'pp2', pk_b64:Fc.pk, pk_hash:Fc.ph, secretKeyBytes:Fc.k.secretKey, passphrase:PASS });
-    let rf3 = await m.resolvePasskeySigningKey(); ok('F4 both present -> prefers PRF key', rf3.hasPrf===true && rf3.fingerprint===Fb.ph.slice(0,16));
-    await delDB(); const H=mk(); await vault.vaultStore({ alg:'ML-DSA-65', label:'h', pk_b64:H.pk, pk_hash:H.ph, secretKeyBytes:H.k.secretKey, passphrase:PASS });
-    let np=false; try { await new m.LocalVaultSigner().activate({ vaultId:H.ph, rpId:'localhost' }); } catch(e){ np=e.code==='need_passphrase'; } ok('H1 passphrase key w/o passphrase -> need_passphrase', np);
-    const sg = await new m.LocalVaultSigner().activate({ vaultId:H.ph, rpId:'localhost', passphrase:PASS });
-    ok('H2 activate(passphrase) signs + verifies', pqc.ml_dsa65.verify(H.k.publicKey, msg, await sg.sign(msg)));
-    ok('H3 signer.publicKey matches enrolled pk', sg.publicKey===H.pk);
-    sg.dispose(); let dp=false; try { await sg.sign(msg); } catch(e){ dp=/disposed/.test(e.message); } ok('H4 sign after dispose throws', dp);
+    const Fb=mk(); await vault.vaultCreatePrfOnly({ alg:'ML-DSA-65', label:'prf', pk_b64:Fb.pk, pk_hash:Fb.ph, secretKeyBytes:Fb.k.secretKey, credentialId:'Yg', prfSalt:rnd(16), prfOutput:rnd(32) });
+    let rf2 = await m.resolvePasskeySigningKey(); ok('F2 PRF key -> hasPrf + correct fingerprint', rf2.hasPrf===true && rf2.vaultId===Fb.ph && rf2.fingerprint===Fb.ph.slice(0,16));
+    ok('F3 resolved key carries pk_b64', (rf2.pk_b64||'').length>1000);
   } catch(e){ ok('PHASE1 FATAL', false, e.message); }
   return T;
 });
 
+// Phase 2a: ensureSigningKey branching + ephemeral TOTP enrol (admin stubbed ok).
 const phase2a = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=10');
+  const m = await import('/js/parasign-signer.js?v=11');
   const pqc = await import('/vendor/paramant-pqc.js');
+  const vault = await import('/vendor/vault.js?v=4');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   const base = { envelopeId:'env_test_000000000001', docHash:'a'.repeat(64), partyIndex:0, emailHash:'' };
   try {
+    // I1: virtual authenticator can't produce a PRF result -> prf_unsupported.
     await delDB(); let i1=false; try { await m.ensureSigningKey({ rpId:'localhost' }); } catch(e){ i1=e.code==='prf_unsupported'; } ok('I1 no-PRF authenticator -> prf_unsupported', i1);
-    const PASS = 'correct-horse-battery-staple-42';
-    const key = await m.enrolSigningKeyWithPassphrase({ rpId:'localhost', label:'g', passphrase:PASS });
-    ok('G1a enrol returns passphrase key', key.hasPassphrase===true && key.hasPrf===false && (key.pk_b64||'').length>1000);
-    const signer = await new m.LocalVaultSigner().activate({ vaultId:key.vaultId, rpId:'localhost', passphrase:PASS });
-    const msg = m.buildDocSignMessage(base); const sig = await signer.sign(msg); const pub = Uint8Array.from(atob(key.pk_b64), c=>c.charCodeAt(0)); signer.dispose();
-    ok('G1b enrolled key signs + verifies (ML-DSA-65)', pqc.ml_dsa65.verify(pub, msg, sig));
-    let g2=false; try { await m.enrolSigningKeyWithPassphrase({ rpId:'localhost', passphrase:'weak' }); } catch(e){ g2=/too weak/.test(e.message); } ok('G2 weak passphrase rejected', g2);
-    const fp = await m.ensureSigningKey({ rpId:'localhost' }); ok('I2 fast-path returns existing key', fp && fp.hasPassphrase===true && fp.vaultId===key.vaultId);
+    // G: ephemeral TOTP enrol returns an in-memory signer (admin stub -> ok).
+    const r = await m.enrolEphemeralSigningKeyWithTotp({ label:'g', totp:'123456' });
+    ok('G1 ephemeral enrol returns signer + ephemeral signKey', !!r.signer && r.signKey.ephemeral===true && r.signKey.hasPrf===false && (r.signKey.pk_b64||'').length>1000);
+    const msg = m.buildDocSignMessage(base); const sig = await r.signer.sign(msg);
+    const pub = Uint8Array.from(atob(r.signKey.pk_b64), c=>c.charCodeAt(0));
+    ok('G2 ephemeral signer signs + verifies (ML-DSA-65)', pqc.ml_dsa65.verify(pub, msg, sig));
+    ok('G3 signer.publicKey matches signKey pk', r.signer.publicKey===r.signKey.pk_b64);
+    r.signer.dispose(); let dp=false; try { await r.signer.sign(msg); } catch(e){ dp=/disposed/.test(e.message); } ok('G4 sign after dispose throws', dp);
+    ok('G5 ephemeral key NOT persisted to vault', (await vault.vaultList()).length===0);
+    let g6=false; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'abc' }); } catch(e){ g6=e.code==='totp_required'; } ok('G6 malformed code rejected', g6);
   } catch(e){ ok('PHASE2a FATAL', false, e.message); }
   return T;
 });
 
+// Phase 2b: TOTP enrol error mapping (admin stub returns relay 403s).
+totpResp = { status: 403, body: { error: 'invalid_totp' } };
+const phase2b1 = await page.evaluate(async () => {
+  const m = await import('/js/parasign-signer.js?v=11');
+  const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
+  let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J1 relay 403 invalid_totp -> totp_invalid', c==='totp_invalid', c);
+  return T;
+});
+totpResp = { status: 403, body: { error: 'no_totp_setup' } };
+const phase2b2 = await page.evaluate(async () => {
+  const m = await import('/js/parasign-signer.js?v=11');
+  const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
+  let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J2 relay 403 no_totp_setup -> totp_unavailable', c==='totp_unavailable', c);
+  return T;
+});
+totpResp = { status: 200, body: { ok: true } };
+
+// Phase 2c: server 409 no_passkey path.
 noPasskeyMode = true;
-const phase2b = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=10');
+const phase2c = await page.evaluate(async () => {
+  const m = await import('/js/parasign-signer.js?v=11');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   await delDB();
@@ -163,41 +172,37 @@ const phase2b = await page.evaluate(async () => {
 });
 noPasskeyMode = false;
 
-// Phase 3: the shared promptPassphrase against each real panel (ds-/cs-/en-).
-const PANELS = [{ page: 'sign.html', prefix: 'ds-pass' }, { page: 'co-sign.html', prefix: 'cs-pass' }, { page: 'account.html', prefix: 'en-pass' }];
+// Phase 3: the shared promptTotp against each real panel (ds-/cs-).
+const PANELS = [{ page: 'sign.html', prefix: 'ds-pass' }, { page: 'co-sign.html', prefix: 'cs-pass' }];
 const phase3 = [];
 for (const { page: pg, prefix } of PANELS) {
   await page.goto(`${ORIGIN}/${pg}`, { waitUntil: 'domcontentloaded' });
   const r = await page.evaluate(async (prefix) => {
     const out = {};
-    const { promptPassphrase } = await import('/js/passphrase-prompt.js?v=1');
+    const { promptTotp } = await import('/js/totp-prompt.js?v=1');
     const $ = (s) => document.getElementById(s);
     out.panelExists = !!$(prefix + '-panel') && !!$(prefix + '-input') && !!$(prefix + '-confirm');
     const tick = () => new Promise(r => setTimeout(r, 15));
-    // unlock: enter a value, confirm -> resolves with it
-    const p1 = promptPassphrase(prefix, 'unlock'); await tick();
-    $(prefix + '-input').value = 'enter-me'; $(prefix + '-confirm').click();
-    out.unlock = (await p1) === 'enter-me';
-    // set: matching strong values -> resolves; panel hidden again
-    const p2 = promptPassphrase(prefix, 'set'); await tick();
-    $(prefix + '-input').value = 'correct-horse-battery-staple-42'; $(prefix + '-input2').value = 'correct-horse-battery-staple-42'; $(prefix + '-confirm').click();
-    out.set = (await p2) === 'correct-horse-battery-staple-42';
+    // valid 6-digit code, confirm -> resolves with it; panel hidden again
+    const p1 = promptTotp(prefix); await tick();
+    $(prefix + '-input').value = '123456'; $(prefix + '-confirm').click();
+    out.ok = (await p1) === '123456';
     out.hiddenAfter = $(prefix + '-panel').hidden === true;
-    // set mismatch -> error shown, promise still pending; cancel to clean up
-    const p3 = promptPassphrase(prefix, 'set'); await tick();
-    $(prefix + '-input').value = 'correct-horse-battery-staple-42'; $(prefix + '-input2').value = 'different-but-also-strong-99'; $(prefix + '-confirm').click(); await tick();
-    out.mismatchErr = $(prefix + '-err').hidden === false;
-    $(prefix + '-cancel').click(); out.cancelNull = (await p3) === null;
+    // invalid code -> error shown, promise still pending; cancel to clean up
+    const p2 = promptTotp(prefix); await tick();
+    $(prefix + '-input').value = '12ab'; $(prefix + '-confirm').click(); await tick();
+    out.invalidErr = $(prefix + '-err').hidden === false;
+    $(prefix + '-cancel').click(); out.cancelNull = (await p2) === null;
     return out;
   }, prefix);
-  phase3.push({ name: `P3 ${prefix} panel (${pg}): exists=${r.panelExists} unlock=${r.unlock} set=${r.set} hidden=${r.hiddenAfter} mismatchErr=${r.mismatchErr} cancel=${r.cancelNull}`,
-    pass: r.panelExists && r.unlock && r.set && r.hiddenAfter && r.mismatchErr && r.cancelNull, detail: '' });
+  phase3.push({ name: `P3 ${prefix} panel (${pg}): exists=${r.panelExists} ok=${r.ok} hidden=${r.hiddenAfter} invalidErr=${r.invalidErr} cancel=${r.cancelNull}`,
+    pass: r.panelExists && r.ok && r.hiddenAfter && r.invalidErr && r.cancelNull, detail: '' });
 }
 
 await browser.close();
 await new Promise(r => server.close(r));
 
-const all = [...phase1, ...phase2a, ...phase2b, ...phase3];
+const all = [...phase1, ...phase2a, ...phase2b1, ...phase2b2, ...phase2c, ...phase3];
 let passed = 0;
 console.log('\n================ ParaSign signing — FULL functional test ================');
 for (const t of all) { console.log(`  ${t.pass ? 'PASS' : 'FAIL'}  ${t.name}${t.detail ? '   (' + t.detail + ')' : ''}`); if (t.pass) passed++; }
