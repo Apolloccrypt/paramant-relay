@@ -4875,6 +4875,16 @@ python3 paramant-receiver.py \\
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(J({ valid: false, reason: 'inclusion_proof_missing_leaf_hash' }));
       }
+      // Bind the proof's leaf to the asserted blob_hash: recompute the leaf the
+      // same way the relay produced it. Without this the proof only proves "some
+      // leaf is in the tree", not that it is the leaf for THIS blob_hash. (The
+      // signature already covers both, so this is defense-in-depth against a
+      // relay self-inconsistency.)
+      const expectedLeaf = blobLeafHash(receiptObj.blob_hash, receiptObj.sector, receiptObj.ts);
+      if (proof.leaf_hash !== expectedLeaf) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ valid: false, reason: 'leaf_hash_mismatch' }));
+      }
       let computedRoot = proof.leaf_hash;
       for (const step of (proof.audit_path || [])) {
         if (step.position === 'right') {
