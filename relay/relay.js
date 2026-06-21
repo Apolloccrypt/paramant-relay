@@ -1453,7 +1453,12 @@ function J(o) { return JSON.stringify(o); }
 
 // ── Client IP — prefers CF-Connecting-IP (production), falls back to X-Real-IP set by nginx ──
 function getClientIp(req) {
-  return req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+  // There is no Cloudflare in front of this deployment (Caddy edge -> nginx), so
+  // CF-Connecting-IP is never set legitimately — trusting it let a client spoof
+  // their IP and rotate past per-IP rate limits. nginx authoritatively sets
+  // X-Real-IP to the real client (via real_ip from Caddy's X-Forwarded-For) and
+  // clears CF-Connecting-IP, so use X-Real-IP only, then the socket as a fallback.
+  return req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
 }
 
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
@@ -4603,6 +4608,15 @@ python3 paramant-receiver.py \\
   // ML-DSA-65 signature, and the signer's public key. The relay verifies the
   // signature, logs it to the CT tree, and counter-signs the .psign envelope.
   if (path === '/v2/sign' && req.method === 'POST') {
+    // RETIRED (H4): the legacy R017 notary verifies a bare, non-domain-separated
+    // doc hash (no envelope/relay/recipe binding), unlike the R018 multi-party
+    // recipe. It has no first-party callers — production signing uses the in-browser
+    // R018 path (/sign -> /v2/user/sign/*). Return 410 rather than mint new weak
+    // signatures. Existing .psign artifacts still verify via /v2/verify.
+    res.writeHead(410, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'gone', message: 'POST /v2/sign (legacy R017 notary) is retired; sign in your browser at /sign (R018).' }));
+  }
+  if (path === '/v2/sign' && req.method === 'POST' && false) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
     try {
