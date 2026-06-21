@@ -11,8 +11,8 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase } from '/js/parasign-signer.js?v=10';
-import { promptPassphrase } from '/js/passphrase-prompt.js?v=1';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=11';
+import { promptTotp } from '/js/totp-prompt.js?v=1';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -446,8 +446,8 @@ async function showSigningIdentity() {
     if (e && e.code === 'no_signing_passkey') {
       const elsewhere = await serverHasSigningKey();
       el.innerHTML = (elsewhere
-        ? 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign — one Face ID / Touch ID tap, no passphrase, no code.'
-        : 'You\'ll sign with your sign-in passkey — this device sets up your signing key with one tap the first time you sign. No passphrase, no separate code.');
+        ? 'You\'ll sign with your sign-in passkey. Signing keys live in the browser where you create them, so this device sets one up the first time you sign — one Face ID / Touch ID tap. No passkey here? You can sign with your authenticator code instead.'
+        : 'You\'ll sign with your sign-in passkey — this device sets up your signing key with one tap the first time you sign. No passkey here? You can sign with your authenticator code instead.');
     } else {
       el.textContent = (e && e.message) ? e.message : 'Could not check your signing key.';
     }
@@ -1049,24 +1049,26 @@ async function doSign() {
   $('ds-sign-status').className = 'ds-banner';
   const status = (t) => { $('ds-sign-status').textContent = t; };
 
+  let ephemeralSigner = null;   // hoisted so the catch can zeroize an unconsumed TOTP secret
   try {
     // The signing key is the account's PASSKEY-protected ML-DSA-65 key. Read ONLY
     // its public half from vault metadata here (for the stamp fingerprint); the
     // secret is unlocked solely by the per-document PRF activation below.
     status('Locating your signing key...');
     // Resolve the account's signing key, or set one up inline. Happy path is one
-    // passkey tap (PRF). If the passkey provider can't do PRF (e.g. Proton Pass),
-    // ensureSigningKey throws prf_unsupported and we fall back to a passphrase-
-    // protected signing key — still bound to the account via the same passkey.
-    let signKey, signPassphrase = null;
+    // passkey tap (PRF). If one-tap passkey signing isn't available — the provider
+    // can't do PRF (e.g. Proton Pass), or there's no passkey at all — we fall back
+    // to a TOTP-gated ephemeral signing key: a 6-digit authenticator code authorises
+    // a fresh key bound to the account, used for this one signing session only.
+    let signKey;
     try {
       signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
     } catch (e) {
-      if (!e || e.code !== 'prf_unsupported') throw e;
-      signPassphrase = await promptPassphrase('ds-pass', 'set');
-      if (signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
+      if (!e || (e.code !== 'prf_unsupported' && e.code !== 'no_passkey')) throw e;
+      const code = await promptTotp('ds-pass');
+      if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
       status('Setting up your signing key…');
-      signKey = await enrolSigningKeyWithPassphrase({ rpId: location.hostname, label: state.signer.name || 'Signing key', passphrase: signPassphrase, onStatus: status });
+      ({ signKey, signer: ephemeralSigner } = await enrolEphemeralSigningKeyWithTotp({ label: state.signer.name || 'Signing key', totp: code, onStatus: status }));
     }
     const fingerprint = signKey.fingerprint;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
@@ -1109,13 +1111,10 @@ async function doSign() {
     const act = await requestSignActivation({ envelopeId: env.id, partyIndex: 0, docHash: docHashForEnvelope, inviteToken: myLink.invite_token });
 
     status('Confirm to sign (Face ID / Touch ID / security key)...');
-    // PRF key: one tap. Passphrase key: unlock with the passphrase — reuse the one
-    // just set during enrol, or ask for it on an already-enrolled passphrase key.
-    if (!signKey.hasPrf && signPassphrase == null) {
-      signPassphrase = await promptPassphrase('ds-pass', 'unlock');
-      if (signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
-    }
-    const signer = await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname, passphrase: signKey.hasPrf ? undefined : signPassphrase });
+    // PRF key: unlock with one passkey tap. TOTP fallback: the signer was already
+    // produced (in memory) when the code was entered, so just use it.
+    const signer = ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
+    ephemeralSigner = null;   // consumed — `signer` owns it now and disposes below
     let sigB64;
     try {
       const message = buildDocSignMessage({ envelopeId: env.id, docHash: docHashForEnvelope, partyIndex: 0, emailHash: act.email_hash });
@@ -1158,6 +1157,8 @@ async function doSign() {
     state.result = { stampedBytes, envelope, fingerprint };
     showDone();
   } catch (e) {
+    // Zeroize any unconsumed ephemeral secret (error before it was handed to the signer).
+    if (ephemeralSigner) { try { ephemeralSigner.dispose(); } catch { /* best-effort */ } ephemeralSigner = null; }
     $('ds-sign-status').className = 'ds-banner err';
     // Map to an actionable message. A passkey/provider error (e.g. Firefox's
     // opaque "AuthenticatorError" from a PRF assertion) has no e.status/e.code,
@@ -1169,8 +1170,9 @@ async function doSign() {
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.';
     else if (e && e.code === 'cancelled') msg = 'Signing cancelled. Tap Sign now when you’re ready.';
-    else if (e && /wrong passphrase/i.test(e.message || '')) msg = 'That signing passphrase didn’t match. Tap Sign now and re-enter it.';
-    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passphrase')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign now to set or enter a signing passphrase instead.';
+    else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = 'That authenticator code didn’t match. Tap Sign now and enter the current 6-digit code.';
+    else if (e && e.code === 'totp_unavailable') msg = 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.';
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign now to sign with your authenticator code instead.';
     else if (e && (e.status === 403 || e.status === 409 || e.status === 410)) msg = 'That signing authorization was already used or has expired. Tap Sign now to start a fresh one.';
     else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
     else msg = 'Your passkey could not complete signing on this browser. Tap Sign now to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';

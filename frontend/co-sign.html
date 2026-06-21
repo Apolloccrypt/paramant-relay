@@ -152,13 +152,13 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Sign this document</button>
-      <!-- Passphrase fallback: shown only when the account's passkey provider can't
-           do WebAuthn-PRF (e.g. Proton Pass). The passkey still proves the account;
-           this passphrase protects the local signing key in place of the PRF. -->
+      <!-- Authenticator-code (TOTP) fallback: shown only when one-tap passkey
+           signing isn't available (provider can't do WebAuthn-PRF, e.g. Proton Pass,
+           or there's no passkey). The 6-digit code authorises a fresh signing key
+           for this session — signing "like logging in again". -->
       <div class="banner" id="cs-pass-panel" hidden style="margin-top:12px">
         <p id="cs-pass-prompt" style="margin-bottom:10px"></p>
-        <input type="password" id="cs-pass-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Signing passphrase" aria-label="Signing passphrase" style="width:100%;padding:10px;border:1px solid var(--ink-hair,#e2e8f0);border-radius:6px;margin-bottom:8px;font-size:14px">
-        <input type="password" id="cs-pass-input2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Confirm passphrase" aria-label="Confirm signing passphrase" hidden style="width:100%;padding:10px;border:1px solid var(--ink-hair,#e2e8f0);border-radius:6px;margin-bottom:8px;font-size:14px">
+        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="6-digit code" aria-label="Authenticator code" style="width:100%;padding:10px;border:1px solid var(--ink-hair,#e2e8f0);border-radius:6px;margin-bottom:8px;font-size:14px">
         <p id="cs-pass-err" hidden style="color:var(--danger,#b91c1c);font-size:13px;margin-bottom:8px"></p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" id="cs-pass-cancel" type="button">Cancel</button>
@@ -195,6 +195,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </main>
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
-<script type="module" src="/co-sign.js?v=11"></script>
+<script type="module" src="/co-sign.js?v=12"></script>
 </body>
 </html>
