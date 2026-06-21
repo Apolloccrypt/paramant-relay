@@ -44,6 +44,18 @@
     return typeof u === 'string' && u.charAt(0) === '/' && u.indexOf('//') === -1 &&
            u.indexOf(':') === -1 && /^[A-Za-z0-9/_.?=&#-]+$/.test(u);
   }
+  // A tool's "source" URL comes from the server-rendered tools list. Only treat
+  // it as a link if it's an http(s) URL (or a same-origin root-relative path);
+  // anything else (javascript:, data:, ...) becomes '#' so it can't execute.
+  function safeSourceUrl(u) {
+    var s = String(u == null ? '' : u).trim();
+    if (/^\/(?!\/)/.test(s)) { return s; }
+    try {
+      var url = new URL(s, location.origin);
+      if (url.protocol === 'http:' || url.protocol === 'https:') { return url.href; }
+    } catch (e) { /* not parseable */ }
+    return '#';
+  }
   // Per-user (per-browser) tool config: remembers your edited command per tool.
   // localStorage only -- no server, no new attack surface. Holds non-sensitive
   // params (bucket, recipient); never the key (the command uses $PARAMANT_API_KEY).
@@ -118,7 +130,7 @@
         '<div class="tool-actions">' +
           runBtn +
           '<button class="dev-btn dev-btn-go" data-config="' + esc(t.name) + '">Configure</button>' +
-          '<a class="dev-link" href="' + esc(t.source) + '" target="_blank" rel="noopener">View source ↗</a>' +
+          '<a class="dev-link" href="' + esc(safeSourceUrl(t.source)) + '" target="_blank" rel="noopener">View source ↗</a>' +
         '</div></div>';
     }).join('');
   }
@@ -175,28 +187,33 @@
 
   function refreshSnapshot() { return getJSON('/api/user/developer/snapshot').then(applySnapshot); }
 
-  /* SSE with polling fallback */
-  var lastPing = 0, pollTimer = null, es = null;
-  function startPolling() {
-    if (pollTimer) return;
-    heartbeat('poll');
-    pollTimer = setInterval(function () { refreshSnapshot().then(function () { heartbeat('poll'); }).catch(function () { heartbeat('down'); }); }, 5000);
-  }
-  function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+  /* SSE with polling fallback.
+   * ONE shared 5s snapshot poll runs for the whole page: it keeps the quota
+   * fresh even while SSE is up, and IS the fallback when SSE drops. We never
+   * spin up a second poll loop, so the dashboard polls /snapshot at most once
+   * per interval (previously startPolling()'s timer + the quota timer both ran,
+   * double-polling during the fallback). The heartbeat is gated on SSE health:
+   * if SSE has pinged within the window we show 'up', otherwise 'poll'. */
+  var lastPing = 0, es = null;
+  var SSE_STALE_MS = 8000;
+  function sseHealthy() { return !!es && (Date.now() - lastPing) <= SSE_STALE_MS; }
   function connectSSE() {
-    if (!window.EventSource) { startPolling(); return; }
-    try { es = new EventSource('/api/user/developer/stream'); } catch (e) { startPolling(); return; }
-    es.addEventListener('hello', function () { lastPing = Date.now(); heartbeat('up'); stopPolling(); });
+    if (!window.EventSource) { heartbeat('poll'); return; }
+    try { es = new EventSource('/api/user/developer/stream'); } catch (e) { es = null; heartbeat('poll'); return; }
+    es.addEventListener('hello', function () { lastPing = Date.now(); heartbeat('up'); });
     es.addEventListener('ping', function () { lastPing = Date.now(); heartbeat('up'); });
     es.addEventListener('audit', function (m) {
       try { var ev = JSON.parse(m.data); pushFeed(ev, true); STATE.status = STATE.status || {}; renderTimeline([ev].concat(STATE.feed.slice(1))); } catch (e) {}
     });
-    es.onerror = function () { heartbeat('poll'); startPolling(); };
+    es.onerror = function () { heartbeat('poll'); };
   }
-  // quota stays fresh even over SSE: light snapshot poll every 5s
-  setInterval(function () { refreshSnapshot().catch(function () {}); }, 5000);
-  // watchdog: if no ping for 8s, mark polling
-  setInterval(function () { if (es && Date.now() - lastPing > 8000) { heartbeat('poll'); startPolling(); } }, 4000);
+  // Single shared timer: refresh the snapshot every 5s and set the heartbeat
+  // from SSE health (so the live audit stream stays primary, polling backstops).
+  setInterval(function () {
+    refreshSnapshot()
+      .then(function () { heartbeat(sseHealthy() ? 'up' : 'poll'); })
+      .catch(function () { heartbeat('down'); });
+  }, 5000);
 
   /* filter */
   var fi = $('#tl-filter'); if (fi) fi.addEventListener('input', function () { STATE.filter = fi.value; getJSON('/api/user/developer/snapshot').then(function (d) { renderTimeline(d.audit || []); }).catch(function () {}); });
@@ -229,7 +246,7 @@
     runEl.setAttribute('data-default', def);
     modal.setAttribute('data-tool', t.name);
     var savedNote = modal.querySelector('[data-m="saved"]'); if (savedNote) savedNote.hidden = (saved == null);
-    modal.querySelector('[data-m="source"]').setAttribute('href', t.source || '#');
+    modal.querySelector('[data-m="source"]').setAttribute('href', safeSourceUrl(t.source));
     var bf = browserFlow(t.category), rib = modal.querySelector('[data-m="browser"]');
     if (rib) { if (bf) { rib.hidden = false; rib.setAttribute('href', bf.url); rib.textContent = '▶ ' + bf.label + ' →'; } else { rib.hidden = true; } }
     modal.hidden = false;

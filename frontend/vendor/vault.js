@@ -202,7 +202,7 @@ export async function vaultUnlockPrf(id, { prfOutput, credentialId } = {}) {
   let plain;
   try {
     plain = new Uint8Array(await crypto.subtle.decrypt({ name: KEK_NAME, iv: b64Decode(wrap.iv) }, kek, b64Decode(wrap.ciphertext)));
-  } catch (e) { db.close(); throw new Error('prf unwrap failed'); }
+  } catch (e) { db.close(); throw new Error('prf unwrap failed', { cause: e }); }
   try { const rw = _tx(db, 'readwrite'); const fresh = await _toPromise(rw.get(id)); if (fresh) { fresh.last_used_at = new Date().toISOString(); await _toPromise(rw.put(fresh)); } } catch {}
   db.close();
   return { secretKeyBytes: plain, pk_b64: entry.pk_b64, pk_hash: entry.pk_hash, label: entry.label };

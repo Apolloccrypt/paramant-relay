@@ -455,7 +455,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </main>
 
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js?v=1" defer></script>
+<script src="/js/nav-auth.js?v=2" defer></script>
 <script>
 (function() {
   function show(id) {
@@ -487,9 +487,17 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
       (data.sessions || []).forEach(function(s) {
         const el = document.createElement('div');
         el.className = 'info-row';
-        el.innerHTML =
-          '<div class="info-label">' + s.ip_masked + (s.current ? ' (this session)' : '') + '</div>' +
-          '<div class="info-value">' + s.user_agent_short + ' &middot; last seen ' + new Date(s.last_seen).toLocaleString() + '</div>';
+        // user_agent_short (and ip_masked) are attacker-controllable at login,
+        // so build the nodes with textContent rather than innerHTML to avoid
+        // self/stored DOM XSS.
+        const labelEl = document.createElement('div');
+        labelEl.className = 'info-label';
+        labelEl.textContent = (s.ip_masked || '') + (s.current ? ' (this session)' : '');
+        const valueEl = document.createElement('div');
+        valueEl.className = 'info-value';
+        valueEl.textContent = (s.user_agent_short || '') + ' · last seen ' + new Date(s.last_seen).toLocaleString();
+        el.appendChild(labelEl);
+        el.appendChild(valueEl);
         sessionsList.appendChild(el);
       });
 
@@ -669,7 +677,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </script>
 
 <script type="module">
-import { vaultAvailable, vaultList } from '/vendor/vault.js?v=4';
+import { vaultAvailable, vaultList } from '/vendor/vault.js?v=5';
 
 const escHtml = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -779,7 +787,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js?v=3"></script>
-<script type="module" src="/js/signing-enrol.js?v=13"></script>
+<script type="module" src="/js/signing-enrol.js?v=14"></script>
 
 </body>
 </html>
