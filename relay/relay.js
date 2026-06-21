@@ -1334,9 +1334,24 @@ const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 const trialRequests   = new Map(); // email_lc → last_request_ts
 const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
+const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
+
+// Eviction sweep for the limiter maps that lacked one (the other limiters already
+// self-evict). Without this they grow unbounded — slow memory/audit creep,
+// especially with spoofable client IPs. Mirrors the dpa*/usedTotp sweeps.
+setInterval(() => {
+  const now = Date.now();
+  const DAY = 86_400_000, HOUR = 3_600_000;
+  for (const [k, t]     of trialRequests)        { if (now - t > 7 * DAY) trialRequests.delete(k); }
+  for (const [k, times] of trialIpRequests)      { const kept = times.filter(t => now - t < DAY);  if (kept.length) trialIpRequests.set(k, kept);      else trialIpRequests.delete(k); }
+  for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
+  for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
+  for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
+}, 3_600_000);
+
 function checkTeamRateLimit(teamId, limit) {
   if (!teamId) return true;
   const now = Date.now();
@@ -4141,6 +4156,18 @@ session = client.create_session('recipient@example.com')</pre>
       const isReceiverSession = typeof d.device_id === 'string' && d.device_id.startsWith('inv_');
       if (!keyData && !isReceiverSession) {
         res.writeHead(401); return res.end(J({ error: 'Valid API key required for pubkey registration' }));
+      }
+      // Keyless inv_ registrations need no API key, so the per-key cap below does
+      // not bound them — an anonymous flood would append forever to didRegistry +
+      // ctLog. Throttle per IP (max 20/hour) to cap anonymous growth.
+      if (!keyData && isReceiverSession) {
+        const now = Date.now(), HOUR_MS = 3_600_000, MAX_INV_PER_IP = 20;
+        const ipKey = getClientIp(req);
+        const times = (invDidIpRequests.get(ipKey) || []).filter(t => now - t < HOUR_MS);
+        if (times.length >= MAX_INV_PER_IP) {
+          res.writeHead(429); return res.end(J({ error: 'Too many receiver-session registrations from this address. Try again later.' }));
+        }
+        times.push(now); invDidIpRequests.set(ipKey, times);
       }
       // Rate limit: max 500 DIDs per API key to prevent RAM DoS
       const MAX_DID_PER_KEY = 500;
