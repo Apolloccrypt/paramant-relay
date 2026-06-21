@@ -94,7 +94,8 @@ async function storeCredential(redisClient, userId, cred) {
       if (idx.userId && idx.userId !== userId) throw new Error('credential already registered to a different account');
     } catch (e) {
       if (e.message === 'credential already registered to a different account') throw e;
-      // malformed index — overwrite below
+      // Fail closed: index exists but is unreadable; refuse rather than overwrite.
+      throw new Error('credential index unreadable; refusing to overwrite');
     }
   }
 

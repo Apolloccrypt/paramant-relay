@@ -71,15 +71,20 @@ async function consumeBackupCode(redisClient, userId, providedCode) {
   return { valid: false };
 }
 
+// AAD binds the TOTP secret blob to this user, so a Redis-write attacker can't
+// transplant one user's secret into another's key (decrypt is backward-compatible
+// with pre-AAD blobs; see encryption.js).
+function _totpAad(userId) { return `totp:${userId}`; }
+
 async function storeUserTotpSecret(redisClient, userId, base32Secret) {
-  const encrypted = encryptSecret(base32Secret);
+  const encrypted = encryptSecret(base32Secret, _totpAad(userId));
   await redisClient.set(`paramant:user:totp:${userId}`, encrypted);
 }
 
 async function getUserTotpSecret(redisClient, userId) {
   const encrypted = await redisClient.get(`paramant:user:totp:${userId}`);
   if (!encrypted) return null;
-  return decryptSecret(encrypted);
+  return decryptSecret(encrypted, _totpAad(userId));
 }
 
 async function deleteUserTotp(redisClient, userId) {
