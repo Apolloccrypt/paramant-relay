@@ -1,7 +1,17 @@
 'use strict';
 
+const crypto = require('crypto');
+
 const BASE_URL = process.env.SITE_URL || 'https://paramant.app';
 const FROM_ADDR = 'Paramant <hello@paramant.app>';
+
+// Derive a short, non-reversible reference id for the X-Entity-Ref-ID mail
+// header. Previously these were prefixes of the setup token / API key, which
+// leaked secret material into outbound mail headers (and any mail-log that
+// records them). Hash first, then truncate, so the ref stays stable per
+// secret but reveals nothing about it.
+const refIdHash = (secret) =>
+  crypto.createHash('sha256').update(String(secret ?? '')).digest('hex').slice(0, 12);
 
 const maskIP = (ip) => {
   if (!ip) return 'unknown';
@@ -9,6 +19,16 @@ const maskIP = (ip) => {
   if (m) return m[1] + '.xxx.xxx';
   return ip.slice(0, 8) + '...';
 };
+
+// HTML-escape any value that may carry user-controlled input before it lands
+// in an HTML email body. Covers &, <, >, " and '. Use for email, label,
+// reason, IP, etc. -- anything not built from constants in this module.
+const escHtml = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
 
 const formatTS = (ts) =>
   new Date(ts).toISOString().replace('T', ' ').replace(/\..*$/, '') + ' UTC';
@@ -122,11 +142,11 @@ https://paramant.app`;
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">After setup you receive 10 backup codes. Save them somewhere safe (password manager, printed copy in a drawer) in case you lose your phone.</p>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Did not request this reset?</strong> Contact support immediately at <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Did not sign up for Paramant?</strong> Ignore this email. No account is created until you complete setup.'}</p>
-    <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">Time: ${formatTS(requestedAt || Date.now())}<br>IP: ${maskIP(requestIP)}</p>
+    <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">Time: ${formatTS(requestedAt || Date.now())}<br>IP: ${escHtml(maskIP(requestIP))}</p>
   `);
 
   return {
-    ...wrap(text, html, { refId: 'setup-' + token.slice(0, 8) }),
+    ...wrap(text, html, { refId: 'setup-' + refIdHash(token) }),
     subject: isReset ? 'Set up your new Paramant authenticator' : 'Complete your Paramant account setup',
   };
 }
@@ -159,7 +179,7 @@ they would also need access to your inbox to click this link.
 
 Request details:
   Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}
-  IP:   ${requestIP || 'unknown'}
+  IP:   ${maskIP(requestIP)}
 
 Paramant
 https://paramant.app`;
@@ -178,12 +198,12 @@ https://paramant.app`;
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:13px;">This two-step flow protects you from accidental or malicious resets. An attacker who knows your email address alone cannot force a reset &mdash; they would also need access to your inbox to click this link.</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">
       Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}<br>
-      IP: ${requestIP || 'unknown'}
+      IP: ${escHtml(maskIP(requestIP))}
     </p>
   `);
 
   return {
-    ...wrap(text, html, { refId: 'reset-confirm-' + confirmToken.slice(0, 8) }),
+    ...wrap(text, html, { refId: 'reset-confirm-' + refIdHash(confirmToken) }),
     subject: 'Did you request a TOTP reset? — Paramant',
   };
 }
@@ -225,9 +245,9 @@ https://paramant.app`;
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Your Paramant API key is ready</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">An administrator has issued a Paramant API key for your account.</p>
     <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
-      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Plan</td><td style="padding:8px 0;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${plan}</span></td></tr>
-      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Label</td><td style="padding:8px 0;">${label || '<em style="color:#94a3b8;">unlabeled</em>'}</td></tr>
-      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Sectors</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${(sectors || []).join(', ') || 'all'}</td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Plan</td><td style="padding:8px 0;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${escHtml(plan)}</span></td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Label</td><td style="padding:8px 0;">${label ? escHtml(label) : '<em style="color:#94a3b8;">unlabeled</em>'}</td></tr>
+      <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Sectors</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${escHtml((sectors || []).join(', ') || 'all')}</td></tr>
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Key (masked)</td><td style="padding:8px 0;font-family:monospace;font-size:13px;color:#0B3A6A;">${masked}</td></tr>
     </table>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">The full key was provided separately by the administrator who issued it.</p>
@@ -248,7 +268,7 @@ https://paramant.app`;
   `);
 
   return {
-    ...wrap(text, html, { refId: 'welcome-' + apiKey.slice(0, 8) }),
+    ...wrap(text, html, { refId: 'welcome-' + refIdHash(apiKey) }),
     subject: 'Your Paramant API key is ready',
   };
 }
@@ -359,7 +379,7 @@ https://paramant.app`;
 
   const html = htmlShell(preheader, `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deleted</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${email}) was deleted on <strong>${dateStr}</strong>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deleted on <strong>${dateStr}</strong>.</p>
     <h2 style="margin:24px 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What this means</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>API key no longer works</li>
@@ -369,7 +389,7 @@ https://paramant.app`;
       <li>Files already relayed are not affected (end-to-end encrypted)</li>
     </ul>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:12px 16px;margin:0 0 24px 0;">
-      <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason || 'not specified'}</p>
+      <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason ? escHtml(reason) : 'not specified'}</p>
     </div>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to return later, <a href="https://paramant.app/signup" style="color:#1D4ED8;">sign up again</a> with a new account.</p>
   `);
@@ -402,7 +422,7 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
   const html = htmlShell(preheader, `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Verify your email</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
-      You requested a Paramant account for <strong>${email}</strong>. Click the button below to confirm your email address and activate your account.
+      You requested a Paramant account for <strong>${escHtml(email)}</strong>. Click the button below to confirm your email address and activate your account.
     </p>
     <div style="text-align:center;margin:0 0 28px 0;">
       <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Verify email &amp; activate account</a>
@@ -414,12 +434,12 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
         This link expires in <strong>24 hours</strong>. If you did not request a Paramant account, ignore this email — no account will be created.
-        <br>Requested ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}.
+        <br>Requested ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
   `);
 
-  return { ...wrap(text, html, { refId: 'verify-' + token.slice(0, 8) }), subject: 'Verify your Paramant account' };
+  return { ...wrap(text, html, { refId: 'verify-' + refIdHash(token) }), subject: 'Verify your Paramant account' };
 }
 
 // ── DUPLICATE SIGNUP ATTEMPT NOTICE ─────────────────────────────────────────
@@ -452,7 +472,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
   const html = htmlShell(preheader, `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signup attempt on your account</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
-      Someone just tried to create a Paramant account with <strong>${email}</strong>. Your existing account was not changed and no new account was created.
+      Someone just tried to create a Paramant account with <strong>${escHtml(email)}</strong>. Your existing account was not changed and no new account was created.
     </p>
     <p style="margin:0 0 20px 0;line-height:1.6;">
       If this was you trying to sign in, use the login page:
@@ -463,7 +483,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.08);padding:12px 16px;margin:24px 0 0 0;border-radius:4px;">
       <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
         If this was not you, ignore this email. The attempt was rate-limited and no account was created.
-        <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}.
+        <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
   `);
@@ -546,7 +566,10 @@ async function sendEmail(to, templateResult) {
       headers: templateResult.headers || {},
     }),
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  // Surface only the HTTP status, never the response body: Resend echoes the
+  // submitted payload (recipient address, subject, sometimes body) in its error
+  // JSON, which would otherwise land verbatim in our logs.
+  if (!res.ok) { res.text().catch(() => {}); throw new Error(`Resend ${res.status}`); }
 }
 
 module.exports = {

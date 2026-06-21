@@ -266,8 +266,12 @@ function keyResults(results) {
   const created  = Object.entries(results).filter(([,v]) => v.status === 200 || v.status === 201).map(([s,v]) => ({ sector: s, key: v.data?.key }));
   const failed   = Object.entries(results).filter(([,v]) => v.status !== 200 && v.status !== 201).map(([s,v]) => ({
     sector: s,
-    status: v.status,
-    error: v.data?.error || `HTTP ${v.status}`,
+    status: v.status ?? null,
+    // A sector that threw in eachSector has { error } and no status/data, so
+    // reading v.data.error yielded "HTTP undefined". Prefer the thrown message,
+    // then the relay's error body, and only fall back to a status string when
+    // we actually have a status.
+    error: v.error || v.data?.error || (v.status ? `HTTP ${v.status}` : 'sector_unreachable'),
     ...(v.status === 402 && v.data?.upgrade_url ? { upgrade_url: v.data.upgrade_url } : {})
   }));
   const upgradeRequired = failed.some(f => f.status === 402);
@@ -313,7 +317,13 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
   if (anyRevoked) {
     try { await logAuditEvent(key, 'admin_key_revoked', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
   }
-  res.status(anyRevoked ? 200 : 502).json({ ok: anyRevoked, results });
+  // 502 is for transport failure only. A relay that answered with a 4xx (e.g.
+  // 404 = key not present in that sector) HANDLED the request -- it is not an
+  // upstream outage. Only return 502 when every sector failed to even answer
+  // (no status, or 5xx). Otherwise the outcome was handled across the fleet.
+  const allFailedTransport = Object.values(results).every(r =>
+    !r.status || r.status >= 500);
+  res.status(allFailedTransport ? 502 : 200).json({ ok: anyRevoked, results });
 });
 
 
@@ -647,6 +657,13 @@ function clearUserCookie(res) {
 
 // GET /api/captcha/challenge
 api.get('/captcha/challenge', async (req, res) => {
+  // Unauthenticated and each issued challenge writes a 300s Redis key, so an
+  // unthrottled caller can flood Redis. Cap per-IP (reuses the webauthn fixed-
+  // window limiter): 60 challenges / 5 min is far above any honest signup flow
+  // (one challenge per attempt) yet bounds the standing key count per source.
+  const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+  if (!(await webauthn.rateHit(redis(), `captcha:ip:${ip}`, 60, 300)))
+    return res.status(429).json({ error: 'rate_limited' });
   try {
     res.json(await pow.issueChallenge());
   } catch (e) {
@@ -980,6 +997,18 @@ api.post("/user/login-with-backup", async (req, res) => {
   const { email, backup_code } = req.body || {};
   if (!email || !backup_code) return res.status(400).json({ error: "missing_fields" });
 
+  // This is an unauthenticated, session-granting factor. Without throttling,
+  // each wrong code triggers up to 10x 64MB argon2id verifications on the relay
+  // (CPU+memory amplification DoS), and nothing caps online guessing. Mirror
+  // the per-IP + per-email fixed-window limits the other auth paths use. The
+  // per-email key is hashed so it never stores PII.
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const emailHash = crypto.createHash('sha256').update(String(email).toLowerCase().trim()).digest('hex');
+  if (!(await webauthn.rateHit(redis(), `bk:ip:${ip}`, 10, 900)))
+    return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `bk:email:${emailHash}`, 5, 900)))
+    return res.status(429).json({ error: "rate_limited" });
+
   const user = await findUserByEmail(email);
   if (!user) return res.status(401).json({ error: "invalid_credentials" });
 
@@ -987,8 +1016,12 @@ api.post("/user/login-with-backup", async (req, res) => {
     user_id: user.key,
     code: backup_code.trim().toUpperCase(),
   });
-  const result = await consumeRes.json();
-  if (!result.valid) return res.status(401).json({ error: "invalid_credentials" });
+  // Guard the relay response parse: a relay error / non-JSON body must surface
+  // as 502 (relay failure), not a 500 from an unhandled JSON.parse throw.
+  if (!consumeRes.ok) return res.status(502).json({ error: "relay_unreachable" });
+  let result;
+  try { result = await consumeRes.json(); } catch { return res.status(502).json({ error: "relay_unreachable" }); }
+  if (!result || !result.valid) return res.status(401).json({ error: "invalid_credentials" });
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
@@ -1847,36 +1880,45 @@ api.get("/user/developer/stream", authUser, developerGate, async (req, res) => {
 
 // GET /api/user/account
 api.get("/user/account", authUser, async (req, res) => {
-  const { user_id, email } = req.userSession;
-  const user = await findUserByEmail(email);
-  const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
+  try {
+    const { user_id, email } = req.userSession;
+    const user = await findUserByEmail(email);
+    const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
 
-  const sessions = [];
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (!raw) continue;
-    const s = JSON.parse(raw);
-    if (s.user_id !== user_id) continue;
-    const token = key.replace("paramant:user:session:", "");
-    sessions.push({
-      ip_masked: maskIp(s.ip || ""),
-      user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
-      last_seen: new Date(s.created_at).toISOString(),
-      current: token === req.userSessionToken,
-      via: s.via || "totp",
+    const sessions = [];
+    for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+      const raw = await redis().get(key);
+      if (!raw) continue;
+      // One corrupt session blob (this user's OR any other user's, since the
+      // SCAN crosses the whole keyspace before the user_id filter below) must
+      // not 500 the whole account view: skip unparseable entries.
+      let s;
+      try { s = JSON.parse(raw); } catch { continue; }
+      if (!s || s.user_id !== user_id) continue;
+      const token = key.replace("paramant:user:session:", "");
+      sessions.push({
+        ip_masked: maskIp(s.ip || ""),
+        user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
+        last_seen: new Date(s.created_at).toISOString(),
+        current: token === req.userSessionToken,
+        via: s.via || "totp",
+      });
+    }
+
+    res.json({
+      email,
+      label: user?.label || null,
+      plan: user?.plan || null,
+      created_at: user?.created_at || null,
+      api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
+      backup_codes_remaining: backupCount,
+      session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      sessions,
     });
+  } catch (err) {
+    console.error("[user/account]", err.message);
+    res.status(503).json({ error: "account_unavailable" });
   }
-
-  res.json({
-    email,
-    label: user?.label || null,
-    plan: user?.plan || null,
-    created_at: user?.created_at || null,
-    api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
-    backup_codes_remaining: backupCount,
-    session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-    sessions,
-  });
 });
 
 function maskIp(ip) {
@@ -2170,12 +2212,72 @@ api.delete("/user/account", authUser, async (req, res) => {
 });
 
 // ── Session → API key proxy ───────────────────────────────────────────────────
+// This forwards a logged-in user's OWN X-Api-Key to a relay sector. It must NOT
+// be an open proxy: previously any method+path was allowed with no `..`
+// normalization, re-exposing the whole key-authenticated relay surface
+// cross-sector. We now enforce three gates before forwarding:
+//   1. method allowlist (GET/POST/DELETE only — the verbs the user surface uses)
+//   2. strict path normalization (reject traversal/scheme/host/control chars,
+//      single leading slash, no double slashes)
+//   3. an endpoint allowlist of the user-facing relay routes only — admin,
+//      setup, internal and reload routes are never reachable through here.
+// NOTE: the production frontend does not call this proxy today (no callers in
+// frontend/). The allowlist is therefore deliberately conservative; add a path
+// here only when a frontend feature genuinely needs it.
+const RELAY_PROXY_METHODS = new Set(["GET", "POST", "DELETE"]);
+// Each entry is an exact path OR a prefix marked with a trailing '/' (matches
+// the prefix and anything under it). Admin/setup/internal/reload are excluded.
+const RELAY_PROXY_ALLOW = [
+  "/v2/status", "/v2/capabilities", "/v2/check-key", "/v2/monitor",
+  "/v2/inbound", "/v2/outbound", "/v2/ack", "/v2/delivery",
+  "/v2/audit", "/v2/dl", "/v2/stream", "/v2/stream-next",
+  "/v2/envelopes/", "/v2/envelopes",
+  "/v2/session/create", "/v2/session/join", "/v2/session",
+  "/v2/pubkey/verify", "/v2/pubkey", "/v2/sender-pubkey",
+  "/v2/lookup-signer/", "/v2/lookup-signer",
+  "/v2/verify-receipt", "/v2/verify",
+  "/v2/team/devices", "/v2/team/add-device", "/v2/team",
+  "/v2/ws-ticket",
+];
+
+function normalizeRelayPath(raw) {
+  // raw is the wildcard remainder, never includes the query (Express strips it
+  // into req.query). Reject anything that smells like traversal or an absolute
+  // URL before we build the upstream target.
+  if (typeof raw !== "string") return null;
+  let p = "/" + raw;
+  // Decode once so percent-encoded traversal (%2e%2e, %2f) is caught too; a
+  // decode failure means malformed input -> reject.
+  try { p = decodeURIComponent(p); } catch { return null; }
+  if (p.includes("\\")) return null;                 // backslash
+  if (/[\x00-\x1f]/.test(p)) return null;            // control chars
+  if (p.includes("..")) return null;                 // traversal
+  if (/^\/+(https?:)?\/\//i.test(p)) return null;    // scheme/host smuggling
+  if (p.includes("//")) return null;                 // double slash / empty seg
+  if (!p.startsWith("/")) return null;
+  return p;
+}
+
+function relayPathAllowed(p) {
+  for (const entry of RELAY_PROXY_ALLOW) {
+    if (entry.endsWith("/")) { if (p.startsWith(entry)) return true; }
+    else if (p === entry) return true;
+  }
+  return false;
+}
+
 api.all("/relay/:sector/*path", authUser, async (req, res) => {
   const sector = req.params.sector;
   const relayBase = SECTORS[sector];
   if (!relayBase) return res.status(404).json({ error: "unknown_sector" });
 
-  const relayPath = "/" + (req.params.path || "");
+  if (!RELAY_PROXY_METHODS.has(req.method))
+    return res.status(405).json({ error: "method_not_allowed" });
+
+  const relayPath = normalizeRelayPath(req.params.path || "");
+  if (!relayPath) return res.status(400).json({ error: "invalid_path" });
+  if (!relayPathAllowed(relayPath)) return res.status(403).json({ error: "path_not_allowed" });
+
   const fetchOpts = {
     method: req.method,
     headers: {
@@ -2184,15 +2286,22 @@ api.all("/relay/:sector/*path", authUser, async (req, res) => {
     },
   };
 
-  if (["POST", "PUT", "PATCH"].includes(req.method)) {
+  // Forward the body faithfully for every method that can carry one (DELETE
+  // included — some relay routes take a JSON body on DELETE). express.json has
+  // already parsed it; re-serialize so the upstream sees the same payload.
+  if (req.method !== "GET" && req.body !== undefined && req.body !== null) {
     fetchOpts.body = JSON.stringify(req.body);
   }
 
   try {
     const proxyRes = await fetch(`${relayBase}${relayPath}`, fetchOpts);
     const ct = proxyRes.headers.get("content-type") || "";
-    res.status(proxyRes.status).set("content-type", ct);
-    res.send(ct.includes("application/json") ? await proxyRes.json() : await proxyRes.text());
+    // Stream the upstream body verbatim instead of re-parsing+re-serializing,
+    // so non-JSON and empty bodies (e.g. 204 on DELETE) survive untouched.
+    const buf = Buffer.from(await proxyRes.arrayBuffer());
+    res.status(proxyRes.status);
+    if (ct) res.set("content-type", ct);
+    res.send(buf);
   } catch (err) {
     console.error("[proxy]", err.message);
     res.status(502).json({ error: "relay_unreachable" });
@@ -2204,6 +2313,19 @@ api.post("/drop/upload", async (req, res) => {
   const { email } = req.body || {};
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: "invalid_email" });
+  }
+  // Per-IP bucket: the per-email limit below is keyed only on attacker-supplied
+  // input, so rotating the email defeats it entirely. Cap per source IP too
+  // (20/day is generous for a human, bounds anonymous-relay abuse from one host).
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const ipKey = `paramant:drop:ratelimit:ip:${ip}`;
+  const ipCount = await redis().incr(ipKey);
+  if (ipCount === 1) await redis().expire(ipKey, 86400);
+  if (ipCount > 20) {
+    return res.status(429).json({
+      error: "rate_limited",
+      message: "Daily limit reached. Create a free account for unlimited drops.",
+    });
   }
   const rlKey = `paramant:drop:ratelimit:${email.toLowerCase()}`;
   const count = await redis().incr(rlKey);
@@ -2625,10 +2747,14 @@ async function getAdminKeyMeta(key_id) {
 
 async function checkAdminRl(scope, id, limit) {
   const key = `paramant:ratelimit:admin_${scope}:${id}`;
-  const cnt = parseInt(await redis().get(key).catch(() => '0') || '0');
-  if (cnt >= limit) return false;
-  await redis().multi().incr(key).expire(key, 86400).exec().catch(() => {});
-  return true;
+  // Atomic INCR-then-compare: the previous get-then-set left a TOCTOU window
+  // where concurrent requests all read the same count and each passed. INCR
+  // returns the post-increment value, so the Nth concurrent caller sees N.
+  let cnt;
+  try { cnt = await redis().incr(key); }
+  catch { return false; } // fail closed if Redis is unavailable
+  if (cnt === 1) await redis().expire(key, 86400).catch(() => {});
+  return cnt <= limit;
 }
 
 // ── POST /admin/send-welcome ───────────────────────────────────────────────────
@@ -2969,7 +3095,10 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
   // 10-11. Client cancel (Ctrl+C closes the stream) -> kill the child.
   let finished = false;
   req.on('close', () => {
-    if (!finished) { try { child.kill('SIGKILL'); } catch {} }
+    if (finished) return;
+    finished = true;            // mark done so the close/error handlers no-op
+    clearTimeout(killer);       // the watchdog is moot once the client is gone
+    try { child.kill('SIGKILL'); } catch {}
   });
 
   child.on('error', err => {
