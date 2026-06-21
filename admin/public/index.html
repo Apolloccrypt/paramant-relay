@@ -911,7 +911,7 @@ async function openUserDetailsModal(key){
   const d=r.data;
   document.getElementById('mo-details-body').innerHTML=
     '<div class="g2" style="margin-bottom:16px">'+
-      '<div><div class="sc-lbl">Email</div><div class="mono" style="font-size:12px">'+(d.email||'—')+'</div></div>'+
+      '<div><div class="sc-lbl">Email</div><div class="mono" style="font-size:12px">'+esc(d.email||'—')+'</div></div>'+
       '<div><div class="sc-lbl">Plan</div><span class="badge '+(d.plan||'community')+'">'+(d.plan||'community')+'</span></div>'+
       '<div><div class="sc-lbl">TOTP</div><span class="chip '+(d.totp_status||'none')+'">'+(d.totp_status||'none')+'</span></div>'+
       '<div><div class="sc-lbl">Sessions</div><div class="sc-val" style="font-size:20px">'+(d.active_sessions||0)+'</div></div>'+
