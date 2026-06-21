@@ -5,7 +5,7 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList } from '/vendor/vault.js?v=4';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList } from '/vendor/vault.js?v=5';
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -223,6 +223,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   // 1) ML-DSA-65 keypair, generated + held only in the browser.
   const seed = crypto.getRandomValues(new Uint8Array(32));
   const kp = ml_dsa65.keygen(seed);
+  seed.fill(0);   // the keypair is derived; the seed is key material, zeroize it
   const pk_b64 = b64EncodeStd(kp.publicKey);
   const pk_hash = toHex(sha3_256(kp.publicKey));
   try {
@@ -340,6 +341,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
   // secret transfers to the returned ActivatedSigner, which zeroizes on dispose().
   const seed = crypto.getRandomValues(new Uint8Array(32));
   const kp = ml_dsa65.keygen(seed);
+  seed.fill(0);   // the keypair is derived; the seed is key material, zeroize it
   const pk_b64 = b64EncodeStd(kp.publicKey);
   const pk_hash = toHex(sha3_256(kp.publicKey));
 

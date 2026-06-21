@@ -10,10 +10,13 @@
 
   function renderLoggedIn(email) {
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
+    // Never interpolate the email into innerHTML (stored/self DOM XSS): the
+    // signup regex permits HTML metacharacters. Build static markup, then set
+    // the email via textContent (mirrors home-auth.js / dashboard.js).
     container.innerHTML =
       '<div class="nav-user">' +
         '<button type="button" class="nav-user-trigger" aria-expanded="false">' +
-          '<span class="nav-user-email">' + shortEmail + '</span>' +
+          '<span class="nav-user-email"></span>' +
           '<span class="nav-user-chevron">\u25be</span>' +
         '</button>' +
         '<div class="nav-user-menu" hidden>' +
@@ -28,6 +31,8 @@
     var trigger = container.querySelector('.nav-user-trigger');
     var menu    = container.querySelector('.nav-user-menu');
     var signout = container.querySelector('#nav-signout');
+    var emailEl = container.querySelector('.nav-user-email');
+    if (emailEl) emailEl.textContent = shortEmail;
 
     trigger.addEventListener('click', function(e) {
       e.stopPropagation();

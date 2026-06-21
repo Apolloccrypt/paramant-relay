@@ -127,7 +127,25 @@ function dnsPreflight() {
     .catch(function () { out.textContent = ''; });
 }
 
-function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+// Full HTML-entity encoder (escapes & < > " ') so esc() is safe in both text
+// and attribute contexts.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+  });
+}
+// Only allow http(s) absolute URLs or a same-origin root-relative path as an
+// href; anything else (javascript:, data:, protocol-relative, ...) falls back
+// to '#' so a hostile value can never become a live link.
+function safeHref(u) {
+  var s = String(u == null ? '' : u).trim();
+  if (/^\/(?!\/)/.test(s)) { return s; }           // root-relative, not protocol-relative
+  try {
+    var url = new URL(s, location.origin);
+    if (url.protocol === 'http:' || url.protocol === 'https:') { return url.href; }
+  } catch (e) { /* not a parseable URL */ }
+  return '#';
+}
 
 function renderReview() {
   var c = state.config;
@@ -191,9 +209,11 @@ function renderDone(res) {
       (b.env_backed_up ? ' (previous one backed up to <code>.env.pre-setup</code>)' : '') +
       '. Restart the relay (<code>docker compose up -d</code>) to apply compliance and TLS settings.</p>';
   }
+  var healthHref = safeHref(b.health_url || '/all-systems-go');
+  var dashHref = safeHref(b.dashboard_url || '/dashboard');
   html += '<div class="actions" style="margin-top:16px">' +
-    '<a class="btn" href="' + esc(b.health_url || '/all-systems-go') + '">Check all systems</a> ' +
-    '<a class="btn" href="' + esc((b.dashboard_url || '/dashboard')) + '?welcome=1">Go to dashboard</a>' +
+    '<a class="btn" href="' + esc(healthHref) + '">Check all systems</a> ' +
+    '<a class="btn" href="' + esc(dashHref) + (dashHref === '#' ? '' : '?welcome=1') + '">Go to dashboard</a>' +
     '</div>';
   body.innerHTML = html;
   var copyBtn = $('#copy-key');

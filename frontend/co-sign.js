@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=11';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=12';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
@@ -128,11 +128,16 @@ function renderEnvelope() {
     const row = document.createElement('div');
     row.className = 'party-row' + (p.index === __partyIndex ? ' me' : '');
     const label = escapeHtml(p.label || ('Party ' + (p.index + 1)));
-    const status = p.status === 'signed' ? 'SIGNED' : p.status === 'viewed' ? 'VIEWED' : 'PENDING';
+    // Allowlist the status to a known enum before putting it in the class attr
+    // (and the visible label) so a hostile relay value can't break out of the
+    // attribute. Unknown -> 'pending'.
+    const statusClass = (p.status === 'signed' || p.status === 'viewed') ? p.status : 'pending';
+    const statusText = statusClass === 'signed' ? 'SIGNED' : statusClass === 'viewed' ? 'VIEWED' : 'PENDING';
+    const idx = Number(p.index);
     row.innerHTML =
-      '<div class="party-idx">#' + p.index + '</div>' +
+      '<div class="party-idx">#' + (Number.isFinite(idx) ? idx : '') + '</div>' +
       '<div class="party-label">' + label + (p.index === __partyIndex ? ' (you)' : '') + '</div>' +
-      '<div class="party-status ' + (p.status || 'pending') + '">' + status + '</div>';
+      '<div class="party-status ' + statusClass + '">' + statusText + '</div>';
     list.appendChild(row);
   }
 

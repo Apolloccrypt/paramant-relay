@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=11';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=12';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
@@ -55,8 +55,20 @@ const $ = id => document.getElementById(id);
 function show(id) { $(id).hidden = false; }
 function hide(id) { $(id).hidden = true; }
 
+let __firstStepRender = true;
 function setActive(stepId) {
   document.querySelectorAll('.ds-step').forEach(s => s.hidden = (s.id !== stepId));
+  // Move focus to the new step's heading so keyboard + screen-reader users land
+  // on the freshly revealed content (skip the very first render at page load).
+  if (!__firstStepRender) {
+    const stepEl = document.getElementById(stepId);
+    const heading = stepEl && stepEl.querySelector('h2');
+    if (heading) {
+      if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+      try { heading.focus({ preventScroll: false }); } catch (e) { heading.focus(); }
+    }
+  }
+  __firstStepRender = false;
   document.querySelectorAll('.ds-stepper li').forEach(li => {
     const k = li.dataset.step;
     const order = ['doc', 'place', 'recipients', 'identity', 'sign'];
@@ -215,6 +227,14 @@ function initStepDoc() {
   const dz = $('ds-dropzone');
   const inp = $('ds-doc-input');
   dz.addEventListener('click', () => inp.click());
+  // Keyboard activation: the dropzone is role="button" tabindex="0", so Enter
+  // and Space must open the file picker the same way a click does.
+  dz.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      inp.click();
+    }
+  });
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
   dz.addEventListener('drop', e => {
@@ -400,9 +420,22 @@ async function initStepIdentity() {
   });
   $('ds-signer-name').dispatchEvent(new Event('input'));
 
-  // Signature style tabs
-  document.querySelectorAll('.ds-sig-tabs .ds-tab').forEach(tab => {
+  // Signature style tabs: click to select, plus full keyboard tablist support
+  // (Left/Right/Home/End move and select per the WAI-ARIA tabs pattern).
+  const tabs = Array.from(document.querySelectorAll('.ds-sig-tabs .ds-tab'));
+  tabs.forEach((tab, i) => {
     tab.addEventListener('click', () => selectSigStyle(tab.dataset.sig));
+    tab.addEventListener('keydown', e => {
+      let next = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = tabs.length - 1;
+      if (next < 0) return;
+      e.preventDefault();
+      selectSigStyle(tabs[next].dataset.sig);
+      tabs[next].focus();
+    });
   });
   initDrawCanvas();
   initImageUpload();
@@ -471,6 +504,8 @@ function selectSigStyle(style) {
     const active = t.dataset.sig === style;
     t.classList.toggle('active', active);
     t.setAttribute('aria-selected', active ? 'true' : 'false');
+    // Roving tabindex: only the selected tab is in the tab order.
+    t.setAttribute('tabindex', active ? '0' : '-1');
   });
   for (const k of ['typed', 'drawn', 'image']) {
     $('ds-sig-panel-' + k).hidden = (k !== style);
@@ -1047,6 +1082,8 @@ async function doSign() {
   $('ds-sign-now').disabled = true;
   $('ds-sign-status').hidden = false;
   $('ds-sign-status').className = 'ds-banner';
+  // Progress updates are non-urgent: announce them politely.
+  $('ds-sign-status').setAttribute('aria-live', 'polite');
   const status = (t) => { $('ds-sign-status').textContent = t; };
 
   let ephemeralSigner = null;   // hoisted so the catch can zeroize an unconsumed TOTP secret
@@ -1160,6 +1197,8 @@ async function doSign() {
     // Zeroize any unconsumed ephemeral secret (error before it was handed to the signer).
     if (ephemeralSigner) { try { ephemeralSigner.dispose(); } catch { /* best-effort */ } ephemeralSigner = null; }
     $('ds-sign-status').className = 'ds-banner err';
+    // A failed signing attempt is urgent and actionable: announce it assertively.
+    $('ds-sign-status').setAttribute('aria-live', 'assertive');
     // Map to an actionable message. A passkey/provider error (e.g. Firefox's
     // opaque "AuthenticatorError" from a PRF assertion) has no e.status/e.code,
     // so it lands in the final else with a recovery path — never the raw engine
@@ -1261,6 +1300,27 @@ function showDone() {
 
   // Render the signed result so the user can see their stamp before downloading.
   renderSignedPreview().catch(() => {});
+
+  // Best-effort: the signature is done and the result (stamped bytes + envelope)
+  // is what the page now uses. The raw source document bytes and any drawn/
+  // uploaded signature-image bytes are no longer needed, so clear them from
+  // memory rather than leaving them resident until the next GC.
+  clearSensitiveDocState();
+}
+
+// Zero/null the in-memory document + signature-image bytes once they are no
+// longer needed (success path). Best-effort: never throws.
+function clearSensitiveDocState() {
+  try {
+    if (state.doc && state.doc.bytes instanceof Uint8Array) { state.doc.bytes.fill(0); }
+    if (state.doc) { state.doc.bytes = null; }
+    if (state.signer && state.signer.sigImageBytes instanceof Uint8Array) { state.signer.sigImageBytes.fill(0); }
+    if (state.signer) {
+      state.signer.sigImageBytes = null;
+      state.signer.sigImageDataUrl = null;
+      state.signer.docImageDataUrl = null;
+    }
+  } catch (e) { /* best-effort */ }
 }
 
 // Invite-to-sign done screen: there is no signed document (the requester didn't
@@ -1440,10 +1500,11 @@ function buildRecipientRow(idx, data) {
   const row = document.createElement('div');
   row.className = 'ds-recipient-row';
   row.dataset.idx = String(idx);
+  const n = idx + 1;
   row.innerHTML =
-    `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="Recipient name (required)" value="${escapeHtml(data.label || '')}">` +
-    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="Email (optional, for your reference only)" value="${escapeHtml(data.email || '')}">` +
-    `<button class="ds-rm" type="button" data-action="remove">Remove</button>`;
+    `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="Recipient name (required)" aria-label="Recipient ${n} name (required)" value="${escapeHtml(data.label || '')}">` +
+    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="Email (optional, for your reference only)" aria-label="Recipient ${n} email (optional, for your reference only)" value="${escapeHtml(data.email || '')}">` +
+    `<button class="ds-rm" type="button" data-action="remove" aria-label="Remove recipient ${n}">Remove</button>`;
   row.querySelector('[data-action="remove"]').addEventListener('click', () => removeRecipientRow(idx));
   return row;
 }

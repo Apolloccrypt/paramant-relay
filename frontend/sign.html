@@ -418,23 +418,23 @@
     </div>
 
     <div class="ds-field">
-      <label class="ds-label">Signature style</label>
-      <div class="ds-sig-tabs" role="tablist">
-        <button class="ds-tab active" data-sig="typed" type="button" role="tab" aria-selected="true">Typed name</button>
-        <button class="ds-tab" data-sig="drawn" type="button" role="tab" aria-selected="false">Draw signature</button>
-        <button class="ds-tab" data-sig="image" type="button" role="tab" aria-selected="false">Upload image</button>
+      <label class="ds-label" id="ds-sig-style-label">Signature style</label>
+      <div class="ds-sig-tabs" role="tablist" aria-labelledby="ds-sig-style-label">
+        <button class="ds-tab active" id="ds-tab-typed" data-sig="typed" type="button" role="tab" aria-selected="true" aria-controls="ds-sig-panel-typed" tabindex="0">Typed name</button>
+        <button class="ds-tab" id="ds-tab-drawn" data-sig="drawn" type="button" role="tab" aria-selected="false" aria-controls="ds-sig-panel-drawn" tabindex="-1">Draw signature</button>
+        <button class="ds-tab" id="ds-tab-image" data-sig="image" type="button" role="tab" aria-selected="false" aria-controls="ds-sig-panel-image" tabindex="-1">Upload image</button>
       </div>
-      <div class="ds-sig-panel" id="ds-sig-panel-typed">
+      <div class="ds-sig-panel" id="ds-sig-panel-typed" role="tabpanel" aria-labelledby="ds-tab-typed" tabindex="0">
         <p class="ds-hint">Your name will appear as text inside the stamp. Choose 'Draw' if you want a handwritten signature.</p>
       </div>
-      <div class="ds-sig-panel" id="ds-sig-panel-drawn" hidden>
+      <div class="ds-sig-panel" id="ds-sig-panel-drawn" role="tabpanel" aria-labelledby="ds-tab-drawn" tabindex="0" hidden>
         <p class="ds-hint">Draw with mouse or finger. Use a steady stroke - the result is rendered as PNG and embedded in the PDF.</p>
-        <canvas id="ds-sig-canvas" width="500" height="160"></canvas>
+        <canvas id="ds-sig-canvas" width="500" height="160" role="img" aria-label="Signature drawing area - draw your signature with mouse or finger"></canvas>
         <div class="ds-actions" style="margin-top:8px">
           <button class="btn btn-tertiary" id="ds-sig-clear" type="button">Clear</button>
         </div>
       </div>
-      <div class="ds-sig-panel" id="ds-sig-panel-image" hidden>
+      <div class="ds-sig-panel" id="ds-sig-panel-image" role="tabpanel" aria-labelledby="ds-tab-image" tabindex="0" hidden>
         <p class="ds-hint">Upload a PNG or JPG of your signature. A transparent PNG works best.</p>
         <label class="ds-dropzone" id="ds-sig-image-drop" style="padding:20px;text-align:center;display:block">
           <input type="file" id="ds-sig-image-input" accept="image/png,image/jpeg" hidden>
@@ -611,9 +611,9 @@
           <a href="/install.sh">install.sh</a>
           <a href="/install-pi.sh">install-pi.sh</a>
           <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" rel="noopener">Docker Hub</a>
+          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank" rel="noopener">Releases</a>
         </div>
       </div>
       <div>
@@ -631,9 +631,9 @@
   </div>
 </footer>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js?v=1" defer></script>
+<script src="/js/nav-auth.js?v=2" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=23"></script>
+<script type="module" src="/sign-flow.js?v=24"></script>
 </body>
 </html>
