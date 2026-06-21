@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Secrets hardening: the license file holds PLK_KEY and ADMIN_TOKEN. Default
+# every file this script creates to owner-only, then widen explicitly where the
+# relay (running as user `paramant`) genuinely needs group-read.
+umask 077
+
 SETUP_DONE_FILE="/etc/paramant/.setup-done"
 LICENSE_FILE="/etc/paramant/license"
+
+# Apply correct owner/perms to the license file in one place. The relay service
+# runs as `paramant` and reads this file, so it needs group-read: root:paramant
+# + 0640 (NOT a bare 640, whose group bit is inert when the group is root).
+secure_license_file() {
+  chown root:paramant "$LICENSE_FILE" 2>/dev/null || true
+  chmod 640 "$LICENSE_FILE"
+}
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -126,12 +139,13 @@ else
 fi
 
 mkdir -p /etc/paramant
+chown root:paramant /etc/paramant 2>/dev/null || true
 chmod 750 /etc/paramant
 
 if [[ -n "$PLK_KEY" ]]; then
   if [[ "$PLK_KEY" == plk_* ]]; then
     printf 'PLK_KEY=%s\nADMIN_TOKEN=%s\n' "$PLK_KEY" "$ADMIN_TOKEN" > "$LICENSE_FILE"
-    chmod 640 "$LICENSE_FILE"
+    secure_license_file
     sudo paramant-relay-ctl restart paramant-relay 2>/dev/null || true
     sleep 2
     EDITION=$(curl -sf http://localhost:3000/health 2>/dev/null | jq -r '.edition // "unknown"' 2>/dev/null || echo "unknown")
@@ -141,7 +155,7 @@ if [[ -n "$PLK_KEY" ]]; then
     if [[ -n "$ADMIN_TOKEN" ]]; then
       printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN" > "$LICENSE_FILE"
       [[ -n "$CURRENT_KEY" ]] && printf 'PLK_KEY=%s\n' "$CURRENT_KEY" >> "$LICENSE_FILE"
-      chmod 640 "$LICENSE_FILE"
+      secure_license_file
     fi
   fi
 else
@@ -152,7 +166,7 @@ else
     else
       printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN" > "$LICENSE_FILE"
     fi
-    chmod 640 "$LICENSE_FILE"
+    secure_license_file
   fi
   info "No license key — running Community Edition (max 5 keys)."
 fi
