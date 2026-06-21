@@ -1862,12 +1862,19 @@ const server = http.createServer(async (req, res) => {
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
-  const keyData = apiKeys.get(apiKey) || (didAuthEntry ? { plan: 'pro', active: true, label: didAuthEntry.device_id } : null);
-  // account_id is what Phase 3 counters key on. For now it is 1:1 with apiKey
-  // (or with the DID device for DID-auth), which means existing single-device
-  // users see no change. Once multi-device sharing of an account_id lands, the
-  // counter math automatically aggregates across devices.
-  if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.device_id) || null;
+  // DID-auth NEVER mints its own principal. A DID only authenticates as the API
+  // key it was REGISTERED under: inherit that key's real plan/active. Keyless DIDs
+  // (e.g. 'inv_' receiver-session DIDs, registered without an API key) therefore
+  // grant NO authenticated principal here — they keep working only through the
+  // per-endpoint INVITE_RE pubkey-exchange bypass, never as a general auth subject.
+  // (Previously any valid DID-auth forged {plan:'pro',active:true}, which let an
+  // anonymous attacker self-register an inv_ DID and ride it into a pro session.)
+  const didOwner = (didAuthEntry && didAuthEntry.key) ? apiKeys.get(didAuthEntry.key) : null;
+  const keyData = apiKeys.get(apiKey)
+    || ((didOwner && didOwner.active) ? { ...didOwner, label: didAuthEntry.device_id } : null);
+  // account_id is what Phase 3 counters key on: the owning API key (1:1 today),
+  // or for DID-auth the key the DID was registered under — never the device id.
+  if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.key) || null;
   const clientIp = getClientIp(req);
 
   // Community Edition limit: block keys that exceed the 5-key cap
