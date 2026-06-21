@@ -5,7 +5,7 @@
 // Tomorrow a RemoteSamSigner (SAP -> HSM-backed SAM) drops in behind the same
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultStore, vaultUnlock, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList, assertStrongPassphrase } from '/vendor/vault.js?v=3';
+import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList } from '/vendor/vault.js?v=4';
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -56,30 +56,33 @@ export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash
   ]));
 }
 
-// v3 signing-key resolution — the SINGLE definition of "what a signing key is",
+// v4 signing-key resolution — the SINGLE definition of "what a signing key is",
 // shared by /sign (self-sign) and /co-sign (recipient). The signing key is the
-// account's ML-DSA-65 key in the vault, unlocked either by the passkey's PRF
-// (one tap, preferred) or by a passphrase (the fallback for passkey providers
-// without PRF, e.g. some password managers). We read its PUBLIC half
-// (pk_b64/pk_hash) from vault metadata WITHOUT unlocking, plus which KEK sources
-// it has so the caller knows whether to do a one-tap PRF unlock or to ask for the
-// passphrase. If no signing key is enrolled, throws code 'no_signing_passkey'.
+// account's ML-DSA-65 key in the vault, unlocked by the passkey's PRF (one tap).
+// We read its PUBLIC half (pk_b64/pk_hash) from vault metadata WITHOUT unlocking.
+// A passphrase wrap is no longer a signing-key source (R018 v4: passkey is the
+// only persisted unlock; the non-PRF fallback is a TOTP-gated ephemeral key that
+// is never written to the vault). If no PRF signing key is enrolled on this
+// device, throws code 'no_signing_passkey'.
 export async function resolvePasskeySigningKey() {
   if (!(await vaultAvailable())) throw new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
   const keys = await vaultList();
-  const usable = keys.filter((k) => (k.kekSources || []).some((s) => s === 'webauthn-prf' || s === 'passphrase'));
-  if (usable.length === 0) {
-    const e = new Error('No signing key on this device yet. Set one up when you sign.');
-    e.code = 'no_signing_passkey';
-    throw e;
+  const candidates = keys.filter((k) => (k.kekSources || []).some((s) => s === 'webauthn-prf'));
+  // Verify the PRF wrap is actually present (not just listed in kekSources). A
+  // desynced row — kekSources says 'webauthn-prf' but vaultGetPrfWrapInfo returns
+  // null — would otherwise resolve as a key that activate() can never unlock,
+  // looping on 'need_passkey'. Skip such rows so we fall through to enrol/fallback.
+  for (const k of candidates) {
+    const info = await vaultGetPrfWrapInfo(k.id);
+    if (!info) continue;
+    return {
+      vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16),
+      kekSources: k.kekSources || [], hasPrf: true,
+    };
   }
-  // Prefer a PRF-capable key (one tap) over a passphrase-only one.
-  const k = usable.find((x) => (x.kekSources || []).includes('webauthn-prf')) || usable[0];
-  const sources = k.kekSources || [];
-  return {
-    vaultId: k.id, pk_b64: k.pk_b64, fingerprint: (k.pk_hash || '').slice(0, 16),
-    kekSources: sources, hasPrf: sources.includes('webauthn-prf'), hasPassphrase: sources.includes('passphrase'),
-  };
+  const e = new Error('No signing key on this device yet. Set one up when you sign.');
+  e.code = 'no_signing_passkey';
+  throw e;
 }
 
 // One WebAuthn get() with PRF, portable across engines. The PRF extension shape
@@ -93,7 +96,7 @@ export async function resolvePasskeySigningKey() {
 // are thrown BEFORE any UI (free, no extra prompt). A cancel/timeout, or a post-UI
 // authenticator/provider failure (e.g. a passkey manager with no PRF extension
 // that engages then errors), is NOT retried — re-prompting is pointless; the
-// caller detects the failure and falls back to a passphrase-protected key.
+// caller detects the failure and falls back to a TOTP-gated ephemeral key.
 function _isChromiumEngine() {
   try {
     const brands = navigator.userAgentData && navigator.userAgentData.brands;
@@ -155,20 +158,14 @@ class ActivatedSigner {
 
 export class LocalVaultSigner {
   // ACTIVATION — the replaceable step. Unlocks the vault's ML-DSA key for exactly
-  // one signature, then the caller disposes (zeroize). Two unlock sources:
-  //   • passphrase (when given): PBKDF2 -> AES-GCM unwrap, no WebAuthn.
-  //   • otherwise the passkey's PRF output (one tap).
-  // A passphrase-only key with no PRF wrap throws code 'need_passphrase' so the UI
-  // can ask for it and call again with { passphrase }.
-  async activate({ vaultId, rpId, passphrase } = {}) {
-    if (passphrase) {
-      const unlocked = await vaultUnlock(vaultId, passphrase);
-      return new ActivatedSigner(unlocked.secretKeyBytes, unlocked.pk_b64);
-    }
+  // one signature via the passkey's PRF output (one tap), then the caller disposes
+  // (zeroize). A vault entry with no PRF wrap is not a usable signing key here
+  // (R018 v4: passkey PRF is the only persisted unlock); throws 'need_passkey'.
+  async activate({ vaultId, rpId } = {}) {
     const info = await vaultGetPrfWrapInfo(vaultId);
     if (!info) {
-      const e = new Error('This signing key is protected by a passphrase on this browser.');
-      e.code = 'need_passphrase';
+      const e = new Error('This signing key can no longer be unlocked on this browser. Sign again to set up a fresh one.');
+      e.code = 'need_passkey';
       throw e;
     }
     const prfOutput = await evalPrf({ rpId, credentialIdB64url: info.credentialId, prfSaltB64url: info.prfSalt });
@@ -278,7 +275,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       if (e && (e.name === 'NotAllowedError' || e.name === 'AbortError')) throw e;   // user cancelled / timed out
       // The authenticator/provider engaged but could not complete a PRF assertion
       // (e.g. a passkey manager like Proton Pass that implements passkeys but not
-      // the PRF extension). Signal the caller to fall back to a passphrase key.
+      // the PRF extension). Signal the caller to fall back to a TOTP ephemeral key.
       const err = new Error('Your passkey provider can’t do the PRF unlock that one-tap signing needs.');
       err.code = 'prf_unsupported'; err.cause = e;
       throw err;
@@ -286,7 +283,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     const prfFirst = cred.getClientExtensionResults()?.prf?.results?.first;
     if (!prfFirst) {
       // The assertion succeeded but produced no PRF result — same outcome: this
-      // passkey can't be a one-tap signing key. The caller falls back to a passphrase.
+      // passkey can't be a one-tap signing key. The caller falls back to TOTP.
       const err = new Error('This passkey doesn’t support the PRF extension that one-tap signing needs.');
       err.code = 'prf_unsupported';
       throw err;
@@ -319,77 +316,53 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   return await resolvePasskeySigningKey();
 }
 
-// ── Passphrase-protected signing key — the fallback when the account's passkey
-// provider cannot do WebAuthn-PRF (e.g. a password manager such as Proton Pass
-// that implements passkeys but not the PRF extension). The passkey is STILL used
-// to prove account possession (a NORMAL step-up assertion, no PRF — exactly what
-// login does, so a non-PRF provider handles it); the local ML-DSA key is wrapped
-// with a user passphrase (PBKDF2 -> AES-256-GCM via vaultStore) instead of a PRF
-// KEK. Same account binding and same server route as the one-tap path; only the
-// local key-wrap differs. Signing later unlocks via LocalVaultSigner.activate
-// ({ passphrase }). Recovery floor is the passphrase, so it is enforced strong.
-export async function enrolSigningKeyWithPassphrase({ rpId, label, passphrase, onStatus } = {}) {
+// ── TOTP-gated ephemeral signing key — the fallback when one-tap passkey-PRF
+// signing isn't available: the account's passkey provider can't do WebAuthn-PRF
+// (e.g. a passkey manager such as Proton Pass), or the account has no passkey at
+// all. A fresh ML-DSA-65 key is generated in the browser and its PUBLIC half is
+// bound to the account gated by a 6-digit authenticator code (the existing
+// TOTP-gated enrol route). The SECRET key is NEVER written to the vault — without
+// a passphrase or a PRF there is no KEK to wrap it at rest — so it lives only in
+// the returned signer for this one signing session and is zeroized by dispose().
+// Signing this way is "enter your authenticator code", repeated each time you sign
+// on a device without a one-tap passkey. Old signatures stay verifiable: the relay
+// keeps every enrolled public key (GitHub-SSH-style multi-key list).
+export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus } = {}) {
   const say = (m) => { try { if (onStatus) onStatus(m); } catch { /* status is best-effort */ } };
-  assertStrongPassphrase(passphrase);   // fail closed on weak input (vaultStore re-checks)
-  if (!(await vaultAvailable())) {
-    const err = new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
-    err.code = 'vault_unavailable';
+  const code = String(totp == null ? '' : totp).trim();
+  if (!/^\d{6}$/.test(code)) {
+    const err = new Error('Enter the 6-digit code from your authenticator app.');
+    err.code = 'totp_required';
     throw err;
   }
-  rpId = rpId || location.hostname;
 
-  // 1) ML-DSA-65 keypair, generated + held only in the browser.
+  // ML-DSA-65 keypair, generated + held only in the browser. Ownership of the
+  // secret transfers to the returned ActivatedSigner, which zeroizes on dispose().
   const seed = crypto.getRandomValues(new Uint8Array(32));
   const kp = ml_dsa65.keygen(seed);
   const pk_b64 = b64EncodeStd(kp.publicKey);
   const pk_hash = toHex(sha3_256(kp.publicKey));
+
+  // Bind the PUBLIC key to the account, gated by the TOTP code (relay verifies it).
+  say('Linking your signing key to your account…');
   try {
-    // 2) Wrap the ML-DSA key with the passphrase locally (no PRF, no WebAuthn).
-    await vaultStore({ alg: 'ML-DSA-65', label: label || 'Signing key', pk_b64, pk_hash, secretKeyBytes: kp.secretKey, passphrase });
-
-    // 3) Prove account possession with a NORMAL passkey step-up (no PRF — this is
-    //    what login does, so a provider without PRF still handles it).
-    say('Confirm with your passkey to link this signing key…');
-    let opt;
-    try {
-      opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
-    } catch (e) {
-      if (e && e.status === 409 && e.data && e.data.error === 'no_passkey') {
-        const err = new Error('Add a passkey to your account first, then you can sign with it.');
-        err.code = 'no_passkey';
-        throw err;
-      }
-      throw e;
-    }
-    const allowList = (opt.options.allowCredentials || []);
-    const cred = await navigator.credentials.get({
-      publicKey: {
-        challenge: b64urlToBytes(opt.options.challenge),
-        rpId,
-        allowCredentials: allowList.map((c) => ({
-          type: 'public-key',
-          id: b64urlToBytes(c.id),
-          ...(c.transports ? { transports: c.transports } : {}),
-        })),
-        userVerification: 'required',
-        timeout: opt.options.timeout || 60000,
-      },
-    });
-
-    // 4) Bind the PUBLIC key to the account — same admin route as the one-tap path.
-    say('Linking your signing key to your account…');
-    await _postJSON('/api/user/account/signing-key/step-up/bind', {
-      flowId: opt.flowId,
-      response: _serializeAssertion(cred),
-      pk_b64,
-      label: label || 'Signing key',
-    });
-  } finally {
-    kp.secretKey.fill(0);   // zeroize the plaintext key
+    await _postJSON('/api/user/account/signing-key', { pk_b64, label: label || 'Signing key', totp: code });
+  } catch (e) {
+    kp.secretKey.fill(0);   // bind failed — drop the secret, nothing was stored
+    const errCode = (e && e.data && e.data.error) || '';
+    // Relay gates the TOTP enrol: 403 invalid_totp (wrong code) / 403 no_totp_setup
+    // (account has no authenticator), 400 totp_required (malformed — caught above).
+    if (errCode === 'no_totp_setup') { const err = new Error('Set up an authenticator app on your account first, then sign with its code.'); err.code = 'totp_unavailable'; throw err; }
+    if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error('That authenticator code didn’t match. Try the current 6-digit code.'); err.code = 'totp_invalid'; throw err; }
+    if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error('That authenticator code didn’t match. Try the current 6-digit code.'); err.code = 'totp_invalid'; throw err; }
+    throw e;
   }
 
-  // Resolve the way /sign does, proving the key is usable now.
-  return await resolvePasskeySigningKey();
+  const signer = new ActivatedSigner(kp.secretKey, pk_b64);   // holds the in-memory secret; caller disposes
+  return {
+    signer,
+    signKey: { pk_b64, fingerprint: pk_hash.slice(0, 16), ephemeral: true, hasPrf: false },
+  };
 }
 
 // Serialize a raw PublicKeyCredential assertion to the JSON shape

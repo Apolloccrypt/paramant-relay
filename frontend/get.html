@@ -511,7 +511,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=1" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
-<script type="module" src="/vendor/parasign-bridge.js?v=1"></script>
+<script type="module" src="/vendor/parasign-bridge.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script>
 const RELAY = 'https://health.paramant.app';
@@ -685,20 +685,9 @@ async function enterSignMode() {
   });
   document.getElementById('preview-actions').style.display = 'none';
 
-  // Populate key sources from vault (if any keys exist).
-  try {
-    const p = await waitForParasign();
-    if (await p.vaultAvailable()) {
-      const sel = document.getElementById('signer-key-src');
-      const items = await p.vaultList();
-      for (const it of items) {
-        const opt = document.createElement('option');
-        opt.value = 'vault:' + it.id;
-        opt.textContent = 'Vault: ' + (it.label || (it.pk_hash || '').slice(0, 12));
-        sel.appendChild(opt);
-      }
-    }
-  } catch {}
+  // This quick-sign on a received file uses a one-time ephemeral key. Persistent
+  // signing keys are unlocked by your passkey at /sign (vault keys are no longer
+  // passphrase-unlockable, R018 v4), so they aren't offered as a source here.
 
   document.getElementById('sign-cancel').onclick = exitSignMode;
   document.getElementById('sign-move').onclick = () => {
@@ -786,14 +775,6 @@ async function ensureSignerKey() {
     const seed = crypto.getRandomValues(new Uint8Array(32));
     const kp = p.ml_dsa65.keygen(seed);
     __signerKey = { secretKey: kp.secretKey, publicKey: kp.publicKey };
-    return __signerKey;
-  }
-  if (sel.startsWith('vault:')) {
-    const id = parseInt(sel.slice('vault:'.length), 10);
-    const pass = prompt('Passphrase to unlock the vault key:');
-    if (!pass) throw new Error('Vault unlock cancelled');
-    const unlocked = await p.vaultUnlock(id, pass);
-    __signerKey = { secretKey: unlocked.secretKey, publicKey: unlocked.publicKey };
     return __signerKey;
   }
   throw new Error('Unsupported key source');

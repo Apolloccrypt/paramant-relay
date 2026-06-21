@@ -18,8 +18,8 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolSigningKeyWithPassphrase } from '/js/parasign-signer.js?v=10';
-import { promptPassphrase } from '/js/passphrase-prompt.js?v=1';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=11';
+import { promptTotp } from '/js/totp-prompt.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -63,8 +63,8 @@ let __envelope = null;
 let __partyIndex = -1;
 let __inviteToken = '';
 let __session = null;       // { email } when logged in as the invited recipient
-let __signKey = null;       // { vaultId, pk_b64, fingerprint, hasPrf, hasPassphrase } — PUBLIC metadata only
-let __signPassphrase = null; // set when the signing key is passphrase-protected (provider without PRF)
+let __signKey = null;       // { vaultId, pk_b64, fingerprint, hasPrf } — PUBLIC metadata only
+let __ephemeralSigner = null; // set when signing via the TOTP fallback (in-memory key, no vault)
 let __hashMatches = null;   // null = no file opened yet, true/false after a local hash check
 let __blindAck = false;     // user explicitly opted to sign without opening the document
 
@@ -183,10 +183,10 @@ async function prepareSigning() {
     return;
   }
 
-  // GATE 2 — a passkey signing key. We no longer dump a first-time recipient to
-  // /account: if this device has no signing key, doSign() sets one up inline with
-  // a single passkey tap (no passphrase, no TOTP) — the sign-in passkey becomes
-  // the signing key. Resolve now only to SHOW the fingerprint when one exists.
+  // GATE 2 — a signing key. We no longer dump a first-time recipient to /account:
+  // if this device has no signing key, doSign() sets one up inline — a single
+  // passkey tap (the sign-in passkey becomes the signing key), or an authenticator
+  // code if there's no one-tap passkey. Resolve now only to SHOW the fingerprint.
   try {
     __signKey = await resolvePasskeySigningKey();
   } catch (e) {
@@ -201,7 +201,7 @@ async function prepareSigning() {
   if (__signKey) {
     setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your signing key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
   } else {
-    setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your sign-in passkey — set up with one tap when you sign (no passphrase, no code).');
+    setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your sign-in passkey — set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.');
   }
   $('sign-confirm').onclick = doSign;
   refreshSignGate();   // stays disabled until the document has been reviewed (or blind-signing is acknowledged)
@@ -331,20 +331,22 @@ async function doSign() {
   $('sign-cta').hidden = true;
 
   try {
-    // 0) Make sure this device has a passkey signing key — set one up inline with
-    //    a single passkey tap (no passphrase, no TOTP) if not. The sign-in passkey
-    //    becomes the signing key; no /account detour. Returns the existing key fast.
-    if (!__signKey) {
+    // 0) Make sure this device has a signing key — set one up inline if not. Happy
+    //    path is a single passkey tap (the sign-in passkey becomes the signing key;
+    //    no /account detour). If one-tap passkey signing isn't available — provider
+    //    can't do PRF (e.g. Proton Pass), or no passkey at all — fall back to a
+    //    TOTP-gated ephemeral key (a 6-digit code, for this signing session only).
+    // A consumed ephemeral key (signer already used/disposed) can't be reused, so
+    // a retry re-enrols with a fresh code.
+    if (!__signKey || (__signKey.ephemeral && !__ephemeralSigner)) {
       try {
         __signKey = await ensureSigningKey({ rpId: location.hostname, onStatus: (m) => setStatus('', m) });
       } catch (e) {
-        if (!e || e.code !== 'prf_unsupported') throw e;
-        // Passkey provider can't do PRF (e.g. Proton Pass): fall back to a
-        // passphrase-protected signing key, still bound to the account via the passkey.
-        __signPassphrase = await promptPassphrase('cs-pass', 'set');
-        if (__signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
+        if (!e || (e.code !== 'prf_unsupported' && e.code !== 'no_passkey')) throw e;
+        const code = await promptTotp('cs-pass');
+        if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
         setStatus('', 'Setting up your signing key…');
-        __signKey = await enrolSigningKeyWithPassphrase({ rpId: location.hostname, passphrase: __signPassphrase, onStatus: (m) => setStatus('', m) });
+        ({ signKey: __signKey, signer: __ephemeralSigner } = await enrolEphemeralSigningKeyWithTotp({ totp: code, onStatus: (m) => setStatus('', m) }));
       }
     }
 
@@ -362,13 +364,10 @@ async function doSign() {
     // 2) Passkey-PRF unlock + sign of the v3 domain-prefixed message. The secret
     //    key lives ONLY inside the ActivatedSigner and is zeroized by dispose().
     setStatus('', 'Confirm to sign (Face ID / Touch ID / security key)...');
-    // PRF key: one tap. Passphrase key: unlock with the passphrase (reuse the one
-    // set on enrol, or ask for it on an already-enrolled passphrase key).
-    if (!__signKey.hasPrf && __signPassphrase == null) {
-      __signPassphrase = await promptPassphrase('cs-pass', 'unlock');
-      if (__signPassphrase == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
-    }
-    const signer = await new LocalVaultSigner().activate({ vaultId: __signKey.vaultId, rpId: location.hostname, passphrase: __signKey.hasPrf ? undefined : __signPassphrase });
+    // PRF key: unlock with one passkey tap. TOTP fallback: the signer was already
+    // produced (in memory) when the code was entered, so just use it.
+    const signer = __ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: __signKey.vaultId, rpId: location.hostname });
+    __ephemeralSigner = null;   // consumed — `signer` owns it now and disposes below
     let sigB64;
     try {
       const message = buildDocSignMessage({ envelopeId: __envelope.id, docHash: __envelope.doc_hash, partyIndex: __partyIndex, emailHash: act.email_hash });
@@ -388,9 +387,9 @@ async function doSign() {
     $('done-pk').textContent = __signKey.fingerprint;
     showStep('step-done');
   } catch (e) {
-    // Reset the cached passphrase so a wrong entry is never silently reused on the
-    // next attempt (the unlock prompt re-appears). __signKey stays cached.
-    __signPassphrase = null;
+    // Zeroize any unconsumed ephemeral secret and drop it so a retry re-prompts
+    // for a fresh code (a PRF __signKey stays cached for a one-tap retry).
+    if (__ephemeralSigner) { try { __ephemeralSigner.dispose(); } catch { /* best-effort */ } __ephemeralSigner = null; }
     let msg;
     if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link — your sign-in passkey becomes your signing key.';
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
@@ -400,8 +399,9 @@ async function doSign() {
     else if (e && e.status === 410) msg = 'This signing invite has expired (invites are valid for 7 days). Ask the sender for a new link.';
     else if (e && e.status === 409) msg = 'That signing authorization was already used or expired. Reload the page and try again.';
     else if (e && e.code === 'cancelled') msg = 'Signing cancelled. Tap Sign when you’re ready.';
-    else if (e && /wrong passphrase/i.test(e.message || '')) msg = 'That signing passphrase didn’t match. Tap Sign and re-enter it.';
-    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passphrase')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign to set or enter a signing passphrase instead.';
+    else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = 'That authenticator code didn’t match. Tap Sign and enter the current 6-digit code.';
+    else if (e && e.code === 'totp_unavailable') msg = 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.';
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign to sign with your authenticator code instead.';
     else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
     else msg = 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';
     setStatus('err', msg);

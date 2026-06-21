@@ -7,8 +7,7 @@
 // (parasign-signer.js) — the EXACT path /sign and /co-sign use — so this file
 // just wires the button + status and can never drift from the sign flow.
 // Self-hosted deps only (CSP script-src 'self'); no-ops if the button is absent.
-import { ensureSigningKey, resolvePasskeySigningKey, enrolSigningKeyWithPassphrase } from '/js/parasign-signer.js?v=10';
-import { promptPassphrase } from '/js/passphrase-prompt.js?v=1';
+import { ensureSigningKey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=11';
 
 function wireSigningEnrol() {
   const btn = document.getElementById('signing-enrol-btn');
@@ -32,20 +31,19 @@ function wireSigningEnrol() {
         k = await ensureSigningKey({ rpId: location.hostname, label, onStatus: (m) => setStatus(m, false) });
       } catch (e) {
         if (!e || e.code !== 'prf_unsupported') throw e;
-        // Passkey provider can't do PRF (e.g. Proton Pass): set a signing passphrase
-        // here, same as /sign. The passkey still proves the account (step-up, no PRF).
-        const passphrase = await promptPassphrase('en-pass', 'set');
-        if (passphrase == null) { setStatus('Set-up cancelled. Tap the button when you’re ready.', false); return; }
-        setStatus('Setting up your signing key…', false);
-        k = await enrolSigningKeyWithPassphrase({ rpId: location.hostname, label, passphrase, onStatus: (m) => setStatus(m, false) });
+        // Passkey provider can't do the one-tap PRF unlock. There's nothing to set
+        // up in advance here: you'll sign with your authenticator code at /sign,
+        // which binds a fresh key for each signing session (no persistent key on
+        // this device). Surface that instead of failing.
+        setStatus('Your passkey can’t do one-tap signing on this browser, so there’s nothing to set up here. Go to /sign and you can sign with your authenticator code (6-digit) instead.', false);
+        return;
       }
       setStatus('Signing key ready — fingerprint ' + (k.fingerprint || (k.pk_hash || '').slice(0, 16)) + '. You can now sign at /sign.', false);
       document.dispatchEvent(new CustomEvent('signing-key-enrolled'));
     } catch (e) {
       let msg;
-      if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (the "Passkey sign-in" card above), then set up signing.';
+      if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (the "Passkey sign-in" card above), then set up signing. No passkey? You can still sign at /sign with your authenticator code.';
       else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
-      else if (e && /wrong passphrase/i.test(e.message || '')) msg = 'That signing passphrase didn’t match. Tap the button and re-enter it.';
       else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap the button to try again.';
       else if (e && e.status) msg = 'Could not set up your signing key right now (server error ' + e.status + '). Please try again in a moment.';
       else msg = 'Your passkey could not complete setup on this browser. Tap the button to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';

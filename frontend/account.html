@@ -380,7 +380,8 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
       Your signing key is created here, in this browser, with ML-DSA-65 (post-quantum), and
       only you hold it. You set it up — and unlock it every time you sign — with the SAME
       passkey you sign in with (Face ID, Touch ID, or a security key). No passphrase, no extra
-      code: your sign-in passkey is your signing key.
+      code: your sign-in passkey is your signing key. No passkey on this browser? You can still
+      sign at <a href="/sign">/sign</a> with your authenticator code instead.
     </p>
     <div class="acct-field">
       <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
@@ -389,19 +390,6 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
       </div>
     </div>
     <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
-    <!-- Passphrase fallback: shown only when the account's passkey provider can't
-         do WebAuthn-PRF (e.g. Proton Pass). The passkey still proves the account;
-         this passphrase protects the local signing key in place of the PRF. -->
-    <div id="en-pass-panel" class="acct-field" hidden style="margin-top:12px">
-      <p id="en-pass-prompt" class="small" style="margin-bottom:8px"></p>
-      <input type="password" id="en-pass-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Signing passphrase" aria-label="Signing passphrase">
-      <input type="password" id="en-pass-input2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Confirm passphrase" aria-label="Confirm signing passphrase" hidden style="margin-top:8px">
-      <p id="en-pass-err" class="small" hidden style="color:var(--danger,#b91c1c);margin-top:8px"></p>
-      <div style="margin-top:10px;display:flex;gap:8px">
-        <button type="button" class="btn btn-small" id="en-pass-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary btn-small" id="en-pass-confirm">Continue</button>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -681,7 +669,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </script>
 
 <script type="module">
-import { vaultAvailable, vaultList } from '/vendor/vault.js?v=3';
+import { vaultAvailable, vaultList } from '/vendor/vault.js?v=4';
 
 const escHtml = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -791,7 +779,7 @@ loadVaultStatus();
 document.addEventListener('signing-key-enrolled', () => { loadEnrolledKeys(); loadVaultStatus(); });
 </script>
 <script type="module" src="/js/passkey.js?v=3"></script>
-<script type="module" src="/js/signing-enrol.js?v=12"></script>
+<script type="module" src="/js/signing-enrol.js?v=13"></script>
 
 </body>
 </html>

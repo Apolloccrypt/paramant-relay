@@ -510,13 +510,13 @@
     </div>
     <div class="ds-banner" id="ds-sign-status" hidden role="status" aria-live="polite"></div>
 
-    <!-- Passphrase fallback: shown only when the account's passkey provider can't
-         do WebAuthn-PRF (e.g. Proton Pass). The passkey still proves the account;
-         this passphrase protects the local signing key in place of the PRF. -->
+    <!-- Authenticator-code (TOTP) fallback: shown only when one-tap passkey
+         signing isn't available (provider can't do WebAuthn-PRF, e.g. Proton Pass,
+         or there's no passkey). The 6-digit code authorises a fresh signing key for
+         this session — signing "like logging in again". -->
     <div class="ds-banner" id="ds-pass-panel" hidden>
       <p id="ds-pass-prompt" style="margin-bottom:10px"></p>
-      <input class="ds-input" type="password" id="ds-pass-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="margin-bottom:8px" aria-label="Signing passphrase">
-      <input class="ds-input" type="password" id="ds-pass-input2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" hidden style="margin-bottom:8px" aria-label="Confirm signing passphrase">
+      <input class="ds-input" type="text" id="ds-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" style="margin-bottom:8px" aria-label="Authenticator code">
       <p id="ds-pass-err" class="ds-hint" hidden style="color:var(--danger,#b91c1c);margin-bottom:8px"></p>
       <div class="ds-actions">
         <button class="btn btn-tertiary" id="ds-pass-cancel" type="button">Cancel</button>
@@ -634,6 +634,6 @@
 <script src="/js/nav-auth.js?v=1" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=22"></script>
+<script type="module" src="/sign-flow.js?v=23"></script>
 </body>
 </html>

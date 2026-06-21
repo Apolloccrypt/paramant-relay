@@ -4,7 +4,7 @@
 // Non-module callers wait for the 'parasign:ready' CustomEvent (or check
 // window.__parasign).
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
-import { vaultAvailable, vaultList, vaultUnlock } from '/vendor/vault.js';
+import { vaultAvailable, vaultList } from '/vendor/vault.js?v=4';
 
-window.__parasign = { ml_dsa65, sha3_256, vaultAvailable, vaultList, vaultUnlock };
+window.__parasign = { ml_dsa65, sha3_256, vaultAvailable, vaultList };
 window.dispatchEvent(new CustomEvent('parasign:ready'));
