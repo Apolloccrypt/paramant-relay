@@ -1,23 +1,47 @@
 version: 2
 
 updates:
-  # npm – relay
+  # npm – relay (this is the entry that surfaces ws / redis / nats / @noble
+  # advisories such as GHSA-96hv-2xvq-fx4p, the ws memory-exhaustion DoS).
   - package-ecosystem: "npm"
+    directory: "/relay"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "relay"
+
+  # npm – admin
+  - package-ecosystem: "npm"
+    directory: "/admin"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "admin"
+
+  # Docker – relay image base (node:22-alpine / rust builder).
+  # Was "/fly-relay", a path that no longer exists in this repo, so the
+  # docker updater silently watched nothing. Point it at the real Dockerfiles.
+  - package-ecosystem: "docker"
     directory: "/relay"
     schedule:
       interval: "weekly"
     labels:
       - "dependencies"
+      - "docker"
       - "relay"
 
-  # Docker – fly-relay
+  # Docker – admin image base
   - package-ecosystem: "docker"
-    directory: "/fly-relay"
+    directory: "/admin"
     schedule:
       interval: "weekly"
     labels:
       - "dependencies"
       - "docker"
+      - "admin"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
