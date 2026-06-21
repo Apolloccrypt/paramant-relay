@@ -963,10 +963,13 @@ async function verifyTotpGeneric(token, secret, opts = {}) {
   }
   if (!matched) return { valid: false };
   if (replayKey && redisClient) {
-    const slot = String(matchedSlot);
-    const existing = await redisClient.get(replayKey).catch(() => null);
-    if (existing === slot) return { valid: false };
-    await redisClient.set(replayKey, slot, { EX: 90 }).catch(() => {});
+    // Atomic one-shot per matched slot. A per-slot key (not a single replayKey
+    // that the next slot would overwrite) plus SET NX makes the get/set race-free:
+    // NX returns null when the slot was already consumed, so two concurrent uses
+    // of the same code, or reuse of a still-in-window code, are both rejected.
+    const slotKey = `${replayKey}:${matchedSlot}`;
+    const ok = await redisClient.set(slotKey, '1', { NX: true, EX: 90 }).catch(() => 'OK');
+    if (ok === null) return { valid: false };
   }
   return { valid: true };
 }
@@ -2175,7 +2178,8 @@ const server = http.createServer(async (req, res) => {
 
   function _internalOk() {
     const tok = process.env.INTERNAL_AUTH_TOKEN;
-    return tok && req.headers["x-internal-auth"] === tok;
+    return !!tok && typeof req.headers["x-internal-auth"] === "string"
+      && safeEqual(req.headers["x-internal-auth"], tok);
   }
   function _internalReject() {
     res.writeHead(401, { "Content-Type": "application/json" });
@@ -2242,45 +2246,69 @@ const server = http.createServer(async (req, res) => {
   // POST /v2/user/activate-totp
   if (req.method === "POST" && path === "/v2/user/activate-totp") {
     if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
-    // Single source of truth for backup codes: mint them here, at the one moment
-    // activation succeeds, and return them exactly once. Generating them at
-    // activation (not at the QR/setup step) is what makes the whole flow robust
-    // against reloads, second tabs, and re-issued setup links.
-    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
-    const backupCodes = await userTotp.regenerateBackupCodes(redisClient, user_id);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ success: true, backup_codes: backupCodes }));
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      await redisClient.set(`paramant:user:totp_active:${user_id}`, "true");
+      // Single source of truth for backup codes: mint them here, at the one moment
+      // activation succeeds, and return them exactly once. Generating them at
+      // activation (not at the QR/setup step) is what makes the whole flow robust
+      // against reloads, second tabs, and re-issued setup links.
+      await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+      const backupCodes = await userTotp.regenerateBackupCodes(redisClient, user_id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ success: true, backup_codes: backupCodes }));
+    } catch (err) {
+      console.error("[user/activate-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // POST /v2/user/consume-backup
   if (req.method === "POST" && path === "/v2/user/consume-backup") {
     if (!_internalOk()) return _internalReject();
-    const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
-    const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J(result));
+    try {
+      const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id || !code) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J(result));
+    } catch (err) {
+      console.error("[user/consume-backup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // POST /v2/user/regenerate-backup
   if (req.method === "POST" && path === "/v2/user/regenerate-backup") {
     if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    const codes = await userTotp.regenerateBackupCodes(redisClient, user_id);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ backup_codes: codes }));
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const codes = await userTotp.regenerateBackupCodes(redisClient, user_id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ backup_codes: codes }));
+    } catch (err) {
+      console.error("[user/regenerate-backup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
   // POST /v2/user/delete-totp
   if (req.method === "POST" && path === "/v2/user/delete-totp") {
     if (!_internalOk()) return _internalReject();
-    const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
-    await userTotp.deleteUserTotp(redisClient, user_id);
-    await redisClient.del(`paramant:user:totp_active:${user_id}`);
-    await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(J({ success: true }));
+    try {
+      const { user_id } = JSON.parse((await readBody(req, 4096)).toString());
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      await userTotp.deleteUserTotp(redisClient, user_id);
+      await redisClient.del(`paramant:user:totp_active:${user_id}`);
+      await redisClient.del(`paramant:user:backup_codes_plaintext:${user_id}`);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ success: true }));
+    } catch (err) {
+      console.error("[user/delete-totp]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
   }
 
 
