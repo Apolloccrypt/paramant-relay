@@ -930,8 +930,9 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
 
 function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg) {
   const { x, y, w, h } = stamp;
-  // Outer fill + border
-  ctx.fillStyle = 'rgba(11, 58, 106, 0.03)';
+  // Solid WHITE body so the seal is always legible on any document (dark text on
+  // white), instead of a near-transparent fill that let busy/dark images bleed through.
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = '#0b3a6a';
   ctx.lineWidth = Math.max(1, w / 200);
@@ -1010,8 +1011,9 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
   const white = PDFLib.rgb(1, 1, 1);
 
-  // Outer border + faint fill
-  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: navy, opacity: 0.03 });
+  // Outer border + SOLID WHITE body (always legible: dark text on white, not a
+  // near-transparent fill that lets the document bleed through).
+  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
 
   // Branded top band: cobalt bar with logo + PQ badge
   const bandH = 16;
