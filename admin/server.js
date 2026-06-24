@@ -516,10 +516,13 @@ async function callRelay(endpoint, body, method = "POST") {
   return res;
 }
 
-// Find API key entry by email (queries health relay)
+// Find API key entry by email (queries health relay).
+// reveal=1: the returned entry's full .key becomes the session user_id (Redis
+// id + relay operation token), so this server-to-server lookup needs the raw
+// value, not the masked default.
 async function findUserByEmail(email) {
   const lower = email.toLowerCase();
-  const r = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const r = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   if (r.status !== 200) return null;
   const keys = r.body?.keys || [];
   return keys.find(k => k.email && k.email.toLowerCase() === lower && k.active !== false) || null;
@@ -529,9 +532,10 @@ async function findUserByEmail(email) {
 // usernameless/discoverable passkey login to resolve the email for the session
 // record after identity has been proven by the credential. Same source/cost as
 // findUserByEmail (one /v2/admin/keys read). Returns null if not found.
+// reveal=1: matches on the raw .key (userId is a full pgp_ value).
 async function findUserById(userId) {
   if (!userId) return null;
-  const r = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const r = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   if (r.status !== 200) return null;
   const keys = r.body?.keys || [];
   return keys.find(k => k.key === userId && k.active !== false) || null;
@@ -2447,7 +2451,7 @@ api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => 
   if (session.status !== 'pending') return res.status(409).json({ error: 'already_processed' });
 
   // Get current plan for audit log
-  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === session.user_id);
   const fromPlan = currentKey?.plan || 'community';
 
@@ -2505,7 +2509,7 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
   const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
-  const keysRes = await relayFetch("health", "/v2/admin/keys", "GET", null, false, ADMIN_TOKEN);
+  const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
   res.json({
     current_plan: currentKey?.plan || 'community',
@@ -2730,7 +2734,7 @@ api.post('/admin/force-totp', authMiddleware, async (req, res) => {
 // ── Admin helpers ─────────────────────────────────────────────────────────────
 async function getAdminKeyMeta(key_id) {
   const [keysRes, metaRaw] = await Promise.all([
-    relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN),
+    relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN),
     redis().get(`paramant:user:meta:${key_id}`).catch(() => null),
   ]);
   const k = (keysRes.body?.keys || []).find(k => k.key === key_id) || {};
@@ -2887,7 +2891,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   try {
     const [keysRes, metaRaw, billingRaw, auditEvents] = await Promise.all([
-      relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN),
+      relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN),
       redis().get(`paramant:user:meta:${key}`).catch(() => null),
       redis().get(`paramant:user:billing:${key}`).catch(() => null),
       getAuditEvents(key, { limit: 20 }),

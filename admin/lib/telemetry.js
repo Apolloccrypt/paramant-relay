@@ -30,7 +30,9 @@ async function getRecentAuditEvents(limit = 20) {
 
 async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
   let r;
-  try { r = await relayFetch('health', '/v2/admin/keys', 'GET', null, false, ADMIN_TOKEN); }
+  // reveal=1: k.key is used as the raw Redis id (totp_active/totp/meta) and
+  // surfaced as key_id for per-user actions, so this needs the full value.
+  try { r = await relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN); }
   catch (e) { console.error('[telemetry] relay unavailable:', e.message); return []; }
   const keys = r.body?.keys || [];
   const users = await Promise.all(keys.map(async k => {
