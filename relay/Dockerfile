@@ -24,7 +24,7 @@ RUN git clone https://github.com/Apolloccrypt/paramant-core.git \
  && cp target/release/libparamant_core_node.so /pkg/paramant-core.node \
  && printf '{\n  "name": "@paramant/core",\n  "version": "0.5.0-alpha.1",\n  "main": "paramant-core.node",\n  "files": ["paramant-core.node"]\n}\n' > /pkg/package.json
 
-FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885 AS build
+FROM node:25-alpine3.21@sha256:32509199057d74a987fdd88cde00fdfd48ef52469adbd6bd11969fc701477761 AS build
 
 RUN apk add --no-cache python3 make g++
 
@@ -40,7 +40,7 @@ RUN node -e "const fs=require('fs');for(const f of ['package.json','package-lock
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 # Lean image: no build tools, no npm, no compilers — only the relay and its deps.
-FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb6804afaf01f8885
+FROM node:25-alpine3.21@sha256:32509199057d74a987fdd88cde00fdfd48ef52469adbd6bd11969fc701477761
 
 LABEL org.opencontainers.image.title="paramant-relay" \
       org.opencontainers.image.version="3.0.0" \
