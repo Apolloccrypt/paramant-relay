@@ -1788,8 +1788,17 @@ pre code { background: none; padding: 0; }
 /* Responsive */
 @media (max-width: 768px) {
   .two-col { grid-template-columns: 1fr; }
+  /* Wide comparison tables: scroll horizontally instead of being clipped by
+     html{overflow-x:clip}. display:block turns the table into its own scroll
+     box; nowrap keeps content wider than the viewport so it actually scrolls. */
   .compare-table,
-  .ownership-table { font-size: 12px; }
+  .ownership-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 12px;
+  }
   .compare-table th,
   .ownership-table th,
   .compare-table td,
