@@ -116,9 +116,13 @@ ok "Disk: ${AVAIL_DISK_GB}GB available"
 if swapon --show 2>/dev/null | grep -q .; then
   warn "Swap is active. Disabling (relay uses RAM-only storage)..."
   swapoff -a
-  # Persist across reboots
-  sed -i '/\sswap\s/d' /etc/fstab 2>/dev/null || true
-  ok "Swap disabled"
+  # Persist across reboots. Back up /etc/fstab before editing so the operator can
+  # restore swap if this host should not have had it removed.
+  if [[ -f /etc/fstab ]]; then
+    cp -a /etc/fstab "/etc/fstab.paramant-bak.$(date -u +%Y%m%dT%H%M%SZ)" 2>/dev/null || true
+    sed -i '/\sswap\s/d' /etc/fstab 2>/dev/null || true
+  fi
+  ok "Swap disabled (fstab backed up to /etc/fstab.paramant-bak.*)"
 else
   ok "Swap already disabled"
 fi
@@ -245,10 +249,18 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" pull --ff-only -q
   ok "Updated to latest"
 else
-  info "Cloning ${REPO}..."
-  git clone --depth 1 --branch "${VERSION}" "$REPO" "$INSTALL_DIR" -q 2>/dev/null \
-    || git clone --depth 1 "$REPO" "$INSTALL_DIR" -q
-  ok "Cloned to ${INSTALL_DIR}"
+  info "Cloning ${REPO} at ${VERSION}..."
+  # Pin to the release tag. Do NOT silently fall back to an unpinned default-
+  # branch clone if the tag is missing/unreachable: that would install whatever
+  # HEAD happens to be (supply-chain integrity gap). Fail loudly so the operator
+  # can pick a known-good VERSION instead of getting a surprise revision.
+  if ! git clone --depth 1 --branch "${VERSION}" "$REPO" "$INSTALL_DIR" -q; then
+    err "Could not clone ${REPO} at tag ${VERSION}."
+    err "Refusing to fall back to an unpinned clone. Check your network, or set"
+    err "VERSION to a tag that exists (see ${REPO}/tags) and re-run."
+    exit 1
+  fi
+  ok "Cloned ${VERSION} to ${INSTALL_DIR}"
 fi
 
 cd "$INSTALL_DIR"

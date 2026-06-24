@@ -158,7 +158,7 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
@@ -166,7 +166,7 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
+               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
   full:       null,
@@ -234,16 +234,27 @@ initNats();
 // deviceQueues[apiKey:deviceId] = [sha256_hash, ...]
 const deviceQueues = new Map(); // `${acctOf(apiKey)}:${deviceId}` → string[]
 
+// Cap per-device queue length. The read-side drain (/v2/stream-next) only shifts
+// entries whose blob already expired, so a device that never polls would grow its
+// queue without bound. Cap it and drop the oldest hash (FIFO) past the limit.
+const MAX_DEVICE_QUEUE = parseInt(process.env.MAX_DEVICE_QUEUE || '1000');
+
 function deviceQueuePush(apiKey, deviceId, hash) {
   if (!deviceId) return;
   const k = `${acctOf(apiKey)}:${deviceId}`;
   if (!deviceQueues.has(k)) deviceQueues.set(k, []);
   const q = deviceQueues.get(k);
   if (!q.includes(hash)) q.push(hash); // dedup
+  while (q.length > MAX_DEVICE_QUEUE) q.shift(); // bound per-device memory
 }
 
 // ── DID — Decentralized Identity (W3C) ───────────────────────────────────────
 const didRegistry = new Map();
+// Per-API-key DID counter so the MAX_DID_PER_KEY cap is enforced in O(1) instead
+// of an O(n) full scan of didRegistry on every registration. Kept in sync at the
+// single didRegistry.set site (only incremented when a genuinely-new did is added,
+// not on re-registration of an existing did).
+const didKeyCounts = new Map(); // apiKey → count
 
 function generateDid(deviceId, pubKeyHex) {
   const hash = crypto.createHash('sha3-256').update(deviceId + pubKeyHex).digest('hex').slice(0,32);
@@ -717,7 +728,14 @@ function produceSth(tree_size, sha3_root) {
 // ── Peer STH storage — mirrors signed tree heads from other relays ─────────────
 const PEER_STH_DIR = process.env.PEER_STH_DIR || '/data/peer-sths';
 const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
-// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string }
+// Cap the NUMBER of distinct peers we mirror. /v2/sth/ingest only verifies an
+// ML-DSA-65 ownership signature (no API-key/admin gate), so an attacker can mint
+// unlimited fresh relay keypairs and have each add a Map entry + an open write
+// fd + a growing .jsonl file. Per-peer records are already capped (peer.sths
+// shift), but the count of peers/fds/files was unbounded — so cap it and evict
+// the least-recently-updated peer (closing its fd) when full.
+const PEER_STH_MAX_PEERS = parseInt(process.env.PEER_STH_MAX_PEERS || '256');
+// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string, last: epoch_ms }
 const peerSths = new Map();
 const _peerSthStreams = new Map(); // pk_hash → fs.WriteStream
 
@@ -733,6 +751,25 @@ function _peerSthStreamFor(pkHash) {
   } catch (e) {
     log('warn', 'peer_sth_stream_open_failed', { err: e.message });
     return null;
+  }
+}
+
+// Close + drop the write stream for an evicted peer so its fd is released.
+function _peerSthStreamClose(pkHash) {
+  const stream = _peerSthStreams.get(pkHash);
+  if (stream) { try { stream.end(); } catch {} _peerSthStreams.delete(pkHash); }
+}
+
+// Evict least-recently-updated peers until under PEER_STH_MAX_PEERS. Keeps the
+// fd table and .jsonl set bounded regardless of how many keys an attacker mints.
+function _evictPeerSthsIfNeeded() {
+  if (peerSths.size <= PEER_STH_MAX_PEERS) return;
+  const ordered = [...peerSths.entries()].sort((a, b) => (a[1].last || 0) - (b[1].last || 0));
+  for (const [pkHash] of ordered) {
+    if (peerSths.size <= PEER_STH_MAX_PEERS) break;
+    peerSths.delete(pkHash);
+    _peerSthStreamClose(pkHash);
+    log('info', 'peer_sth_evicted', { id: pkHash.slice(0, 16), peers: peerSths.size });
   }
 }
 
@@ -754,9 +791,11 @@ function loadPeerSths() {
         for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
         const recent = sths.slice(-PEER_STH_MAX);
         const pk_b64 = recent.length > 0 ? (recent[recent.length - 1].public_key || '') : '';
-        peerSths.set(id, { sths: recent, pk_b64 });
+        const lastRec = recent.length > 0 ? Date.parse(recent[recent.length - 1].received_at || '') : 0;
+        peerSths.set(id, { sths: recent, pk_b64, last: Number.isFinite(lastRec) ? lastRec : 0 });
       } catch {}
     }
+    _evictPeerSthsIfNeeded();
     if (peerSths.size > 0) log('info', 'peer_sths_loaded', { peers: peerSths.size });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'peer_sths_load_failed', { err: e.message });
@@ -1330,11 +1369,9 @@ const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/l
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
-// Trial key request rate limiting (in-memory)
-const trialRequests   = new Map(); // email_lc → last_request_ts
-const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
+const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest (unauthenticated)
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
@@ -1344,11 +1381,10 @@ const teamRateLimits = new Map(); // team_id → { count, resetAt }
 // especially with spoofable client IPs. Mirrors the dpa*/usedTotp sweeps.
 setInterval(() => {
   const now = Date.now();
-  const DAY = 86_400_000, HOUR = 3_600_000;
-  for (const [k, t]     of trialRequests)        { if (now - t > 7 * DAY) trialRequests.delete(k); }
-  for (const [k, times] of trialIpRequests)      { const kept = times.filter(t => now - t < DAY);  if (kept.length) trialIpRequests.set(k, kept);      else trialIpRequests.delete(k); }
+  const HOUR = 3_600_000;
   for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
   for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
+  for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
   for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
 }, 3_600_000);
 
@@ -1794,6 +1830,10 @@ function safeEqual(a, b) {
     return crypto.timingSafeEqual(ba, bb);
   } catch { return false; }
 }
+
+// Mask a secret API key for list/observation output. Canonical implementation
+// lives in lib/keys-table.js (unit-tested); aliased here for the admin handlers.
+const maskKey = keysTable.maskApiKey;
 
 // ── DID-auth replay protection ────────────────────────────────────────────────
 // The previous DID-auth signed ONLY req.url, so any captured (X-DID,
@@ -2862,125 +2902,6 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // ── POST /v2/request-trial — Self-service trial key request (public, no auth) ──
-  if (path === '/v2/request-trial' && req.method === 'POST') {
-    try {
-      const d = JSON.parse((await readBody(req, 4096)).toString());
-
-      // Honeypot: bots fill hidden fields; legitimate browsers leave them empty
-      if (d._hp) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true })); }
-
-      const rawEmail = (d.email || '').toString().trim();
-      const name = (d.name || '').toString().trim().slice(0, 128);
-      const useCase = ((d.use_case || d.usecase) || '').toString().trim().slice(0, 512);
-      if (!name || !rawEmail || !useCase) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'name, email and use_case are required' }));
-      }
-      if (rawEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'Invalid email address' }));
-      }
-
-      const now = Date.now();
-      const DAY_MS = 86_400_000;
-
-      // IP rate limit: max 3 per IP per 24h
-      // Use CF-Connecting-IP (Cloudflare) or X-Real-IP (nginx $remote_addr) instead of
-      // socket address, which collapses to the proxy IP in reverse-proxy deployments.
-      const clientIp = getClientIp(req);
-      const ipTimes = (trialIpRequests.get(clientIp) || []).filter(t => now - t < DAY_MS);
-      if (ipTimes.length >= 3) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
-        return res.end(J({ error: 'Too many requests' }));
-      }
-
-      // Email rate limit: 1 per 7 days — generic 429 (no info disclosure about existing key)
-      const emailKey = rawEmail.toLowerCase();
-      if (trialRequests.has(emailKey) && now - trialRequests.get(emailKey) < 7 * DAY_MS) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '604800' });
-        return res.end(J({ error: 'Too many requests' }));
-      }
-
-      // Record rate limit entries
-      ipTimes.push(now);
-      trialIpRequests.set(clientIp, ipTimes);
-      trialRequests.set(emailKey, now);
-
-      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
-      const label = `trial:${name.replace(/\s+/g, '_').toLowerCase().slice(0, 40)}`;
-      const trialCreated = now;
-      apiKeys.set(newKey, {
-        plan: 'community', label, email: rawEmail, active: true, dsa_pub: '',
-        daily_uploads: 0, daily_reset_ts: now + DAY_MS,
-        is_trial: true, trial_created: trialCreated,
-        uploads_today: 0, last_upload_day: '',
-      });
-
-      // Persist to JSONL (append-only, survives restarts independently of users.json)
-      const trialRecord = JSON.stringify({ key: newKey, label, email: rawEmail, active: true, created: trialCreated, trial_metadata: { name, use_case: useCase } });
-      fs.promises.appendFile(TRIAL_KEYS_FILE, trialRecord + '\n').catch(e => log('warn', 'trial_key_jsonl_failed', { err: e.message }));
-
-      // Also persist to users.json (admin visibility) — full read-modify-write inside queue
-      _mutateUsersJson(d => {
-        d.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date(trialCreated).toISOString(), trial_metadata: { name, use_case: useCase } });
-        d.updated = new Date().toISOString();
-      });
-
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      function sendEmail(to, subject, html) {
-        if (!RESEND_KEY) return;
-        const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [to], subject, html });
-        const r = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, res2 => { res2.on('data', () => {}); res2.on('end', () => {}); });
-        r.on('error', e => log('warn', 'trial_email_failed', { to, err: e.message }));
-        r.write(body); r.end();
-      }
-
-      // Welcome email to requester
-      const welcomeHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Hi ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">Your free trial API key is ready. It gives you access to the community relay — burn-on-read, ML-KEM-768 encryption, EU/DE jurisdiction.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
-            <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
-            <div style="font-size:14px;color:#ededed;word-break:break-all">${newKey}</div>
-          </div>
-          <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-            IMPORTANT: Save this key in your password manager immediately. It is generated once and cannot be recovered.
-          </div>
-          <p style="font-size:12px;color:#555">Limits: 10 uploads/day · 1h TTL · 5MB · 30-day trial</p>
-          <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install paramant-sdk
-
-from paramant import ParamantClient
-client = ParamantClient(api_key='${newKey}')
-session = client.create_session('recipient@example.com')</pre>
-          <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> &nbsp;&middot;&nbsp; <a href="https://paramant.app" style="color:#888">Dashboard</a></p>
-          <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 &nbsp;&middot;&nbsp; Burn-on-read &nbsp;&middot;&nbsp; EU/DE &nbsp;&middot;&nbsp; BUSL-1.1</p>
-        </div>`;
-      sendEmail(rawEmail, 'Your PARAMANT trial API key', welcomeHtml);
-
-      // Notification email to operator
-      const notifyHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:32px;max-width:480px">
-          <div style="font-size:14px;font-weight:600;margin-bottom:16px;letter-spacing:.08em">PARAMANT — new trial key</div>
-          <table style="font-size:12px;color:#888;border-collapse:collapse">
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Name</td><td>${escHtml(name)}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td>${escHtml(rawEmail)}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Use case</td><td>${escHtml(useCase.slice(0, 120))}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Key prefix</td><td>${newKey.slice(0, 12)}…</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Time</td><td>${new Date(now).toISOString()}</td></tr>
-          </table>
-        </div>`;
-      sendEmail('privacy@paramant.app', `New trial key: ${name} <${rawEmail}>`, notifyHtml);
-
-      log('info', 'trial_key_requested', { name, email: rawEmail, use_case: useCase.slice(0, 80) });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, key: newKey, email: rawEmail,
-        message: 'Your API key is ready. Save it now — it cannot be recovered. A copy has also been sent to your email.' }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-  }
-
   // ── POST /v2/sign-dpa — Electronic DPA signature (GDPR Art. 28) ──────────────
   if (path === '/v2/sign-dpa' && req.method === 'POST') {
     try {
@@ -3231,6 +3152,22 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(503, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ML-DSA-65 not available — STH ingestion disabled' }));
     }
+    // This endpoint is unauthenticated (ownership-signature only), so a flood of
+    // attacker-minted relay keypairs is otherwise unbounded. Per-IP limiter caps
+    // the rate before any body read / signature verify (mirrors anon-inbound).
+    {
+      const STH_INGEST_RPH = parseInt(process.env.STH_INGEST_RATE_PER_HOUR || '120');
+      const HOUR_MS = 3_600_000;
+      const ip      = getClientIp(req);
+      const now     = Date.now();
+      const ipTimes = (sthIngestIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
+      if (ipTimes.length >= STH_INGEST_RPH) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
+        return res.end(J({ error: 'Rate limit: too many STH ingest requests from this address. Try again later.' }));
+      }
+      ipTimes.push(now);
+      sthIngestIpRequests.set(ip, ipTimes);
+    }
     let body;
     try { body = JSON.parse((await readBody(req, 65536)).toString()); } catch {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -3261,9 +3198,19 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Signature verification failed' }));
     }
-    if (!peerSths.has(computedPkHash)) peerSths.set(computedPkHash, { sths: [], pk_b64: public_key });
+    if (!peerSths.has(computedPkHash)) {
+      peerSths.set(computedPkHash, { sths: [], pk_b64: public_key, last: Date.now() });
+      _evictPeerSthsIfNeeded(); // bound distinct peers (Map entries + fds + .jsonl files)
+    }
     const peer = peerSths.get(computedPkHash);
+    // If this peer was just evicted by the cap (e.g. immediately re-added under
+    // load), it is no longer in the Map — skip the write to avoid resurrecting it.
+    if (!peer) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Peer relay table at capacity. Try again later.' }));
+    }
     peer.pk_b64 = public_key;
+    peer.last = Date.now();
     const record = { relay_id, relay_pk_hash: computedPkHash, sha3_root, timestamp, tree_size,
                      version: version || 1, signature, public_key, received_at: new Date().toISOString() };
     peer.sths.push(record);
@@ -4232,18 +4179,20 @@ session = client.create_session('recipient@example.com')</pre>
         }
         times.push(now); invDidIpRequests.set(ipKey, times);
       }
-      // Rate limit: max 500 DIDs per API key to prevent RAM DoS
+      // Rate limit: max 500 DIDs per API key to prevent RAM DoS. Counter is O(1)
+      // (didKeyCounts) instead of an O(n) scan of the whole registry per request.
       const MAX_DID_PER_KEY = 500;
       if (apiKey) {
-        let keyDidCount = 0;
-        for (const e of didRegistry.values()) { if (e.key === apiKey) keyDidCount++; }
+        const keyDidCount = didKeyCounts.get(apiKey) || 0;
         if (keyDidCount >= MAX_DID_PER_KEY) {
           res.writeHead(429); return res.end(J({ error: `DID limit reached. Max ${MAX_DID_PER_KEY} DIDs per API key.` }));
         }
       }
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
+      const _didIsNew = !didRegistry.has(did); // overwrite of same did must not double-count
       didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
+      if (_didIsNew && apiKey) didKeyCounts.set(apiKey, (didKeyCounts.get(apiKey) || 0) + 1);
       const _didPlan = keyData?.plan || 'pro';
       pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
@@ -4392,13 +4341,40 @@ session = client.create_session('recipient@example.com')</pre>
     // Account fields (kid/account_id/is_primary/scope/created) are ADDITIVE —
     // existing consumers read key/plan/label/email/active; stap-4 self-service
     // and the account-aware admin view use the account grouping.
+    //
+    // Blast-radius hygiene: the bulk list MASKS the secret key by default so a
+    // full pgp_ value is never returned for every account at once. Server-to-
+    // server callers that genuinely need the raw key (revoke/plan-change/reset)
+    // opt in with ?reveal=1; per-row reveal is also available at
+    // GET /v2/admin/keys/reveal/:account_id. key_masked is always present so
+    // browser-facing list views can render rows without ever holding a secret.
+    const reveal = query.reveal === '1' || query.reveal === 'true';
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
-      key: k, plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
+      key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
       kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, count: keys.length, keys, license: licenseInfo }));
+    return res.end(J({ ok: true, count: keys.length, masked: !reveal, keys, license: licenseInfo }));
+  }
+
+  // ── GET /v2/admin/keys/reveal/:account_id — reveal ONE full secret key ──────
+  // Single-key counterpart to the masked list: returns the full pgp_ value for
+  // exactly one account/key so an operator never has to pull the whole table in
+  // the clear. Path-param (mirrors /v2/admin/usage/:account_id) so no query
+  // parse. ADMIN_TOKEN-gated by the admin-path guard above. Matches by
+  // account_id, then by the raw key, then by kid.
+  const revealGet = path.match(/^\/v2\/admin\/keys\/reveal\/(.+)$/);
+  if (revealGet && req.method === 'GET') {
+    const id = decodeURIComponent(revealGet[1]);
+    const entry = [...apiKeys.entries()].find(([k, v]) => (v.account_id || k) === id || k === id || v.kid === id);
+    if (!entry) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'key_not_found' })); }
+    const [k, v] = entry;
+    log('info', 'admin_key_revealed', { account: String(v.account_id || k).slice(0, 12), kid: v.kid || null });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
+      account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
+      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null }));
   }
 
   // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────

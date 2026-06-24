@@ -6,7 +6,7 @@
 # Compiles the paramant-core-node napi binding for musl, so it loads inside the
 # node:22-alpine runtime (a glibc build would not). Pinned to a paramant-core
 # commit for reproducibility; bump PARAMANT_CORE_COMMIT when upgrading.
-FROM rust:1.95-alpine AS paramant-core-binding
+FROM rust:1.95-alpine@sha256:606fd313a0f49743ee2a7bd49a0914bab7deedb12791f3a846a34a4711db7ed2 AS paramant-core-binding
 
 RUN apk add --no-cache musl-dev gcc g++ make cmake ninja clang clang-dev llvm-dev perl nasm git bash
 ENV LIBCLANG_PATH=/usr/lib
@@ -29,11 +29,14 @@ FROM node:22-alpine3.21@sha256:af8023ec879993821f6d5b21382ed915622a1b0f1cc03dbeb
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 # Strip the @paramant/core dev file-link (resolvable only in a sibling checkout);
 # the binding is installed from the paramant-core-binding stage in the runtime.
-RUN node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));if(p.dependencies)delete p.dependencies['@paramant/core'];fs.writeFileSync('package.json',JSON.stringify(p,null,2))" \
- && npm install --omit=dev && npm cache clean --force
+# Strip it from BOTH package.json and package-lock.json so the two stay in sync
+# and `npm ci` (which fails on any drift) accepts the lockfile. Every other
+# dependency then installs at its exact lockfile-pinned version (no ^ re-resolve).
+RUN node -e "const fs=require('fs');for(const f of ['package.json','package-lock.json']){const j=JSON.parse(fs.readFileSync(f));if(j.dependencies)delete j.dependencies['@paramant/core'];if(j.packages){if(j.packages['']&&j.packages[''].dependencies)delete j.packages[''].dependencies['@paramant/core'];delete j.packages['node_modules/@paramant/core'];delete j.packages['../../paramant-core/crates/paramant-core-node'];}fs.writeFileSync(f,JSON.stringify(j,null,2));}" \
+ && npm ci --omit=dev && npm cache clean --force
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 # Lean image: no build tools, no npm, no compilers — only the relay and its deps.

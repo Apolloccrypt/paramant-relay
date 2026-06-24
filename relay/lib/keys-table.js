@@ -21,6 +21,18 @@ function computeKid(key) {
   return 'k_' + crypto.createHash('sha256').update(String(key)).digest('hex').slice(0, 12);
 }
 
+// Mask a secret API key for list/observation output so the full pgp_ value is
+// never returned in bulk. Keeps a short prefix + last 4 so an operator can tell
+// rows apart, without leaking enough to use the key. The full value is only
+// returned by the explicit ?reveal=1 list opt-in or the single-key reveal route
+// (both ADMIN_TOKEN-gated, for server-to-server callers). Short strings (<=12)
+// are returned unchanged — they are not full keys.
+function maskApiKey(key) {
+  const s = String(key || '');
+  if (s.length <= 12) return s;
+  return s.slice(0, 8) + '…' + s.slice(-4);
+}
+
 // Parse the additive account fields off a raw users.json key record, with
 // backward-compatible defaults. A record with no explicit account_id is its own
 // account (account_id = key), is its own primary, full scope, and — being a
@@ -165,4 +177,4 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
   return { previous, current: key };
 }
 
-module.exports = { VALID_SCOPES, computeKid, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
+module.exports = { VALID_SCOPES, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
