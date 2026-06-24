@@ -31,6 +31,7 @@ let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,ta
 let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
 let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indicator
 let _drag = null;             // active stamp drag-reposition gesture
+let _reviewZoom = 1;          // zoom factor of the review document preview
 
 const state = {
   signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
@@ -931,6 +932,30 @@ async function renderDocPreview() {
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
 
+  _reviewZoom = 1;
+  // A small zoom control so the signer can inspect the document + seal at the
+  // last step before signing (DocuSign/Adobe keep the document interactive).
+  // The whole zoomwrap (canvas/img + the stamp overlay) is CSS-scaled together,
+  // so the stamp stays glued to its spot with no repositioning math.
+  const buildReviewZoom = (zoomwrap) => {
+    const bar = document.createElement('div');
+    bar.className = 'ds-zoom ds-rv-zoom';
+    bar.innerHTML = '<button type="button" aria-label="Zoom out" data-z="out">&minus;</button>' +
+      '<span class="ds-rv-pct">100%</span><button type="button" aria-label="Zoom in" data-z="in">+</button>' +
+      '<button type="button" data-z="fit">Fit</button>';
+    const pct = bar.querySelector('.ds-rv-pct');
+    const apply = () => { zoomwrap.style.transform = 'scale(' + _reviewZoom + ')'; pct.textContent = Math.round(_reviewZoom * 100) + '%'; };
+    bar.addEventListener('click', (e) => {
+      const z = e.target && e.target.dataset && e.target.dataset.z; if (!z) return;
+      if (z === 'out') _reviewZoom = Math.max(1, _reviewZoom / 1.25);
+      else if (z === 'in') _reviewZoom = Math.min(3, _reviewZoom * 1.25);
+      else _reviewZoom = 1;
+      apply();
+    });
+    pane.insertBefore(bar, pane.firstChild);
+    apply();
+  };
+
   if (state.mode === 'pdf') {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
@@ -938,55 +963,50 @@ async function renderDocPreview() {
     const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
     const page = await pdf.getPage(state.stamp.pageIndex + 1);
     const baseViewport = page.getViewport({ scale: 1 });
-    // Target a smaller render for the review (max ~340px wide) so it fits the grid cell.
     const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    const scale = targetW / baseViewport.width;
-    const viewport = page.getViewport({ scale });
+    // Render at 2.5x so CSS-zooming stays sharp; canvas{width:100%} shows it at targetW.
+    const renderScale = (targetW / baseViewport.width) * 2.5;
+    const viewport = page.getViewport({ scale: renderScale });
+    const zoomwrap = document.createElement('div');
+    zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    pane.appendChild(canvas);
+    zoomwrap.appendChild(canvas);
+    pane.appendChild(zoomwrap);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    // Mock the stamp as an absolutely positioned overlay so the user sees
-    // where it will land. Convert PDF points -> displayed pixels.
-    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
+    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;   // pdf pt per displayed px
     const left = state.stamp.x / ratio;
     const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
-    const w = state.stamp.w / ratio;
-    const h = state.stamp.h / ratio;
     const mock = document.createElement('div');
     mock.className = 'ds-mockup-stamp';
-    mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+    mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
     mock.innerHTML = stampInnerHtml();
-    pane.appendChild(mock);
+    zoomwrap.appendChild(mock);
+    buildReviewZoom(zoomwrap);
     return;
   }
 
-  // Image-mode: render the image with the same stamp-mockup overlay
-  // the PDF preview gets, so the signer sees WHERE the seal will land.
   if (state.mode === 'image' && state.signer.docImageDataUrl && state.stamp) {
-    pane.classList.add('has-pdf');   // reuse PDF-pane layout (top-aligned, scrollable)
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative;display:inline-block;width:100%';
+    pane.classList.add('has-pdf');
+    const zoomwrap = document.createElement('div');
+    zoomwrap.style.cssText = 'position:relative;display:block;width:100%;transform-origin:0 0';
     const img = document.createElement('img');
     img.src = state.signer.docImageDataUrl;
     img.alt = state.doc.name;
     img.style.cssText = 'display:block;width:100%;height:auto';
-    wrap.appendChild(img);
-    pane.appendChild(wrap);
+    zoomwrap.appendChild(img);
+    pane.appendChild(zoomwrap);
     img.onload = () => {
-      // Image natural -> displayed ratio
       const rect = img.getBoundingClientRect();
-      const ratio = state.doc && state.signer.docImageDataUrl ? (img.naturalWidth / rect.width) : 1;
-      const left = state.stamp.x / ratio;
-      const top  = state.stamp.y / ratio;
-      const w = state.stamp.w / ratio;
-      const h = state.stamp.h / ratio;
+      const ratio = img.naturalWidth / rect.width;
+      const left = state.stamp.x / ratio, top = state.stamp.y / ratio;
       const mock = document.createElement('div');
       mock.className = 'ds-mockup-stamp';
-      mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+      mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
       mock.innerHTML = stampInnerHtml();
-      wrap.appendChild(mock);
+      zoomwrap.appendChild(mock);
+      buildReviewZoom(zoomwrap);
     };
     return;
   }

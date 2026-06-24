@@ -154,6 +154,10 @@
 .ds-page-nav>*{pointer-events:auto}
 .ds-page-nav input{width:46px;text-align:center;font:inherit;border:1px solid var(--ink-hair);border-radius:6px;padding:2px 4px}
 .ds-page-nav button{border:1px solid var(--ink-hair);background:#fff;border-radius:6px;cursor:pointer;padding:2px 8px;font:inherit}
+/* Review-step document preview: sticky zoom bar + scroll the (CSS-)zoomed content */
+.ds-review-pane.has-pdf{overflow:auto}
+.ds-rv-zoom{position:sticky;top:0;z-index:6;background:#fff;margin:0;padding:6px 4px;width:100%}
+.ds-rv-zoom .ds-rv-pct{font-family:var(--mono);font-size:11px;color:var(--ink-dim);min-width:42px;text-align:center}
 </style>
 </head>
 <body>
