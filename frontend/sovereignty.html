@@ -504,14 +504,18 @@
       <div class="tag">honest about<br/>the gaps</div>
     </div>
 
-    <p>Paramant's application infrastructure is fully EU-based and EU-owned:</p>
+    <p>Paramant's core application infrastructure is EU-based and EU-owned:</p>
     <ul>
       <li><strong>Application servers</strong>: Hetzner (Nuremberg, Germany &amp; Helsinki, Finland)</li>
-      <li><strong>Email delivery</strong>: Resend (EU data processing agreement)</li>
       <li><strong>SIEM/logging</strong>: Wazuh on dedicated EU infrastructure</li>
     </ul>
 
-    <p>Two dependencies at the DNS and CDN layer currently sit outside this boundary:</p>
+    <p>Three dependencies currently sit outside this boundary, at the email, DNS, and CDN layers:</p>
+
+    <h3>Transactional email: Resend (US, under SCC / Data Privacy Framework)</h3>
+    <p>Outbound transactional email (account verification, signing invites, billing notices) is sent through <strong>Resend</strong>. Resend is operated by Plus Five Five, Inc., a US company based in San Francisco; its data processing addendum states that its primary processing takes place in the United States, governed by Standard Contractual Clauses and the EU-US Data Privacy Framework rather than EU data residency. It is therefore subject to US jurisdiction, including the CLOUD Act.</p>
+
+    <p>The practical impact is bounded: Resend receives only the recipient email address and the message we send (a verification link, an invite, or a billing notice). It never receives file contents, encryption keys, account passwords, or relay metadata. It is never used for marketing. This dependency is the same as disclosed in the <a href="/privacy">privacy policy</a>; an EU-resident email provider is on the roadmap.</p>
 
     <h3>DNS and CDN: Cloudflare (current, being replaced)</h3>
     <p>paramant.app currently uses Cloudflare for DNS hosting and static asset delivery. Cloudflare is a US company incorporated in Delaware, subject to US jurisdiction including the CLOUD Act and FISA 702.</p>
