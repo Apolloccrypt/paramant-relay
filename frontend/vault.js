@@ -46,6 +46,7 @@
 
   function unpackPlain(buf) {
     const metaLen = new DataView(buf.buffer, buf.byteOffset, 4).getUint32(0, true);
+    if (metaLen > buf.length - 4) throw new Error('Damaged .prmnt file.');   // bounds before slice/parse
     const meta = JSON.parse(td.decode(buf.subarray(4, 4 + metaLen)));
     return { meta, bytes: buf.subarray(4 + metaLen) };
   }
@@ -74,6 +75,9 @@
     for (let i = 0; i < 5; i++) if (buf[i] !== MAGIC[i]) throw new Error('That is not a .prmnt file.');
     if (buf[5] !== VERSION) throw new Error('This .prmnt was made with a newer version.');
     const iter = new DataView(buf.buffer, buf.byteOffset + 7, 4).getUint32(0, true);
+    // iter is unauthenticated header data; clamp so a crafted/corrupt file can't drive
+    // PBKDF2 to billions of rounds and freeze the tab (DoS) before the passphrase check.
+    if (iter < 1000 || iter > 1000000) throw new Error('That is not a .prmnt file.');
     const salt = buf.subarray(11, 27), nonce = buf.subarray(27, 39), ct = buf.subarray(39);
     const key = await deriveKey(passphrase, salt, iter);
     let plain;
