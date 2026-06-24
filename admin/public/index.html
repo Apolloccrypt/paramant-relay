@@ -168,6 +168,76 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 /* TOTP required badges */
 .chip.required-missing{background:rgba(220,38,38,.08);color:#dc2626;font-weight:600}
 .chip.required-ok{background:rgba(29,78,216,.08);color:#1D4ED8}
+
+/* ════════════════════════════════════════════════════════════════
+   MOBILE-FIRST UX/UI OVERHAUL  (additive — geen JS-hooks aangeraakt)
+   ════════════════════════════════════════════════════════════════ */
+:root{
+  --ink:#0B3A6A; --ink-2:#475569; --ink-mut:#94a3b8; --blue:#1D4ED8;
+  --bg:#F8FAFC; --line:rgba(11,58,106,.12); --line-soft:rgba(11,58,106,.06);
+  --ok:#059669; --warn:#d97706; --danger:#dc2626; --tap:44px; --radius:10px;
+}
+/* Iets warmere kaart-randen + zachte schaduw voor diepte/hiërarchie */
+.card,.sc{border-radius:var(--radius);box-shadow:0 1px 2px rgba(11,58,106,.04)}
+.btn,.l-btn,.lo-btn,.amb,.pag button,.fb input,.fb select,.l-inp,.mc input,.mc select{border-radius:8px}
+.badge,.chip{border-radius:6px}
+.btn{transition:background .15s,transform .05s}.btn:active{transform:translateY(1px)}
+/* Comfortabele tap-targets op touch (laat desktop ongemoeid) */
+@media(hover:none),(pointer:coarse){
+  .btn,.amb,.lo-btn,.pag button,.pag select,.fb input,.fb select{min-height:var(--tap)}
+  .am button{padding-top:13px;padding-bottom:13px;font-size:14px}
+  .tabs button{padding-top:15px;padding-bottom:13px}
+  .amb{padding:9px 14px;font-size:12px}
+}
+/* Tabellen: altijd horizontaal scrollbaar MET een schaduw-cue aan de overvloei-rand */
+.tbl-wrap,#u-table-wrap,#a-results{overflow-x:auto;-webkit-overflow-scrolling:touch;
+  background:
+    radial-gradient(farthest-side at 0 50%,rgba(11,58,106,.10),transparent) 0 0,
+    radial-gradient(farthest-side at 100% 50%,rgba(11,58,106,.10),transparent) 100% 0;
+  background-repeat:no-repeat;background-size:16px 100%,16px 100%;background-attachment:scroll}
+/* ── Tablet ── */
+@media(max-width:900px){.g3{grid-template-columns:1fr 1fr}}
+/* ── Telefoon ── */
+@media(max-width:760px){
+  .main{padding:14px}
+  .hdr{flex-wrap:wrap;height:auto;padding:8px 14px 0;row-gap:4px}
+  .hdr-brand{order:1}.hdr-meta{order:2;margin-left:auto}
+  .tabs{order:3;flex-basis:100%;width:100%;margin-top:6px;border-top:1px solid var(--line);
+    scroll-snap-type:x proximity;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{scroll-snap-align:start;flex:0 0 auto}
+  /* Filters → verticaal, vol-breed */
+  .fb{flex-direction:column;align-items:stretch;gap:8px}
+  .fb>input,.fb>select{width:100%}
+  .fb .sp{display:none}
+  /* Paginatie wikkelt netjes */
+  .pag{flex-wrap:wrap;gap:10px}
+  .pag-info{order:-1;flex-basis:100%;text-align:left;flex:none}
+  /* Modals → bottom-sheet (duim-bereikbaar, knoppen vol-breed) */
+  .mo{align-items:flex-end;padding:0}
+  .mb{max-width:none;width:100%;max-height:92vh;border-radius:16px 16px 0 0}
+  .mfoot{flex-direction:column-reverse;gap:10px}
+  .mfoot>.btn,.mfoot>button{width:100%;text-align:center;justify-content:center}
+  .sc-val{font-size:24px}
+  .toast{left:14px;right:14px;bottom:14px;max-width:none;text-align:center}
+}
+/* ── Kleine telefoon: Users-tabel → kaarten (data-label gevuld in renderUsers) ── */
+@media(max-width:560px){
+  table.tbl.cards thead{display:none}
+  table.tbl.cards,table.tbl.cards tbody{display:block;width:100%}
+  table.tbl.cards tr{display:block;border:1px solid var(--line);border-radius:var(--radius);
+    margin-bottom:10px;background:#fff;padding:4px 2px;box-shadow:0 1px 2px rgba(11,58,106,.04)}
+  table.tbl.cards tr:hover td{background:transparent}
+  table.tbl.cards td{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    border:none;border-bottom:1px solid var(--line-soft);padding:10px 14px;text-align:right}
+  table.tbl.cards tr td:last-child{border-bottom:none}
+  table.tbl.cards td::before{content:attr(data-label);font-family:var(--ff-mono);font-size:10px;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mut);text-align:left;flex:0 0 auto}
+  table.tbl.cards td.actions{justify-content:flex-end}
+  table.tbl.cards td.actions::before{content:none}
+  .amw,.am{position:static}
+  table.tbl.cards td.actions .am{right:0}
+}
 </style>
 </head>
 <body>
@@ -535,18 +605,18 @@ function filterUsers(){
 
 function usersTable(users){
   if(!users.length)return '<div class="empty">No users match filters</div>';
-  return '<table class="tbl" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
+  return '<table class="tbl cards" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
     users.map((u,i)=>{
       const ki=esc(u.key_id||u.key),em=esc(u.email||''),pl=esc(u.plan||'community');
       const hasE=!!u.email,hasTotp=hasE&&u.totp_status!=='none',isRevoked=!u.active;
       return '<tr>'+
-        '<td><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
+        '<td data-label="User"><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
         '</td>'+
-        '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
-        '<td>'+totpBadge(u)+'</td>'+
-        '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
-        '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
-        '<td><div class="amw">'+
+        '<td data-label="Plan"><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
+        '<td data-label="TOTP">'+totpBadge(u)+'</td>'+
+        '<td data-label="Status"><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
+        '<td data-label="Created" class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
+        '<td class="actions"><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" onclick="toggleMenu(event,\'m'+i+'\')">···</button>'+
           '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
             '<button role="menuitem" tabindex="-1" onclick="uAction(\'details\',this)">View details</button>'+
