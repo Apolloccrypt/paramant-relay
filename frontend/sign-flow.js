@@ -30,6 +30,7 @@ const MAX_PREVIEW_PAGES = 30;
 let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,task}], zoom }
 let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
 let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indicator
+let _drag = null;             // active stamp drag-reposition gesture
 
 const state = {
   signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
@@ -511,7 +512,62 @@ function renderStampMarker(wrap, left, top, w, h) {
   m.className = 'ds-stamp-marker';
   m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
   m.innerHTML = stampMockupHtml();
+  m.addEventListener('pointerdown', onStampPointerDown);   // drag to reposition
   wrap.appendChild(m);
+}
+
+// ── Drag the placed stamp to reposition (coexists with click-to-place) ──────
+function onStampPointerDown(e) {
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  const marker = e.currentTarget, wrap = marker.parentElement;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  _drag = {
+    marker, wrap, rect,
+    grabX: e.clientX - (rect.left + parseFloat(marker.style.left)),
+    grabY: e.clientY - (rect.top + parseFloat(marker.style.top)),
+    w: parseFloat(marker.style.width), h: parseFloat(marker.style.height), moved: false,
+  };
+  try { marker.setPointerCapture(e.pointerId); } catch (_) {}
+  marker.style.cursor = 'grabbing';
+  marker.addEventListener('pointermove', onStampPointerMove);
+  marker.addEventListener('pointerup', onStampPointerUp);
+  marker.addEventListener('pointercancel', onStampPointerUp);
+  e.preventDefault(); e.stopPropagation();
+}
+
+function onStampPointerMove(e) {
+  if (!_drag) return;
+  _drag.moved = true;
+  const left = Math.max(0, Math.min(_drag.rect.width - _drag.w, e.clientX - _drag.rect.left - _drag.grabX));
+  const top = Math.max(0, Math.min(_drag.rect.height - _drag.h, e.clientY - _drag.rect.top - _drag.grabY));
+  _drag.marker.style.left = left + 'px';
+  _drag.marker.style.top = top + 'px';
+}
+
+function onStampPointerUp(e) {
+  if (!_drag) return;
+  const { marker, wrap, w, h, moved } = _drag;
+  marker.removeEventListener('pointermove', onStampPointerMove);
+  marker.removeEventListener('pointerup', onStampPointerUp);
+  marker.removeEventListener('pointercancel', onStampPointerUp);
+  try { marker.releasePointerCapture(e.pointerId); } catch (_) {}
+  marker.style.cursor = 'grab';
+  if (moved) {
+    const left = parseFloat(marker.style.left), top = parseFloat(marker.style.top);
+    const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+    const stampNatW = w * ratio, stampNatH = h * ratio;
+    const natX = left * ratio, natYTop = top * ratio;
+    if (wrap._pdfPage.isImage) {
+      state.stamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
+    } else {
+      const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
+      state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
+    }
+    // Swallow the click the browser fires after pointerup so onPlaceClick on the
+    // wrap does not ALSO re-place the stamp at the cursor.
+    wrap.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+  }
+  _drag = null;
 }
 
 // ====================================================================
