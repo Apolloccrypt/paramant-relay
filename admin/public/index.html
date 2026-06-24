@@ -432,6 +432,9 @@ let openMenu = null;
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+// Event-type display. Older mis-stored records had the type/user swapped (event_type
+// held an object), so fall back to user_id when event_type is not a plain string.
+function evType(e){return typeof e.event_type==='string'?e.event_type:(typeof e.user_id==='string'?e.user_id:'—');}
 function fmt(ts){if(!ts)return '—';const d=new Date(ts);return d.toLocaleDateString('nl-NL',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
 function toast(msg,type=''){const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;el.setAttribute('role','status');document.body.appendChild(el);requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),250);},3200);}
 function showErr(msg){const e=document.getElementById('l-err');e.textContent=msg;e.style.display='block'}
@@ -525,7 +528,7 @@ async function loadOverview(){
       '<div class="card"><div class="card-hdr">Recent activity <small>last 10 events</small></div>'+
         '<div class="al">'+
           (d.recent_activity&&d.recent_activity.length?
-            d.recent_activity.map(e=>'<div class="ai"><span class="t">'+fmt(e.ts).split(' ').slice(-1)[0]+'</span><span class="e">'+esc(e.event_type||'—')+'</span><span class="u">'+esc((e.user_id||'').slice(0,20))+'</span></div>').join(''):
+            d.recent_activity.map(e=>'<div class="ai"><span class="t">'+fmt(e.ts).split(' ').slice(-1)[0]+'</span><span class="e">'+esc(evType(e))+'</span><span class="u">'+esc((e.user_id||'').slice(0,20))+'</span></div>').join(''):
             '<div class="empty">No events yet</div>')+
         '</div>'+
       '</div>'+
@@ -775,7 +778,7 @@ async function fetchAudit(){
   el.innerHTML='<table class="tbl"><thead><tr><th>Timestamp</th><th>Event</th><th>User</th><th>Details</th></tr></thead><tbody>'+
     events.map(e=>'<tr>'+
       '<td class="mono" style="font-size:11px;white-space:nowrap">'+esc(e.ts?new Date(e.ts).toISOString().replace('T',' ').slice(0,19):'—')+'</td>'+
-      '<td><span class="chip active">'+esc(e.event_type||'—')+'</span></td>'+
+      '<td><span class="chip active">'+esc(evType(e))+'</span></td>'+
       '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,20))+'</td>'+
       '<td><details><summary style="cursor:pointer;font-size:11px;color:#475569">show</summary><pre style="font-size:10px;font-family:\'IBM Plex Mono\',monospace;margin-top:4px;color:#0B3A6A;white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
     '</tr>').join('')+'</tbody></table>';
@@ -812,7 +815,7 @@ async function loadBilling(){
           d.recent_checkouts.map(e=>'<tr>'+
             '<td class="mono" style="font-size:11px">'+esc(e.ts?new Date(e.ts).toISOString().slice(0,10):'—')+'</td>'+
             '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,16))+'</td>'+
-            '<td>'+esc(e.event_type||'—')+'</td>'+
+            '<td>'+esc(evType(e))+'</td>'+
           '</tr>').join('')+'</tbody></table>':
           '<div class="empty">No plan changes recorded yet</div>')+
       '</div>'+
@@ -990,7 +993,7 @@ async function openUserDetailsModal(key){
     '</div>'+
     '<div class="card-hdr" style="margin-bottom:8px">Recent audit</div>'+
     '<div class="al">'+(d.audit_events&&d.audit_events.length?
-      d.audit_events.slice(0,10).map(e=>'<div class="ai"><span class="t" style="font-size:10px">'+(e.ts?new Date(e.ts).toISOString().slice(11,19):'—')+'</span><span class="e" style="font-size:11px">'+esc(e.event_type||'—')+'</span></div>').join(''):
+      d.audit_events.slice(0,10).map(e=>'<div class="ai"><span class="t" style="font-size:10px">'+(e.ts?new Date(e.ts).toISOString().slice(11,19):'—')+'</span><span class="e" style="font-size:11px">'+esc(evType(e))+'</span></div>').join(''):
       '<div class="empty" style="padding:12px">No events</div>')+
     '</div>';
 }

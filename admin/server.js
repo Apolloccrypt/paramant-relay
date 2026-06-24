@@ -1214,7 +1214,7 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
-  try { logAuditEvent("webauthn_login", { user_id: String(authedUserId).slice(0, 12) + "…" }); } catch {}
+  try { logAuditEvent(String(authedUserId).slice(0, 12) + "…", "webauthn_login", {}); } catch {}
   res.json({ success: true, email: authedEmail });
 });
 
@@ -1381,7 +1381,7 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
-  try { logAuditEvent("webauthn_register", { user_id: String(flow.user_id).slice(0, 12) + "…" }); } catch {}
+  try { logAuditEvent(String(flow.user_id).slice(0, 12) + "…", "webauthn_register", {}); } catch {}
   res.json({ success: true, email: flow.email, recovery_codes: recoveryCodes });
 });
 
@@ -1605,7 +1605,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
     }, "POST");
     const body = await r.json().catch(() => ({}));
     if (r.status !== 200) return res.status(r.status).json({ error: body.error || "sign_failed" });
-    try { logAuditEvent("parasign_doc_signed", { account: String(user_id).slice(0, 12) + "…", envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
+    try { logAuditEvent(String(user_id).slice(0, 12) + "…", "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
     return res.json({ ok: true, signed_count: body.signed_count, party_count: body.party_count, status: body.status });
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
 });
