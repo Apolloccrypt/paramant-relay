@@ -13,6 +13,13 @@
 import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=12';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
+// Robust PDF.js page render (iOS Safari blank-seal fix) — the single shared helper,
+// also used by /co-sign. Caps the canvas backing store under WebKit's silent
+// ~16.7 Mpx limit, clamps dpr, resets recycled GPU buffers, verifies the raster is
+// non-blank (retry + graceful fallback), and lazy-renders so ~30 pages aren't all
+// live at once. Imported from the already-loaded loader module (modules are
+// singletons, so this does not re-run the loader).
+import { renderPageToCanvas } from '/vendor/pdfjs/pdfjs-loader.js?v=3';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -338,17 +345,20 @@ async function renderPdfForPlacement() {
     const baseViewport = page.getViewport({ scale: 1 });
     const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
     const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
     const wrap = document.createElement('div');
     wrap.className = 'ds-page-wrap';
     wrap.dataset.pageIndex = String(i - 1);
     wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    wrap.appendChild(canvas);
     container.appendChild(wrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Lazy render: only paint pages as they scroll into view so all ~30 canvases
+    // are not simultaneously live (WebKit per-tab canvas budget). The helper caps
+    // the backing store, clamps dpr and verifies the raster is non-blank; a page
+    // that cannot raster gets a placeholder, and wrap._renderOk lets onPlaceClick
+    // refuse to drop a seal on it.
+    const res = await renderPageToCanvas(page, container, { scale, lazy: true, wrap });
+    wrap._render = res;
+    wrap._renderOk = res.ok;
+    res.render().then((ok) => { wrap._renderOk = ok; });
     wrap.addEventListener('click', onPlaceClick);
   }
   $('ds-place-page-count').textContent =
@@ -359,6 +369,14 @@ async function renderPdfForPlacement() {
 function onPlaceClick(e) {
   const wrap = e.currentTarget;
   const canvas = wrap.querySelector('canvas');
+  // Seal-gating: never drop the floating seal on a page that did not raster. If
+  // the helper replaced the canvas with a placeholder (no <canvas>) or the raster
+  // verified blank (wrap._renderOk === false), refuse placement here. (Images and
+  // the desktop happy path always have an ok canvas, so this is a no-op there.)
+  if (!canvas || wrap._renderOk === false) {
+    $('ds-place-hint').textContent = 'This page could not be displayed on your device, so the seal cannot be placed here. Try another page, or use a desktop browser.';
+    return;
+  }
   const rect = canvas.getBoundingClientRect();
   const isImage = !!wrap._pdfPage.isImage;
   const ratio = wrap._pdfPage.width / rect.width;
@@ -761,14 +779,17 @@ async function renderDocPreview() {
     // Target a smaller render for the review (max ~340px wide) so it fits the grid cell.
     const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
     const scale = targetW / baseViewport.width;
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    pane.appendChild(canvas);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Robust render: caps/clamps/verifies. THIS is the call-site that produced the
+    // iOS "blank page + floating seal" bug, so the seal mockup is GATED on a
+    // verified non-blank raster (res.ok). A failed raster shows the placeholder
+    // and NO floating seal — never again a seal over a blank page.
+    const res = await renderPageToCanvas(page, pane, { scale });
+    const canvas = res.canvas;
+    if (!res.ok || !canvas || !canvas.isConnected) return;   // placeholder shown; no seal
     // Mock the stamp as an absolutely positioned overlay so the user sees
-    // where it will land. Convert PDF points -> displayed pixels.
+    // where it will land. Convert PDF points -> displayed pixels. Display width is
+    // the CSS box (getBoundingClientRect), unaffected by the device-pixel backing
+    // store, so the overlay math is identical on desktop and retina.
     const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
     const left = state.stamp.x / ratio;
     const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
@@ -1430,12 +1451,10 @@ async function renderSignedPreview() {
     const baseViewport = page.getViewport({ scale: 1 });
     const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
     const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    container.appendChild(canvas);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // At most two pages here, so render eagerly. The seal is already baked into
+    // the stamped PDF bytes (not a DOM overlay), so there is no floating-seal risk
+    // on this screen; the robust helper still prevents a blank page on iOS.
+    await renderPageToCanvas(page, container, { scale });
   }
 }
 

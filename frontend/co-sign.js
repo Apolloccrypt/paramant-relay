@@ -20,6 +20,10 @@
 import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=12';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
+// Same robust PDF.js render helper as /sign — caps the WebKit canvas backing
+// store, clamps dpr, verifies non-blank, lazy-renders. Keeps /co-sign's document
+// preview from going blank on iOS Safari the same way /sign does.
+import { renderPageToCanvas } from '/vendor/pdfjs/pdfjs-loader.js?v=3';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -263,15 +267,15 @@ async function renderPdfPreview(bytes, host) {
     const page = await pdf.getPage(i);
     const base = page.getViewport({ scale: 1 });
     const targetWidth = Math.min(820, Math.floor(((host.clientWidth || window.innerWidth) - 20) * 0.98)) || 600;
-    const viewport = page.getViewport({ scale: targetWidth / base.width });
+    const scale = targetWidth / base.width;
     const wrap = document.createElement('div');
     wrap.className = 'doc-page';
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    wrap.appendChild(canvas);
     host.appendChild(wrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Lazy + robust render (shared helper): caps the WebKit canvas, clamps dpr,
+    // verifies non-blank, and keeps all ~30 pages from being live at once. The
+    // co-sign preview has no DOM seal overlay, so there is nothing to gate here —
+    // a page that cannot raster simply shows the placeholder.
+    await renderPageToCanvas(page, host, { scale, lazy: true, wrap });
   }
   const meta = document.createElement('div');
   meta.className = 'doc-preview-meta';
