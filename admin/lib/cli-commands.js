@@ -182,6 +182,14 @@ function validateArgs(cmd, rawArgs) {
         if (/[\x00-\x1f\x7f`$;&|<>(){}\\]/.test(v)) {
           return { ok: false, error: `Arg ${spec.name} contains disallowed characters` };
         }
+        // Reject a leading '-' so a value can never be read by a handler script
+        // as an option flag instead of a positional argument (option/argument
+        // injection). A '--' terminator in buildArgv is NOT usable here because
+        // the handlers consume argv as their own $1/$2 positionals (see note on
+        // buildArgv), so this upstream rejection is the guard.
+        if (v[0] === '-') {
+          return { ok: false, error: `Arg ${spec.name} must not start with '-'` };
+        }
         break;
       default:
         return { ok: false, error: `Unknown arg type for ${spec.name}` };
@@ -192,6 +200,12 @@ function validateArgs(cmd, rawArgs) {
 }
 
 // Build the positional argv array for spawn(), in schema declared order.
+// NOTE: handlers in scripts/cli read these as their OWN positional params
+// ($1, $2, ...), so we must NOT prepend a '--' option terminator here -- that
+// would land as $1 and shift every real value by one, breaking the handlers.
+// Option/flag injection is instead blocked upstream in validateArgs(), which
+// rejects any string value beginning with '-'; non-string args are enum/number
+// /email and can never be a bare flag.
 function buildArgv(cmd, values) {
   return cmd.args
     .filter(spec => values[spec.name] !== undefined)

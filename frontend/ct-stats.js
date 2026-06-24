@@ -2,6 +2,15 @@
 (function() {
   var RELAY = 'https://health.paramant.app';
 
+  // Full HTML-entity encoder (escapes & < > " ') so esc() is safe in both text
+  // and attribute contexts. The /ct/feed JSON is relay-controlled, not strictly
+  // trusted, so anything interpolated into innerHTML below is run through this.
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
   function set(id, val) {
     var el = document.getElementById(id);
     if (el) el.textContent = val;
@@ -41,10 +50,15 @@
           var rows = last3.map(function(e) {
             var ts = new Date(e.t);
             var time = ts.toISOString().slice(11, 19);
-            var hash = e.h ? e.h.slice(0, 12) + '...' : '--';
-            return '<div><span style="color:var(--quiet)">#' + e.i + '</span>'
-              + ' &nbsp;&middot;&nbsp; ' + hash
-              + ' &nbsp;&middot;&nbsp; <span style="color:var(--quiet)">' + time + ' UTC</span></div>';
+            // index is an integer log position; coerce and drop anything else.
+            var idx = Number(e.i);
+            var idxStr = Number.isFinite(idx) ? String(Math.trunc(idx)) : '?';
+            // hash is a hex digest; keep only the hex prefix, else show nothing.
+            var hex = /^[0-9a-fA-F]+$/.test(e.h) ? e.h.slice(0, 12) : '';
+            var hash = hex ? hex + '...' : '--';
+            return '<div><span style="color:var(--quiet)">#' + esc(idxStr) + '</span>'
+              + ' &nbsp;&middot;&nbsp; ' + esc(hash)
+              + ' &nbsp;&middot;&nbsp; <span style="color:var(--quiet)">' + esc(time) + ' UTC</span></div>';
           });
           feedEl.innerHTML = rows.join('');
         }
