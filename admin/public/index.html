@@ -811,7 +811,7 @@ async function loadBilling(){
   const dist=d.plan_distribution||{};
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
   el.innerHTML=
-    '<div class="banner stub" role="status"><strong>Beta billing</strong> &mdash; Payment processing (Stripe) is in integration. Customers are manually invoiced. Data shown is stub only.'+'</div>'+
+    '<div class="banner stub" role="status"><strong>Beta billing</strong> &mdash; Payment processing (Mollie) is in integration. Customers are manually invoiced. Data shown is stub only.'+'</div>'+
       '<div class="card"><div class="card-hdr">Recent plan changes <small>'+( d.recent_checkouts?.length||0)+' events</small></div>'+
         (d.recent_checkouts&&d.recent_checkouts.length?
           '<table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead><tbody>'+

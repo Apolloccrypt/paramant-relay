@@ -2431,7 +2431,7 @@ api.post("/user/billing/checkout", authUser, async (req, res) => {
     { EX: 3600 }
   );
 
-  // PLACEHOLDER: replace this block with stripe.checkout.sessions.create() when integrating Stripe
+  // PLACEHOLDER: replace this block with a Mollie payment (mollieClient.payments.create) when integrating Mollie
   res.json({ checkout_url: `/billing/checkout/${token}`, expires_at: expiresAt });
 });
 
@@ -2455,7 +2455,7 @@ api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => 
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === session.user_id);
   const fromPlan = currentKey?.plan || 'community';
 
-  // PLACEHOLDER: replace with stripe.webhooks.constructEvent() verification when integrating Stripe
+  // PLACEHOLDER: replace with Mollie webhook handling (re-fetch payment status) when integrating Mollie
   const updateRes = await callRelay("/v2/admin/keys/update-plan", { key: session.user_id, plan: session.plan_id });
   if (!updateRes.ok) {
     console.error('[billing] update-plan failed:', updateRes.status);

@@ -148,7 +148,7 @@ Located in `admin/lib/email-templates.js`. All emails go via Resend (`RESEND_API
 | `setupEmail` | "Complete your Paramant account setup" / "Set up your new Paramant authenticator" | New account created or TOTP reset confirmed |
 | `resetConfirmationEmail` | "Did you request a TOTP reset? — Paramant" | Two-stage TOTP reset step 1 |
 | `welcomeEmail` | "Your Paramant API key is ready" | Manual send from admin panel |
-| `billingConfirmationEmail` | "Paramant plan upgraded to {plan}" | Plan upgrade (admin or Stripe) |
+| `billingConfirmationEmail` | "Paramant plan upgraded to {plan}" | Plan upgrade (admin or Mollie) |
 | `billingCancellationEmail` | "Your Paramant plan cancellation is scheduled" | Subscription cancelled |
 
 > `dropNotificationEmail` and `accountDeletionEmail` are defined in the module but not yet wired to a UI action.

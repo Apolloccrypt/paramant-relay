@@ -146,15 +146,15 @@ module.exports = {
     class: 'relay-restart', secret: true,
     description: 'Shared token for internal relay<->admin calls. Masked; replace-only.',
   },
-  STRIPE_SECRET_KEY: {
+  MOLLIE_API_KEY: {
     type: 'string', ui: 'input', group: 'Secrets', default: '',
     class: 'relay-restart', secret: true,
-    description: 'Stripe secret key (SaaS billing only). Masked; replace-only.',
+    description: 'Mollie live API key (live_...) for SaaS billing. Masked; replace-only.',
   },
-  STRIPE_WEBHOOK_SECRET: {
+  MOLLIE_TEST_API_KEY: {
     type: 'string', ui: 'input', group: 'Secrets', default: '',
     class: 'relay-restart', secret: true,
-    description: 'Stripe webhook signing secret. Masked; replace-only.',
+    description: 'Mollie test API key (test_...). Masked; replace-only.',
   },
 
   // ---- Panel credentials (masked + READ-ONLY to prevent self-lockout) ------

@@ -304,7 +304,7 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend) for messages we send you</td></tr>
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
-<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Stripe) once billing is enabled</td></tr>
+<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU) once billing is enabled</td></tr>
 <tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Transient (session/rate-limit TTL; audit log volume-capped)</td><td>Never</td></tr>
 </tbody>
 </table>
@@ -348,7 +348,7 @@ footer a{color:var(--ink);text-decoration:none}
 <ul>
 <li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
 <li><strong>Resend</strong>: transactional email only (account verification, signing invites, billing notices). It receives the recipient address and the message we send; it is never used for marketing.</li>
-<li><strong>Stripe</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Stripe handles card data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
+<li><strong>Mollie</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Mollie (a Dutch company, EU jurisdiction, GDPR-native) handles payment data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
 </ul>
 
 <h2>GDPR / AVG</h2>
