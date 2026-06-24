@@ -303,9 +303,7 @@ function loadImageElement(bytes, mime) {
 
 async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
-  teardownPageNav();                                  // image mode: no page-nav
-  placeState = null;
-  { const zb = $('ds-zoom'); if (zb) zb.hidden = true; }  // zoom is PDF-only
+  teardownPageNav();                                  // single image: no page-nav
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -324,6 +322,15 @@ async function renderImageForPlacement() {
   wrap.appendChild(canvas);
   container.appendChild(wrap);
   wrap.addEventListener('click', onPlaceClick);
+
+  // Zoom + drag work for images too (page-nav is multi-page-PDF only).
+  placeState = { isImage: true, wrap, zoom: 1 };
+  { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
+  const zo = $('ds-zoom-out'), zi = $('ds-zoom-in'), zf = $('ds-zoom-fit');
+  if (zo) zo.onclick = () => setPlaceZoom(placeState.zoom / 1.25);
+  if (zi) zi.onclick = () => setPlaceZoom(placeState.zoom * 1.25);
+  if (zf) zf.onclick = () => setPlaceZoom(1);
+  applyPlaceZoom();
 
   $('ds-place-page-count').textContent = '1 image (' + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
 }
@@ -388,9 +395,17 @@ function setPlaceZoom(z) {
 // touched; only the displayed canvas size changes and the marker is repainted.
 async function applyPlaceZoom() {
   if (!placeState) return;
-  const token = ++placeRenderToken;
   const z = placeState.zoom;
   const pctEl = $('ds-zoom-pct'); if (pctEl) pctEl.textContent = Math.round(z * 100) + '%';
+  if (placeState.isImage) {
+    // Image: canvas is at natural resolution, CSS width:100% scales it; zoom =
+    // set the wrap width. No re-render needed.
+    const fit = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    placeState.wrap.style.width = Math.floor(fit * z) + 'px';
+    reflowStampMarker();
+    return;
+  }
+  const token = ++placeRenderToken;
   for (const p of placeState.pages) {
     const scale = fitScaleFor(p.baseViewport) * z;
     const viewport = p.page.getViewport({ scale });
@@ -410,15 +425,19 @@ async function applyPlaceZoom() {
 // display width. Never mutates state.stamp.
 function reflowStampMarker() {
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
-  if (!state.stamp || state.stamp.isImage || !placeState) return;
-  const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex);
-  if (!p) return;
-  const rect = p.canvas.getBoundingClientRect();
-  const ratio = p.wrap._pdfPage.width / rect.width;          // PDF pt per CSS px
+  if (!state.stamp || !placeState) return;
+  let wrap;
+  if (placeState.isImage) wrap = placeState.wrap;
+  else { const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex); wrap = p && p.wrap; }
+  if (!wrap) return;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;            // natural units per CSS px
   const w = state.stamp.w / ratio, h = state.stamp.h / ratio;
   const left = state.stamp.x / ratio;
-  const top = (p.wrap._pdfPage.height - state.stamp.y - state.stamp.h) / ratio;
-  renderStampMarker(p.wrap, left, top, w, h);
+  const top = state.stamp.isImage
+    ? state.stamp.y / ratio                                   // image: top-left origin
+    : (wrap._pdfPage.height - state.stamp.y - state.stamp.h) / ratio;  // pdf: bottom-left flip
+  renderStampMarker(wrap, left, top, w, h);
 }
 
 function teardownPageNav() {
