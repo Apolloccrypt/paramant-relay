@@ -983,6 +983,7 @@ async function renderDocPreview() {
     mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
     mock.innerHTML = stampInnerHtml();
     zoomwrap.appendChild(mock);
+    makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
     buildReviewZoom(zoomwrap);
     return;
   }
@@ -1006,6 +1007,7 @@ async function renderDocPreview() {
       mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
       mock.innerHTML = stampInnerHtml();
       zoomwrap.appendChild(mock);
+      makeReviewStampDraggable(mock, ratio, true, 0, 0);
       buildReviewZoom(zoomwrap);
     };
     return;
@@ -1030,6 +1032,46 @@ async function renderDocPreview() {
     '<div style="margin-top:8px"><strong>SHA3-256</strong></div>' +
     '<div style="font-size:10px">' + sha + '</div>';
   pane.appendChild(meta);
+}
+
+// Make the review preview's stamp draggable so the signer can reposition it on the
+// last screen before signing (one interactive document, Adobe/DocuSign-style). The
+// mockup lives in a CSS-scaled zoomwrap, so screen deltas are divided by _reviewZoom
+// to map back to the un-scaled local px the mockup's left/top use. ratio = doc-unit
+// per local px (computed at zoom 1), so on drop we convert local px -> doc units.
+function makeReviewStampDraggable(mock, ratio, isImage, pageH, pageIndex) {
+  mock.style.pointerEvents = 'auto';
+  mock.style.cursor = 'grab';
+  mock.style.touchAction = 'none';
+  let d = null;
+  mock.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    d = { x0: e.clientX, y0: e.clientY, left0: parseFloat(mock.style.left), top0: parseFloat(mock.style.top) };
+    try { mock.setPointerCapture(e.pointerId); } catch (_) {}
+    mock.style.cursor = 'grabbing';
+    e.preventDefault(); e.stopPropagation();
+  });
+  mock.addEventListener('pointermove', (e) => {
+    if (!d) return;
+    const z = _reviewZoom || 1;
+    const w = parseFloat(mock.style.width), h = parseFloat(mock.style.height);
+    const parent = mock.parentElement;
+    const left = Math.max(0, Math.min(parent.clientWidth - w, d.left0 + (e.clientX - d.x0) / z));
+    const top = Math.max(0, Math.min(parent.clientHeight - h, d.top0 + (e.clientY - d.y0) / z));
+    mock.style.left = left + 'px'; mock.style.top = top + 'px';
+  });
+  const up = (e) => {
+    if (!d) return; d = null;
+    try { mock.releasePointerCapture(e.pointerId); } catch (_) {}
+    mock.style.cursor = 'grab';
+    const left = parseFloat(mock.style.left), top = parseFloat(mock.style.top);
+    const natX = left * ratio, natYTop = top * ratio;
+    const w = parseFloat(mock.style.width) * ratio, h = parseFloat(mock.style.height) * ratio;
+    if (isImage) state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
+    else state.stamp = { pageIndex, x: natX, y: pageH - natYTop - h, w, h };
+  };
+  mock.addEventListener('pointerup', up);
+  mock.addEventListener('pointercancel', up);
 }
 
 function renderSigPreview() {
