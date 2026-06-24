@@ -27,6 +27,31 @@ const STAMP_PDF_W = 240;
 const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
 
+// --- Preview-render robustness (iOS Safari blank-canvas + race fixes) -------
+// Wait one layout frame so a pane that just became visible (or is mid-CSS-
+// transition) reports its settled width before we read clientWidth. Without
+// this, clientWidth is read while display:none / mid-transition and returns a
+// minuscule or stale value -> a 1px canvas -> a blank preview.
+function nextFrame() {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+// Clamp a pane's content width to a sane render target. The old `|| 340`
+// fallback only rescued an EXACT 0; a value of 1 (mid-transition) slipped
+// through and produced a 1px-wide canvas. Min keeps the raster legible; max
+// keeps it inside the grid cell.
+function previewTargetWidth(pane, max, min) {
+  const w = Math.floor((pane && pane.clientWidth) || max);
+  return Math.min(max, Math.max(min, w));
+}
+
+// Re-entrancy guard. Each preview-render bumps this counter and remembers its
+// own ticket; after an `await page.render(...)` it checks the counter still
+// matches before touching the (possibly already-cleared) pane. A newer render
+// that ran `pane.innerHTML = ''` therefore can never be overwritten by an
+// older async render still finishing in the background.
+let __previewGen = 0;
+
 const state = {
   signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
   mode: null,            // 'pdf' | 'image' | 'hash'
@@ -327,16 +352,22 @@ async function renderImageForPlacement() {
 async function renderPdfForPlacement() {
   $('ds-place-continue').disabled = true;
   const pdfjs = await waitForPdfjs();
+  const gen = ++__previewGen;
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
 
   const container = $('ds-pdf-canvas-list');
   container.innerHTML = '';
+  // Settle layout before measuring (the placement step may have just become
+  // visible on iOS Safari); the canvas width feeds the click->coords ratio, so
+  // a minuscule canvas here also mis-places the seal, not just blanks it.
+  await nextFrame();
+  if (gen !== __previewGen) return;
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
     const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    const targetWidth = Math.min(820, Math.max(280, Math.floor((window.innerWidth || 820) * 0.88)));
     const scale = targetWidth / baseViewport.width;
     const viewport = page.getViewport({ scale });
     const wrap = document.createElement('div');
@@ -346,9 +377,13 @@ async function renderPdfForPlacement() {
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
+    canvas.style.background = '#fff';
     wrap.appendChild(canvas);
+    if (gen !== __previewGen) return;
     container.appendChild(wrap);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Abort if a newer placement render replaced the list mid-loop.
+    if (gen !== __previewGen) return;
     wrap.addEventListener('click', onPlaceClick);
   }
   $('ds-place-page-count').textContent =
@@ -748,28 +783,42 @@ async function renderReviewPreviews() {
 async function renderDocPreview() {
   const pane = $('ds-review-doc-preview');
   if (!pane) return;
+  const gen = ++__previewGen;
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
 
   if (state.mode === 'pdf') {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
+    // Let the pane settle to its real width before measuring (it may have just
+    // become visible / be mid-transition on iOS Safari).
+    await nextFrame();
+    if (gen !== __previewGen) return;
     const copy = new Uint8Array(state.doc.bytes);
     const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
     const page = await pdf.getPage(state.stamp.pageIndex + 1);
     const baseViewport = page.getViewport({ scale: 1 });
-    // Target a smaller render for the review (max ~340px wide) so it fits the grid cell.
-    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
+    // Target a smaller render for the review (max ~340px, min 280px so it never
+    // collapses to a minuscule/blank raster) so it fits the grid cell.
+    const targetW = previewTargetWidth(pane, 340, 280);
     const scale = targetW / baseViewport.width;
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
+    canvas.style.background = '#fff';   // white under a dark PDF + seal stays legible
+    if (gen !== __previewGen) return;
     pane.appendChild(canvas);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // A newer render may have cleared the pane while this one was drawing; if so
+    // the canvas is detached -> do not place a stamp overlay into a stale pane.
+    if (gen !== __previewGen) return;
     // Mock the stamp as an absolutely positioned overlay so the user sees
-    // where it will land. Convert PDF points -> displayed pixels.
-    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
+    // where it will land. Convert PDF points -> displayed pixels. Measure the
+    // canvas's displayed width; fall back to its pixel width if the layout box
+    // is not measurable yet (avoids a divide-by-zero that hides the stamp).
+    const dispW = canvas.getBoundingClientRect().width || canvas.width;
+    const ratio = baseViewport.width / dispW;
     const left = state.stamp.x / ratio;
     const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
     const w = state.stamp.w / ratio;
@@ -1393,6 +1442,7 @@ function renderPartyLinks(mp) {
 async function renderSignedPreview() {
   const container = $('ds-signed-preview');
   if (!container) return;
+  const gen = ++__previewGen;
   container.innerHTML = '';
   const r = state.result;
 
@@ -1421,6 +1471,9 @@ async function renderSignedPreview() {
   // PDF mode: render the stamp page (and the next page if it exists) so the
   // signer sees their stamp in context without scrolling long documents.
   const pdfjs = await waitForPdfjs();
+  // Settle layout before measuring the viewport width (iOS Safari).
+  await nextFrame();
+  if (gen !== __previewGen) return;
   const copy = new Uint8Array(r.stampedBytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
   const idxs = [state.stamp.pageIndex];
@@ -1428,14 +1481,20 @@ async function renderSignedPreview() {
   for (const idx of idxs) {
     const page = await pdf.getPage(idx + 1);
     const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    // Clamp to [280, 820]: window.innerWidth*0.88 stays comfortably above 280
+    // on a phone, but guard the floor so a transient tiny value can't blank it.
+    const targetWidth = Math.min(820, Math.max(280, Math.floor((window.innerWidth || 820) * 0.88)));
     const scale = targetWidth / baseViewport.width;
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
+    canvas.style.background = '#fff';   // white under a dark PDF keeps it legible
+    if (gen !== __previewGen) return;
     container.appendChild(canvas);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Abort if a newer signed-preview render has since cleared the container.
+    if (gen !== __previewGen) return;
   }
 }
 
