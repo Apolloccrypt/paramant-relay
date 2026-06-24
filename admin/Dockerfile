@@ -7,8 +7,11 @@ LABEL org.opencontainers.image.title="paramant-admin" \
       org.opencontainers.image.licenses="BUSL-1.1"
 
 WORKDIR /app
-COPY package.json .
-RUN npm install --production --quiet && npm cache clean --force
+# Copy the lockfile too and use `npm ci` so the build installs the exact
+# versions in package-lock.json instead of re-resolving the ^ ranges on every
+# rebuild (reproducible, supply-chain-pinned image).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --quiet && npm cache clean --force
 COPY server.js .
 COPY lib/ lib/
 COPY public/ public/
