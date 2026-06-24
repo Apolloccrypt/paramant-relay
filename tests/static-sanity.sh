@@ -126,6 +126,50 @@ if [ -f "$ROOT/admin/server.js" ]; then
   fi
 fi
 
+# ── 7. DID-auth credential is replay-protected ───────────────────────────────
+# The DID-auth signature MUST bind a freshness window + one-time nonce, not just
+# req.url (which replayed forever). Guard against a regression to the bare form.
+echo ""
+echo "7. DID-auth replay protection present..."
+RELAY="$ROOT/relay/relay.js"
+if [ -f "$RELAY" ]; then
+  did7_fail=0
+  # 7a. The replay nonce cache + freshness window + bound message must exist.
+  for needle in "_usedDidNonces" "DID_AUTH_SKEW_MS" "didAuthMessage(" "x-did-nonce" "x-did-ts"; do
+    if ! grep -q "$needle" "$RELAY"; then
+      printf "   FAIL  relay.js  — DID-auth replay guard missing: %s\n" "$needle"
+      did7_fail=1
+    fi
+  done
+  # 7b. authByDid must NOT verify the bare url/payload (the old, replayable form:
+  #     crypto.verify('SHA256', Buffer.from(payload), ...) on a multi-line call).
+  if grep -A2 -P "crypto\.verify\(\s*$" "$RELAY" 2>/dev/null | grep -q "Buffer.from(payload)"; then
+    printf "   FAIL  relay.js  — DID-auth still verifies bare Buffer.from(payload) (replayable)\n"
+    did7_fail=1
+  fi
+  if [ "$did7_fail" -eq 0 ]; then
+    printf "   OK  relay.js  (DID-auth binds ts+nonce, no bare-url replay)\n"
+  else
+    FAIL=$((FAIL + did7_fail))
+  fi
+fi
+
+# ── 8. Open-mode envelope signatures are signer-bound ────────────────────────
+# Open party slots have no email/invite-token gate, so the signature MUST commit
+# to the signer pubkey (recipe v4) — otherwise any caller who knows the envelope
+# id can fill any slot with a substituted key.
+echo ""
+echo "8. Open-mode envelope signer binding present..."
+ENV="$ROOT/relay/envelope.js"
+if [ -f "$ENV" ]; then
+  if grep -q "effectiveRecipe" "$ENV" && grep -q "v >= 4" "$ENV"; then
+    printf "   OK  envelope.js  (open-mode sign() binds signer pubkey via recipe v4)\n"
+  else
+    printf "   FAIL  envelope.js  — open-mode signature is not signer-bound (recipe v4 missing)\n"
+    FAIL=$((FAIL + 1))
+  fi
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "════════ RESULT ════════"

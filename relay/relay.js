@@ -1835,22 +1835,76 @@ function safeEqual(a, b) {
 // lives in lib/keys-table.js (unit-tested); aliased here for the admin handlers.
 const maskKey = keysTable.maskApiKey;
 
-function authByDid(didStr, signature, payload) {
+// ── DID-auth replay protection ────────────────────────────────────────────────
+// The previous DID-auth signed ONLY req.url, so any captured (X-DID,
+// X-DID-Signature) pair replayed forever against the same URL. We now bind a
+// freshness window (X-DID-TS, ±DID_AUTH_SKEW_MS) and a one-time nonce
+// (X-DID-Nonce) into the signed message, and reject any (did|nonce) we have
+// already accepted. The nonce cache self-evicts after the freshness window
+// (mirrors the _usedTotpCodes sweep) and is hard-capped to bound memory under a
+// nonce flood (evict-oldest, like the relay registry).
+const DID_AUTH_SKEW_MS  = 300_000;        // ±5 min, matches the /v2/relays/register window
+const MAX_DID_NONCES     = 50_000;        // hard cap on the in-flight nonce cache
+const _usedDidNonces = new Map();         // `${did}|${nonce}` → expiry ms
+setInterval(() => { const now = Date.now(); for (const [k, exp] of _usedDidNonces) if (now > exp) _usedDidNonces.delete(k); }, 30_000);
+
+// Canonical bytes a DID client must sign. Binding the method + url + timestamp +
+// nonce makes each signature single-use and non-transferable across requests.
+// Byte-identical recipe MUST be reproduced by the SDK:
+//   `${method}\n${url}\n${ts}\n${nonce}`
+function didAuthMessage(method, url, ts, nonce) {
+  return Buffer.from(`${String(method || '').toUpperCase()}\n${url}\n${ts}\n${nonce}`, 'utf8');
+}
+
+// authByDid: verify a DID-auth credential with replay protection. `ctx` carries
+// the request method and the freshness headers (ts, nonce). A missing/stale ts,
+// missing/oversized nonce, or a previously-seen (did|nonce) yields NO principal
+// (fail-closed) — the legacy bare-url signature is no longer accepted.
+function authByDid(didStr, signature, ctx) {
   const entry = didRegistry.get(didStr);
   if (!entry) return null;
   const vm = entry.doc.verificationMethod?.[0];
   if (!vm || !vm.publicKeyHex) return null;
+
+  const { method = 'GET', url = '', ts = '', nonce = '' } = (ctx && typeof ctx === 'object') ? ctx : { url: ctx };
+  // Freshness: timestamp must be a finite ms-epoch within the skew window.
+  const tsNum = Number(ts);
+  if (!ts || !Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > DID_AUTH_SKEW_MS) {
+    log('warn', 'did_auth_stale_or_missing_ts', { did: didStr.slice(0,30) });
+    return null;
+  }
+  // Nonce: required, hex, bounded length (128 hex = 64 random bytes is plenty).
+  if (!nonce || !/^[0-9a-fA-F]{16,128}$/.test(nonce)) {
+    log('warn', 'did_auth_bad_nonce', { did: didStr.slice(0,30) });
+    return null;
+  }
+  const nonceKey = `${didStr}|${nonce.toLowerCase()}`;
+  if (_usedDidNonces.has(nonceKey)) {
+    log('warn', 'did_auth_replay_blocked', { did: didStr.slice(0,30) });
+    return null;
+  }
+
   try {
     const rawKey = Buffer.from(vm.publicKeyHex, 'hex');
     // Wrap raw uncompressed P-256 point in DER-SPKI if not already encoded (0x30 = SEQUENCE tag)
     const spkiKey = rawKey[0] === 0x30 ? rawKey : Buffer.concat([P256_SPKI_PREFIX, rawKey]);
     const valid = crypto.verify(
       'SHA256',
-      Buffer.from(payload),
+      didAuthMessage(method, url, ts, nonce),
       { key: spkiKey, format: 'der', type: 'spki' },
       Buffer.from(signature, 'hex')
     );
-    if (valid) return entry;
+    if (valid) {
+      // Burn the nonce only after a valid signature, so an attacker cannot pre-
+      // poison the cache with arbitrary nonces. Expires one skew-window out;
+      // evict the oldest entry first if the cache is at capacity (flood guard).
+      if (_usedDidNonces.size >= MAX_DID_NONCES) {
+        const oldest = _usedDidNonces.keys().next().value;
+        if (oldest !== undefined) _usedDidNonces.delete(oldest);
+      }
+      _usedDidNonces.set(nonceKey, Date.now() + DID_AUTH_SKEW_MS);
+      return entry;
+    }
   } catch(e) {
     log('warn', 'did_auth_verify_error', { err: e.message, did: didStr.slice(0,30) });
   }
@@ -1871,7 +1925,7 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
@@ -1919,9 +1973,13 @@ const server = http.createServer(async (req, res) => {
   }
   const didHeader = req.headers['x-did'] || '';
   const didSig    = req.headers['x-did-signature'] || '';
+  // Freshness factors that make a DID-auth credential single-use (replay guard):
+  // the client signs `${method}\n${url}\n${ts}\n${nonce}` and sends ts/nonce here.
+  const didTs     = req.headers['x-did-ts']    || '';
+  const didNonce  = req.headers['x-did-nonce'] || '';
   let didAuthEntry = null;
   if (!apiKey && didHeader && didSig) {
-    didAuthEntry = authByDid(didHeader, didSig, req.url);
+    didAuthEntry = authByDid(didHeader, didSig, { method: req.method, url: req.url, ts: didTs, nonce: didNonce });
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
@@ -4726,9 +4784,14 @@ python3 paramant-receiver.py \\
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     const id = path.slice('/v2/envelopes/'.length).split('/')[0];
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
-    const recipeFor = (v) => v >= 2
-      ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
-      : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)';
+    // Recipe the co-signer must reproduce. Open-mode slots are signer-bound
+    // (recipe v4): the signer's public key is appended so the signature commits
+    // to the exact key. Email/PRF slots stay email/document-hash bound (v2/v3).
+    const recipeFor = (v, mode) => (mode || 'open') === 'open'
+      ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes || signer_public_key_bytes)'
+      : (v >= 2
+        ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
+        : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)');
     try {
       // ?p=<i>&t=<invite_token> -> party-scoped view. For email-bound envelopes
       // the token must match (getForParty returns null otherwise); for open
@@ -4740,12 +4803,12 @@ python3 paramant-receiver.py \\
         const view = await store.getForParty(id, pi, token);
         if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, envelope: view, sign_message_recipe: recipeFor(view.recipe_version) }));
+        return res.end(J({ ok: true, envelope: view, sign_message_recipe: recipeFor(view.recipe_version, view.binding_mode) }));
       }
       const env = await store.getRedacted(id);
       if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version) }));
+      return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version, env.binding_mode) }));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
