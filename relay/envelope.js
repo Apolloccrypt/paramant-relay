@@ -105,7 +105,14 @@ function safeTokenEqual(stored, provided) {
 //     as any other signed message (pentest H3). The label is byte-identical
 //     across relay + SDK + core; the NUL terminator delimits it from the id.
 //       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash)
-function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion) {
+//   recipeVersion 4 (open-mode signer binding): like v3 but the SIGNER's public
+//     key is APPENDED, so the signature commits to "key K signed slot i of doc D".
+//     Open envelopes have no email/invite-token gate, so without this any caller
+//     who knew the envelope id could fill any party slot with a substituted key.
+//     Binding the pubkey turns each open-slot signature into a genuine, non-
+//     forgeable commitment to the exact key that produced it.
+//       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash || signer_pub)
+function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion, signerPubB64) {
   const v = Number(recipeVersion) || 1;
   const h = crypto.createHash('sha3-256');
   if (v >= 3) {
@@ -118,6 +125,12 @@ function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex,
     // Decoded email-hash bytes: 32 bytes when present, 0 bytes when the party
     // has no email -- deterministic either way.
     h.update(Buffer.from(partyEmailHashHex || '', 'hex'));
+  }
+  if (v >= 4) {
+    // Signer public-key bytes bind the signature to the exact key. base64 in,
+    // raw bytes mixed in (deterministic; empty -> 0 bytes, but sign() rejects
+    // an empty signer key before reaching here).
+    h.update(Buffer.from(signerPubB64 || '', 'base64'));
   }
   return h.digest();
 }
@@ -389,8 +402,18 @@ class EnvelopeStore {
     // party_index (and, for v2, the party's email hash) - so the recipient
     // signs over their hash, not the document. This binds the signature to
     // this envelope slot. The recipe is chosen by the stored recipe_version.
-    const recipeVersion = parseInt(h.recipe_version, 10) || 1;
-    const msg = signMessageBytes(id, h.doc_hash, pi, emailHash, recipeVersion);
+    //
+    // Open-mode slots have NO email/invite-token gate, so a bare id+party_index
+    // message would let any caller who knew the id fill any slot with a
+    // substituted key. For open mode we therefore upgrade to recipe v4, which
+    // APPENDS the signer's public key: the signature now commits to the exact
+    // key that produced it. (email/v2 and PRF/v3 keep their stored recipe — the
+    // email_hash / internal-proxy path already binds the signer there.) A v4
+    // message mixes the pubkey bytes, so reject an empty signer key up front.
+    const storedRecipe = parseInt(h.recipe_version, 10) || 1;
+    const effectiveRecipe = (mode === 'open') ? 4 : storedRecipe;
+    if (effectiveRecipe >= 4 && !signerPubB64) return { ok: false, code: 'bad_signature' };
+    const msg = signMessageBytes(id, h.doc_hash, pi, emailHash, effectiveRecipe, signerPubB64);
     let verified = false;
     try {
       verified = !!this.sigVerify(Buffer.from(signatureB64, 'base64'), msg, Buffer.from(signerPubB64, 'base64'));

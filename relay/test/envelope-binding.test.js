@@ -63,6 +63,15 @@ async function main() {
   assert.ok(signMessageBytes(ID, DOC, 2, '', 2).equals(signMessageBytes(ID, DOC, 2)), 'v2 empty-email == v1');
   ok('signMessageBytes v2 email commitment');
 
+  // 3b. signMessageBytes v4 commits to the SIGNER pubkey (open-mode binding).
+  const PUB_A = 'cHViQQ==', PUB_B = 'cHViQg==';
+  const v4a = signMessageBytes(ID, DOC, 0, '', 4, PUB_A);
+  const v4b = signMessageBytes(ID, DOC, 0, '', 4, PUB_B);
+  assert.ok(!v4a.equals(v4b), 'v4 changes with a different signer pubkey');
+  assert.ok(!v4a.equals(signMessageBytes(ID, DOC, 0, '', 3, PUB_A)), 'v4 differs from v3 (pubkey appended)');
+  assert.ok(!v4a.equals(signMessageBytes(ID, DOC, 0)), 'v4 differs from the unbound v1 recipe');
+  ok('signMessageBytes v4 signer-pubkey commitment');
+
   // 4. sign(): email-bound slot rejects a public (non-internal) caller
   {
     const store = new EnvelopeStore(fakeRedis(emailHashOf(EMAIL_HASH)), { sigVerify: () => true });
@@ -96,9 +105,11 @@ async function main() {
     ok('sign() accepts matching internal caller with v2 message');
   }
 
-  // 7. sign(): legacy/open envelope (no binding_mode) still works via public path
-  //    and verifies the v1 message - the existing co-sign flow is unchanged.
+  // 7. sign(): open envelope (no binding_mode) works via the public path but is
+  //    now SIGNER-BOUND (recipe v4): the verified message appends the signer's
+  //    public key, so the signature commits to the exact key that produced it.
   {
+    const SIGNER_PUB = 'cHViMQ==';   // base64('pub1')
     const hash = {
       id: ID, doc_hash: DOC, status: 'sent',   // no binding_mode, no recipe_version
       party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending',
@@ -107,10 +118,15 @@ async function main() {
     const store = new EnvelopeStore(fakeRedis(hash), {
       sigVerify: (_sig, msg) => { seenMsg = msg; return true; },
     });
-    const r = await store.sign(ID, 0, 'cHVi', 'c2ln');   // public, no opts
+    const r = await store.sign(ID, 0, SIGNER_PUB, 'c2ln');   // public, no opts
     assert.strictEqual(r.ok, true, 'open envelope accepts public caller');
-    assert.ok(seenMsg && seenMsg.equals(signMessageBytes(ID, DOC, 0)), 'open envelope verifies v1 message');
-    ok('sign() legacy/open envelope unchanged (v1, public)');
+    // The verified message is the v4 recipe bound to THIS signer pubkey...
+    assert.ok(seenMsg && seenMsg.equals(signMessageBytes(ID, DOC, 0, '', 4, SIGNER_PUB)),
+      'open envelope verifies the signer-bound v4 message');
+    // ...and is provably NOT the old (signer-agnostic) v1 message.
+    assert.ok(!seenMsg.equals(signMessageBytes(ID, DOC, 0)),
+      'open-mode message is no longer the unbound v1 recipe');
+    ok('sign() open envelope is signer-bound (v4, public)');
   }
 
   // 8. getForParty: email mode is token-gated and never leaks the invite token
@@ -165,6 +181,53 @@ async function main() {
     const view = await vstore.getForParty(ID, 0, TOKEN);
     assert.ok(view.sign_expires_at && Date.parse(view.sign_expires_at) > Date.now(), 'sign_expires_at set + in the future for a fresh email invite');
     ok('sign() enforces the 7-day signing-invite window (email mode; open unaffected)');
+  }
+
+  // 10. sign(): open-mode signer-substitution is rejected. A real ML-DSA verify
+  //     only passes when the signature matches the message AND the submitted
+  //     pubkey. We model that: the verifier accepts iff the message equals the
+  //     v4 recipe for the *submitted* pubkey. An attacker who signs the legacy
+  //     (signer-agnostic) message, or presents a signature minted for a
+  //     different key, no longer validates against any other key/slot.
+  {
+    const hash = {
+      id: ID, doc_hash: DOC, status: 'sent',   // open envelope
+      party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending',
+    };
+    // Honest verifier: bind sig<->(message, pubkey). Here a "signature" is just
+    // the v4 message the signer committed to; it verifies only if it equals the
+    // v4 message recomputed for the pubkey actually submitted to sign().
+    const honest = (committedMsgB64) => (sigBuf, msg, pubBuf) => {
+      const submittedPub = pubBuf.toString('base64');
+      const expected = signMessageBytes(ID, DOC, 0, '', 4, submittedPub);
+      return Buffer.from(committedMsgB64, 'base64').equals(msg) && msg.equals(expected);
+    };
+
+    const PUB_A = 'cHViQQ==';   // base64('pubA')
+    const PUB_B = 'cHViQg==';   // base64('pubB')
+
+    // (a) Honest signer A: commits to v4 message for PUB_A, submits PUB_A -> ok.
+    const msgA = signMessageBytes(ID, DOC, 0, '', 4, PUB_A).toString('base64');
+    const okStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: honest(msgA) });
+    assert.strictEqual((await okStore.sign(ID, 0, PUB_A, msgA)).ok, true, 'honest signer with matching v4 commitment accepted');
+
+    // (b) Attacker captured A's signature (committed to PUB_A) but submits PUB_B
+    //     to claim the slot as a different identity -> rejected (message for
+    //     PUB_B differs, so the captured commitment no longer verifies).
+    const subStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: honest(msgA) });
+    assert.strictEqual((await subStore.sign(ID, 0, PUB_B, msgA)).code, 'bad_signature', 'key-substituted signature rejected');
+
+    // (c) Legacy attack: sign the OLD signer-agnostic v1 message -> rejected,
+    //     because open mode now verifies the signer-bound v4 message only.
+    const legacyMsg = signMessageBytes(ID, DOC, 0).toString('base64');
+    const legacyStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: honest(legacyMsg) });
+    assert.strictEqual((await legacyStore.sign(ID, 0, PUB_A, legacyMsg)).code, 'bad_signature', 'legacy signer-agnostic signature rejected');
+
+    // (d) Empty signer key is rejected before verify (v4 mixes the pubkey).
+    const emptyStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: () => true });
+    assert.strictEqual((await emptyStore.sign(ID, 0, '', 'c2ln')).code, 'bad_signature', 'empty signer key rejected');
+
+    ok('sign() open-mode signer binding blocks key substitution + legacy replay');
   }
 }
 
