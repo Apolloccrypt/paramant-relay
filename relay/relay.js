@@ -158,7 +158,7 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
-               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/request-trial','/v2/sign-dpa',
+               '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
@@ -166,7 +166,7 @@ const ALLOWED = {
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
-               '/v2/relays','/v2/request-trial','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
+               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
   full:       null,
@@ -1330,9 +1330,6 @@ const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/l
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
-// Trial key request rate limiting (in-memory)
-const trialRequests   = new Map(); // email_lc → last_request_ts
-const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
 
@@ -1344,9 +1341,7 @@ const teamRateLimits = new Map(); // team_id → { count, resetAt }
 // especially with spoofable client IPs. Mirrors the dpa*/usedTotp sweeps.
 setInterval(() => {
   const now = Date.now();
-  const DAY = 86_400_000, HOUR = 3_600_000;
-  for (const [k, t]     of trialRequests)        { if (now - t > 7 * DAY) trialRequests.delete(k); }
-  for (const [k, times] of trialIpRequests)      { const kept = times.filter(t => now - t < DAY);  if (kept.length) trialIpRequests.set(k, kept);      else trialIpRequests.delete(k); }
+  const HOUR = 3_600_000;
   for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
   for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
   for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
@@ -2802,125 +2797,6 @@ const server = http.createServer(async (req, res) => {
       console.error('[lookup-signer]', err.message);
       res.writeHead(500); return res.end(J({ error: 'internal' }));
     }
-  }
-
-  // ── POST /v2/request-trial — Self-service trial key request (public, no auth) ──
-  if (path === '/v2/request-trial' && req.method === 'POST') {
-    try {
-      const d = JSON.parse((await readBody(req, 4096)).toString());
-
-      // Honeypot: bots fill hidden fields; legitimate browsers leave them empty
-      if (d._hp) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true })); }
-
-      const rawEmail = (d.email || '').toString().trim();
-      const name = (d.name || '').toString().trim().slice(0, 128);
-      const useCase = ((d.use_case || d.usecase) || '').toString().trim().slice(0, 512);
-      if (!name || !rawEmail || !useCase) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'name, email and use_case are required' }));
-      }
-      if (rawEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: 'Invalid email address' }));
-      }
-
-      const now = Date.now();
-      const DAY_MS = 86_400_000;
-
-      // IP rate limit: max 3 per IP per 24h
-      // Use CF-Connecting-IP (Cloudflare) or X-Real-IP (nginx $remote_addr) instead of
-      // socket address, which collapses to the proxy IP in reverse-proxy deployments.
-      const clientIp = getClientIp(req);
-      const ipTimes = (trialIpRequests.get(clientIp) || []).filter(t => now - t < DAY_MS);
-      if (ipTimes.length >= 3) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '86400' });
-        return res.end(J({ error: 'Too many requests' }));
-      }
-
-      // Email rate limit: 1 per 7 days — generic 429 (no info disclosure about existing key)
-      const emailKey = rawEmail.toLowerCase();
-      if (trialRequests.has(emailKey) && now - trialRequests.get(emailKey) < 7 * DAY_MS) {
-        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '604800' });
-        return res.end(J({ error: 'Too many requests' }));
-      }
-
-      // Record rate limit entries
-      ipTimes.push(now);
-      trialIpRequests.set(clientIp, ipTimes);
-      trialRequests.set(emailKey, now);
-
-      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
-      const label = `trial:${name.replace(/\s+/g, '_').toLowerCase().slice(0, 40)}`;
-      const trialCreated = now;
-      apiKeys.set(newKey, {
-        plan: 'community', label, email: rawEmail, active: true, dsa_pub: '',
-        daily_uploads: 0, daily_reset_ts: now + DAY_MS,
-        is_trial: true, trial_created: trialCreated,
-        uploads_today: 0, last_upload_day: '',
-      });
-
-      // Persist to JSONL (append-only, survives restarts independently of users.json)
-      const trialRecord = JSON.stringify({ key: newKey, label, email: rawEmail, active: true, created: trialCreated, trial_metadata: { name, use_case: useCase } });
-      fs.promises.appendFile(TRIAL_KEYS_FILE, trialRecord + '\n').catch(e => log('warn', 'trial_key_jsonl_failed', { err: e.message }));
-
-      // Also persist to users.json (admin visibility) — full read-modify-write inside queue
-      _mutateUsersJson(d => {
-        d.api_keys.push({ key: newKey, plan: 'community', label, email: rawEmail, active: true, created: new Date(trialCreated).toISOString(), trial_metadata: { name, use_case: useCase } });
-        d.updated = new Date().toISOString();
-      });
-
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      function sendEmail(to, subject, html) {
-        if (!RESEND_KEY) return;
-        const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [to], subject, html });
-        const r = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, res2 => { res2.on('data', () => {}); res2.on('end', () => {}); });
-        r.on('error', e => log('warn', 'trial_email_failed', { to, err: e.message }));
-        r.write(body); r.end();
-      }
-
-      // Welcome email to requester
-      const welcomeHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
-          <p style="color:#888;margin-bottom:16px">Hi ${escHtml(name)},</p>
-          <p style="color:#888;margin-bottom:24px">Your free trial API key is ready. It gives you access to the community relay — burn-on-read, ML-KEM-768 encryption, EU/DE jurisdiction.</p>
-          <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
-            <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — COMMUNITY TRIAL</div>
-            <div style="font-size:14px;color:#ededed;word-break:break-all">${newKey}</div>
-          </div>
-          <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-            IMPORTANT: Save this key in your password manager immediately. It is generated once and cannot be recovered.
-          </div>
-          <p style="font-size:12px;color:#555">Limits: 10 uploads/day · 1h TTL · 5MB · 30-day trial</p>
-          <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install paramant-sdk
-
-from paramant import ParamantClient
-client = ParamantClient(api_key='${newKey}')
-session = client.create_session('recipient@example.com')</pre>
-          <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> &nbsp;&middot;&nbsp; <a href="https://paramant.app" style="color:#888">Dashboard</a></p>
-          <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 &nbsp;&middot;&nbsp; Burn-on-read &nbsp;&middot;&nbsp; EU/DE &nbsp;&middot;&nbsp; BUSL-1.1</p>
-        </div>`;
-      sendEmail(rawEmail, 'Your PARAMANT trial API key', welcomeHtml);
-
-      // Notification email to operator
-      const notifyHtml = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:32px;max-width:480px">
-          <div style="font-size:14px;font-weight:600;margin-bottom:16px;letter-spacing:.08em">PARAMANT — new trial key</div>
-          <table style="font-size:12px;color:#888;border-collapse:collapse">
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Name</td><td>${escHtml(name)}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td>${escHtml(rawEmail)}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Use case</td><td>${escHtml(useCase.slice(0, 120))}</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Key prefix</td><td>${newKey.slice(0, 12)}…</td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#555">Time</td><td>${new Date(now).toISOString()}</td></tr>
-          </table>
-        </div>`;
-      sendEmail('privacy@paramant.app', `New trial key: ${name} <${rawEmail}>`, notifyHtml);
-
-      log('info', 'trial_key_requested', { name, email: rawEmail, use_case: useCase.slice(0, 80) });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, key: newKey, email: rawEmail,
-        message: 'Your API key is ready. Save it now — it cannot be recovered. A copy has also been sent to your email.' }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/sign-dpa — Electronic DPA signature (GDPR Art. 28) ──────────────
