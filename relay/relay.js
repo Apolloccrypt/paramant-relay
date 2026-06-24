@@ -769,6 +769,9 @@ function _evictPeerSthsIfNeeded() {
     if (peerSths.size <= PEER_STH_MAX_PEERS) break;
     peerSths.delete(pkHash);
     _peerSthStreamClose(pkHash);
+    // Reclaim the evicted peer's on-disk .jsonl so the file set is actually
+    // bounded (not just the fd table); a later re-ingest re-creates it fresh.
+    try { fs.unlinkSync(path.join(PEER_STH_DIR, pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64) + '.jsonl')); } catch {}
     log('info', 'peer_sth_evicted', { id: pkHash.slice(0, 16), peers: peerSths.size });
   }
 }
