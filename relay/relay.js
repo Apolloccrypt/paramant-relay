@@ -1795,6 +1795,10 @@ function safeEqual(a, b) {
   } catch { return false; }
 }
 
+// Mask a secret API key for list/observation output. Canonical implementation
+// lives in lib/keys-table.js (unit-tested); aliased here for the admin handlers.
+const maskKey = keysTable.maskApiKey;
+
 function authByDid(didStr, signature, payload) {
   const entry = didRegistry.get(didStr);
   if (!entry) return null;
@@ -4334,13 +4338,40 @@ session = client.create_session('recipient@example.com')</pre>
     // Account fields (kid/account_id/is_primary/scope/created) are ADDITIVE —
     // existing consumers read key/plan/label/email/active; stap-4 self-service
     // and the account-aware admin view use the account grouping.
+    //
+    // Blast-radius hygiene: the bulk list MASKS the secret key by default so a
+    // full pgp_ value is never returned for every account at once. Server-to-
+    // server callers that genuinely need the raw key (revoke/plan-change/reset)
+    // opt in with ?reveal=1; per-row reveal is also available at
+    // GET /v2/admin/keys/reveal/:account_id. key_masked is always present so
+    // browser-facing list views can render rows without ever holding a secret.
+    const reveal = query.reveal === '1' || query.reveal === 'true';
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
-      key: k, plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
+      key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
       kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, count: keys.length, keys, license: licenseInfo }));
+    return res.end(J({ ok: true, count: keys.length, masked: !reveal, keys, license: licenseInfo }));
+  }
+
+  // ── GET /v2/admin/keys/reveal/:account_id — reveal ONE full secret key ──────
+  // Single-key counterpart to the masked list: returns the full pgp_ value for
+  // exactly one account/key so an operator never has to pull the whole table in
+  // the clear. Path-param (mirrors /v2/admin/usage/:account_id) so no query
+  // parse. ADMIN_TOKEN-gated by the admin-path guard above. Matches by
+  // account_id, then by the raw key, then by kid.
+  const revealGet = path.match(/^\/v2\/admin\/keys\/reveal\/(.+)$/);
+  if (revealGet && req.method === 'GET') {
+    const id = decodeURIComponent(revealGet[1]);
+    const entry = [...apiKeys.entries()].find(([k, v]) => (v.account_id || k) === id || k === id || v.kid === id);
+    if (!entry) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'key_not_found' })); }
+    const [k, v] = entry;
+    log('info', 'admin_key_revealed', { account: String(v.account_id || k).slice(0, 12), kid: v.kid || null });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
+      account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
+      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null }));
   }
 
   // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────
