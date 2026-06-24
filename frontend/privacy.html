@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Privacy Policy — PARAMANT</title>
+<title>Privacy Policy · PARAMANT</title>
 <meta name="description" content="PARAMANT privacy policy. Minimal data: an email to run your account; the encrypted file relay stays RAM-only and burn-on-read. EU/Germany hosting, no trackers, no ads.">
 <meta property="og:title" content="Privacy Policy · PARAMANT">
 <meta property="og:description" content="PARAMANT privacy policy. Minimal data: an email to run your account; the encrypted file relay stays RAM-only and burn-on-read. EU/Germany hosting, no trackers, no ads.">
@@ -280,11 +280,23 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: June 17, 2026</p>
+<p class="updated">Last updated: June 24, 2026</p>
+
+<h2>Who we are</h2>
+<p>This Privacy Policy explains how PARAMANT processes your personal data when you use paramant.app and the PARAMANT services (Ghost Pipe, ParaShare, ParaSign, the relay, and the SDK). It is provided under Articles 13 and 14 of the EU General Data Protection Regulation (GDPR / AVG).</p>
+<p>The <strong>controller</strong> responsible for the processing described here is:</p>
+<ul>
+<li><strong>[PARAMANT legal entity, e.g. PARAMANT B.V.]</strong></li>
+<li>Registered address: <strong>[registered address]</strong></li>
+<li>Company registration: <strong>[KvK / company number]</strong></li>
+<li>Privacy contact: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> &middot; controller contact: <strong>[controller contact email]</strong></li>
+</ul>
+<p>We have not appointed a statutory Data Protection Officer, as we are not required to under Article 37 GDPR. For any privacy question, or to exercise the rights set out below, contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+<p>For file content you move through the service, the roles are different: <strong>you are the controller and PARAMANT acts only as a processor</strong>. See <a href="#roles">Controller and processor roles</a> below.</p>
 
 <h2>Core principle</h2>
-<p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
-<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling; an IP is processed only transiently, for security and abuse-prevention (rate limiting, the session record, an audit log, and the DPA signature record). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
+<p><strong>PARAMANT collects only what is strictly required to operate your account and run the service (data minimisation, Article 5(1)(c) GDPR).</strong></p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling; an IP is processed only transiently, for security and abuse-prevention (rate limiting, the session record, an audit log, and the DPA signature record). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data, and we never use it for automated decision-making or profiling.</p>
 
 <h2>How Ghost Pipe &amp; ParaShare work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
@@ -292,26 +304,38 @@ footer a{color:var(--ink);text-decoration:none}
 <p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
 <h2>What we process</h2>
+<p>The table below lists each category of data, why we process it, the lawful basis under Article 6 GDPR, how and where it is stored, how long we keep it, and whether it is shared with a subprocessor. Where the lawful basis is legitimate interest (Article 6(1)(f)), our interest is operating a secure, abuse-resistant service; you may object on grounds relating to your situation (see <a href="#rights">Your rights</a>).</p>
 <table>
-<thead><tr><th>Data</th><th>Purpose</th><th>Storage</th><th>Shared</th></tr></thead>
+<thead><tr><th>Data</th><th>Purpose</th><th>Lawful basis (Art. 6)</th><th>Storage</th><th>Retention</th><th>Shared</th></tr></thead>
 <tbody>
-<tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
-<tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
-<tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
-<tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
-<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
-<tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
-<tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend) for messages we send you</td></tr>
-<tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
-<tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
-<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Stripe) once billing is enabled</td></tr>
-<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Transient (session/rate-limit TTL; audit log volume-capped)</td><td>Never</td></tr>
+<tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>Contract (b): the transfer you request</td><td>RAM only &middot; burn-on-read</td><td>Until first download, else max TTL (1h Free / 24h Pro / 7d Enterprise)</td><td>Never</td></tr>
+<tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>Contract (b)</td><td>RAM only &middot; deleted on burn</td><td>Same as the blob it routes</td><td>Never</td></tr>
+<tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Contract (b)</td><td>Loaded from config at startup</td><td>For the lifetime of the plan; revoked on request</td><td>Never</td></tr>
+<tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>Contract (b)</td><td>RAM only &middot; cleared on restart</td><td>Until session ends / relay restart</td><td>Never</td></tr>
+<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Legitimate interest (f): integrity / anti-tamper</td><td>Disk &middot; /data/ct-log.json &middot; SHA-256 one-way hash only</td><td>Retained for the integrity of the append-only log (one-way hash, not reversible to a person)</td><td>Never</td></tr>
+<tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>Legitimate interest (f): availability</td><td>In-process counters only</td><td>Not persisted (counters reset on restart)</td><td>Never</td></tr>
+<tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Contract (b)</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Life of the account; deleted within 30 days of account closure (see Retention)</td><td>Email provider for messages we send you (see Subprocessors)</td></tr>
+<tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Contract (b); security is also legitimate interest (f)</td><td>Stored (server)</td><td>Life of the account; deleted within 30 days of account closure</td><td>Never</td></tr>
+<tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Contract (b)</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Retained while the signing identity is active; the CT-log hash is permanent for verifiability</td><td>Public (its hash is in the CT log)</td></tr>
+<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Contract (b); invoice retention is a legal obligation (c)</td><td>Stored (server)</td><td>Account life; billing records kept up to <strong>[7 years, NL tax retention]</strong> to meet the legal obligation</td><td>Payment processor once billing is enabled (see Subprocessors)</td></tr>
+<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Legitimate interest (f): security / abuse-prevention</td><td>Transient (session/rate-limit TTL; audit log volume-capped)</td><td>Session / rate-limit TTL; audit entries rotated by volume cap</td><td>Never</td></tr>
 </tbody>
 </table>
+
+<h2 id="retention">How long we keep account data</h2>
+<p>Temporary relay data is governed by the TTLs above and is usually destroyed much sooner on download. <strong>Account data</strong> follows these retention rules:</p>
+<ul>
+<li><strong>Email address and account profile</strong>: kept while your account exists; deleted within <strong>30 days</strong> of you closing the account, except where a legal obligation requires us to keep a limited record longer.</li>
+<li><strong>Sign-in factors</strong> (passkey public keys, encrypted TOTP secret, hashed recovery codes): deleted within <strong>30 days</strong> of account closure.</li>
+<li><strong>ParaSign signing public key</strong>: removed from your account on closure; the one-way hash already written to the public Certificate Transparency log remains, because it is what makes past signatures verifiable and it cannot be reversed to a person.</li>
+<li><strong>Billing records</strong> (plan, invoices, anonymised payment reference): retained up to <strong>[7 years, the NL statutory tax-administration term]</strong> after the transaction, to satisfy the legal obligation in Article 6(1)(c); then deleted.</li>
+<li><strong>Security and audit logs</strong> (transient IP / user-agent): kept only for the short session or rate-limit window, or until rotated out by the audit-log volume cap.</li>
+</ul>
 
 <h2>What we never do</h2>
 <ul>
 <li>Sell your data, or use it for advertising or profiling</li>
+<li>Carry out automated decision-making or profiling that produces legal or similarly significant effects (Article 22 GDPR): we do none</li>
 <li>Log or store IP addresses for analytics or profiling (an IP is used only transiently, for security and abuse-prevention)</li>
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
@@ -319,6 +343,13 @@ footer a{color:var(--ink);text-decoration:none}
 <li>Write file data to disk at any point</li>
 <li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
+
+<h2>Cookies</h2>
+<p>We set <strong>one</strong> cookie, and only after you log in:</p>
+<ul>
+<li><strong><code>paramant_session</code></strong> (name may vary): a strictly-necessary, <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite</code> session cookie that keeps you signed in. Purpose: authentication only. Duration: the browser session, or until you sign out or it expires. It carries no tracking identifier and is exempt from consent because it is strictly necessary to deliver the service you asked for.</li>
+</ul>
+<p>We set no analytics, advertising, or third-party cookies, so there is no cookie banner to click.</p>
 
 <h2>No third-party requests</h2>
 <p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page: every request goes to one origin, and nowhere else.</p>
@@ -338,31 +369,49 @@ footer a{color:var(--ink);text-decoration:none}
 <p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
 
 <h2>Servers &amp; jurisdiction</h2>
-<p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Frankfurt, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. No CLOUD Act exposure. All data is subject to EU/GDPR jurisdiction only.</p>
+<p>All hosting and the encrypted file relay run on <strong>Hetzner</strong> infrastructure in <strong>Frankfurt, Germany (EU/DE)</strong>. Your account data, the relay, and the Certificate Transparency log are stored and processed in the EU only. We engage no hosting, storage, or compute provider outside the EU.</p>
+<p>The only point at which a limited amount of data may reach a provider outside the EU is <strong>transactional email</strong>, depending on the provider chosen below; that single transfer, if it applies, is disclosed and safeguarded in the Subprocessors section. There is no other transfer of personal data outside the EU, and the file relay itself never leaves EU/GDPR jurisdiction.</p>
 
 <h2>Network edge</h2>
 <p>TLS is terminated by <strong>our own edge (Caddy)</strong>, running on the same Hetzner infrastructure in Germany, with post-quantum key exchange. There is no third-party reverse proxy or CDN in front of the site: your connection reaches our server and nowhere else. Short-lived connection metadata (IP, timestamp) is processed transiently for security and abuse-prevention as described above, never for analytics.</p>
 
-<h2>Subprocessors</h2>
-<p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking:</p>
+<h2>Subprocessors and international transfers</h2>
+<p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking. We enter into a data-processing agreement with each, as required by Article 28 GDPR.</p>
 <ul>
-<li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
-<li><strong>Resend</strong>: transactional email only (account verification, signing invites, billing notices). It receives the recipient address and the message we send; it is never used for marketing.</li>
-<li><strong>Stripe</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Stripe handles card data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
+<li><strong>Hetzner Online GmbH</strong> (Germany, EU): hosting and infrastructure for the website, the relay, and account data. <strong>No transfer outside the EU.</strong></li>
+<li><strong>Mollie B.V.</strong> (Amsterdam, Netherlands, EU): payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Mollie handles payment data on its own pages and PARAMANT never sees or stores card numbers or bank credentials, only your plan and an anonymised reference. <strong>No transfer outside the EU.</strong></li>
+<li><strong>Transactional email provider</strong> (account verification, signing invites, billing notices): the provider receives the recipient address and the message we send; it is never used for marketing. <strong>[DECISION required, choose one: (a) move to an EU-based email provider, so this becomes an EU-only transfer with no third-country exposure; OR (b) keep Resend, Inc. (United States) and disclose it here honestly as a US subprocessor. If (b): personal data (your email address and message content) is transferred to the United States. The United States does not have an EU adequacy decision of general application; the transfer relies on Resend's certification under the EU-US Data Privacy Framework and, as a backstop, the European Commission's Standard Contractual Clauses (SCC, Module 2) together with supplementary measures. Because US law (including the CLOUD Act) can compel a US provider to disclose data, this residual exposure is limited to transactional email metadata and content and does not touch the file relay, which stays in the EU.]</strong></li>
+</ul>
+<p>We keep an up-to-date list of subprocessors. We will inform account holders of any intended addition or replacement of a subprocessor before it takes effect, so that you can object.</p>
+
+<h2 id="roles">Controller and processor roles</h2>
+<p>For the <strong>personal data of your PARAMANT account</strong> (your email, sign-in factors, plan, signing public key), PARAMANT is the <strong>controller</strong> and this policy governs that processing.</p>
+<p>For the <strong>content of files you transfer or documents you sign</strong>, PARAMANT acts only as a <strong>processor</strong> on your behalf: you decide what to send and to whom, and you remain the <strong>controller</strong> of that content. Technically we cannot read it (it is encrypted client-side, RAM-only, burn-on-read), and we process it solely to deliver it. If you use PARAMANT in a professional context, and especially in sectors such as <strong>healthcare, legal, or government</strong> where files may contain special categories of data (Article 9 GDPR) or otherwise sensitive personal data, this processor relationship is set out in our <a href="/dpa"><strong>Data Processing Agreement (DPA)</strong></a>, which forms the Article 28 contract between you (controller) and PARAMANT (processor). PARAMANT does not determine the purposes of, or otherwise access, that content.</p>
+
+<h2 id="rights">Your rights</h2>
+<p>Under the GDPR you have the following rights regarding your personal data. To exercise any of them, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>; we respond within one month (Article 12(3)) and we do not charge for a reasonable request.</p>
+<ul>
+<li><strong>Access</strong> (Art. 15): obtain confirmation of, and a copy of, the personal data we hold about you.</li>
+<li><strong>Rectification</strong> (Art. 16): have inaccurate data corrected and incomplete data completed.</li>
+<li><strong>Erasure</strong> (Art. 17): have your data deleted, for example by closing your account, subject only to data we must keep by law (such as billing records).</li>
+<li><strong>Restriction</strong> (Art. 18): ask us to limit processing while a dispute or check is resolved.</li>
+<li><strong>Data portability</strong> (Art. 20): receive the account data you provided in a structured, commonly used, machine-readable format, and have it sent to another controller where technically feasible.</li>
+<li><strong>Object</strong> (Art. 21): object, on grounds relating to your particular situation, to processing based on our legitimate interest.</li>
+<li><strong>Withdraw consent</strong> (Art. 7(3)): where we rely on your consent, withdraw it at any time, without affecting processing already carried out.</li>
+<li><strong>No automated decisions</strong> (Art. 22): you are not subject to any decision based solely on automated processing, including profiling; we do none.</li>
 </ul>
 
-<h2>GDPR / AVG</h2>
-<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. For Pro and Enterprise customers we provide a <strong>Data Processing Agreement (DPA)</strong>.</p>
-<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Free, 24 hours for Pro, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
+<h2>Right to lodge a complaint</h2>
+<p>If you believe we process your personal data unlawfully, you have the right to lodge a complaint with a supervisory authority. In the Netherlands this is the <strong>Autoriteit Persoonsgegevens (Dutch Data Protection Authority)</strong>: <a href="https://www.autoriteitpersoonsgegevens.nl">autoriteitpersoonsgegevens.nl</a>. You may also contact the supervisory authority in your own EU country of residence or work. We would, of course, appreciate the chance to address your concern first at <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
 
 <h2>Children</h2>
-<p>PARAMANT is not directed at children under 13. We do not knowingly collect data from minors.</p>
+<p>PARAMANT is not directed at children under 16, the age of consent for information-society services in the Netherlands under the UAVG. We do not knowingly collect personal data from anyone under 16; if you believe a minor has provided us data, contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> and we will delete it.</p>
 
 <h2>Changes to this policy</h2>
-<p>We may update this policy. Material changes will be noted via the "Last updated" date above. Continued use of the service after a change constitutes acceptance.</p>
+<p>We may update this policy to reflect changes in the service or the law. We will note any change via the "Last updated" date above, and for any material change affecting how we process your personal data we will notify account holders in advance (for example by email) and, where the change requires it, ask for your consent. Your rights under this policy are not reduced without notice.</p>
 
 <h2>Contact</h2>
-<p>Questions about this Privacy Policy? Email <a href="mailto:info@paramant.app">info@paramant.app</a>.</p>
+<p>Questions about this Privacy Policy, or want to exercise a right above? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
 
 </div>
 
@@ -372,7 +421,7 @@ footer a{color:var(--ink);text-decoration:none}
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; EU relay<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
       </div>
       <div>
         <div class="footer-col-label">Trust</div>
