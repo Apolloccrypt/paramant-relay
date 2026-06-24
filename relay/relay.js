@@ -234,16 +234,27 @@ initNats();
 // deviceQueues[apiKey:deviceId] = [sha256_hash, ...]
 const deviceQueues = new Map(); // `${acctOf(apiKey)}:${deviceId}` → string[]
 
+// Cap per-device queue length. The read-side drain (/v2/stream-next) only shifts
+// entries whose blob already expired, so a device that never polls would grow its
+// queue without bound. Cap it and drop the oldest hash (FIFO) past the limit.
+const MAX_DEVICE_QUEUE = parseInt(process.env.MAX_DEVICE_QUEUE || '1000');
+
 function deviceQueuePush(apiKey, deviceId, hash) {
   if (!deviceId) return;
   const k = `${acctOf(apiKey)}:${deviceId}`;
   if (!deviceQueues.has(k)) deviceQueues.set(k, []);
   const q = deviceQueues.get(k);
   if (!q.includes(hash)) q.push(hash); // dedup
+  while (q.length > MAX_DEVICE_QUEUE) q.shift(); // bound per-device memory
 }
 
 // ── DID — Decentralized Identity (W3C) ───────────────────────────────────────
 const didRegistry = new Map();
+// Per-API-key DID counter so the MAX_DID_PER_KEY cap is enforced in O(1) instead
+// of an O(n) full scan of didRegistry on every registration. Kept in sync at the
+// single didRegistry.set site (only incremented when a genuinely-new did is added,
+// not on re-registration of an existing did).
+const didKeyCounts = new Map(); // apiKey → count
 
 function generateDid(deviceId, pubKeyHex) {
   const hash = crypto.createHash('sha3-256').update(deviceId + pubKeyHex).digest('hex').slice(0,32);
@@ -717,7 +728,14 @@ function produceSth(tree_size, sha3_root) {
 // ── Peer STH storage — mirrors signed tree heads from other relays ─────────────
 const PEER_STH_DIR = process.env.PEER_STH_DIR || '/data/peer-sths';
 const PEER_STH_MAX = parseInt(process.env.PEER_STH_MAX || '500'); // per peer
-// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string }
+// Cap the NUMBER of distinct peers we mirror. /v2/sth/ingest only verifies an
+// ML-DSA-65 ownership signature (no API-key/admin gate), so an attacker can mint
+// unlimited fresh relay keypairs and have each add a Map entry + an open write
+// fd + a growing .jsonl file. Per-peer records are already capped (peer.sths
+// shift), but the count of peers/fds/files was unbounded — so cap it and evict
+// the least-recently-updated peer (closing its fd) when full.
+const PEER_STH_MAX_PEERS = parseInt(process.env.PEER_STH_MAX_PEERS || '256');
+// peerSths: relay pk_hash (hex) → { sths: STH[], pk_b64: string, last: epoch_ms }
 const peerSths = new Map();
 const _peerSthStreams = new Map(); // pk_hash → fs.WriteStream
 
@@ -733,6 +751,25 @@ function _peerSthStreamFor(pkHash) {
   } catch (e) {
     log('warn', 'peer_sth_stream_open_failed', { err: e.message });
     return null;
+  }
+}
+
+// Close + drop the write stream for an evicted peer so its fd is released.
+function _peerSthStreamClose(pkHash) {
+  const stream = _peerSthStreams.get(pkHash);
+  if (stream) { try { stream.end(); } catch {} _peerSthStreams.delete(pkHash); }
+}
+
+// Evict least-recently-updated peers until under PEER_STH_MAX_PEERS. Keeps the
+// fd table and .jsonl set bounded regardless of how many keys an attacker mints.
+function _evictPeerSthsIfNeeded() {
+  if (peerSths.size <= PEER_STH_MAX_PEERS) return;
+  const ordered = [...peerSths.entries()].sort((a, b) => (a[1].last || 0) - (b[1].last || 0));
+  for (const [pkHash] of ordered) {
+    if (peerSths.size <= PEER_STH_MAX_PEERS) break;
+    peerSths.delete(pkHash);
+    _peerSthStreamClose(pkHash);
+    log('info', 'peer_sth_evicted', { id: pkHash.slice(0, 16), peers: peerSths.size });
   }
 }
 
@@ -754,9 +791,11 @@ function loadPeerSths() {
         for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
         const recent = sths.slice(-PEER_STH_MAX);
         const pk_b64 = recent.length > 0 ? (recent[recent.length - 1].public_key || '') : '';
-        peerSths.set(id, { sths: recent, pk_b64 });
+        const lastRec = recent.length > 0 ? Date.parse(recent[recent.length - 1].received_at || '') : 0;
+        peerSths.set(id, { sths: recent, pk_b64, last: Number.isFinite(lastRec) ? lastRec : 0 });
       } catch {}
     }
+    _evictPeerSthsIfNeeded();
     if (peerSths.size > 0) log('info', 'peer_sths_loaded', { peers: peerSths.size });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'peer_sths_load_failed', { err: e.message });
@@ -1335,6 +1374,7 @@ const trialRequests   = new Map(); // email_lc → last_request_ts
 const trialIpRequests = new Map(); // ip → [timestamps]  (max 3 per 24h)
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
+const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest (unauthenticated)
 
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
@@ -1349,6 +1389,7 @@ setInterval(() => {
   for (const [k, times] of trialIpRequests)      { const kept = times.filter(t => now - t < DAY);  if (kept.length) trialIpRequests.set(k, kept);      else trialIpRequests.delete(k); }
   for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
   for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
+  for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
   for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
 }, 3_600_000);
 
@@ -3173,6 +3214,22 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(503, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ML-DSA-65 not available — STH ingestion disabled' }));
     }
+    // This endpoint is unauthenticated (ownership-signature only), so a flood of
+    // attacker-minted relay keypairs is otherwise unbounded. Per-IP limiter caps
+    // the rate before any body read / signature verify (mirrors anon-inbound).
+    {
+      const STH_INGEST_RPH = parseInt(process.env.STH_INGEST_RATE_PER_HOUR || '120');
+      const HOUR_MS = 3_600_000;
+      const ip      = getClientIp(req);
+      const now     = Date.now();
+      const ipTimes = (sthIngestIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
+      if (ipTimes.length >= STH_INGEST_RPH) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
+        return res.end(J({ error: 'Rate limit: too many STH ingest requests from this address. Try again later.' }));
+      }
+      ipTimes.push(now);
+      sthIngestIpRequests.set(ip, ipTimes);
+    }
     let body;
     try { body = JSON.parse((await readBody(req, 65536)).toString()); } catch {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -3203,9 +3260,19 @@ session = client.create_session('recipient@example.com')</pre>
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Signature verification failed' }));
     }
-    if (!peerSths.has(computedPkHash)) peerSths.set(computedPkHash, { sths: [], pk_b64: public_key });
+    if (!peerSths.has(computedPkHash)) {
+      peerSths.set(computedPkHash, { sths: [], pk_b64: public_key, last: Date.now() });
+      _evictPeerSthsIfNeeded(); // bound distinct peers (Map entries + fds + .jsonl files)
+    }
     const peer = peerSths.get(computedPkHash);
+    // If this peer was just evicted by the cap (e.g. immediately re-added under
+    // load), it is no longer in the Map — skip the write to avoid resurrecting it.
+    if (!peer) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Peer relay table at capacity. Try again later.' }));
+    }
     peer.pk_b64 = public_key;
+    peer.last = Date.now();
     const record = { relay_id, relay_pk_hash: computedPkHash, sha3_root, timestamp, tree_size,
                      version: version || 1, signature, public_key, received_at: new Date().toISOString() };
     peer.sths.push(record);
@@ -4174,18 +4241,20 @@ session = client.create_session('recipient@example.com')</pre>
         }
         times.push(now); invDidIpRequests.set(ipKey, times);
       }
-      // Rate limit: max 500 DIDs per API key to prevent RAM DoS
+      // Rate limit: max 500 DIDs per API key to prevent RAM DoS. Counter is O(1)
+      // (didKeyCounts) instead of an O(n) scan of the whole registry per request.
       const MAX_DID_PER_KEY = 500;
       if (apiKey) {
-        let keyDidCount = 0;
-        for (const e of didRegistry.values()) { if (e.key === apiKey) keyDidCount++; }
+        const keyDidCount = didKeyCounts.get(apiKey) || 0;
         if (keyDidCount >= MAX_DID_PER_KEY) {
           res.writeHead(429); return res.end(J({ error: `DID limit reached. Max ${MAX_DID_PER_KEY} DIDs per API key.` }));
         }
       }
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
+      const _didIsNew = !didRegistry.has(did); // overwrite of same did must not double-count
       didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
+      if (_didIsNew && apiKey) didKeyCounts.set(apiKey, (didKeyCounts.get(apiKey) || 0) + 1);
       const _didPlan = keyData?.plan || 'pro';
       pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
