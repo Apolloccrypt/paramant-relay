@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}[hidden]{display:none !important}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lock a file · Paramant</title>
+<meta name="description" content="Encrypt a file into a .prmnt container with a passphrase. Everything happens on your device; the file and key never leave your browser.">
+<meta property="og:title" content="Lock a file · Paramant">
+<meta property="og:description" content="Encrypt a file with a passphrase, right in your browser. The file never leaves your device.">
+<meta property="og:url" content="https://paramant.app/vault">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<link rel="canonical" href="https://paramant.app/vault">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0B3A6A">
+<link rel="stylesheet" href="/design-system.css?v=19">
+<style>
+.vt-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--ink-hair)}
+.vt-brand{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--navy);text-decoration:none}
+.vt-brand span{color:var(--cobalt)}
+.vt-back{font-family:var(--mono);font-size:12px;color:var(--ink-dim);text-decoration:none}
+.vt-back:hover{color:var(--cobalt)}
+.vt-wrap{max-width:640px;margin:40px auto;padding:0 20px}
+.vt-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.vt-title{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 10px;color:var(--navy)}
+.vt-lede{font-size:14px;color:var(--ink-dim);line-height:1.7;margin:0 0 26px}
+.vt-tabs{display:flex;gap:8px;margin-bottom:22px}
+.vt-tab{flex:1;padding:14px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink-dim);font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer;border-radius:12px;text-align:center;transition:all .14s}
+.vt-tab.on{border-color:var(--cobalt);color:var(--navy);background:rgba(11,58,106,.05)}
+.vt-card{background:#fff;border:1px solid var(--ink-hair);border-radius:16px;padding:24px}
+.vt-drop{border:2px dashed var(--ink-hair);background:var(--bone);border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .14s;outline:none}
+.vt-drop:hover,.vt-drop:focus-visible,.vt-drop.drag{border-color:var(--cobalt);background:rgba(11,58,106,.04)}
+.vt-drop .big{font-size:16px;font-weight:600;color:var(--navy);margin:0 0 4px}
+.vt-drop .small{font-size:12px;color:var(--ink-dim);margin:0}
+.vt-info{margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--navy);background:var(--bone-2,rgba(11,58,106,.04));border:1px solid var(--ink-hair);border-radius:10px;padding:10px 12px;word-break:break-all}
+.vt-field{margin-top:16px}
+.vt-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.vt-input{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:10px;background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:14px}
+.vt-input:focus{outline:none;border-color:var(--cobalt)}
+.vt-run{width:100%;margin-top:20px;min-height:48px;font-size:15px}
+.vt-status{margin-top:16px;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.5;border:1px solid var(--ink-hair);background:var(--bone)}
+.vt-status.ok{border-color:var(--lime);background:rgba(178,255,63,.14);color:var(--navy)}
+.vt-status.err{border-color:rgba(200,30,30,.5);background:rgba(255,80,80,.06);color:rgba(170,20,20,1)}
+.vt-note{margin-top:22px;font-size:12px;color:var(--ink-dim);line-height:1.6;text-align:center}
+.vt-warn{margin:20px 0;padding:14px 16px;border:1px solid #d4a017;background:#fff4d6;border-radius:10px;color:#5a3f00;font-size:13px}
+</style>
+</head>
+<body>
+<header class="vt-bar">
+  <a class="vt-brand" href="/dashboard">Para<span>MANT</span></a>
+  <a class="vt-back" href="/dashboard">← Dashboard</a>
+</header>
+
+<main class="vt-wrap">
+  <div class="vt-kicker">Paramant Vault</div>
+  <h1 class="vt-title">Lock a file</h1>
+  <p class="vt-lede">Pick a file and a passphrase. Paramant turns it into a locked <code>.prmnt</code> file that only your passphrase can open. Everything happens on this device — the file and the passphrase never leave your browser.</p>
+
+  <div id="vt-unsupported" class="vt-warn" hidden>Your browser does not support the encryption this page needs. Try a recent Chrome, Edge, Safari or Firefox.</div>
+
+  <div class="vt-tabs" role="tablist">
+    <button class="vt-tab on" data-mode="lock" role="tab" aria-selected="true">Lock a file</button>
+    <button class="vt-tab" data-mode="open" role="tab" aria-selected="false">Open a .prmnt</button>
+  </div>
+
+  <!-- Lock -->
+  <section id="panel-lock" class="vt-card" role="tabpanel">
+    <div id="lock-drop" class="vt-drop" tabindex="0" role="button" aria-label="Choose a file to lock">
+      <p class="big">Drop a file here</p>
+      <p class="small">or click to choose · any file type</p>
+    </div>
+    <input id="lock-input" type="file" hidden>
+    <div id="lock-info" class="vt-info" hidden></div>
+    <div class="vt-field">
+      <label class="vt-label" for="lock-pw">Passphrase</label>
+      <input id="lock-pw" class="vt-input" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+    </div>
+    <div class="vt-field">
+      <label class="vt-label" for="lock-pw2">Repeat passphrase</label>
+      <input id="lock-pw2" class="vt-input" type="password" autocomplete="new-password" placeholder="Type it again">
+    </div>
+    <button id="lock-run" class="btn btn-primary vt-run" type="button" disabled>Lock file</button>
+    <div id="lock-status" class="vt-status" hidden></div>
+  </section>
+
+  <!-- Open -->
+  <section id="panel-open" class="vt-card" role="tabpanel" hidden>
+    <div id="open-drop" class="vt-drop" tabindex="0" role="button" aria-label="Choose a .prmnt file to open">
+      <p class="big">Drop a .prmnt file here</p>
+      <p class="small">or click to choose</p>
+    </div>
+    <input id="open-input" type="file" accept=".prmnt" hidden>
+    <div id="open-info" class="vt-info" hidden></div>
+    <div class="vt-field">
+      <label class="vt-label" for="open-pw">Passphrase</label>
+      <input id="open-pw" class="vt-input" type="password" autocomplete="current-password" placeholder="The passphrase it was locked with">
+    </div>
+    <button id="open-run" class="btn btn-primary vt-run" type="button" disabled>Open file</button>
+    <div id="open-status" class="vt-status" hidden></div>
+  </section>
+
+  <p class="vt-note">Locked with AES-256-GCM (quantum-resistant), key from your passphrase via PBKDF2. Lose the passphrase and the file cannot be recovered — that is the point.</p>
+</main>
+
+<script src="/vault.js?v=1" defer></script>
+</body>
+</html>
