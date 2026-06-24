@@ -26,7 +26,11 @@ nav.nav .nav-logo {
   letter-spacing: .04em;
   text-decoration: none;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
+nav.nav .nav-logo .nav-mark { height: 22px; width: auto; display: block; }
 nav.nav .nav-logo .logo-para { font-weight: 400; color: var(--ink); }
 nav.nav .nav-logo .logo-mant { font-weight: 700; color: var(--cobalt); }
 
