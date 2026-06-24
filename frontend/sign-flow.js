@@ -26,6 +26,10 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const STAMP_PDF_W = 240;
 const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
+// PDF placement view state for zoom + page-nav (PDF mode only).
+let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,task}], zoom }
+let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
+let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indicator
 
 const state = {
   signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
@@ -298,6 +302,9 @@ function loadImageElement(bytes, mime) {
 
 async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
+  teardownPageNav();                                  // image mode: no page-nav
+  placeState = null;
+  { const zb = $('ds-zoom'); if (zb) zb.hidden = true; }  // zoom is PDF-only
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -326,6 +333,8 @@ async function renderImageForPlacement() {
 
 async function renderPdfForPlacement() {
   $('ds-place-continue').disabled = true;
+  teardownPageNav();
+  { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
@@ -333,27 +342,123 @@ async function renderPdfForPlacement() {
   const container = $('ds-pdf-canvas-list');
   container.innerHTML = '';
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+  const pages = [];
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
     const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
-    const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
     const wrap = document.createElement('div');
     wrap.className = 'ds-page-wrap';
     wrap.dataset.pageIndex = String(i - 1);
     wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
     wrap.appendChild(canvas);
     container.appendChild(wrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     wrap.addEventListener('click', onPlaceClick);
+    pages.push({ page, baseViewport, wrap, canvas, task: null });
   }
+  placeState = { pdf, pages, zoom: 1 };
+
   $('ds-place-page-count').textContent =
     pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
     (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
+
+  const zo = $('ds-zoom-out'), zi = $('ds-zoom-in'), zf = $('ds-zoom-fit');
+  if (zo) zo.onclick = () => setPlaceZoom(placeState.zoom / 1.25);
+  if (zi) zi.onclick = () => setPlaceZoom(placeState.zoom * 1.25);
+  if (zf) zf.onclick = () => setPlaceZoom(1);
+
+  await applyPlaceZoom();                 // initial render == fit-to-width (zoom 1)
+  setupPageNav(container, maxPages);
+}
+
+// Fit-to-width base scale (the original targetWidth logic), times the zoom factor.
+function fitScaleFor(baseViewport) {
+  const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+  return targetWidth / baseViewport.width;
+}
+
+function setPlaceZoom(z) {
+  if (!placeState) return;
+  placeState.zoom = Math.max(0.4, Math.min(4, z));
+  applyPlaceZoom();
+}
+
+// (Re)render every page at the current zoom. state.stamp (PDF points) is never
+// touched; only the displayed canvas size changes and the marker is repainted.
+async function applyPlaceZoom() {
+  if (!placeState) return;
+  const token = ++placeRenderToken;
+  const z = placeState.zoom;
+  const pctEl = $('ds-zoom-pct'); if (pctEl) pctEl.textContent = Math.round(z * 100) + '%';
+  for (const p of placeState.pages) {
+    const scale = fitScaleFor(p.baseViewport) * z;
+    const viewport = p.page.getViewport({ scale });
+    p.wrap.style.width = Math.floor(viewport.width) + 'px';
+    p.canvas.width = Math.floor(viewport.width);
+    p.canvas.height = Math.floor(viewport.height);
+    if (p.task) { try { p.task.cancel(); } catch (e) {} }
+    p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport });
+    try { await p.task.promise; }
+    catch (e) { if (e && e.name === 'RenderingCancelledException') return; }
+    if (token !== placeRenderToken) return;   // a newer zoom superseded this pass
+  }
+  reflowStampMarker();
+}
+
+// Re-derive the marker's pixel box from the PDF-point state.stamp at the current
+// display width. Never mutates state.stamp.
+function reflowStampMarker() {
+  document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
+  if (!state.stamp || state.stamp.isImage || !placeState) return;
+  const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex);
+  if (!p) return;
+  const rect = p.canvas.getBoundingClientRect();
+  const ratio = p.wrap._pdfPage.width / rect.width;          // PDF pt per CSS px
+  const w = state.stamp.w / ratio, h = state.stamp.h / ratio;
+  const left = state.stamp.x / ratio;
+  const top = (p.wrap._pdfPage.height - state.stamp.y - state.stamp.h) / ratio;
+  renderStampMarker(p.wrap, left, top, w, h);
+}
+
+function teardownPageNav() {
+  if (_pageNavObserver) { _pageNavObserver.disconnect(); _pageNavObserver = null; }
+  const nav = $('ds-page-nav'); if (nav) nav.hidden = true;
+}
+
+// Sticky "Page X of N" that follows the most-visible page; jump/prev/next.
+function setupPageNav(container, total) {
+  teardownPageNav();
+  const nav = $('ds-page-nav'), label = $('ds-page-nav-label');
+  if (!nav || !label) return;
+  const wraps = Array.from(container.querySelectorAll('.ds-page-wrap'));
+  if (wraps.length <= 1) { nav.hidden = true; return; }
+  nav.hidden = false;
+  const ratios = new Map(wraps.map(w => [w, 0]));
+  let current = 0;
+  const render = () => { label.textContent = 'Page ' + (current + 1) + ' of ' + total; };
+  _pageNavObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) ratios.set(e.target, e.intersectionRatio);
+    let best = wraps[0], bestR = -1;
+    for (const w of wraps) { const r = ratios.get(w) || 0; if (r > bestR) { bestR = r; best = w; } }
+    const idx = Number(best.dataset.pageIndex) || 0;
+    if (idx !== current) { current = idx; render(); }
+  }, { root: null, rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
+  wraps.forEach(w => _pageNavObserver.observe(w));
+  render();
+  const goTo = (i) => {
+    const w = container.querySelector('.ds-page-wrap[data-page-index="' + i + '"]');
+    if (w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const jump = $('ds-page-nav-jump');
+  if (jump && !jump._wired) {
+    jump._wired = true; jump.max = String(total);
+    const go = () => { const n = Math.max(1, Math.min(total, parseInt(jump.value, 10) || 1)); goTo(n - 1); };
+    jump.addEventListener('change', go);
+    jump.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  }
+  const prev = $('ds-page-nav-prev'), next = $('ds-page-nav-next');
+  if (prev && !prev._wired) { prev._wired = true; prev.addEventListener('click', () => goTo(Math.max(0, current - 1))); }
+  if (next && !next._wired) { next._wired = true; next.addEventListener('click', () => goTo(Math.min(total - 1, current + 1))); }
 }
 
 function onPlaceClick(e) {

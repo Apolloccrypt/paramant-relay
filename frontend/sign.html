@@ -144,6 +144,16 @@
 .ds-mode-card:hover{border-color:var(--cobalt);background:rgba(11,58,106,.04)}
 .ds-mode-t{font-size:16px;font-weight:700;color:var(--navy)}
 .ds-mode-d{font-size:13px;color:var(--ink-dim);line-height:1.5}
+/* PDF placement: zoom toolbar + page-nav (the stamp marker stays pointer-events:none) */
+.ds-zoom{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ds-zoom button{font:inherit;padding:2px 10px;border:1px solid var(--ink-hair);background:#fff;border-radius:4px;cursor:pointer;line-height:1.4}
+.ds-zoom #ds-zoom-pct{font-family:var(--mono);font-size:11px;color:var(--ink-dim);min-width:42px;text-align:center}
+#ds-pdf-canvas-list{overflow:auto}
+#ds-pdf-canvas-list .ds-page-wrap{max-width:none;margin-left:auto;margin-right:auto}
+.ds-page-nav{position:sticky;top:8px;z-index:5;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
+.ds-page-nav>*{pointer-events:auto}
+.ds-page-nav input{width:46px;text-align:center;font:inherit;border:1px solid var(--ink-hair);border-radius:6px;padding:2px 4px}
+.ds-page-nav button{border:1px solid var(--ink-hair);background:#fff;border-radius:6px;cursor:pointer;padding:2px 8px;font:inherit}
 </style>
 </head>
 <body>
@@ -365,6 +375,18 @@
     <h2>Place your signature</h2>
     <p class="ds-sub">Click anywhere on a page to drop the stamp. Click another spot to move it. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
     <p class="ds-hint" id="ds-place-hint">Click a page to drop the signature stamp.</p>
+    <div class="ds-zoom" id="ds-zoom" hidden>
+      <button id="ds-zoom-out" type="button" aria-label="Zoom out">&minus;</button>
+      <span id="ds-zoom-pct">100%</span>
+      <button id="ds-zoom-in" type="button" aria-label="Zoom in">+</button>
+      <button id="ds-zoom-fit" type="button">Fit</button>
+    </div>
+    <div class="ds-page-nav" id="ds-page-nav" hidden>
+      <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
+      <span id="ds-page-nav-label"></span>
+      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Go to page">
+      <button id="ds-page-nav-next" type="button" aria-label="Next page">&#8595;</button>
+    </div>
     <div id="ds-pdf-canvas-list"></div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
