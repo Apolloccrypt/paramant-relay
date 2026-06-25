@@ -1,4 +1,4 @@
-# PARAMANT self-hosted relay stack — v2.4.5
+# PARAMANT self-hosted relay stack — v3.0.0
 # One codebase (relay/), five sector containers, system nginx as TLS terminator.
 #
 # Quick start:
