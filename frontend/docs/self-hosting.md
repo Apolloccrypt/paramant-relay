@@ -537,7 +537,7 @@ Expected output (one entry per registered relay):
 > location /admin/ {
 >     allow YOUR_ADMIN_IP;
 >     deny all;
->     proxy_pass http://admin:4200/admin/;
+>     proxy_pass http://127.0.0.1:4200/admin/;
 >     ...
 > }
 > ```

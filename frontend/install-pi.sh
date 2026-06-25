@@ -288,7 +288,7 @@ step "Step 8/8 — Launching relay stack"
 cd "$INSTALL_DIR"
 
 info "Pulling arm64 image from Docker Hub..."
-docker pull mtty001/relay:latest --platform linux/arm64 2>&1 | tail -3 || true
+docker pull "mtty001/relay:${VERSION#v}" --platform linux/arm64 2>&1 | tail -3 || true
 
 info "Starting services..."
 docker compose up -d --remove-orphans 2>&1 | tail -5

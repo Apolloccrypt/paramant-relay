@@ -123,7 +123,7 @@ Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 | Admin dashboard (Overview, Users, Audit, Billing, Relay) | Live — `/admin/` |
 | Resend TOTP setup link | Live — admin panel |
 | Developer API keys | Live — [paramant.app/request-key](https://paramant.app/request-key) |
-| Billing (Stripe integration) | Scaffold — Stripe connect pending |
+| Billing | Operator-managed. Hosted paramant.app uses Mollie; bundled admin tool has Stripe device-sync hooks |
 | Chromium browser extension | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 

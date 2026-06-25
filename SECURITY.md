@@ -363,7 +363,7 @@ If you need formal certification or third-party attestation as part of your proc
 ## Known limitations (beta)
 
 - Beta access only; hardening for general public availability is in progress.
-- Stripe billing integration is a scaffold; production payments are not yet active.
+- Billing in the bundled admin tool uses optional Stripe device-sync hooks (operator-configured); the hosted paramant.app service uses Mollie.
 - Some accounts created before TOTP rollout operate on API-key-only authentication.
 - Rate limits have not been validated under sustained adversarial load; no WAF is deployed.
 - External third-party penetration test has not yet been conducted.
