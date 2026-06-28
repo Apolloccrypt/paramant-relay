@@ -112,7 +112,8 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 
 **TLS:**
 - Handled by **system nginx** (not a Docker container). Install via Certbot / Let's Encrypt or bring your own cert.
-- See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
+- See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, OCSP stapling, and an SSL Labs A+ cipher/protocol baseline.
+- **Post-quantum (hybrid) TLS** — on OpenSSL 3.5+ the edge negotiates the `X25519MLKEM768` hybrid key exchange automatically, making the handshake itself quantum-resistant. See [`docs/security/pq-tls.md`](security/pq-tls.md) for the full guide and verification steps.
 
 **Dockerfile — two-stage build:**
 - Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings

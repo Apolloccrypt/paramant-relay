@@ -9,6 +9,25 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- **Next-level HTTPS — post-quantum (hybrid) TLS at the relay edge.** PARAMANT
+  encrypts payloads with ML-KEM-768, but the TLS handshake carrying them was the
+  last classical link (vulnerable to harvest-now-decrypt-later on the session
+  key). The hardened `nginx-selfhost.conf` no longer pins a classical-only
+  `ssl_ecdh_curve`, so on OpenSSL 3.5+ (or 3.2+ with oqs-provider) nginx
+  negotiates the `X25519MLKEM768` RFC 9794 hybrid group automatically; a
+  commented opt-in line pins PQ-first preference order on capable builds. New
+  guide `docs/security/pq-tls.md` covers requirements, enablement, and
+  verification (`openssl s_client -groups X25519MLKEM768`, testssl.sh, browser).
+- **`nginx-selfhost.conf` (repo root) re-synced with the hardened edge config.**
+  The v2.3.3 nginx hardening (modern AEAD-only cipher suite, `ssl_session_tickets
+  off`, OCSP stapling, HSTS preload, slowloris timeouts, `client_max_body_size`,
+  per-endpoint rate-limit zones, minimal access log) had only landed in
+  `deploy/nginx-selfhost.conf`; the repo-root copy that the README and
+  self-hosting docs point operators to was still the pre-hardening version with
+  `ssl_ciphers HIGH:!aNULL:!MD5` and no OCSP stapling. Both files are now
+  identical and quantum-ready.
+
 ### Removed
 - **Thunderbird FileLink add-on retired.** `thunderbird-filelink/` removed from the
   repo and the add-on unpublished from addons.thunderbird.net (it was status
