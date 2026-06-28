@@ -26,6 +26,12 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const STAMP_PDF_W = 240;
 const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
+// PDF placement view state for zoom + page-nav (PDF mode only).
+let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,task}], zoom }
+let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
+let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indicator
+let _drag = null;             // active stamp drag-reposition gesture
+let _reviewZoom = 1;          // zoom factor of the review document preview
 
 const state = {
   signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
@@ -298,6 +304,7 @@ function loadImageElement(bytes, mime) {
 
 async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
+  teardownPageNav();                                  // single image: no page-nav
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -317,6 +324,15 @@ async function renderImageForPlacement() {
   container.appendChild(wrap);
   wrap.addEventListener('click', onPlaceClick);
 
+  // Zoom + drag work for images too (page-nav is multi-page-PDF only).
+  placeState = { isImage: true, wrap, zoom: 1 };
+  { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
+  const zo = $('ds-zoom-out'), zi = $('ds-zoom-in'), zf = $('ds-zoom-fit');
+  if (zo) zo.onclick = () => setPlaceZoom(placeState.zoom / 1.25);
+  if (zi) zi.onclick = () => setPlaceZoom(placeState.zoom * 1.25);
+  if (zf) zf.onclick = () => setPlaceZoom(1);
+  applyPlaceZoom();
+
   $('ds-place-page-count').textContent = '1 image (' + img.naturalWidth + ' x ' + img.naturalHeight + ' pixels)';
 }
 
@@ -326,6 +342,8 @@ async function renderImageForPlacement() {
 
 async function renderPdfForPlacement() {
   $('ds-place-continue').disabled = true;
+  teardownPageNav();
+  { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
@@ -333,27 +351,135 @@ async function renderPdfForPlacement() {
   const container = $('ds-pdf-canvas-list');
   container.innerHTML = '';
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+  const pages = [];
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
     const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
-    const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
     const wrap = document.createElement('div');
     wrap.className = 'ds-page-wrap';
     wrap.dataset.pageIndex = String(i - 1);
     wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
     wrap.appendChild(canvas);
     container.appendChild(wrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     wrap.addEventListener('click', onPlaceClick);
+    pages.push({ page, baseViewport, wrap, canvas, task: null });
   }
+  placeState = { pdf, pages, zoom: 1 };
+
   $('ds-place-page-count').textContent =
     pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
     (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
+
+  const zo = $('ds-zoom-out'), zi = $('ds-zoom-in'), zf = $('ds-zoom-fit');
+  if (zo) zo.onclick = () => setPlaceZoom(placeState.zoom / 1.25);
+  if (zi) zi.onclick = () => setPlaceZoom(placeState.zoom * 1.25);
+  if (zf) zf.onclick = () => setPlaceZoom(1);
+
+  await applyPlaceZoom();                 // initial render == fit-to-width (zoom 1)
+  setupPageNav(container, maxPages);
+}
+
+// Fit-to-width base scale (the original targetWidth logic), times the zoom factor.
+function fitScaleFor(baseViewport) {
+  const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+  return targetWidth / baseViewport.width;
+}
+
+function setPlaceZoom(z) {
+  if (!placeState) return;
+  placeState.zoom = Math.max(0.4, Math.min(4, z));
+  applyPlaceZoom();
+}
+
+// (Re)render every page at the current zoom. state.stamp (PDF points) is never
+// touched; only the displayed canvas size changes and the marker is repainted.
+async function applyPlaceZoom() {
+  if (!placeState) return;
+  const z = placeState.zoom;
+  const pctEl = $('ds-zoom-pct'); if (pctEl) pctEl.textContent = Math.round(z * 100) + '%';
+  if (placeState.isImage) {
+    // Image: canvas is at natural resolution, CSS width:100% scales it; zoom =
+    // set the wrap width. No re-render needed.
+    const fit = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    placeState.wrap.style.width = Math.floor(fit * z) + 'px';
+    reflowStampMarker();
+    return;
+  }
+  const token = ++placeRenderToken;
+  for (const p of placeState.pages) {
+    const scale = fitScaleFor(p.baseViewport) * z;
+    const viewport = p.page.getViewport({ scale });
+    p.wrap.style.width = Math.floor(viewport.width) + 'px';
+    p.canvas.width = Math.floor(viewport.width);
+    p.canvas.height = Math.floor(viewport.height);
+    if (p.task) { try { p.task.cancel(); } catch (e) {} }
+    p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport });
+    try { await p.task.promise; }
+    catch (e) { if (e && e.name === 'RenderingCancelledException') return; }
+    if (token !== placeRenderToken) return;   // a newer zoom superseded this pass
+  }
+  reflowStampMarker();
+}
+
+// Re-derive the marker's pixel box from the PDF-point state.stamp at the current
+// display width. Never mutates state.stamp.
+function reflowStampMarker() {
+  document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
+  if (!state.stamp || !placeState) return;
+  let wrap;
+  if (placeState.isImage) wrap = placeState.wrap;
+  else { const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex); wrap = p && p.wrap; }
+  if (!wrap) return;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;            // natural units per CSS px
+  const w = state.stamp.w / ratio, h = state.stamp.h / ratio;
+  const left = state.stamp.x / ratio;
+  const top = state.stamp.isImage
+    ? state.stamp.y / ratio                                   // image: top-left origin
+    : (wrap._pdfPage.height - state.stamp.y - state.stamp.h) / ratio;  // pdf: bottom-left flip
+  renderStampMarker(wrap, left, top, w, h);
+}
+
+function teardownPageNav() {
+  if (_pageNavObserver) { _pageNavObserver.disconnect(); _pageNavObserver = null; }
+  const nav = $('ds-page-nav'); if (nav) nav.hidden = true;
+}
+
+// Sticky "Page X of N" that follows the most-visible page; jump/prev/next.
+function setupPageNav(container, total) {
+  teardownPageNav();
+  const nav = $('ds-page-nav'), label = $('ds-page-nav-label');
+  if (!nav || !label) return;
+  const wraps = Array.from(container.querySelectorAll('.ds-page-wrap'));
+  if (wraps.length <= 1) { nav.hidden = true; return; }
+  nav.hidden = false;
+  const ratios = new Map(wraps.map(w => [w, 0]));
+  let current = 0;
+  const render = () => { label.textContent = 'Page ' + (current + 1) + ' of ' + total; };
+  _pageNavObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) ratios.set(e.target, e.intersectionRatio);
+    let best = wraps[0], bestR = -1;
+    for (const w of wraps) { const r = ratios.get(w) || 0; if (r > bestR) { bestR = r; best = w; } }
+    const idx = Number(best.dataset.pageIndex) || 0;
+    if (idx !== current) { current = idx; render(); }
+  }, { root: null, rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
+  wraps.forEach(w => _pageNavObserver.observe(w));
+  render();
+  const goTo = (i) => {
+    const w = container.querySelector('.ds-page-wrap[data-page-index="' + i + '"]');
+    if (w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const jump = $('ds-page-nav-jump');
+  if (jump && !jump._wired) {
+    jump._wired = true; jump.max = String(total);
+    const go = () => { const n = Math.max(1, Math.min(total, parseInt(jump.value, 10) || 1)); goTo(n - 1); };
+    jump.addEventListener('change', go);
+    jump.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  }
+  const prev = $('ds-page-nav-prev'), next = $('ds-page-nav-next');
+  if (prev && !prev._wired) { prev._wired = true; prev.addEventListener('click', () => goTo(Math.max(0, current - 1))); }
+  if (next && !next._wired) { next._wired = true; next.addEventListener('click', () => goTo(Math.min(total - 1, current + 1))); }
 }
 
 function onPlaceClick(e) {
@@ -406,7 +532,62 @@ function renderStampMarker(wrap, left, top, w, h) {
   m.className = 'ds-stamp-marker';
   m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
   m.innerHTML = stampMockupHtml();
+  m.addEventListener('pointerdown', onStampPointerDown);   // drag to reposition
   wrap.appendChild(m);
+}
+
+// ── Drag the placed stamp to reposition (coexists with click-to-place) ──────
+function onStampPointerDown(e) {
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  const marker = e.currentTarget, wrap = marker.parentElement;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  _drag = {
+    marker, wrap, rect,
+    grabX: e.clientX - (rect.left + parseFloat(marker.style.left)),
+    grabY: e.clientY - (rect.top + parseFloat(marker.style.top)),
+    w: parseFloat(marker.style.width), h: parseFloat(marker.style.height), moved: false,
+  };
+  try { marker.setPointerCapture(e.pointerId); } catch (_) {}
+  marker.style.cursor = 'grabbing';
+  marker.addEventListener('pointermove', onStampPointerMove);
+  marker.addEventListener('pointerup', onStampPointerUp);
+  marker.addEventListener('pointercancel', onStampPointerUp);
+  e.preventDefault(); e.stopPropagation();
+}
+
+function onStampPointerMove(e) {
+  if (!_drag) return;
+  _drag.moved = true;
+  const left = Math.max(0, Math.min(_drag.rect.width - _drag.w, e.clientX - _drag.rect.left - _drag.grabX));
+  const top = Math.max(0, Math.min(_drag.rect.height - _drag.h, e.clientY - _drag.rect.top - _drag.grabY));
+  _drag.marker.style.left = left + 'px';
+  _drag.marker.style.top = top + 'px';
+}
+
+function onStampPointerUp(e) {
+  if (!_drag) return;
+  const { marker, wrap, w, h, moved } = _drag;
+  marker.removeEventListener('pointermove', onStampPointerMove);
+  marker.removeEventListener('pointerup', onStampPointerUp);
+  marker.removeEventListener('pointercancel', onStampPointerUp);
+  try { marker.releasePointerCapture(e.pointerId); } catch (_) {}
+  marker.style.cursor = 'grab';
+  if (moved) {
+    const left = parseFloat(marker.style.left), top = parseFloat(marker.style.top);
+    const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+    const stampNatW = w * ratio, stampNatH = h * ratio;
+    const natX = left * ratio, natYTop = top * ratio;
+    if (wrap._pdfPage.isImage) {
+      state.stamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
+    } else {
+      const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
+      state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
+    }
+    // Swallow the click the browser fires after pointerup so onPlaceClick on the
+    // wrap does not ALSO re-place the stamp at the cursor.
+    wrap.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+  }
+  _drag = null;
 }
 
 // ====================================================================
@@ -751,6 +932,30 @@ async function renderDocPreview() {
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
 
+  _reviewZoom = 1;
+  // A small zoom control so the signer can inspect the document + seal at the
+  // last step before signing (DocuSign/Adobe keep the document interactive).
+  // The whole zoomwrap (canvas/img + the stamp overlay) is CSS-scaled together,
+  // so the stamp stays glued to its spot with no repositioning math.
+  const buildReviewZoom = (zoomwrap) => {
+    const bar = document.createElement('div');
+    bar.className = 'ds-zoom ds-rv-zoom';
+    bar.innerHTML = '<button type="button" aria-label="Zoom out" data-z="out">&minus;</button>' +
+      '<span class="ds-rv-pct">100%</span><button type="button" aria-label="Zoom in" data-z="in">+</button>' +
+      '<button type="button" data-z="fit">Fit</button>';
+    const pct = bar.querySelector('.ds-rv-pct');
+    const apply = () => { zoomwrap.style.transform = 'scale(' + _reviewZoom + ')'; pct.textContent = Math.round(_reviewZoom * 100) + '%'; };
+    bar.addEventListener('click', (e) => {
+      const z = e.target && e.target.dataset && e.target.dataset.z; if (!z) return;
+      if (z === 'out') _reviewZoom = Math.max(1, _reviewZoom / 1.25);
+      else if (z === 'in') _reviewZoom = Math.min(3, _reviewZoom * 1.25);
+      else _reviewZoom = 1;
+      apply();
+    });
+    pane.insertBefore(bar, pane.firstChild);
+    apply();
+  };
+
   if (state.mode === 'pdf') {
     pane.classList.add('has-pdf');
     const pdfjs = await waitForPdfjs();
@@ -758,55 +963,52 @@ async function renderDocPreview() {
     const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
     const page = await pdf.getPage(state.stamp.pageIndex + 1);
     const baseViewport = page.getViewport({ scale: 1 });
-    // Target a smaller render for the review (max ~340px wide) so it fits the grid cell.
     const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    const scale = targetW / baseViewport.width;
-    const viewport = page.getViewport({ scale });
+    // Render at 2.5x so CSS-zooming stays sharp; canvas{width:100%} shows it at targetW.
+    const renderScale = (targetW / baseViewport.width) * 2.5;
+    const viewport = page.getViewport({ scale: renderScale });
+    const zoomwrap = document.createElement('div');
+    zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    pane.appendChild(canvas);
+    zoomwrap.appendChild(canvas);
+    pane.appendChild(zoomwrap);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    // Mock the stamp as an absolutely positioned overlay so the user sees
-    // where it will land. Convert PDF points -> displayed pixels.
-    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;
+    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;   // pdf pt per displayed px
     const left = state.stamp.x / ratio;
     const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
-    const w = state.stamp.w / ratio;
-    const h = state.stamp.h / ratio;
     const mock = document.createElement('div');
     mock.className = 'ds-mockup-stamp';
-    mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+    mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
     mock.innerHTML = stampInnerHtml();
-    pane.appendChild(mock);
+    zoomwrap.appendChild(mock);
+    makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+    buildReviewZoom(zoomwrap);
     return;
   }
 
-  // Image-mode: render the image with the same stamp-mockup overlay
-  // the PDF preview gets, so the signer sees WHERE the seal will land.
   if (state.mode === 'image' && state.signer.docImageDataUrl && state.stamp) {
-    pane.classList.add('has-pdf');   // reuse PDF-pane layout (top-aligned, scrollable)
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative;display:inline-block;width:100%';
+    pane.classList.add('has-pdf');
+    const zoomwrap = document.createElement('div');
+    zoomwrap.style.cssText = 'position:relative;display:block;width:100%;transform-origin:0 0';
     const img = document.createElement('img');
     img.src = state.signer.docImageDataUrl;
     img.alt = state.doc.name;
     img.style.cssText = 'display:block;width:100%;height:auto';
-    wrap.appendChild(img);
-    pane.appendChild(wrap);
+    zoomwrap.appendChild(img);
+    pane.appendChild(zoomwrap);
     img.onload = () => {
-      // Image natural -> displayed ratio
       const rect = img.getBoundingClientRect();
-      const ratio = state.doc && state.signer.docImageDataUrl ? (img.naturalWidth / rect.width) : 1;
-      const left = state.stamp.x / ratio;
-      const top  = state.stamp.y / ratio;
-      const w = state.stamp.w / ratio;
-      const h = state.stamp.h / ratio;
+      const ratio = img.naturalWidth / rect.width;
+      const left = state.stamp.x / ratio, top = state.stamp.y / ratio;
       const mock = document.createElement('div');
       mock.className = 'ds-mockup-stamp';
-      mock.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+      mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
       mock.innerHTML = stampInnerHtml();
-      wrap.appendChild(mock);
+      zoomwrap.appendChild(mock);
+      makeReviewStampDraggable(mock, ratio, true, 0, 0);
+      buildReviewZoom(zoomwrap);
     };
     return;
   }
@@ -830,6 +1032,46 @@ async function renderDocPreview() {
     '<div style="margin-top:8px"><strong>SHA3-256</strong></div>' +
     '<div style="font-size:10px">' + sha + '</div>';
   pane.appendChild(meta);
+}
+
+// Make the review preview's stamp draggable so the signer can reposition it on the
+// last screen before signing (one interactive document, Adobe/DocuSign-style). The
+// mockup lives in a CSS-scaled zoomwrap, so screen deltas are divided by _reviewZoom
+// to map back to the un-scaled local px the mockup's left/top use. ratio = doc-unit
+// per local px (computed at zoom 1), so on drop we convert local px -> doc units.
+function makeReviewStampDraggable(mock, ratio, isImage, pageH, pageIndex) {
+  mock.style.pointerEvents = 'auto';
+  mock.style.cursor = 'grab';
+  mock.style.touchAction = 'none';
+  let d = null;
+  mock.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    d = { x0: e.clientX, y0: e.clientY, left0: parseFloat(mock.style.left), top0: parseFloat(mock.style.top) };
+    try { mock.setPointerCapture(e.pointerId); } catch (_) {}
+    mock.style.cursor = 'grabbing';
+    e.preventDefault(); e.stopPropagation();
+  });
+  mock.addEventListener('pointermove', (e) => {
+    if (!d) return;
+    const z = _reviewZoom || 1;
+    const w = parseFloat(mock.style.width), h = parseFloat(mock.style.height);
+    const parent = mock.parentElement;
+    const left = Math.max(0, Math.min(parent.clientWidth - w, d.left0 + (e.clientX - d.x0) / z));
+    const top = Math.max(0, Math.min(parent.clientHeight - h, d.top0 + (e.clientY - d.y0) / z));
+    mock.style.left = left + 'px'; mock.style.top = top + 'px';
+  });
+  const up = (e) => {
+    if (!d) return; d = null;
+    try { mock.releasePointerCapture(e.pointerId); } catch (_) {}
+    mock.style.cursor = 'grab';
+    const left = parseFloat(mock.style.left), top = parseFloat(mock.style.top);
+    const natX = left * ratio, natYTop = top * ratio;
+    const w = parseFloat(mock.style.width) * ratio, h = parseFloat(mock.style.height) * ratio;
+    if (isImage) state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
+    else state.stamp = { pageIndex, x: natX, y: pageH - natYTop - h, w, h };
+  };
+  mock.addEventListener('pointerup', up);
+  mock.addEventListener('pointercancel', up);
 }
 
 function renderSigPreview() {
@@ -930,8 +1172,9 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
 
 function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg) {
   const { x, y, w, h } = stamp;
-  // Outer fill + border
-  ctx.fillStyle = 'rgba(11, 58, 106, 0.03)';
+  // Solid WHITE body so the seal is always legible on any document (dark text on
+  // white), instead of a near-transparent fill that let busy/dark images bleed through.
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = '#0b3a6a';
   ctx.lineWidth = Math.max(1, w / 200);
@@ -1010,8 +1253,9 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
   const white = PDFLib.rgb(1, 1, 1);
 
-  // Outer border + faint fill
-  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: navy, opacity: 0.03 });
+  // Outer border + SOLID WHITE body (always legible: dark text on white, not a
+  // near-transparent fill that lets the document bleed through).
+  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
 
   // Branded top band: cobalt bar with logo + PQ badge
   const bandH = 16;
