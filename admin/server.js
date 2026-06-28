@@ -14,6 +14,7 @@ const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
+const { acquireSignupLock } = require('./lib/signup-lock');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -802,73 +803,97 @@ api.get("/user/signup/verify/:token", async (req, res) => {
   let pending;
   try { pending = JSON.parse(raw); } catch { return res.redirect('/signup?error=invalid_token'); }
 
-  // Consume immediately (one-shot)
-  await redis().del(`paramant:signup:pending:${token}`);
-
   const { email, label } = pending;
 
-  // Check again — race guard
-  const existing = await findUserByEmail(email);
-  if (existing) return res.redirect('/signup?error=account_exists');
-
-  // Create the account across every sector listed in SECTORS so the key works
-  // on every relay -- including main (relay.paramant.app, internal sector
-  // "relay") which the SDK and direct API consumers target. Before SECTORS
-  // gained the 'main' entry (added together with this comment), the fan-out
-  // silently skipped main even while claiming to write to "every sector",
-  // and main's users.json drifted weeks behind the others.
-  const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
-  const createdAt = new Date().toISOString();
-  const createBody = {
-    key: keyVal,
-    email,
-    label: label || null,
-    plan: "community",
-    active: true,
-    created: createdAt,
-    created_at_ts: Date.now(),
-  };
-
-  // health is the source of truth for admin UI visibility. Must succeed.
-  const primaryRes = await relayFetch("health", "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN);
-  if (primaryRes.status !== 200 && primaryRes.status !== 201) {
-    console.error("[signup/verify] key creation failed on health:", primaryRes.status, primaryRes.body);
-    return res.redirect('/signup?error=server_error');
+  // Race guard (known-issues C1, TOCTOU). Two different pending tokens for
+  // the same address can reach this point concurrently -- both were issued
+  // while no account existed yet -- and both used to pass the existence
+  // re-check before either had created the account. Serialize on the e-mail
+  // hash: exactly one request runs check + create, the loser waits and then
+  // sees the winner's account. The same lock also covers a double click on
+  // one link, because the token is re-read and consumed under the lock.
+  const lock = await acquireSignupLock(redis(), email, token);
+  if (!lock.acquired) {
+    // Creation for this address is still in flight after ~3s of waiting.
+    // The pending token was NOT consumed, so a retry of the same link works.
+    return res.redirect('/signup?error=busy');
   }
-
-  // Fan-out to the other sectors. Best-effort — if one is briefly unavailable, reload-users
-  // can pick it up later; we don't want to leak a half-created account by failing the whole
-  // signup here after health succeeded.
-  const otherSectors = Object.keys(SECTORS).filter(s => s !== "health");
-  await Promise.all(otherSectors.map(s =>
-    relayFetch(s, "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN).catch(e => {
-      console.error(`[signup/verify] key propagation failed on ${s}:`, e && e.message || e);
-    })
-  ));
-
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id: keyVal, email, label: label || null }),
-    { EX: 14 * 86400 }
-  );
-  await redis().set(
-    `paramant:user:meta:${keyVal}`,
-    JSON.stringify({ email, created_at: createdAt })
-  ).catch(() => {});
-
   try {
-    await sendSetupEmail(email, setupToken);
-  } catch (err) {
-    console.error("[signup/verify] setup email failed:", err.message);
-    // Account exists, don't undo — they can contact support
+
+    // Re-read under the lock: a parallel click on the same link may have
+    // consumed the token while we waited for the lock.
+    if (!(await redis().get(`paramant:signup:pending:${token}`))) {
+      const consumed = await redis().get(`paramant:signup:consumed:${token}`);
+      return res.redirect(consumed ? '/signup/verified' : '/signup?error=expired_token');
+    }
+    // Consume immediately (one-shot)
+    await redis().del(`paramant:signup:pending:${token}`);
+
+    const existing = await findUserByEmail(email);
+    if (existing) return res.redirect('/signup?error=account_exists');
+
+    // Create the account across every sector listed in SECTORS so the key works
+    // on every relay -- including main (relay.paramant.app, internal sector
+    // "relay") which the SDK and direct API consumers target. Before SECTORS
+    // gained the 'main' entry (added together with this comment), the fan-out
+    // silently skipped main even while claiming to write to "every sector",
+    // and main's users.json drifted weeks behind the others.
+    const keyVal = "pgp_" + crypto.randomBytes(32).toString("hex");
+    const createdAt = new Date().toISOString();
+    const createBody = {
+      key: keyVal,
+      email,
+      label: label || null,
+      plan: "community",
+      active: true,
+      created: createdAt,
+      created_at_ts: Date.now(),
+    };
+
+    // health is the source of truth for admin UI visibility. Must succeed.
+    const primaryRes = await relayFetch("health", "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN);
+    if (primaryRes.status !== 200 && primaryRes.status !== 201) {
+      console.error("[signup/verify] key creation failed on health:", primaryRes.status, primaryRes.body);
+      return res.redirect('/signup?error=server_error');
+    }
+
+    // Fan-out to the other sectors. Best-effort — if one is briefly unavailable, reload-users
+    // can pick it up later; we don't want to leak a half-created account by failing the whole
+    // signup here after health succeeded.
+    const otherSectors = Object.keys(SECTORS).filter(s => s !== "health");
+    await Promise.all(otherSectors.map(s =>
+      relayFetch(s, "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN).catch(e => {
+        console.error(`[signup/verify] key propagation failed on ${s}:`, e && e.message || e);
+      })
+    ));
+
+    const setupToken = crypto.randomBytes(32).toString("hex");
+    await redis().set(
+      `paramant:user:setup_token:${setupToken}`,
+      JSON.stringify({ user_id: keyVal, email, label: label || null }),
+      { EX: 14 * 86400 }
+    );
+    await redis().set(
+      `paramant:user:meta:${keyVal}`,
+      JSON.stringify({ email, created_at: createdAt })
+    ).catch(() => {});
+
+    try {
+      await sendSetupEmail(email, setupToken);
+    } catch (err) {
+      console.error("[signup/verify] setup email failed:", err.message);
+      // Account exists, don't undo — they can contact support
+    }
+
+    // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
+    await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 30 * 86400 }).catch(() => {});
+
+    console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
+    res.redirect('/signup/verified');
+
+  } finally {
+    await lock.release();
   }
-
-  // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
-  await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 30 * 86400 }).catch(() => {});
-
-  console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
-  res.redirect('/signup/verified');
 });
 
 // POST /api/user/setup/:token — retrieve TOTP QR data (idempotent)
