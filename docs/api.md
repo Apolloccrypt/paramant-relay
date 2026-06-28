@@ -1,4 +1,4 @@
-# API Reference — PARAMANT v0.9.0-beta
+# API Reference — PARAMANT v3.0.0
 
 ## Base URLs
 
@@ -18,8 +18,17 @@ Three credential types are in use across different API surfaces:
 |------------|-------------------|----------|
 | API key (`pgp_` prefix) | `X-Api-Key: pgp_your_key` | Data plane — uploads, downloads, CT log (developer clients) |
 | Operator key (`plk_` prefix) | `X-Api-Key: plk_your_key` | Data plane — unlimited throughput (operator license) |
+| DID signature | `X-DID: did:paramant:…` + `X-DID-Signature: <sig over request URL>` | Data plane — **active fallback** when no `X-Api-Key` is sent (see Device Identity) |
 | Session cookie | `Cookie: paramant_user_session=<token>` | `/api/user/*` endpoints — set automatically after TOTP login |
 | Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints — admin panel only |
+
+> **DID fallback semantics.** When a request carries no API key but a valid
+> `X-DID` + `X-DID-Signature` pair, the relay authenticates the device and
+> processes the request **as a `pro`-plan principal** attributed to that
+> device. An enrolled device credential is therefore a full data-plane
+> credential in its own right, not merely an attribution label: treat device
+> private keys with the same care as API keys, and revoke the DID enrollment
+> when a device is retired or compromised.
 
 CT log and STH endpoints are **public** — no credential required.
 
@@ -367,6 +376,10 @@ curl https://relay.paramant.app/v2/pubkey/phone-001 \
 ## Device Identity
 
 Ghost Pipe supports W3C-compatible decentralised identifiers (`did:paramant:`) for field devices. Registering a device identity enrolls it in the CT log and allows transfers to be attributed to a specific device without exposing the API key.
+
+Note that an enrolled DID is also an **authentication fallback**: a request
+without an API key but with a valid `X-DID` + `X-DID-Signature` is accepted
+and runs under the `pro` plan, attributed to the device (see Authentication).
 
 ### POST /v2/did/register — Enroll a device
 

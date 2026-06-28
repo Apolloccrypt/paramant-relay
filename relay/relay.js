@@ -46,8 +46,6 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of wsTickets) if (
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;
 try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
-let bip39Lib  = null;
-try { bip39Lib  = require('bip39');  } catch(e) { /* npm install bip39  */ }
 // Redis client for user TOTP endpoints
 const RELAY_REDIS_URL = process.env.REDIS_URL || '';
 let redisClient = null;
@@ -1529,17 +1527,6 @@ function hkdf(ikm, salt, info, length) {
     }
     return okm.slice(0, length);
   }
-}
-
-// Leid relay lookup-hash af van BIP39 mnemonic (zelfde als Python SDK)
-function mnemonicToLookupHash(phrase) {
-  if (!bip39Lib) throw new Error('bip39 not available (npm install bip39)');
-  if (!bip39Lib.validateMnemonic(phrase)) throw new Error('Invalid BIP39 mnemonic (checksum error)');
-  const entropy = Buffer.from(bip39Lib.mnemonicToEntropy(phrase), 'hex');
-  const idBytes = hkdf(entropy, 'paramant-drop-v1', 'lookup-id', 32);
-  const hash    = crypto.createHash('sha3-256').update(idBytes).digest('hex');
-  zeroBuffer(entropy);
-  return hash;
 }
 
 // ── Merkle audit chain ────────────────────────────────────────────────────────

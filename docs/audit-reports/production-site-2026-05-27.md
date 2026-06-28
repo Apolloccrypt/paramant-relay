@@ -100,7 +100,7 @@ Cross-check against `health.paramant.app`: identical /health and /v2/capabilitie
 - Severity: MEDIUM. Suggested fix: vendor the three textures under /assets and point three-globe at the local copies.
 
 ### M-07  Live /docs does not document paramant-core / @paramant/core
-- Evidence: live `/docs` grep -- present: ML-KEM-768, ML-DSA-65, AES-256-GCM, Ghost Pipe, ParaShare, ParaDrop. MISSING: `paramant-core`, `@paramant/core`, `CRYPTO_MODE`.
+- Evidence: live `/docs` grep -- present: ML-KEM-768, ML-DSA-65, AES-256-GCM, Ghost Pipe, ParaShare, ParaDrop *(ParaDrop has since been removed as a feature, PRs #150-152)*. MISSING: `paramant-core`, `@paramant/core`, `CRYPTO_MODE`.
 - Impact: the M5b architectural change (server-side ML-DSA-65 provided by the paramant-core Rust NAPI binding) is invisible to users/auditors on the live docs. Partly an artefact of M-01 (prod 2.5.0) and the docs PR not being deployed.
 - Severity: MEDIUM. Suggested fix: deploy the docs update (a prior branch already adds the crypto-stack attribution); add a short CRYPTO_MODE note once R006 is live.
 
