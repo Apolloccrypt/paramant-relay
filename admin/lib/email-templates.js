@@ -285,7 +285,7 @@ Your Paramant plan has been upgraded.
 Plan:    ${planName}
 Billing: ${periodLabel}
 Amount:  ${amountStr || 'N/A'}
-${stub ? '\nNote: payment processing is in beta. This confirmation reflects the\nplan change on your account. Formal invoicing follows when Stripe\nintegration goes live.\n' : ''}
+${stub ? '\nNote: payment processing is in beta. This confirmation reflects the\nplan change on your account. Formal invoicing follows when Mollie\nintegration goes live.\n' : ''}
 Questions about billing? Reply to this email.
 
 Paramant
@@ -299,7 +299,7 @@ https://paramant.app`;
       <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Billing</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${periodLabel}</td></tr>
       <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Amount</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;">${amountStr || 'N/A'}</td></tr>
     </table>
-    ${stub ? '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#92400E;font-size:13px;"><strong>Beta note:</strong> payment processing is not yet live. This confirmation reflects the plan change on your account. Formal invoicing follows when Stripe integration goes live.</p></div>' : ''}
+    ${stub ? '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#92400E;font-size:13px;"><strong>Beta note:</strong> payment processing is not yet live. This confirmation reflects the plan change on your account. Formal invoicing follows when Mollie integration goes live.</p></div>' : ''}
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions about billing? Reply to this email.</p>
   `);
 

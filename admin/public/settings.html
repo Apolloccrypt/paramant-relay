@@ -85,6 +85,27 @@
   .modal h3 { font-family:var(--ff-mono); font-size:13px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; }
   .modal p { font-size:12px; color:#475569; margin-bottom:14px; line-height:1.5; }
   .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  /* ── Mobile-first overhaul (additief) ── */
+  @media(max-width:760px){
+    header { padding:12px 14px; flex-wrap:wrap; gap:8px; }
+    .wrap { flex-direction:column; padding:14px; gap:14px; }
+    .side { width:100%; flex:none; position:static; display:flex; gap:6px; overflow-x:auto;
+      border-bottom:1px solid rgba(11,58,106,.1); padding-bottom:8px; scrollbar-width:none; }
+    .side::-webkit-scrollbar { display:none; }
+    .side button { width:auto; flex:0 0 auto; border-left:none; white-space:nowrap;
+      min-height:40px; padding:9px 12px; }
+    .side button.on, .side button.active { border-left:none; border-bottom:2px solid #1D4ED8; }
+    input[type=text], input[type=number], select, .slider-row, .secret-row { max-width:none; }
+    .slider-row input[type=number] { width:96px; }
+    .footbar { flex-wrap:wrap; gap:10px; padding:12px 14px; }
+    .foot-info { flex-basis:100%; }
+    .footbar button { flex:1; min-height:44px; }
+    .audit-row { flex-wrap:wrap; gap:4px 14px; } .audit-ts { flex-basis:100%; }
+    .modal-bg { align-items:flex-end; }
+    .modal { width:100%; border-radius:16px 16px 0 0; }
+    .modal-actions { flex-direction:column-reverse; gap:10px; }
+    .modal-actions button { width:100%; min-height:44px; }
+  }
 </style>
 </head>
 <body>

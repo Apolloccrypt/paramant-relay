@@ -517,24 +517,12 @@
 
     <p>The practical impact is bounded: Resend receives only the recipient email address and the message we send (a verification link, an invite, or a billing notice). It never receives file contents, encryption keys, account passwords, or relay metadata. It is never used for marketing. This dependency is the same as disclosed in the <a href="/privacy">privacy policy</a>; an EU-resident email provider is on the roadmap.</p>
 
-    <h3>DNS and CDN: Cloudflare (current, being replaced)</h3>
-    <p>paramant.app currently uses Cloudflare for DNS hosting and static asset delivery. Cloudflare is a US company incorporated in Delaware, subject to US jurisdiction including the CLOUD Act and FISA 702.</p>
+    <h3>DNS: Bunny.net (EU) &mdash; Cloudflare removed</h3>
+    <p>paramant.app uses <strong>Bunny.net</strong> for DNS, a Slovenian company (EU jurisdiction, GDPR-native, not subject to the US CLOUD Act or FISA 702). The earlier dependency on Cloudflare (a US company) has been <strong>removed</strong>: the authoritative nameservers are now Bunny&rsquo;s (kiki/coco.bunny.net).</p>
 
-    <p>The practical impact is bounded by architecture: all file content is encrypted client-side with ML-KEM-768 before any network transit. Cloudflare terminates TLS but receives only ciphertext, so it cannot read file contents, encryption keys, or recipient identities. What is theoretically observable at the Cloudflare edge: source IP addresses, request timing, request volume, and HTTP headers (not body content).</p>
+    <p>There is no third-party CDN or reverse proxy in front of the site. TLS terminates directly on our own edge (Caddy) on Hetzner infrastructure in Germany, with post-quantum key exchange; your connection reaches our server and nowhere else. DNS resolution is handled by Bunny in the EU. No US provider sits in the request or resolution path.</p>
 
-    <p>For most threat models this is acceptable. For high-sensitivity use cases (legal, government, healthcare under strict NEN 7510 interpretation) where even metadata exposure is a concern, this is a gap we are closing.</p>
-
-    <h3>Migration to Bunny.net (Q2 2026)</h3>
-    <p>Paramant is migrating DNS and CDN infrastructure to <strong>Bunny.net</strong>, a Slovenian company (EU jurisdiction, GDPR-native, not subject to CLOUD Act) with 119 edge PoPs and comparable latency to Cloudflare.</p>
-
-    <p>The migration is phased to avoid downtime:</p>
-    <ul>
-      <li><strong>Phase 1 (Q2 early)</strong>: DNS-only migration from Cloudflare to Bunny DNS, with a nameserver change at the registrar and zero downtime if TTLs are managed correctly</li>
-      <li><strong>Phase 2 (Q2 mid)</strong>: Static asset CDN via Bunny Pull Zone, with parallel paths during transition</li>
-      <li><strong>Phase 3 (Q2 late)</strong>: Full reverse proxy via Bunny with WAF, replacing Cloudflare DDoS protection</li>
-    </ul>
-
-    <p>Full migration plan including rollback procedures is documented in the <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/migration-bunny.md" target="_blank" rel="noopener">repository (docs/migration-bunny.md)</a>.</p>
+    <p>The migration history, including rollback procedures, is documented in the <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/docs/migration-bunny.md" target="_blank" rel="noopener">repository (docs/migration-bunny.md)</a>.</p>
 
     <div class="callout">
       <h4>why we document this</h4>
