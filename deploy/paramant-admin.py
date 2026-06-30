@@ -14,7 +14,7 @@ Omgeving:
   PARAMANT_SECTORS_DIR   Pad naar sector dirs (default: /home/paramant)
   PARAMANT_RELAY_BASE    Base URL voor /v2/check-key calls (default: https://health.paramant.app)
 """
-import os, sys, json, secrets, argparse, urllib.request, urllib.error
+import os, sys, json, secrets, argparse, re, urllib.request, urllib.error
 from datetime import datetime, timezone
 
 # ── Resend mail ───────────────────────────────────────────────────────────────
@@ -74,25 +74,35 @@ data  = gp.receive(hash_)</pre>
     return False
 
 # ── Config ────────────────────────────────────────────────────────────────────
-# De compose-deploy bewaart /data van elke relay in een named docker volume
-# (paramant-relay_relay-<sector>-data). De /home/paramant/relay-*-bestanden
-# zijn een artefact van de oude systemd-topologie en worden niet meer
-# beschreven sinds de docker-migratie; daarop muteren is een stille no-op
-# richting de relays. Het volume-pad wint daarom altijd als het bestaat.
+# De compose-deploy bewaart /data van elke relay in een named docker volume.
+# Docker Compose gebruikt standaard de install-dir als projectnaam, dus
+# /opt/paramant krijgt volumes zoals paramant_relay-<sector>-data. De
+# /home/paramant/relay-*-bestanden zijn een artefact van de oude
+# systemd-topologie; daarop muteren is een stille no-op richting de relays.
 SECTORS_DIR     = os.environ.get('PARAMANT_SECTORS_DIR', '/home/paramant')
 VOLUMES_DIR     = os.environ.get('PARAMANT_DOCKER_VOLUMES_DIR', '/var/lib/docker/volumes')
-COMPOSE_PROJECT = os.environ.get('PARAMANT_COMPOSE_PROJECT', 'paramant-relay')
+
+def _compose_project_name():
+    explicit = os.environ.get('PARAMANT_COMPOSE_PROJECT') or os.environ.get('COMPOSE_PROJECT_NAME')
+    if explicit:
+        return explicit
+    install_dir = os.environ.get('PARAMANT_DIR')
+    if not install_dir:
+        install_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    base = os.path.basename(os.path.abspath(install_dir)) or 'paramant'
+    project = re.sub(r'[^a-z0-9_-]', '', base.lower())
+    return project or 'paramant'
+
+COMPOSE_PROJECT = _compose_project_name()
 
 SECTOR_NAMES = ('main', 'health', 'legal', 'finance', 'iot')
 
 def _users_json_path(sector):
-    vol = os.path.join(VOLUMES_DIR, f'{COMPOSE_PROJECT}_relay-{sector}-data', '_data', 'users.json')
-    if os.path.exists(vol):
+    vol_dir = os.path.join(VOLUMES_DIR, f'{COMPOSE_PROJECT}_relay-{sector}-data', '_data')
+    vol = os.path.join(vol_dir, 'users.json')
+    if os.path.isdir(vol_dir):
         return vol
     legacy = os.path.join(SECTORS_DIR, f'relay-{sector}', 'users.json')
-    if os.path.exists(legacy) and os.path.isdir(os.path.join(VOLUMES_DIR, f'{COMPOSE_PROJECT}_relay-{sector}-data')):
-        # niet warn(): die is hier nog niet gedefinieerd (module-level init)
-        print(f'\033[33m⚠\033[0m {sector}: docker volume bestaat maar users.json ontbreekt erin; val terug op legacy pad {legacy}', file=sys.stderr)
     return legacy
 
 SECTORS = {s: _users_json_path(s) for s in SECTOR_NAMES}
