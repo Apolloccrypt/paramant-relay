@@ -4621,21 +4621,29 @@ python3 paramant-receiver.py \\
       if (!/^[0-9a-f]{64}$/.test(documentHash)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'document_hash must be a 64-char SHA3-256 hex string' })); }
       if (!signatureB64 || !signerPubB64)       { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signature and signer_public_key are required' })); }
 
-      // Refuse to notarise a signature that does not verify against the supplied key.
-      let signerOk = false;
-      try {
-        signerOk = registry.getSig(0x0002).verify(
-          Buffer.from(signatureB64, 'base64'),
-          Buffer.from(documentHash, 'hex'),
-          Buffer.from(signerPubB64, 'base64'));
-      } catch (e) { signerOk = false; }
-      if (!signerOk) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer signature does not verify against signer_public_key' })); }
+      // Refuse to notarise a signature that does not verify against the supplied
+      // key. The signer MUST sign the domain-separated v2 message (pentest
+      // #3/#4) so a signature minted for another purpose cannot be replayed as a
+      // document notarisation. Legacy bare-hash (v1) signers are only accepted
+      // when PARASIGN_ACCEPT_LEGACY_V1=true (transition escape hatch); by
+      // default v1 is rejected, closing the cross-protocol replay.
+      const _sigBuf = Buffer.from(signatureB64, 'base64');
+      const _pubBuf = Buffer.from(signerPubB64, 'base64');
+      const _sigEng = registry.getSig(0x0002);
+      const _tryVerify = (bytes) => { try { return _sigEng.verify(_sigBuf, bytes, _pubBuf); } catch (e) { return false; } };
+      let sigVersion = '2';
+      let signerOk = _tryVerify(parasign.singleSignerMessage(documentHash));
+      if (!signerOk && process.env.PARASIGN_ACCEPT_LEGACY_V1 === 'true') {
+        signerOk = _tryVerify(Buffer.from(documentHash, 'hex'));
+        if (signerOk) { sigVersion = '1'; log('warn', 'parasign_legacy_v1_signature', { doc: documentHash.slice(0, 16) + '…' }); }
+      }
+      if (!signerOk) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer signature does not verify against signer_public_key (expected a v2 domain-separated signature: ML-DSA over sha3_256("paramant/parasign/notary/v1" || 0x00 || document_hash))' })); }
 
       const signerPkHash = crypto.createHash('sha3-256').update(Buffer.from(signerPubB64, 'base64')).digest('hex');
       const ctEntry = ctAppendParasign(documentHash, signerPkHash);
 
       const envelope = parasign.buildEnvelope(
-        { documentHashHex: documentHash, signatureB64, signerPubB64, signerLabel, ttlDays, ctLogIndex: ctEntry.index },
+        { documentHashHex: documentHash, signatureB64, signerPubB64, signerLabel, ttlDays, ctLogIndex: ctEntry.index, version: sigVersion },
         { relaySign: (msg) => registry.getSig(0x0002).sign(msg, relayIdentity.sk), relayPkHash: relayIdentity.pk_hash });
 
       log('info', 'parasign_signed', { ct_index: ctEntry.index, signer_pk_hash: signerPkHash.slice(0, 16) + '…' });
