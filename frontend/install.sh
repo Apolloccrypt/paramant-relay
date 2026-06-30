@@ -21,7 +21,7 @@ dim()  { echo -e "${D}$*${E}"; }
 
 INSTALL_DIR="${PARAMANT_DIR:-/opt/paramant}"
 REPO="https://github.com/Apolloccrypt/paramant-relay"
-VERSION="v3.0.0"
+RELAY_VERSION="${PARAMANT_VERSION:-v3.0.0}"
 MIN_RAM_MB=512
 MIN_DISK_GB=4
 
@@ -34,7 +34,7 @@ ${C}${BOLD}  ██╔═══╝ ██╔══██║██╔══██
 ${C}${BOLD}  ██║     ██║  ██║██║  ██║██║  ██║██║ ╚═╝ ██║██║  ██║██║ ╚███║   ██║   ${E}
 ${C}${BOLD}  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚══╝   ╚═╝   ${E}
 
-  ${D}Post-Quantum Relay Installer ${VERSION}${E}
+  ${D}Post-Quantum Relay Installer ${RELAY_VERSION}${E}
   ${D}ML-KEM-768 · Burn-on-read · Community Edition${E}
 
   ${Y}License: BUSL-1.1 — free for up to 5 API keys.${E}
@@ -221,10 +221,18 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" pull --ff-only -q
   ok "Updated to latest"
 else
-  info "Cloning ${REPO}..."
-  git clone --depth 1 --branch "${VERSION}" "$REPO" "$INSTALL_DIR" -q 2>/dev/null \
-    || git clone --depth 1 "$REPO" "$INSTALL_DIR" -q
-  ok "Cloned to ${INSTALL_DIR}"
+  info "Cloning ${REPO} at ${RELAY_VERSION}..."
+  # Pin to the release tag. Do NOT silently fall back to an unpinned default-
+  # branch clone if the tag is missing/unreachable: that would install whatever
+  # HEAD happens to be (supply-chain integrity gap). Fail loudly so the operator
+  # can pick a known-good PARAMANT_VERSION instead of getting a surprise revision.
+  if ! git clone --depth 1 --branch "${RELAY_VERSION}" "$REPO" "$INSTALL_DIR" -q; then
+    err "Could not clone ${REPO} at tag ${RELAY_VERSION}."
+    err "Refusing to fall back to an unpinned clone. Check your network, or set"
+    err "PARAMANT_VERSION to a tag that exists (see ${REPO}/tags) and re-run."
+    exit 1
+  fi
+  ok "Cloned ${RELAY_VERSION} to ${INSTALL_DIR}"
 fi
 
 cd "$INSTALL_DIR"

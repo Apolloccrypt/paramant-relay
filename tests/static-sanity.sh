@@ -170,6 +170,37 @@ if [ -f "$ENV" ]; then
   fi
 fi
 
+# ── 9. Public installers keep release pinning ─────────────────────────────────
+# /etc/os-release exports VERSION on Debian-family hosts. Installer scripts must
+# not use that variable for the release tag, and must not fall back to main HEAD.
+echo ""
+echo "9. Public installer release pinning..."
+for f in \
+  "$ROOT/install.sh" \
+  "$ROOT/frontend/install.sh" \
+  "$ROOT/frontend/install-pi.sh"; do
+  [ -f "$f" ] || continue
+  name="${f#$ROOT/}"
+  installer_fail=0
+  if grep -qE '^VERSION=' "$f" 2>/dev/null; then
+    printf "   FAIL  %s  — uses VERSION, which /etc/os-release can clobber\n" "$name"
+    installer_fail=1
+  fi
+  if ! grep -q 'RELAY_VERSION="${PARAMANT_VERSION:-' "$f" 2>/dev/null; then
+    printf "   FAIL  %s  — missing PARAMANT_VERSION-backed RELAY_VERSION pin\n" "$name"
+    installer_fail=1
+  fi
+  if grep -qE '\|\|[[:space:]]*git clone --depth 1 "\$REPO"' "$f" 2>/dev/null; then
+    printf "   FAIL  %s  — falls back to an unpinned default-branch clone\n" "$name"
+    installer_fail=1
+  fi
+  if [ "$installer_fail" -eq 0 ]; then
+    printf "   OK  %s  (release tag is isolated from OS VERSION and fail-closed)\n" "$name"
+  else
+    FAIL=$((FAIL + installer_fail))
+  fi
+done
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "════════ RESULT ════════"
