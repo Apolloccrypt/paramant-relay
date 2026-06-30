@@ -551,6 +551,17 @@ function blobLeafHash(blobHash, sector, ts) {
   return crypto.createHash('sha3-256').update(Buffer.from([0x02])).update(data).digest('hex');
 }
 
+// Coarsen an ISO timestamp to the top of its hour for PUBLIC projections only.
+// The full-precision ts stays in the stored entry (and is committed in the leaf
+// hash); this just blunts millisecond traffic-analysis in the public CT log.
+function ctCoarseTs(ts) {
+  if (!ts) return ts;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  d.setUTCMinutes(0, 0, 0);
+  return d.toISOString();
+}
+
 // Recursive canonical JSON (sorted keys, no whitespace) — used for signing receipts + STH.
 function canonicalJSON(obj) {
   if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
@@ -2986,7 +2997,15 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v2/ct/log') {
     const limit = Math.min(parseInt(query.limit || '100'), 1000);
     const from  = parseInt(query.from || '0');
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, device_hash: e.device_hash, ts: e.ts }));
+    // Privacy: the public log projection deliberately omits device_hash and
+    // coarsens timestamps to the hour. device_hash is a stable, deterministic
+    // function of a participant public key, so publishing it unauthenticated
+    // let anyone holding a target's pubkey confirm presence, reconstruct a
+    // per-device activity timeline to the millisecond, and link a device
+    // across sector relays. The transparency guarantee does NOT depend on it:
+    // tamper-evidence comes from leaf_hash + tree_hash + the Merkle proof
+    // (/v2/ct/proof) + the signed tree head, none of which reveal identity.
+    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
   }
@@ -2997,7 +3016,7 @@ const server = http.createServer(async (req, res) => {
     const entry = ctLog[idx];
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: entry.ts }));
+    return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
   }
 
   // ── GET /v2/sth, /v2/sth/history, /v2/sth/:timestamp — Signed Tree Head (public) ──
