@@ -20,6 +20,7 @@
   const KDF_PBKDF2 = 1;
   const ITER = 210000;
   const HDR_LEN = 5 + 1 + 1 + 4 + 16 + 12; // 39
+  const LOCKED_CONTAINER_NAME = 'paramant-vault.prmnt';
 
   const te = new TextEncoder();
   const td = new TextDecoder();
@@ -159,7 +160,7 @@
         const pw = $(cfg.pw).value;
         if (cfg.mode === 'lock') {
           const out = await encryptFile(file, pw);
-          downloadBytes(out, file.name + '.prmnt', 'application/octet-stream');
+          downloadBytes(out, LOCKED_CONTAINER_NAME, 'application/octet-stream');
           setStatus(status, 'Locked. Your .prmnt file is downloading. Keep your passphrase safe — without it the file cannot be opened.', 'ok');
         } else {
           const { meta, bytes } = await decryptFile(file, pw);
