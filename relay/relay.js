@@ -1419,6 +1419,25 @@ function checkMfaRateLimit(ip) {
   b.count++; mfaRateLimits.set(ip, b); return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) if (now > v.resetAt + 60000) mfaRateLimits.delete(k); }, 120_000);
+
+// Per-USER throttle for /v2/user/{verify-totp,consume-backup}. The internal-auth
+// guard proves the caller (admin proxy), not that the end user isn't brute-forcing
+// their own 6-digit TOTP (10^6 space). Cap attempts per user in a sliding window;
+// reset on success so legit retries never lock out. In-memory, mirrors
+// checkMfaRateLimit; fails open on nothing (pure counter).
+const USER_MFA_MAX = 10;
+const USER_MFA_WINDOW_MS = 300_000; // 5 min
+const userMfaAttempts = new Map(); // user_id → { count, resetAt }
+function userMfaAttemptOk(user_id) {
+  const now = Date.now();
+  const b = userMfaAttempts.get(user_id) || { count: 0, resetAt: now + USER_MFA_WINDOW_MS };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + USER_MFA_WINDOW_MS; }
+  if (b.count >= USER_MFA_MAX) return false;
+  b.count++; userMfaAttempts.set(user_id, b); return true;
+}
+function userMfaAttemptReset(user_id) { userMfaAttempts.delete(user_id); }
+setInterval(() => { const now = Date.now(); for (const [k, v] of userMfaAttempts) if (now > v.resetAt + USER_MFA_WINDOW_MS) userMfaAttempts.delete(k); }, 300_000);
+
 // Per-IP rate limit for /v2/check-key (max 30/min) — prevents API key brute-force
 const checkKeyRateLimits = new Map();
 function checkKeyRateOk(ip) {
@@ -1512,6 +1531,28 @@ function getClientIp(req) {
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
 function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Mask an email for logs: keep first local char + full domain, drop the rest.
+// e.g. "alice@example.com" -> "a***@example.com". Keeps logs debuggable without
+// writing raw PII to stdout/journald.
+function maskEmail(e) {
+  const s = String(e || '');
+  const at = s.indexOf('@');
+  if (at < 1) return s ? '***' : '';
+  return s[0] + '***' + s.slice(at);
+}
+
+// Mask a client IP for logs: keep the network prefix, drop the host part.
+// IPv4 1.2.3.4 -> "1.2.x.x"; IPv6 keeps the first two hextets. Enough to spot a
+// noisy /16 or subnet without storing a full, identifying address.
+function maskIp(ip) {
+  const s = String(ip || '');
+  if (!s) return '';
+  if (s.includes(':')) { const p = s.split(':'); return p.slice(0, 2).join(':') + '::x'; }
+  const p = s.split('.');
+  if (p.length === 4) return p[0] + '.' + p[1] + '.x.x';
+  return '***';
 }
 
 // ── Key zeroization ───────────────────────────────────────────────────────────
@@ -2315,12 +2356,14 @@ const server = http.createServer(async (req, res) => {
     try {
       const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      if (!userMfaAttemptOk(user_id)) { res.writeHead(429); return res.end(J({ error: "too_many_attempts" })); }
       const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
         algorithm: "sha256", window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      if (result && result.valid) userMfaAttemptReset(user_id);
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
@@ -2356,7 +2399,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !code) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      if (!userMfaAttemptOk(user_id)) { res.writeHead(429); return res.end(J({ error: "too_many_attempts" })); }
       const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
+      if (result && (result.valid || result.success)) userMfaAttemptReset(user_id);
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
@@ -2928,7 +2973,7 @@ const server = http.createServer(async (req, res) => {
               <tr><td style="color:#555;padding:4px 0">Organisation</td><td style="color:#ededed">${escHtml(org)}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signatory</td><td style="color:#ededed">${escHtml(name)}${title ? ' — ' + escHtml(title) : ''}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Signed at</td><td style="color:#ededed">${signed_at}</td></tr>
-              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${version}</td></tr>
+              <tr><td style="color:#555;padding:4px 0">DPA version</td><td style="color:#ededed">${escHtml(version)}</td></tr>
               <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
             </table>
           </div>
@@ -2944,12 +2989,12 @@ const server = http.createServer(async (req, res) => {
         });
         const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(emailBody) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'dpa_email_sent', { ref, email, id: p.id }); } catch(e) {} }); });
+        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'dpa_email_sent', { ref, email: maskEmail(email), id: p.id }); } catch(e) {} }); });
         req2.on('error', e => log('warn', 'dpa_email_failed', { err: e.message }));
         req2.write(emailBody); req2.end();
       }
 
-      log('info', 'dpa_signed', { ref, org, email, version });
+      log('info', 'dpa_signed', { ref, org, email: maskEmail(email), version });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, ref, signed_at }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -4230,14 +4275,14 @@ const server = http.createServer(async (req, res) => {
     // M2: rate limit — max 5 attempts per IP per minute
     const clientIp = getClientIp(req);
     if (!checkMfaRateLimit(clientIp)) {
-      log('warn', 'mfa_rate_limited', { ip: clientIp });
+      log('warn', 'mfa_rate_limited', { ip: maskIp(clientIp) });
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
       return res.end(J({ error: 'Too many MFA attempts — try again in 60 seconds' }));
     }
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const valid = verifyTotp(d.totp_code || '');
-      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: clientIp });
+      log(valid ? 'info' : 'warn', 'mfa_attempt', { valid, ip: maskIp(clientIp) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: valid, error: valid ? null : 'Invalid TOTP code' }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -4531,11 +4576,11 @@ python3 paramant-receiver.py \\
         req2.write(body); req2.end();
       });
       if (resp.id) {
-        log('info', 'welcome_mail_sent', { email: d.email, id: resp.id, label: d.label });
+        log('info', 'welcome_mail_sent', { email: maskEmail(d.email), id: resp.id, label: d.label });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(J({ ok: true, id: resp.id }));
       } else {
-        log('warn', 'welcome_mail_failed', { email: d.email, resp });
+        log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), resp });
         res.writeHead(502); return res.end(J({ error: 'Resend error', detail: resp }));
       }
     } catch(e) { res.writeHead(500); return res.end(J({ error: e.message })); }
@@ -4993,7 +5038,7 @@ try {
       else { log('warn', 'ws_ticket_invalid', { ticket: parsed.query.ticket?.slice(0, 12) }); }
     }
     if (!wsApiKey && parsed.query.k) {
-      log('warn', 'ws_key_in_querystring_rejected', { ip: (socket.remoteAddress||'').slice(0,15) });
+      log('warn', 'ws_key_in_querystring_rejected', { ip: maskIp(socket.remoteAddress) });
       return socket.destroy();
     }
     const apiKey = wsApiKey;
