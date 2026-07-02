@@ -361,7 +361,7 @@ api.post('/admin/resend-setup', async (req, res) => {
     const expiresAt = Date.now() + 14 * 86400 * 1000;
     const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
     try { await logAuditEvent(user_id, 'admin_setup_resent', { email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    console.log(`[admin/resend-setup] sent to ${email}`);
+    console.log(`[admin/resend-setup] sent to ${maskEmail(email)}`);
     res.json({ success: true, email, expires_at: expiresAt, setup_url: setupUrl });
   } catch (err) {
     console.error('[admin/resend-setup]', err.message);
@@ -888,7 +888,7 @@ api.get("/user/signup/verify/:token", async (req, res) => {
     // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
     await redis().set(`paramant:signup:consumed:${token}`, keyVal, { EX: 30 * 86400 }).catch(() => {});
 
-    console.log(`[signup/verify] account created for ${email} (${keyVal.slice(0, 12)}...)`);
+    console.log(`[signup/verify] account created for ${maskEmail(email)} (${keyVal.slice(0, 12)}...)`);
     res.redirect('/signup/verified');
 
   } finally {
@@ -1680,7 +1680,7 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
 
   try {
     await sendResetConfirmEmail(norm, confirmToken, maskedIp, new Date(requestedAt).toISOString());
-    console.log(`[totp-reset-req] confirmation email sent to ${norm}`);
+    console.log(`[totp-reset-req] confirmation email sent to ${maskEmail(norm)}`);
   } catch (err) {
     console.error("[totp-reset-req] email failed:", err.message);
   }
@@ -1730,7 +1730,7 @@ api.post("/user/auth/reset-confirm", async (req, res) => {
     return res.status(500).json({ error: "email_failed" });
   }
 
-  console.log(`[reset-confirm] TOTP reset completed for ${email}`);
+  console.log(`[reset-confirm] TOTP reset completed for ${maskEmail(email)}`);
   res.json({ success: true, message: "Setup email sent. Check your inbox." });
 });
 
@@ -1957,6 +1957,16 @@ function maskIp(ip) {
     return `${p[0]}.${p[1]}.${p[2]}.0`;
   }
   return ip.split(":").slice(0, 2).join(":") + "::0";
+}
+
+// Mask an email for stdout/journald logs: keep first local char + full domain.
+// e.g. "alice@example.com" -> "a***@example.com". Audit-chain records keep the
+// full email on purpose (admin traceability); this is only for process logs.
+function maskEmail(e) {
+  const s = String(e || "");
+  const at = s.indexOf("@");
+  if (at < 1) return s ? "***" : "";
+  return s[0] + "***" + s.slice(at);
 }
 
 // GET /api/user/account/key
