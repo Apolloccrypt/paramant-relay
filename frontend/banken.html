@@ -340,10 +340,10 @@ input:focus,textarea:focus{border-color:var(--cobalt)}
     <div class="gp-demo">
       <div class="demo-label">// LIVE DEMO — stuur een test bericht</div>
       <p style="font-size:12px;color:var(--ink-dim);margin-bottom:16px">Genereer een keypair en stuur een testbestand. Alles verloopt in uw browser — niets verlaat uw systeem vóór versleuteling.</p>
-      <button onclick="demoKeygen()" style="padding:9px 20px;background:var(--cobalt);color:var(--bone-on-navy);border:none;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:900;margin-bottom:12px">GENEREER TEST KEYPAIR</button>
+      <button data-click="demoKeygen" style="padding:9px 20px;background:var(--cobalt);color:var(--bone-on-navy);border:none;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:900;margin-bottom:12px">GENEREER TEST KEYPAIR</button>
       <div id="demo-pub" style="display:none;margin-bottom:10px">
         <div style="font-size:9px;color:var(--ink-dim);margin-bottom:4px">PUBLIEKE SLEUTEL (deel met verzender)</div>
-        <div id="demo-pub-val" style="background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:8px;font-size:10px;word-break:break-all;cursor:pointer" onclick="navigator.clipboard.writeText(this.textContent)"></div>
+        <div id="demo-pub-val" style="background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:8px;font-size:10px;word-break:break-all;cursor:pointer" data-click="copyText"></div>
         <div style="font-size:10px;color:var(--ink-dim);margin-top:4px">↑ Klik om te kopiëren</div>
       </div>
       <div id="demo-result" class="result"></div>
@@ -428,16 +428,8 @@ input:focus,textarea:focus{border-color:var(--cobalt)}
   </div>
 </footer>
 
-<script>
-async function demoKeygen(){
-  const kp = await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
-  const pub = Array.from(new Uint8Array(await crypto.subtle.exportKey('raw',kp.publicKey))).map(b=>b.toString(16).padStart(2,'0')).join('');
-  document.getElementById('demo-pub').style.display='block';
-  document.getElementById('demo-pub-val').textContent=pub;
-  document.getElementById('demo-result').style.display='block';
-  document.getElementById('demo-result').textContent='✓ Keypair gegenereerd. Publieke sleutel klaar om te delen met uw counterparty.';
-}
-</script>
+<script src="/js/delegate.js?v=1" defer></script>
+<script src="/js/banken.page.js?v=1" defer></script>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
 </body></html>
