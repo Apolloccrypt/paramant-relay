@@ -2989,7 +2989,10 @@ const server = http.createServer(async (req, res) => {
 
       // Persist DPA signature record (append-only)
       const DPA_FILE = process.env.DPA_FILE || '/etc/paramant/dpa-signatures.jsonl';
-      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: getClientIp(req) });
+      // Keep the signing party's identity (name/org/email) for the legal Art. 28
+      // record, but store only a masked IP: the full address is not needed for
+      // the agreement and is unnecessary PII in a permanent append-only file.
+      const record = JSON.stringify({ ref, name, title, org, kvk, email, version, signed_at, ip: maskIp(getClientIp(req)) });
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
       // Send countersigned DPA email
