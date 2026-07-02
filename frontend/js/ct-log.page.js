@@ -86,6 +86,7 @@ function render() {
       : 'n/a';
     var leaf   = trunc(e.leaf_hash   || e.hash || '');
     var tree   = trunc(e.tree_hash   || e.merkle_root || '');
+    var device = trunc(e.device_hash || e.pubkey_hash  || '');
     var proofHtml = '';
     if (e.proof && e.proof.length) {
       proofHtml = '<div class="drow"><span class="dkey">Merkle proof</span>'
@@ -97,12 +98,14 @@ function render() {
       + '<div class="idx">'+esc(String(idx))+'</div>'
       + '<div class="hash leaf">'+esc(leaf)+'</div>'
       + '<div class="hash">'+esc(tree)+'</div>'
+      + '<div class="hash">'+esc(device)+'</div>'
       + '<div class="ts">'+esc(time)+'</div>'
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
       + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
       + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+esc(e.device_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
       + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
       + proofHtml
@@ -126,7 +129,7 @@ function filterEntries() {
     : allEntries;
   filtered = q ? base.filter(function(e) {
     return (e.leaf_hash||'').includes(q) || (e.tree_hash||'').includes(q)
-        || String(e.index||'').includes(q);
+        || (e.device_hash||'').includes(q) || String(e.index||'').includes(q);
   }) : base;
   page = 0;
   render();
@@ -157,7 +160,7 @@ function verifyHash() {
   if (!q || q.length < 8) { el.style.display='none'; return; }
 
   var match = allEntries.find(function(e) {
-    return (e.leaf_hash||'').startsWith(q)
+    return (e.leaf_hash||'').startsWith(q) || (e.device_hash||'').startsWith(q)
         || (e.tree_hash||'').startsWith(q);
   });
 
@@ -172,13 +175,14 @@ function verifyHash() {
 
   el.className = 'verify-result found';
   var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
-             : 'tree_hash';
+             : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
   el.innerHTML = '<strong>✓ Verified: found at index ' + esc(String(match.index)) + '</strong>'
     + '<pre>'
     + 'Matched field : ' + esc(field) + '\n'
     + 'Index         : ' + esc(String(match.index)) + '\n'
     + 'Leaf hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
     + 'Tree hash     : ' + esc(match.tree_hash||'n/a') + '\n'
+    + 'Device hash   : ' + esc(match.device_hash||'n/a') + '\n'
     + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a') + '\n'
     + (match.proof && match.proof.length ? 'Merkle proof  : ' + esc(match.proof.join(' → ')) : '')
     + '</pre>';
