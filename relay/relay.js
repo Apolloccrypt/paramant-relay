@@ -3922,6 +3922,23 @@ const server = http.createServer(async (req, res) => {
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
         pw_hash = await argon2Lib.hash(password, { type: argon2Lib.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
       }
+      // Phase 4 quota enforcement: decline a NEW transfer once the monthly tier
+      // cap is reached. Access to existing blobs (download/view) is never gated.
+      // A continuing multi-chunk upload (dedup hit) and Redis outages both pass
+      // (fail-open) — this only declines fresh active use over the cap.
+      if (keyData && keyData.account_id) {
+        const _dedupKey = (meta && meta.file_id)
+          ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
+          : quota.firstChunkHash(blob);
+        const _tLimit = tiers.tierLimitNum(keyData.plan || 'community', 'transfers_month');
+        const _tGate  = await quota.gateTransfer(redisClient, keyData.account_id, _dedupKey, _tLimit, log);
+        if (!_tGate.allowed) {
+          log('info', 'quota_transfer_declined', { account: String(keyData.account_id).slice(0, 12), plan: keyData.plan || 'community', limit: _tLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: keyData.plan || 'community', limit: _tLimit }));
+        }
+      }
+
       // Append transfer to CT log before storing — so proof is available at outbound time
       const ctEntry = ctAppendTransfer(hash, SECTOR);
       blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
@@ -3947,22 +3964,7 @@ const server = http.createServer(async (req, res) => {
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
 
-      // Phase 3 quota counter: tally one transfer per account_id per month.
-      // ParaShare sends chunks of the same file with a shared meta.file_id, so
-      // we dedup on file_id (preferred) or on the encrypted-blob hash (single-
-      // blob SDK path). A 111-chunk upload counts as one transfer; a brand-new
-      // upload tomorrow with the same file_id counts as a new transfer (24 h
-      // dedup window).
-      //
-      // COUNT ONLY -- no gate, no 402. If Redis is unavailable the counter is
-      // skipped silently; the upload completes either way.
-      if (keyData && keyData.account_id) {
-        const dedupKey = (meta && meta.file_id)
-          ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
-          : quota.firstChunkHash(blob);
-        quota.recordTransfer(redisClient, keyData.account_id, dedupKey, log)
-          .catch(() => { /* never throws but be defensive */ });
-      }
+      // (Transfer already counted by the quota gate above, before storage.)
 
       if (deviceId) {
         pushWebhooks(apiKey, deviceId, 'blob_ready', { hash, size: blob.length, ttl_ms: ttl, sig_valid: sigResult.valid });
@@ -4703,6 +4705,19 @@ python3 paramant-receiver.py \\
       }
       if (!signerOk) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer signature does not verify against signer_public_key (expected a v2 domain-separated signature: ML-DSA over sha3_256("paramant/parasign/notary/v1" || 0x00 || document_hash))' })); }
 
+      // Phase 4 quota enforcement: decline a NEW counter-signature once the
+      // monthly tier cap is reached. Verifying/reading existing envelopes is not
+      // gated. Redis outages pass (fail-open).
+      if (keyData && keyData.account_id) {
+        const _sLimit = tiers.tierLimitNum(keyData.plan || 'community', 'signs_month');
+        const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
+        if (!_sGate.allowed) {
+          log('info', 'quota_sign_declined', { account: String(keyData.account_id).slice(0, 12), plan: keyData.plan || 'community', limit: _sLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: keyData.plan || 'community', limit: _sLimit }));
+        }
+      }
+
       const signerPkHash = crypto.createHash('sha3-256').update(Buffer.from(signerPubB64, 'base64')).digest('hex');
       const ctEntry = ctAppendParasign(documentHash, signerPkHash);
 
@@ -4712,12 +4727,7 @@ python3 paramant-receiver.py \\
 
       log('info', 'parasign_signed', { ct_index: ctEntry.index, signer_pk_hash: signerPkHash.slice(0, 16) + '…' });
 
-      // Phase 3 quota counter: tally one sign per account_id per month.
-      // No dedup -- every counter-signature is a billable event.
-      // COUNT ONLY -- no gate, no 402. Redis failure does not block the response.
-      if (keyData && keyData.account_id) {
-        quota.recordSign(redisClient, keyData.account_id, log).catch(() => {});
-      }
+      // (Sign already counted by the quota gate above, before the envelope was built.)
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope }));

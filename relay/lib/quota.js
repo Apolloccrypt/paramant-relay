@@ -80,6 +80,62 @@ async function recordSign(redisClient, accountId, log) {
   }
 }
 
+// ── Phase 4 enforcement ──────────────────────────────────────────────────────
+// Decline NEW active use once the monthly tier cap is reached, WITHOUT touching
+// access to existing data (download/view paths never call these). Fail-open:
+// missing account, unlimited plan, or any Redis trouble => allowed:true, so a
+// paying user is never locked out by infra and existing access always works.
+//
+// gateTransfer also counts (it replaces recordTransfer on the upload path) so a
+// declined transfer is never counted and can't be bypassed by retrying — the
+// dedup `seen` key is only claimed once we've decided to count.
+async function gateTransfer(redisClient, accountId, chunkHash, limit, log) {
+  if (!accountId || !redisClient || !redisClient.isReady || !Number.isFinite(limit)) {
+    const r = await recordTransfer(redisClient, accountId, chunkHash, log);
+    return { allowed: true, counted: r.counted, deduped: r.deduped, over_limit: false, error: r.error };
+  }
+  try {
+    if (chunkHash) {
+      const sk = seenKey(accountId, chunkHash);
+      // Continuing an already-counted (multi-chunk) upload is always allowed.
+      if (await redisClient.exists(sk)) return { allowed: true, counted: false, deduped: true, over_limit: false, error: null };
+      const cur = parseInt((await redisClient.get(transfersKey(accountId))) || '0', 10);
+      if (cur >= limit) return { allowed: false, counted: false, deduped: false, over_limit: true, error: null };
+      // Under cap: claim the seen key, then count.
+      const setRes = await redisClient.set(sk, '1', { NX: true, EX: SEEN_TTL_SECONDS });
+      if (setRes !== 'OK') return { allowed: true, counted: false, deduped: true, over_limit: false, error: null };
+    } else {
+      const cur = parseInt((await redisClient.get(transfersKey(accountId))) || '0', 10);
+      if (cur >= limit) return { allowed: false, counted: false, deduped: false, over_limit: true, error: null };
+    }
+    const tk = transfersKey(accountId);
+    const n  = await redisClient.incr(tk);
+    if (n === 1) await redisClient.expire(tk, MONTH_TTL_SECONDS);
+    return { allowed: true, counted: true, deduped: false, over_limit: false, error: null };
+  } catch (e) {
+    if (log) log('warn', 'quota_gate_transfer_failed', { account: String(accountId).slice(0, 12), err: e.message });
+    return { allowed: true, counted: false, deduped: false, over_limit: false, error: e.message }; // fail open
+  }
+}
+
+async function gateSign(redisClient, accountId, limit, log) {
+  if (!accountId || !redisClient || !redisClient.isReady || !Number.isFinite(limit)) {
+    const r = await recordSign(redisClient, accountId, log);
+    return { allowed: true, counted: r.counted, over_limit: false, error: r.error };
+  }
+  try {
+    const cur = parseInt((await redisClient.get(signsKey(accountId))) || '0', 10);
+    if (cur >= limit) return { allowed: false, counted: false, over_limit: true, error: null };
+    const sk = signsKey(accountId);
+    const n  = await redisClient.incr(sk);
+    if (n === 1) await redisClient.expire(sk, MONTH_TTL_SECONDS);
+    return { allowed: true, counted: true, over_limit: false, error: null };
+  } catch (e) {
+    if (log) log('warn', 'quota_gate_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });
+    return { allowed: true, counted: false, over_limit: false, error: e.message }; // fail open
+  }
+}
+
 // Read the current month's counts. Used by the Phase 4 admin/usage endpoint.
 async function readUsage(redisClient, accountId, ym) {
   if (!accountId || !redisClient || !redisClient.isReady) {
@@ -107,6 +163,8 @@ module.exports = {
   firstChunkHash,
   recordTransfer,
   recordSign,
+  gateTransfer,
+  gateSign,
   readUsage,
   // exported for tests / admin tooling
   transfersKey,
