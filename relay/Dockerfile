@@ -6,7 +6,15 @@
 # Compiles the paramant-core-node napi binding for musl, so it loads inside the
 # node:22-alpine runtime (a glibc build would not). Pinned to a paramant-core
 # commit for reproducibility; bump PARAMANT_CORE_COMMIT when upgrading.
-FROM rust:1.96-alpine@sha256:f87aa870663e2b57ec8c69de82c7eedf7383bee987eef7612c0359635eaadb41 AS paramant-core-binding
+#
+# Pinned to rust:1.95-alpine. The 1.96-alpine bump (#222) moved to a newer Alpine
+# whose clang/liboqs toolchain makes the vendored `oqs` crate fail to compile
+# (E0609: no field `alg_version`/`length_signature`/… on `OQS_SIG` — bindgen no
+# longer generates those fields). 1.95-alpine is the exact base that built the
+# live relay images; revert until paramant-core's oqs crate supports the newer
+# liboqs. NOTE: CI's crypto suite does not build via this musl Dockerfile, so it
+# stayed green through the bump — this base must be verified by an actual image build.
+FROM rust:1.95-alpine@sha256:606fd313a0f49743ee2a7bd49a0914bab7deedb12791f3a846a34a4711db7ed2 AS paramant-core-binding
 
 RUN apk add --no-cache musl-dev gcc g++ make cmake ninja clang clang-dev llvm-dev perl nasm git bash
 ENV LIBCLANG_PATH=/usr/lib
