@@ -1012,15 +1012,7 @@ python3 scripts/paramant-admin.py sync</pre>
   </div>
 </div>
 
-<script>
-const headings = document.querySelectorAll('.content h2[id]');
-const links = document.querySelectorAll('.sidebar a');
-window.addEventListener('scroll', () => {
-  let cur = '';
-  headings.forEach(h => { if (window.scrollY >= h.offsetTop - 80) cur = h.id; });
-  links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
-}, { passive: true });
-</script>
+<script src="/js/docs.inline1.js"></script>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
 <footer>
