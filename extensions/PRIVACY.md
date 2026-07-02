@@ -34,8 +34,10 @@ expiry you chose (1 hour to 7 days), whichever comes first, then deleted.
 
 ## Third parties
 
-No analytics, advertising, or tracking services are used. No data is sold. No remote code is
-loaded by the extension or add-in.
+No analytics, advertising, or tracking services are used. No data is sold. The browser
+extension loads no remote code. The Outlook add-in loads Microsoft's required Office.js
+runtime (`appsforoffice.microsoft.com`), a mandatory Office platform dependency; this exposes
+your IP and load time to Microsoft on add-in load. No other remote code is loaded.
 
 ## Contact
 

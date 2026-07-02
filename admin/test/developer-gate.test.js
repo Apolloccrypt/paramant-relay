@@ -19,9 +19,9 @@ assert.deepStrictEqual(
 ok('developerAllowlist parsing');
 
 // Allowlisted email => allowed (case/space-insensitive)
-const prodEnv = { DEVELOPER_ALLOWLIST: 'mickbr@protonmail.com' };
-assert.strictEqual(isDeveloper('mickbr@protonmail.com', prodEnv), true, 'exact match allowed');
-assert.strictEqual(isDeveloper('  MickBr@Protonmail.com ', prodEnv), true, 'case/space-insensitive');
+const prodEnv = { DEVELOPER_ALLOWLIST: 'dev@example.com' };
+assert.strictEqual(isDeveloper('dev@example.com', prodEnv), true, 'exact match allowed');
+assert.strictEqual(isDeveloper('  Dev@Example.com ', prodEnv), true, 'case/space-insensitive');
 ok('allowlisted email allowed');
 
 // Non-allowlisted email => denied (this is the "/developer 404" case)
@@ -32,9 +32,9 @@ assert.strictEqual(isDeveloper(undefined, prodEnv), false, 'undefined email deni
 ok('non-allowlisted email denied');
 
 // Empty allowlist in production (NODE_ENV unset) => closed for everyone
-assert.strictEqual(isDeveloper('mickbr@protonmail.com', { DEVELOPER_ALLOWLIST: '' }), false,
+assert.strictEqual(isDeveloper('dev@example.com', { DEVELOPER_ALLOWLIST: '' }), false,
   'empty allowlist, no NODE_ENV => closed');
-assert.strictEqual(isDeveloper('mickbr@protonmail.com', { DEVELOPER_ALLOWLIST: '', NODE_ENV: 'production' }), false,
+assert.strictEqual(isDeveloper('dev@example.com', { DEVELOPER_ALLOWLIST: '', NODE_ENV: 'production' }), false,
   'empty allowlist in production => closed');
 ok('empty allowlist closed in production');
 

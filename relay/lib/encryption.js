@@ -16,9 +16,14 @@ function getMasterKey() {
 // `aad` (optional) binds the ciphertext to a context (e.g. the userId), so a
 // Redis-write attacker can't lift one user's encrypted blob into another user's
 // key and have it decrypt — the GCM tag covers the AAD. Callers pass a stable
-// per-record string. Backward compatible: blobs written before AAD existed have
-// none, so decryptSecret retries without AAD when an AAD-bound decrypt fails (the
-// next write upgrades them).
+// per-record string.
+//
+// AAD-bound blobs are written with a `v2:` prefix so they can NEVER be decrypted
+// unbound: a cross-user lift fails closed instead of silently downgrading. Only
+// legacy 3-part blobs (written before AAD existed, no prefix) still allow the
+// unbound retry, and the next write upgrades them to v2.
+const V2 = 'v2:';
+
 function encryptSecret(plaintext, aad) {
   const key    = getMasterKey();
   const nonce  = crypto.randomBytes(NONCE_LEN);
@@ -27,7 +32,8 @@ function encryptSecret(plaintext, aad) {
   const enc    = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag    = cipher.getAuthTag();
   key.fill(0);
-  return `${nonce.toString('base64')}:${enc.toString('base64')}:${tag.toString('base64')}`;
+  const serialized = `${nonce.toString('base64')}:${enc.toString('base64')}:${tag.toString('base64')}`;
+  return aad ? V2 + serialized : serialized;
 }
 
 function _decrypt(parts, aad) {
@@ -44,12 +50,20 @@ function _decrypt(parts, aad) {
 }
 
 function decryptSecret(serialized, aad) {
-  const parts = (serialized || '').split(':');
+  const s = serialized || '';
+  if (s.startsWith(V2)) {
+    // AAD-bound blob: decrypt with AAD only. No unbound fallback — a lifted
+    // blob from another context fails closed.
+    const parts = s.slice(V2.length).split(':');
+    if (parts.length !== 3) throw new Error('Invalid encrypted format');
+    return _decrypt(parts, aad);
+  }
+  const parts = s.split(':');
   if (parts.length !== 3) throw new Error('Invalid encrypted format');
   try {
     return _decrypt(parts, aad);
   } catch (e) {
-    // Legacy blob written without AAD: retry unbound (only when we tried AAD).
+    // Legacy pre-AAD blob (no v2 prefix): retry unbound (only when we tried AAD).
     if (aad) return _decrypt(parts, null);
     throw e;
   }
