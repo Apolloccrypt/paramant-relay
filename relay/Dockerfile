@@ -27,7 +27,11 @@ ARG PARAMANT_CORE_COMMIT=dc454d47880ab54e6f1483433580abab894b854e
 WORKDIR /build
 RUN git clone https://github.com/Apolloccrypt/paramant-core.git \
  && cd paramant-core && git checkout "${PARAMANT_CORE_COMMIT}" \
- && cargo build --release -p paramant-core-node \
+ # --locked: build against paramant-core's committed Cargo.lock (oqs 0.10.1 +
+ # vendored liboqs 0.12.0) so a transitive bump can't silently drift the crypto
+ # build. paramant-core's CI has a musl job pinned to this same base that proves
+ # the lockfile builds here; keep the two in lockstep when bumping the base.
+ && cargo build --locked --release -p paramant-core-node \
  && mkdir -p /pkg \
  && cp target/release/libparamant_core_node.so /pkg/paramant-core.node \
  && printf '{\n  "name": "@paramant/core",\n  "version": "0.5.0-alpha.1",\n  "main": "paramant-core.node",\n  "files": ["paramant-core.node"]\n}\n' > /pkg/package.json
