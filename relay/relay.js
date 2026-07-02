@@ -2685,9 +2685,27 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && path === "/v2/user/signing-key/attested") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, pk_b64, label } = JSON.parse((await readBody(req, 16384)).toString());
+      const { user_id, pk_b64, label, step_up_token } = JSON.parse((await readBody(req, 16384)).toString());
       if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
       if (!pk_b64 || typeof pk_b64 !== "string") { res.writeHead(400); return res.end(J({ error: "missing_pk_b64" })); }
+      // GATE 1 (Auth M1) — a FRESH, one-shot step-up proof. The admin mints this
+      // only after a live WebAuthn assertion and binds it to this user in Redis;
+      // the relay consumes it atomically (getDel) and checks the binding. Without
+      // it, "a passkey exists" (the old gate 2) — or any second admin code path
+      // that skips the step-up ceremony — could enroll an attacker's signing key
+      // on a hijacked session. The relay now enforces the step-up independently.
+      if (typeof step_up_token !== "string" || !/^[a-f0-9]{64}$/.test(step_up_token)) {
+        res.writeHead(403); return res.end(J({ error: "step_up_required" }));
+      }
+      if (!redisClient || !redisClient.isReady) { res.writeHead(503); return res.end(J({ error: "step_up_store_unavailable" })); }
+      const _suKey = `paramant:signing:stepup:${step_up_token}`;
+      const _suRaw = redisClient.getDel
+        ? await redisClient.getDel(_suKey)
+        : await (async () => { const v = await redisClient.get(_suKey); if (v !== null) await redisClient.del(_suKey); return v; })();
+      let _su = null; try { _su = _suRaw ? JSON.parse(_suRaw) : null; } catch { _su = null; }
+      // Freshness is enforced by the Redis EX on the token; a returned value means
+      // still-valid. Bind the token to this exact account.
+      if (!_su || _su.user_id !== user_id) { res.writeHead(403); return res.end(J({ error: "step_up_invalid" })); }
       // GATE 2 — the account must actually have a passkey (the factor the admin
       // stepped up). No passkey -> no attested bind (fall back to the TOTP route).
       const credCount = await userWebauthn.countActiveCredentials(redisClient, user_id);
@@ -4929,9 +4947,28 @@ const server = http.createServer(async (req, res) => {
       const pi = parseInt(d.party_index, 10);
       const signerPub = (d.signer_public_key || '').toString();
       const sig = (d.signature || '').toString();
+      const accountId = (d.account_id || '').toString();
       if (!Number.isInteger(pi) || pi < 0 || !signerPub || !sig) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
+      }
+      // Crypto M1: when the trusted admin proxy names the signer's account_id,
+      // pin the submitted key to that account's ENROLLED active signing keys.
+      // The email-binding check proves *which mailbox*; this proves the signature
+      // was made by a key the account actually enrolled — so a leaked internal
+      // token can't fill an email-bound slot with an attacker-substituted key.
+      // Fail-closed (Redis is already a hard dependency of the envelope store).
+      if (accountId) {
+        try {
+          const active = await userSigning.getActiveSigningPks(redisClient, accountId);
+          const subj = Buffer.from(signerPub, 'base64');
+          const enrolled = active.some(e => {
+            try { return Buffer.from(e.pk_b64, 'base64').equals(subj); } catch { return false; }
+          });
+          if (!enrolled) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer_not_enrolled' })); }
+        } catch (e) {
+          res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer_not_enrolled' }));
+        }
       }
       // Email-bound envelopes (R018): the store accepts the signature only when
       // a trusted internal caller (the admin proxy, which verified the signer's

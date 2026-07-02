@@ -1627,6 +1627,9 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
   try {
     const r = await callRelay(`/v2/envelopes/${encodeURIComponent(act.envelope_id)}/sign`, {
       party_index: act.party_index, signer_public_key, signature, verified_email_hash: act.email_hash,
+      // Crypto M1: the account this activation was issued to, so the relay can
+      // pin the submitted key to that account's enrolled signing keys.
+      account_id: act.account_id,
     }, "POST");
     const body = await r.json().catch(() => ({}));
     if (r.status !== 200) return res.status(r.status).json({ error: body.error || "sign_failed" });
@@ -2136,9 +2139,18 @@ api.post("/user/account/signing-key/step-up/bind", authUser, async (req, res) =>
   }
   try { await callRelay("/v2/user/webauthn/counter", { user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}
 
-  // Step-up proven -> forward the bind to the relay's TOTP-free attested route.
+  // Step-up proven -> mint a one-shot proof token the relay consumes, then
+  // forward the bind. The token (256-bit, bound to this user, EX 120s in the
+  // SHARED Redis) lets the relay enforce the step-up itself (Auth M1) instead of
+  // trusting "a passkey exists"; a code path that skips this ceremony has no
+  // valid token and is rejected by the relay.
+  const stepUpToken = crypto.randomBytes(32).toString("hex");
   try {
-    const relayRes = await callRelay("/v2/user/signing-key/attested", { user_id, pk_b64, label }, "POST");
+    await redis().set(`paramant:signing:stepup:${stepUpToken}`,
+      JSON.stringify({ user_id, ts: Date.now() }), { EX: 120 });
+  } catch (e) { return res.status(502).json({ error: "step_up_store_unavailable" }); }
+  try {
+    const relayRes = await callRelay("/v2/user/signing-key/attested", { user_id, pk_b64, label, step_up_token: stepUpToken }, "POST");
     const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
     return res.status(relayRes.status).json(body);
   } catch (err) {
