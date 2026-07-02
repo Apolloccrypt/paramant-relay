@@ -1419,6 +1419,25 @@ function checkMfaRateLimit(ip) {
   b.count++; mfaRateLimits.set(ip, b); return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) if (now > v.resetAt + 60000) mfaRateLimits.delete(k); }, 120_000);
+
+// Per-USER throttle for /v2/user/{verify-totp,consume-backup}. The internal-auth
+// guard proves the caller (admin proxy), not that the end user isn't brute-forcing
+// their own 6-digit TOTP (10^6 space). Cap attempts per user in a sliding window;
+// reset on success so legit retries never lock out. In-memory, mirrors
+// checkMfaRateLimit; fails open on nothing (pure counter).
+const USER_MFA_MAX = 10;
+const USER_MFA_WINDOW_MS = 300_000; // 5 min
+const userMfaAttempts = new Map(); // user_id → { count, resetAt }
+function userMfaAttemptOk(user_id) {
+  const now = Date.now();
+  const b = userMfaAttempts.get(user_id) || { count: 0, resetAt: now + USER_MFA_WINDOW_MS };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + USER_MFA_WINDOW_MS; }
+  if (b.count >= USER_MFA_MAX) return false;
+  b.count++; userMfaAttempts.set(user_id, b); return true;
+}
+function userMfaAttemptReset(user_id) { userMfaAttempts.delete(user_id); }
+setInterval(() => { const now = Date.now(); for (const [k, v] of userMfaAttempts) if (now > v.resetAt + USER_MFA_WINDOW_MS) userMfaAttempts.delete(k); }, 300_000);
+
 // Per-IP rate limit for /v2/check-key (max 30/min) — prevents API key brute-force
 const checkKeyRateLimits = new Map();
 function checkKeyRateOk(ip) {
@@ -2337,12 +2356,14 @@ const server = http.createServer(async (req, res) => {
     try {
       const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      if (!userMfaAttemptOk(user_id)) { res.writeHead(429); return res.end(J({ error: "too_many_attempts" })); }
       const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
         algorithm: "sha256", window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      if (result && result.valid) userMfaAttemptReset(user_id);
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
@@ -2378,7 +2399,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !code) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      if (!userMfaAttemptOk(user_id)) { res.writeHead(429); return res.end(J({ error: "too_many_attempts" })); }
       const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
+      if (result && (result.valid || result.success)) userMfaAttemptReset(user_id);
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
