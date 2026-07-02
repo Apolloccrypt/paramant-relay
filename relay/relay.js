@@ -61,6 +61,7 @@ const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
 const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
+const CLAIM_TTL_SECONDS = parseInt(process.env.CLAIM_TTL_SECONDS || String(7 * 86400)); // one-time API-key claim link lifetime
 const _RAW_MODE  = process.env.RELAY_MODE          || 'full';
 const RELAY_MODE = ['ghost_pipe', 'iot', 'full'].includes(_RAW_MODE) ? _RAW_MODE : (() => {
   console.error(`[paramant] Invalid RELAY_MODE="${_RAW_MODE}". Must be ghost_pipe|iot|full. Defaulting to ghost_pipe.`);
@@ -158,7 +159,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
@@ -166,7 +167,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim'],
   full:       null,
 };
 
@@ -1437,6 +1438,18 @@ function userMfaAttemptOk(user_id) {
 }
 function userMfaAttemptReset(user_id) { userMfaAttempts.delete(user_id); }
 setInterval(() => { const now = Date.now(); for (const [k, v] of userMfaAttempts) if (now > v.resetAt + USER_MFA_WINDOW_MS) userMfaAttempts.delete(k); }, 300_000);
+
+// Per-IP rate limit for the public /v2/claim/reveal (max 20/min) — a claim token
+// is a 256-bit random hex, so this just caps abusive polling, not real guessing.
+const claimRateLimits = new Map();
+function claimRateOk(ip) {
+  const now = Date.now();
+  const b = claimRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
+  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
+  if (b.count >= 20) return false;
+  b.count++; claimRateLimits.set(ip, b); return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of claimRateLimits) if (now > v.resetAt + 60000) claimRateLimits.delete(k); }, 120_000);
 
 // Per-IP rate limit for /v2/check-key (max 30/min) — prevents API key brute-force
 const checkKeyRateLimits = new Map();
@@ -2865,6 +2878,26 @@ const server = http.createServer(async (req, res) => {
       console.error("[user/webauthn/credential DELETE]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
+  }
+
+  // ── POST /v2/claim/reveal — burn-on-reveal for the welcome-email claim link ──
+  // Public: the bearer is the 256-bit claim token, not an API key. Returns the
+  // key exactly once, then deletes the token atomically (getDel) so a second
+  // reveal — or a mail-scanner prefetch — gets nothing.
+  if (path === '/v2/claim/reveal' && req.method === 'POST') {
+    if (!claimRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const token = String(d.token || '');
+      if (!/^[a-f0-9]{64}$/.test(token)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid_token' })); }
+      if (!redisClient || !redisClient.isReady) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'claim store unavailable' })); }
+      const k = `paramant:claim:${token}`;
+      const key = redisClient.getDel ? await redisClient.getDel(k) : await (async () => { const v = await redisClient.get(k); if (v !== null) await redisClient.del(k); return v; })();
+      if (key === null || key === undefined) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'claim_not_found_or_used' })); }
+      log('info', 'claim_revealed', {});
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, key }));
+    } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_request' })); }
   }
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
@@ -4548,26 +4581,27 @@ const server = http.createServer(async (req, res) => {
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
       const RESEND_KEY = process.env.RESEND_API_KEY || '';
       if (!RESEND_KEY) { res.writeHead(503); return res.end(J({ error: 'RESEND_API_KEY not configured' })); }
+      // H1: never put the raw API key in the email body (it would sit in the
+      // mailbox and pass through Resend in plaintext). Mint a one-time claim
+      // token and email a link instead. The token travels in the URL fragment
+      // (#...), so it is never sent to the server on page load, never logged,
+      // and never leaks via Referer; the claim page POSTs it to burn-on-reveal.
+      if (!redisClient || !redisClient.isReady) { res.writeHead(503); return res.end(J({ error: 'claim store unavailable' })); }
+      const claimToken = crypto.randomBytes(32).toString('hex');
+      await redisClient.set(`paramant:claim:${claimToken}`, d.key, { EX: CLAIM_TTL_SECONDS });
+      const claimUrl = `https://paramant.app/claim.html#${claimToken}`;
       const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:520px">
         <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
         <div style="background:#1a1a00;border:1px solid #2a2a00;border-radius:6px;padding:16px;margin-bottom:24px;color:#cccc00;font-size:12px">
-          IMPORTANT: Save this API key in your password manager immediately. It is generated once and cannot be recovered. If you lose it, you need to purchase a new subscription.
+          Your API key is ready to claim. The link below reveals it once and expires in 7 days. Save the key in your password manager the moment you see it — it is generated once and cannot be recovered.
         </div>
-        <p style="color:#888;margin-bottom:24px">Your API key is ready.</p>
-        <div style="background:#111;border:1px solid #1a1a1a;border-radius:6px;padding:20px;margin-bottom:24px">
-          <div style="font-size:11px;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">API KEY — ${(d.plan||'').toUpperCase()}</div>
-          <div style="font-size:14px;color:#ededed;word-break:break-all">${d.key}</div>
-        </div>
-        <pre style="background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:16px;font-size:12px;color:#888;overflow-x:auto">pip install cryptography
-
-python3 paramant-receiver.py \\
-  --key ${d.key} \\
-  --device my-device \\
-  --output /tmp/received/</pre>
+        <p style="color:#888;margin-bottom:24px">Plan: <strong style="color:#ededed">${escHtml((d.plan||'').toUpperCase())}</strong></p>
+        <div style="margin-bottom:24px"><a href="${claimUrl}" style="display:inline-block;background:#ededed;color:#0c0c0c;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600">Reveal my API key</a></div>
+        <p style="color:#555;font-size:12px;margin-bottom:24px">Or paste this link into your browser:<br><span style="color:#888;word-break:break-all">${claimUrl}</span></p>
         <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> · <a href="https://paramant.app/ct-log" style="color:#555">CT log</a></p>
         <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 · Burn-on-read · EU/DE · BUSL-1.1</p>
       </div>`;
-      const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [d.email], subject: 'Your PARAMANT API key', html });
+      const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [d.email], subject: 'Claim your PARAMANT API key', html });
       const resp = await new Promise((resolve, reject) => {
         const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
