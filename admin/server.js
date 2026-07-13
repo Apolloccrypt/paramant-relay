@@ -826,9 +826,6 @@ api.get("/user/signup/verify/:token", async (req, res) => {
       const consumed = await redis().get(`paramant:signup:consumed:${token}`);
       return res.redirect(consumed ? '/signup/verified' : '/signup?error=expired_token');
     }
-    // Consume immediately (one-shot)
-    await redis().del(`paramant:signup:pending:${token}`);
-
     const existing = await findUserByEmail(email);
     if (existing) return res.redirect('/signup?error=account_exists');
 
@@ -854,8 +851,13 @@ api.get("/user/signup/verify/:token", async (req, res) => {
     const primaryRes = await relayFetch("health", "/v2/admin/keys", "POST", createBody, false, ADMIN_TOKEN);
     if (primaryRes.status !== 200 && primaryRes.status !== 201) {
       console.error("[signup/verify] key creation failed on health:", primaryRes.status, primaryRes.body);
+      // De pending-token is NIET verbruikt: een relay-hik mag de link uit de
+      // verificatiemail niet vernietigen. De gebruiker klikt hem gewoon opnieuw.
       return res.redirect('/signup?error=server_error');
     }
+
+    // Pas verbruiken nu het account echt bestaat (one-shot, onder de lock).
+    await redis().del(`paramant:signup:pending:${token}`);
 
     // Fan-out to the other sectors. Best-effort — if one is briefly unavailable, reload-users
     // can pick it up later; we don't want to leak a half-created account by failing the whole

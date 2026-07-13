@@ -9,8 +9,8 @@
   if (!banner || !title || !msg) return;
   var map = {
     expired_token: {
-      t: 'Your account is already active',
-      m: 'You\'ve already verified this email. <a href="/auth/login" style="background:#1D4ED8;color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-weight:600;display:inline-block;margin:6px 0">Sign in</a> <br><span style="color:#78350F;font-size:13px">Still finishing setup? Look for the email <code>Complete your Paramant account setup</code> in your inbox and open the link to continue.</span>'
+      t: 'This verification link has expired',
+      m: 'Verification links are valid for 24 hours. Enter your email below to get a fresh one. If you already finished setup, <a href="/auth/login">sign in</a> instead.'
     },
     invalid_token: {
       t: 'Verification link not recognised',
