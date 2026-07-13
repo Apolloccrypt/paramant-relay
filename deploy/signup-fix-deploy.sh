@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# LET OP: de docroot is /home/paramant/app (nginx `root`), NIET de
+# git-checkout. deploy/server-fix.sh synct frontend/ -> /home/paramant/app
+# met rsync --delete. Eenmalig script; na merge van deze PR overbodig.
 # Deploy de paramant signup/login fix op productie, drift-veilig (past de
 # transformatie toe op de ECHT gedeployde bestanden). Met backup, verificatie
 # en auto-rollback. Draait vanaf de NUC; hopt read/write naar paramant-server.
@@ -43,10 +46,10 @@ PYEOF
 
 # 1. Backup
 TS=$(run 'date +%Y%m%d-%H%M%S')
-BK="/opt/paramant-relay/backups/signup-fix-$TS"
+BK="/home/paramant/app/backups/signup-fix-$TS"
 say "backup -> $BK"
 run "mkdir -p $BK/frontend/auth $BK/frontend/js $BK/frontend/billing $BK/nginx
-     cd /opt/paramant-relay
+     cd /home/paramant/app
      cp -a frontend/auth/*.html $BK/frontend/auth/ 2>/dev/null
      cp -a frontend/billing/checkout.html $BK/frontend/billing/ 2>/dev/null
      cp -a frontend/js $BK/frontend/js.orig 2>/dev/null
@@ -55,7 +58,7 @@ run "mkdir -p $BK/frontend/auth $BK/frontend/js $BK/frontend/billing $BK/nginx
 
 # 2. BLOKKER A - externaliseer op de gedeployde bestanden
 say "BLOKKER A: externaliseren"
-run "cd /opt/paramant-relay && python3 /tmp/extract.py"
+run "cd /home/paramant/app && python3 /tmp/extract.py"
 
 # 3. BLOKKER B - nginx real_ip fix
 say "BLOKKER B: nginx real_ip"
@@ -88,7 +91,7 @@ say "  kale <script> op /auth/login: $BARE (moet 0)"
 
 if [ "$FAIL" = "1" ]; then
   say "!! VERIFICATIE GEFAALD - ROLLBACK frontend"
-  run "cd /opt/paramant-relay && cp -a $BK/frontend/auth/*.html frontend/auth/ && cp -a $BK/frontend/billing/checkout.html frontend/billing/ 2>/dev/null; echo frontend-teruggezet"
+  run "cd /home/paramant/app && cp -a $BK/frontend/auth/*.html frontend/auth/ && cp -a $BK/frontend/billing/checkout.html frontend/billing/ 2>/dev/null; echo frontend-teruggezet"
   say "rollback klaar. Backup: $BK"
 else
   say "=== KLAAR: signup/login hersteld. Backup: $BK ==="
