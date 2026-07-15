@@ -30,6 +30,7 @@ const MAX_PREVIEW_PAGES = 30;
 let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,task}], zoom }
 let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
 let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indicator
+let _placeCurrentPage = 0;    // most-visible page index (for where a new text/date lands)
 let _drag = null;             // active stamp drag-reposition gesture
 let _reviewZoom = 1;          // zoom factor of the review document preview
 
@@ -39,6 +40,8 @@ const state = {
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
+  extras: [],            // PDF mode only: [{ id, type:'text'|'date', pageIndex, x, y, size, text }]
+                         // x,y = bottom-left in PDF points; baked as pdf-lib vector text.
   signer: {
     name: '',
     fingerprint: '',       // public passkey-key fingerprint, resolved before sign (display only)
@@ -262,6 +265,7 @@ async function onDocChosen(file) {
   state.doc = { bytes, name: file.name, size: file.size };
   state.signer.docImageDataUrl = null;
   state.imageType = null;
+  state.extras = [];        // fresh document: drop any text/date objects from a prior file
 
   const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
   const mimeGuess = guessMimeFromMagic(bytes);
@@ -312,6 +316,7 @@ function loadImageElement(bytes, mime) {
 async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();                                  // single image: no page-nav
+  { const et = $('ds-edit-tools'); if (et) et.hidden = true; }   // text/date tools are PDF-only
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -351,6 +356,7 @@ async function renderPdfForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();
   { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
+  { const et = $('ds-edit-tools'); if (et) et.hidden = false; }   // text/date tools: PDF only
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
@@ -432,6 +438,7 @@ async function applyPlaceZoom() {
     if (token !== placeRenderToken) return;   // a newer zoom superseded this pass
   }
   reflowStampMarker();
+  reflowExtras();                             // text/date objects follow the new scale too
 }
 
 // Re-derive the marker's pixel box from the PDF-point state.stamp at the current
@@ -451,6 +458,188 @@ function reflowStampMarker() {
     ? state.stamp.y / ratio                                   // image: top-left origin
     : (wrap._pdfPage.height - state.stamp.y - state.stamp.h) / ratio;  // pdf: bottom-left flip
   renderStampMarker(wrap, left, top, w, h);
+}
+
+// ====================================================================
+// Edit layer: free text + date annotations (PDF mode). Additive — the seal
+// (state.stamp) and the whole signing/envelope path are untouched. Each extra
+// is baked as pdf-lib vector text, so the output stays sharp and selectable.
+// ====================================================================
+
+const TEXT_LINE_H = 1.35;            // box height = font size * this
+let _extraSeq = 0;
+
+// Height of a text box in PDF points for a given font size.
+function extraBoxH(size) { return size * TEXT_LINE_H; }
+
+// The page the user is currently looking at (updated by the page-nav observer),
+// so a new text/date object lands on the page in view, not always page 1.
+function addExtra(type) {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const size = Math.round(Math.max(12, Math.min(pageW, pageH) * 0.035));   // sane default per page size
+  const h = extraBoxH(size);
+  const text = type === 'date' ? new Date().toISOString().slice(0, 10) : 'Text';
+  const extra = {
+    id: ++_extraSeq, type, pageIndex: pageIdx,
+    x: Math.round(pageW * 0.12),                 // a little in from the left
+    y: Math.round(pageH * 0.82 - h),             // near the top of the page
+    size, text,
+  };
+  state.extras.push(extra);
+  const el = renderExtraMarker(extra);
+  // Continue stays gated on the SEAL (the signature) being placed — extras are
+  // optional additions, not a substitute for signing.
+  if (el && type === 'text') beginEditExtra(el, extra);   // let the user type straight away
+}
+
+function extraWrapFor(pageIndex) {
+  if (!placeState || placeState.isImage) return null;
+  const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === pageIndex);
+  return p && p.wrap;
+}
+
+// Build the on-page marker for one extra from its PDF-point geometry at the
+// current display scale. Never mutates the extra; reflowExtras re-derives on zoom.
+function renderExtraMarker(extra) {
+  const wrap = extraWrapFor(extra.pageIndex);
+  if (!wrap) return null;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;      // pdf points per CSS px
+  const h = extraBoxH(extra.size);
+  const left = extra.x / ratio;
+  const top = (wrap._pdfPage.height - extra.y - h) / ratio;
+  const el = document.createElement('div');
+  el.className = 'ds-anno';
+  el.dataset.type = extra.type;
+  el.dataset.id = String(extra.id);
+  el.style.cssText = `left:${left}px;top:${top}px;height:${h / ratio}px;font-size:${extra.size / ratio}px`;
+  el.textContent = extra.text;
+
+  const del = document.createElement('button');
+  del.className = 'ds-anno-del'; del.type = 'button'; del.textContent = '×';
+  del.title = 'Remove'; del.setAttribute('aria-label', 'Remove this object');
+  del.addEventListener('pointerdown', e => { e.stopPropagation(); });
+  del.addEventListener('click', e => { e.stopPropagation(); removeExtra(extra.id); });
+  el.appendChild(del);
+
+  const grip = document.createElement('div');
+  grip.className = 'ds-anno-resize';
+  el.appendChild(grip);
+
+  wrap.appendChild(el);
+  wireExtraMarker(el, extra, grip);
+  return el;
+}
+
+function removeExtra(id) {
+  state.extras = state.extras.filter(e => e.id !== id);
+  document.querySelectorAll(`.ds-anno[data-id="${id}"]`).forEach(el => el.remove());
+}
+
+// Drag to move, corner to resize (scales font size), double-click to edit text.
+function wireExtraMarker(el, extra, grip) {
+  let drag = null, rez = null;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (el.classList.contains('editing')) return;         // editing: let the caret work
+    if (e.target === grip) return;                        // resize handled below
+    const wrap = el.parentElement;
+    const rect = wrap.querySelector('canvas').getBoundingClientRect();
+    drag = { rect, grabX: e.clientX - (rect.left + parseFloat(el.style.left)), grabY: e.clientY - (rect.top + parseFloat(el.style.top)) };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.style.cursor = 'grabbing';
+    e.preventDefault(); e.stopPropagation();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const left = Math.max(0, Math.min(drag.rect.width - el.offsetWidth, e.clientX - drag.rect.left - drag.grabX));
+    const top = Math.max(0, Math.min(drag.rect.height - el.offsetHeight, e.clientY - drag.rect.top - drag.grabY));
+    el.style.left = left + 'px'; el.style.top = top + 'px';
+  });
+  const dragUp = (e) => {
+    if (!drag) return; drag = null;
+    try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    el.style.cursor = 'grab';
+    commitExtraFromMarker(el, extra);
+  };
+  el.addEventListener('pointerup', dragUp);
+  el.addEventListener('pointercancel', dragUp);
+
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    rez = { y0: e.clientY, h0: el.offsetHeight, size0: extra.size };
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!rez) return;
+    const factor = Math.max(0.35, (rez.h0 + (e.clientY - rez.y0)) / rez.h0);
+    const wrap = el.parentElement;
+    const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+    const newSize = Math.max(6, Math.min(96, rez.size0 * factor));
+    el.style.fontSize = (newSize / ratio) + 'px';
+    el.style.height = (extraBoxH(newSize) / ratio) + 'px';
+    el.dataset.pendingSize = String(newSize);
+  });
+  const rezUp = (e) => {
+    if (!rez) return; rez = null;
+    try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (el.dataset.pendingSize) { extra.size = parseFloat(el.dataset.pendingSize); delete el.dataset.pendingSize; }
+    commitExtraFromMarker(el, extra);
+  };
+  grip.addEventListener('pointerup', rezUp);
+  grip.addEventListener('pointercancel', rezUp);
+
+  el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEditExtra(el, extra); });
+}
+
+// Inline text editing via contentEditable. On blur/Enter the text is saved back
+// to the extra and the box re-fits.
+function beginEditExtra(el, extra) {
+  el.classList.add('editing');
+  el.contentEditable = 'true';
+  // Drop the child controls from the editable text, restore them after.
+  const del = el.querySelector('.ds-anno-del'), grip = el.querySelector('.ds-anno-resize');
+  if (del) del.remove(); if (grip) grip.remove();
+  el.textContent = extra.text;
+  el.focus();
+  try { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (_) {}
+  const finish = () => {
+    el.contentEditable = 'false';
+    el.classList.remove('editing');
+    extra.text = (el.textContent || '').replace(/\n/g, ' ').trim() || (extra.type === 'date' ? new Date().toISOString().slice(0, 10) : 'Text');
+    el.removeEventListener('blur', finish);
+    el.removeEventListener('keydown', onKey);
+    // Rebuild the marker so delete/resize handles + geometry are consistent.
+    el.remove();
+    renderExtraMarker(extra);
+  };
+  const onKey = (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); el.blur(); }
+  };
+  el.addEventListener('blur', finish);
+  el.addEventListener('keydown', onKey);
+}
+
+// Write a marker's pixel box back into the extra's PDF-point x,y (bottom-left).
+function commitExtraFromMarker(el, extra) {
+  const wrap = el.parentElement;
+  const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+  const left = parseFloat(el.style.left), top = parseFloat(el.style.top);
+  const h = extraBoxH(extra.size);
+  extra.x = left * ratio;
+  extra.y = wrap._pdfPage.height - (top * ratio) - h;
+}
+
+// Re-render every extra marker from state (used after a zoom re-render, which
+// wipes the overlay divs). PDF-point geometry is the source of truth.
+function reflowExtras() {
+  document.querySelectorAll('.ds-anno').forEach(el => el.remove());
+  if (placeState && placeState.isImage) return;
+  for (const extra of state.extras) renderExtraMarker(extra);
 }
 
 function teardownPageNav() {
@@ -474,6 +663,7 @@ function setupPageNav(container, total) {
     let best = wraps[0], bestR = -1;
     for (const w of wraps) { const r = ratios.get(w) || 0; if (r > bestR) { bestR = r; best = w; } }
     const idx = Number(best.dataset.pageIndex) || 0;
+    _placeCurrentPage = idx;                 // new text/date objects land on the visible page
     if (idx !== current) { current = idx; render(); }
   }, { root: null, rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
   wraps.forEach(w => _pageNavObserver.observe(w));
@@ -1082,6 +1272,19 @@ async function renderDocPreview() {
     mock.innerHTML = stampInnerHtml();
     zoomwrap.appendChild(mock);
     makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+    // Show the text/date objects that sit on this page, so the review reflects the
+    // whole document, not just the seal. Read-only here (editing was on step-place).
+    for (const ex of state.extras) {
+      if (ex.pageIndex !== state.stamp.pageIndex) continue;
+      const h = extraBoxH(ex.size);
+      const a = document.createElement('div');
+      a.className = 'ds-anno';
+      a.dataset.type = ex.type;
+      a.style.cssText = `left:${ex.x / ratio}px;top:${(baseViewport.height - ex.y - h) / ratio}px;` +
+        `height:${h / ratio}px;font-size:${ex.size / ratio}px;pointer-events:none;border-style:solid;background:transparent`;
+      a.textContent = ex.text;
+      zoomwrap.appendChild(a);
+    }
     buildReviewZoom(zoomwrap);
     return;
   }
@@ -1414,6 +1617,24 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
     thickness: 0.5, color: navy, opacity: 0.25,
   });
 
+  // Bake the free text/date objects (the edit layer) as real vector text on
+  // their pages. Additive to the seal; each stays selectable + sharp at any zoom.
+  if (Array.isArray(state.extras) && state.extras.length) {
+    const courier = await pdfDoc.embedFont(PDFLib.StandardFonts.Courier);
+    const ink = PDFLib.rgb(0.1, 0.1, 0.1);
+    const pages = pdfDoc.getPages();
+    for (const ex of state.extras) {
+      const pg = pages[ex.pageIndex];
+      if (!pg) continue;
+      const f = ex.type === 'date' ? courier : font;
+      pg.drawText(String(ex.text || ''), {
+        x: ex.x + ex.size * 0.1,
+        y: ex.y + ex.size * 0.35,          // box-bottom -> text baseline (matches the on-screen box)
+        size: ex.size, font: f, color: ink,
+      });
+    }
+  }
+
   return await pdfDoc.save();
 }
 
@@ -1515,6 +1736,9 @@ async function doSign() {
         algorithm: 'ML-DSA-65', hash_algorithm: 'SHA3-256',
         original_filename: state.doc.name, stamped_filename: state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name,
         original_hash: origHashHex, stamped_hash: stampedHashHex, coords,
+        extras: (state.mode === 'pdf' && state.extras.length)
+          ? state.extras.map(e => ({ type: e.type, pageIndex: e.pageIndex, x: Math.round(e.x), y: Math.round(e.y), size: e.size, text: e.text }))
+          : undefined,
         signature_style: state.signer.sigStyle,
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
@@ -1898,7 +2122,15 @@ function init() {
   initStepIdentity();
   wireNav();
   wireLiveStampUpdates();
+  wireEditTools();
   setActive('step-mode');
+}
+
+// Text/date edit toolbar (step-place, PDF mode). Additive to the seal.
+function wireEditTools() {
+  const t = $('ds-add-text'), d = $('ds-add-date');
+  if (t) t.addEventListener('click', () => addExtra('text'));
+  if (d) d.addEventListener('click', () => addExtra('date'));
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
