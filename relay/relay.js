@@ -497,60 +497,8 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
   return crypto.createHash('sha3-256').update(Buffer.from([0x00])).update(data).digest('hex');
 }
 
-function ctNodeHash(left, right) {
-  return crypto.createHash('sha3-256')
-    .update(Buffer.from([0x01]))
-    .update(Buffer.from(left, 'hex'))
-    .update(Buffer.from(right, 'hex'))
-    .digest('hex');
-}
-
-function ctTreeHash(entries) {
-  if (entries.length === 0) return '0'.repeat(64);
-  let hashes = entries.map(e => e.leaf_hash);
-  while (hashes.length > 1) {
-    const next = [];
-    for (let i = 0; i < hashes.length; i += 2) {
-      next.push(i + 1 < hashes.length ? ctNodeHash(hashes[i], hashes[i+1]) : hashes[i]);
-    }
-    hashes = next;
-  }
-  return hashes[0];
-}
-
-// Returns the Merkle audit path for `idx` in the given entries array.
-// Each element is { hash, position: 'left'|'right' } so verifiers know how to combine.
-// Verification: start with leaf_hash, for each step combine with sibling per position.
-function ctInclusionProof(entries, idx) {
-  if (entries.length <= 1) return [];
-  let hashes = entries.map(e => e.leaf_hash);
-  const path = [];
-  let i = idx;
-  while (hashes.length > 1) {
-    const sibling = i % 2 === 0 ? i + 1 : i - 1;
-    if (sibling < hashes.length) {
-      path.push({ hash: hashes[sibling], position: i % 2 === 0 ? 'right' : 'left' });
-    }
-    const next = [];
-    for (let j = 0; j < hashes.length; j += 2) {
-      next.push(j + 1 < hashes.length ? ctNodeHash(hashes[j], hashes[j+1]) : hashes[j]);
-    }
-    hashes = next;
-    i = Math.floor(i / 2);
-  }
-  return path;
-}
-
-// Leaf hash for blob/transfer entries — domain separator 0x02 (0x00=pubkey, 0x01=inner node)
-// Commits to transfer hash + sector without exposing payload content.
-function blobLeafHash(blobHash, sector, ts) {
-  const data = Buffer.concat([
-    Buffer.from(blobHash, 'hex'),                                        // 32 bytes — transfer hash
-    crypto.createHash('sha3-256').update(sector || 'relay').digest(),    // 32 bytes — sector identity
-    Buffer.from(ts, 'utf8')                                              // ISO timestamp
-  ]);
-  return crypto.createHash('sha3-256').update(Buffer.from([0x02])).update(data).digest('hex');
-}
+// CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
+const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
 
 // Coarsen an ISO timestamp to the top of its hour for PUBLIC projections only.
 // The full-precision ts stays in the stored entry (and is committed in the leaf
@@ -3764,7 +3712,8 @@ const server = http.createServer(async (req, res) => {
         blob, ts: now, ttl, size: blob.length,
         apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
         ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
-                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null },
+                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null,
+                    ts: ctEntry.ts },
       });
       setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
       ipTimes.push(now);
@@ -4005,6 +3954,7 @@ const server = http.createServer(async (req, res) => {
           tree_size: ctEntry.index + 1,
           audit_path: ctEntry.proof,
           sth:       ctEntry.sth || null,
+          ts:        ctEntry.ts,
         }
       });
       setTimeout(() => {
@@ -4132,6 +4082,7 @@ const server = http.createServer(async (req, res) => {
       };
       const receiptPayload = {
         blob_hash:              outm[1],
+        ts:                     ctData.ts,
         retrieved_at:           Date.now(),
         sector:                 entry.sector || SECTOR,
         relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
