@@ -162,3 +162,72 @@ test('designatePrimary: rejects unknown and inactive keys', () => {
   assert.throws(() => kt.designatePrimary(apiKeys, accounts, accountKeys, 'pgp_primary', 'pgp_second'),
     (e) => e.code === 'key_inactive');
 });
+
+// ── Scope enforcement (audit 4.1 / HOOG) ─────────────────────────────────────
+test('scopeActionFor: classifies the v2 mutating routes', () => {
+  // ParaSend data-plane writes.
+  assert.equal(kt.scopeActionFor('POST', '/v2/inbound'), 'send');
+  assert.equal(kt.scopeActionFor('POST', '/v2/session/create'), 'send');
+  // ParaSign data-plane writes.
+  assert.equal(kt.scopeActionFor('POST', '/v2/envelopes'), 'sign');
+  assert.equal(kt.scopeActionFor('POST', '/v2/envelopes/AbCdEfGhIjKlMnOpQrSt/sign'), 'sign');
+  assert.equal(kt.scopeActionFor('POST', '/v2/sign-dpa'), 'sign');
+  // Shared infra writes.
+  assert.equal(kt.scopeActionFor('POST', '/v2/pubkey'), 'common');
+  assert.equal(kt.scopeActionFor('POST', '/v2/did/register'), 'common');
+  assert.equal(kt.scopeActionFor('POST', '/v2/ack'), 'common');
+  // Account / key management.
+  assert.equal(kt.scopeActionFor('POST', '/v2/admin/keys'), 'admin');
+  assert.equal(kt.scopeActionFor('GET',  '/v2/admin/usage'), 'admin');
+  assert.equal(kt.scopeActionFor('POST', '/v2/user/signing-key'), 'admin');
+  // Reads default to 'read' (allowed for every scope).
+  assert.equal(kt.scopeActionFor('GET',  '/v2/audit'), 'read');
+  assert.equal(kt.scopeActionFor('POST', '/v2/verify-receipt'), 'read');
+  assert.equal(kt.scopeActionFor('GET',  '/v2/pubkey'), 'read');
+  assert.equal(kt.scopeActionFor('POST', '/v2/envelopes/AbCdEfGhIjKlMnOpQrSt/view'), 'read');
+});
+
+test('requireScope: read-only key is denied every write, allowed reads', () => {
+  const ro = { scope: 'read-only' };
+  assert.equal(kt.requireScope(ro, 'read'),   true);   // reads OK
+  assert.equal(kt.requireScope(ro, 'common'), false);  // no infra writes
+  assert.equal(kt.requireScope(ro, 'send'),   false);
+  assert.equal(kt.requireScope(ro, 'sign'),   false);
+  assert.equal(kt.requireScope(ro, 'admin'),  false);
+});
+
+test('requireScope: send-only may send + common, not sign/admin', () => {
+  const so = { scope: 'send-only' };
+  assert.equal(kt.requireScope(so, 'send'),   true);
+  assert.equal(kt.requireScope(so, 'common'), true);
+  assert.equal(kt.requireScope(so, 'read'),   true);
+  assert.equal(kt.requireScope(so, 'sign'),   false);  // cannot sign
+  assert.equal(kt.requireScope(so, 'admin'),  false);
+});
+
+test('requireScope: sign-only may sign + common, not send/admin', () => {
+  const si = { scope: 'sign-only' };
+  assert.equal(kt.requireScope(si, 'sign'),   true);
+  assert.equal(kt.requireScope(si, 'common'), true);
+  assert.equal(kt.requireScope(si, 'read'),   true);
+  assert.equal(kt.requireScope(si, 'send'),   false);  // cannot transfer-upload
+  assert.equal(kt.requireScope(si, 'admin'),  false);
+});
+
+test('requireScope: full key may do everything (existing behaviour preserved)', () => {
+  const f = { scope: 'full' };
+  for (const a of ['read', 'common', 'send', 'sign', 'admin']) {
+    assert.equal(kt.requireScope(f, a), true);
+  }
+});
+
+test('requireScope: legacy/missing/unknown scope is treated as full (backward-compat)', () => {
+  assert.equal(kt.requireScope({}, 'send'), true);              // no scope field
+  assert.equal(kt.requireScope({ scope: undefined }, 'sign'), true);
+  assert.equal(kt.requireScope({ scope: 'root' }, 'admin'), true); // unknown → full
+  assert.equal(kt.requireScope(null, 'send'), true);           // no keyData → full
+});
+
+test('requireScope: unknown action is default-deny', () => {
+  assert.equal(kt.requireScope({ scope: 'full' }, 'delete-everything'), false);
+});

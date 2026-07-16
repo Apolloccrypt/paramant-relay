@@ -2044,6 +2044,20 @@ const server = http.createServer(async (req, res) => {
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
 
+  // ── Scope enforcement (audit 4.1 / HOOG) ──────────────────────────────────────
+  // Single choke point that gates an authenticated v2 key by its scope
+  // (full/send-only/sign-only/read-only). Only runs when a real key resolved:
+  // keyless/public routes and the inv_ receiver-session bypass keep keyData null,
+  // so they are unaffected. The route→action map and the scope→action matrix both
+  // live in lib/keys-table.js (default-deny, unit-tested) — one source of truth.
+  if (keyData) {
+    const _scopeAction = keysTable.scopeActionFor(req.method, path);
+    if (!keysTable.requireScope(keyData, _scopeAction)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'insufficient_scope', required_action: _scopeAction, scope: keyData.scope || 'full' }));
+    }
+  }
+
   // ── GET /health ─────────────────────────────────────────────────────────────
   if (path === '/health') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();

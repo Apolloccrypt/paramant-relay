@@ -10,10 +10,74 @@
 // Pure module: no I/O, no globals. Unit-tested in test/keys-table.test.js.
 const crypto = require('crypto');
 
-// Scopes are reserved now (every key is "full"); the relay does not yet gate on
-// them. Kept as an allow-list so the enum stays stable for a non-breaking
-// future migration to composite grants.
+// Scopes gate what a v2 key may do — ENFORCED via requireScope()/scopeActionFor()
+// below (single source of truth). Kept as an allow-list so the enum stays stable.
 const VALID_SCOPES = new Set(['full', 'send-only', 'sign-only', 'read-only']);
+
+// ── Scope enforcement (single source of truth) ────────────────────────────────
+// v2 API keys carry a scope: full | send-only | sign-only | read-only. Until now
+// scope was stored and shown but NEVER enforced, so every key had full power
+// regardless of its label (privilege escalation — audit 4.1 / HOOG). The two
+// helpers below are the one choke point that fixes that. Design: DEFAULT-DENY per
+// (scope → action) — a scope only gets the actions explicitly granted here.
+//
+//   action   full  send-only  sign-only  read-only
+//   read      y       y          y          y      GET / verify / lookup (any authed key)
+//   common    y       y          y          .      shared infra writes (pubkey/did/ack/attest/webhook/session)
+//   send      y       y          .          .      ParaSend upload / transfer
+//   sign      y       .          y          .      ParaSign envelope / signing
+//   admin     y       .          .          .      account / key / credential management
+//
+// Backward-compat: a legacy key with no scope is normalised to 'full' at load
+// (parseAccountFields), so requireScope() sees 'full' and nothing existing breaks;
+// an unrecognised scope string is likewise treated as 'full' (matches the load
+// path). The security win: keys explicitly minted send/sign/read-only are now
+// enforced. Independent of the separate /v1 psk_ open-API scope check.
+const SCOPE_ACTIONS = {
+  read:   new Set(['full', 'send-only', 'sign-only', 'read-only']),
+  common: new Set(['full', 'send-only', 'sign-only']),
+  send:   new Set(['full', 'send-only']),
+  sign:   new Set(['full', 'sign-only']),
+  admin:  new Set(['full']),
+};
+
+// True if a key with keyData's scope may perform `action`. Default-deny: an
+// unknown action returns false; a missing/unknown scope is normalised to 'full'
+// (backward-compat with legacy keys, which carry no scope field).
+function requireScope(keyData, action) {
+  const allowed = SCOPE_ACTIONS[action];
+  if (!allowed) return false; // unknown action = deny
+  let scope = (keyData && keyData.scope) || 'full';
+  if (!VALID_SCOPES.has(scope)) scope = 'full';
+  return allowed.has(scope);
+}
+
+// Map an HTTP (method, path) to the scope action it requires. Everything not
+// listed as a write is 'read', which every scope may do — so the default never
+// blocks an existing flow; only the explicit write actions below are gated.
+// Pure and exhaustive over the v2 mutating routes; unit-tested in keys-table.test.js.
+function scopeActionFor(method, path) {
+  // Account / key / credential / relay management → full only.
+  if (path.startsWith('/v2/admin/') || path.startsWith('/v2/user/') ||
+      path === '/v2/team/add-device' || path === '/v2/reload-users' ||
+      path === '/v2/setup/apply') return 'admin';
+
+  if (method === 'POST') {
+    // ParaSend data-plane writes (upload / transfer session).
+    if (path === '/v2/inbound' || path === '/v2/session/create' ||
+        path === '/v2/anon-inbound') return 'send';
+    // ParaSign data-plane writes (envelope create / party sign / DPA sign).
+    if (path === '/v2/envelopes' || path === '/v2/sign-dpa') return 'sign';
+    if (path.startsWith('/v2/envelopes/') && path.endsWith('/sign')) return 'sign';
+    // Shared infra writes needed by BOTH send and sign flows (not read-only).
+    if (path === '/v2/pubkey' || path === '/v2/did/register' ||
+        path === '/v2/attest' || path === '/v2/ack' ||
+        path === '/v2/webhook' || path === '/v2/ws-ticket' ||
+        path === '/v2/session/join') return 'common';
+  }
+  // GET / verify / lookup / receipt / envelope-view / everything else authed.
+  return 'read';
+}
 
 // Non-secret, stable key identifier for URLs/listings (never the raw pgp_ key).
 // 48 bits of SHA3-free SHA-256 prefix: collision-safe well past 10M keys.
@@ -177,4 +241,4 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
   return { previous, current: key };
 }
 
-module.exports = { VALID_SCOPES, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
+module.exports = { VALID_SCOPES, SCOPE_ACTIONS, requireScope, scopeActionFor, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
