@@ -103,9 +103,9 @@ note "== frontend pages =="
 check "/setup reachable" "200" "$(http_code "$SITE/setup")" no
 check "/docs reachable"  "200" "$(http_code "$SITE/docs")" no
 DASH=$($CURL -L "$SITE/dashboard" 2>/dev/null)
-contains "/dashboard renders cards" "$DASH" "cards-grid" no
-HOME=$($CURL -L "$SITE/" 2>/dev/null)
-contains "homepage advertises PQC" "$HOME" "ML-KEM" no
+contains "/dashboard renders cards" "$DASH" "dh-acct-grid" no
+HOMEPG=$($CURL -L "$SITE/" 2>/dev/null)
+contains "homepage advertises PQC" "$HOMEPG" "ML-KEM" no
 
 note ""
 note "== admin pages =="
