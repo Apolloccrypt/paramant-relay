@@ -5,7 +5,7 @@ const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
-const { initRedis, redis } = require('./lib/redis');
+const { initRedis, redis, scanKeys } = require('./lib/redis');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 const { spawn } = require('child_process');
 const cliCommands = require('./lib/cli-commands');
@@ -347,7 +347,7 @@ api.post('/admin/resend-setup', async (req, res) => {
       redis().del(`paramant:user:backup_codes:${user_id}`),
       redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
     ]);
-    for await (const k of redis().scanIterator({ MATCH: 'paramant:user:setup_token:*', COUNT: 100 })) {
+    for await (const k of scanKeys(redis(), { MATCH: 'paramant:user:setup_token:*', COUNT: 100 })) {
       const raw = await redis().get(k);
       if (raw) { try { const d = JSON.parse(raw); if (d.user_id === user_id) await redis().del(k); } catch {} }
     }
@@ -1714,7 +1714,7 @@ api.post("/user/auth/reset-confirm", async (req, res) => {
     redis().del(`paramant:user:backup_codes:${user_id}`),
     redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
   ]);
-  for await (const k of redis().scanIterator({ MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
+  for await (const k of scanKeys(redis(), { MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
     const r = await redis().get(k);
     if (r) { try { const d = JSON.parse(r); if (d.user_id === user_id) await redis().del(k); } catch {} }
   }
@@ -1920,7 +1920,7 @@ api.get("/user/account", authUser, async (req, res) => {
     const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
 
     const sessions = [];
-    for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+    for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
       const raw = await redis().get(key);
       if (!raw) continue;
       // One corrupt session blob (this user's OR any other user's, since the
@@ -2218,7 +2218,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
   }
 
   // Invalidate all sessions for this user
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+  for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
     const raw = await redis().get(key);
     if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
   }
@@ -2231,7 +2231,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
 api.post("/user/account/sessions/revoke-others", authUser, async (req, res) => {
   const { user_id } = req.userSession;
   let revoked = 0;
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+  for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
     const raw = await redis().get(key);
     if (!raw) continue;
     const s = JSON.parse(raw);
@@ -2255,7 +2255,7 @@ api.delete("/user/account", authUser, async (req, res) => {
 
   await callRelay("/v2/user/delete-totp", { user_id });
 
-  for await (const key of redis().scanIterator({ MATCH: "paramant:user:session:*", COUNT: 100 })) {
+  for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
     const raw = await redis().get(key);
     if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
   }
@@ -2676,7 +2676,7 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
     const eventFilter = req.query.event || null;
     const sinceMs = req.query.since ? new Date(req.query.since).getTime() : 0;
     const events = [];
-    for await (const key of redis().scanIterator({ MATCH: "paramant:user:audit:*", COUNT: 100 })) {
+    for await (const key of scanKeys(redis(), { MATCH: "paramant:user:audit:*", COUNT: 100 })) {
       const userId = key.split(":").pop();
       if (userFilter && !userId.includes(userFilter)) continue;
       const entries = await redis().zRange(key, 0, -1).catch(() => []);
@@ -2761,7 +2761,7 @@ api.post('/admin/force-totp', authMiddleware, async (req, res) => {
     if (required) {
       const totpActive = await redis().get(`paramant:user:totp_active:${key}`).catch(() => null);
       if (totpActive !== 'true') {
-        for await (const rkey of redis().scanIterator({ MATCH: `paramant:user:session:*`, COUNT: 100 })) {
+        for await (const rkey of scanKeys(redis(), { MATCH: `paramant:user:session:*`, COUNT: 100 })) {
           const raw = await redis().get(rkey).catch(() => null);
           if (raw) { try { const ss = JSON.parse(raw); if (ss.user_id === key) { await redis().del(rkey); sessions_revoked++; } } catch {} }
         }
@@ -2881,7 +2881,7 @@ api.post('/admin/revoke-sessions', authMiddleware, async (req, res) => {
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   try {
     let count = 0;
-    for await (const rkey of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 100 })) {
+    for await (const rkey of scanKeys(redis(), { MATCH: 'paramant:user:session:*', COUNT: 100 })) {
       const raw = await redis().get(rkey).catch(() => null);
       if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) { await redis().del(rkey); count++; } } catch {} }
     }
@@ -2917,7 +2917,7 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
     await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
-    for await (const rkey of redis().scanIterator({ MATCH: `paramant:user:session:*`, COUNT: 100 })) {
+    for await (const rkey of scanKeys(redis(), { MATCH: `paramant:user:session:*`, COUNT: 100 })) {
       const raw = await redis().get(rkey).catch(() => null);
       if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) await redis().del(rkey); } catch {} }
     }
@@ -2950,7 +2950,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
     let meta = {}; try { if (metaRaw) meta = JSON.parse(metaRaw); } catch {}
     let billing = null; try { if (billingRaw) billing = JSON.parse(billingRaw); } catch {}
     let sessionCount = 0;
-    for await (const rkey of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 100 })) {
+    for await (const rkey of scanKeys(redis(), { MATCH: 'paramant:user:session:*', COUNT: 100 })) {
       const raw = await redis().get(rkey).catch(() => null);
       if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) sessionCount++; } catch {} }
     }
