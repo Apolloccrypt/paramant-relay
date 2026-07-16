@@ -475,6 +475,7 @@ function reflowStampMarker() {
 // ====================================================================
 
 const TEXT_LINE_H = 1.35;            // box height = font size * this
+const LINE_STROKE_PT = 2;            // line/arrow stroke width in PDF points
 let _extraSeq = 0;
 
 // Height of a text box in PDF points for a given font size.
@@ -572,6 +573,43 @@ function addEllipse() {
   renderExtraMarker(extra);
 }
 
+// A straight line: navy, drawn diagonally across a box (bottom-left corner to
+// top-right corner). Reuses the box geometry so drag + corner-resize work; the
+// SVG line is stretched/redrawn to the box and baked via pdf-lib drawLine.
+function addLine() {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const w = Math.round(pageW * 0.28);
+  const h = Math.round(Math.max(24, pageH * 0.10));
+  const extra = {
+    id: ++_extraSeq, type: 'line', pageIndex: pageIdx,
+    x: Math.round(pageW * 0.36), y: Math.round(pageH * 0.40), w, h,
+    width: LINE_STROKE_PT,
+  };
+  state.extras.push(extra);
+  renderExtraMarker(extra);
+}
+
+// An arrow: same as a line but with a two-stroke arrowhead baked at the
+// top-right end point.
+function addArrow() {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const w = Math.round(pageW * 0.28);
+  const h = Math.round(Math.max(24, pageH * 0.10));
+  const extra = {
+    id: ++_extraSeq, type: 'arrow', pageIndex: pageIdx,
+    x: Math.round(pageW * 0.38), y: Math.round(pageH * 0.34), w, h,
+    width: LINE_STROKE_PT,
+  };
+  state.extras.push(extra);
+  renderExtraMarker(extra);
+}
+
 // A sticky note: filled box, text wraps to the box width, anchored at its top
 // edge so the box can grow downward while you type without drifting.
 function addNote() {
@@ -609,7 +647,7 @@ function renderExtraMarker(extra) {
   el.className = 'ds-anno';
   el.dataset.type = extra.type;
   el.dataset.id = String(extra.id);
-  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse') {
+  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse' || extra.type === 'line' || extra.type === 'arrow') {
     el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.y - extra.h) / ratio}px;width:${extra.w / ratio}px;height:${extra.h / ratio}px`;
   } else if (extra.type === 'note') {
     el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.yTop) / ratio}px;width:${extra.w / ratio}px;font-size:${extra.size / ratio}px`;
@@ -633,7 +671,44 @@ function renderExtraMarker(extra) {
 
   wrap.appendChild(el);
   wireExtraMarker(el, extra, grip);
+  if (extra.type === 'line' || extra.type === 'arrow') drawLineSvg(el, extra);
   return el;
+}
+
+// (Re)build the SVG shaft (+ arrowhead for arrows) inside a line/arrow marker's
+// box, in the box's own pixel space. Called on render and on every resize step
+// so the stroke stays uniform (no aspect distortion) and the arrowhead stays
+// square. Line runs from the box bottom-left corner to its top-right corner.
+function drawLineSvg(el, extra) {
+  const wrap = el.parentElement;
+  if (!wrap) return;
+  const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+  const wPx = Math.max(1, el.clientWidth || parseFloat(el.style.width) || 1);
+  const hPx = Math.max(1, el.clientHeight || parseFloat(el.style.height) || 1);
+  let svg = el.querySelector('svg');
+  if (!svg) { svg = document.createElementNS(SVGNS, 'svg'); el.insertBefore(svg, el.firstChild); }
+  svg.setAttribute('viewBox', `0 0 ${wPx} ${hPx}`);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const strokeW = String(Math.max(1, (extra.width || LINE_STROKE_PT) / ratio));
+  const mk = (a, b, c, d) => {
+    const l = document.createElementNS(SVGNS, 'line');
+    l.setAttribute('x1', a); l.setAttribute('y1', b); l.setAttribute('x2', c); l.setAttribute('y2', d);
+    l.setAttribute('stroke', '#0b3a6a'); l.setAttribute('stroke-width', strokeW); l.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(l);
+  };
+  const x1 = 0, y1 = hPx, x2 = wPx, y2 = 0;                 // bottom-left -> top-right
+  mk(x1, y1, x2, y2);
+  if (extra.type === 'arrow') {
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const head = Math.max(6, Math.min(len * 0.3, 16 / ratio));
+    const sp = 0.45;                                        // half-angle of the arrowhead
+    const rot = (vx, vy, t) => [vx * Math.cos(t) - vy * Math.sin(t), vx * Math.sin(t) + vy * Math.cos(t)];
+    const [ax, ay] = rot(-ux, -uy, sp);
+    const [cx, cy] = rot(-ux, -uy, -sp);
+    mk(x2, y2, x2 + ax * head, y2 + ay * head);
+    mk(x2, y2, x2 + cx * head, y2 + cy * head);
+  }
 }
 
 function removeExtra(id) {
@@ -681,9 +756,10 @@ function wireExtraMarker(el, extra, grip) {
     // What the corner grip means depends on the type: a highlight resizes its
     // box in both dimensions, a note resizes its width (text re-wraps), and
     // text/date scale their font size.
-    if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse') {
+    if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse' || extra.type === 'line' || extra.type === 'arrow') {
       el.style.width  = Math.max(12, rez.w0 + (e.clientX - rez.x0)) + 'px';
       el.style.height = Math.max(8,  rez.h0 + (e.clientY - rez.y0)) + 'px';
+      if (extra.type === 'line' || extra.type === 'arrow') drawLineSvg(el, extra);
       return;
     }
     if (extra.type === 'note') {
@@ -708,7 +784,7 @@ function wireExtraMarker(el, extra, grip) {
   grip.addEventListener('pointercancel', rezUp);
   }   // if (grip): draw markers have no resize grip
 
-  if (extra.type !== 'highlight' && extra.type !== 'draw' && extra.type !== 'redact' && extra.type !== 'rect' && extra.type !== 'ellipse') {
+  if (extra.type !== 'highlight' && extra.type !== 'draw' && extra.type !== 'redact' && extra.type !== 'rect' && extra.type !== 'ellipse' && extra.type !== 'line' && extra.type !== 'arrow') {
     el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEditExtra(el, extra); });
   }
 }
@@ -749,7 +825,7 @@ function commitExtraFromMarker(el, extra) {
   const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
   const pageH = wrap._pdfPage.height;
   const left = parseFloat(el.style.left), top = parseFloat(el.style.top);
-  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse') {
+  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse' || extra.type === 'line' || extra.type === 'arrow') {
     extra.x = left * ratio;
     extra.w = el.offsetWidth * ratio;
     extra.h = el.offsetHeight * ratio;
@@ -2041,6 +2117,23 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
       } else if (ex.type === 'ellipse') {
         // Ellipse outline: navy border, no fill. pdf-lib centres on x,y.
         pg.drawEllipse({ x: ex.x + ex.w / 2, y: ex.y + ex.h / 2, xScale: ex.w / 2, yScale: ex.h / 2, borderColor: penInk, borderWidth: 1.2, opacity: 0 });
+      } else if (ex.type === 'line' || ex.type === 'arrow') {
+        // Straight navy line across the box (bottom-left -> top-right). The arrow
+        // adds two short barbs at the top-right tip.
+        const sx = ex.x, sy = ex.y, tx = ex.x + ex.w, ty = ex.y + ex.h;
+        const lw = ex.width || LINE_STROKE_PT;
+        pg.drawLine({ start: { x: sx, y: sy }, end: { x: tx, y: ty }, thickness: lw, color: penInk, lineCap: PDFLib.LineCapStyle.Round });
+        if (ex.type === 'arrow') {
+          const dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len, uy = dy / len;
+          const head = Math.max(6, Math.min(len * 0.3, 18));
+          const sp = 0.45;                                  // half-angle of the arrowhead
+          const rot = (vx, vy, t) => [vx * Math.cos(t) - vy * Math.sin(t), vx * Math.sin(t) + vy * Math.cos(t)];
+          const [ax, ay] = rot(-ux, -uy, sp);
+          const [cx, cy] = rot(-ux, -uy, -sp);
+          pg.drawLine({ start: { x: tx, y: ty }, end: { x: tx + ax * head, y: ty + ay * head }, thickness: lw, color: penInk, lineCap: PDFLib.LineCapStyle.Round });
+          pg.drawLine({ start: { x: tx, y: ty }, end: { x: tx + cx * head, y: ty + cy * head }, thickness: lw, color: penInk, lineCap: PDFLib.LineCapStyle.Round });
+        }
       } else if (ex.type === 'note') {
         // Box height follows the wrapped text; the note is anchored at its top
         // edge (ex.yTop), matching the on-screen behaviour while typing.
@@ -2584,11 +2677,13 @@ function wireEditTools() {
   const t = $('ds-add-text'), d = $('ds-add-date');
   if (t) t.addEventListener('click', () => addExtra('text'));
   if (d) d.addEventListener('click', () => addExtra('date'));
-  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen'), rd = $('ds-add-redact'), rc = $('ds-add-rect'), ov = $('ds-add-ellipse');
+  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen'), rd = $('ds-add-redact'), rc = $('ds-add-rect'), ov = $('ds-add-ellipse'), ln = $('ds-add-line'), ar = $('ds-add-arrow');
   if (h) h.addEventListener('click', addHighlight);
   if (rd) rd.addEventListener('click', addRedact);
   if (rc) rc.addEventListener('click', addRect);
   if (ov) ov.addEventListener('click', addEllipse);
+  if (ln) ln.addEventListener('click', addLine);
+  if (ar) ar.addEventListener('click', addArrow);
   if (n) n.addEventListener('click', addNote);
   if (p) p.addEventListener('click', () => setPenMode(!_penMode));
   wirePageTools();
