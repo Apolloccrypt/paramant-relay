@@ -107,6 +107,13 @@ function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Supersampling factor for canvas rendering: the screen's devicePixelRatio,
+// capped at 3 so a 4K/retina display gets crisp output without exploding the
+// backing-store memory on very large PDF pages.
+function hiDpiScale() {
+  return Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+}
+
 // CSP on this site allows img-src 'self' data: (no blob:), so previews for
 // drawn/uploaded signatures and for image documents must go through a
 // data: URL or they fail silently and only show the alt text.
@@ -407,11 +414,16 @@ async function applyPlaceZoom() {
     return;
   }
   const token = ++placeRenderToken;
+  // Render at devicePixelRatio so the backing store has real pixels behind every
+  // CSS pixel. The canvas is shown at the CSS width (wrap width + canvas{width:100%}),
+  // but drawn at cssWidth*dpr, so it stays razor sharp on HiDPI/retina screens.
+  const dpr = hiDpiScale();
   for (const p of placeState.pages) {
-    const scale = fitScaleFor(p.baseViewport) * z;
-    const viewport = p.page.getViewport({ scale });
-    p.wrap.style.width = Math.floor(viewport.width) + 'px';
-    p.canvas.width = Math.floor(viewport.width);
+    const cssScale = fitScaleFor(p.baseViewport) * z;
+    const cssW = Math.floor(p.baseViewport.width * cssScale);
+    const viewport = p.page.getViewport({ scale: cssScale * dpr });
+    p.wrap.style.width = cssW + 'px';                 // CSS size drives layout + coords
+    p.canvas.width = Math.floor(viewport.width);      // backing store = cssW * dpr
     p.canvas.height = Math.floor(viewport.height);
     if (p.task) { try { p.task.cancel(); } catch (e) {} }
     p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport });
@@ -533,7 +545,52 @@ function renderStampMarker(wrap, left, top, w, h) {
   m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
   m.innerHTML = stampMockupHtml();
   m.addEventListener('pointerdown', onStampPointerDown);   // drag to reposition
+  addStampResizeHandle(m, wrap);                           // corner grip to scale
   wrap.appendChild(m);
+}
+
+// Write a marker's current pixel box (left/top/width/height in CSS px on the
+// wrap) back into state.stamp in the page's natural units. Shared by drag and
+// resize so the two can never drift on the coordinate math.
+function commitStampFromMarker(marker, wrap) {
+  const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+  const left = parseFloat(marker.style.left), top = parseFloat(marker.style.top);
+  const w = parseFloat(marker.style.width) * ratio, h = parseFloat(marker.style.height) * ratio;
+  const natX = left * ratio, natYTop = top * ratio;
+  if (wrap._pdfPage.isImage) {
+    state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
+  } else {
+    state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: wrap._pdfPage.height - natYTop - h, w, h };
+  }
+}
+
+// A bottom-right corner grip that scales the seal uniformly (keeps its aspect
+// ratio). The screen top-left stays pinned, so only width/height - and, for a
+// PDF, the bottom-left y - change. Min 60px wide, capped at the page width.
+function addStampResizeHandle(marker, wrap) {
+  const grip = document.createElement('div');
+  grip.className = 'ds-stamp-resize';
+  marker.appendChild(grip);
+  let rs = null;
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();               // never start a reposition drag
+    const w0 = parseFloat(marker.style.width), h0 = parseFloat(marker.style.height);
+    rs = { x0: e.clientX, w0, aspect: h0 / w0, maxW: wrap.getBoundingClientRect().width - parseFloat(marker.style.left) };
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!rs) return;
+    const w = Math.max(60, Math.min(rs.maxW, rs.w0 + (e.clientX - rs.x0)));
+    marker.style.width = w + 'px';
+    marker.style.height = (w * rs.aspect) + 'px';
+  });
+  const up = (e) => {
+    if (!rs) return; rs = null;
+    try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+    commitStampFromMarker(marker, wrap);
+  };
+  grip.addEventListener('pointerup', up);
+  grip.addEventListener('pointercancel', up);
 }
 
 // ── Drag the placed stamp to reposition (coexists with click-to-place) ──────
@@ -566,23 +623,14 @@ function onStampPointerMove(e) {
 
 function onStampPointerUp(e) {
   if (!_drag) return;
-  const { marker, wrap, w, h, moved } = _drag;
+  const { marker, wrap, moved } = _drag;
   marker.removeEventListener('pointermove', onStampPointerMove);
   marker.removeEventListener('pointerup', onStampPointerUp);
   marker.removeEventListener('pointercancel', onStampPointerUp);
   try { marker.releasePointerCapture(e.pointerId); } catch (_) {}
   marker.style.cursor = 'grab';
   if (moved) {
-    const left = parseFloat(marker.style.left), top = parseFloat(marker.style.top);
-    const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
-    const stampNatW = w * ratio, stampNatH = h * ratio;
-    const natX = left * ratio, natYTop = top * ratio;
-    if (wrap._pdfPage.isImage) {
-      state.stamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
-    } else {
-      const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
-      state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
-    }
+    commitStampFromMarker(marker, wrap);
     // Swallow the click the browser fires after pointerup so onPlaceClick on the
     // wrap does not ALSO re-place the stamp at the cursor.
     wrap.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
@@ -694,72 +742,121 @@ function selectSigStyle(style) {
   refreshIdentityValid();
 }
 
-// ---- drawn-signature canvas (pointer + touch) ----
+// ---- drawn-signature canvas (pointer + touch), HiDPI + smoothed ----
 function initDrawCanvas() {
   const cv = $('ds-sig-canvas');
+  // Supersample the backing store well past the CSS box (500x160, aspect 25:8)
+  // so strokes stay smooth on HiDPI screens AND survive being embedded + scaled
+  // inside the PDF seal. Keeping the 25:8 ratio lets CSS height:auto stay correct.
+  const DENSITY = Math.max(2, Math.ceil(hiDpiScale() * 1.5));   // dpr1->2, dpr2->3
+  const BASE_W = 500, BASE_H = 160;
+  cv.width = BASE_W * DENSITY;
+  cv.height = BASE_H * DENSITY;
   const ctx = cv.getContext('2d');
-  // Fill white so the exported PNG isn't transparent against light backgrounds
-  // (pdf-lib renders transparent PNG fine, but a white-bg signature also
-  // shows clearly during the on-screen preview marker).
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.strokeStyle = '#0b3a6a';
-  ctx.lineWidth = 2.2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+
+  // Reset to a clean white sheet with the ink style. White (not transparent) so
+  // the seal reads clearly on any document and the on-screen marker matches.
+  const paint = () => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.strokeStyle = '#0b3a6a';
+    ctx.lineWidth = 2.4 * DENSITY;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  };
+  paint();
 
   let drawing = false;
-  let last = null;
+  let last = null;          // previous raw point (backing-store coords)
+  let mid = null;           // previous midpoint the curve passed through
+  let ink = null;           // drawn bounding box, for a tight crop on export
 
   function pos(ev) {
     const r = cv.getBoundingClientRect();
-    const x = ((ev.clientX ?? (ev.touches && ev.touches[0].clientX)) - r.left) * (cv.width / r.width);
-    const y = ((ev.clientY ?? (ev.touches && ev.touches[0].clientY)) - r.top) * (cv.height / r.height);
-    return { x, y };
+    const cx = ev.clientX ?? (ev.touches && ev.touches[0].clientX);
+    const cy = ev.clientY ?? (ev.touches && ev.touches[0].clientY);
+    return { x: (cx - r.left) * (cv.width / r.width), y: (cy - r.top) * (cv.height / r.height) };
+  }
+  function grow(p) {
+    if (!ink) ink = { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y };
+    else {
+      ink.minX = Math.min(ink.minX, p.x); ink.minY = Math.min(ink.minY, p.y);
+      ink.maxX = Math.max(ink.maxX, p.x); ink.maxY = Math.max(ink.maxY, p.y);
+    }
   }
 
-  function start(ev) { ev.preventDefault(); drawing = true; last = pos(ev); }
+  function start(ev) {
+    ev.preventDefault();
+    drawing = true;
+    last = pos(ev); mid = last; grow(last);
+    // A filled dot so a single tap leaves a mark (a lone quadratic never strokes).
+    ctx.beginPath();
+    ctx.fillStyle = '#0b3a6a';
+    ctx.arc(last.x, last.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   function move(ev) {
     if (!drawing) return;
     ev.preventDefault();
     const p = pos(ev);
+    // Quadratic curve through the running midpoint: smooth, ink-like strokes
+    // instead of the visibly faceted straight lineTo segments used before.
+    const m = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
     ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(p.x, p.y);
+    ctx.moveTo(mid.x, mid.y);
+    ctx.quadraticCurveTo(last.x, last.y, m.x, m.y);
     ctx.stroke();
-    last = p;
+    last = p; mid = m; grow(p);
   }
   async function end(ev) {
     if (!drawing) return;
     drawing = false;
-    // Convert to PNG bytes + data URL and stash. refreshIdentityValid will enable Continue.
-    cv.toBlob(async (blob) => {
-      if (!blob) return;
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      state.signer.sigImageBytes = bytes;
-      state.signer.sigImageType = 'png';
-      state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, 'image/png');
-      refreshIdentityValid();
-    }, 'image/png');
+    await exportSignature();
+  }
+
+  // Export a TIGHTLY CROPPED PNG of just the ink (+ small padding) so the seal
+  // embeds a signature that fills its band, not a stamp-sized mostly-white image
+  // with a tiny scribble. pdf-lib preserves aspect ratio when it scales this in.
+  async function exportSignature() {
+    if (!ink) { clearSig(); return; }
+    const pad = ctx.lineWidth * 1.5;
+    const x0 = Math.max(0, Math.floor(ink.minX - pad));
+    const y0 = Math.max(0, Math.floor(ink.minY - pad));
+    const x1 = Math.min(cv.width, Math.ceil(ink.maxX + pad));
+    const y1 = Math.min(cv.height, Math.ceil(ink.maxY + pad));
+    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const octx = out.getContext('2d');
+    octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, w, h);
+    octx.drawImage(cv, x0, y0, w, h, 0, 0, w, h);
+    const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+    if (!blob) return;
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    state.signer.sigImageBytes = bytes;
+    state.signer.sigImageType = 'png';
+    state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, 'image/png');
+    refreshIdentityValid();
+  }
+
+  function clearSig() {
+    state.signer.sigImageBytes = null;
+    state.signer.sigImageType = null;
+    state.signer.sigImageDataUrl = null;
+    refreshIdentityValid();
   }
 
   // Pointer Events cover mouse, touch and pen on every modern browser (iOS 13+).
   // Using ONLY pointer events avoids the double-fire you get when touch* and
-  // pointer* listeners both run on a touch device. The canvas has touch-action:none,
-  // so panning/zooming never hijacks a stroke.
+  // pointer* listeners both run on a touch device. touch-action:none on the
+  // canvas keeps panning/zooming from hijacking a stroke.
   cv.addEventListener('pointerdown', start);
   cv.addEventListener('pointermove', move);
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
   cv.addEventListener('pointerleave', end);
 
-  $('ds-sig-clear').addEventListener('click', () => {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    state.signer.sigImageBytes = null;
-    state.signer.sigImageType = null;
-    refreshIdentityValid();
-  });
+  $('ds-sig-clear').addEventListener('click', () => { paint(); ink = null; clearSig(); });
 }
 
 // ---- image upload ----
@@ -964,8 +1061,9 @@ async function renderDocPreview() {
     const page = await pdf.getPage(state.stamp.pageIndex + 1);
     const baseViewport = page.getViewport({ scale: 1 });
     const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    // Render at 2.5x so CSS-zooming stays sharp; canvas{width:100%} shows it at targetW.
-    const renderScale = (targetW / baseViewport.width) * 2.5;
+    // Supersample so both CSS-zooming AND HiDPI screens stay sharp. 2.5x covers
+    // the review zoom (up to 3x); lift it to the real dpr when that is higher.
+    const renderScale = (targetW / baseViewport.width) * Math.max(2.5, hiDpiScale());
     const viewport = page.getViewport({ scale: renderScale });
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
@@ -1675,11 +1773,15 @@ async function renderSignedPreview() {
     const page = await pdf.getPage(idx + 1);
     const baseViewport = page.getViewport({ scale: 1 });
     const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
-    const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
+    const dpr = hiDpiScale();
+    const cssScale = targetWidth / baseViewport.width;
+    const viewport = page.getViewport({ scale: cssScale * dpr });
     const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
+    canvas.width = Math.floor(viewport.width);        // backing store = cssW * dpr
     canvas.height = Math.floor(viewport.height);
+    canvas.style.width = targetWidth + 'px';          // shown at CSS width -> crisp
+    canvas.style.height = Math.floor(baseViewport.height * cssScale) + 'px';
+    canvas.style.display = 'block';
     container.appendChild(canvas);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   }

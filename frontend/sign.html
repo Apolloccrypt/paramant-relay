@@ -51,6 +51,8 @@
 .ds-page-wrap{position:relative;margin-bottom:14px;cursor:crosshair}
 .ds-page-wrap canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff}
 .ds-stamp-marker{position:absolute;border:1px solid var(--cobalt);background:#fff;pointer-events:auto;cursor:grab;touch-action:none;z-index:5;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
+.ds-stamp-resize{position:absolute;right:0;bottom:0;width:14px;height:14px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:6}
+.ds-stamp-resize::after{content:'';position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-right:1.5px solid #fff;border-bottom:1.5px solid #fff}
 .ds-sm-band{background:var(--cobalt);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:2px 5px;line-height:1;flex:0 0 auto}
 .ds-sm-logo{font-family:var(--mono);font-weight:700;letter-spacing:.04em;font-size:8px}
 .ds-sm-logo span{color:var(--lime)}
