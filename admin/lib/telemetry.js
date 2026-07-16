@@ -1,9 +1,9 @@
 'use strict';
-const { redis } = require('./redis');
+const { redis, scanKeys } = require('./redis');
 
 async function countActiveSessions() {
   let count = 0;
-  for await (const _ of redis().scanIterator({ MATCH: 'paramant:user:session:*', COUNT: 200 })) count++;
+  for await (const _ of scanKeys(redis(), { MATCH: 'paramant:user:session:*', COUNT: 200 })) count++;
   return count;
 }
 
@@ -17,7 +17,7 @@ async function getRecentAuditEvents(limit = 20) {
   }
   // Fallback: SCAN (first run before any events written to global ZSET)
   const events = [];
-  for await (const key of redis().scanIterator({ MATCH: 'paramant:user:audit:*', COUNT: 100 })) {
+  for await (const key of scanKeys(redis(), { MATCH: 'paramant:user:audit:*', COUNT: 100 })) {
     const userId = key.split(':').pop();
     const entries = await redis().zRange(key, 0, -1, { REV: true }).catch(() => []);
     for (const entry of entries.slice(0, limit)) {
