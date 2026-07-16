@@ -105,6 +105,22 @@ async function main() {
     ok('sign() accepts matching internal caller with v2 message');
   }
 
+  // 6b. sign(): audit 1.1 fail-closed. A slot created with an EMPTY email hash
+  //     (the dead-end the old UI/create path could mint) can NEVER be signed in
+  //     email mode -- not by a public caller, and not even by a trusted internal
+  //     caller asserting an empty verified hash. So even if a doomed slot leaked
+  //     past the new create-time guard, it stays unsignable (no accidental sign).
+  {
+    const store = new EnvelopeStore(fakeRedis(emailHashOf('')), { sigVerify: () => true });
+    const pub = await store.sign(ID, 0, 'cHVi', 'c2ln');
+    assert.strictEqual(pub.code, 'email_binding_required', 'empty-hash slot rejects public caller');
+    const internalEmpty = await store.sign(ID, 0, 'cHVi', 'c2ln', { internalTrusted: true, verifiedEmailHash: '' });
+    assert.strictEqual(internalEmpty.code, 'email_mismatch', 'empty verified hash never matches an empty slot (fail-closed)');
+    const internalReal = await store.sign(ID, 0, 'cHVi', 'c2ln', { internalTrusted: true, verifiedEmailHash: EMAIL_HASH });
+    assert.strictEqual(internalReal.code, 'email_mismatch', 'a real email can never claim an empty-hash slot either');
+    ok('sign() empty-email slot is fail-closed (audit 1.1 dead-end unsignable)');
+  }
+
   // 7. sign(): open envelope (no binding_mode) works via the public path but is
   //    now SIGNER-BOUND (recipe v4): the verified message appends the signer's
   //    public key, so the signature commits to the exact key that produced it.

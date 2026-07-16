@@ -1420,6 +1420,7 @@ async function doSign() {
         signature_style: state.signer.sigStyle,
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
+        party_email_hash: act.email_hash || '',
         signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };
@@ -1430,6 +1431,7 @@ async function doSign() {
         original_filename: state.doc.name, document_hash: docHashForEnvelope,
         signer_name: state.signer.name,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
+        party_email_hash: act.email_hash || '',
         signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };
@@ -1700,6 +1702,10 @@ function wireNav() {
   });
   $('ds-recipients-continue').addEventListener('click', () => {
     commitRecipientsFromDom();
+    // Audit 1.1: every envelope is email-bound, so every co-signer needs a
+    // valid email or their invite is a guaranteed dead end. Block here.
+    const rErr = validateRecipients();
+    if (rErr) { showRecipientsHint(rErr, true); return; }
     if (state.signingMode === 'invite') {
       if (state.recipients.length === 0) { showRecipientsHint('Add at least one person to send this to.', true); return; }
       sendForSignature();
@@ -1747,7 +1753,7 @@ function buildRecipientRow(idx, data) {
   const n = idx + 1;
   row.innerHTML =
     `<input class="ds-input" type="text" data-field="label" maxlength="80" placeholder="Recipient name (required)" aria-label="Recipient ${n} name (required)" value="${escapeHtml(data.label || '')}">` +
-    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="Email (optional, for your reference only)" aria-label="Recipient ${n} email (optional, for your reference only)" value="${escapeHtml(data.email || '')}">` +
+    `<input class="ds-input" type="email" data-field="email" maxlength="200" placeholder="Email (required)" aria-label="Recipient ${n} email (required, invite is bound to it)" value="${escapeHtml(data.email || '')}">` +
     `<button class="ds-rm" type="button" data-action="remove" aria-label="Remove recipient ${n}">Remove</button>`;
   row.querySelector('[data-action="remove"]').addEventListener('click', () => removeRecipientRow(idx));
   return row;
@@ -1767,6 +1773,22 @@ function removeRecipientRow(idx) {
   commitRecipientsFromDom();
   state.recipients.splice(idx, 1);
   renderRecipients();
+}
+
+// Audit 1.1: the co-sign invite is cryptographically bound to each recipient's
+// email, so an empty/malformed address yields a slot that can never be signed.
+// Returns an error string (shown to the sender) or null when every recipient
+// row has a name and a syntactically valid email.
+const RECIPIENT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function validateRecipients() {
+  for (let i = 0; i < state.recipients.length; i++) {
+    const r = state.recipients[i] || {};
+    const n = i + 1;
+    if (!r.label) return `Recipient ${n} needs a name.`;
+    if (!r.email) return `Recipient ${n} needs an email address. The invite is cryptographically bound to it.`;
+    if (!RECIPIENT_EMAIL_RE.test(r.email)) return `Recipient ${n}: \u201c${r.email}\u201d is not a valid email address.`;
+  }
+  return null;
 }
 
 function commitRecipientsFromDom() {

@@ -67,3 +67,6 @@ package.json.bak-*
 # Retired/rotated secrets — never re-commit
 deploy/token
 .env.bak*
+
+# Stijl-denylist met te-beschermen namen (lokaal, NOOIT committen; .example wel)
+.style-denylist

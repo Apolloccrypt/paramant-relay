@@ -418,7 +418,7 @@
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Add co-signers (optional)</h2>
-    <p class="ds-sub">Adding someone here makes this a multi-party signature. <strong>After you sign, you'll get a personal co-sign link for each person</strong> to send them yourself (along with the signed file). The email is a label for your reference only. Leave empty to sign just for yourself.</p>
+    <p class="ds-sub">Adding someone here makes this a multi-party signature. <strong>After you sign, you'll get a personal co-sign link for each person</strong> to send them yourself (along with the signed file). Each co-signer needs their email address here: the invite is cryptographically bound to it, so it must be the exact address they sign in with. Add no one to sign just for yourself.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -660,6 +660,6 @@
 <script src="/js/nav-auth.js?v=2" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=24"></script>
+<script type="module" src="/sign-flow.js?v=25"></script>
 </body>
 </html>

@@ -1,5 +1,34 @@
 # AGENTS.md
 
+## Commit- en GitHub-stijl (hard, geldt voor elke agent)
+
+Deze repos zijn Micks publieke repos onder zijn merk. Commit-messages, PR-teksten
+en GitHub-comments volgen deze regels:
+
+- Alles in Micks naam. Geen co-author-trailer (in welke schrijfwijze dan ook),
+  geen generated-with-regel, geen enkele AI-attributie.
+- Geen em-dashes (het teken U+2014). Geen emoji.
+- Kaal en feitelijk. Herhaal niet wat de diff al toont.
+- Nooit secrets, geen placeholders, geen debug-ruis of half-afgemaakte zinnen.
+- Nooit echte persoons- of bedrijfsnamen in code, comments, commits, tests of
+  branchnamen. Gebruik generieke placeholders: acct_demo, demo@example.com,
+  signer Demo, bedrijf Acme. Echte verboden termen staan alleen in de
+  gitignored .style-denylist, afgedwongen door de stijl-scan.
+
+De poort is `scripts/check-commit-style.sh`. Die scant de commit-message(s) en de
+toegevoegde diff-regels op deze fouten. Een commit die de scan laat FALEN mag niet
+gepusht worden; herschrijf de message of de diff en commit opnieuw. De scan draait
+op twee plekken:
+
+- `bash tests/static-sanity.sh` (de gate vlak voor commit) draait de scan over de
+  laatste commit, naast de bestaande checks.
+- De committed pre-push hook `.githooks/pre-push` draait dezelfde scan over het
+  push-bereik. Committed hooks activeren niet vanzelf; zet ze eenmalig aan met:
+
+  ```
+  git config core.hooksPath .githooks
+  ```
+
 ## Cursor Cloud specific instructions
 
 PARAMANT is a post-quantum encrypted file relay. The components relevant to local
