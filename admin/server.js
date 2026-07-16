@@ -14,6 +14,7 @@ const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
+const { buildRecipientParties } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
@@ -1529,9 +1530,13 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   const creatorPublicKey = (req.body?.creator_public_key || "").toString();
   // Party 0 = the signer (self), bound to their verified session email.
   const parties = [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }];
-  for (const r of recipients) {
-    if (r && r.email) parties.push({ label: (r.label || "").toString().slice(0, 80), email: r.email.toString() });
-  }
+  // Audit 1.1: every envelope is binding_mode:"email", so a co-signer slot with
+  // an empty/invalid email hashes to a value the co-signer can never match ->
+  // a guaranteed 403 dead end. Require a valid email per recipient and refuse
+  // creation (400) instead of minting a doomed invite (was: silently dropped).
+  const built = buildRecipientParties(recipients);
+  if (built.error) return res.status(400).json({ error: built.error });
+  for (const p of built.parties) parties.push(p);
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
@@ -2795,6 +2800,7 @@ async function getAdminKeyMeta(key_id) {
     label: k.label || null,
     active: k.active !== false,
     sectors: k.sectors || [],
+    parasign: k.parasign === true, /*MARK:parasign_meta*/
   };
 }
 
@@ -2873,6 +2879,45 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
     try { await logAuditEvent(key, 'admin_plan_changed', { from: meta.plan, to: new_plan, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, from: meta.plan, to: new_plan, email_sent: !!(notify && meta.email) });
   } catch (err) { console.error('[admin/change-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/set-parasign - grant/revoke the ParaSign /v1 API entitlement ──
+// Admin override for the `parasign` scope, alongside the automatic grant on
+// payment. Fans the flag out to every sector (like disable-key) so the grant is
+// fleet-consistent, then reloads users so the change is observable at once.
+api.post('/admin/set-parasign', authMiddleware, async (req, res) => {/*MARK:parasign_routes*/
+  const { key, enabled } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled_required', message: 'Body must include enabled: true|false' });
+  if (!await checkAdminRl('set_parasign', 'admin', 30)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const results = await eachSector(Object.keys(SECTORS), async s =>
+      relayFetch(s, '/v2/admin/keys/set-parasign', 'POST', { key, enabled }, false, ADMIN_TOKEN));
+    const anyOk = Object.values(results).some(r => r && r.status === 200);
+    if (!anyOk) return res.status(502).json({ error: 'relay_error', results });
+    await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
+    try { await logAuditEvent(key, enabled ? 'admin_parasign_enabled' : 'admin_parasign_disabled', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, key, parasign: enabled });
+  } catch (err) { console.error('[admin/set-parasign]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
+// ── POST /admin/send-parasign-onboarding - email the ParaSign API how-to (NL) ──
+// Reuses the existing Resend send layer (emailTemplates.sendEmail). The mail
+// carries the MASKED key + a link to /docs; the full key is never put in mail
+// (same posture as welcomeEmail). ?preview=1 returns the rendered template.
+api.post('/admin/send-parasign-onboarding', authMiddleware, async (req, res) => {
+  const { key } = req.body || {};
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    if (!meta.email) return res.status(422).json({ error: 'no_email', message: 'No email on record for this key' });
+    const tpl = emailTemplates.parasignOnboardingEmail({ apiKey: key, plan: meta.plan, label: meta.label, enabled: meta.parasign });
+    if (req.query.preview === '1') return res.json({ ...tpl, recipient: meta.email });
+    if (!await checkAdminRl('parasign_onboard', key, 10)) return res.status(429).json({ error: 'rate_limited' });
+    await emailTemplates.sendEmail(meta.email, tpl);
+    try { await logAuditEvent(key, 'admin_parasign_onboarding_sent', { email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, email: meta.email });
+  } catch (err) { console.error('[admin/send-parasign-onboarding]', err.message); res.status(500).json({ error: 'send_failed', message: err.message }); }
 });
 
 // ── POST /admin/revoke-sessions ───────────────────────────────────────────────

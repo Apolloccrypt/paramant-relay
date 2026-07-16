@@ -301,6 +301,7 @@ class EnvelopeStore {
       created_at: h.created_at,
       expires_at: h.expires_at,
       completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
       party_count: partyCount,
       signed_count: parseInt(h.signed_count, 10) || 0,
       parties,
@@ -312,6 +313,89 @@ class EnvelopeStore {
     if (!this.available()) throw new Error('redis unavailable');
     const stored = await this.redis.hGet('env:' + id, 'p' + parseInt(partyIndex, 10) + '_invite_token');
     return safeTokenEqual(stored, token);
+  }
+
+  // Participant-membership check for the authorized receipt channel: does `token`
+  // match ANY party's per-party invite token on this envelope? A signer holds
+  // this secret (it is embedded in their signing link), so a valid match proves
+  // they are a participant of THIS envelope without needing to know their slot
+  // index. Constant-time per comparison and it scans every slot (no early
+  // return) so the matching position is not timing-distinguishable. Returns the
+  // matching party index, or -1 (open envelopes carry no tokens -> always -1).
+  async isParticipantToken(id, token) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (typeof token !== 'string' || token.length === 0) return -1;
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return -1;
+    const partyCount = parseInt(h.party_count, 10) || 0;
+    let found = -1;
+    for (let i = 0; i < partyCount; i++) {
+      if (safeTokenEqual(h['p' + i + '_invite_token'], token) && found === -1) found = i;
+    }
+    return found;
+  }
+
+  // Authorized full view for the receipt/.psign channel. UNLIKE getRedacted this
+  // deliberately EXPOSES the raw per-party ML-DSA-65 signatures (sig_b64 +
+  // pk_b64) needed to assemble the complete, independently-verifiable multi-
+  // signer .psign, plus the creator fingerprints (creator_api_hash /
+  // creator_pk_hash) the caller uses to authorize the request. This method does
+  // NO authorization of its own -- it MUST only be reached after the /v1/receipt
+  // handler has confirmed the caller owns (creator_api_hash) or participates in
+  // (valid invite token) this envelope. getRedacted stays the public, redacted
+  // view and is intentionally left untouched.
+  async getForReceipt(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const key = 'env:' + id;
+    const h = await this.redis.hGetAll(key);
+    if (!h || !h.doc_hash) return null;
+    const partyCount = parseInt(h.party_count, 10) || 0;
+    const mode = h.binding_mode || 'open';
+    const storedRecipe = parseInt(h.recipe_version, 10) || 1;
+    // The recipe each slot was actually VERIFIED under in sign(): open slots are
+    // upgraded to v4 (signer-pubkey-bound); email/PRF keep their stored recipe.
+    // A verifier MUST recompute each party message under this same recipe.
+    const effectiveRecipe = (mode === 'open') ? 4 : storedRecipe;
+    const parties = [];
+    for (let i = 0; i < partyCount; i++) {
+      // Stored composite is 'sig_b64:pk_b64' (see the SIGN_LUA field p<i>_sig).
+      // Split on the FIRST ':' only -- base64 never contains ':' so this is exact.
+      const composite = h['p' + i + '_sig'] || '';
+      const ci = composite.indexOf(':');
+      const sigB64 = ci >= 0 ? composite.slice(0, ci) : '';
+      const pkB64  = ci >= 0 ? composite.slice(ci + 1) : '';
+      parties.push({
+        index: i,
+        label: h['p' + i + '_label'] || null,
+        email_hash: h['p' + i + '_email_hash'] || '',
+        status: composite ? 'signed' : (h['p' + i + '_status'] || 'pending'),
+        signed_at: h['p' + i + '_signed_at'] || null,
+        sig_b64: sigB64,
+        pk_b64: pkB64,
+        signer_pk_hash: pkB64
+          ? crypto.createHash('sha3-256').update(Buffer.from(pkB64, 'base64')).digest('hex')
+          : null,
+      });
+    }
+    return {
+      id: h.id,
+      status: h.status,
+      doc_hash: h.doc_hash,
+      binding_mode: mode,
+      recipe_version: storedRecipe,
+      effective_recipe: effectiveRecipe,
+      original_filename: h.original_filename || null,
+      created_at: h.created_at,
+      expires_at: h.expires_at,
+      completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
+      party_count: partyCount,
+      signed_count: parseInt(h.signed_count, 10) || 0,
+      // Durable creator fingerprints for the handler's ownership gate.
+      creator_pk_hash: h.creator_pk_hash || '',
+      creator_api_hash: h.creator_api_hash || '',
+      parties,
+    };
   }
 
   // Party-scoped view for the co-signer: exactly what the client needs to
@@ -366,6 +450,23 @@ class EnvelopeStore {
       try { this.ctAppend('envelope_view', id, { party_index: partyIndex }); } catch {}
     }
     return true;
+  }
+
+  // Void an envelope (ParaSign Open-API /v1). Initiator action: flips a still-open
+  // envelope to status 'void'. A 'complete' envelope is immutable and cannot be
+  // voided. Idempotent: voiding an already-void envelope returns the prior time.
+  // (New /v1 transition; the base state machine only had 'sent' -> 'complete'.)
+  async voidEnvelope(id, reason) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const key = 'env:' + id;
+    const h = await this.redis.hGetAll(key);
+    if (!h || !h.doc_hash) return { ok: false, code: 'not_found' };
+    if (h.status === 'complete') return { ok: false, code: 'already_complete' };
+    if (h.status === 'void') return { ok: true, code: 'idem', status: 'void', voided_at: h.voided_at || null };
+    const at = new Date().toISOString();
+    await this.redis.hSet(key, { status: 'void', voided_at: at, void_reason: (reason || '').toString().slice(0, 200) });
+    try { this.ctAppend('envelope_void', id, { reason: (reason || '').toString().slice(0, 80) }); } catch {}
+    return { ok: true, code: 'void', status: 'void', voided_at: at };
   }
 
   // Sign a party slot. Idempotent: re-submitting the same (sig, pubkey)

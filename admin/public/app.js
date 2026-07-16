@@ -214,13 +214,13 @@ function usersTable(users){
       return '<tr>'+
         '<td data-label="User"><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
         '</td>'+
-        '<td data-label="Plan"><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
+        '<td data-label="Plan"><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span>'+(u.parasign?' <span class="chip active" title="ParaSign /v1 API enabled">ParaSign</span>':'')+'</td>'+ /*MARK:parasign_badge*/
         '<td data-label="TOTP">'+totpBadge(u)+'</td>'+
         '<td data-label="Status"><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
         '<td data-label="Created" class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
         '<td class="actions"><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" data-click="toggleMenu" data-menu="m'+i+'">···</button>'+
-          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
+          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'" data-parasign="'+(u.parasign?'true':'false')+'">'+ /*MARK:parasign_dataset*/
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="details">View details</button>'+
             '<div class="ag-lbl">Email</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="welcome"'+(hasE?'':' disabled')+'>Send welcome</button>'+
@@ -231,7 +231,10 @@ function usersTable(users){
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="revoke-sessions">Revoke sessions</button>'+
             '<div class="ag-lbl">Security</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="force-totp">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
-'<div class="ag-lbl danger">Destructive</div>'+
+            '<div class="ag-lbl">ParaSign API</div>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="parasign-toggle">'+(u.parasign?'Disable ParaSign API':'Enable ParaSign API')+'</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="parasign-onboard"'+(hasE?'':' disabled')+'>Send ParaSign onboarding</button>'+
+'<div class="ag-lbl danger">Destructive</div>'+ /*MARK:parasign_menu*/
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="disable" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Delete account</button>'+
           '</div>'+
@@ -298,7 +301,21 @@ function uAction(action,btn){
         toast(r.ok?'Sessions revoked ('+(r.data?.revoked||0)+')':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
       });
       break;
-    case 'disable': openDisableKeyModal(key,email); break;
+    case 'parasign-toggle': {
+      const enabled=m.dataset.parasign!=='true';
+      api('/admin/set-parasign',{method:'POST',body:JSON.stringify({key,enabled})}).then(r=>{
+        toast(r.ok?('ParaSign '+(enabled?'enabled':'disabled')):'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+        if(r.ok){LOADED.users=false;loadUsers();}
+      });
+      break;
+    }
+    case 'parasign-onboard':
+      if(!confirm('Send ParaSign onboarding email to '+(email||key.slice(0,20)+'…')+'?'))return;
+      api('/admin/send-parasign-onboarding',{method:'POST',body:JSON.stringify({key})}).then(r=>{
+        toast(r.ok?'ParaSign onboarding sent':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+      });
+      break;
+    case 'disable': openDisableKeyModal(key,email); break; /*MARK:parasign_action*/
     case 'delete':  openDeleteAccountModal(key,email); break;
   }
 }

@@ -86,6 +86,7 @@ const wireFormat = require('./crypto/wire-format');
 const cryptoErrors = require('./crypto/errors');
 const parasign = require('./parasign');
 const envelopeMod = require('./envelope');
+const parasignOpenApi = require('./lib/parasign-open-api'); // ParaSign Open Developer-API (/v1)
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -159,7 +160,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
@@ -167,7 +168,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim','/v1'],
   full:       null,
 };
 
@@ -285,8 +286,12 @@ function createDidDocument(did, deviceId, ecdhPubHex, dsaPubHex) {
 }
 
 // ── Certificate Transparency Log ─────────────────────────────────────────────
-const ctLog = [];
 const CT_MAX = 10000;
+// Bounded, monotonically-indexed window (see lib/ct-window). Past CT_MAX the
+// logical index keeps advancing (no duplicates / frozen STH) and lookups for a
+// pruned index return null instead of the wrong entry.
+const { CtWindow } = require('./lib/ct-window');
+const ctWindow = new CtWindow(CT_MAX);
 const CT_FILE     = process.env.CT_FILE     || null; // opt-in only — auto-derive disabled to preserve RAM-only default
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
 
@@ -344,19 +349,21 @@ function _flushCtOnExit() {
 if (CT_FILE) {
   try {
     const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
+    const loaded = [];
     for (const line of lines) {
       try {
         const parsed = JSON.parse(line);
         if (Array.isArray(parsed)) {
           for (const entry of parsed) {
-            if (entry && typeof entry === 'object' && !Array.isArray(entry)) ctLog.push(entry);
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
           }
         } else {
-          ctLog.push(parsed);
+          loaded.push(parsed);
         }
       } catch {}
     }
-    if (ctLog.length) log('info', 'ct_log_loaded', { entries: ctLog.length, file: CT_FILE });
+    ctWindow.load(loaded);
+    if (ctWindow.windowLength) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, file: CT_FILE });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
   }
@@ -461,7 +468,7 @@ const relayRegistry = new Map();
 const MAX_RELAY_REGISTRY = parseInt(process.env.MAX_RELAY_REGISTRY || '10000');
 
 function relayRegistryFromCTLog() {
-  for (const entry of ctLog) {
+  for (const entry of ctWindow.entries) {
     if (entry.type !== 'relay_reg') continue;
     const key = entry.relay_pk_hash;
     if (!key) continue;
@@ -497,60 +504,8 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
   return crypto.createHash('sha3-256').update(Buffer.from([0x00])).update(data).digest('hex');
 }
 
-function ctNodeHash(left, right) {
-  return crypto.createHash('sha3-256')
-    .update(Buffer.from([0x01]))
-    .update(Buffer.from(left, 'hex'))
-    .update(Buffer.from(right, 'hex'))
-    .digest('hex');
-}
-
-function ctTreeHash(entries) {
-  if (entries.length === 0) return '0'.repeat(64);
-  let hashes = entries.map(e => e.leaf_hash);
-  while (hashes.length > 1) {
-    const next = [];
-    for (let i = 0; i < hashes.length; i += 2) {
-      next.push(i + 1 < hashes.length ? ctNodeHash(hashes[i], hashes[i+1]) : hashes[i]);
-    }
-    hashes = next;
-  }
-  return hashes[0];
-}
-
-// Returns the Merkle audit path for `idx` in the given entries array.
-// Each element is { hash, position: 'left'|'right' } so verifiers know how to combine.
-// Verification: start with leaf_hash, for each step combine with sibling per position.
-function ctInclusionProof(entries, idx) {
-  if (entries.length <= 1) return [];
-  let hashes = entries.map(e => e.leaf_hash);
-  const path = [];
-  let i = idx;
-  while (hashes.length > 1) {
-    const sibling = i % 2 === 0 ? i + 1 : i - 1;
-    if (sibling < hashes.length) {
-      path.push({ hash: hashes[sibling], position: i % 2 === 0 ? 'right' : 'left' });
-    }
-    const next = [];
-    for (let j = 0; j < hashes.length; j += 2) {
-      next.push(j + 1 < hashes.length ? ctNodeHash(hashes[j], hashes[j+1]) : hashes[j]);
-    }
-    hashes = next;
-    i = Math.floor(i / 2);
-  }
-  return path;
-}
-
-// Leaf hash for blob/transfer entries — domain separator 0x02 (0x00=pubkey, 0x01=inner node)
-// Commits to transfer hash + sector without exposing payload content.
-function blobLeafHash(blobHash, sector, ts) {
-  const data = Buffer.concat([
-    Buffer.from(blobHash, 'hex'),                                        // 32 bytes — transfer hash
-    crypto.createHash('sha3-256').update(sector || 'relay').digest(),    // 32 bytes — sector identity
-    Buffer.from(ts, 'utf8')                                              // ISO timestamp
-  ]);
-  return crypto.createHash('sha3-256').update(Buffer.from([0x02])).update(data).digest('hex');
-}
+// CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
+const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
 
 // Coarsen an ISO timestamp to the top of its hour for PUBLIC projections only.
 // The full-precision ts stays in the stored entry (and is committed in the leaf
@@ -574,16 +529,15 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index); // real audit path, not a slice
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
   const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -595,10 +549,10 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const urlSectorHash = crypto.createHash('sha3-256').update(relayUrl + '|' + sector).digest('hex');
   // ctLeafHash(deviceIdHash, pubKeyHex, ts) — reuse with urlSectorHash as identity, pkHash as key
   const leaf_hash = ctLeafHash(urlSectorHash, pkHash, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
   const entry = {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
@@ -607,11 +561,10 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
     relay_pk_hash: pkHash,
     ts, proof
   };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -622,18 +575,17 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
 function ctAppendTransfer(blobHash, sector) {
   const ts = new Date().toISOString();
   const leaf_hash = blobLeafHash(blobHash, sector, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
   const entry = {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
   };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWindow.append(entry);
   ctWrite(entry);
-  const sth = produceSth(entry.index + 1, entry.tree_hash);
+  const sth = produceSth(allEntries.length, entry.tree_hash);
   return { ...entry, sth };
 }
 
@@ -644,18 +596,17 @@ function ctAppendTransfer(blobHash, sector) {
 function ctAppendParasign(documentHashHex, signerPkHash) {
   const ts = new Date().toISOString();
   const leaf_hash = ctLeafHash(signerPkHash, documentHashHex, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
   const entry = {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
   };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -668,18 +619,17 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
     .update(eventType).update('|').update(envelopeId).update('|')
     .update(JSON.stringify(payload || {})).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
   const entry = {
     index, type: 'envelope_' + eventType, leaf_hash, tree_hash,
     envelope_id: envelopeId, payload: payload || {}, ts, proof
   };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -694,18 +644,17 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
-  const index = ctLog.length;
-  const allEntries = [...ctLog, { leaf_hash }];
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, index);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
   const entry = {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
   };
-  ctLog.push(entry);
-  if (ctLog.length > CT_MAX) ctLog.shift();
+  ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(entry.index + 1, entry.tree_hash);
+  produceSth(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -872,11 +821,13 @@ function _subproof(m, nodes, b) {
   return [_merkleRootOf(nodes.slice(0, k))].concat(_subproof(m - k, nodes.slice(k), false));
 }
 
-// 0 ≤ fromSize ≤ toSize ≤ ctLog.length
+// Consistency proof over the retained window. fromSize/toSize are leaf counts
+// within the in-memory tree (0 ≤ from ≤ to ≤ windowLength); entries pruned past
+// the CT_MAX window cannot participate.
 function ctConsistencyProof(fromSize, toSize) {
-  if (fromSize < 0 || toSize < fromSize || toSize > ctLog.length) return null;
+  if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) return null;
   if (fromSize === 0 || fromSize === toSize) return [];
-  const leaves = ctLog.slice(0, toSize).map(e => e.leaf_hash);
+  const leaves = ctWindow.entries.slice(0, toSize).map(e => e.leaf_hash);
   return _subproof(fromSize, leaves, fromSize === leaves.length);
 }
 
@@ -925,7 +876,7 @@ function renderPrometheus() {
     L.push(`# TYPE paramant_${k} counter`);
     L.push(`paramant_${k}{sector="${SECTOR}",v="${VERSION}"} ${v}`);
   }
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctLog.length],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -1676,6 +1627,64 @@ function _mutateUsersJson(fn) {
   return _usersWriteQueue;
 }
 
+// ── Billing auto-grant: paid Pro plan → parasign entitlement ──────────────
+// /*MARK:parasign_billing_autograt*/ Called from the plan-change path when an
+// account moves to a paid plan (pro/licensed/enterprise). Reuses the exact
+// account-level fan-out + persistence of /v2/admin/keys/set-parasign: flips the
+// `parasign` flag on every member key of the account, then persists to users.json.
+// Idempotent and additive - safe to call on every paid update-plan.
+const PARASIGN_PAID_PLANS = new Set(['pro', 'licensed', 'enterprise']);
+function grantParasignOnPaidPlan(accountId) {
+  if (!accountId) return { ok: false, reason: 'no_account' };
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return { ok: false, reason: 'no_keys' };
+  let changed = 0;
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.parasign !== true) { mv.parasign = true; changed++; } }
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) {
+      if ((entry.account_id || entry.key) === accountId) entry.parasign = true;
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_grant_on_paid_plan', { account: String(accountId).slice(0, 12), keys: members.size, changed, persisted: true }))
+    .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+  return { ok: true, keys: members.size, changed };
+}
+
+// -- ParaSign /v1 key issuance -- THE single generator -------------------------
+// Used by BOTH /v2/user/parasign-keys (self-serve) and /v2/admin/keys/mint-parasign
+// (admin), so there is exactly one psk_ format + one storage path (no drift).
+// Mirrors the pgp_ mint in /v2/admin/keys: a CSPRNG token, inserted into the live
+// apiKeys/accounts/accountKeys/kidIndex maps and persisted to users.json, bound to
+// `accountId` and carrying the parasign grant so /v1 auth accepts it. Inherits the
+// account's plan+email so the key clicks straight into the tiers.js/quota.js
+// entitlement layer (quota is keyed by account_id + plan). Returns the FULL key
+// ONCE (caller shows it a single time) plus a masked form for logging/listing.
+function mintParasignKey(accountId, opts = {}) {
+  if (!accountId) throw new Error('accountId required');
+  const acct = accounts.get(accountId);
+  const anchorRec = apiKeys.get(accountId);
+  const plan = opts.plan || (acct && acct.plan) || (anchorRec && anchorRec.plan) || 'community';
+  const email = (acct && acct.email) || (anchorRec && anchorRec.email) || '';
+  const built = keysTable.buildParasignKeyRecord({
+    accountId, plan, email, label: opts.label, test: !!opts.test,
+    randomHex: crypto.randomBytes(32).toString('hex'),
+  });
+  const { key, record, usersEntry } = built;
+  apiKeys.set(key, record);
+  if (!accounts.has(accountId)) accounts.set(accountId, { account_id: accountId, plan, email, primary_api_key: null, label: '' });
+  if (!accountKeys.has(accountId)) accountKeys.set(accountId, new Set());
+  accountKeys.get(accountId).add(key);
+  const kid = keysTable.assignKid(kidIndex, key, log);
+  record.kid = kid;
+  kidIndex.set(kid, key);
+  _mutateUsersJson(ud => {
+    ud.api_keys.push(usersEntry);
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_key_minted', { account: String(accountId).slice(0, 12), kid, mode: opts.test ? 'test' : 'live', plan: record.plan, persisted: true }))
+    .catch(we => log('warn', 'parasign_key_persist_failed', { err: we.message }));
+  return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
     try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
@@ -2043,6 +2052,29 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, relay: SECTOR, version: VERSION, status: 'operational', protocol: 'ghost-pipe-v2', docs: 'https://paramant.app/docs' }));
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
+
+  // ── ParaSign Open Developer-API (/v1) ────────────────────────────────────────
+  // Thin public layer over the internal /v2 envelope machinery. Owns its own
+  // Bearer psk_ auth + parasign-scope gate (independent of the X-Api-Key path).
+  // All relay internals it needs are injected; see lib/parasign-open-api.js.
+  if (path === '/v1' || path.startsWith('/v1/')) {
+    const _proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+    const _host  = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    return parasignOpenApi.route({
+      req, res, method: req.method, path, query, clientIp,
+      authHeader: req.headers['authorization'] || '',
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || (_host ? `${_proto}://${_host}` : ''),
+      apiKeys,
+      envStore: _envStore(),
+      envCreateRateOk,
+      safeHttpsRequest,
+      canonicalJSON: parasign.canonicalJSON,
+      sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
+      relayIdentity,
+      signQuotaGate: async (accountId, plan) => quota.gateSign(redisClient, accountId, tiers.tierLimitNum(plan, 'signs_month'), log),
+      readBody, J, log,
+    });
+  }
 
   // ── GET /health ─────────────────────────────────────────────────────────────
   if (path === '/health') {
@@ -2898,6 +2930,86 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // -- ParaSign /v1 self-serve API keys (user session via X-Internal-Auth) -------
+  // The admin server proxies the logged-in account's request here. GATED on the
+  // ParaSign entitlement: a paid plan (pro/enterprise/licensed) OR an explicit
+  // grant on the account. No entitlement -> 403. Runs the SAME mintParasignKey
+  // generator as the admin route. POST mints (full key ONCE), GET lists masked,
+  // DELETE revokes (after which the /v1 auth rejects the key).
+  if (path === "/v2/user/parasign-keys" && req.method === "POST") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      const user_id = (d.user_id || "").toString();
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+      const memberRecords = [...members].map(k => apiKeys.get(k)).filter(Boolean);
+      const acct = accounts.get(accountId);
+      const plan = (acct && acct.plan) || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || "community";
+      if (!keysTable.accountHasParasignEntitlement(memberRecords, plan)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen recht op de ParaSign-API; upgrade naar een betaald plan of laat een beheerder ParaSign inschakelen." }));
+      }
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
+      log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
+      res.writeHead(201, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+        note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
+    } catch (err) {
+      console.error("[user/parasign-keys POST]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  if (path === "/v2/user/parasign-keys" && req.method === "GET") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const user_id = (query.user_id || "").toString();
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || new Set();
+      const keys = [...members]
+        .map(k => [k, apiKeys.get(k)])
+        .filter(([k, v]) => v && (v.scope === "parasign" || v.product === "parasign" || /^psk_/.test(k)))
+        .map(([k, v]) => ({ kid: v.kid || keysTable.computeKid(k), key_masked: maskKey(k), mode: /^psk_test_/.test(k) ? "test" : "live", plan: v.plan, label: v.label || "", active: v.active !== false, created: v.created || null }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
+    } catch (err) {
+      console.error("[user/parasign-keys GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  if (path === "/v2/user/parasign-keys" && req.method === "DELETE") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const user_id = (d.user_id || "").toString();
+      const target = (d.kid || d.key || "").toString();
+      if (!user_id || !target) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || new Set();
+      let hitKey = null;
+      for (const k of members) { const v = apiKeys.get(k); if (!v) continue; if (k === target || v.kid === target) { hitKey = k; break; } }
+      if (!hitKey) { res.writeHead(404); return res.end(J({ error: "key_not_found" })); }
+      const rec = apiKeys.get(hitKey);
+      if (!(rec.scope === "parasign" || rec.product === "parasign" || /^psk_/.test(hitKey))) { res.writeHead(400); return res.end(J({ error: "not_a_parasign_key" })); }
+      rec.active = false;
+      _mutateUsersJson(ud => {
+        const ue = ud.api_keys.find(k => k.key === hitKey);
+        if (ue) { ue.active = false; ue.revoked_at = new Date().toISOString(); }
+        ud.updated = new Date().toISOString();
+      }).then(() => log("info", "parasign_key_revoked", { account: String(accountId).slice(0, 12), kid: rec.kid || null, persisted: true }))
+        .catch(we => log("warn", "parasign_key_revoke_persist_failed", { err: we.message }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, revoked: rec.kid || maskKey(hitKey) }));
+    } catch (err) {
+      console.error("[user/parasign-keys DELETE]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ── POST /v2/claim/reveal — burn-on-reveal for the welcome-email claim link ──
   // Public: the bearer is the 256-bit claim token, not an API key. Returns the
   // key exactly once, then deletes the token atomically (getDel) so a second
@@ -3073,14 +3185,14 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /ct/feed — public JSON feed for CT log UI (no auth, no keys) ─────────
   if (path === '/ct/feed' && req.method === 'GET') {
-    const last50 = ctLog.slice(-50);
-    const root   = ctLog.length ? ctLog[ctLog.length - 1].tree_hash : '0'.repeat(64);
+    const last50 = ctWindow.recent(50);
+    const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({
       relay_id: relayIdentity ? relayIdentity.pk_hash : null,
       sector:   SECTOR,
       version:  VERSION,
-      tree_size: ctLog.length,
+      tree_size: ctWindow.size,
       root,
       entries: last50.map(e => ({
         i:    e.index,
@@ -3104,15 +3216,15 @@ const server = http.createServer(async (req, res) => {
     // across sector relays. The transparency guarantee does NOT depend on it:
     // tamper-evidence comes from leaf_hash + tree_hash + the Merkle proof
     // (/v2/ct/proof) + the signed tree head, none of which reveal identity.
-    const entries = ctLog.slice(from, from + limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
+    const entries = ctWindow.sliceByIndex(from, limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctLog.length, root: ctLog.length ? ctLog[ctLog.length-1].tree_hash : '0'.repeat(64), entries }));
+    return res.end(J({ ok: true, size: ctWindow.size, root: ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64), entries }));
   }
   const ctpm0 = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
   if (ctpm0 || (ctpq0 !== null && ctpq0 !== undefined)) {
     const idx = parseInt(ctpm0 ? ctpm0[1] : ctpq0);
-    const entry = ctLog[idx];
+    const entry = ctWindow.get(idx);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
@@ -3332,14 +3444,14 @@ const server = http.createServer(async (req, res) => {
   // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
   if (path === '/v2/sth/consistency' && req.method === 'GET') {
     const fromSize = parseInt(query.from);
-    const toSize   = query.to !== undefined ? parseInt(query.to) : ctLog.length;
+    const toSize   = query.to !== undefined ? parseInt(query.to) : ctWindow.windowLength;
     if (isNaN(fromSize) || isNaN(toSize)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Query params required: from=<integer> (and optionally to=<integer>)' }));
     }
-    if (fromSize < 0 || toSize < fromSize || toSize > ctLog.length) {
+    if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ log size (${ctLog.length})` }));
+      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ window size (${ctWindow.windowLength})` }));
     }
     const proof = ctConsistencyProof(fromSize, toSize);
     if (proof === null) { res.writeHead(500); return res.end(J({ error: 'Could not compute proof' })); }
@@ -3764,7 +3876,8 @@ const server = http.createServer(async (req, res) => {
         blob, ts: now, ttl, size: blob.length,
         apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
         ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
-                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null },
+                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null,
+                    ts: ctEntry.ts },
       });
       setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
       ipTimes.push(now);
@@ -4005,6 +4118,7 @@ const server = http.createServer(async (req, res) => {
           tree_size: ctEntry.index + 1,
           audit_path: ctEntry.proof,
           sth:       ctEntry.sth || null,
+          ts:        ctEntry.ts,
         }
       });
       setTimeout(() => {
@@ -4132,10 +4246,11 @@ const server = http.createServer(async (req, res) => {
       };
       const receiptPayload = {
         blob_hash:              outm[1],
+        ts:                     ctData.ts,
         retrieved_at:           Date.now(),
         sector:                 entry.sector || SECTOR,
         relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
-        tree_size_at_retrieval: ctLog.length,
+        tree_size_at_retrieval: ctWindow.size,
         inclusion_proof:        inclusionProof,
         burn_confirmed:         burned,
       };
@@ -4428,7 +4543,7 @@ const server = http.createServer(async (req, res) => {
     const reveal = query.reveal === '1' || query.reveal === 'true';
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
       key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
-      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null
+      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4451,7 +4566,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
       account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
-      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null }));
+      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null }));/*MARK:parasign_reveal*/
   }
 
   // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────
@@ -4546,6 +4661,8 @@ const server = http.createServer(async (req, res) => {
       // Keep the account's plan in step so the per-account cap re-evaluates.
       const _aid = apiKeys.get(key).account_id;
       if (_aid && accounts.has(_aid)) accounts.get(_aid).plan = plan;
+      // Billing auto-grant: a paid Pro plan entitles the account to ParaSign /v1.
+      if (PARASIGN_PAID_PLANS.has(plan)) grantParasignOnPaidPlan(_aid || key); /*MARK:parasign_billing_autograt*/
       _mutateUsersJson(ud => {
         const entry = ud.api_keys.find(k => k.key === key);
         if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
@@ -4553,6 +4670,53 @@ const server = http.createServer(async (req, res) => {
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
       applyKeyLimitEnforcement();
       res.writeHead(200); return res.end(J({ ok: true, key, plan }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/set-parasign - grant/revoke the ParaSign /v1 API ────
+  // Admin override for the `parasign` entitlement, alongside the automatic grant
+  // on payment. Sets the flag on the target key AND every sibling key of its
+  // account (account-level grant), then persists to users.json. ADMIN_TOKEN-gated
+  // by the admin-path guard above; the admin server fans this out to every sector
+  // so the grant is fleet-consistent. Additive: no current relay path gates on it.
+  if (path === '/v2/admin/keys/set-parasign' && req.method === 'POST') {/*MARK:parasign_endpoint*/
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const key = (d.key || '').toString();
+      const enabled = d.enabled === true || d.parasign === true;
+      if (!key) { res.writeHead(400); return res.end(J({ error: 'key required' })); }
+      const kv = apiKeys.get(key);
+      if (!kv) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      const accountId = kv.account_id || key;
+      const members = accountKeys.get(accountId) || new Set([key]);
+      for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.parasign = enabled; }
+      _mutateUsersJson(ud => {
+        for (const entry of ud.api_keys) {
+          if ((entry.account_id || entry.key) === accountId) entry.parasign = enabled;
+        }
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'parasign_grant_via_admin', { account: String(accountId).slice(0, 12), enabled, keys: members.size, persisted: true }))
+        .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, key, account_id: accountId, parasign: enabled, keys_updated: members.size }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/mint-parasign - mint a psk_ ParaSign /v1 key ─────────
+  // Manual admin-setup path. ADMIN_TOKEN-gated (admin-path guard above). Runs the
+  // SAME mintParasignKey generator as the self-serve route, so both paths share
+  // one key format + one storage shape. Binds the key to {account_id} (or the
+  // account of {key}); returns the FULL key ONCE (never re-retrievable in full).
+  if (path === '/v2/admin/keys/mint-parasign' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      let accountId = (d.account_id && String(d.account_id)) || '';
+      if (!accountId && d.key) accountId = acctOf(String(d.key));
+      if (!accountId) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label, plan: d.plan });
+      res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+        note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -5322,9 +5486,9 @@ loadPeerSths();
 // Generate a startup STH if the CT log has entries but no STH was persisted.
 // Covers the case where the STH file was missing or the relay restarted after
 // new CT entries were written without a corresponding STH flush.
-if (ctLog.length > 0 && sthLog.length === 0) {
-  const last = ctLog[ctLog.length - 1];
-  produceSth(ctLog.length, last.tree_hash);
+if (ctWindow.windowLength > 0 && sthLog.length === 0) {
+  const last = ctWindow.last();
+  produceSth(ctWindow.windowLength, last.tree_hash);
 }
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {
