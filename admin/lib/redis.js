@@ -1,5 +1,7 @@
 'use strict';
-const { createClient } = require('redis');
+// `redis` is required lazily inside initRedis() so this module can be imported
+// (e.g. for scanKeys in the unit tests) without the npm package installed —
+// the admin test job runs `node --test` without `npm ci`.
 
 let client = null;
 
@@ -8,6 +10,7 @@ async function initRedis() {
     console.error('[admin/redis] FATAL: REDIS_URL not set');
     process.exit(1);
   }
+  const { createClient } = require('redis');
   client = createClient({
     url: process.env.REDIS_URL,
     socket: {
@@ -32,4 +35,14 @@ function redis() {
   return client;
 }
 
-module.exports = { initRedis, redis };
+// node-redis v5+ laat scanIterator BATCHES (arrays) van keys yielden waar v4
+// losse strings gaf. scanKeys vlakt beide vormen af naar één key per iteratie,
+// zodat call-sites versie-agnostisch blijven.
+async function* scanKeys(c, opts) {
+  for await (const batch of c.scanIterator(opts)) {
+    if (Array.isArray(batch)) { for (const key of batch) yield key; }
+    else yield batch;
+  }
+}
+
+module.exports = { initRedis, redis, scanKeys };
