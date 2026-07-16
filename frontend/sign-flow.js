@@ -228,7 +228,7 @@ async function sendForSignature() {
           party_links: created.envelope.party_links,
           expires_at: created.envelope.expires_at,
         },
-        disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+        disclaimer: 'Advanced electronic signature (AES): post-quantum, zero-knowledge. Not eIDAS-qualified (QES).',
       },
     };
     showDone();
@@ -1534,7 +1534,7 @@ function fillReview() {
     signature: '<base64 of ML-DSA-65 signature over signed_message>',
     multiparty: { envelope_id: '<set on sign>', party_index: 0 },
     signed_at: '<set on sign>',
-    disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+    disclaimer: 'Advanced electronic signature (AES): post-quantum, zero-knowledge. Not eIDAS-qualified (QES).',
   } : {
     version: 'parasign-doc-3',
     recipe_version: 3,
@@ -1550,7 +1550,7 @@ function fillReview() {
     signature: '<base64 of ML-DSA-65 signature over signed_message>',
     multiparty: { envelope_id: '<set on sign>', party_index: 0 },
     signed_at: '<set on sign>',
-    disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+    disclaimer: 'Advanced electronic signature (AES): post-quantum, zero-knowledge. Not eIDAS-qualified (QES).',
   };
   $('ds-proof-json').textContent = JSON.stringify(previewEnv, null, 2);
 
@@ -2155,7 +2155,7 @@ async function doSign() {
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
         signature: sigB64, signed_at: dateStr, multiparty: mp,
-        disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+        disclaimer: 'Advanced electronic signature (AES): post-quantum, zero-knowledge. Not eIDAS-qualified (QES).',
       };
     } else {
       envelope = {
@@ -2165,7 +2165,7 @@ async function doSign() {
         signer_name: state.signer.name,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
         signature: sigB64, signed_at: dateStr, multiparty: mp,
-        disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
+        disclaimer: 'Advanced electronic signature (AES): post-quantum, zero-knowledge. Not eIDAS-qualified (QES).',
       };
     }
 
