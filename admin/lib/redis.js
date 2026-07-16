@@ -32,4 +32,14 @@ function redis() {
   return client;
 }
 
-module.exports = { initRedis, redis };
+// node-redis v5+ laat scanIterator BATCHES (arrays) van keys yielden waar v4
+// losse strings gaf. scanKeys vlakt beide vormen af naar één key per iteratie,
+// zodat call-sites versie-agnostisch blijven.
+async function* scanKeys(c, opts) {
+  for await (const batch of c.scanIterator(opts)) {
+    if (Array.isArray(batch)) { for (const key of batch) yield key; }
+    else yield batch;
+  }
+}
+
+module.exports = { initRedis, redis, scanKeys };
