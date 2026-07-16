@@ -14,6 +14,7 @@ const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
+const { buildRecipientParties } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
@@ -1527,9 +1528,13 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   const creatorPublicKey = (req.body?.creator_public_key || "").toString();
   // Party 0 = the signer (self), bound to their verified session email.
   const parties = [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }];
-  for (const r of recipients) {
-    if (r && r.email) parties.push({ label: (r.label || "").toString().slice(0, 80), email: r.email.toString() });
-  }
+  // Audit 1.1: every envelope is binding_mode:"email", so a co-signer slot with
+  // an empty/invalid email hashes to a value the co-signer can never match ->
+  // a guaranteed 403 dead end. Require a valid email per recipient and refuse
+  // creation (400) instead of minting a doomed invite (was: silently dropped).
+  const built = buildRecipientParties(recipients);
+  if (built.error) return res.status(400).json({ error: built.error });
+  for (const p of built.parties) parties.push(p);
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
