@@ -62,6 +62,51 @@ function hasParaSignScope(rec) {
   return false;
 }
 
+// Constant-time compare of two equal-length hex strings (SHA3-256 fingerprints).
+// false for empty / mismatched-length / non-string inputs.
+function hexEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length === 0 || a.length !== b.length) return false;
+  try { return crypto.timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8')); }
+  catch { return false; }
+}
+
+// ── Receipt authorization ─────────────────────────────────────────────────────
+// The scope gate (psk_ + parasign) only proves the caller may use ParaSign at
+// all -- NOT that they may pull THIS envelope's full .psign with the raw signer
+// signatures. This is the per-envelope owner/participant check. Authorized iff:
+//   (a) OWNER by durable fingerprint -- create() stored SHA3(api_key) as
+//       creator_api_hash; recompute from the presented key and constant-time
+//       compare. Survives restarts (Redis-backed), independent of the ephemeral
+//       meta map. This is the authoritative owner check.
+//   (b) OWNER by account -- a DIFFERENT key on the SAME account that created it.
+//       The durable record only fingerprints the creating key, so this leans on
+//       the ephemeral meta side-record (accountId captured at create); best-
+//       effort convenience layered on top of (a).
+//   (c) PARTICIPANT by invite token -- a signer proves membership with the per-
+//       party invite token from their signing link, via header
+//       X-ParaSign-Invite-Token or ?invite_token=/?t=. Verified constant-time
+//       against every party slot by the store.
+// Anything else -> not authorized (the caller then gets a generic 404, so it
+// cannot tell "not yours" from "does not exist").
+async function authorizeReceipt(deps, id, token, rec, env) {
+  // (a) durable owner fingerprint.
+  if (env && env.creator_api_hash && hexEqual(SHA3(Buffer.from(token)), env.creator_api_hash)) return true;
+  // (b) same-account owner (ephemeral meta).
+  const m = meta.get(id);
+  const acct = rec && rec.account_id;
+  if (m && acct && m.accountId && m.accountId === acct) return true;
+  // (c) participant invite token (header preferred; query fallback).
+  const hdr = (deps.req && deps.req.headers && deps.req.headers['x-parasign-invite-token']) || '';
+  const q = (deps.query && (deps.query.invite_token || deps.query.t)) || '';
+  const inviteTok = (hdr || q || '').toString();
+  if (inviteTok) {
+    try { if ((await deps.envStore.isParticipantToken(id, inviteTok)) >= 0) return true; }
+    catch { /* store hiccup -> deny */ }
+  }
+  return false;
+}
+
 // ── Entitlement hooks (STUBS — wire to billing + admin) ───────────────────────
 // Grant point: call from the billing-success handler once a plan that includes
 // ParaSign is paid. Toggle point: call from an admin route to enable/disable per
@@ -181,7 +226,7 @@ async function route(deps) {
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
     if (!sub && method === 'GET')             return getEnvelope(deps, id);
     if (sub === 'document' && method === 'GET') return getDocument(deps, id);
-    if (sub === 'receipt'  && method === 'GET') return getReceipt(deps, id);
+    if (sub === 'receipt'  && method === 'GET') return getReceipt(deps, id, token, rec);
     if (sub === 'void'     && method === 'POST') return voidEnvelope(deps, id, token);
   }
 
@@ -347,44 +392,81 @@ async function getDocument(deps, id) {
 }
 
 // ── GET /v1/envelopes/:id/receipt ─────────────────────────────────────────────
-// INTERIM: returns a notary-signed manifest over the envelope metadata, not the
-// full per-signer .psign. Building the true .psign needs a store method that
-// exposes raw per-party (signature, pubkey); getRedacted deliberately hides
-// those. Labelled version '1-interim'. Verifiable with the relay notary pubkey.
-async function getReceipt(deps, id) {
+// Returns the FULL multi-signer .psign for an authorized caller: the complete
+// record MET the raw per-party ML-DSA-65 signatures (public_key + signature per
+// party), notary-counter-signed exactly like the single-signer .psign that
+// parasign.buildEnvelope produces (algorithm/document_hash/notary block +
+// notary signature over the canonical JSON minus that signature field). A
+// verifier can therefore (1) recompute each party's sign-message via
+// envelope.signMessageBytes under `sign_recipe` and check every signer
+// signature, and (2) check the notary counter-signature against the relay
+// pubkey -- the same verify logic the direct sign-flow / /v2/verify use.
+//
+// SECURITY: gated on authorizeReceipt() -- the caller must be the envelope OWNER
+// (durable creator_api_hash / same account) or a PARTICIPANT (valid invite
+// token). An authenticated-but-unrelated key gets a generic 404 (no existence
+// leak). getForReceipt exposes the raw signatures; getRedacted is untouched.
+async function getReceipt(deps, id, token, rec) {
   const { res, envStore, canonicalJSON, sigEngine, relayIdentity, J } = deps;
   let env;
-  try { env = await envStore.getRedacted(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
+  try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
+  // Generic 404 for BOTH "unknown" and "not authorized" so a valid key from
+  // another account/envelope cannot distinguish the two. Authorization runs
+  // BEFORE any state-dependent (409 not_ready) branch so state does not leak.
   if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+  let authorized = false;
+  try { authorized = await authorizeReceipt(deps, id, token, rec, env); }
+  catch (_) { authorized = false; }
+  if (!authorized) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+
   if (env.status !== 'complete') return errRes(res, 409, 'not_ready', 'Envelope is not completed yet.', J);
   if (!sigEngine || !relayIdentity) return errRes(res, 503, 'notary_unavailable', 'Notary key not available.', J);
 
-  const manifest = {
+  const psign = {
     type: 'parasign-envelope-receipt',
-    version: '1-interim',
+    version: '2',
     algorithm: 'ML-DSA-65',
     envelope_id: env.id,
     document_hash: env.doc_hash,
     document_hash_algo: 'sha3-256',
+    binding_mode: env.binding_mode,
+    recipe_version: env.recipe_version,
+    // The recipe each party signature was verified under (open -> v4). A verifier
+    // recomputes each party message with envelope.signMessageBytes(...) at this
+    // recipe. Included so the .psign is self-contained.
+    sign_recipe: env.effective_recipe,
     status: 'completed',
     created_at: env.created_at,
     completed_at: env.completed_at,
-    parties: env.parties.map(p => ({ index: p.index, label: p.label, signer_pk_hash: p.signer_pk_hash, signed_at: p.signed_at })),
-    notary: { relay_pk_hash: relayIdentity.pk_hash },
+    expires_at: env.expires_at,
+    parties: env.parties.map(p => ({
+      index: p.index,
+      label: p.label,
+      email_hash: p.email_hash || null,
+      status: p.status,
+      signed_at: p.signed_at,
+      public_key: p.pk_b64 || null,   // raw ML-DSA-65 signer public key (base64)
+      signature: p.sig_b64 || null,   // raw ML-DSA-65 per-party signature (base64)
+      signer_pk_hash: p.signer_pk_hash,
+    })),
+    notary: {
+      relay_pk_hash: relayIdentity.pk_hash,
+      relay_pubkey_url: (deps.publicOrigin || 'https://paramant.app') + '/v2/pubkey',
+    },
   };
   let notarySig;
-  try { notarySig = Buffer.from(sigEngine.sign(Buffer.from(canonicalJSON(manifest), 'utf8'), relayIdentity.sk)).toString('base64'); }
+  try { notarySig = Buffer.from(sigEngine.sign(Buffer.from(canonicalJSON(psign), 'utf8'), relayIdentity.sk)).toString('base64'); }
   catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
-  manifest.notary_signature = notarySig;
+  psign.notary_signature = notarySig;
 
   const m = meta.get(id) || {};
-  const base = (m.original_filename || 'document').replace(/\.pdf$/i, '').replace(/"/g, '');
+  const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '').replace(/"/g, '');
   res.writeHead(200, {
     'Content-Type': 'application/json',
     'Content-Disposition': `attachment; filename="${base}.psign"`,
-    'X-ParaSign-Receipt-Kind': 'interim-manifest',
+    'X-ParaSign-Receipt-Kind': 'full-psign',
   });
-  return res.end(J(manifest));
+  return res.end(J(psign));
 }
 
 // ── POST /v1/envelopes/:id/void ───────────────────────────────────────────────
@@ -405,5 +487,6 @@ async function voidEnvelope(deps, id, apiKey) {
 module.exports = {
   route, emitEvent, hasParaSignScope, externalStatus,
   grantParaSignScope, setParaSignEnabled,
+  authorizeReceipt, hexEqual,   // exposed for tests
   _blobs: blobs, _meta: meta,   // exposed for tests / diagnostics
 };
