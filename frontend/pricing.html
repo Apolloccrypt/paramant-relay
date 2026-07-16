@@ -4,16 +4,16 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing — PARAMANT</title>
-<meta name="description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
+<title>Pricing · PARAMANT</title>
+<meta name="description" content="PARAMANT pricing. Two products: ParaSend encrypted transfer (RAM-only, burn-on-read) and ParaSign post-quantum signing (ML-DSA-65, SES + AES). Free tiers forever; Pro and Business for higher limits.">
 <meta property="og:title" content="Pricing · PARAMANT">
-<meta property="og:description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
+<meta property="og:description" content="PARAMANT pricing. Two products: ParaSend encrypted transfer (RAM-only, burn-on-read) and ParaSign post-quantum signing (ML-DSA-65, SES + AES). Free tiers forever; Pro and Business for higher limits.">
 <meta property="og:url" content="https://paramant.app/pricing">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Pricing · PARAMANT">
-<meta name="twitter:description" content="PARAMANT pricing. Free forever: AES-256-GCM, 5 MB, RAM-only. Pro coming soon. Enterprise: dedicated relay, ML-KEM-768, 7-day TTL, SLA.">
+<meta name="twitter:description" content="PARAMANT pricing. Two products: ParaSend encrypted transfer (RAM-only, burn-on-read) and ParaSign post-quantum signing (ML-DSA-65, SES + AES). Free tiers forever; Pro and Business for higher limits.">
 <link rel="canonical" href="https://paramant.app/pricing">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=13">
@@ -283,10 +283,10 @@
     <div class="sec-head" style="text-align:left">
       <span class="num">00</span>
       <h2>Pricing</h2>
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Three tiers</span>
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Two products</span>
     </div>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.75;margin-bottom:var(--space-5)">
-      Send files for free with a Paramant account. Scale when you need audit trails, team access, or a dedicated relay.
+      Two products on one post-quantum core. <strong>ParaSend</strong> for encrypted file transfer and <strong>ParaSign</strong> for document signing. Both start free with a Paramant account; scale when you need higher limits, API access, or a dedicated relay.
     </p>
     <div style="text-align:left;max-width:760px;margin:0 auto var(--space-6);padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
@@ -299,9 +299,13 @@
   </div>
 </section>
 
-<!-- TIER CARDS -->
+<!-- TIER CARDS: PARASEND -->
 <section style="padding:0 0 var(--space-9)">
   <div class="container">
+    <div style="margin-bottom:var(--space-6)">
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
+      <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Encrypted transfer</h3>
+    </div>
     <div class="tier-grid">
 
       <div class="tier-card">
@@ -336,7 +340,7 @@
           <li class="dim">No IP rate limit</li>
         </ul>
         <a href="#" id="upgrade-pro-monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Upgrade to Pro &rarr;</a>
-        <a href="#" id="upgrade-pro-yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Yearly — €89/yr (save €19) &rarr;</a>
+        <a href="#" id="upgrade-pro-yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Yearly · €89/yr (save €19) &rarr;</a>
         <p id="pro-login-note" style="font-size:11px;color:var(--ink-dim);text-align:center;margin-top:8px;display:none">
           <a href="/auth/login?return=/pricing" style="color:var(--cobalt)">Sign in</a> to upgrade
         </p>
@@ -363,6 +367,73 @@
         <a href="mailto:privacy@paramant.app?subject=Enterprise" class="btn btn-secondary" style="display:block;text-align:center">Contact &rarr;</a>
       </div>
 
+    </div>
+  </div>
+</section>
+
+<!-- TIER CARDS: PARASIGN -->
+<section style="padding:0 0 var(--space-9)">
+  <div class="container">
+    <div style="margin-bottom:var(--space-6)">
+      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
+      <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSign · Post-quantum signing</h3>
+      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
+        Document signing on the same post-quantum core, priced separately from ParaSend. New: a <strong>developer API</strong> (from Pro) with its own <a href="/docs#parasign" style="color:var(--cobalt)">documentation</a> and webhooks, so you can plug signing straight into your own apps and quotes.
+      </p>
+    </div>
+    <div class="tier-grid">
+
+      <div class="tier-card">
+        <div class="tier-name">Free</div>
+        <div class="tier-price">&euro;0</div>
+        <div class="tier-price-note">Forever &middot; no card required</div>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For occasional post-quantum signing.</p>
+        <ul class="tier-features">
+          <li>2 signatures per month</li>
+          <li>SES (simple electronic signature)</li>
+          <li>Client-side encryption</li>
+          <li>ML-DSA-65 (FIPS 204)</li>
+          <li>Public CT-log verification</li>
+        </ul>
+        <a href="/dashboard" class="btn btn-primary" style="display:block;text-align:center">Open your dashboard &rarr;</a>
+      </div>
+
+      <div class="tier-card featured">
+        <div class="tier-name">Pro</div>
+        <div class="tier-price">&euro;49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
+        <div class="tier-price-note">or &euro;499/yr &middot; excl. btw</div>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For professionals who sign regularly.</p>
+        <ul class="tier-features">
+          <li>~100 signatures per month</li>
+          <li>SES + AES (advanced e-signature)</li>
+          <li>API access &amp; docs</li>
+          <li>Webhooks</li>
+          <li>Send history</li>
+          <li>Email support</li>
+        </ul>
+        <a href="/signup" class="btn btn-primary" style="display:block;text-align:center">Get ParaSign Pro &rarr;</a>
+      </div>
+
+      <div class="tier-card">
+        <div class="tier-name">Business</div>
+        <div class="tier-price">&euro;299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
+        <div class="tier-price-note">excl. btw</div>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For teams with volume and compliance needs.</p>
+        <ul class="tier-features">
+          <li>Everything in Pro</li>
+          <li>~1,000 signatures per month</li>
+          <li>SSO</li>
+          <li>Audit export</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="mailto:privacy@paramant.app?subject=ParaSign+Business" class="btn btn-secondary" style="display:block;text-align:center">Contact &rarr;</a>
+      </div>
+
+    </div>
+    <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
+      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
+        <strong>Enterprise from &euro;1,499/mo</strong> · unlimited signatures, dedicated relay, SLA. QES coming via an EU QTSP partner. <a href="mailto:privacy@paramant.app?subject=ParaSign+Enterprise" style="color:var(--cobalt)">Contact us</a>.
+      </p>
     </div>
   </div>
 </section>
@@ -430,7 +501,12 @@
 
     <div class="faq-item">
       <p class="faq-q">Is there a free trial for Pro?</p>
-      <div class="faq-a">Pro is not yet launched. You can join the waitlist at <a href="mailto:privacy@paramant.app?subject=Pro+waitlist">privacy@paramant.app</a>. In the meantime, <a href="/signup">create a free account</a> — trial plan includes relay access, no credit card required.</div>
+      <div class="faq-a">Pro is not yet launched. You can join the waitlist at <a href="mailto:privacy@paramant.app?subject=Pro+waitlist">privacy@paramant.app</a>. In the meantime, <a href="/signup">create a free account</a> , trial plan includes relay access, no credit card required.</div>
+    </div>
+
+    <div class="faq-item">
+      <p class="faq-q">How does ParaSign pricing work?</p>
+      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Free covers 2 signatures a month with SES; Pro (&euro;49/mo or &euro;499/yr) raises this to ~100 with SES + AES, API access, webhooks and email support; Business (&euro;299/mo) adds SSO, audit export and ~1,000 signatures. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. Signatures are advanced (AES), not qualified (QES). QES is coming via an EU QTSP partner.</div>
     </div>
 
     <div class="faq-item">
