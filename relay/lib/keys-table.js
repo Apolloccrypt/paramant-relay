@@ -13,7 +13,19 @@ const crypto = require('crypto');
 // Scopes are reserved now (every key is "full"); the relay does not yet gate on
 // them. Kept as an allow-list so the enum stays stable for a non-breaking
 // future migration to composite grants.
-const VALID_SCOPES = new Set(['full', 'send-only', 'sign-only', 'read-only']);
+const VALID_SCOPES = new Set(['full', 'send-only', 'sign-only', 'read-only', 'parasign']);
+
+// ParaSign Open-API (/v1) entitlement check. A key grants the parasign scope
+// when its record says so in any of three accepted shapes, so this survives the
+// single-string scope enum above without a schema migration:
+//   rec.scope === 'parasign'  |  rec.parasign === true  |  rec.scopes[] has it.
+function hasParaSignScope(rec) {
+  if (!rec) return false;
+  if (rec.scope === 'parasign') return true;
+  if (rec.parasign === true) return true;
+  if (Array.isArray(rec.scopes) && rec.scopes.includes('parasign')) return true;
+  return false;
+}
 
 // Non-secret, stable key identifier for URLs/listings (never the raw pgp_ key).
 // 48 bits of SHA3-free SHA-256 prefix: collision-safe well past 10M keys.
@@ -177,4 +189,4 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
   return { previous, current: key };
 }
 
-module.exports = { VALID_SCOPES, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
+module.exports = { VALID_SCOPES, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };

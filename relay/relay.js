@@ -86,6 +86,7 @@ const wireFormat = require('./crypto/wire-format');
 const cryptoErrors = require('./crypto/errors');
 const parasign = require('./parasign');
 const envelopeMod = require('./envelope');
+const parasignOpenApi = require('./lib/parasign-open-api'); // ParaSign Open Developer-API (/v1)
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -159,7 +160,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
@@ -167,7 +168,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim','/v1'],
   full:       null,
 };
 
@@ -2043,6 +2044,28 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, relay: SECTOR, version: VERSION, status: 'operational', protocol: 'ghost-pipe-v2', docs: 'https://paramant.app/docs' }));
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
+
+  // ── ParaSign Open Developer-API (/v1) ────────────────────────────────────────
+  // Thin public layer over the internal /v2 envelope machinery. Owns its own
+  // Bearer psk_ auth + parasign-scope gate (independent of the X-Api-Key path).
+  // All relay internals it needs are injected; see lib/parasign-open-api.js.
+  if (path === '/v1' || path.startsWith('/v1/')) {
+    const _proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+    const _host  = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    return parasignOpenApi.route({
+      req, res, method: req.method, path, query, clientIp,
+      authHeader: req.headers['authorization'] || '',
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || (_host ? `${_proto}://${_host}` : ''),
+      apiKeys,
+      envStore: _envStore(),
+      envCreateRateOk,
+      safeHttpsRequest,
+      canonicalJSON: parasign.canonicalJSON,
+      sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
+      relayIdentity,
+      readBody, J, log,
+    });
+  }
 
   // ── GET /health ─────────────────────────────────────────────────────────────
   if (path === '/health') {

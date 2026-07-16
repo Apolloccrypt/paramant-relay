@@ -301,6 +301,7 @@ class EnvelopeStore {
       created_at: h.created_at,
       expires_at: h.expires_at,
       completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
       party_count: partyCount,
       signed_count: parseInt(h.signed_count, 10) || 0,
       parties,
@@ -366,6 +367,23 @@ class EnvelopeStore {
       try { this.ctAppend('envelope_view', id, { party_index: partyIndex }); } catch {}
     }
     return true;
+  }
+
+  // Void an envelope (ParaSign Open-API /v1). Initiator action: flips a still-open
+  // envelope to status 'void'. A 'complete' envelope is immutable and cannot be
+  // voided. Idempotent: voiding an already-void envelope returns the prior time.
+  // (New /v1 transition; the base state machine only had 'sent' -> 'complete'.)
+  async voidEnvelope(id, reason) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const key = 'env:' + id;
+    const h = await this.redis.hGetAll(key);
+    if (!h || !h.doc_hash) return { ok: false, code: 'not_found' };
+    if (h.status === 'complete') return { ok: false, code: 'already_complete' };
+    if (h.status === 'void') return { ok: true, code: 'idem', status: 'void', voided_at: h.voided_at || null };
+    const at = new Date().toISOString();
+    await this.redis.hSet(key, { status: 'void', voided_at: at, void_reason: (reason || '').toString().slice(0, 200) });
+    try { this.ctAppend('envelope_void', id, { reason: (reason || '').toString().slice(0, 80) }); } catch {}
+    return { ok: true, code: 'void', status: 'void', voided_at: at };
   }
 
   // Sign a party slot. Idempotent: re-submitting the same (sig, pubkey)
