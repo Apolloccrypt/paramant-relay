@@ -155,7 +155,7 @@ try {
 const ALLOWED = {
   ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
-               '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
+               '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
@@ -163,7 +163,7 @@ const ALLOWED = {
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/claim','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
-               '/v2/sender-pubkey','/v2/ack','/v2/delivery','/v2/monitor',
+               '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
@@ -3154,7 +3154,7 @@ const server = http.createServer(async (req, res) => {
               <tr><td style="color:#555;padding:4px 0">Processor</td><td style="color:#ededed">PARAMANT — Hetzner, Germany</td></tr>
             </table>
           </div>
-          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/verwerkersovereenkomst" style="color:#888">paramant.app/verwerkersovereenkomst</a>. Keep this email and the reference number for your records.</p>
+          <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
           <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
         </div>`;
         const emailBody = JSON.stringify({
@@ -3180,8 +3180,12 @@ const server = http.createServer(async (req, res) => {
   // ── GET /metrics — Prometheus metrics (voor auth gate, ADMIN_TOKEN vereist) ──
   if (path === '/metrics') {
     const adminToken = process.env.ADMIN_TOKEN || '';
+    if (!adminToken) {
+      // Fail closed: without an ADMIN_TOKEN configured, metrics must not be public.
+      res.writeHead(503, { 'Content-Type': 'text/plain' }); return res.end('Metrics disabled: ADMIN_TOKEN not configured');
+    }
     const reqToken = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-    if (adminToken && !safeEqual(reqToken, adminToken)) {
+    if (!safeEqual(reqToken, adminToken)) {
       res.writeHead(401, { 'Content-Type': 'text/plain' }); return res.end('Unauthorized');
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
