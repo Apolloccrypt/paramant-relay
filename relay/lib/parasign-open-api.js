@@ -230,6 +230,26 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   const docHash = SHA3(pdf);
   const bindingMode = (d.binding_mode === 'open') ? 'open' : 'email';
   const ttlDays = Number.isFinite(d.ttl_days) ? d.ttl_days : undefined;
+
+  // 2b) Entitlement metering. Count this create against the account's monthly
+  //     ParaSign signing quota for its plan (tiers.js signs_month). This is what
+  //     ties a psk_ key to the paid entitlement layer: over the plan cap -> 402
+  //     monthly_sign_quota_reached, no envelope created, nothing else counted.
+  //     Injected (deps.signQuotaGate) so this module owns no redis; it fails OPEN
+  //     on missing plan/redis so a paying user is never blocked by infra.
+  if (typeof deps.signQuotaGate === 'function') {
+    const meteredAccount = (rec && rec.account_id) || apiKey;
+    let g;
+    try { g = await deps.signQuotaGate(meteredAccount, rec && rec.plan); }
+    catch (_e) { g = { allowed: true }; }
+    if (g && g.allowed === false && g.over_limit) {
+      return jsonRes(res, 402, {
+        error: 'monthly_sign_quota_reached',
+        message: 'Monthly ParaSign signing quota reached for this plan. Upgrade to continue. / Maandelijkse ParaSign-ondertekenlimiet voor dit plan bereikt; upgrade om door te gaan.',
+      }, J, { 'Retry-After': '86400' });
+    }
+  }
+
   let out;
   try {
     out = await envStore.create({

@@ -1700,6 +1700,41 @@ function grantParasignOnPaidPlan(accountId) {
   return { ok: true, keys: members.size, changed };
 }
 
+// -- ParaSign /v1 key issuance -- THE single generator -------------------------
+// Used by BOTH /v2/user/parasign-keys (self-serve) and /v2/admin/keys/mint-parasign
+// (admin), so there is exactly one psk_ format + one storage path (no drift).
+// Mirrors the pgp_ mint in /v2/admin/keys: a CSPRNG token, inserted into the live
+// apiKeys/accounts/accountKeys/kidIndex maps and persisted to users.json, bound to
+// `accountId` and carrying the parasign grant so /v1 auth accepts it. Inherits the
+// account's plan+email so the key clicks straight into the tiers.js/quota.js
+// entitlement layer (quota is keyed by account_id + plan). Returns the FULL key
+// ONCE (caller shows it a single time) plus a masked form for logging/listing.
+function mintParasignKey(accountId, opts = {}) {
+  if (!accountId) throw new Error('accountId required');
+  const acct = accounts.get(accountId);
+  const anchorRec = apiKeys.get(accountId);
+  const plan = opts.plan || (acct && acct.plan) || (anchorRec && anchorRec.plan) || 'community';
+  const email = (acct && acct.email) || (anchorRec && anchorRec.email) || '';
+  const built = keysTable.buildParasignKeyRecord({
+    accountId, plan, email, label: opts.label, test: !!opts.test,
+    randomHex: crypto.randomBytes(32).toString('hex'),
+  });
+  const { key, record, usersEntry } = built;
+  apiKeys.set(key, record);
+  if (!accounts.has(accountId)) accounts.set(accountId, { account_id: accountId, plan, email, primary_api_key: null, label: '' });
+  if (!accountKeys.has(accountId)) accountKeys.set(accountId, new Set());
+  accountKeys.get(accountId).add(key);
+  const kid = keysTable.assignKid(kidIndex, key, log);
+  record.kid = kid;
+  kidIndex.set(kid, key);
+  _mutateUsersJson(ud => {
+    ud.api_keys.push(usersEntry);
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_key_minted', { account: String(accountId).slice(0, 12), kid, mode: opts.test ? 'test' : 'live', plan: record.plan, persisted: true }))
+    .catch(we => log('warn', 'parasign_key_persist_failed', { err: we.message }));
+  return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
     try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
@@ -2086,6 +2121,7 @@ const server = http.createServer(async (req, res) => {
       canonicalJSON: parasign.canonicalJSON,
       sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
       relayIdentity,
+      signQuotaGate: async (accountId, plan) => quota.gateSign(redisClient, accountId, tiers.tierLimitNum(plan, 'signs_month'), log),
       readBody, J, log,
     });
   }
@@ -2940,6 +2976,86 @@ const server = http.createServer(async (req, res) => {
       return res.end(J({ ok: true, remaining_active: result.remaining_active }));
     } catch (err) {
       console.error("[user/webauthn/credential DELETE]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  // -- ParaSign /v1 self-serve API keys (user session via X-Internal-Auth) -------
+  // The admin server proxies the logged-in account's request here. GATED on the
+  // ParaSign entitlement: a paid plan (pro/enterprise/licensed) OR an explicit
+  // grant on the account. No entitlement -> 403. Runs the SAME mintParasignKey
+  // generator as the admin route. POST mints (full key ONCE), GET lists masked,
+  // DELETE revokes (after which the /v1 auth rejects the key).
+  if (path === "/v2/user/parasign-keys" && req.method === "POST") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString());
+      const user_id = (d.user_id || "").toString();
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+      const memberRecords = [...members].map(k => apiKeys.get(k)).filter(Boolean);
+      const acct = accounts.get(accountId);
+      const plan = (acct && acct.plan) || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || "community";
+      if (!keysTable.accountHasParasignEntitlement(memberRecords, plan)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen recht op de ParaSign-API; upgrade naar een betaald plan of laat een beheerder ParaSign inschakelen." }));
+      }
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
+      log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
+      res.writeHead(201, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+        note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
+    } catch (err) {
+      console.error("[user/parasign-keys POST]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  if (path === "/v2/user/parasign-keys" && req.method === "GET") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const user_id = (query.user_id || "").toString();
+      if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || new Set();
+      const keys = [...members]
+        .map(k => [k, apiKeys.get(k)])
+        .filter(([k, v]) => v && (v.scope === "parasign" || v.product === "parasign" || /^psk_/.test(k)))
+        .map(([k, v]) => ({ kid: v.kid || keysTable.computeKid(k), key_masked: maskKey(k), mode: /^psk_test_/.test(k) ? "test" : "live", plan: v.plan, label: v.label || "", active: v.active !== false, created: v.created || null }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
+    } catch (err) {
+      console.error("[user/parasign-keys GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
+  if (path === "/v2/user/parasign-keys" && req.method === "DELETE") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const user_id = (d.user_id || "").toString();
+      const target = (d.kid || d.key || "").toString();
+      if (!user_id || !target) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      const accountId = acctOf(user_id);
+      const members = accountKeys.get(accountId) || new Set();
+      let hitKey = null;
+      for (const k of members) { const v = apiKeys.get(k); if (!v) continue; if (k === target || v.kid === target) { hitKey = k; break; } }
+      if (!hitKey) { res.writeHead(404); return res.end(J({ error: "key_not_found" })); }
+      const rec = apiKeys.get(hitKey);
+      if (!(rec.scope === "parasign" || rec.product === "parasign" || /^psk_/.test(hitKey))) { res.writeHead(400); return res.end(J({ error: "not_a_parasign_key" })); }
+      rec.active = false;
+      _mutateUsersJson(ud => {
+        const ue = ud.api_keys.find(k => k.key === hitKey);
+        if (ue) { ue.active = false; ue.revoked_at = new Date().toISOString(); }
+        ud.updated = new Date().toISOString();
+      }).then(() => log("info", "parasign_key_revoked", { account: String(accountId).slice(0, 12), kid: rec.kid || null, persisted: true }))
+        .catch(we => log("warn", "parasign_key_revoke_persist_failed", { err: we.message }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(J({ ok: true, revoked: rec.kid || maskKey(hitKey) }));
+    } catch (err) {
+      console.error("[user/parasign-keys DELETE]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
   }
@@ -4630,6 +4746,24 @@ const server = http.createServer(async (req, res) => {
         .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key, account_id: accountId, parasign: enabled, keys_updated: members.size }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/mint-parasign — mint a psk_ ParaSign /v1 key ─────────
+  // Manual Nick-setup path. ADMIN_TOKEN-gated (admin-path guard above). Runs the
+  // SAME mintParasignKey generator as the self-serve route, so both paths share
+  // one key format + one storage shape. Binds the key to {account_id} (or the
+  // account of {key}); returns the FULL key ONCE (never re-retrievable in full).
+  if (path === '/v2/admin/keys/mint-parasign' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      let accountId = (d.account_id && String(d.account_id)) || '';
+      if (!accountId && d.key) accountId = acctOf(String(d.key));
+      if (!accountId) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label, plan: d.plan });
+      res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
+        note: 'Store this key now — it is shown once and cannot be retrieved in full again.' }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
