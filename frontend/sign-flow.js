@@ -30,6 +30,7 @@ const MAX_PREVIEW_PAGES = 30;
 let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,task}], zoom }
 let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
 let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indicator
+let _placeCurrentPage = 0;    // most-visible page index (for where a new text/date lands)
 let _drag = null;             // active stamp drag-reposition gesture
 let _reviewZoom = 1;          // zoom factor of the review document preview
 
@@ -39,6 +40,11 @@ const state = {
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
+  extras: [],            // PDF mode only. Types (all baked as pdf-lib vectors):
+                         //   text/date : { id, type, pageIndex, x, y, size, text }        x,y = box bottom-left (points)
+                         //   highlight : { id, type, pageIndex, x, y, w, h }              translucent rect over content
+                         //   note      : { id, type, pageIndex, x, yTop, w, size, text }  anchored at its TOP edge (height follows the wrapped text)
+                         //   draw      : { id, type, pageIndex, points:[{x,y}], width }   one freehand pen stroke
   signer: {
     name: '',
     fingerprint: '',       // public passkey-key fingerprint, resolved before sign (display only)
@@ -105,6 +111,13 @@ function formatSize(n) {
 }
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Supersampling factor for canvas rendering: the screen's devicePixelRatio,
+// capped at 3 so a 4K/retina display gets crisp output without exploding the
+// backing-store memory on very large PDF pages.
+function hiDpiScale() {
+  return Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
 }
 
 // CSP on this site allows img-src 'self' data: (no blob:), so previews for
@@ -255,6 +268,7 @@ async function onDocChosen(file) {
   state.doc = { bytes, name: file.name, size: file.size };
   state.signer.docImageDataUrl = null;
   state.imageType = null;
+  state.extras = [];        // fresh document: drop any text/date objects from a prior file
 
   const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
   const mimeGuess = guessMimeFromMagic(bytes);
@@ -305,6 +319,7 @@ function loadImageElement(bytes, mime) {
 async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();                                  // single image: no page-nav
+  { const et = $('ds-edit-tools'); if (et) et.hidden = true; }   // text/date tools are PDF-only
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -344,6 +359,7 @@ async function renderPdfForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();
   { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
+  { const et = $('ds-edit-tools'); if (et) et.hidden = false; }   // text/date tools: PDF only
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
@@ -361,8 +377,13 @@ async function renderPdfForPlacement() {
     wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
     wrap.appendChild(canvas);
+    wrap.appendChild(buildPageBar(i - 1));
     container.appendChild(wrap);
     wrap.addEventListener('click', onPlaceClick);
+    wrap.addEventListener('pointerdown', onPenDown);
+    wrap.addEventListener('pointermove', onPenMove);
+    wrap.addEventListener('pointerup', onPenUp);
+    wrap.addEventListener('pointercancel', onPenUp);
     pages.push({ page, baseViewport, wrap, canvas, task: null });
   }
   placeState = { pdf, pages, zoom: 1 };
@@ -407,11 +428,16 @@ async function applyPlaceZoom() {
     return;
   }
   const token = ++placeRenderToken;
+  // Render at devicePixelRatio so the backing store has real pixels behind every
+  // CSS pixel. The canvas is shown at the CSS width (wrap width + canvas{width:100%}),
+  // but drawn at cssWidth*dpr, so it stays razor sharp on HiDPI/retina screens.
+  const dpr = hiDpiScale();
   for (const p of placeState.pages) {
-    const scale = fitScaleFor(p.baseViewport) * z;
-    const viewport = p.page.getViewport({ scale });
-    p.wrap.style.width = Math.floor(viewport.width) + 'px';
-    p.canvas.width = Math.floor(viewport.width);
+    const cssScale = fitScaleFor(p.baseViewport) * z;
+    const cssW = Math.floor(p.baseViewport.width * cssScale);
+    const viewport = p.page.getViewport({ scale: cssScale * dpr });
+    p.wrap.style.width = cssW + 'px';                 // CSS size drives layout + coords
+    p.canvas.width = Math.floor(viewport.width);      // backing store = cssW * dpr
     p.canvas.height = Math.floor(viewport.height);
     if (p.task) { try { p.task.cancel(); } catch (e) {} }
     p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport });
@@ -420,6 +446,7 @@ async function applyPlaceZoom() {
     if (token !== placeRenderToken) return;   // a newer zoom superseded this pass
   }
   reflowStampMarker();
+  reflowExtras();                             // text/date objects follow the new scale too
 }
 
 // Re-derive the marker's pixel box from the PDF-point state.stamp at the current
@@ -439,6 +466,528 @@ function reflowStampMarker() {
     ? state.stamp.y / ratio                                   // image: top-left origin
     : (wrap._pdfPage.height - state.stamp.y - state.stamp.h) / ratio;  // pdf: bottom-left flip
   renderStampMarker(wrap, left, top, w, h);
+}
+
+// ====================================================================
+// Edit layer: free text + date annotations (PDF mode). Additive - the seal
+// (state.stamp) and the whole signing/envelope path are untouched. Each extra
+// is baked as pdf-lib vector text, so the output stays sharp and selectable.
+// ====================================================================
+
+const TEXT_LINE_H = 1.35;            // box height = font size * this
+let _extraSeq = 0;
+
+// Height of a text box in PDF points for a given font size.
+function extraBoxH(size) { return size * TEXT_LINE_H; }
+
+// The page the user is currently looking at (updated by the page-nav observer),
+// so a new text/date object lands on the page in view, not always page 1.
+function addExtra(type) {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const size = Math.round(Math.max(12, Math.min(pageW, pageH) * 0.035));   // sane default per page size
+  const h = extraBoxH(size);
+  const text = type === 'date' ? new Date().toISOString().slice(0, 10) : 'Text';
+  const extra = {
+    id: ++_extraSeq, type, pageIndex: pageIdx,
+    x: Math.round(pageW * 0.12),                 // a little in from the left
+    y: Math.round(pageH * 0.82 - h),             // near the top of the page
+    size, text,
+  };
+  state.extras.push(extra);
+  const el = renderExtraMarker(extra);
+  // Continue stays gated on the SEAL (the signature) being placed - extras are
+  // optional additions, not a substitute for signing.
+  if (el && type === 'text') beginEditExtra(el, extra);   // let the user type straight away
+}
+
+// A highlight starts as a translucent bar near the top of the visible page;
+// drag it over the passage, corner-resize to fit.
+function addHighlight() {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const w = Math.round(pageW * 0.36);
+  const h = Math.round(Math.max(14, pageH * 0.028));
+  const extra = {
+    id: ++_extraSeq, type: 'highlight', pageIndex: pageIdx,
+    x: Math.round(pageW * 0.32), y: Math.round(pageH * 0.72), w, h,
+  };
+  state.extras.push(extra);
+  renderExtraMarker(extra);
+}
+
+// A sticky note: filled box, text wraps to the box width, anchored at its top
+// edge so the box can grow downward while you type without drifting.
+function addNote() {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const size = Math.round(Math.max(9, Math.min(pageW, pageH) * 0.022));
+  const extra = {
+    id: ++_extraSeq, type: 'note', pageIndex: pageIdx,
+    x: Math.round(pageW * 0.58), yTop: Math.round(pageH * 0.85),
+    w: Math.round(pageW * 0.28), size, text: 'Note',
+  };
+  state.extras.push(extra);
+  const el = renderExtraMarker(extra);
+  if (el) beginEditExtra(el, extra);
+}
+
+function extraWrapFor(pageIndex) {
+  if (!placeState || placeState.isImage) return null;
+  const p = placeState.pages.find(pp => pp.wrap._pdfPage.index === pageIndex);
+  return p && p.wrap;
+}
+
+// Build the on-page marker for one extra from its PDF-point geometry at the
+// current display scale. Never mutates the extra; reflowExtras re-derives on zoom.
+function renderExtraMarker(extra) {
+  if (extra.type === 'draw') return renderDrawMarker(extra);
+  const wrap = extraWrapFor(extra.pageIndex);
+  if (!wrap) return null;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;      // pdf points per CSS px
+  const pageH = wrap._pdfPage.height;
+  const el = document.createElement('div');
+  el.className = 'ds-anno';
+  el.dataset.type = extra.type;
+  el.dataset.id = String(extra.id);
+  if (extra.type === 'highlight') {
+    el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.y - extra.h) / ratio}px;width:${extra.w / ratio}px;height:${extra.h / ratio}px`;
+  } else if (extra.type === 'note') {
+    el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.yTop) / ratio}px;width:${extra.w / ratio}px;font-size:${extra.size / ratio}px`;
+    el.textContent = extra.text;
+  } else {
+    const h = extraBoxH(extra.size);
+    el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.y - h) / ratio}px;height:${h / ratio}px;font-size:${extra.size / ratio}px`;
+    el.textContent = extra.text;
+  }
+
+  const del = document.createElement('button');
+  del.className = 'ds-anno-del'; del.type = 'button'; del.textContent = '×';
+  del.title = 'Remove'; del.setAttribute('aria-label', 'Remove this object');
+  del.addEventListener('pointerdown', e => { e.stopPropagation(); });
+  del.addEventListener('click', e => { e.stopPropagation(); removeExtra(extra.id); });
+  el.appendChild(del);
+
+  const grip = document.createElement('div');
+  grip.className = 'ds-anno-resize';
+  el.appendChild(grip);
+
+  wrap.appendChild(el);
+  wireExtraMarker(el, extra, grip);
+  return el;
+}
+
+function removeExtra(id) {
+  state.extras = state.extras.filter(e => e.id !== id);
+  document.querySelectorAll(`.ds-anno[data-id="${id}"]`).forEach(el => el.remove());
+}
+
+// Drag to move, corner to resize (scales font size), double-click to edit text.
+function wireExtraMarker(el, extra, grip) {
+  let drag = null, rez = null;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (el.classList.contains('editing')) return;         // editing: let the caret work
+    if (e.target === grip) return;                        // resize handled below
+    const wrap = el.parentElement;
+    const rect = wrap.querySelector('canvas').getBoundingClientRect();
+    drag = { rect, grabX: e.clientX - (rect.left + parseFloat(el.style.left)), grabY: e.clientY - (rect.top + parseFloat(el.style.top)) };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.style.cursor = 'grabbing';
+    e.preventDefault(); e.stopPropagation();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const left = Math.max(0, Math.min(drag.rect.width - el.offsetWidth, e.clientX - drag.rect.left - drag.grabX));
+    const top = Math.max(0, Math.min(drag.rect.height - el.offsetHeight, e.clientY - drag.rect.top - drag.grabY));
+    el.style.left = left + 'px'; el.style.top = top + 'px';
+  });
+  const dragUp = (e) => {
+    if (!drag) return; drag = null;
+    try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    el.style.cursor = 'grab';
+    commitExtraFromMarker(el, extra);
+  };
+  el.addEventListener('pointerup', dragUp);
+  el.addEventListener('pointercancel', dragUp);
+
+  if (grip) {
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    rez = { x0: e.clientX, y0: e.clientY, w0: el.offsetWidth, h0: el.offsetHeight, size0: extra.size };
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!rez) return;
+    // What the corner grip means depends on the type: a highlight resizes its
+    // box in both dimensions, a note resizes its width (text re-wraps), and
+    // text/date scale their font size.
+    if (extra.type === 'highlight') {
+      el.style.width  = Math.max(12, rez.w0 + (e.clientX - rez.x0)) + 'px';
+      el.style.height = Math.max(8,  rez.h0 + (e.clientY - rez.y0)) + 'px';
+      return;
+    }
+    if (extra.type === 'note') {
+      el.style.width = Math.max(60, rez.w0 + (e.clientX - rez.x0)) + 'px';
+      return;
+    }
+    const factor = Math.max(0.35, (rez.h0 + (e.clientY - rez.y0)) / rez.h0);
+    const wrap = el.parentElement;
+    const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+    const newSize = Math.max(6, Math.min(96, rez.size0 * factor));
+    el.style.fontSize = (newSize / ratio) + 'px';
+    el.style.height = (extraBoxH(newSize) / ratio) + 'px';
+    el.dataset.pendingSize = String(newSize);
+  });
+  const rezUp = (e) => {
+    if (!rez) return; rez = null;
+    try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (el.dataset.pendingSize) { extra.size = parseFloat(el.dataset.pendingSize); delete el.dataset.pendingSize; }
+    commitExtraFromMarker(el, extra);
+  };
+  grip.addEventListener('pointerup', rezUp);
+  grip.addEventListener('pointercancel', rezUp);
+  }   // if (grip): draw markers have no resize grip
+
+  if (extra.type !== 'highlight' && extra.type !== 'draw') {
+    el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEditExtra(el, extra); });
+  }
+}
+
+// Inline text editing via contentEditable. On blur/Enter the text is saved back
+// to the extra and the box re-fits.
+function beginEditExtra(el, extra) {
+  el.classList.add('editing');
+  el.contentEditable = 'true';
+  // Drop the child controls from the editable text, restore them after.
+  const del = el.querySelector('.ds-anno-del'), grip = el.querySelector('.ds-anno-resize');
+  if (del) del.remove(); if (grip) grip.remove();
+  el.textContent = extra.text;
+  el.focus();
+  try { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (_) {}
+  const finish = () => {
+    el.contentEditable = 'false';
+    el.classList.remove('editing');
+    extra.text = (el.textContent || '').replace(/\n/g, ' ').trim()
+      || (extra.type === 'date' ? new Date().toISOString().slice(0, 10) : extra.type === 'note' ? 'Note' : 'Text');
+    el.removeEventListener('blur', finish);
+    el.removeEventListener('keydown', onKey);
+    // Rebuild the marker so delete/resize handles + geometry are consistent.
+    el.remove();
+    renderExtraMarker(extra);
+  };
+  const onKey = (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); el.blur(); }
+  };
+  el.addEventListener('blur', finish);
+  el.addEventListener('keydown', onKey);
+}
+
+// Write a marker's pixel box back into the extra's PDF-point geometry.
+function commitExtraFromMarker(el, extra) {
+  const wrap = el.parentElement;
+  const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+  const pageH = wrap._pdfPage.height;
+  const left = parseFloat(el.style.left), top = parseFloat(el.style.top);
+  if (extra.type === 'highlight') {
+    extra.x = left * ratio;
+    extra.w = el.offsetWidth * ratio;
+    extra.h = el.offsetHeight * ratio;
+    extra.y = pageH - (top * ratio) - extra.h;
+    return;
+  }
+  if (extra.type === 'note') {
+    extra.x = left * ratio;
+    extra.w = el.offsetWidth * ratio;
+    extra.yTop = pageH - (top * ratio);
+    return;
+  }
+  if (extra.type === 'draw') {
+    // Dragging translated the bounding box; shift every stroke point by the
+    // same delta (the origin at render time is remembered on the element).
+    const o = el._drawOrigin || { minX: 0, maxY: 0 };
+    const dx = left * ratio - o.minX;
+    const dy = (pageH - top * ratio) - o.maxY;
+    for (const pt of extra.points) { pt.x += dx; pt.y += dy; }
+    el._drawOrigin = { minX: o.minX + dx, maxY: o.maxY + dy };
+    return;
+  }
+  const h = extraBoxH(extra.size);
+  extra.x = left * ratio;
+  extra.y = pageH - (top * ratio) - h;
+}
+
+// Re-render every extra marker from state (used after a zoom re-render, which
+// wipes the overlay divs). PDF-point geometry is the source of truth.
+function reflowExtras() {
+  document.querySelectorAll('.ds-anno').forEach(el => el.remove());
+  if (placeState && placeState.isImage) return;
+  for (const extra of state.extras) renderExtraMarker(extra);
+}
+
+// ====================================================================
+// Pen tool: freehand strokes, stored as PDF-point polylines and baked as
+// round-capped vector line segments. One stroke = one extra (deletable,
+// draggable as a whole).
+// ====================================================================
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const PEN_STROKE_PT = 2;             // stroke width in PDF points
+let _penMode = false;
+let _penStroke = null;               // live stroke: { wrap, ratio, pts:[{px,py}], svg, poly }
+
+function setPenMode(on) {
+  _penMode = !!on;
+  const b = $('ds-tool-pen');
+  if (b) { b.classList.toggle('active', _penMode); b.setAttribute('aria-pressed', String(_penMode)); }
+  const list = $('ds-pdf-canvas-list');
+  if (list) list.classList.toggle('pen-mode', _penMode);
+}
+
+function onPenDown(e) {
+  if (!_penMode || !placeState || placeState.isImage || _penStroke) return;
+  const wrap = e.currentTarget;
+  if (e.target.closest('.ds-anno') || e.target.closest('.ds-page-bar') || e.target.closest('.ds-stamp-marker')) return;
+  const canvas = wrap.querySelector('canvas');
+  const rect = canvas.getBoundingClientRect();
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'ds-pen-live');
+  const poly = document.createElementNS(SVGNS, 'polyline');
+  poly.setAttribute('fill', 'none');
+  poly.setAttribute('stroke', '#0b3a6a');
+  poly.setAttribute('stroke-width', String(PEN_STROKE_PT * (rect.width / wrap._pdfPage.width)));
+  poly.setAttribute('stroke-linecap', 'round');
+  poly.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(poly);
+  wrap.appendChild(svg);
+  _penStroke = { wrap, rect, pts: [{ px: e.clientX - rect.left, py: e.clientY - rect.top }], svg, poly };
+  try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+  e.preventDefault(); e.stopPropagation();
+}
+
+function onPenMove(e) {
+  const s = _penStroke;
+  if (!s) return;
+  const px = e.clientX - s.rect.left, py = e.clientY - s.rect.top;
+  const last = s.pts[s.pts.length - 1];
+  if (Math.hypot(px - last.px, py - last.py) < 1.5) return;   // decimate micro-moves
+  s.pts.push({ px, py });
+  s.poly.setAttribute('points', s.pts.map(p => p.px + ',' + p.py).join(' '));
+}
+
+function onPenUp(e) {
+  const s = _penStroke;
+  if (!s) return;
+  _penStroke = null;
+  try { s.wrap.releasePointerCapture(e.pointerId); } catch (_) {}
+  s.svg.remove();
+  if (s.pts.length < 2) return;                               // a bare tap is not a stroke
+  const ratio = s.wrap._pdfPage.width / s.rect.width;         // pdf points per CSS px
+  const pageH = s.wrap._pdfPage.height;
+  const points = s.pts.map(p => ({ x: p.px * ratio, y: pageH - p.py * ratio }));
+  const extra = { id: ++_extraSeq, type: 'draw', pageIndex: s.wrap._pdfPage.index, points, width: PEN_STROKE_PT };
+  state.extras.push(extra);
+  renderExtraMarker(extra);
+}
+
+// A draw marker is an absolutely positioned SVG over the stroke's bounding box.
+// Dragging moves the whole stroke (commitExtraFromMarker shifts the points).
+function renderDrawMarker(extra) {
+  const wrap = extraWrapFor(extra.pageIndex);
+  if (!wrap || !extra.points.length) return null;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;
+  const pageH = wrap._pdfPage.height;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of extra.points) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const padPt = extra.width * 2;                              // room for the round caps
+  minX -= padPt; maxX += padPt; minY -= padPt; maxY += padPt;
+  const wPx = Math.max(8, (maxX - minX) / ratio), hPx = Math.max(8, (maxY - minY) / ratio);
+  const el = document.createElement('div');
+  el.className = 'ds-anno ds-anno-draw';
+  el.dataset.type = 'draw';
+  el.dataset.id = String(extra.id);
+  el.style.cssText = `left:${minX / ratio}px;top:${(pageH - maxY) / ratio}px;width:${wPx}px;height:${hPx}px`;
+  el._drawOrigin = { minX, maxY };
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${wPx} ${hPx}`);
+  const poly = document.createElementNS(SVGNS, 'polyline');
+  poly.setAttribute('fill', 'none');
+  poly.setAttribute('stroke', '#0b3a6a');
+  poly.setAttribute('stroke-width', String(extra.width / ratio));
+  poly.setAttribute('stroke-linecap', 'round');
+  poly.setAttribute('stroke-linejoin', 'round');
+  poly.setAttribute('points', extra.points.map(p => ((p.x - minX) / ratio) + ',' + ((maxY - p.y) / ratio)).join(' '));
+  svg.appendChild(poly);
+  el.appendChild(svg);
+
+  const del = document.createElement('button');
+  del.className = 'ds-anno-del'; del.type = 'button'; del.textContent = '×';
+  del.title = 'Remove'; del.setAttribute('aria-label', 'Remove this drawing');
+  del.addEventListener('pointerdown', e => { e.stopPropagation(); });
+  del.addEventListener('click', e => { e.stopPropagation(); removeExtra(extra.id); });
+  el.appendChild(del);
+
+  wrap.appendChild(el);
+  wireExtraMarker(el, extra, null);                           // drag + delete, no resize grip
+  return el;
+}
+
+// ====================================================================
+// Page manager: delete / rotate / reorder per page, merge another PDF,
+// export a page range. Every op transforms state.doc.bytes via the pure
+// ParasignPdfOps module, remaps or clears the placed objects, and re-renders.
+// The bytes that get hashed + signed later are exactly these bytes.
+// ====================================================================
+
+let _pageOpBusy = false;
+
+function setPlaceHint(msg) {
+  const h = $('ds-place-hint');
+  if (h) h.textContent = msg;
+}
+
+async function runPageOp(fn) {
+  if (_pageOpBusy || !placeState || placeState.isImage) return;
+  _pageOpBusy = true;
+  try {
+    const PDFLib = await waitForPdfLib();
+    const out = await fn(PDFLib, window.ParasignPdfOps);
+    if (out) {
+      state.doc.bytes = new Uint8Array(out);
+      state.doc.size = state.doc.bytes.length;
+      await renderPdfForPlacement();
+      // The seal gate: re-disable Continue when the op removed the stamp.
+      $('ds-place-continue').disabled = !state.stamp;
+    }
+  } catch (err) {
+    setPlaceHint('Page operation failed: ' + err.message);
+  } finally {
+    _pageOpBusy = false;
+  }
+}
+
+// Drop placed objects that lived on a removed/rotated page; tell the user.
+function clearObjectsOnPage(idx, why) {
+  const hadExtras = state.extras.some(e => e.pageIndex === idx);
+  const hadStamp = !!(state.stamp && !state.stamp.isImage && state.stamp.pageIndex === idx);
+  state.extras = state.extras.filter(e => e.pageIndex !== idx);
+  if (hadStamp) state.stamp = null;
+  if (hadExtras || hadStamp) {
+    setPlaceHint('Page ' + (idx + 1) + ' was ' + why + '; the objects placed on it were removed' +
+      (hadStamp ? ' (place the signature stamp again)' : '') + '.');
+  }
+  return hadExtras || hadStamp;
+}
+
+function remapAfterDelete(idx) {
+  clearObjectsOnPage(idx, 'deleted');
+  state.extras.forEach(e => { if (e.pageIndex > idx) e.pageIndex--; });
+  if (state.stamp && !state.stamp.isImage && state.stamp.pageIndex > idx) state.stamp.pageIndex--;
+}
+
+function remapAfterMove(from, to) {
+  const map = i => {
+    if (i === from) return to;
+    if (from < to)  return (i > from && i <= to) ? i - 1 : i;
+    return (i >= to && i < from) ? i + 1 : i;
+  };
+  state.extras.forEach(e => { e.pageIndex = map(e.pageIndex); });
+  if (state.stamp && !state.stamp.isImage) state.stamp.pageIndex = map(state.stamp.pageIndex);
+}
+
+function pageOpDelete(idx) {
+  runPageOp(async (PDFLib, Ops) => {
+    if (!confirm('Delete page ' + (idx + 1) + ' from the document?')) return null;
+    const out = await Ops.deletePage(PDFLib, state.doc.bytes, idx);
+    remapAfterDelete(idx);
+    return out;
+  });
+}
+
+function pageOpMove(idx, to) {
+  runPageOp(async (PDFLib, Ops) => {
+    const n = await Ops.pageCount(PDFLib, state.doc.bytes);
+    if (to < 0 || to >= n) return null;
+    const out = await Ops.movePage(PDFLib, state.doc.bytes, idx, to);
+    remapAfterMove(idx, to);
+    return out;
+  });
+}
+
+// Rotation changes the page's render coordinate system; remapping every placed
+// object through the rotation is not worth the risk of a silently misbaked
+// seal, so objects on the rotated page are cleared with a visible notice.
+function pageOpRotate(idx) {
+  runPageOp(async (PDFLib, Ops) => {
+    const out = await Ops.rotatePage(PDFLib, state.doc.bytes, idx, 90);
+    clearObjectsOnPage(idx, 'rotated');
+    return out;
+  });
+}
+
+// Small always-available action bar in the corner of every rendered page.
+function buildPageBar(idx) {
+  const bar = document.createElement('div');
+  bar.className = 'ds-page-bar';
+  bar.addEventListener('pointerdown', e => e.stopPropagation());
+  bar.addEventListener('click', e => e.stopPropagation());
+  const mk = (label, title, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label; b.title = title; b.setAttribute('aria-label', title);
+    b.addEventListener('click', fn);
+    bar.appendChild(b);
+  };
+  mk('↑', 'Move page ' + (idx + 1) + ' up',   () => pageOpMove(idx, idx - 1));
+  mk('↓', 'Move page ' + (idx + 1) + ' down', () => pageOpMove(idx, idx + 1));
+  mk('⟳', 'Rotate page ' + (idx + 1) + ' 90°', () => pageOpRotate(idx));
+  mk('×', 'Delete page ' + (idx + 1),         () => pageOpDelete(idx));
+  return bar;
+}
+
+function wirePageTools() {
+  const mergeBtn = $('ds-page-merge'), mergeFile = $('ds-page-merge-file'), splitBtn = $('ds-page-split');
+  if (mergeBtn && mergeFile) {
+    mergeBtn.addEventListener('click', () => mergeFile.click());
+    mergeFile.addEventListener('change', async () => {
+      const f = mergeFile.files && mergeFile.files[0];
+      mergeFile.value = '';
+      if (!f) return;
+      const other = new Uint8Array(await f.arrayBuffer());
+      runPageOp(async (PDFLib, Ops) => {
+        const out = await Ops.appendPdf(PDFLib, state.doc.bytes, other);
+        setPlaceHint('Appended the pages of ' + f.name + ' to the end of the document.');
+        return out;
+      });
+    });
+  }
+  if (splitBtn) {
+    splitBtn.addEventListener('click', () => {
+      runPageOp(async (PDFLib, Ops) => {
+        const n = await Ops.pageCount(PDFLib, state.doc.bytes);
+        const raw = prompt('Export which pages as a new PDF? (e.g. 3 or 2-5, of ' + n + ' total)');
+        if (raw === null) return null;
+        const r = Ops.parsePageRange(raw, n);
+        if (!r) { setPlaceHint('Could not read that page range.'); return null; }
+        const out = await Ops.extractRange(PDFLib, state.doc.bytes, r.from, r.to);
+        const base = (state.doc.name || 'document.pdf').replace(/\.pdf$/i, '');
+        downloadBytes(out, base + '-pages-' + (r.from + 1) + '-' + (r.to + 1) + '.pdf', 'application/pdf');
+        setPlaceHint('Exported pages ' + (r.from + 1) + ' to ' + (r.to + 1) + ' as a separate PDF. The document here is unchanged.');
+        return null;                                          // export only
+      });
+    });
+  }
 }
 
 function teardownPageNav() {
@@ -462,6 +1011,7 @@ function setupPageNav(container, total) {
     let best = wraps[0], bestR = -1;
     for (const w of wraps) { const r = ratios.get(w) || 0; if (r > bestR) { bestR = r; best = w; } }
     const idx = Number(best.dataset.pageIndex) || 0;
+    _placeCurrentPage = idx;                 // new text/date objects land on the visible page
     if (idx !== current) { current = idx; render(); }
   }, { root: null, rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
   wraps.forEach(w => _pageNavObserver.observe(w));
@@ -483,6 +1033,7 @@ function setupPageNav(container, total) {
 }
 
 function onPlaceClick(e) {
+  if (_penMode) return;                 // pen mode: pointer gestures draw, they don't place the seal
   const wrap = e.currentTarget;
   const canvas = wrap.querySelector('canvas');
   const rect = canvas.getBoundingClientRect();
@@ -533,7 +1084,52 @@ function renderStampMarker(wrap, left, top, w, h) {
   m.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
   m.innerHTML = stampMockupHtml();
   m.addEventListener('pointerdown', onStampPointerDown);   // drag to reposition
+  addStampResizeHandle(m, wrap);                           // corner grip to scale
   wrap.appendChild(m);
+}
+
+// Write a marker's current pixel box (left/top/width/height in CSS px on the
+// wrap) back into state.stamp in the page's natural units. Shared by drag and
+// resize so the two can never drift on the coordinate math.
+function commitStampFromMarker(marker, wrap) {
+  const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
+  const left = parseFloat(marker.style.left), top = parseFloat(marker.style.top);
+  const w = parseFloat(marker.style.width) * ratio, h = parseFloat(marker.style.height) * ratio;
+  const natX = left * ratio, natYTop = top * ratio;
+  if (wrap._pdfPage.isImage) {
+    state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
+  } else {
+    state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: wrap._pdfPage.height - natYTop - h, w, h };
+  }
+}
+
+// A bottom-right corner grip that scales the seal uniformly (keeps its aspect
+// ratio). The screen top-left stays pinned, so only width/height - and, for a
+// PDF, the bottom-left y - change. Min 60px wide, capped at the page width.
+function addStampResizeHandle(marker, wrap) {
+  const grip = document.createElement('div');
+  grip.className = 'ds-stamp-resize';
+  marker.appendChild(grip);
+  let rs = null;
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();               // never start a reposition drag
+    const w0 = parseFloat(marker.style.width), h0 = parseFloat(marker.style.height);
+    rs = { x0: e.clientX, w0, aspect: h0 / w0, maxW: wrap.getBoundingClientRect().width - parseFloat(marker.style.left) };
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!rs) return;
+    const w = Math.max(60, Math.min(rs.maxW, rs.w0 + (e.clientX - rs.x0)));
+    marker.style.width = w + 'px';
+    marker.style.height = (w * rs.aspect) + 'px';
+  });
+  const up = (e) => {
+    if (!rs) return; rs = null;
+    try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+    commitStampFromMarker(marker, wrap);
+  };
+  grip.addEventListener('pointerup', up);
+  grip.addEventListener('pointercancel', up);
 }
 
 // ── Drag the placed stamp to reposition (coexists with click-to-place) ──────
@@ -566,23 +1162,14 @@ function onStampPointerMove(e) {
 
 function onStampPointerUp(e) {
   if (!_drag) return;
-  const { marker, wrap, w, h, moved } = _drag;
+  const { marker, wrap, moved } = _drag;
   marker.removeEventListener('pointermove', onStampPointerMove);
   marker.removeEventListener('pointerup', onStampPointerUp);
   marker.removeEventListener('pointercancel', onStampPointerUp);
   try { marker.releasePointerCapture(e.pointerId); } catch (_) {}
   marker.style.cursor = 'grab';
   if (moved) {
-    const left = parseFloat(marker.style.left), top = parseFloat(marker.style.top);
-    const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
-    const stampNatW = w * ratio, stampNatH = h * ratio;
-    const natX = left * ratio, natYTop = top * ratio;
-    if (wrap._pdfPage.isImage) {
-      state.stamp = { pageIndex: 0, x: natX, y: natYTop, w: stampNatW, h: stampNatH, isImage: true };
-    } else {
-      const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
-      state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
-    }
+    commitStampFromMarker(marker, wrap);
     // Swallow the click the browser fires after pointerup so onPlaceClick on the
     // wrap does not ALSO re-place the stamp at the cursor.
     wrap.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
@@ -694,72 +1281,121 @@ function selectSigStyle(style) {
   refreshIdentityValid();
 }
 
-// ---- drawn-signature canvas (pointer + touch) ----
+// ---- drawn-signature canvas (pointer + touch), HiDPI + smoothed ----
 function initDrawCanvas() {
   const cv = $('ds-sig-canvas');
+  // Supersample the backing store well past the CSS box (500x160, aspect 25:8)
+  // so strokes stay smooth on HiDPI screens AND survive being embedded + scaled
+  // inside the PDF seal. Keeping the 25:8 ratio lets CSS height:auto stay correct.
+  const DENSITY = Math.max(2, Math.ceil(hiDpiScale() * 1.5));   // dpr1->2, dpr2->3
+  const BASE_W = 500, BASE_H = 160;
+  cv.width = BASE_W * DENSITY;
+  cv.height = BASE_H * DENSITY;
   const ctx = cv.getContext('2d');
-  // Fill white so the exported PNG isn't transparent against light backgrounds
-  // (pdf-lib renders transparent PNG fine, but a white-bg signature also
-  // shows clearly during the on-screen preview marker).
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.strokeStyle = '#0b3a6a';
-  ctx.lineWidth = 2.2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+
+  // Reset to a clean white sheet with the ink style. White (not transparent) so
+  // the seal reads clearly on any document and the on-screen marker matches.
+  const paint = () => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.strokeStyle = '#0b3a6a';
+    ctx.lineWidth = 2.4 * DENSITY;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  };
+  paint();
 
   let drawing = false;
-  let last = null;
+  let last = null;          // previous raw point (backing-store coords)
+  let mid = null;           // previous midpoint the curve passed through
+  let ink = null;           // drawn bounding box, for a tight crop on export
 
   function pos(ev) {
     const r = cv.getBoundingClientRect();
-    const x = ((ev.clientX ?? (ev.touches && ev.touches[0].clientX)) - r.left) * (cv.width / r.width);
-    const y = ((ev.clientY ?? (ev.touches && ev.touches[0].clientY)) - r.top) * (cv.height / r.height);
-    return { x, y };
+    const cx = ev.clientX ?? (ev.touches && ev.touches[0].clientX);
+    const cy = ev.clientY ?? (ev.touches && ev.touches[0].clientY);
+    return { x: (cx - r.left) * (cv.width / r.width), y: (cy - r.top) * (cv.height / r.height) };
+  }
+  function grow(p) {
+    if (!ink) ink = { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y };
+    else {
+      ink.minX = Math.min(ink.minX, p.x); ink.minY = Math.min(ink.minY, p.y);
+      ink.maxX = Math.max(ink.maxX, p.x); ink.maxY = Math.max(ink.maxY, p.y);
+    }
   }
 
-  function start(ev) { ev.preventDefault(); drawing = true; last = pos(ev); }
+  function start(ev) {
+    ev.preventDefault();
+    drawing = true;
+    last = pos(ev); mid = last; grow(last);
+    // A filled dot so a single tap leaves a mark (a lone quadratic never strokes).
+    ctx.beginPath();
+    ctx.fillStyle = '#0b3a6a';
+    ctx.arc(last.x, last.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   function move(ev) {
     if (!drawing) return;
     ev.preventDefault();
     const p = pos(ev);
+    // Quadratic curve through the running midpoint: smooth, ink-like strokes
+    // instead of the visibly faceted straight lineTo segments used before.
+    const m = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
     ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(p.x, p.y);
+    ctx.moveTo(mid.x, mid.y);
+    ctx.quadraticCurveTo(last.x, last.y, m.x, m.y);
     ctx.stroke();
-    last = p;
+    last = p; mid = m; grow(p);
   }
   async function end(ev) {
     if (!drawing) return;
     drawing = false;
-    // Convert to PNG bytes + data URL and stash. refreshIdentityValid will enable Continue.
-    cv.toBlob(async (blob) => {
-      if (!blob) return;
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      state.signer.sigImageBytes = bytes;
-      state.signer.sigImageType = 'png';
-      state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, 'image/png');
-      refreshIdentityValid();
-    }, 'image/png');
+    await exportSignature();
+  }
+
+  // Export a TIGHTLY CROPPED PNG of just the ink (+ small padding) so the seal
+  // embeds a signature that fills its band, not a stamp-sized mostly-white image
+  // with a tiny scribble. pdf-lib preserves aspect ratio when it scales this in.
+  async function exportSignature() {
+    if (!ink) { clearSig(); return; }
+    const pad = ctx.lineWidth * 1.5;
+    const x0 = Math.max(0, Math.floor(ink.minX - pad));
+    const y0 = Math.max(0, Math.floor(ink.minY - pad));
+    const x1 = Math.min(cv.width, Math.ceil(ink.maxX + pad));
+    const y1 = Math.min(cv.height, Math.ceil(ink.maxY + pad));
+    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const octx = out.getContext('2d');
+    octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, w, h);
+    octx.drawImage(cv, x0, y0, w, h, 0, 0, w, h);
+    const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+    if (!blob) return;
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    state.signer.sigImageBytes = bytes;
+    state.signer.sigImageType = 'png';
+    state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, 'image/png');
+    refreshIdentityValid();
+  }
+
+  function clearSig() {
+    state.signer.sigImageBytes = null;
+    state.signer.sigImageType = null;
+    state.signer.sigImageDataUrl = null;
+    refreshIdentityValid();
   }
 
   // Pointer Events cover mouse, touch and pen on every modern browser (iOS 13+).
   // Using ONLY pointer events avoids the double-fire you get when touch* and
-  // pointer* listeners both run on a touch device. The canvas has touch-action:none,
-  // so panning/zooming never hijacks a stroke.
+  // pointer* listeners both run on a touch device. touch-action:none on the
+  // canvas keeps panning/zooming from hijacking a stroke.
   cv.addEventListener('pointerdown', start);
   cv.addEventListener('pointermove', move);
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
   cv.addEventListener('pointerleave', end);
 
-  $('ds-sig-clear').addEventListener('click', () => {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    state.signer.sigImageBytes = null;
-    state.signer.sigImageType = null;
-    refreshIdentityValid();
-  });
+  $('ds-sig-clear').addEventListener('click', () => { paint(); ink = null; clearSig(); });
 }
 
 // ---- image upload ----
@@ -964,8 +1600,9 @@ async function renderDocPreview() {
     const page = await pdf.getPage(state.stamp.pageIndex + 1);
     const baseViewport = page.getViewport({ scale: 1 });
     const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    // Render at 2.5x so CSS-zooming stays sharp; canvas{width:100%} shows it at targetW.
-    const renderScale = (targetW / baseViewport.width) * 2.5;
+    // Supersample so both CSS-zooming AND HiDPI screens stay sharp. 2.5x covers
+    // the review zoom (up to 3x); lift it to the real dpr when that is higher.
+    const renderScale = (targetW / baseViewport.width) * Math.max(2.5, hiDpiScale());
     const viewport = page.getViewport({ scale: renderScale });
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
@@ -984,6 +1621,19 @@ async function renderDocPreview() {
     mock.innerHTML = stampInnerHtml();
     zoomwrap.appendChild(mock);
     makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+    // Show the text/date objects that sit on this page, so the review reflects the
+    // whole document, not just the seal. Read-only here (editing was on step-place).
+    for (const ex of state.extras) {
+      if (ex.pageIndex !== state.stamp.pageIndex) continue;
+      const h = extraBoxH(ex.size);
+      const a = document.createElement('div');
+      a.className = 'ds-anno';
+      a.dataset.type = ex.type;
+      a.style.cssText = `left:${ex.x / ratio}px;top:${(baseViewport.height - ex.y - h) / ratio}px;` +
+        `height:${h / ratio}px;font-size:${ex.size / ratio}px;pointer-events:none;border-style:solid;background:transparent`;
+      a.textContent = ex.text;
+      zoomwrap.appendChild(a);
+    }
     buildReviewZoom(zoomwrap);
     return;
   }
@@ -1316,7 +1966,67 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
     thickness: 0.5, color: navy, opacity: 0.25,
   });
 
+  // Bake the edit layer (text, date, highlight, note, pen strokes) as real
+  // vectors on their pages. Additive to the seal; sharp at any zoom.
+  if (Array.isArray(state.extras) && state.extras.length) {
+    const courier = await pdfDoc.embedFont(PDFLib.StandardFonts.Courier);
+    const ink = PDFLib.rgb(0.1, 0.1, 0.1);
+    const penInk = PDFLib.rgb(0.043, 0.227, 0.416);                    // same navy as the seal
+    const hlYellow = PDFLib.rgb(1, 0.84, 0.24);
+    const noteBg = PDFLib.rgb(1, 0.968, 0.788), noteEdge = PDFLib.rgb(0.83, 0.7, 0.2);
+    const pages = pdfDoc.getPages();
+    for (const ex of state.extras) {
+      const pg = pages[ex.pageIndex];
+      if (!pg) continue;
+      if (ex.type === 'highlight') {
+        pg.drawRectangle({ x: ex.x, y: ex.y, width: ex.w, height: ex.h, color: hlYellow, opacity: 0.35 });
+      } else if (ex.type === 'note') {
+        // Box height follows the wrapped text; the note is anchored at its top
+        // edge (ex.yTop), matching the on-screen behaviour while typing.
+        const pad = ex.size * 0.5;
+        const lineH = ex.size * TEXT_LINE_H;
+        const lines = wrapPdfText(font, ex.text, ex.size, Math.max(ex.size, ex.w - pad * 2));
+        const boxH = lines.length * lineH + pad * 2;
+        pg.drawRectangle({ x: ex.x, y: ex.yTop - boxH, width: ex.w, height: boxH, color: noteBg, borderColor: noteEdge, borderWidth: 0.8 });
+        lines.forEach((ln, i) => pg.drawText(ln, {
+          x: ex.x + pad,
+          y: ex.yTop - pad - (i + 1) * lineH + ex.size * 0.32,         // line-bottom -> baseline
+          size: ex.size, font, color: ink,
+        }));
+      } else if (ex.type === 'draw') {
+        for (let i = 1; i < ex.points.length; i++) {
+          pg.drawLine({
+            start: ex.points[i - 1], end: ex.points[i],
+            thickness: ex.width, color: penInk, lineCap: PDFLib.LineCapStyle.Round,
+          });
+        }
+      } else {
+        const f = ex.type === 'date' ? courier : font;
+        pg.drawText(String(ex.text || ''), {
+          x: ex.x + ex.size * 0.1,
+          y: ex.y + ex.size * 0.35,        // box-bottom -> text baseline (matches the on-screen box)
+          size: ex.size, font: f, color: ink,
+        });
+      }
+    }
+  }
+
   return await pdfDoc.save();
+}
+
+// Greedy word wrap against real font metrics; a word longer than the box gets
+// its own (overflowing) line rather than an infinite loop.
+function wrapPdfText(font, text, size, maxW) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const candidate = cur ? cur + ' ' + w : w;
+    if (!cur || font.widthOfTextAtSize(candidate, size) <= maxW) cur = candidate;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [''];
 }
 
 async function doSign() {
@@ -1417,6 +2127,9 @@ async function doSign() {
         algorithm: 'ML-DSA-65', hash_algorithm: 'SHA3-256',
         original_filename: state.doc.name, stamped_filename: state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name,
         original_hash: origHashHex, stamped_hash: stampedHashHex, coords,
+        extras: (state.mode === 'pdf' && state.extras.length)
+          ? state.extras.map(e => ({ type: e.type, pageIndex: e.pageIndex, x: Math.round(e.x), y: Math.round(e.y), size: e.size, text: e.text }))
+          : undefined,
         signature_style: state.signer.sigStyle,
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
@@ -1675,11 +2388,15 @@ async function renderSignedPreview() {
     const page = await pdf.getPage(idx + 1);
     const baseViewport = page.getViewport({ scale: 1 });
     const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
-    const scale = targetWidth / baseViewport.width;
-    const viewport = page.getViewport({ scale });
+    const dpr = hiDpiScale();
+    const cssScale = targetWidth / baseViewport.width;
+    const viewport = page.getViewport({ scale: cssScale * dpr });
     const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
+    canvas.width = Math.floor(viewport.width);        // backing store = cssW * dpr
     canvas.height = Math.floor(viewport.height);
+    canvas.style.width = targetWidth + 'px';          // shown at CSS width -> crisp
+    canvas.style.height = Math.floor(baseViewport.height * cssScale) + 'px';
+    canvas.style.display = 'block';
     container.appendChild(canvas);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   }
@@ -1818,7 +2535,21 @@ function init() {
   initStepIdentity();
   wireNav();
   wireLiveStampUpdates();
+  wireEditTools();
   setActive('step-mode');
+}
+
+// Edit toolbar (step-place, PDF mode): text, date, highlight, note, pen,
+// plus the page tools (merge/export). Additive to the seal.
+function wireEditTools() {
+  const t = $('ds-add-text'), d = $('ds-add-date');
+  if (t) t.addEventListener('click', () => addExtra('text'));
+  if (d) d.addEventListener('click', () => addExtra('date'));
+  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen');
+  if (h) h.addEventListener('click', addHighlight);
+  if (n) n.addEventListener('click', addNote);
+  if (p) p.addEventListener('click', () => setPenMode(!_penMode));
+  wirePageTools();
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

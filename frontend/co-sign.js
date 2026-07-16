@@ -259,16 +259,23 @@ async function renderPdfPreview(bytes, host) {
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
   host.innerHTML = '';
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+  // Supersample at devicePixelRatio (capped at 3) so the recipient's preview is
+  // crisp on HiDPI screens: backing store = cssWidth*dpr, shown at cssWidth.
+  const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
     const base = page.getViewport({ scale: 1 });
     const targetWidth = Math.min(820, Math.floor(((host.clientWidth || window.innerWidth) - 20) * 0.98)) || 600;
-    const viewport = page.getViewport({ scale: targetWidth / base.width });
+    const cssScale = targetWidth / base.width;
+    const viewport = page.getViewport({ scale: cssScale * dpr });
     const wrap = document.createElement('div');
     wrap.className = 'doc-page';
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
+    canvas.style.width = targetWidth + 'px';
+    canvas.style.height = Math.floor(base.height * cssScale) + 'px';
+    canvas.style.display = 'block';
     wrap.appendChild(canvas);
     host.appendChild(wrap);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;

@@ -51,6 +51,34 @@
 .ds-page-wrap{position:relative;margin-bottom:14px;cursor:crosshair}
 .ds-page-wrap canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff}
 .ds-stamp-marker{position:absolute;border:1px solid var(--cobalt);background:#fff;pointer-events:auto;cursor:grab;touch-action:none;z-index:5;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
+.ds-stamp-resize{position:absolute;right:0;bottom:0;width:14px;height:14px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:6}
+.ds-stamp-resize::after{content:'';position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-right:1.5px solid #fff;border-bottom:1.5px solid #fff}
+/* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
+.ds-edit-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
+.ds-edit-btn{font:inherit;font-size:12px;padding:3px 12px;border:1px solid var(--cobalt);background:#fff;color:var(--cobalt);border-radius:4px;cursor:pointer;line-height:1.4;font-weight:600}
+.ds-edit-btn:hover{background:var(--cobalt);color:#fff}
+.ds-edit-tip{font-size:11px;color:var(--ink-dim)}
+.ds-anno{position:absolute;box-sizing:border-box;z-index:5;border:1px dashed var(--cobalt);background:rgba(255,255,255,.7);color:var(--navy);font-family:'Times New Roman',Times,serif;display:flex;align-items:center;padding:2px 4px;cursor:grab;touch-action:none;overflow:hidden;white-space:pre;line-height:1.15}
+.ds-anno.editing{cursor:text;background:#fff;outline:2px solid var(--cobalt);border-style:solid}
+.ds-anno[data-type="date"]{font-family:var(--mono)}
+.ds-anno-del{position:absolute;top:-9px;left:-9px;width:18px;height:18px;border-radius:50%;background:#b00;color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0}
+.ds-anno-resize{position:absolute;right:0;bottom:0;width:12px;height:12px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:7}
+/* Annotation types: highlight (translucent bar), note (sticky, wrapping), draw (pen stroke) */
+.ds-anno[data-type="highlight"]{background:rgba(255,214,61,.42);border:1px dashed rgba(191,146,7,.85);padding:0}
+.ds-anno[data-type="note"]{background:#fff7c9;border:1px solid #d3b334;white-space:normal;line-height:1.35;align-items:flex-start;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:4px 6px}
+.ds-anno-draw{background:transparent;border:1px dashed transparent;padding:0}
+.ds-anno-draw:hover,.ds-anno-draw:focus-within{border-color:var(--cobalt)}
+.ds-anno-draw svg{display:block;width:100%;height:100%;pointer-events:none}
+.ds-pen-live{position:absolute;inset:0;z-index:6;pointer-events:none}
+#ds-pdf-canvas-list.pen-mode .ds-page-wrap{cursor:crosshair}
+#ds-tool-pen.active{background:var(--cobalt);color:#fff}
+.ds-edit-sep{width:1px;height:18px;background:var(--ink-hair);margin:0 2px}
+/* Per-page action bar (move / rotate / delete) */
+.ds-page-bar{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:8;opacity:.3;transition:opacity .15s}
+.ds-page-wrap:hover .ds-page-bar,.ds-page-bar:focus-within{opacity:1}
+.ds-page-bar button{font:inherit;font-size:12px;width:26px;height:24px;padding:0;border:1px solid var(--ink-hair);background:#fff;color:var(--navy);border-radius:4px;cursor:pointer;line-height:1}
+.ds-page-bar button:hover{background:var(--cobalt);border-color:var(--cobalt);color:#fff}
 .ds-sm-band{background:var(--cobalt);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:2px 5px;line-height:1;flex:0 0 auto}
 .ds-sm-logo{font-family:var(--mono);font-weight:700;letter-spacing:.04em;font-size:8px}
 .ds-sm-logo span{color:var(--lime)}
@@ -385,6 +413,19 @@
       <button id="ds-zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="ds-zoom-fit" type="button">Fit</button>
     </div>
+    <div class="ds-edit-tools" id="ds-edit-tools" hidden>
+      <span class="ds-edit-label">Add to the document:</span>
+      <button class="ds-edit-btn" id="ds-add-text" type="button">+ Text</button>
+      <button class="ds-edit-btn" id="ds-add-date" type="button">+ Date</button>
+      <button class="ds-edit-btn" id="ds-add-highlight" type="button">+ Highlight</button>
+      <button class="ds-edit-btn" id="ds-add-note" type="button">+ Note</button>
+      <button class="ds-edit-btn" id="ds-tool-pen" type="button" aria-pressed="false">&#9998; Draw</button>
+      <span class="ds-edit-sep" aria-hidden="true"></span>
+      <button class="ds-edit-btn" id="ds-page-merge" type="button">+ Pages&hellip;</button>
+      <button class="ds-edit-btn" id="ds-page-split" type="button">Export pages&hellip;</button>
+      <input id="ds-page-merge-file" type="file" accept="application/pdf,.pdf" hidden>
+      <span class="ds-edit-tip">Double-click a text box to edit, drag to move, corner to resize. Page buttons sit on each page.</span>
+    </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
       <span id="ds-page-nav-label"></span>
@@ -660,6 +701,7 @@
 <script src="/js/nav-auth.js?v=2" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=25"></script>
+<script src="/js/parasign-pdf-ops.js?v=1"></script>
+<script type="module" src="/sign-flow.js?v=26"></script>
 </body>
 </html>
