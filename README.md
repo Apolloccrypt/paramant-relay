@@ -150,6 +150,83 @@ Every transfer is hashed into a SHA3-256 Merkle tree. The relay signs each tree 
 
 ---
 
+## ParaSign - Post-quantum document signing
+
+ParaSign is the second product on the PARAMANT relay: post-quantum document signing, alongside the encrypted file transfer described above. Same relay, same notary invariant, a different job. Instead of moving a file and burning it, ParaSign proves who signed what, and when, with a signature that survives the arrival of quantum computers.
+
+- Post-quantum signatures. Every signature is ML-DSA-65 (NIST FIPS 204). No RSA and no ECDSA on the signing path.
+- Envelopes. A signing request is an envelope: one document, one or more signers, an optional signing order, and a TTL.
+- Multi-signer. Route a single document to several signers; the envelope completes only when every party has signed.
+- Hosted signing ceremony. Each signer gets a hosted browser page and signs there. The signing key is generated and used client-side, so a private key never reaches the relay.
+
+Signature level: ParaSign produces advanced electronic signatures (AES) as understood under eIDAS. It is explicitly NOT an eIDAS-qualified signature (QES). There is no qualified trust service provider and no qualified certificate on this path, and ParaSign makes no qualified-signature claim.
+
+### The .psign proof
+
+When an envelope completes, ParaSign issues a .psign receipt: a compact, canonical-JSON proof that is self-contained and verifiable offline. It binds together:
+
+| Field | What it proves |
+|-------|----------------|
+| Signer public key | who signed |
+| Timestamp | when they signed |
+| ML-DSA-65 signature per party | that this signer, and only this signer, signed this document |
+| Document hash (SHA3-256) | which document, without ever revealing its contents |
+| Relay notary countersignature | that the relay witnessed the ceremony and logged it |
+
+A .psign is independently verifiable with no call back to the relay: re-check each ML-DSA-65 signature against the signer public key, verify the notary countersignature against the relay public key, and confirm the envelope's inclusion in the public CT log (the same SHA3-256 Merkle tree that backs file transfers). You verify the math, not the operator.
+
+### Zero-knowledge scope
+
+The relay is a notary, not a reader. What it retains for an envelope is the SHA3-256 document hash, never the document content, and it never holds a signing private key. In the hosted /v1 ceremony the relay does hold the raw document blob, but only for the lifetime of that ceremony, and it is dropped on TTL expiry. Nothing but the hash persists.
+
+### /v1 developer API
+
+A thin, public /v1 layer lets any application create envelopes and collect signatures without a browser session, using an API key. It wraps the internal envelope machinery.
+
+Authentication is a Bearer token: an API key with the psk_ prefix (psk_live_ for production, psk_test_ for the sandbox) that carries the parasign scope. A key without that scope is rejected.
+
+| Method and path | Purpose |
+|-----------------|---------|
+| POST /v1/envelopes | Create an envelope from a PDF plus a signer list; returns the envelope id and one hosted sign_url per signer. |
+| GET /v1/envelopes/:id | Read envelope status and per-signer progress. |
+| GET /v1/envelopes/:id/receipt | Download the full .psign proof once the envelope is complete. |
+| GET /v1/envelopes/:id/document | Download the signed PDF once the envelope is complete. |
+| POST /v1/envelopes/:id/void | Void an open envelope (owner only). |
+
+```bash
+# 1. Create an envelope. The document is sent as base64; signers are routed to
+#    hosted signing pages.
+curl -X POST https://api.paramant.app/v1/envelopes \
+  -H "Authorization: Bearer psk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+        "document": { "content_base64": "JVBERi0xLjc..." },
+        "original_filename": "quote-8842.pdf",
+        "signers": [
+          { "name": "Signer One", "email": "signer@example.com", "order": 1 }
+        ],
+        "webhook_url": "https://app.example.com/hooks/parasign"
+      }'
+# 201 -> { "id": "env_...", "status": "sent",
+#          "signers": [ { "sign_url": "https://api.paramant.app/..." } ],
+#          "webhook_secret": "..." }   # returned once, for HMAC verification
+
+# 2. The signer opens sign_url and signs ML-DSA-65 client-side (hosted ceremony).
+
+# 3. On completion, pull the full .psign proof.
+curl https://api.paramant.app/v1/envelopes/env_.../receipt \
+  -H "Authorization: Bearer psk_live_..." \
+  --output quote-8842.psign
+```
+
+Webhooks: point webhook_url at your endpoint and the relay posts envelope lifecycle events (for example envelope.sent and envelope.voided), each signed with HMAC-SHA256 in the X-Paramant-Sig header, so you do not have to poll. The webhook secret is returned once, in the create response.
+
+Pricing for signing volume lives with everything else at https://paramant.app/pricing.
+
+Licensing: ParaSign runs on the same source-available relay (BUSL-1.1). The client SDKs are open source (Apache-2.0).
+
+---
+
 ## Use cases
 
 ### Healthcare — DICOM / HL7 FHIR (NEN 7510)
