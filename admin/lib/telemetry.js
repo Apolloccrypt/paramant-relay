@@ -56,6 +56,7 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       key_id: k.key, // internal id for actions (not exposed in list response)
       email: meta.email || k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
+      parasign: k.parasign === true, /*MARK:parasign_user*/
       active: k.active !== false, revoked_at: k.revoked_at || null,
       created, totp_status,
       totp_required: meta.totp_required === true,

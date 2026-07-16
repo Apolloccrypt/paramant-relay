@@ -4428,7 +4428,7 @@ const server = http.createServer(async (req, res) => {
     const reveal = query.reveal === '1' || query.reveal === 'true';
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
       key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
-      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null
+      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4451,7 +4451,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
       account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
-      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', created: v.created || null }));
+      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null }));/*MARK:parasign_reveal*/
   }
 
   // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────
@@ -4553,6 +4553,35 @@ const server = http.createServer(async (req, res) => {
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
       applyKeyLimitEnforcement();
       res.writeHead(200); return res.end(J({ ok: true, key, plan }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/set-parasign — grant/revoke the ParaSign /v1 API ────
+  // Admin override for the `parasign` entitlement, alongside the automatic grant
+  // on payment. Sets the flag on the target key AND every sibling key of its
+  // account (account-level grant), then persists to users.json. ADMIN_TOKEN-gated
+  // by the admin-path guard above; the admin server fans this out to every sector
+  // so the grant is fleet-consistent. Additive: no current relay path gates on it.
+  if (path === '/v2/admin/keys/set-parasign' && req.method === 'POST') {/*MARK:parasign_endpoint*/
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const key = (d.key || '').toString();
+      const enabled = d.enabled === true || d.parasign === true;
+      if (!key) { res.writeHead(400); return res.end(J({ error: 'key required' })); }
+      const kv = apiKeys.get(key);
+      if (!kv) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      const accountId = kv.account_id || key;
+      const members = accountKeys.get(accountId) || new Set([key]);
+      for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.parasign = enabled; }
+      _mutateUsersJson(ud => {
+        for (const entry of ud.api_keys) {
+          if ((entry.account_id || entry.key) === accountId) entry.parasign = enabled;
+        }
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'parasign_grant_via_admin', { account: String(accountId).slice(0, 12), enabled, keys: members.size, persisted: true }))
+        .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, key, account_id: accountId, parasign: enabled, keys_updated: members.size }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 

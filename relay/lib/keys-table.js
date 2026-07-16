@@ -45,7 +45,12 @@ function parseAccountFields(rawKey) {
   const legacy_revealable = (rawKey.legacy_revealable !== undefined)
     ? !!rawKey.legacy_revealable
     : (!hasAccountId && is_primary);
-  return { account_id, is_primary, scope, legacy_revealable };
+  // ParaSign /v1 API grant. Orthogonal to `scope` (which stays single-valued):
+  // this is an additive, behaviour-neutral boolean entitlement — the relay does
+  // not gate on it yet — that an admin toggles on/off as the override alongside
+  // the automatic grant on payment. Default off. /*MARK:parasign_parse*/
+  const parasign = rawKey.parasign === true;
+  return { account_id, is_primary, scope, legacy_revealable, parasign };
 }
 
 // Pick a kid not already present in `taken` (anything with a .has(kid) method:
