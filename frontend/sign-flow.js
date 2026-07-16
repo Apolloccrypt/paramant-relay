@@ -1420,6 +1420,7 @@ async function doSign() {
         signature_style: state.signer.sigStyle,
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
+        party_email_hash: act.email_hash || '',
         signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };
@@ -1430,6 +1431,7 @@ async function doSign() {
         original_filename: state.doc.name, document_hash: docHashForEnvelope,
         signer_name: state.signer.name,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
+        party_email_hash: act.email_hash || '',
         signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };

@@ -72,7 +72,10 @@ async function verify() {
 // Returns an HTML fragment (already-escaped) or '' if no attribution found.
 async function lookupSignerHtml(envelope) {
   try {
-    const pkB64 = envelope && envelope.signer && envelope.signer.public_key;
+    // v1/v2 nest the key under signer.public_key; v3 (parasign-doc-3) carries it
+    // flat as signer_public_key.
+    const pkB64 = (envelope && envelope.signer && envelope.signer.public_key)
+      || (envelope && envelope.signer_public_key);
     if (!pkB64) return '';
     const pkBytes = fromB64(pkB64);
     const pkHash = toHex(sha3_256(pkBytes));
