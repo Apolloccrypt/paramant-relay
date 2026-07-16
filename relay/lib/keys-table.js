@@ -13,7 +13,19 @@ const crypto = require('crypto');
 // Scopes are reserved now (every key is "full"); the relay does not yet gate on
 // them. Kept as an allow-list so the enum stays stable for a non-breaking
 // future migration to composite grants.
-const VALID_SCOPES = new Set(['full', 'send-only', 'sign-only', 'read-only']);
+const VALID_SCOPES = new Set(['full', 'send-only', 'sign-only', 'read-only', 'parasign']);
+
+// ParaSign Open-API (/v1) entitlement check. A key grants the parasign scope
+// when its record says so in any of three accepted shapes, so this survives the
+// single-string scope enum above without a schema migration:
+//   rec.scope === 'parasign'  |  rec.parasign === true  |  rec.scopes[] has it.
+function hasParaSignScope(rec) {
+  if (!rec) return false;
+  if (rec.scope === 'parasign') return true;
+  if (rec.parasign === true) return true;
+  if (Array.isArray(rec.scopes) && rec.scopes.includes('parasign')) return true;
+  return false;
+}
 
 // Non-secret, stable key identifier for URLs/listings (never the raw pgp_ key).
 // 48 bits of SHA3-free SHA-256 prefix: collision-safe well past 10M keys.
@@ -45,7 +57,12 @@ function parseAccountFields(rawKey) {
   const legacy_revealable = (rawKey.legacy_revealable !== undefined)
     ? !!rawKey.legacy_revealable
     : (!hasAccountId && is_primary);
-  return { account_id, is_primary, scope, legacy_revealable };
+  // ParaSign /v1 API grant. Orthogonal to `scope` (which stays single-valued):
+  // this is an additive, behaviour-neutral boolean entitlement - the relay does
+  // not gate on it yet - that an admin toggles on/off as the override alongside
+  // the automatic grant on payment. Default off. /*MARK:parasign_parse*/
+  const parasign = rawKey.parasign === true;
+  return { account_id, is_primary, scope, legacy_revealable, parasign };
 }
 
 // Pick a kid not already present in `taken` (anything with a .has(kid) method:
@@ -177,4 +194,53 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
   return { previous, current: key };
 }
 
-module.exports = { VALID_SCOPES, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary };
+// -- ParaSign /v1 key issuance (psk_) -----------------------------------------
+// Pure record builder shared by BOTH issuance paths (self-serve + admin-mint) so
+// there is exactly ONE psk_ format and ONE stored shape -- no drift. relay.js
+// wraps this with a CSPRNG token, the live-Map wiring and users.json persistence
+// (see mintParasignKey). The key is bound to `accountId` and carries BOTH the
+// scope=='parasign' and the boolean parasign grant, so the /v1 auth accepts it
+// under either representation and it survives a users.json reload (parseAccountFields
+// keeps scope+parasign). A minted product key is never an account primary.
+//   randomHex: caller-supplied cryptographic hex (relay: crypto.randomBytes(32)).
+//   test:      psk_test_ (sandbox) vs psk_live_.
+function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt }) {
+  if (!accountId) throw new Error('accountId required');
+  if (!randomHex || typeof randomHex !== 'string') throw new Error('randomHex required');
+  const key = (test ? 'psk_test_' : 'psk_live_') + randomHex;
+  const created = createdAt || new Date().toISOString();
+  const normPlan = (typeof plan === 'string' && plan) ? plan : 'community';
+  const rec = {
+    plan: normPlan,
+    label: (typeof label === 'string' ? label.slice(0, 128) : '') || 'parasign-api',
+    email: email || '',
+    active: true,
+    account_id: accountId,
+    is_primary: false,
+    scope: 'parasign',
+    parasign: true,
+    product: 'parasign',
+    created,
+  };
+  // users.json persisted entry (subset the loader re-hydrates via parseAccountFields).
+  const usersEntry = {
+    key, plan: rec.plan, label: rec.label, email: rec.email, active: true, created,
+    account_id: accountId, is_primary: false, scope: 'parasign', parasign: true, product: 'parasign',
+  };
+  return { key, record: rec, usersEntry };
+}
+
+// Which plans carry the ParaSign entitlement without an explicit grant. `licensed`
+// is listed alongside `enterprise` so an un-normalised plan name still matches.
+const PARASIGN_ENTITLED_PLANS = new Set(['pro', 'enterprise', 'licensed']);
+
+// Self-serve gate: may this account mint a ParaSign /v1 key? True when ANY member
+// key already carries the parasign grant (admin set-parasign / billing auto-grant),
+// OR the account plan itself includes ParaSign (paid). Pure: takes the account's
+// member key-records and its plan; no I/O, no globals.
+function accountHasParasignEntitlement(memberRecords, plan) {
+  for (const r of (memberRecords || [])) { if (r && r.parasign === true) return true; }
+  return PARASIGN_ENTITLED_PLANS.has(plan);
+}
+
+module.exports = { VALID_SCOPES, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };

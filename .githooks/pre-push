@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Committed pre-push hook. Activeer met: git config core.hooksPath .githooks
+# Blokkeert een push met em-dashes, emoji's of AI-attributie in de commit-messages
+# of toegevoegde diff-regels van het push-bereik.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+exec "$ROOT/scripts/check-commit-style.sh" --pre-push

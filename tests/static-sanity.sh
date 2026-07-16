@@ -201,6 +201,26 @@ for f in \
   fi
 done
 
+# ── 10. Commit/GitHub style guard ────────────────────────────────────────────
+# Same gate as the secret checks: block em-dashes, emoji, and AI attribution
+# markers in the last commit message and its added diff lines.
+# scripts/check-commit-style.sh is the single source of truth; the committed
+# pre-push hook (.githooks/pre-push) runs the same script on push.
+echo ""
+echo "10. Commit/GitHub style guard (scripts/check-commit-style.sh)..."
+STYLE="$ROOT/scripts/check-commit-style.sh"
+if [ -x "$STYLE" ]; then
+  if STYLE_OUT="$("$STYLE" 2>&1)"; then
+    printf "   OK  last commit message + added lines are style-clean\n"
+  else
+    printf "   FAIL  style guard flagged the last commit:\n"
+    printf '%s\n' "$STYLE_OUT" | sed 's/^/     /'
+    FAIL=$((FAIL + 1))
+  fi
+else
+  printf "   WARN  %s not found or not executable, style guard skipped\n" "$STYLE"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "════════ RESULT ════════"

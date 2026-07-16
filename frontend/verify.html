@@ -197,7 +197,7 @@
   <header class="ps-head">
     <p class="ps-kicker">Verify signature</p>
     <h1 class="ps-title">Verify a .psign envelope</h1>
-    <p class="ps-lede">Check that a document has not been altered since signing. The document never leaves your browser &mdash; only its SHA3-256 hash and the envelope are sent.</p>
+    <p class="ps-lede">Check that a document has not been altered since signing. Everything runs in your browser &mdash; the document never leaves your device, and current signatures verify offline with no account or API key.</p>
   </header>
 
   <section class="card ps-panel" aria-labelledby="v1">
@@ -206,12 +206,12 @@
   </section>
 
   <section class="card ps-panel" aria-labelledby="v2">
-    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope &amp; key</h2></div>
+    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope</h2></div>
     <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
-    <div class="ps-field">
+    <div class="ps-field" id="vf-key-block" hidden>
       <label class="ps-label" for="vf-api-key">API key (X-Api-Key)</label>
       <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">The verify endpoint currently requires an API key. (Fully account-free, client-side verification is a planned enhancement.)</p>
+      <p class="ps-warn">This is a legacy (v1/v2) envelope; its relay notary signature can only be checked by the relay, which requires an API key. Current signatures verify fully offline with no key.</p>
     </div>
   </section>
 
@@ -226,9 +226,9 @@
     <ul>
       <li>SHA3-256 of your document matches the hash inside the envelope</li>
       <li>The signer's ML-DSA-65 signature over that hash is valid</li>
-      <li>The relay's notary signature over the envelope is valid</li>
       <li>The envelope has not expired</li>
     </ul>
+    <p class="ps-help">Signatures verify entirely in your browser &mdash; no account, no API key, works offline.</p>
     <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
   </aside>
 </div>
@@ -291,6 +291,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/parasign-verify.js?v=2"></script>
+<script type="module" src="/parasign-verify.js?v=4"></script>
 </body>
 </html>
