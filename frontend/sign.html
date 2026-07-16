@@ -66,6 +66,7 @@
 .ds-anno-resize{position:absolute;right:0;bottom:0;width:12px;height:12px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:7}
 /* Annotation types: highlight (translucent bar), note (sticky, wrapping), draw (pen stroke) */
 .ds-anno[data-type="highlight"]{background:rgba(255,214,61,.42);border:1px dashed rgba(191,146,7,.85);padding:0}
+.ds-anno[data-type="redact"]{background:#000;border:1px solid #000;padding:0}
 .ds-anno[data-type="note"]{background:#fff7c9;border:1px solid #d3b334;white-space:normal;line-height:1.35;align-items:flex-start;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:4px 6px}
 .ds-anno-draw{background:transparent;border:1px dashed transparent;padding:0}
 .ds-anno-draw:hover,.ds-anno-draw:focus-within{border-color:var(--cobalt)}
@@ -418,6 +419,7 @@
       <button class="ds-edit-btn" id="ds-add-text" type="button">+ Text</button>
       <button class="ds-edit-btn" id="ds-add-date" type="button">+ Date</button>
       <button class="ds-edit-btn" id="ds-add-highlight" type="button">+ Highlight</button>
+      <button class="ds-edit-btn" id="ds-add-redact" type="button">+ Redact</button>
       <button class="ds-edit-btn" id="ds-add-note" type="button">+ Note</button>
       <button class="ds-edit-btn" id="ds-tool-pen" type="button" aria-pressed="false">&#9998; Draw</button>
       <span class="ds-edit-sep" aria-hidden="true"></span>

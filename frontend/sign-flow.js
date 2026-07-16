@@ -520,6 +520,24 @@ function addHighlight() {
   renderExtraMarker(extra);
 }
 
+// Redaction: an opaque black bar that covers content. NOTE: this bakes a solid
+// rectangle over the area (visual redaction). True content removal (stripping the
+// underlying text) is a separate, stronger step — see the AES/redaction roadmap.
+function addRedact() {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const w = Math.round(pageW * 0.30);
+  const h = Math.round(Math.max(14, pageH * 0.026));
+  const extra = {
+    id: ++_extraSeq, type: 'redact', pageIndex: pageIdx,
+    x: Math.round(pageW * 0.34), y: Math.round(pageH * 0.60), w, h,
+  };
+  state.extras.push(extra);
+  renderExtraMarker(extra);
+}
+
 // A sticky note: filled box, text wraps to the box width, anchored at its top
 // edge so the box can grow downward while you type without drifting.
 function addNote() {
@@ -557,7 +575,7 @@ function renderExtraMarker(extra) {
   el.className = 'ds-anno';
   el.dataset.type = extra.type;
   el.dataset.id = String(extra.id);
-  if (extra.type === 'highlight') {
+  if (extra.type === 'highlight' || extra.type === 'redact') {
     el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.y - extra.h) / ratio}px;width:${extra.w / ratio}px;height:${extra.h / ratio}px`;
   } else if (extra.type === 'note') {
     el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.yTop) / ratio}px;width:${extra.w / ratio}px;font-size:${extra.size / ratio}px`;
@@ -629,7 +647,7 @@ function wireExtraMarker(el, extra, grip) {
     // What the corner grip means depends on the type: a highlight resizes its
     // box in both dimensions, a note resizes its width (text re-wraps), and
     // text/date scale their font size.
-    if (extra.type === 'highlight') {
+    if (extra.type === 'highlight' || extra.type === 'redact') {
       el.style.width  = Math.max(12, rez.w0 + (e.clientX - rez.x0)) + 'px';
       el.style.height = Math.max(8,  rez.h0 + (e.clientY - rez.y0)) + 'px';
       return;
@@ -656,7 +674,7 @@ function wireExtraMarker(el, extra, grip) {
   grip.addEventListener('pointercancel', rezUp);
   }   // if (grip): draw markers have no resize grip
 
-  if (extra.type !== 'highlight' && extra.type !== 'draw') {
+  if (extra.type !== 'highlight' && extra.type !== 'draw' && extra.type !== 'redact') {
     el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEditExtra(el, extra); });
   }
 }
@@ -697,7 +715,7 @@ function commitExtraFromMarker(el, extra) {
   const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
   const pageH = wrap._pdfPage.height;
   const left = parseFloat(el.style.left), top = parseFloat(el.style.top);
-  if (extra.type === 'highlight') {
+  if (extra.type === 'highlight' || extra.type === 'redact') {
     extra.x = left * ratio;
     extra.w = el.offsetWidth * ratio;
     extra.h = el.offsetHeight * ratio;
@@ -1980,6 +1998,9 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
       if (!pg) continue;
       if (ex.type === 'highlight') {
         pg.drawRectangle({ x: ex.x, y: ex.y, width: ex.w, height: ex.h, color: hlYellow, opacity: 0.35 });
+      } else if (ex.type === 'redact') {
+        // Opaque black bar covering the area (visual redaction).
+        pg.drawRectangle({ x: ex.x, y: ex.y, width: ex.w, height: ex.h, color: PDFLib.rgb(0, 0, 0), opacity: 1 });
       } else if (ex.type === 'note') {
         // Box height follows the wrapped text; the note is anchored at its top
         // edge (ex.yTop), matching the on-screen behaviour while typing.
@@ -2523,8 +2544,9 @@ function wireEditTools() {
   const t = $('ds-add-text'), d = $('ds-add-date');
   if (t) t.addEventListener('click', () => addExtra('text'));
   if (d) d.addEventListener('click', () => addExtra('date'));
-  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen');
+  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen'), rd = $('ds-add-redact');
   if (h) h.addEventListener('click', addHighlight);
+  if (rd) rd.addEventListener('click', addRedact);
   if (n) n.addEventListener('click', addNote);
   if (p) p.addEventListener('click', () => setPenMode(!_penMode));
   wirePageTools();
