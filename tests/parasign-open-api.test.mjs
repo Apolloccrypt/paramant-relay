@@ -59,6 +59,23 @@ function fakeStore() {
         ],
       };
     },
+    async getForReceipt(id) {
+      if (id !== 'AAAAAAAAAAAAAAAAAAAAAA') return null;
+      // Superset of getRedacted with the durable creator fingerprint the status
+      // handler needs for its owner check. Empty hash here -> the default keys
+      // in these tests are NOT the owner, so they see the public redacted view.
+      return {
+        id, status: 'sent', doc_hash: 'a'.repeat(64), binding_mode: 'email',
+        recipe_version: 2, effective_recipe: 2, original_filename: 'q.pdf',
+        created_at: '2026-07-16T10:00:00Z', expires_at: '2026-08-15T10:00:00Z',
+        completed_at: null, voided_at: null, party_count: 2, signed_count: 1,
+        creator_pk_hash: '', creator_api_hash: '',
+        parties: [
+          { index: 0, label: 'Jan', email_hash: '', status: 'signed', signed_at: '2026-07-16T11:00:00Z', signer_pk_hash: 'p0' },
+          { index: 1, label: 'Piet', email_hash: '', status: 'pending', signed_at: null, signer_pk_hash: null },
+        ],
+      };
+    },
     async voidEnvelope() { return { ok: true, code: 'void', status: 'void', voided_at: '2026-07-16T12:00:00Z' }; },
   };
 }
@@ -712,4 +729,78 @@ test('document: not-completed -> 409 for the OWNER but 404 for a STRANGER (autho
     rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: DOC_ID, store: strangerFx.store });
   await v1.route(dStranger);
   assert.equal(dStranger.res.statusCode, 404);
+});
+
+// ===========================================================================
+//  GET /v1/envelopes/:id (status) — authorization-aware redaction
+// ===========================================================================
+// The status view stays reachable to any scoped key (a deliberate progress
+// oracle: per-party pending/signed + counts + timestamps) but must NOT leak
+// identities or commercial data. Only the OWNER or a PARTICIPANT gets the rich
+// view (signer names + creator metadata); everyone else gets it redacted.
+
+function statusDeps({ token, rec, id, store, query, headers }) {
+  return baseDeps({
+    method: 'GET', path: `/v1/envelopes/${id}`,
+    authHeader: token ? 'Bearer ' + token : '',
+    apiKeys: new Map(rec ? [[token, rec]] : []),
+    envStore: store, query: query || {}, req: { headers: headers || {} },
+  });
+}
+
+const STATUS_ID = 'EnvStat0AAAAAAAAAAAAAAAAAAAA';
+// Seed the ephemeral side-record exactly as create() would: real signer names +
+// commercial metadata. If redaction regressed, these strings would surface.
+function seedStatusMeta(id) {
+  v1._meta.set(id, { signers: [{ name: 'Jan Jansen' }, { name: 'Piet Peters' }],
+    metadata: { quote_id: 'Q-42' }, ts: Date.now(), ttlMs: 3600_000 });
+}
+
+test('status: a scoped STRANGER key gets the PUBLIC view -> counts + per-party status, but NO names and NO metadata', async () => {
+  const { store } = voidableStore({ id: STATUS_ID, status: 'sent', ownerToken: 'psk_live_st1owner' });
+  seedStatusMeta(STATUS_ID);
+  const d = statusDeps({ token: 'psk_live_st1stranger',
+    rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: STATUS_ID, store });
+  await v1.route(d);
+  v1._meta.delete(STATUS_ID);
+  const b = d.res.json();
+  assert.equal(d.res.statusCode, 200);
+  // Progress oracle IS present (the feature we keep).
+  assert.equal(b.signer_count, 2);
+  assert.equal(b.signers.length, 2);
+  assert.ok(['pending', 'viewed', 'signed'].includes(b.signers[0].status));
+  // But NOTHING identifying or commercial.
+  for (const s of b.signers) assert.ok(!('name' in s), 'no signer name field in the public view');
+  assert.ok(!('metadata' in b), 'no creator metadata field in the public view');
+  const dump = JSON.stringify(b);
+  assert.equal(dump.indexOf('Q-42'), -1, 'quote_id absent from the public view');
+  assert.equal(dump.indexOf('Jansen'), -1, 'signer name absent from the public view');
+});
+
+test('status: the OWNER gets the RICH view -> signer names + creator metadata (quote_id)', async () => {
+  const OWNER = 'psk_live_st2owner';
+  const { store } = voidableStore({ id: STATUS_ID, status: 'sent', ownerToken: OWNER });
+  seedStatusMeta(STATUS_ID);
+  const d = statusDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' }, id: STATUS_ID, store });
+  await v1.route(d);
+  v1._meta.delete(STATUS_ID);
+  const b = d.res.json();
+  assert.equal(d.res.statusCode, 200);
+  assert.equal(b.signers[0].name, 'Jan Jansen');
+  assert.equal(b.signers[1].name, 'Piet Peters');
+  assert.equal(b.metadata.quote_id, 'Q-42');
+});
+
+test('status: an authorized PARTICIPANT (valid invite token) also gets the rich view', async () => {
+  const { store, inviteTokens } = voidableStore({ id: STATUS_ID, status: 'sent', ownerToken: 'psk_live_st3owner' });
+  seedStatusMeta(STATUS_ID);
+  const d = statusDeps({ token: 'psk_live_st3signer',
+    rec: { active: true, parasign: true, account_id: 'acct_signer' }, id: STATUS_ID, store,
+    query: { invite_token: inviteTokens[0] } });
+  await v1.route(d);
+  v1._meta.delete(STATUS_ID);
+  const b = d.res.json();
+  assert.equal(d.res.statusCode, 200);
+  assert.equal(b.signers[0].name, 'Jan Jansen');
+  assert.equal(b.metadata.quote_id, 'Q-42');
 });

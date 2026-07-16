@@ -235,7 +235,7 @@ async function route(deps) {
   if (tail !== null) {
     const [id, sub] = tail.split('/');
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
-    if (!sub && method === 'GET')             return getEnvelope(deps, id);
+    if (!sub && method === 'GET')             return getEnvelope(deps, id, token, rec);
     if (sub === 'document' && method === 'GET') return getDocument(deps, id, token, rec);
     if (sub === 'receipt'  && method === 'GET') return getReceipt(deps, id, token, rec);
     if (sub === 'void'     && method === 'POST') return voidEnvelope(deps, id, token, rec);
@@ -348,11 +348,23 @@ async function createEnvelope(deps, apiKey, mode, rec) {
 }
 
 // ── GET /v1/envelopes/:id ─────────────────────────────────────────────────────
-async function getEnvelope(deps, id) {
+// This is deliberately the ONE /v1 read that stays reachable to a scoped key
+// that is neither owner nor participant: a lightweight progress oracle (per-
+// party pending/signed, counts, timestamps). But it must NOT hand identifying
+// or commercial data to a stranger, so it is authorization-AWARE:
+//   * OWNER or PARTICIPANT (authorizeReceipt, same gate as /document) -> RICH
+//     view: signer NAMES + the creator METADATA (quote_id & friends).
+//   * anyone else -> REDACTED public view: names and metadata omitted entirely.
+// Loads via getForReceipt for the durable creator_api_hash the owner check
+// needs (getRedacted omits it). getRedacted itself is left untouched.
+async function getEnvelope(deps, id, token, rec) {
   const { res, envStore, J } = deps;
   let env;
-  try { env = await envStore.getRedacted(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
+  try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
   if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+  let authorized = false;
+  try { authorized = await authorizeReceipt(deps, id, token, rec, env); }
+  catch (_) { authorized = false; }
   const m = meta.get(id) || {};
   const ext = externalStatus(env);
   const nameFor = (i) => (m.signers && m.signers[i]) ? m.signers[i].name : (env.parties[i] && env.parties[i].label) || null;
@@ -361,7 +373,8 @@ async function getEnvelope(deps, id) {
     status: ext,
     signers: env.parties.map(p => ({
       index: p.index,
-      name: nameFor(p.index),
+      // Names are identifying -> only for the owner/participant view.
+      ...(authorized ? { name: nameFor(p.index) } : {}),
       status: p.status,
       signed_at: p.signed_at || undefined,
     })),
@@ -370,7 +383,9 @@ async function getEnvelope(deps, id) {
     created_at: env.created_at,
     expires_at: env.expires_at,
     documents: null,
-    metadata: m.metadata || {},
+    // Creator metadata (quote_id & any free-form fields) is commercial -> only
+    // exposed to the owner/participant. Absent from the public redacted view.
+    ...(authorized ? { metadata: m.metadata || {} } : {}),
   };
   if (ext === 'completed') {
     body.documents = {
