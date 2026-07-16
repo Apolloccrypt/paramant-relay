@@ -190,10 +190,21 @@ test('422 POST with a non-PDF body', async () => {
   assert.equal(d.res.json().error, 'not_a_pdf');
 });
 
-test('200 POST /v1/envelopes/:id/void', async () => {
-  const apiKeys = new Map([['psk_live_ok', { active: true, parasign: true }]]);
-  const d = baseDeps({ method: 'POST', path: '/v1/envelopes/AAAAAAAAAAAAAAAAAAAAAA/void',
-    authHeader: 'Bearer psk_live_ok', apiKeys, readBody: async () => Buffer.from('{"reason":"superseded"}') });
+test('200 POST /v1/envelopes/:id/void — the OWNER voids a non-completed envelope', async () => {
+  // Owner-only gate: present the creating key (durable creator_api_hash match).
+  const ID = 'EnvVoid0AAAAAAAAAAAAAAAAAAAA';
+  const OWNER = 'psk_live_voidowner';
+  const store = new EnvelopeStore(fakeRedis({
+    id: ID, status: 'sent', doc_hash: 'a'.repeat(64), binding_mode: 'email',
+    recipe_version: '2', party_count: '2', signed_count: '0',
+    created_at: '2026-07-16T10:00:00Z', expires_at: '2026-08-15T10:00:00Z',
+    creator_api_hash: SHA3HEX(Buffer.from(OWNER)),
+    p0_status: 'pending', p1_status: 'pending',
+  }));
+  const d = baseDeps({ method: 'POST', path: `/v1/envelopes/${ID}/void`,
+    authHeader: 'Bearer ' + OWNER, req: { headers: {} },
+    apiKeys: new Map([[OWNER, { active: true, parasign: true, account_id: 'acct_owner' }]]),
+    envStore: store, readBody: async () => Buffer.from('{"reason":"superseded"}') });
   await v1.route(d);
   assert.equal(d.res.statusCode, 200);
   assert.equal(d.res.json().status, 'void');
@@ -241,9 +252,16 @@ function fakeSig() {
   };
 }
 
-// Fake Redis exposing only what getForReceipt / isParticipantToken touch.
+// Fake Redis exposing only what getForReceipt / isParticipantToken / void touch.
+// hSet mutates the backing hash so the real EnvelopeStore.voidEnvelope state
+// transition (sent -> void) round-trips through a subsequent read.
 function fakeRedis(hash) {
-  return { isReady: true, async hGetAll() { return { ...hash }; }, async hGet(_k, f) { return hash[f]; } };
+  return {
+    isReady: true,
+    async hGetAll() { return { ...hash }; },
+    async hGet(_k, f) { return hash[f]; },
+    async hSet(_k, obj) { Object.assign(hash, obj); return Object.keys(obj || {}).length; },
+  };
 }
 
 // Sorted-key canonical JSON (mirrors relay/parasign.canonicalJSON), used to sign
@@ -501,4 +519,197 @@ test('getForReceipt: exposes raw sig/pubkey split + creator fingerprints; getRed
     assert.ok(p.sig_b64 && p.pk_b64, 'raw signature + pubkey split out');
     assert.ok(p.signer_pk_hash, 'signer_pk_hash derived');
   }
+});
+
+// ===========================================================================
+//  POST /v1/envelopes/:id/void — OWNER-ONLY per-envelope authorization
+// ===========================================================================
+// void tears down the WHOLE envelope, so the gate is stricter than receipt:
+// only the OWNER (creator fingerprint / same account) may void; a PARTICIPANT
+// holding a valid invite token must NOT. Every failure collapses to a generic
+// 404, and authorization runs BEFORE the store's state branches (the 409).
+
+// A minimal, voidable envelope over the real EnvelopeStore + fakeRedis: carries
+// the durable creator_api_hash and per-party invite tokens so both the owner
+// (path a) and participant (path c, receipt-only) gates run for real.
+function voidableStore({ id, status, ownerToken }) {
+  const hash = {
+    id, status, doc_hash: 'a'.repeat(64), binding_mode: 'email',
+    recipe_version: '2', party_count: '2', signed_count: '0',
+    original_filename: 'contract.pdf',
+    created_at: '2026-07-16T10:00:00Z', expires_at: '2026-08-15T10:00:00Z',
+    completed_at: status === 'complete' ? '2026-07-16T12:00:00Z' : null,
+    creator_api_hash: SHA3HEX(Buffer.from(ownerToken)),
+  };
+  const inviteTokens = [];
+  for (let i = 0; i < 2; i++) {
+    hash['p' + i + '_status'] = status === 'complete' ? 'signed' : 'pending';
+    const tok = 'invite_tok_' + id + '_' + i;
+    hash['p' + i + '_invite_token'] = tok;
+    inviteTokens.push(tok);
+  }
+  return { store: new EnvelopeStore(fakeRedis(hash)), inviteTokens };
+}
+
+function voidDeps({ token, rec, id, store, query, headers, body }) {
+  return baseDeps({
+    method: 'POST', path: `/v1/envelopes/${id}/void`,
+    authHeader: token ? 'Bearer ' + token : '',
+    apiKeys: new Map(rec ? [[token, rec]] : []),
+    envStore: store, query: query || {}, req: { headers: headers || {} },
+    readBody: async () => Buffer.from(body || '{}'),
+  });
+}
+
+const VOID_ID = 'EnvVoidNAAAAAAAAAAAAAAAAAAAA';
+
+test('void: missing API key -> 401 (never reaches the store)', async () => {
+  const { store } = voidableStore({ id: VOID_ID, status: 'sent', ownerToken: 'psk_live_vo1' });
+  const d = voidDeps({ token: '', rec: null, id: VOID_ID, store });
+  d.authHeader = '';
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 401);
+});
+
+test('void: valid key WITHOUT the parasign scope -> 403 (scope gate before ownership)', async () => {
+  const OWNER = 'psk_live_vo2';
+  const { store } = voidableStore({ id: VOID_ID, status: 'sent', ownerToken: OWNER });
+  const d = voidDeps({ token: OWNER, rec: { active: true, scope: 'full' }, id: VOID_ID, store });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 403);
+  assert.equal(d.res.json().error, 'forbidden_scope');
+});
+
+test('void: valid scoped key of ANOTHER account -> 404, no existence leak', async () => {
+  const { store } = voidableStore({ id: VOID_ID, status: 'sent', ownerToken: 'psk_live_vo3owner' });
+  const d = voidDeps({ token: 'psk_live_vo3stranger',
+    rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: VOID_ID, store });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 404);
+  assert.equal(d.res.json().error, 'not_found');
+});
+
+test('void: a PARTICIPANT with a VALID invite token may NOT void -> 404 (owner-only)', async () => {
+  const { store, inviteTokens } = voidableStore({ id: VOID_ID, status: 'sent', ownerToken: 'psk_live_vo4owner' });
+  // This exact token would PASS the receipt gate -- but void is owner-only.
+  const d = voidDeps({ token: 'psk_live_vo4signer',
+    rec: { active: true, parasign: true, account_id: 'acct_signer' }, id: VOID_ID, store,
+    query: { invite_token: inviteTokens[1] } });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 404);
+  assert.equal(d.res.json().error, 'not_found');
+});
+
+test('void: the OWNER voids a non-completed envelope -> 200 { status: void }', async () => {
+  const OWNER = 'psk_live_vo5owner';
+  const { store } = voidableStore({ id: VOID_ID, status: 'sent', ownerToken: OWNER });
+  const d = voidDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' },
+    id: VOID_ID, store, body: '{"reason":"superseded"}' });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 200);
+  assert.equal(d.res.json().status, 'void');
+  assert.ok(d.res.json().voided_at, 'voided_at present');
+});
+
+test('void: already-completed -> 409 for the OWNER but 404 for a STRANGER (authorization before the 409)', async () => {
+  const OWNER = 'psk_live_vo6owner';
+  // Owner reaches the state branch: a completed envelope cannot be voided (409).
+  const ownerFx = voidableStore({ id: VOID_ID, status: 'complete', ownerToken: OWNER });
+  const dOwner = voidDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' },
+    id: VOID_ID, store: ownerFx.store });
+  await v1.route(dOwner);
+  assert.equal(dOwner.res.statusCode, 409);
+  assert.equal(dOwner.res.json().error, 'already_complete');
+  // A stranger against the SAME completed envelope must get 404, never the 409.
+  const strangerFx = voidableStore({ id: VOID_ID, status: 'complete', ownerToken: OWNER });
+  const dStranger = voidDeps({ token: 'psk_live_vo6stranger',
+    rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: VOID_ID, store: strangerFx.store });
+  await v1.route(dStranger);
+  assert.equal(dStranger.res.statusCode, 404);
+});
+
+// ===========================================================================
+//  GET /v1/envelopes/:id/document — OWNER-OR-PARTICIPANT (serves signed PDF)
+// ===========================================================================
+// The document route returns the actual signed PDF bytes, so it carries the
+// SAME per-envelope gate as the receipt: OWNER or PARTICIPANT (valid invite
+// token). A participant IS allowed here (a signer may fetch the final PDF) --
+// that is where it differs from void. Failures collapse to a generic 404 and
+// authorization precedes the 409 not_ready branch.
+
+function docDeps({ token, rec, id, store, query, headers }) {
+  return baseDeps({
+    method: 'GET', path: `/v1/envelopes/${id}/document`,
+    authHeader: token ? 'Bearer ' + token : '',
+    apiKeys: new Map(rec ? [[token, rec]] : []),
+    envStore: store, query: query || {}, req: { headers: headers || {} },
+  });
+}
+
+const DOC_ID = 'EnvDoc00AAAAAAAAAAAAAAAAAAAA';
+
+test('document: missing API key -> 401 (never reaches the store)', async () => {
+  const { store } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: 'psk_live_do1' });
+  const d = docDeps({ token: '', rec: null, id: DOC_ID, store });
+  d.authHeader = '';
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 401);
+});
+
+test('document: valid key WITHOUT the parasign scope -> 403 (scope gate before ownership)', async () => {
+  const OWNER = 'psk_live_do2';
+  const { store } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: OWNER });
+  const d = docDeps({ token: OWNER, rec: { active: true, scope: 'full' }, id: DOC_ID, store });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 403);
+  assert.equal(d.res.json().error, 'forbidden_scope');
+});
+
+test('document: valid scoped key of ANOTHER account -> 404 even with the blob present (no leak)', async () => {
+  const { store } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: 'psk_live_do3owner' });
+  v1._blobs.set(DOC_ID, { pdf: Buffer.from('%PDF-1.7 signed'), filename: 'contract.pdf' });
+  const d = docDeps({ token: 'psk_live_do3stranger',
+    rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: DOC_ID, store });
+  await v1.route(d);
+  v1._blobs.delete(DOC_ID);
+  assert.equal(d.res.statusCode, 404);
+  assert.equal(d.res.json().error, 'not_found');
+});
+
+test('document: an authorized PARTICIPANT (valid invite token) DOES get the signed PDF -> 200', async () => {
+  const { store, inviteTokens } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: 'psk_live_do4owner' });
+  v1._blobs.set(DOC_ID, { pdf: Buffer.from('%PDF-1.7 signed'), filename: 'contract.pdf' });
+  const d = docDeps({ token: 'psk_live_do4signer',
+    rec: { active: true, parasign: true, account_id: 'acct_signer' }, id: DOC_ID, store,
+    headers: { 'x-parasign-invite-token': inviteTokens[0] } });
+  await v1.route(d);
+  v1._blobs.delete(DOC_ID);
+  assert.equal(d.res.statusCode, 200);
+  assert.equal(d.res.headers['Content-Type'], 'application/pdf');
+});
+
+test('document: the OWNER gets the signed PDF -> 200', async () => {
+  const OWNER = 'psk_live_do5owner';
+  const { store } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: OWNER });
+  v1._blobs.set(DOC_ID, { pdf: Buffer.from('%PDF-1.7 signed'), filename: 'contract.pdf' });
+  const d = docDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' }, id: DOC_ID, store });
+  await v1.route(d);
+  v1._blobs.delete(DOC_ID);
+  assert.equal(d.res.statusCode, 200);
+  assert.equal(d.res.headers['Content-Type'], 'application/pdf');
+});
+
+test('document: not-completed -> 409 for the OWNER but 404 for a STRANGER (authorization before the 409)', async () => {
+  const OWNER = 'psk_live_do6owner';
+  const ownerFx = voidableStore({ id: DOC_ID, status: 'sent', ownerToken: OWNER });
+  const dOwner = docDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' },
+    id: DOC_ID, store: ownerFx.store });
+  await v1.route(dOwner);
+  assert.equal(dOwner.res.statusCode, 409);
+  assert.equal(dOwner.res.json().error, 'not_ready');
+  const strangerFx = voidableStore({ id: DOC_ID, status: 'sent', ownerToken: OWNER });
+  const dStranger = docDeps({ token: 'psk_live_do6stranger',
+    rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: DOC_ID, store: strangerFx.store });
+  await v1.route(dStranger);
+  assert.equal(dStranger.res.statusCode, 404);
 });

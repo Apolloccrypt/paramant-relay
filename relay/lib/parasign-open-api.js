@@ -89,13 +89,24 @@ function hexEqual(a, b) {
 //       against every party slot by the store.
 // Anything else -> not authorized (the caller then gets a generic 404, so it
 // cannot tell "not yours" from "does not exist").
-async function authorizeReceipt(deps, id, token, rec, env) {
-  // (a) durable owner fingerprint.
+// OWNER-only check -- the (a)+(b) half of authorizeReceipt, split out so the
+// destructive/private owner-only routes (void, document) and the owner-OR-
+// participant receipt route share ONE definition of "who owns this envelope".
+// Synchronous: both owner paths are local (fingerprint + ephemeral meta).
+function isEnvelopeOwner(deps, id, token, rec, env) {
+  // (a) durable owner fingerprint -- create() stored SHA3(api_key); recompute
+  //     from the presented key and constant-time compare.
   if (env && env.creator_api_hash && hexEqual(SHA3(Buffer.from(token)), env.creator_api_hash)) return true;
-  // (b) same-account owner (ephemeral meta).
+  // (b) same-account owner (ephemeral meta) -- a different key on the same acct.
   const m = meta.get(id);
   const acct = rec && rec.account_id;
   if (m && acct && m.accountId && m.accountId === acct) return true;
+  return false;
+}
+
+async function authorizeReceipt(deps, id, token, rec, env) {
+  // (a)+(b) OWNER (durable fingerprint or same-account).
+  if (isEnvelopeOwner(deps, id, token, rec, env)) return true;
   // (c) participant invite token (header preferred; query fallback).
   const hdr = (deps.req && deps.req.headers && deps.req.headers['x-parasign-invite-token']) || '';
   const q = (deps.query && (deps.query.invite_token || deps.query.t)) || '';
@@ -225,9 +236,9 @@ async function route(deps) {
     const [id, sub] = tail.split('/');
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
     if (!sub && method === 'GET')             return getEnvelope(deps, id);
-    if (sub === 'document' && method === 'GET') return getDocument(deps, id);
+    if (sub === 'document' && method === 'GET') return getDocument(deps, id, token, rec);
     if (sub === 'receipt'  && method === 'GET') return getReceipt(deps, id, token, rec);
-    if (sub === 'void'     && method === 'POST') return voidEnvelope(deps, id, token);
+    if (sub === 'void'     && method === 'POST') return voidEnvelope(deps, id, token, rec);
   }
 
   return errRes(res, 404, 'not_found', 'No such /v1 route.', J);
@@ -371,11 +382,23 @@ async function getEnvelope(deps, id) {
 }
 
 // ── GET /v1/envelopes/:id/document ────────────────────────────────────────────
-async function getDocument(deps, id) {
+// SECURITY: this serves the actual signed PDF bytes, so it is gated exactly like
+// the receipt -- the caller must be the envelope OWNER or a PARTICIPANT (valid
+// invite token). An authenticated-but-unrelated key gets a generic 404 (no
+// existence/state leak). Loads via getForReceipt because the ownership check
+// needs the durable creator_api_hash (getRedacted intentionally omits it).
+async function getDocument(deps, id, token, rec) {
   const { res, envStore, J } = deps;
   let env;
-  try { env = await envStore.getRedacted(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
+  try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
   if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+  // Authorization runs BEFORE any state-dependent (409 not_ready) branch so a
+  // valid stranger key cannot tell "not yours" from "does not exist" from "not
+  // completed yet" -- all collapse to the same 404.
+  let authorized = false;
+  try { authorized = await authorizeReceipt(deps, id, token, rec, env); }
+  catch (_) { authorized = false; }
+  if (!authorized) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
   if (env.status !== 'complete') return errRes(res, 409, 'not_ready', 'Envelope is not completed yet.', J);
   const b = blobs.get(id);
   if (!b) return errRes(res, 404, 'document_gone', 'Document blob expired or unavailable (ephemeral Model-A store).', J);
@@ -470,8 +493,20 @@ async function getReceipt(deps, id, token, rec) {
 }
 
 // ── POST /v1/envelopes/:id/void ───────────────────────────────────────────────
-async function voidEnvelope(deps, id, apiKey) {
+// SECURITY: voiding tears down the WHOLE envelope, so it is OWNER-ONLY -- a
+// participant proving membership with an invite token must NOT be able to
+// retract everyone's envelope. Hence isEnvelopeOwner (paths a+b) and NOT the
+// owner-OR-participant authorizeReceipt. An unrelated key -- or a mere
+// participant -- gets a generic 404. Authorization runs BEFORE the store's
+// state-dependent branches (e.g. the already_complete 409) so a stranger cannot
+// probe an envelope's state. Loads via getForReceipt for the durable
+// creator_api_hash (getRedacted omits it).
+async function voidEnvelope(deps, id, token, rec) {
   const { res, envStore, readBody, J } = deps;
+  let env;
+  try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
+  if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+  if (!isEnvelopeOwner(deps, id, token, rec, env)) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
   let reason = '';
   try { const d = JSON.parse((await readBody(deps.req, 4096)).toString() || '{}'); reason = (d.reason || '').toString(); } catch (_) {}
   let out;
