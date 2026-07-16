@@ -207,7 +207,7 @@ The `leaf_hash` proves the transfer happened at `ts` without storing any patient
 No. Ciphertext is held in RAM only. It is destroyed immediately after the first authorised download. No disk I/O occurs.
 
 **Q: Can we run paramant entirely on-premise?**  
-Yes. The relay is open source (BUSL-1.1). Run it in your own Kubernetes cluster or on a VPS. The receiver and sender still apply client-side encryption — the operator of the relay never has access to plaintext.
+Yes. The relay is source-available (BUSL-1.1). Run it in your own Kubernetes cluster or on a VPS. The receiver and sender still apply client-side encryption — the operator of the relay never has access to plaintext.
 
 **Q: What about DICOM files > 5 MB?**  
 The relay currently pads all transfers to 5 MB and has a hard limit. For large CT/MRI series, split by series UID or use the streaming WebSocket mode (available in Enterprise tier).

@@ -229,7 +229,7 @@ See [API reference — Device Identity](api.md#device-identity) for the full enr
 | SR 2.8 — Auditable events | Every transfer appended to tamper-evident Merkle CT log. Public at `iot.paramant.app/ct`. |
 | SR 5.2 — Zone boundary protection | Self-hosted relay in DMZ. No persistent connection crosses the OT/IT boundary. |
 | IEC 62443-3-2 — Zones and conduits | `iot.paramant.app` is an isolated sector. No cross-sector data sharing with health/legal/finance relays. |
-| IEC 62443-2-3 — Patch management | Open source (BUSL-1.1), versioned Docker releases, public security audit (April 2026). |
+| IEC 62443-2-3 — Patch management | Source-available (BUSL-1.1), versioned Docker releases, public security audit (April 2026). |
 
 ---
 
