@@ -17,6 +17,10 @@
   .claim-btn:disabled{opacity:.5;cursor:default}
   .claim-muted{color:#64748B;font-size:13px;line-height:1.6}
   .claim-err{color:#B91C1C;font-size:14px}
+  .claim-next{margin-top:24px;padding-top:20px;border-top:1px solid #E2E8F0}
+  .claim-next p{margin:0 0 10px}
+  .claim-link{display:inline-block;margin-right:16px;color:#0B3A6A;font-weight:600;font-size:14px;text-decoration:none}
+  .claim-link:hover{text-decoration:underline}
   [hidden]{display:none !important}
 </style>
 </head>
@@ -34,6 +38,11 @@
         <div class="claim-warn">Copy this key now. Refreshing or reopening the link will not show it again.</div>
         <div class="claim-key" id="keyOut" aria-live="polite"></div>
         <button id="copyBtn" class="claim-btn" type="button">Copy key</button>
+        <div class="claim-next">
+          <p class="claim-muted">Next steps</p>
+          <a class="claim-link" href="/docs#api">Read the API docs</a>
+          <a class="claim-link" href="/dashboard">Go to your dashboard</a>
+        </div>
       </div>
 
       <p id="error" class="claim-err" hidden></p>
