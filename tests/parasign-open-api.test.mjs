@@ -115,6 +115,32 @@ test('200 GET status when key has parasign scope', async () => {
   assert.equal(b.signed_count, 1);
 });
 
+test('200 GET status when key has ONLY the admin-grant parasign field (scope=full)', async () => {
+  // Admin grant path: /v2/admin/keys/set-parasign flips a boolean `parasign`
+  // flag on the key record while leaving the single-scope enum on 'full'.
+  // hasParaSignScope() must honour that boolean, so the gate opens.
+  const apiKeys = new Map([['psk_live_adminok', { plan: 'pro', active: true, scope: 'full', parasign: true }]]);
+  const d = baseDeps({ authHeader: 'Bearer psk_live_adminok', apiKeys });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 200);
+  assert.equal(d.res.json().signer_count, 2);
+});
+
+test('403 when the admin-grant field is explicitly false and scope is full', async () => {
+  const apiKeys = new Map([['psk_live_off', { plan: 'pro', active: true, scope: 'full', parasign: false }]]);
+  const d = baseDeps({ authHeader: 'Bearer psk_live_off', apiKeys });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 403);
+  assert.equal(d.res.json().error, 'forbidden_scope');
+});
+
+test('200 when parasign is expressed via a scopes[] array', async () => {
+  const apiKeys = new Map([['psk_live_arr', { plan: 'pro', active: true, scope: 'full', scopes: ['read-only', 'parasign'] }]]);
+  const d = baseDeps({ authHeader: 'Bearer psk_live_arr', apiKeys });
+  await v1.route(d);
+  assert.equal(d.res.statusCode, 200);
+});
+
 test('403 outranks 404: bad key never learns whether an envelope exists', async () => {
   const d = baseDeps({ authHeader: 'Bearer psk_live_noscope',
     apiKeys: new Map([['psk_live_noscope', { active: true, scope: 'full' }]]),

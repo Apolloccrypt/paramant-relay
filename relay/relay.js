@@ -1677,6 +1677,29 @@ function _mutateUsersJson(fn) {
   return _usersWriteQueue;
 }
 
+// ── Billing auto-grant: paid Pro plan → parasign entitlement ──────────────
+// /*MARK:parasign_billing_autograt*/ Called from the plan-change path when an
+// account moves to a paid plan (pro/licensed/enterprise). Reuses the exact
+// account-level fan-out + persistence of /v2/admin/keys/set-parasign: flips the
+// `parasign` flag on every member key of the account, then persists to users.json.
+// Idempotent and additive — safe to call on every paid update-plan.
+const PARASIGN_PAID_PLANS = new Set(['pro', 'licensed', 'enterprise']);
+function grantParasignOnPaidPlan(accountId) {
+  if (!accountId) return { ok: false, reason: 'no_account' };
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return { ok: false, reason: 'no_keys' };
+  let changed = 0;
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.parasign !== true) { mv.parasign = true; changed++; } }
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) {
+      if ((entry.account_id || entry.key) === accountId) entry.parasign = true;
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_grant_on_paid_plan', { account: String(accountId).slice(0, 12), keys: members.size, changed, persisted: true }))
+    .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+  return { ok: true, keys: members.size, changed };
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
     try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
@@ -4569,6 +4592,8 @@ const server = http.createServer(async (req, res) => {
       // Keep the account's plan in step so the per-account cap re-evaluates.
       const _aid = apiKeys.get(key).account_id;
       if (_aid && accounts.has(_aid)) accounts.get(_aid).plan = plan;
+      // Billing auto-grant: a paid Pro plan entitles the account to ParaSign /v1.
+      if (PARASIGN_PAID_PLANS.has(plan)) grantParasignOnPaidPlan(_aid || key); /*MARK:parasign_billing_autograt*/
       _mutateUsersJson(ud => {
         const entry = ud.api_keys.find(k => k.key === key);
         if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
