@@ -336,6 +336,14 @@ tr:last-child td{border-bottom:none}
     <a href="#monitor">GET /v2/monitor</a>
     <a href="#webhook">POST /v2/webhook</a>
     <a href="#health">GET /health</a>
+    <h3>ParaSign API</h3>
+    <a href="#parasign">Overview</a>
+    <a href="#parasign-model">Signing model</a>
+    <a href="#parasign-auth">Authentication</a>
+    <a href="#parasign-endpoints">Endpoints</a>
+    <a href="#parasign-webhooks">Webhooks</a>
+    <a href="#parasign-assurance">Assurance level</a>
+    <a href="#parasign-example">Example: quote &rarr; signed</a>
     <h3>Self-hosting</h3>
     <a href="#selfhost-docker">Docker Compose</a>
     <a href="#selfhost-nginx">nginx &amp; TLS</a>
@@ -608,6 +616,245 @@ ws.onmessage = e => {
   "uptime_s": 3600,
   "license_expires": "2027-01-01"
 }</span></pre>
+
+    <!-- ── ParaSign API ─────────────────────────────────────────── -->
+    <span id="parasign" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="parasign-overview">ParaSign API</h2>
+    <p>The ParaSign API is a thin, public <code>/v1</code> layer for e-signature workflows: send a PDF, have humans sign it, and get the signed PDF plus a verifiable <code>.psign</code> proof back. It sits on top of the internal <code>/v2</code> notary relay and does not replace it. Your integration only needs an API key: no ParaSign account or logged-in browser session on your side.</p>
+
+    <div class="callout"><span class="callout-label">ParaSign Connect</span>
+      <p><strong style="color:#B2FF3F">This is the ParaSign Connect tier.</strong> Unlike the rest of the relay, the Connect flow temporarily stores your PDF blob for the duration of the signing ceremony (opt-in, retention = <code>ttl_days</code>). Everywhere else the notary invariant holds: the relay never sees your document. These docs live here temporarily until Connect gets its own home.</p>
+    </div>
+
+    <p><strong>Base URL.</strong> All ParaSign endpoints are served from <code>https://api.parasign.io/v1</code>. Hosted signing pages are served from <code>https://sign.parasign.io</code>.</p>
+
+    <h3>The model</h3>
+    <p>One end-to-end flow: PDF in, hosted signing ceremony, signed PDF and <code>.psign</code> out via webhook.</p>
+    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px"><strong>Create.</strong> <code>POST /v1/envelopes</code> with the PDF and the signers. ParaSign stores the blob, hashes it (SHA3-256), builds the internal envelope, and returns one hosted <code>sign_url</code> per signer.</p></div></div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px"><strong>Sign.</strong> Each signer opens their hosted page and signs client-side with ML-DSA-65. The private key never leaves their browser. A <code>signer.completed</code> webhook fires per signature.</p></div></div>
+    <div class="step-row"><div class="step-num">3</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px"><strong>Collect.</strong> When the last signer is done the envelope flips to <code>completed</code>. An <code>envelope.completed</code> webhook delivers download links for the signed PDF and the <code>.psign</code> receipt.</p></div></div>
+
+    <span id="parasign-model" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h3>Signing model: hosted ceremony</h3>
+    <p>The relay is a notary, not a signer. ParaSign never holds a private key. In the Connect tier the human signs in a ParaSign-hosted browser page (the existing signing flow); ParaSign only orchestrates and countersigns the receipt with its own notary key. The one new trust surface is that ParaSign holds the PDF blob for the length of the ceremony.</p>
+    <div class="callout warn"><span class="callout-label">Honest limitation</span>
+      <p>Fully headless server-to-server signing is out of scope. A human signs each slot in a hosted page. If you need to sign without a browser, you would run an ML-DSA signing client per signer yourself, which offline quote software usually does not want to do.</p>
+    </div>
+
+    <!-- ── Auth ──────────────────────────────────────────────────── -->
+    <span id="parasign-auth" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="parasign-authentication">Authentication</h2>
+    <p>Every <code>/v1</code> request carries a ParaSign key as a Bearer token:</p>
+    <pre>Authorization: Bearer psk_live_your_key_here</pre>
+    <table>
+      <tr><th>Prefix</th><th>Environment</th><th>Effect</th></tr>
+      <tr><td><code>psk_live_</code></td><td>Production</td><td>Real envelopes, real notary countersign, webhooks to your live URL</td></tr>
+      <tr><td><code>psk_test_</code></td><td>Sandbox</td><td>Separate namespace. Envelopes are auto-signed by a disposable sandbox signer so you can test end-to-end without a human in the loop</td></tr>
+    </table>
+    <p><strong>Getting a key.</strong> A <code>psk_</code> key is minted per ParaSign account (your tenant). Live and test keys share one <code>account_id</code> but live in separate namespaces, and you may hold several keys per account. Listings only ever show a masked key id, never the full secret. To revoke, mark a key inactive: it then returns <code>401</code> on all <code>/v1</code> routes.</p>
+    <h3>Rate limits</h3>
+    <table>
+      <tr><th>Scope</th><th>Limit</th></tr>
+      <tr><td>POST /v1/envelopes</td><td>50 / hour / key</td></tr>
+      <tr><td>GET reads (status, document, receipt)</td><td>600 / hour / key</td></tr>
+      <tr><td>POST /v1/envelopes/:id/void</td><td>50 / hour / key</td></tr>
+    </table>
+    <p>Over the limit returns <code>429</code> with a <code>Retry-After</code> header.</p>
+
+    <!-- ── Endpoints ─────────────────────────────────────────────── -->
+    <span id="parasign-endpoints" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="parasign-endpoints-table">Endpoints</h2>
+    <p>All bodies are <code>application/json</code>. All routes require <code>Authorization: Bearer psk_...</code>. Errors return <code>{ "error": "code", "message": "..." }</code>.</p>
+    <table>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v1/envelopes</td><td>Create an envelope from a PDF</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v1/envelopes/:id</td><td>Envelope and per-signer status</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v1/envelopes/:id/document</td><td>Download the signed PDF</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v1/envelopes/:id/receipt</td><td>Download the .psign proof</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v1/envelopes/:id/void</td><td>Cancel before completion</td></tr>
+    </table>
+
+    <h3><span class="method post">POST</span> /v1/envelopes</h3>
+    <p>Create an envelope. Provide the PDF inline as base64 or as an HTTPS <code>url</code> (fetched under an SSRF guard, HTTPS only, max 20 MB). ParaSign hashes the PDF with SHA3-256 and returns a hosted <code>sign_url</code> per signer.</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">curl</span></div>
+      <pre>curl -X POST https://api.parasign.io/v1/envelopes \
+  -H "Authorization: Bearer psk_live_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document": { "content_base64": "JVBERi0xLjc..." },
+    "original_filename": "offerte-8842.pdf",
+    "signers": [
+      { "name": "Jan de Vries", "email": "jan@klant.nl", "order": 1 },
+      { "name": "Piet Bakker",  "email": "piet@bv.nl",   "order": 2 }
+    ],
+    "binding_mode": "email",
+    "webhook_url": "https://klant.example/hooks/parasign",
+    "ttl_days": 30,
+    "metadata": { "quote_id": "Q-8842", "crm_ref": "deal/551" }
+  }'</pre>
+    </div>
+    <p><code>201 Created</code>:</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">json</span></div>
+      <pre>{
+  "id": "env_9fJk2b7Qx3mZ8raLpV0t",
+  "status": "sent",
+  "doc_hash": "3af1...e9",
+  "binding_mode": "email",
+  "created_at": "2026-07-16T10:03:11Z",
+  "expires_at": "2026-08-15T10:03:11Z",
+  "signers": [
+    { "index": 0, "name": "Jan de Vries", "email": "jan@klant.nl", "order": 1,
+      "status": "pending",
+      "sign_url": "https://sign.parasign.io/e/env_9fJk2b7Qx3mZ8raLpV0t?p=0&t=..." },
+    { "index": 1, "name": "Piet Bakker", "email": "piet@bv.nl", "order": 2,
+      "status": "pending",
+      "sign_url": "https://sign.parasign.io/e/env_9fJk2b7Qx3mZ8raLpV0t?p=1&t=..." }
+  ],
+  "metadata": { "quote_id": "Q-8842", "crm_ref": "deal/551" }
+}</pre>
+    </div>
+    <p>Status codes: <code>201</code> ok &middot; <code>400</code> bad PDF or fields &middot; <code>401</code> invalid or revoked key &middot; <code>413</code> PDF over 20 MB &middot; <code>422</code> <code>url</code> not fetchable or not a PDF &middot; <code>429</code> create quota &middot; <code>503</code> envelope store unavailable.</p>
+
+    <h3><span class="method get">GET</span> /v1/envelopes/:id</h3>
+    <p>Poll envelope and signer status. When <code>status</code> is <code>completed</code>, <code>documents</code> holds the download links.</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">json</span></div>
+      <pre>{
+  "id": "env_9fJk2b7Qx3mZ8raLpV0t",
+  "status": "in_progress",
+  "signers": [
+    { "index": 0, "name": "Jan de Vries", "status": "signed",
+      "signed_at": "2026-07-16T11:20:04Z" },
+    { "index": 1, "name": "Piet Bakker",  "status": "pending" }
+  ],
+  "signed_count": 1,
+  "signer_count": 2,
+  "documents": null,
+  "metadata": { "quote_id": "Q-8842" }
+}</pre>
+    </div>
+    <p>External statuses: <code>sent</code>, <code>in_progress</code>, <code>completed</code>, <code>declined</code>, <code>void</code>, <code>expired</code>. On <code>completed</code>, <code>documents</code> becomes <code>{ "signed_pdf": "/v1/envelopes/:id/document", "receipt": "/v1/envelopes/:id/receipt" }</code>. Status codes: <code>200</code> &middot; <code>401</code> &middot; <code>404</code> &middot; <code>429</code>.</p>
+
+    <h3><span class="method get">GET</span> /v1/envelopes/:id/document</h3>
+    <p>Returns the signed, stamped PDF. Only available once <code>status</code> is <code>completed</code>, otherwise <code>409 not_ready</code>.</p>
+    <pre>200 OK
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="offerte-8842-signed.pdf"
+<span class="cm">&lt;binary PDF body&gt;</span></pre>
+    <p>Status codes: <code>200</code> &middot; <code>401</code> &middot; <code>404</code> &middot; <code>409 not_ready</code>.</p>
+
+    <h3><span class="method get">GET</span> /v1/envelopes/:id/receipt</h3>
+    <p>Returns the <code>.psign</code> proof: canonical JSON produced by the notary countersign. It contains the ML-DSA-65 signature(s), signer public keys, the notary countersign and metadata. Verify it with <code>POST /v2/verify-receipt</code>.</p>
+    <pre>200 OK
+Content-Type: application/json
+Content-Disposition: attachment; filename="offerte-8842.psign"</pre>
+    <p>Status codes: <code>200</code> &middot; <code>401</code> &middot; <code>404</code> &middot; <code>409 not_ready</code>.</p>
+
+    <h3><span class="method post">POST</span> /v1/envelopes/:id/void</h3>
+    <p>Cancel an envelope that has not yet completed. A completed envelope cannot be voided.</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">curl</span></div>
+      <pre>curl -X POST https://api.parasign.io/v1/envelopes/env_9fJk2b7Qx3mZ8raLpV0t/void \
+  -H "Authorization: Bearer psk_live_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "quote superseded" }'</pre>
+    </div>
+    <p><code>200</code>: <code>{ "id": "...", "status": "void", "voided_at": "..." }</code>. Emits an <code>envelope.voided</code> webhook. Status codes: <code>200</code> &middot; <code>401</code> &middot; <code>404</code> &middot; <code>409 already_complete</code>.</p>
+
+    <!-- ── Webhooks ──────────────────────────────────────────────── -->
+    <span id="parasign-webhooks" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="parasign-webhooks-h">Webhooks</h2>
+    <p>ParaSign POSTs signed JSON to your <code>webhook_url</code> as the envelope moves through its lifecycle.</p>
+    <table>
+      <tr><th>Event</th><th>When</th></tr>
+      <tr><td>envelope.sent</td><td>Right after POST /v1/envelopes</td></tr>
+      <tr><td>signer.completed</td><td>Each time a signer successfully signs</td></tr>
+      <tr><td>envelope.completed</td><td>Last signer done; signed PDF and .psign ready</td></tr>
+      <tr><td>envelope.declined</td><td>A signer declines</td></tr>
+      <tr><td>envelope.voided</td><td>Initiator voids via /v1/.../void</td></tr>
+    </table>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">json</span></div>
+      <pre>{
+  "event": "signer.completed",
+  "id": "env_9fJk2b7Qx3mZ8raLpV0t",
+  "ts": "2026-07-16T11:20:04Z",
+  "data": {
+    "signer": { "index": 0, "name": "Jan de Vries", "email": "jan@klant.nl" },
+    "signed_count": 1,
+    "signer_count": 2,
+    "status": "in_progress"
+  },
+  "metadata": { "quote_id": "Q-8842" }
+}</pre>
+    </div>
+    <p>On <code>envelope.completed</code>, <code>data.documents</code> carries the same signed PDF and receipt links as the status endpoint.</p>
+    <h3>Verifying the signature</h3>
+    <p>Each delivery carries <code>X-Paramant-Event</code> and <code>X-Paramant-Sig</code> (hex), where the signature is <code>HMAC_SHA256(webhook_secret, raw_request_body)</code>. A unique <code>X-Paramant-Delivery</code> id lets you drop replays. Verify against the raw body bytes, in constant time:</p>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
+      <pre>import hmac, hashlib
+
+def verify(raw_body: bytes, sig_header: str, webhook_secret: str) -> bool:
+    computed = hmac.new(
+        webhook_secret.encode(), raw_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(computed, sig_header)  <span class="cm"># constant time</span></pre>
+    </div>
+    <div class="callout"><span class="callout-label">Secret</span>
+      <p>The <code>webhook_secret</code> is shown once when the key is minted. Store it; ParaSign will not show it again. One secret per <code>psk_</code> key, one <code>webhook_url</code> per envelope.</p>
+    </div>
+
+    <!-- ── Assurance ─────────────────────────────────────────────── -->
+    <span id="parasign-assurance" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="parasign-assurance-h">Assurance level</h2>
+    <table>
+      <tr><th>Property</th><th>Value</th></tr>
+      <tr><td>Signature class</td><td>AES (Advanced Electronic Signature)</td></tr>
+      <tr><td>Algorithm</td><td>ML-DSA-65 (FIPS 204) client-side, plus notary countersign</td></tr>
+      <tr><td>Not</td><td>QES: no qualified certificate, no QSCD</td></tr>
+      <tr><td>Pro tier volume</td><td>~100 signatures / month</td></tr>
+    </table>
+    <div class="callout warn"><span class="callout-label">Not QES</span>
+      <p>ParaSign produces an Advanced Electronic Signature (AES) under eIDAS, not a Qualified one (QES). There is no qualified certificate and no qualified signature creation device. If your use case legally requires QES, ParaSign Connect is not sufficient on its own.</p>
+    </div>
+
+    <!-- ── Example ───────────────────────────────────────────────── -->
+    <span id="parasign-example" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="parasign-example-h">Example: quote in, signed quote back</h2>
+    <p>A common Connect integration for offer or quote software: submit the quote PDF, let the customer sign, receive the signed PDF and proof.</p>
+    <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Your app posts the quote PDF and the customer as a signer.</p></div></div>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">curl</span></div>
+      <pre>curl -X POST https://api.parasign.io/v1/envelopes \
+  -H "Authorization: Bearer psk_live_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document": { "url": "https://app.example/quotes/Q-8842.pdf" },
+    "original_filename": "Q-8842.pdf",
+    "signers": [ { "name": "Klant BV", "email": "inkoop@klant.nl", "order": 1 } ],
+    "binding_mode": "email",
+    "webhook_url": "https://app.example/hooks/parasign",
+    "metadata": { "quote_id": "Q-8842" }
+  }'</pre>
+    </div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">ParaSign emails the customer a hosted <code>sign_url</code>. They sign in the browser; the private key stays on their device.</p></div></div>
+    <div class="step-row"><div class="step-num">3</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Your webhook receives <code>envelope.completed</code> with the download links.</p></div></div>
+    <div class="step-row"><div class="step-num">4</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Fetch both artifacts and attach them to the CRM deal.</p></div></div>
+    <div class="cb">
+      <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
+      <pre>ENV=env_9fJk2b7Qx3mZ8raLpV0t
+AUTH="Authorization: Bearer psk_live_your_key_here"
+
+<span class="cm"># Signed PDF</span>
+curl -H "$AUTH" https://api.parasign.io/v1/envelopes/$ENV/document -o Q-8842-signed.pdf
+
+<span class="cm"># .psign proof (verify with POST /v2/verify-receipt)</span>
+curl -H "$AUTH" https://api.parasign.io/v1/envelopes/$ENV/receipt -o Q-8842.psign</pre>
+    </div>
+    <p>Prefer the sandbox first: run the same calls with a <code>psk_test_</code> key and the disposable sandbox signer completes every slot automatically, so you can test the full round trip without a human.</p>
 
     <!-- ── Self-hosting ─────────────────────────────────────────── -->
     <span id="self-hosting" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
