@@ -19,7 +19,8 @@ function relayDeps(relaySk, relayPk) {
 function verifyDeps(relayPk) {
   return {
     sigVerify: (s, m, p) => { try { return sig.verify(s, m, p); } catch { return false; } },
-    relayPub: Buffer.from(relayPk),
+    // v3 doc-sign envelopes have no notary signature, so relayPk is optional.
+    relayPub: relayPk ? Buffer.from(relayPk) : Buffer.alloc(0),
   };
 }
 
@@ -99,4 +100,70 @@ test("expired envelope fails", () => {
   const r = parasign.verifyEnvelope({ documentHashHex: docHashHex, envelope }, verifyDeps(relayPk));
   assert.strictEqual(r.valid, false);
   assert.ok(r.errors.some((e) => e.includes("expired")), JSON.stringify(r.errors));
+});
+
+// ── v3 doc-sign envelopes (parasign-doc-3) - the .psign the /sign page emits ──
+const { signMessageBytes } = require("../envelope");
+
+// Build a v3 .psign the way the browser client does: the signer signs the
+// doc-sign message (recipe 3) over the STAMPED hash for pdf/image documents.
+function makeV3Envelope(opts = {}) {
+  const signer = sig.generateKeyPair();
+  const envelopeId = opts.envelopeId || "env_" + crypto.randomBytes(6).toString("hex");
+  const partyIndex = opts.partyIndex != null ? opts.partyIndex : 0;
+  const stampedHash = crypto.createHash("sha3-256").update(Buffer.from(opts.doc || "stamped-pdf")).digest("hex");
+  const emailHash = opts.emailHash != null ? opts.emailHash
+    : crypto.createHash("sha3-256").update(Buffer.from("alice@example.com")).digest("hex");
+  const msg = signMessageBytes(envelopeId, stampedHash, partyIndex, emailHash, 3);
+  const signature = sig.sign(msg, signer.secretKey);
+  const envelope = {
+    version: "parasign-doc-3", recipe_version: 3, sign_domain: "paramant/parasign/doc/v1",
+    algorithm: "ML-DSA-65", hash_algorithm: "SHA3-256",
+    original_hash: crypto.createHash("sha3-256").update(Buffer.from("orig")).digest("hex"),
+    stamped_hash: stampedHash,
+    signer_public_key: Buffer.from(signer.publicKey).toString("base64"),
+    signature: Buffer.from(signature).toString("base64"),
+    party_email_hash: emailHash,
+    multiparty: { envelope_id: envelopeId, party_index: partyIndex },
+  };
+  return { envelope, stampedHash, signerPk: signer.publicKey };
+}
+
+test("v3: valid doc-sign envelope verifies offline (was always INVALID before D3)", () => {
+  const { envelope, stampedHash } = makeV3Envelope();
+  const r = parasign.verifyEnvelope({ documentHashHex: stampedHash, envelope }, verifyDeps());
+  assert.strictEqual(r.valid, true, JSON.stringify(r.errors));
+});
+
+test("v3: tampered signature fails", () => {
+  const { envelope } = makeV3Envelope();
+  const b = Buffer.from(envelope.signature, "base64"); b[0] ^= 0xff;
+  envelope.signature = b.toString("base64");
+  const r = parasign.verifyEnvelope({ envelope }, verifyDeps());
+  assert.strictEqual(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes("signer signature invalid")), JSON.stringify(r.errors));
+});
+
+test("v3: a different email_hash breaks verification (email is bound into the message)", () => {
+  const { envelope } = makeV3Envelope();
+  envelope.party_email_hash = crypto.createHash("sha3-256").update(Buffer.from("mallory@example.com")).digest("hex");
+  const r = parasign.verifyEnvelope({ envelope }, verifyDeps());
+  assert.strictEqual(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes("signer signature invalid")), JSON.stringify(r.errors));
+});
+
+test("v3: missing party_email_hash is reported (cannot verify offline)", () => {
+  const { envelope } = makeV3Envelope();
+  delete envelope.party_email_hash;
+  const r = parasign.verifyEnvelope({ envelope }, verifyDeps());
+  assert.strictEqual(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes("party_email_hash")), JSON.stringify(r.errors));
+});
+
+test("v3: document-hash binding rejects a mismatched stamped hash", () => {
+  const { envelope } = makeV3Envelope();
+  const wrong = crypto.createHash("sha3-256").update(Buffer.from("nope")).digest("hex");
+  const r = parasign.verifyEnvelope({ documentHashHex: wrong, envelope }, verifyDeps());
+  assert.strictEqual(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes("document_hash mismatch")), JSON.stringify(r.errors));
 });
