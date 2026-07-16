@@ -555,6 +555,23 @@ function addRect() {
   renderExtraMarker(extra);
 }
 
+// An ellipse/oval outline: navy border, transparent fill. Same box geometry as
+// the rectangle; rendered with border-radius and baked via pdf-lib drawEllipse.
+function addEllipse() {
+  if (!placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
+  const w = Math.round(pageW * 0.24);
+  const h = Math.round(Math.max(24, pageH * 0.05));
+  const extra = {
+    id: ++_extraSeq, type: 'ellipse', pageIndex: pageIdx,
+    x: Math.round(pageW * 0.38), y: Math.round(pageH * 0.44), w, h,
+  };
+  state.extras.push(extra);
+  renderExtraMarker(extra);
+}
+
 // A sticky note: filled box, text wraps to the box width, anchored at its top
 // edge so the box can grow downward while you type without drifting.
 function addNote() {
@@ -592,7 +609,7 @@ function renderExtraMarker(extra) {
   el.className = 'ds-anno';
   el.dataset.type = extra.type;
   el.dataset.id = String(extra.id);
-  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect') {
+  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse') {
     el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.y - extra.h) / ratio}px;width:${extra.w / ratio}px;height:${extra.h / ratio}px`;
   } else if (extra.type === 'note') {
     el.style.cssText = `left:${extra.x / ratio}px;top:${(pageH - extra.yTop) / ratio}px;width:${extra.w / ratio}px;font-size:${extra.size / ratio}px`;
@@ -664,7 +681,7 @@ function wireExtraMarker(el, extra, grip) {
     // What the corner grip means depends on the type: a highlight resizes its
     // box in both dimensions, a note resizes its width (text re-wraps), and
     // text/date scale their font size.
-    if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect') {
+    if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse') {
       el.style.width  = Math.max(12, rez.w0 + (e.clientX - rez.x0)) + 'px';
       el.style.height = Math.max(8,  rez.h0 + (e.clientY - rez.y0)) + 'px';
       return;
@@ -691,7 +708,7 @@ function wireExtraMarker(el, extra, grip) {
   grip.addEventListener('pointercancel', rezUp);
   }   // if (grip): draw markers have no resize grip
 
-  if (extra.type !== 'highlight' && extra.type !== 'draw' && extra.type !== 'redact' && extra.type !== 'rect') {
+  if (extra.type !== 'highlight' && extra.type !== 'draw' && extra.type !== 'redact' && extra.type !== 'rect' && extra.type !== 'ellipse') {
     el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEditExtra(el, extra); });
   }
 }
@@ -732,7 +749,7 @@ function commitExtraFromMarker(el, extra) {
   const ratio = wrap._pdfPage.width / wrap.querySelector('canvas').getBoundingClientRect().width;
   const pageH = wrap._pdfPage.height;
   const left = parseFloat(el.style.left), top = parseFloat(el.style.top);
-  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect') {
+  if (extra.type === 'highlight' || extra.type === 'redact' || extra.type === 'rect' || extra.type === 'ellipse') {
     extra.x = left * ratio;
     extra.w = el.offsetWidth * ratio;
     extra.h = el.offsetHeight * ratio;
@@ -2021,6 +2038,9 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
       } else if (ex.type === 'rect') {
         // Rectangle outline: navy border, no fill.
         pg.drawRectangle({ x: ex.x, y: ex.y, width: ex.w, height: ex.h, borderColor: penInk, borderWidth: 1.2, opacity: 0 });
+      } else if (ex.type === 'ellipse') {
+        // Ellipse outline: navy border, no fill. pdf-lib centres on x,y.
+        pg.drawEllipse({ x: ex.x + ex.w / 2, y: ex.y + ex.h / 2, xScale: ex.w / 2, yScale: ex.h / 2, borderColor: penInk, borderWidth: 1.2, opacity: 0 });
       } else if (ex.type === 'note') {
         // Box height follows the wrapped text; the note is anchored at its top
         // edge (ex.yTop), matching the on-screen behaviour while typing.
@@ -2564,10 +2584,11 @@ function wireEditTools() {
   const t = $('ds-add-text'), d = $('ds-add-date');
   if (t) t.addEventListener('click', () => addExtra('text'));
   if (d) d.addEventListener('click', () => addExtra('date'));
-  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen'), rd = $('ds-add-redact'), rc = $('ds-add-rect');
+  const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen'), rd = $('ds-add-redact'), rc = $('ds-add-rect'), ov = $('ds-add-ellipse');
   if (h) h.addEventListener('click', addHighlight);
   if (rd) rd.addEventListener('click', addRedact);
   if (rc) rc.addEventListener('click', addRect);
+  if (ov) ov.addEventListener('click', addEllipse);
   if (n) n.addEventListener('click', addNote);
   if (p) p.addEventListener('click', () => setPenMode(!_penMode));
   wirePageTools();
