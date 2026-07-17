@@ -203,6 +203,11 @@
 .pid-beta { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; background: var(--cobalt); color: #fff; border-radius: 2px; padding: 3px 8px; }
 .pid-head h1 { font-size: clamp(28px, 4.4vw, 42px); line-height: 1.08; letter-spacing: -0.02em; color: var(--navy); margin: 12px 0; }
 .pid-head .lede { font-size: 16px; line-height: 1.6; color: var(--ink-dim); }
+.pid-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: var(--space-4) 0 var(--space-2); }
+.pid-cta-ghost { background: transparent; color: var(--navy); border: 1px solid var(--ink-hair); }
+.pid-cta-ghost:hover { border-color: var(--navy); }
+.pid-cta-sub { font-size: 12.5px; color: var(--ink-dim); }
+.pid-cta-sub a { color: var(--cobalt); }
 .pid-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin: 0 0 var(--space-6); padding: 0; list-style: none; counter-reset: pid; }
 .pid-steps li { border-top: 2px solid #B2FF3F; background: #fff; border: 1px solid var(--ink-hair); border-top: 2px solid #B2FF3F; padding: var(--space-4); font-size: 13px; line-height: 1.55; color: var(--ink-dim); }
 .pid-steps h3 { font-size: 15px; color: var(--navy); margin: 0 0 4px; }
@@ -267,6 +272,11 @@
     <p class="pid-eyebrow"><span></span>ParaID &nbsp;<span class="pid-beta">Beta</span></p>
     <h1>Prove a claim. Keep the data.</h1>
     <p class="lede">A verifier asks a question, like &ldquo;is this person 18 or older?&rdquo;. Your device answers yes or no, with cryptographic proof. The passport fields behind the answer never leave your device, and the relay never sees them either.</p>
+    <div class="pid-cta">
+      <a class="btn btn-lime" href="/paraid-app">Open your wallet</a>
+      <a class="btn pid-cta-ghost" href="/liveness">Try the liveness check</a>
+    </div>
+    <p class="pid-cta-sub">The demo below runs entirely in this page. <a href="/paraid-app">Your wallet</a> holds a real credential and answers requests. <a href="/liveness">Screen-flash liveness</a> is our app-less identity research.</p>
   </div>
 
   <ol class="pid-steps">
