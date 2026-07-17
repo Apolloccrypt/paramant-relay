@@ -178,6 +178,30 @@ function initWallet() {
     catch (e) { status('Could not get a credential: ' + (e.message || e)); }
   };
   $('wallet-create-key').onclick = () => { createHolder(); localStorage.removeItem(CRED_KEY); renderWallet(); $('wallet-status').textContent = 'New holder key created. Get a fresh credential.'; };
+  // Scan a request QR with the camera (jsQR), so a verifier can just show it.
+  const scanBtn = $('wallet-scan');
+  if (scanBtn) scanBtn.onclick = async () => {
+    const box = $('wallet-scanbox'), vid = $('wallet-scanvid');
+    if (!window.jsQR) { $('wallet-answer-out').textContent = 'Scanner unavailable.'; return; }
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); }
+    catch (e) { $('wallet-answer-out').textContent = 'Camera blocked: ' + (e.message || e); return; }
+    box.hidden = false; vid.srcObject = s; await vid.play().catch(() => {});
+    const cv = document.createElement('canvas'); const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const stop = () => { s.getTracks().forEach((t) => t.stop()); box.hidden = true; };
+    const tick = () => {
+      if (box.hidden) return;
+      if (vid.videoWidth) {
+        cv.width = vid.videoWidth; cv.height = vid.videoHeight;
+        ctx.drawImage(vid, 0, 0, cv.width, cv.height);
+        const img = ctx.getImageData(0, 0, cv.width, cv.height);
+        const code = window.jsQR(img.data, img.width, img.height);
+        if (code && /#request=/.test(code.data)) { $('wallet-req-in').value = code.data; stop(); $('wallet-answer-out').textContent = 'Request scanned. Build your answer.'; return; }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
   // Answer an incoming request pasted or via #request=
   $('wallet-answer-btn').onclick = () => {
     let req;
@@ -290,8 +314,13 @@ function initRequester() {
   $('req-build').onclick = () => {
     const predicate = $('req-predicate').value || 'age_over_18|yes';
     const req = { v: 1, predicate, purpose: $('req-purpose').value || '', nonce: b64url(rand(16)) };
-    $('req-link').value = location.origin + '/paraid-app#request=' + b64url(te.encode(JSON.stringify(req)));
+    const link = location.origin + '/paraid-app#request=' + b64url(te.encode(JSON.stringify(req)));
+    $('req-link').value = link;
     $('req-out').hidden = false;
+    // Render the request as a QR the holder can scan (the request is small, so
+    // it fits; the answer with its ML-DSA signatures does not and stays a link).
+    const qr = $('req-qr'); qr.innerHTML = '';
+    try { if (window.QRCode) new window.QRCode(qr, { text: link, width: 180, height: 180, correctLevel: window.QRCode.CorrectLevel.M }); } catch (_) {}
     sessionStorage.setItem('paraid.req.nonce', req.nonce);
   };
   $('req-verify').onclick = async () => {
@@ -307,6 +336,26 @@ function initRequester() {
       : '<b>&#10007; rejected</b><br>' + r.errors.map(esc).join('<br>') + '<br>issuer: ' + esc(r.registry);
     out.hidden = false;
     showVerifyTransparency(bundle, r);
+    // A receipt: portable evidence that this check happened, for the verifier's
+    // records. It carries the outcome, not the person: no name or birthdate.
+    const rc = $('req-receipt');
+    if (r.ok) {
+      const receiptId = hex(sha3_256(concat(fromHex(bundle.root), fromB64url(bundle.nonce)))).slice(0, 24);
+      rc.hidden = false;
+      rc.innerHTML = '<h4>Verification receipt</h4><pre>' + esc(
+        'result:    ' + r.question + ' ' + String(r.answer).toUpperCase() + '\n' +
+        'assurance: ' + (bundle.tier || 'presence') + '\n' +
+        'issuer:    ' + bundle.issuerDid + '\n' +
+        'registry:  ' + r.registry + '\n' +
+        'receipt:   ' + receiptId + '\n' +
+        'checked:   (your local time on saving)') +
+        '</pre><button type="button" class="btn" id="rc-copy">Copy receipt</button>';
+      const cp = $('rc-copy');
+      if (cp) cp.addEventListener('click', () => {
+        const text = rc.querySelector('pre').textContent.replace('(your local time on saving)', new Date().toISOString());
+        navigator.clipboard.writeText(text).then(() => { cp.textContent = 'Copied'; }).catch(() => {});
+      });
+    } else { rc.hidden = true; }
   };
   const m = location.hash.match(/#result=([A-Za-z0-9_-]+)/);
   if (m) { $('req-answer-in').value = location.origin + '/paraid-app#result=' + m[1]; document.querySelector('[data-role="requester"]').click(); }

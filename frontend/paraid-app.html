@@ -250,6 +250,13 @@ select.pa-in { cursor: pointer; }
 .tpl-chip:hover { border-color: var(--cobalt); }
 .tpl-chip.mine { border-style: dashed; }
 .tpl-chip .x { color: var(--ink-dim); margin-left: 5px; }
+.pa-qr { margin: var(--space-3) 0; display: flex; justify-content: center; }
+.pa-qr > * { width: 180px; height: 180px; }
+.pa-scan { margin: var(--space-2) 0; border-radius: 8px; overflow: hidden; max-width: 280px; }
+.pa-scan video { width: 100%; display: block; }
+.pa-receipt { margin-top: var(--space-3); border: 1px solid var(--ink-hair); border-left: 3px solid #B2FF3F; border-radius: 6px; padding: var(--space-3); font-size: 12.5px; }
+.pa-receipt h4 { margin: 0 0 6px; font-size: 13px; color: var(--navy); }
+.pa-receipt pre { font-family: var(--mono); font-size: 11px; background: var(--bone); border-radius: 4px; padding: 8px 10px; margin: 6px 0; overflow-x: auto; white-space: pre; }
 </style>
 
 <div class="pa-wrap">
@@ -297,8 +304,12 @@ select.pa-in { cursor: pointer; }
       <div class="pa-card">
         <h2>2. Answer a request</h2>
         <p>Paste a request link a verifier sent you (or open their link and it lands here). Your device builds a proof that reveals only the answer.</p>
-        <input class="pa-in" id="wallet-req-in" placeholder="Paste the request link (…/paraid-app#request=…)">
-        <button type="button" class="btn btn-lime" id="wallet-answer-btn">Build my answer</button>
+        <input class="pa-in" id="wallet-req-in" placeholder="Paste the request link, or scan it">
+        <div class="pa-row">
+          <button type="button" class="btn btn-lime" id="wallet-answer-btn">Build my answer</button>
+          <button type="button" class="btn" id="wallet-scan">Scan a request</button>
+        </div>
+        <div class="pa-scan" id="wallet-scanbox" hidden><video id="wallet-scanvid" playsinline muted></video></div>
         <p class="pa-status" id="wallet-answer-out"></p>
         <div class="tx-log" id="wallet-tx" hidden></div>
         <input class="pa-in" id="wallet-answer-link" hidden readonly data-selectall="1">
@@ -325,7 +336,8 @@ select.pa-in { cursor: pointer; }
         </div>
         <div id="req-out" hidden>
           <input class="pa-in" id="req-link" readonly data-selectall="1">
-          <p class="pa-note">Send this link to the holder. They answer on their own device.</p>
+          <div class="pa-qr" id="req-qr"></div>
+          <p class="pa-note">Send this link, or let the holder scan the code. They answer on their own device.</p>
         </div>
       </div>
       <div class="pa-card">
@@ -334,7 +346,9 @@ select.pa-in { cursor: pointer; }
         <input class="pa-in" id="req-answer-in" placeholder="Paste the answer link (…/paraid-app#result=…)">
         <button type="button" class="btn btn-lime" id="req-verify">Verify</button>
         <div class="pa-result" id="req-verify-out" hidden></div>
+        <div class="pa-receipt" id="req-receipt" hidden></div>
         <div class="tx-log" id="req-tx" hidden></div>
+        <p class="pa-note"><b>Pricing.</b> Free while in beta. Holders always prove for free. For verifiers, the plan is pay-per-verification (a few cents each) or a monthly bundle, billed to your Paramant account. No per-check fee touches the holder.</p>
       </div>
     </div>
 
@@ -401,6 +415,8 @@ select.pa-in { cursor: pointer; }
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid-app.js?v=10"></script>
+<script src="/vendor/qrcode.min.js?v=1"></script>
+<script src="/vendor/jsQR.min.js?v=1"></script>
+<script type="module" src="/js/paraid-app.js?v=11"></script>
 </body>
 </html>
