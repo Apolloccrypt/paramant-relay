@@ -30,6 +30,7 @@ const userTotp      = require('./lib/user-totp');
 const userSigning   = require('./lib/user-signing');
 const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
+const entitlements  = require('./lib/entitlements'); // product+tier separation (ParaSend vs ParaSign)
 const quota         = require('./lib/quota');
 const keysTable     = require('./lib/keys-table');
 const paraidRegistry = require('./lib/paraid-registry');
@@ -2127,7 +2128,10 @@ const server = http.createServer(async (req, res) => {
       canonicalJSON: parasign.canonicalJSON,
       sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
       relayIdentity,
-      signQuotaGate: async (accountId, plan) => quota.gateSign(redisClient, accountId, tiers.tierLimitNum(plan, 'signs_month'), log),
+      // rec is the psk_ key record; entitlements.signsQuota reads plan_parasign
+      // (with legacy-plan fallback) so the /v1 API meters against the ParaSign
+      // tier, not a product-blind plan field.
+      signQuotaGate: async (accountId, rec) => quota.gateSign(redisClient, accountId, entitlements.signsQuota(rec), log),
       readBody, J, log,
     });
   }
@@ -4232,7 +4236,10 @@ const server = http.createServer(async (req, res) => {
         const _dedupKey = (meta && meta.file_id)
           ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
           : quota.firstChunkHash(blob);
-        const _tLimit = tiers.tierLimitNum(keyData.plan || 'community', 'transfers_month');
+        // ParaSend entitlement: transfers_month for this account's plan_parasend
+        // (falls back to the legacy plan when not yet migrated). Independent of
+        // the ParaSign signs quota below.
+        const _tLimit = entitlements.getEntitlements(keyData).parasend.quotas.transfers_month;
         const _tGate  = await quota.gateTransfer(redisClient, keyData.account_id, _dedupKey, _tLimit, log);
         if (!_tGate.allowed) {
           log('info', 'quota_transfer_declined', { account: String(keyData.account_id).slice(0, 12), plan: keyData.plan || 'community', limit: _tLimit });
@@ -4792,15 +4799,21 @@ const server = http.createServer(async (req, res) => {
       const VALID_PLANS = new Set(['community','dev','pro','licensed','enterprise']);
       if (!key || !VALID_PLANS.has(plan)) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
       if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
-      apiKeys.get(key).plan = plan;
+      const _rec = apiKeys.get(key);
+      _rec.plan = plan;
+      // Re-derive the per-product plans from the new unified plan (there is no
+      // per-product admin endpoint yet). An explicit admin plan change may raise
+      // or lower a product tier; that is intentional, not a silent migration.
+      _rec.plan_parasend = entitlements.derivePlanParasend(plan);
+      _rec.plan_parasign = entitlements.derivePlanParasign(plan, _rec.parasign);
       // Keep the account's plan in step so the per-account cap re-evaluates.
-      const _aid = apiKeys.get(key).account_id;
+      const _aid = _rec.account_id;
       if (_aid && accounts.has(_aid)) accounts.get(_aid).plan = plan;
       // Billing auto-grant: a paid Pro plan entitles the account to ParaSign /v1.
       if (PARASIGN_PAID_PLANS.has(plan)) grantParasignOnPaidPlan(_aid || key); /*MARK:parasign_billing_autograt*/
       _mutateUsersJson(ud => {
         const entry = ud.api_keys.find(k => k.key === key);
-        if (entry) { entry.plan = plan; entry.plan_updated = new Date().toISOString(); }
+        if (entry) { entry.plan = plan; entry.plan_parasend = _rec.plan_parasend; entry.plan_parasign = _rec.plan_parasign; entry.plan_updated = new Date().toISOString(); }
         ud.updated = new Date().toISOString();
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
       applyKeyLimitEnforcement();
@@ -5063,7 +5076,9 @@ const server = http.createServer(async (req, res) => {
       // monthly tier cap is reached. Verifying/reading existing envelopes is not
       // gated. Redis outages pass (fail-open).
       if (keyData && keyData.account_id) {
-        const _sLimit = tiers.tierLimitNum(keyData.plan || 'community', 'signs_month');
+        // ParaSign entitlement: signs_month for this account's plan_parasign
+        // (independent of the ParaSend transfers quota). Separate counter key.
+        const _sLimit = entitlements.getEntitlements(keyData).parasign.quotas.signs_month;
         const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
         if (!_sGate.allowed) {
           log('info', 'quota_sign_declined', { account: String(keyData.account_id).slice(0, 12), plan: keyData.plan || 'community', limit: _sLimit });
