@@ -79,6 +79,20 @@
 /* Per-page action bar (move / rotate / delete) */
 .ds-page-bar{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:8;opacity:.3;transition:opacity .15s}
 .ds-page-wrap:hover .ds-page-bar,.ds-page-bar:focus-within{opacity:1}
+/* Touch / a11y (QA cluster E): touch has no hover, so per-page controls must be
+   always visible; the sticky page-nav must clear the fixed header; and pointer
+   handles need a bigger hit area than the mouse defaults. */
+.ds-anno-edit{position:absolute;top:-9px;left:14px;width:18px;height:18px;border-radius:50%;background:var(--cobalt);color:#fff;border:2px solid #fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0}
+@media (hover: none), (pointer: coarse){
+  .ds-page-bar{opacity:1}
+  .ds-page-nav{top:64px}
+  .ds-anno-del,.ds-anno-edit{width:28px;height:28px;font-size:15px;top:-14px}
+  .ds-anno-edit{left:20px}
+  .ds-anno-resize,.ds-stamp-resize{width:24px;height:24px}
+  .ds-page-bar button{width:34px;height:32px;font-size:14px}
+  .ds-page-nav button{padding:6px 12px}
+  .ds-page-nav input{width:54px;padding:6px 4px}
+}
 .ds-page-bar button{font:inherit;font-size:12px;width:26px;height:24px;padding:0;border:1px solid var(--ink-hair);background:#fff;color:var(--navy);border-radius:4px;cursor:pointer;line-height:1}
 .ds-page-bar button:hover{background:var(--cobalt);border-color:var(--cobalt);color:#fff}
 .ds-sm-band{background:var(--cobalt);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:2px 5px;line-height:1;flex:0 0 auto}
@@ -708,6 +722,6 @@
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
-<script type="module" src="/sign-flow.js?v=33"></script>
+<script type="module" src="/sign-flow.js?v=34"></script>
 </body>
 </html>

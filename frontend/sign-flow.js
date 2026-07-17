@@ -609,6 +609,17 @@ function renderExtraMarker(extra) {
   del.addEventListener('click', e => { e.stopPropagation(); removeExtra(extra.id); });
   el.appendChild(del);
 
+  // Editable objects get an explicit edit button: double-click is mouse-only, so
+  // touch users (and keyboard users) had no way to edit the text (QA cluster E).
+  if (extra.type === 'text' || extra.type === 'date' || extra.type === 'note') {
+    const ed = document.createElement('button');
+    ed.className = 'ds-anno-edit'; ed.type = 'button'; ed.textContent = '✎';
+    ed.title = 'Edit text'; ed.setAttribute('aria-label', 'Edit this text');
+    ed.addEventListener('pointerdown', e => { e.stopPropagation(); });
+    ed.addEventListener('click', e => { e.stopPropagation(); beginEditExtra(el, extra); });
+    el.appendChild(ed);
+  }
+
   const grip = document.createElement('div');
   grip.className = 'ds-anno-resize';
   el.appendChild(grip);
@@ -706,8 +717,8 @@ function beginEditExtra(el, extra) {
   el.classList.add('editing');
   el.contentEditable = 'true';
   // Drop the child controls from the editable text, restore them after.
-  const del = el.querySelector('.ds-anno-del'), grip = el.querySelector('.ds-anno-resize');
-  if (del) del.remove(); if (grip) grip.remove();
+  const del = el.querySelector('.ds-anno-del'), grip = el.querySelector('.ds-anno-resize'), edit = el.querySelector('.ds-anno-edit');
+  if (del) del.remove(); if (grip) grip.remove(); if (edit) edit.remove();
   el.textContent = extra.text;
   el.focus();
   try { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (_) {}
