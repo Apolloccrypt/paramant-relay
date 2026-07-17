@@ -1599,42 +1599,61 @@ async function renderDocPreview() {
     const pdfjs = await waitForPdfjs();
     const copy = new Uint8Array(state.doc.bytes);
     const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
-    const page = await pdf.getPage(state.stamp.pageIndex + 1);
-    const baseViewport = page.getViewport({ scale: 1 });
-    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
-    // Supersample so both CSS-zooming AND HiDPI screens stay sharp. 2.5x covers
-    // the review zoom (up to 3x); lift it to the real dpr when that is higher.
-    const renderScale = (targetW / baseViewport.width) * Math.max(2.5, hiDpiScale());
-    const viewport = page.getViewport({ scale: renderScale });
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    zoomwrap.appendChild(canvas);
     pane.appendChild(zoomwrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    const ratio = baseViewport.width / canvas.getBoundingClientRect().width;   // pdf pt per displayed px
-    const left = state.stamp.x / ratio;
-    const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
-    const mock = document.createElement('div');
-    mock.className = 'ds-mockup-stamp';
-    mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
-    mock.innerHTML = stampInnerHtml();
-    zoomwrap.appendChild(mock);
-    makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
-    // Show the text/date objects that sit on this page, so the review reflects the
-    // whole document, not just the seal. Read-only here (editing was on step-place).
-    for (const ex of state.extras) {
-      if (ex.pageIndex !== state.stamp.pageIndex) continue;
-      const h = extraBoxH(ex.size);
-      const a = document.createElement('div');
-      a.className = 'ds-anno';
-      a.dataset.type = ex.type;
-      a.style.cssText = `left:${ex.x / ratio}px;top:${(baseViewport.height - ex.y - h) / ratio}px;` +
-        `height:${h / ratio}px;font-size:${ex.size / ratio}px;pointer-events:none;border-style:solid;background:transparent`;
-      a.textContent = ex.text;
-      zoomwrap.appendChild(a);
+    // Review shows EVERY page (capped), each with its own annotations, and the
+    // seal on its page. Only the seal page gets the heavy supersample; other
+    // pages render at screen resolution to keep memory sane on long documents.
+    const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
+    for (let p = 1; p <= maxPages; p++) {
+      const page = await pdf.getPage(p);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const isSealPage = (p - 1 === state.stamp.pageIndex);
+      const superSample = isSealPage ? Math.max(2.5, hiDpiScale()) : Math.min(1.5, Math.max(1, hiDpiScale()));
+      const viewport = page.getViewport({ scale: (targetW / baseViewport.width) * superSample });
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px';
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      // The missing line behind the white-review bug: without an explicit CSS
+      // width the supersampled canvas rendered at raw pixel size and the pane
+      // showed only its blank top-left corner.
+      canvas.style.cssText = 'display:block;width:100%;height:auto';
+      wrap.appendChild(canvas);
+      zoomwrap.appendChild(wrap);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const ratio = baseViewport.width / (wrap.getBoundingClientRect().width || targetW);   // pdf pt per displayed px
+      if (isSealPage) {
+        const left = state.stamp.x / ratio;
+        const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
+        const mock = document.createElement('div');
+        mock.className = 'ds-mockup-stamp';
+        mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
+        mock.innerHTML = stampInnerHtml();
+        wrap.appendChild(mock);
+        makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+      }
+      for (const ex of state.extras) {
+        if (ex.pageIndex !== p - 1) continue;
+        const h = extraBoxH(ex.size);
+        const a = document.createElement('div');
+        a.className = 'ds-anno';
+        a.dataset.type = ex.type;
+        a.style.cssText = `left:${ex.x / ratio}px;top:${(baseViewport.height - ex.y - h) / ratio}px;` +
+          `height:${h / ratio}px;font-size:${ex.size / ratio}px;pointer-events:none;border-style:solid;background:transparent`;
+        a.textContent = ex.text;
+        wrap.appendChild(a);
+      }
+    }
+    if (pdf.numPages > maxPages) {
+      const more = document.createElement('div');
+      more.className = 'ds-ops-dim';
+      more.style.cssText = 'font-size:11px;color:var(--ink-dim);padding:6px 0';
+      more.textContent = '+ ' + (pdf.numPages - maxPages) + ' more pages not previewed here; all pages are in the signed file.';
+      zoomwrap.appendChild(more);
     }
     buildReviewZoom(zoomwrap);
     return;
