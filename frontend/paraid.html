@@ -198,7 +198,8 @@
 .pid-wrap { max-width: 1040px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-7); }
 .pid-head { text-align: center; max-width: 62ch; margin: 0 auto var(--space-5); }
 .pid-eyebrow { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
-.pid-eyebrow span { display: inline-block; width: 22px; height: 2px; background: #B2FF3F; }
+.pid-eyebrow > span:first-child { display: inline-block; width: 22px; height: 2px; background: #B2FF3F; }
+.pid-eyebrow .pid-beta { white-space: nowrap; }
 .pid-beta { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; background: var(--cobalt); color: #fff; border-radius: 2px; padding: 3px 8px; }
 .pid-head h1 { font-size: clamp(28px, 4.4vw, 42px); line-height: 1.08; letter-spacing: -0.02em; color: var(--navy); margin: 12px 0; }
 .pid-head .lede { font-size: 16px; line-height: 1.6; color: var(--ink-dim); }
@@ -206,7 +207,7 @@
 .pid-steps li { border-top: 2px solid #B2FF3F; background: #fff; border: 1px solid var(--ink-hair); border-top: 2px solid #B2FF3F; padding: var(--space-4); font-size: 13px; line-height: 1.55; color: var(--ink-dim); }
 .pid-steps h3 { font-size: 15px; color: var(--navy); margin: 0 0 4px; }
 .pid-demo { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
-.pid-panel { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--ink-hair); padding: var(--space-4); }
+.pid-panel { display: flex; flex-direction: column; min-width: 0; background: #fff; border: 1px solid var(--ink-hair); padding: var(--space-4); }
 .pid-panel > h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 var(--space-3); }
 .pid-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
 .pid-row span { color: var(--ink-dim); }
@@ -220,7 +221,7 @@
 .pid-consent { margin-top: var(--space-3); border: 1px dashed var(--ink-hair); padding: var(--space-3); font-size: 12.5px; color: var(--ink-dim); }
 .pid-consent b { color: var(--navy); }
 .pid-consent-h { font-size: 12px; font-weight: 600; color: var(--navy); margin: 0 0 4px; }
-.pid-code { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; background: #0a1626; color: #d5e6ff; border-radius: 6px; padding: 10px 12px; margin: 0 0 var(--space-3); overflow-x: auto; white-space: pre; }
+.pid-code { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; max-width: 100%; background: #0a1626; color: #d5e6ff; border-radius: 6px; padding: 10px 12px; margin: 0 0 var(--space-3); overflow-x: auto; white-space: pre; }
 .pid-code .k { color: #B2FF3F; }
 .pid-code .c { color: #7f9cc0; }
 .pid-code.kept { background: #10233c; color: #8ca6c4; }
