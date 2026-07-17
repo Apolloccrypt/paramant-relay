@@ -545,3 +545,7 @@ nav.nav .nav-link-btn:hover {
   letter-spacing: .04em;
 }
 .nav-mobile-meta .meta-sep { color: #B2FF3F; }
+
+/* Beeldmerk-logo: de blauwe P met lime stip als de P van Paramant. */
+nav.nav .nav-logo { display: inline-flex; align-items: center; gap: 0; color: var(--ink); font-weight: 600; }
+nav.nav .nav-logo-mark { height: 20px; width: 20px; border-radius: 4px; margin-right: 1px; display: block; }
