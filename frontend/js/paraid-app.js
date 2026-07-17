@@ -239,8 +239,54 @@ function showAnswerTransparency(req, bundle) {
     '{\n  answer: "' + bundle.disclosed.key + ' = ' + bundle.disclosed.value + '",\n  issuer: "' + bundle.issuerDid.slice(0, 28) + '…",\n  key_binding + issuer_signature + holder_signature + ' + bundle.path.length + ' path hashes,\n  nonce: "' + bundle.nonce.slice(0, 14) + '…"\n}');
 }
 
+// ── Templates: curated request presets + the user's own private ones ─────────
+const CURATED_TEMPLATES = [
+  { name: 'Age check at the door', predicate: 'age_over_18|yes', purpose: 'Age verification for entry' },
+  { name: 'Online 18+ gate', predicate: 'age_over_18|yes', purpose: 'Access to age-restricted content' },
+  { name: 'Dutch nationality', predicate: 'nationality|NL', purpose: 'Nationality check' },
+  { name: 'Just a real person', predicate: 'presence_verified|yes', purpose: 'Anti-bot / one real human' },
+];
+const TPL_KEY = 'paraid.templates.v1';
+function loadMyTemplates() { try { return JSON.parse(localStorage.getItem(TPL_KEY)) || []; } catch { return []; } }
+function saveMyTemplates(t) { localStorage.setItem(TPL_KEY, JSON.stringify(t)); }
+
+function renderTemplates() {
+  const el = $('tpl-chips'); if (!el) return;
+  el.innerHTML = '';
+  const apply = (t) => { const sel = $('req-predicate'); if ([...sel.options].some((o) => o.value === t.predicate)) sel.value = t.predicate; $('req-purpose').value = t.purpose || ''; };
+  for (const t of CURATED_TEMPLATES) {
+    const c = document.createElement('button');
+    c.type = 'button'; c.className = 'tpl-chip'; c.textContent = t.name;
+    c.addEventListener('click', () => apply(t));
+    el.appendChild(c);
+  }
+  const mine = loadMyTemplates();
+  mine.forEach((t, i) => {
+    const c = document.createElement('button');
+    c.type = 'button'; c.className = 'tpl-chip mine';
+    c.innerHTML = esc(t.name) + '<span class="x" title="Remove">&times;</span>';
+    c.addEventListener('click', (e) => {
+      if (e.target && e.target.classList.contains('x')) { const m = loadMyTemplates(); m.splice(i, 1); saveMyTemplates(m); renderTemplates(); return; }
+      apply(t);
+    });
+    el.appendChild(c);
+  });
+}
+
 // ── Requester role ───────────────────────────────────────────────────────────
 function initRequester() {
+  renderTemplates();
+  const saveBtn = $('tpl-save');
+  if (saveBtn) saveBtn.addEventListener('click', () => {
+    const predicate = $('req-predicate').value;
+    const purpose = $('req-purpose').value || '';
+    const label = (PREDICATES[predicate] ? PREDICATES[predicate].label : predicate) + (purpose ? ' (' + purpose.slice(0, 20) + ')' : '');
+    const m = loadMyTemplates();
+    if (m.length >= 12) { m.shift(); }
+    m.push({ name: label.slice(0, 40), predicate, purpose });
+    saveMyTemplates(m);
+    renderTemplates();
+  });
   $('req-build').onclick = () => {
     const predicate = $('req-predicate').value || 'age_over_18|yes';
     const req = { v: 1, predicate, purpose: $('req-purpose').value || '', nonce: b64url(rand(16)) };

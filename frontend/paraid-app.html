@@ -242,6 +242,14 @@ select.pa-in { cursor: pointer; }
 .tx-data { font-family: var(--mono); font-size: 11px; color: #d5e6ff; background: #0a1626; border-radius: 4px; padding: 6px 8px; margin: 6px 0 0; overflow-x: auto; white-space: pre; }
 .tx-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 10.5px; color: var(--ink-dim); padding: 8px 12px; background: var(--bone); }
 .tx-legend b { font-family: var(--mono); font-weight: 700; }
+/* Templates: curated Paramant request presets + your own private ones. */
+.tpl-bar { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: var(--space-2); }
+.tpl-label { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
+.tpl-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.tpl-chip { font-size: 12px; padding: 5px 11px; border: 1px solid var(--ink-hair); border-radius: 999px; background: #fff; color: var(--navy); cursor: pointer; }
+.tpl-chip:hover { border-color: var(--cobalt); }
+.tpl-chip.mine { border-style: dashed; }
+.tpl-chip .x { color: var(--ink-dim); margin-left: 5px; }
 </style>
 
 <div class="pa-wrap">
@@ -301,13 +309,20 @@ select.pa-in { cursor: pointer; }
       <div class="pa-card">
         <h2>1. Ask a question</h2>
         <p>Pick exactly what must be proven. Only claims the credential can actually answer are listed, so free text can never ask for something the passport never sealed. A fresh nonce makes every answer one-time.</p>
+        <div class="tpl-bar">
+          <span class="tpl-label">Templates:</span>
+          <div class="tpl-chips" id="tpl-chips"></div>
+        </div>
         <select class="pa-in" id="req-predicate">
           <option value="presence_verified|yes">Is a verified live person present?</option>
           <option value="age_over_18|yes">Is 18 or older? (needs a document credential)</option>
           <option value="nationality|NL">Has Dutch nationality? (needs a document credential)</option>
         </select>
         <input class="pa-in" id="req-purpose" placeholder="Purpose (optional), e.g. age check at the door">
-        <button type="button" class="btn btn-lime" id="req-build">Create request link</button>
+        <div class="pa-row">
+          <button type="button" class="btn btn-lime" id="req-build">Create request link</button>
+          <button type="button" class="btn" id="tpl-save">Save as my template</button>
+        </div>
         <div id="req-out" hidden>
           <input class="pa-in" id="req-link" readonly data-selectall="1">
           <p class="pa-note">Send this link to the holder. They answer on their own device.</p>
@@ -386,6 +401,6 @@ select.pa-in { cursor: pointer; }
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid-app.js?v=9"></script>
+<script type="module" src="/js/paraid-app.js?v=10"></script>
 </body>
 </html>
