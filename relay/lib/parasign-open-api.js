@@ -296,7 +296,9 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   if (typeof deps.signQuotaGate === 'function') {
     const meteredAccount = (rec && rec.account_id) || apiKey;
     let g;
-    try { g = await deps.signQuotaGate(meteredAccount, rec && rec.plan); }
+    // Pass the whole key record so the gate can read plan_parasign (ParaSign
+    // tier), not just the product-blind legacy plan. Fallback stays legacy-plan.
+    try { g = await deps.signQuotaGate(meteredAccount, rec || {}); }
     catch (_e) { g = { allowed: true }; }
     if (g && g.allowed === false && g.over_limit) {
       return jsonRes(res, 402, {

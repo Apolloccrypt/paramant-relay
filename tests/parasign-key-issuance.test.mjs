@@ -17,6 +17,7 @@ import keysTable from '../relay/lib/keys-table.js';
 import v1 from '../relay/lib/parasign-open-api.js';
 import quota from '../relay/lib/quota.js';
 import tiers from '../relay/lib/tiers.js';
+import entitlements from '../relay/lib/entitlements.js';
 
 // ---- mocks (mirror tests/parasign-open-api.test.mjs) ------------------------
 function mockRes() {
@@ -94,9 +95,11 @@ function fakeRedis() {
     async exists(k) { return m.has(k) ? 1 : 0; },
   };
 }
-// Exactly the wiring relay.js injects into the /v1 deps.
+// Exactly the wiring relay.js injects into the /v1 deps: the gate receives the
+// key RECORD and meters against its ParaSign entitlement (plan_parasign, with a
+// legacy-plan fallback).
 function makeSignQuotaGate(redis) {
-  return async (accountId, plan) => quota.gateSign(redis, accountId, tiers.tierLimitNum(plan, 'signs_month'), noop);
+  return async (accountId, rec) => quota.gateSign(redis, accountId, entitlements.signsQuota(rec), noop);
 }
 
 const RAND = () => crypto.randomBytes(32).toString('hex');

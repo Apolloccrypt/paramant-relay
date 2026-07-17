@@ -9,6 +9,7 @@
 //
 // Pure module: no I/O, no globals. Unit-tested in test/keys-table.test.js.
 const crypto = require('crypto');
+const entitlements = require('./entitlements'); // per-product plan derivation
 
 // Scopes are reserved now (every key is "full"); the relay does not yet gate on
 // them. Kept as an allow-list so the enum stays stable for a non-breaking
@@ -62,7 +63,12 @@ function parseAccountFields(rawKey) {
   // not gate on it yet - that an admin toggles on/off as the override alongside
   // the automatic grant on payment. Default off. /*MARK:parasign_parse*/
   const parasign = rawKey.parasign === true;
-  return { account_id, is_primary, scope, legacy_revealable, parasign };
+  // Per-product plans (ParaSend vs ParaSign). Prefer an explicit stored value
+  // (post-migration); otherwise derive from the legacy `plan` (+ parasign flag)
+  // WITHOUT downgrading, so an un-migrated key still gets correct entitlements.
+  const plan_parasend = rawKey.plan_parasend || entitlements.derivePlanParasend(rawKey.plan);
+  const plan_parasign = rawKey.plan_parasign || entitlements.derivePlanParasign(rawKey.plan, parasign);
+  return { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign };
 }
 
 // Pick a kid not already present in `taken` (anything with a .has(kid) method:
