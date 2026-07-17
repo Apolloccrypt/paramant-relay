@@ -7,7 +7,9 @@
 // try the flow with, until passport-grade issuance (NFC eMRTD) lands.
 import { readFileSync } from 'fs';
 import crypto from 'crypto';
-import { ml_dsa65, sha3_256 } from '../../frontend/vendor/paramant-pqc.js';
+// Vendored next to this module so the relative path resolves identically in the
+// repo and in the flattened container image (where relay/ becomes /app).
+import { ml_dsa65, sha3_256 } from './paramant-pqc.js';
 
 const te = new TextEncoder();
 const hex = (u8) => Buffer.from(u8).toString('hex');
