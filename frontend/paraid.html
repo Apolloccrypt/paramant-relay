@@ -219,6 +219,11 @@
 .pid-result.err { border-left: 3px solid #d33; }
 .pid-consent { margin-top: var(--space-3); border: 1px dashed var(--ink-hair); padding: var(--space-3); font-size: 12.5px; color: var(--ink-dim); }
 .pid-consent b { color: var(--navy); }
+.pid-consent-h { font-size: 12px; font-weight: 600; color: var(--navy); margin: 0 0 4px; }
+.pid-code { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; background: #0a1626; color: #d5e6ff; border-radius: 6px; padding: 10px 12px; margin: 0 0 var(--space-3); overflow-x: auto; white-space: pre; }
+.pid-code .k { color: #B2FF3F; }
+.pid-code .c { color: #7f9cc0; }
+.pid-code.kept { background: #10233c; color: #8ca6c4; }
 .pid-boundary { border: 2px dashed #B2FF3F; border-radius: 10px; padding: var(--space-3); background: rgba(178,255,63,.03); }
 .pid-boundary-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: var(--space-3); }
 .pid-boundary-label { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--navy); font-weight: 600; }
@@ -272,10 +277,16 @@
       <h2>2 &#183; Your wallet (this device)</h2>
       <p class="pid-note" id="pid-wallet-hint">Issue a credential first.</p>
       <div class="pid-consent" id="pid-consent" hidden>
-        <b>Will be shared:</b> age_over_18 = yes, plus the (public) key binding and a signature over the verifier&rsquo;s nonce<br>
-        <b>Stays on this device:</b> name, birthdate, nationality, document number, and the holder key itself
+        <p class="pid-consent-h">Exactly this leaves your device:</p>
+        <pre class="pid-code" id="pid-consent-share"></pre>
+        <p class="pid-consent-h">This never leaves your device:</p>
+        <pre class="pid-code kept" id="pid-consent-keep"></pre>
       </div>
-      <div id="pid-bundle-out" hidden><p class="pid-note" id="pid-bundle-size"></p></div>
+      <div id="pid-bundle-out" hidden>
+        <p class="pid-note" id="pid-bundle-size"></p>
+        <p class="pid-consent-h">The actual bundle sent to the verifier:</p>
+        <pre class="pid-code" id="pid-bundle-json"></pre>
+      </div>
       <div class="pid-btn-row"><button type="button" class="btn btn-lime" id="pid-answer-btn" disabled>Answer &ldquo;18+?&rdquo; with proof</button></div>
     </div>
     <div class="pid-panel">
@@ -390,6 +401,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid.js?v=6"></script>
+<script type="module" src="/js/paraid.js?v=7"></script>
 </body>
 </html>

@@ -114,6 +114,28 @@ function issueDemo() {
   $('pid-wallet-hint').textContent = 'Credential loaded. The verifier asks: is the holder 18 or older?';
   $('pid-verify-out').hidden = true;
   $('pid-consent').hidden = false;
+  // Show, as a readable code block, EXACTLY which fields leave the device and
+  // which stay. Values are the real ones from the credential just issued.
+  const shareLines = [
+    '{',
+    '  <span class="k">"answer"</span>:        { <span class="k">"age_over_18"</span>: <span class="k">"yes"</span> },',
+    '  <span class="k">"holder_binding"</span>: <span class="k">"' + fields.holder_binding.slice(0, 24) + '…"</span>  <span class="c">// public hash of your key</span>',
+    '  <span class="k">"nonce"</span>:         <span class="k">"' + hex(state.verifierNonce).slice(0, 20) + '…"</span>  <span class="c">// from the verifier</span>',
+    '  <span class="k">"holder_signature"</span>: <span class="c">"…ML-DSA-65 over (nonce+root)…"</span>',
+    '  <span class="k">"issuer_signature"</span>: <span class="c">"…ML-DSA-65 over the root…"</span>',
+    '}',
+  ].join('\n');
+  const keepLines = [
+    '{',
+    '  <span class="k">"name"</span>:        <span class="k">"' + fields.name + '"</span>,',
+    '  <span class="k">"birthdate"</span>:   <span class="k">"' + fields.birthdate + '"</span>,',
+    '  <span class="k">"nationality"</span>: <span class="k">"' + fields.nationality + '"</span>,',
+    '  <span class="k">"document_no"</span>: <span class="k">"' + fields.document_no + '"</span>,',
+    '  <span class="k">"holder_secret_key"</span>: <span class="c">"…never transmitted…"</span>',
+    '}',
+  ].join('\n');
+  $('pid-consent-share').innerHTML = shareLines;
+  $('pid-consent-keep').innerHTML = keepLines;
 }
 
 function answerPredicate() {
@@ -143,6 +165,23 @@ function answerPredicate() {
   $('pid-bundle-size').textContent = 'Proof bundle: 2 revealed leaves (answer + key binding) + ' +
     (state.bundle.path.length + state.bundle.bindingPath.length) +
     ' path hashes + issuer root signature + holder signature over the verifier nonce.';
+  // The real outgoing bundle, rendered readable (long hashes trimmed for the eye;
+  // nothing here reveals birthdate, name, nationality or document number).
+  const b = state.bundle;
+  const short = (u8) => hex(u8).slice(0, 20) + '…';
+  const shortS = (s) => (s || '').slice(0, 20) + '…';
+  $('pid-bundle-json').innerHTML = [
+    '{',
+    '  <span class="k">"question"</span>: <span class="k">"' + b.question + '"</span>,',
+    '  <span class="k">"disclosed"</span>: { <span class="k">"key"</span>: <span class="k">"' + b.disclosed.key + '"</span>, <span class="k">"value"</span>: <span class="k">"' + b.disclosed.value + '"</span> },',
+    '  <span class="k">"nonce"</span>: <span class="k">"' + short(b.nonce) + '"</span>,',
+    '  <span class="k">"root"</span>: <span class="k">"' + b.root.slice(0, 20) + '…"</span>,',
+    '  <span class="k">"issuerDid"</span>: <span class="k">"' + b.issuerDid + '"</span>,',
+    '  <span class="k">"rootSig"</span>: <span class="c">"' + shortS(b.rootSig) + '  // issuer, ML-DSA-65"</span>,',
+    '  <span class="k">"presenterSig"</span>: <span class="c">"' + shortS(b.presenterSig) + '  // holder, over nonce+root"</span>,',
+    '  <span class="k">"path"</span>: <span class="c">[' + b.path.length + ' + ' + b.bindingPath.length + ' Merkle hashes]</span>',
+    '}',
+  ].join('\n');
   verifyBundle();
 }
 
