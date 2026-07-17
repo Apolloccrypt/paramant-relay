@@ -1987,6 +1987,12 @@ const paraidIssuers = paraidRegistry.createRegistry({ file: PARAID_REGISTRY_FILE
 try { log('info', 'paraid_registry_loaded', { issuers: paraidIssuers.load() }); }
 catch (e) { log('warn', 'paraid_registry_load_error', { err: e.message }); }
 
+// ── Code-transparency manifest: in-memory + /data, CT-verankerd bij publish ──
+const CODE_MANIFEST_FILE = process.env.CODE_MANIFEST_FILE || '/data/code-manifest.json';
+let codeManifest = null;
+try { codeManifest = JSON.parse(require('fs').readFileSync(CODE_MANIFEST_FILE, 'utf8')); }
+catch (e) { if (e.code !== 'ENOENT') log('warn', 'code_manifest_load_error', { err: e.message }); }
+
 function ctAppendParaidIssuer(eventType, did, payload) {
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
@@ -2093,6 +2099,14 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v1/paraid/issuers' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({ issuers: paraidIssuers.list() }));
+  }
+  // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
+  // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
+  // Independent monitors fetch this and compare it against the live assets.
+  if (path === '/v1/code-manifest' && req.method === 'GET') {
+    if (!codeManifest) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'no manifest published yet' })); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    return res.end(J(codeManifest));
   }
 
   // ── ParaSign Open Developer-API (/v1) ────────────────────────────────────────
@@ -3242,6 +3256,28 @@ const server = http.createServer(async (req, res) => {
     log('info', 'paraid_issuer_added', { did: r.issuer.did, label: r.issuer.label });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, issuer: r.issuer, ct_index: ct.index }));
+  }
+  // Publish a new code-transparency manifest (deploy-time step, CT-anchored).
+  if (path === '/v2/admin/code-manifest' && req.method === 'POST') {
+    const adminTok = (req.headers['x-admin-token'] || '').trim();
+    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 2 * 1024 * 1024)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    if (!body || !body.files || !body.manifest_hash || typeof body.files !== 'object') {
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'manifest needs files + manifest_hash' }));
+    }
+    const ct = ctAppendParaidIssuer('code_manifest_published', body.manifest_hash, {
+      git_commit: body.git_commit || '', file_count: Object.keys(body.files).length,
+    });
+    codeManifest = { ...body, published: new Date().toISOString(), ct_index: ct.index };
+    try { require('fs').writeFileSync(CODE_MANIFEST_FILE, JSON.stringify(codeManifest)); }
+    catch (e) { log('warn', 'code_manifest_write_error', { err: e.message }); }
+    log('info', 'code_manifest_published', { hash: body.manifest_hash.slice(0, 16), files: Object.keys(body.files).length });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, manifest_hash: body.manifest_hash, ct_index: ct.index }));
   }
   if (path === '/v2/admin/paraid/issuers/revoke' && req.method === 'POST') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
