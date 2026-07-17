@@ -1987,6 +1987,15 @@ const paraidIssuers = paraidRegistry.createRegistry({ file: PARAID_REGISTRY_FILE
 try { log('info', 'paraid_registry_loaded', { issuers: paraidIssuers.load() }); }
 catch (e) { log('warn', 'paraid_registry_load_error', { err: e.message }); }
 
+// ── ParaID demo issuer: signs demo credentials so logged-in users have a real,
+// registry-anchored credential to use. ESM (noble) loaded via dynamic import so
+// signatures match the browser verifier. Absent key file -> issuance disabled.
+const PARAID_ISSUER_KEY_FILE = process.env.PARAID_ISSUER_KEY_FILE || '/data/paraid-demo-authority.sk.json';
+let paraidIssuer = null;
+import('./lib/paraid-issuer.mjs')
+  .then((m) => { paraidIssuer = m.createIssuer({ keyFile: PARAID_ISSUER_KEY_FILE }); log('info', 'paraid_issuer_loaded', { did: paraidIssuer.did }); })
+  .catch((e) => { log('warn', 'paraid_issuer_unavailable', { err: e.message }); });
+
 // ── Code-transparency manifest: in-memory + /data, CT-verankerd bij publish ──
 const CODE_MANIFEST_FILE = process.env.CODE_MANIFEST_FILE || '/data/code-manifest.json';
 let codeManifest = null;
@@ -2099,6 +2108,20 @@ const server = http.createServer(async (req, res) => {
   if (path === '/v1/paraid/issuers' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({ issuers: paraidIssuers.list() }));
+  }
+  // Issue a demo credential bound to a holder key. Rate-limited per IP. The
+  // wallet page is session-gated client-side; issuance itself only ever mints
+  // clearly-labelled demo credentials from the Paramant Demo Authority.
+  if (path === '/v1/paraid/issue-demo' && req.method === 'POST') {
+    if (!paraidIssuer) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'demo issuer not configured' })); }
+    if (!envCreateRateOk('paraid:' + clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'issuance quota exceeded, try later' })); }
+    let body;
+    try { body = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    const out = paraidIssuer.issue({ holderBindingB64url: String(body.holder_binding || ''), subject: body.subject || {} });
+    if (!out.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(out)); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J(out));
   }
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
