@@ -231,12 +231,29 @@
 .pid-netmeter b { color: var(--navy); }
 .pid-netmeter.dirty b { color: #d33; }
 .pid-boundary-foot { font-size: 12px; line-height: 1.5; color: var(--ink-dim); margin: var(--space-3) 0 0; }
-.pid-legend { margin-top: var(--space-6); border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-4) var(--space-5); }
-.pid-legend h2 { font-size: 18px; color: var(--navy); margin: 0 0 var(--space-3); }
-.pid-legend dl { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 8px 20px; margin: 0; }
-.pid-legend dt { font-family: var(--mono); font-size: 12px; color: var(--navy); font-weight: 600; overflow-wrap: anywhere; }
-.pid-legend dd { font-size: 13px; line-height: 1.55; color: var(--ink-dim); margin: 0; }
-@media (max-width: 700px) { .pid-legend dl { grid-template-columns: 1fr; gap: 2px 0; } .pid-legend dd { margin-bottom: 10px; } }
+.pid-how { margin-top: var(--space-6); border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-4) var(--space-5); }
+.pid-how h2, .pid-legend h2 { font-size: 18px; color: var(--navy); margin: 0 0 var(--space-2); }
+.pid-tree { font-size: 11px; line-height: 1.6; overflow-x: auto; }
+@media (max-width: 620px) { .pid-tree { font-size: 9px; } }
+.pid-how-steps { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-2); }
+.pid-how-step { position: relative; font-size: 13px; line-height: 1.55; color: var(--ink-dim); padding-left: 34px; }
+.pid-how-step b { color: var(--navy); }
+.pid-how-n { position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; background: #0a1626; color: #B2FF3F; font-family: var(--mono); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 620px) { .pid-how-steps { grid-template-columns: 1fr; } }
+.pid-legend { margin-top: var(--space-5); border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-4) var(--space-5); }
+.pid-lg-group { margin-top: var(--space-4); }
+.pid-lg-group:first-of-type { margin-top: var(--space-2); }
+.pid-lg-group h3 { font-size: 14px; color: var(--navy); margin: 0 0 4px; }
+.pid-lg-intro { font-size: 12.5px; color: var(--ink-dim); margin: 0 0 var(--space-2); }
+.pid-lg-rows { display: flex; flex-direction: column; gap: 6px; }
+.pid-lg-row { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; padding: 7px 10px; background: var(--bone); border-radius: 6px; }
+.pid-lg-tok { font-size: 11.5px; color: var(--navy); font-weight: 600; overflow-wrap: anywhere; }
+.pid-lg-txt { font-size: 12.5px; line-height: 1.5; color: var(--ink-dim); }
+.pid-pill { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 3px; padding: 3px 7px; height: fit-content; white-space: nowrap; }
+.pid-pill.ok { background: #B2FF3F; color: #0a1626; }
+.pid-pill.neutral { background: var(--ink-hair); color: var(--navy); }
+.pid-pill.bad { background: #d33; color: #fff; }
+@media (max-width: 620px) { .pid-lg-row { grid-template-columns: 1fr; gap: 4px; } }
 .pid-limits { margin-top: var(--space-6); border-top: 1px solid var(--ink-hair); padding-top: var(--space-5); max-width: 70ch; }
 .pid-limits h2 { font-size: 18px; color: var(--navy); margin: 0 0 var(--space-2); }
 .pid-limits ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); }
@@ -300,34 +317,66 @@
     <p class="pid-boundary-foot">The counter above is measured live by your own browser (Performance API), not written by us. Want harder proof? Turn on airplane mode and run the demo again: everything keeps working.</p>
   </div>
 
+  <div class="pid-how">
+    <h2>How it works, in one picture</h2>
+    <p class="pid-lg-intro">The trick is a Merkle tree. Each passport fact is sealed into its own hash (a leaf). Pairs of hashes are hashed together, again and again, up to a single fingerprint at the top: the root. The issuer signs only that root.</p>
+    <pre class="pid-code pid-tree">
+                        ROOT  <span class="c">&lt;-- issuer signs THIS with ML-DSA-65</span>
+                    /          \
+             H(1,2)              H(3,4)
+            /      \            /      \
+        H(name) H(birth)   H(nat)  H(doc)   ... H(<span class="k">age_over_18=yes</span>)  H(holder key)
+           |       |          |       |              |                    |
+        "name"  "1994.."    "NL"   "DEMO.."    <span class="k">the answer</span>          <span class="k">your device</span>
+        <span class="c">stays home</span> <span class="c">stays home</span>  <span class="c">stays home</span> <span class="c">stays home</span>     <span class="c">shared</span>              <span class="c">bound</span></pre>
+    <div class="pid-how-steps">
+      <div class="pid-how-step"><span class="pid-how-n">1</span><b>Only the answer opens.</b> To prove &ldquo;18+ = yes&rdquo; the wallet reveals just that one leaf plus the few sibling hashes on the path up to the root. From those you can recompute the root, but you can never run the hashes backwards to learn the birthdate.</div>
+      <div class="pid-how-step"><span class="pid-how-n">2</span><b>The signature proves who.</b> The root carries the issuer&rsquo;s ML-DSA-65 signature. The issuer&rsquo;s identity (its DID) is the hash of its own public key, so a signature can never be re-attributed to someone else, and any change to any fact changes the root and breaks the signature.</div>
+      <div class="pid-how-step"><span class="pid-how-n">3</span><b>The binding proves whose.</b> One leaf is the hash of your device key. You sign the verifier&rsquo;s fresh nonce with that key, so the proof only works from your device and only for this one check. A copied or replayed proof fails.</div>
+      <div class="pid-how-step"><span class="pid-how-n">4</span><b>The registry proves it is real.</b> Anyone can check that the signing issuer is on Paramant&rsquo;s public, transparency-logged registry, and not on its revocation list.</div>
+    </div>
+  </div>
+
   <div class="pid-legend">
     <h2>How to read the results</h2>
-    <dl>
-      <dt>&#10003; 18+? YES</dt>
-      <dd>The answer itself, cryptographically proven, without showing the birthdate behind it.</dd>
-      <dt>issuer: did:paramant:&hellip;</dt>
-      <dd>Who vouched for the facts. The code is derived from the issuer&rsquo;s signing key, so it cannot point to anyone else.</dd>
-      <dt>issuer signature: ML-DSA-65 valid</dt>
-      <dd>The sealed set of facts really was signed by that issuer, and nothing in it was changed afterwards.</dd>
-      <dt>holder: key bound &#10003; &#183; fresh nonce &#10003;</dt>
-      <dd>The credential is locked to the key of the device showing it, and the answer was produced just now for this specific check. A stolen or replayed proof fails here.</dd>
-      <dt>fields received: age_over_18 + key binding</dt>
-      <dd>The complete list of what actually reached the verifier. Everything else stayed sealed on the device.</dd>
-      <dt>issuer registered? yes: &lt;name&gt;</dt>
-      <dd>The issuer appears in Paramant&rsquo;s public issuer registry, and every registration is anchored in the public transparency log, so it cannot be quietly added or removed.</dd>
-      <dt>issuer registered? no (demo)</dt>
-      <dd>This demo invents its own issuer inside your browser tab, so it is deliberately NOT in the public registry. Real credentials come from registered issuers only. The count shown is how many real issuers are registered today.</dd>
-      <dt>issuer registered? REVOKED</dt>
-      <dd>The issuer was withdrawn from the registry. The math of the proof may still be valid, but you should no longer trust credentials from this issuer. Revocations stay visible forever.</dd>
-      <dt>credential revoked by the issuer</dt>
-      <dd>The issuer is fine, but this specific credential was withdrawn (lost phone, expired document, error at issuance). Issuers publish a status list of revoked credential ids (opaque hashes, no personal data), and the verifier checks the proof&rsquo;s root against it.</dd>
-      <dt>why the registry check makes 1 request</dt>
-      <dd>&ldquo;Is this issuer registered right now?&rdquo; is a question about a live, shared list (issuers get added and revoked), so your browser has to fetch that public list once. The request carries nothing about you, your document or your answer. What it buys you: the guarantee that the vouching party is a vetted, registered issuer rather than anyone who generated a key.</dd>
-      <dt>&#10007; rejected</dt>
-      <dd>One of the checks failed: tampered data, a key that does not match, an expired or foreign nonce. The verifier tells you which one.</dd>
-      <dt>network requests during demo</dt>
-      <dd>Stays 0 while you issue and prove. The optional registry check makes exactly 1 request, and the counter turning red on that click is the counter proving it works.</dd>
-    </dl>
+
+    <section class="pid-lg-group">
+      <h3>1. The green result box, line by line</h3>
+      <p class="pid-lg-intro">On success the verifier shows five rows, each a separate check that had to pass.</p>
+      <div class="pid-lg-rows">
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">&#10003; 18+? YES</span><span class="pid-lg-txt">The answer, cryptographically proven, without ever showing the birthdate behind it.</span></div>
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">issuer</span><span class="pid-lg-txt">Who vouched for the facts. The code is derived from the issuer&rsquo;s key, so it cannot point to anyone else.</span></div>
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">issuer signature</span><span class="pid-lg-txt">The sealed facts really were signed by that issuer, and nothing was changed afterwards.</span></div>
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">holder</span><span class="pid-lg-txt">Locked to the key of the device showing it, and made just now for this check. Stolen or replayed proofs fail here.</span></div>
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">fields received</span><span class="pid-lg-txt">The complete list of what actually reached the verifier. Everything else stayed sealed on the device.</span></div>
+      </div>
+    </section>
+
+    <section class="pid-lg-group">
+      <h3>2. Is the issuer trustworthy? (the registry check)</h3>
+      <p class="pid-lg-intro">One optional button checks the public issuer registry. Four possible outcomes:</p>
+      <div class="pid-lg-rows">
+        <div class="pid-lg-row"><span class="pid-pill ok">registered</span><span class="pid-lg-txt">The issuer is in the public registry, anchored in the transparency log, so it cannot be quietly added or removed. Trust the credential.</span></div>
+        <div class="pid-lg-row"><span class="pid-pill neutral">demo only</span><span class="pid-lg-txt">This demo invents its own issuer inside your tab, so it is deliberately not registered. Real credentials come from registered issuers only.</span></div>
+        <div class="pid-lg-row"><span class="pid-pill bad">issuer revoked</span><span class="pid-lg-txt">The issuer was withdrawn. The math may still check out, but do not trust its credentials. Revocations stay visible forever.</span></div>
+        <div class="pid-lg-row"><span class="pid-pill bad">credential revoked</span><span class="pid-lg-txt">The issuer is fine, but this one credential was withdrawn (lost phone, expired document, error). Checked against the issuer&rsquo;s status list of opaque hashes, no personal data.</span></div>
+      </div>
+    </section>
+
+    <section class="pid-lg-group">
+      <h3>3. Your privacy, shown live</h3>
+      <div class="pid-lg-rows">
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">network: 0</span><span class="pid-lg-txt">Issuing and proving make zero network requests. Everything runs on your device.</span></div>
+        <div class="pid-lg-row"><span class="pid-lg-tok mono">network: 1</span><span class="pid-lg-txt">Only the optional registry check fetches the public issuer list, once. It sends nothing about you, and the counter turning red is the counter proving itself.</span></div>
+      </div>
+    </section>
+
+    <section class="pid-lg-group">
+      <h3>4. When it fails</h3>
+      <div class="pid-lg-rows">
+        <div class="pid-lg-row"><span class="pid-pill bad">&#10007; rejected</span><span class="pid-lg-txt">One check failed: tampered data, a key that does not match, or an expired or foreign nonce. The verifier names the exact reason.</span></div>
+      </div>
+    </section>
   </div>
 
   <div class="pid-limits">
