@@ -336,6 +336,8 @@ tr:last-child td{border-bottom:none}
     <a href="#monitor">GET /v2/monitor</a>
     <a href="#webhook">POST /v2/webhook</a>
     <a href="#health">GET /health</a>
+    <h3>ParaSign API</h3>
+    <a href="#v1-envelopes">/v1 envelopes</a>
     <h3>Self-hosting</h3>
     <a href="#selfhost-docker">Docker Compose</a>
     <a href="#selfhost-nginx">nginx &amp; TLS</a>
@@ -608,6 +610,31 @@ ws.onmessage = e => {
   "uptime_s": 3600,
   "license_expires": "2027-01-01"
 }</span></pre>
+
+    <!-- ── ParaSign API (/v1) ───────────────────────────────────── -->
+    <span id="parasign-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="v1-envelopes">ParaSign API (/v1)</h2>
+    <p>Hosted signing ceremonies from your own stack: create an envelope from a PDF plus a signer list, route each signer to a hosted signing page, and pull the completed <code>.psign</code> proof. Authenticate with <code>Authorization: Bearer psk_live_...</code> (mint keys in the <a href="/developer">developer dashboard</a>; API access is part of Pro).</p>
+    <pre><span class="cm">Endpoints:</span>
+POST   /v1/envelopes                Create an envelope; returns id + one sign_url per signer
+GET    /v1/envelopes/:id            Envelope status and per-signer progress
+GET    /v1/envelopes/:id/receipt    The full .psign proof, once complete
+GET    /v1/envelopes/:id/document   The signed PDF, once complete
+POST   /v1/envelopes/:id/void       Void an open envelope (owner only)</pre>
+    <pre><span class="cm"># Create an envelope. The document travels base64; signers get hosted pages.</span>
+curl -X POST https://paramant.app/v1/envelopes \
+  -H "Authorization: Bearer psk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+        "document": { "content_base64": "JVBERi0xLjc..." },
+        "original_filename": "quote-8842.pdf",
+        "signers": [ { "name": "A. Jansen", "email": "a@example.org" } ]
+      }'
+
+<span class="cm"># On completion, pull the offline-verifiable proof.</span>
+curl https://paramant.app/v1/envelopes/env_.../receipt \
+  -H "Authorization: Bearer psk_live_..." --output quote-8842.psign</pre>
+    <p>Quota: 50 envelope creations per key per hour; envelope records are held with a 30-day TTL and store only the document hash plus metadata, never the document bytes. Webhooks: set <code>webhook_url</code> and lifecycle events arrive signed with HMAC-SHA256 in the <code>X-Paramant-Sig</code> header. Receipts verify offline against the public CT log; see <a href="/verify">/verify</a>.</p>
 
     <!-- ── Self-hosting ─────────────────────────────────────────── -->
     <span id="self-hosting" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>

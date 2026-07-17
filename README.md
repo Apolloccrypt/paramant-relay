@@ -196,7 +196,7 @@ Authentication is a Bearer token: an API key with the psk_ prefix (psk_live_ for
 ```bash
 # 1. Create an envelope. The document is sent as base64; signers are routed to
 #    hosted signing pages.
-curl -X POST https://api.paramant.app/v1/envelopes \
+curl -X POST https://paramant.app/v1/envelopes \
   -H "Authorization: Bearer psk_live_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -214,7 +214,7 @@ curl -X POST https://api.paramant.app/v1/envelopes \
 # 2. The signer opens sign_url and signs ML-DSA-65 client-side (hosted ceremony).
 
 # 3. On completion, pull the full .psign proof.
-curl https://api.paramant.app/v1/envelopes/env_.../receipt \
+curl https://paramant.app/v1/envelopes/env_.../receipt \
   -H "Authorization: Bearer psk_live_..." \
   --output quote-8842.psign
 ```
