@@ -2631,7 +2631,7 @@ function commitRecipientsFromDom() {
   state.recipients = Array.from(rows).map(row => ({
     label: row.querySelector('[data-field="label"]').value.trim(),
     email: row.querySelector('[data-field="email"]').value.trim(),
-  })).filter(r => r.label.length > 0);   // drop empty rows silently
+  })).filter(r => r.label.length > 0 || r.email.length > 0);   // keep half-filled rows so validation flags them (QA: email-without-name was dropped silently, turning a co-sign into a solo signature)
 }
 
 function wireLiveStampUpdates() {
