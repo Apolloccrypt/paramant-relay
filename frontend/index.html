@@ -185,6 +185,18 @@
 .p-link { display: inline-block; margin-top: var(--space-2); font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 3px; width: fit-content; }
 .p-link:hover { color: var(--cobalt); }
 @media (max-width: 760px) { .pillars-grid { grid-template-columns: 1fr; } }
+
+/* ── Verify links in the rules grid + the honest in-development band. Dashed
+   hairline cards mark not-yet-live work; same tokens, nothing new. ── */
+.r-verify { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .05em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 2px; }
+.r-verify:hover { color: var(--cobalt); }
+.home-soon { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
+.soon-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin: 0; padding: 0; }
+.soon-grid li { border: 1px dashed var(--ink-hair); background: transparent; padding: var(--space-4); }
+.soon-chip { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 2px; padding: 3px 8px; background: var(--bone); }
+.soon-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 10px 0 4px; }
+.soon-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+@media (max-width: 760px) { .soon-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -357,8 +369,13 @@
 
 <section class="home-hero">
   <div class="home-state" data-home="out">
-    <h1>Sign it. Send it. We never even had it.</h1>
-    <p class="lede">Post-quantum signatures and encrypted transfers, held in memory and gone after read. The server is blind by design, not by promise.</p>
+    <h1>Send it. Sign it. Prove it.</h1>
+    <p class="lede">One encrypted relay for files and documents. End-to-end post-quantum crypto, RAM-only servers in Germany, and a public transparency log, so you never have to take our word for it.</p>
+    <div class="home-actions">
+      <a class="btn btn-lime" href="/sign">Sign a document</a>
+      <a class="btn home-act-ghost" href="/dashboard">Send a file</a>
+      <a class="btn home-act-ghost" href="/docs">Read the docs</a>
+    </div>
     <ul class="hero-badges" aria-label="At a glance">
       <li><a href="https://github.com/Apolloccrypt/paramant-relay">Open source</a></li>
       <li><a href="/pricing">Free for community</a></li>
@@ -451,33 +468,33 @@
 
 <section class="home-pillars" aria-labelledby="pillars-h">
   <div class="pillars-intro">
-    <p class="rules-eyebrow"><span></span>the full map</p>
-    <h2 id="pillars-h">One core. Three jobs.</h2>
-    <p class="pillars-lede">Everything on Paramant is one small post-quantum core doing one of three jobs: moving secrets, recording facts, or proving claims. Know the job, and you know the tool.</p>
+    <p class="rules-eyebrow"><span></span>live today</p>
+    <h2 id="pillars-h">Three ways in. One crypto core.</h2>
+    <p class="pillars-lede">Everything below is running now, on the same audited post-quantum core. No roadmap promises on this list.</p>
   </div>
   <p class="pillars-core"><strong>paramant-core</strong><span>PQ primitives &#183; ML-KEM-768 &#183; ML-DSA-65 &#183; SPHINCS+ &#183; Falcon</span></p>
   <div class="pillars-stem" aria-hidden="true"></div>
   <ul class="pillars-grid">
     <li>
-      <span class="p-job">Move</span>
-      <h3>Nobody reads along.</h3>
-      <p>End-to-end encrypted transfers through a relay that keeps bytes in RAM and burns them on first read. We never had your file, so we can never leak it.</p>
-      <p class="p-tags">relay &#183; E2EE &#183; burn-on-read</p>
+      <span class="p-job">ParaSend</span>
+      <h3>Send files that vanish.</h3>
+      <p>End-to-end encrypted transfer through a relay that only ever holds ciphertext in RAM. Burned on read. Dedicated relays for finance, legal and IoT traffic.</p>
+      <p class="p-tags">burn-on-read &#183; sector relays &#183; no account for receivers</p>
       <a class="p-link" href="/dashboard">Send a file <span aria-hidden="true">&rarr;</span></a>
     </li>
     <li>
-      <span class="p-job">Record</span>
-      <h3>This existed then, unchanged since.</h3>
-      <p>Notarised hashes in an append-only Merkle log (RFC 6962), plus .psign sidecars anyone can verify offline. Proof of existence without handing over the document.</p>
-      <p class="p-tags">notarize &#183; Merkle log &#183; .psign</p>
-      <a class="p-link" href="/ct-log">See the public CT log <span aria-hidden="true">&rarr;</span></a>
+      <span class="p-job">ParaSign</span>
+      <h3>Sign PDFs in your browser.</h3>
+      <p>A full PDF editor: place text, dates and annotations, manage pages, then sign. Co-signing with routing order. Your key never leaves your device, and every signature comes with a verifiable .psign receipt.</p>
+      <p class="p-tags">HiDPI editor + annotations &#183; co-sign &#183; offline-verifiable receipts</p>
+      <a class="p-link" href="/sign">Open ParaSign <span aria-hidden="true">&rarr;</span></a>
     </li>
     <li>
-      <span class="p-job">Prove</span>
-      <h3>X says Y. Provably.</h3>
-      <p>ML-DSA-65 signatures on documents today, and verifiable credentials that answer questions like &ldquo;is this person 18+?&rdquo; without exposing the data behind them.</p>
-      <p class="p-tags">ParaSign &#183; ParaID (VCs) &#183; DIDs</p>
-      <a class="p-link" href="/sign">Sign a document <span aria-hidden="true">&rarr;</span></a>
+      <span class="p-job">Developers</span>
+      <h3>Build on the core.</h3>
+      <p>Open SDK in JavaScript and Python (Apache-2.0), a /v1 signing API, and a self-host installer. Run your own relay, or the whole OS.</p>
+      <p class="p-tags">paramant-sdk npm + PyPI &#183; /v1 signing API &#183; ParamantOS</p>
+      <a class="p-link" href="/developer">Get an API key <span aria-hidden="true">&rarr;</span></a>
     </li>
   </ul>
 </section>
@@ -485,23 +502,45 @@
 <section class="home-rules" aria-labelledby="rules-h">
   <div class="rules-intro">
     <p class="rules-eyebrow"><span></span>our policy</p>
-    <h2 id="rules-h">Everyone has a privacy policy. We have rules you can check.</h2>
-    <p class="rules-lede">The ParaRules are the principles we hold ourselves to, in the product and in the code. Not marketing copy: every one is something you can verify yourself.</p>
+    <h2 id="rules-h">Rules you can check. Every one has a proof.</h2>
+    <p class="rules-lede">Everyone has a privacy policy. The ParaRules come with a verify link each: a log, a header, a repo. Not a promise.</p>
   </div>
   <ol class="rules-grid">
-    <li><span class="r-n">01</span><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p></li>
-    <li><span class="r-n">02</span><h3>Your browser talks only to us</h3><p>No third-party requests. No fonts, CDNs, analytics or pixels.</p></li>
-    <li><span class="r-n">03</span><h3>No surveillance</h3><p>No tracking cookies, no fingerprinting, no ad tech.</p></li>
-    <li><span class="r-n">04</span><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p></li>
-    <li><span class="r-n">05</span><h3>EU soil, EU law</h3><p>Hosted in Germany. No US CLOUD Act reach over your data.</p></li>
-    <li><span class="r-n">06</span><h3>Quantum-ready by default</h3><p>FIPS 203/204 today, not &ldquo;soon&rdquo;.</p></li>
-    <li><span class="r-n">07</span><h3>Honest by design</h3><p>No dark patterns. Real errors, never tidy lies.</p></li>
-    <li><span class="r-n">08</span><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, a relay that proves itself.</p></li>
-    <li><span class="r-n">09</span><h3>Only what&rsquo;s required</h3><p>An email, nothing more. Data we don&rsquo;t hold can&rsquo;t leak.</p></li>
+    <li><span class="r-n">01</span><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
+    <li><span class="r-n">02</span><h3>Your browser talks only to us</h3><p>No third-party requests. No fonts, CDNs, analytics or pixels.</p><a class="r-verify" href="/pararules">verify: open devtools <span aria-hidden="true">&rarr;</span></a></li>
+    <li><span class="r-n">03</span><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
+    <li><span class="r-n">04</span><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the chain.</p><a class="r-verify" href="/sovereignty">verify: dig and headers <span aria-hidden="true">&rarr;</span></a></li>
+    <li><span class="r-n">05</span><h3>Quantum-ready by default</h3><p>FIPS 203/204 today, not &ldquo;soon&rdquo;.</p><a class="r-verify" href="/crypto-agility">verify: KAT vectors <span aria-hidden="true">&rarr;</span></a></li>
+    <li><span class="r-n">06</span><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, receipts anyone can check offline.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
   </ol>
   <div class="rules-cta">
     <a class="rules-link" href="/pararules">Read all nine ParaRules <span aria-hidden="true">&rarr;</span></a>
   </div>
+</section>
+
+<section class="home-soon" aria-labelledby="soon-h">
+  <div class="rules-intro">
+    <p class="rules-eyebrow"><span></span>in development</p>
+    <h2 id="soon-h">What&rsquo;s next. Labeled honestly.</h2>
+    <p class="rules-lede">In development means exactly that: not live, no dates promised. It ships when it verifies.</p>
+  </div>
+  <ul class="soon-grid">
+    <li>
+      <span class="soon-chip">In development</span>
+      <h3>Signing API tiers</h3>
+      <p>Hosted signing ceremonies for your quotes and contracts. Transparently labeled: this tier holds the PDF briefly; the zero-knowledge route stays the SDK.</p>
+    </li>
+    <li>
+      <span class="soon-chip">In development</span>
+      <h3>Registered delivery</h3>
+      <p>Send a document and get an offline-verifiable proof of filing, anchored in the public transparency log.</p>
+    </li>
+    <li>
+      <span class="soon-chip">In development</span>
+      <h3>ParaID checks</h3>
+      <p>Ask &ldquo;18+?&rdquo; and get yes or no. Passport fields never leave the holder&rsquo;s phone.</p>
+    </li>
+  </ul>
 </section>
 
 </main>
