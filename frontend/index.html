@@ -164,6 +164,27 @@
 .rules-link:hover { color: var(--cobalt); }
 @media (max-width: 760px) { .rules-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 480px) { .rules-grid { grid-template-columns: 1fr; } }
+
+/* ── Capability map: one PQ core, three jobs (move / record / prove). Core bar
+   in the deep-navy panel style, three cards hanging off it via a lime top
+   accent. Existing tokens only; design-system.css and nav.css untouched. ── */
+.home-pillars { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
+.pillars-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
+.pillars-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
+.pillars-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
+.pillars-core { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px 14px; width: fit-content; max-width: 100%; margin: 0 auto; padding: var(--space-3) var(--space-4); background: #0a1626; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
+.pillars-core strong { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; font-weight: 600; color: #B2FF3F; }
+.pillars-core span { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: #88a6cb; }
+.pillars-stem { width: 2px; height: 22px; background: var(--ink-hair); margin: 0 auto; }
+.pillars-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin: 0; padding: 0; }
+.pillars-grid li { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--ink-hair); border-top: 2px solid #B2FF3F; padding: var(--space-4); }
+.p-job { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.pillars-grid h3 { font-size: 17px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 8px 0 6px; }
+.pillars-grid li > p { font-size: 13px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-3); }
+.p-tags { margin-top: auto; font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: .02em; color: var(--ink-dim); }
+.p-link { display: inline-block; margin-top: var(--space-2); font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 3px; width: fit-content; }
+.p-link:hover { color: var(--cobalt); }
+@media (max-width: 760px) { .pillars-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -427,6 +448,39 @@
 </section>
 
 <p class="home-compare">Weighing the options? <a href="/vs">See how Paramant compares to Zivver, Tresorit, WeTransfer and SFTP &rarr;</a></p>
+
+<section class="home-pillars" aria-labelledby="pillars-h">
+  <div class="pillars-intro">
+    <p class="rules-eyebrow"><span></span>the full map</p>
+    <h2 id="pillars-h">One core. Three jobs.</h2>
+    <p class="pillars-lede">Everything on Paramant is one small post-quantum core doing one of three jobs: moving secrets, recording facts, or proving claims. Know the job, and you know the tool.</p>
+  </div>
+  <p class="pillars-core"><strong>paramant-core</strong><span>PQ primitives &#183; ML-KEM-768 &#183; ML-DSA-65 &#183; SPHINCS+ &#183; Falcon</span></p>
+  <div class="pillars-stem" aria-hidden="true"></div>
+  <ul class="pillars-grid">
+    <li>
+      <span class="p-job">Move</span>
+      <h3>Nobody reads along.</h3>
+      <p>End-to-end encrypted transfers through a relay that keeps bytes in RAM and burns them on first read. We never had your file, so we can never leak it.</p>
+      <p class="p-tags">relay &#183; E2EE &#183; burn-on-read</p>
+      <a class="p-link" href="/dashboard">Send a file <span aria-hidden="true">&rarr;</span></a>
+    </li>
+    <li>
+      <span class="p-job">Record</span>
+      <h3>This existed then, unchanged since.</h3>
+      <p>Notarised hashes in an append-only Merkle log (RFC 6962), plus .psign sidecars anyone can verify offline. Proof of existence without handing over the document.</p>
+      <p class="p-tags">notarize &#183; Merkle log &#183; .psign</p>
+      <a class="p-link" href="/ct-log">See the public CT log <span aria-hidden="true">&rarr;</span></a>
+    </li>
+    <li>
+      <span class="p-job">Prove</span>
+      <h3>X says Y. Provably.</h3>
+      <p>ML-DSA-65 signatures on documents today, and verifiable credentials that answer questions like &ldquo;is this person 18+?&rdquo; without exposing the data behind them.</p>
+      <p class="p-tags">ParaSign &#183; ParaID (VCs) &#183; DIDs</p>
+      <a class="p-link" href="/sign">Sign a document <span aria-hidden="true">&rarr;</span></a>
+    </li>
+  </ul>
+</section>
 
 <section class="home-rules" aria-labelledby="rules-h">
   <div class="rules-intro">
