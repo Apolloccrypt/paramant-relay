@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Your Paramant — Dashboard</title>
+<title>Your Paramant · Dashboard</title>
 <meta name="description" content="Sign in to your Paramant dashboard.">
 <meta name="theme-color" content="#0B1622">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -66,6 +66,11 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-tools-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 var(--space-3); }
 .dh-tools-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
 .dh-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-7); }
+.dh-chip { display: inline-block; width: fit-content; font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; border-radius: 2px; padding: 3px 8px; margin-bottom: 2px; }
+.dh-chip.live { background: var(--lime); color: #0a1626; }
+.dh-chip.beta { background: var(--cobalt); color: #fff; }
+.dh-chip.soon { background: var(--bone); color: var(--ink-dim); border: 1px solid var(--ink-hair); }
+.dh-tool-off { border-style: dashed; background: transparent; pointer-events: none; }
 .dh-tool { display: flex; flex-direction: column; gap: 4px; padding: var(--space-4) var(--space-4); border-radius: 14px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.03); border: 1px solid rgba(11,58,106,0.06); }
 .dh-tool:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(11,58,106,0.04), 0 6px 14px rgba(11,58,106,0.06); }
 .dh-tool:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
@@ -356,10 +361,14 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
     <div class="dh-tools-head"><h2>More tools</h2></div>
     <section class="dh-tools" aria-label="More tools">
-      <a class="dh-tool" href="/get"><h3>Receive a file</h3><p>Open a secure link someone sent you. Decryption happens locally.</p></a>
-      <a class="dh-tool" href="/parashare"><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
-      <a class="dh-tool" href="/verify"><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
-      <a class="dh-tool" href="/vault"><h3>Lock a file</h3><p>Encrypt any file into a <code>.prmnt</code> with a passphrase. Opens only with the passphrase. Fully on your device.</p></a>
+      <a class="dh-tool" href="/get"><span class="dh-chip live">Live</span><h3>Receive a file</h3><p>Open a secure link someone sent you. Decryption happens locally.</p></a>
+      <a class="dh-tool" href="/parashare"><span class="dh-chip live">Live</span><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
+      <a class="dh-tool" href="/verify"><span class="dh-chip live">Live</span><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
+      <a class="dh-tool" href="/vault"><span class="dh-chip live">Live</span><h3>Lock a file</h3><p>Encrypt any file into a <code>.prmnt</code> with a passphrase. Opens only with the passphrase. Fully on your device.</p></a>
+      <a class="dh-tool" href="/ct-log"><span class="dh-chip live">Live</span><h3>Transparency log</h3><p>Browse the public CT log and signed tree heads. Every signature is anchored here.</p></a>
+      <a class="dh-tool" href="/paraid"><span class="dh-chip beta">Beta</span><h3>ParaID</h3><p>Prove a claim like &ldquo;18+?&rdquo; with yes or no. Passport fields never leave your device.</p></a>
+      <div class="dh-tool dh-tool-off"><span class="dh-chip soon">In development</span><h3>Notarize a bundle</h3><p>One post-quantum signature over a whole evidence folder.</p></div>
+      <div class="dh-tool dh-tool-off"><span class="dh-chip soon">In development</span><h3>Registered send</h3><p>Send with an offline-verifiable proof of filing, anchored in the CT log.</p></div>
     </section>
 
     <div class="dh-tools-head"><h2>Operations</h2></div>

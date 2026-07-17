@@ -194,8 +194,9 @@
 .soon-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin: 0; padding: 0; }
 .soon-grid li { border: 1px dashed var(--ink-hair); background: transparent; padding: var(--space-4); }
 .soon-chip { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 2px; padding: 3px 8px; background: var(--bone); }
+.soon-chip.soon-beta { background: var(--cobalt); color: #fff; border-color: transparent; }
 .soon-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 10px 0 4px; }
-.soon-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+.soon-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 var(--space-2); }
 @media (max-width: 760px) { .soon-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -386,10 +387,11 @@
   </div>
   <div class="home-state" data-home="in" hidden>
     <h1>Welcome back<span class="home-hi-name" data-home-name></span>.</h1>
-    <p class="lede">Your relay is ready. Pick up where you left off, or start something new.</p>
+    <p class="lede">Your relay is ready. Send, sign, or prove something new.</p>
     <div class="home-actions">
       <a class="btn btn-lime" href="/sign">Sign a document</a>
-      <a class="btn home-act-ghost" href="/dashboard">Your dashboard</a>
+      <a class="btn home-act-ghost" href="/dashboard">Send a file</a>
+      <a class="btn home-act-ghost" href="/paraid">Try ParaID beta</a>
       <a class="btn home-act-ghost" href="/developer">Developer dashboard</a>
     </div>
   </div>
@@ -536,9 +538,10 @@
       <p>Send a document and get an offline-verifiable proof of filing, anchored in the public transparency log.</p>
     </li>
     <li>
-      <span class="soon-chip">In development</span>
+      <span class="soon-chip soon-beta">Beta</span>
       <h3>ParaID checks</h3>
       <p>Ask &ldquo;18+?&rdquo; and get yes or no. Passport fields never leave the holder&rsquo;s phone.</p>
+      <a class="p-link" href="/paraid">Try the beta <span aria-hidden="true">&rarr;</span></a>
     </li>
   </ul>
 </section>

@@ -197,7 +197,17 @@
   // usage bars stay current; the audit feed and key are refreshed on the same tick.
   var opsAudit = [], opsFilter = '', opsPollTimer = 0;
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
-  function fmtTime(ts) { if (!ts) return '--:--:--'; var d = new Date(ts); function p(n) { return (n < 10 ? '0' : '') + n; } return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  function fmtTime(ts) {
+    if (!ts) return '--:--:--';
+    var d = new Date(ts);
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    var hm = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    var now = new Date();
+    if (d.toDateString() === now.toDateString()) return hm;
+    var mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+    var day = d.getDate() + ' ' + mon + (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
+    return day + ' ' + hm;
+  }
   function opsBar(used, cap) {
     var unlimited = (cap == null);
     var pct = unlimited ? 4 : Math.min(100, Math.round(((used || 0) / Math.max(1, cap)) * 100));
