@@ -2088,6 +2088,13 @@ const server = http.createServer(async (req, res) => {
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
 
+  // ── ParaID issuer registry: publiek leesbaar, vóór de /v1-Bearer-gate ───────
+  // Verifiers must be able to check issuer registrations without an API key.
+  if (path === '/v1/paraid/issuers' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    return res.end(J({ issuers: paraidIssuers.list() }));
+  }
+
   // ── ParaSign Open Developer-API (/v1) ────────────────────────────────────────
   // Thin public layer over the internal /v2 envelope machinery. Owns its own
   // Bearer psk_ auth + parasign-scope gate (independent of the X-Api-Key path).
@@ -3216,15 +3223,10 @@ const server = http.createServer(async (req, res) => {
     return res.end(renderPrometheus());
   }
 
-  // ── ParaID issuer registry ─────────────────────────────────────────────────
-  // Public read: a verifier checks whether an issuer DID is operator-registered
-  // and still active. Registrations and revocations are anchored in the CT log.
-  if (path === '/v1/paraid/issuers' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
-    return res.end(J({ issuers: paraidIssuers.list() }));
-  }
-  // Admin writes. The public apex 404s /v2/admin at nginx; these are reached
-  // from the admin surface or the host itself.
+  // ── ParaID issuer registry: admin writes ───────────────────────────────────
+  // The public read lives BEFORE the /v1 Bearer-gate higher up. Admin writes:
+  // the public apex 404s /v2/admin at nginx; these are reached from the admin
+  // surface or the host itself. Every mutation is CT-anchored.
   if (path === '/v2/admin/paraid/issuers' && req.method === 'POST') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
