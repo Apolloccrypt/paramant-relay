@@ -263,12 +263,28 @@ function initStepDoc() {
   inp.addEventListener('change', e => e.target.files[0] && onDocChosen(e.target.files[0]));
 }
 
+function showDocError(msg) {
+  const el = $('ds-doc-error');
+  if (el) { el.textContent = msg; el.hidden = false; }
+}
+function clearDocError() {
+  const el = $('ds-doc-error'); if (el) el.hidden = true;
+}
+
 async function onDocChosen(file) {
+  clearDocError();
   const bytes = new Uint8Array(await file.arrayBuffer());
+  // Empty file: nothing to sign or attest. Reject with a clear message instead
+  // of silently enabling Continue on a 0-byte document (QA).
+  if (!bytes.length) {
+    showDocError('That file is empty (0 bytes). Pick a file that has content.');
+    return;
+  }
   state.doc = { bytes, name: file.name, size: file.size };
   state.signer.docImageDataUrl = null;
   state.imageType = null;
   state.extras = [];        // fresh document: drop any text/date objects from a prior file
+  state.stamp = null;       // fresh document: drop the previous file's seal (QA: ghost stamp)
 
   const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
   const mimeGuess = guessMimeFromMagic(bytes);
@@ -286,19 +302,35 @@ async function onDocChosen(file) {
     try { state.signer.docImageDataUrl = await bytesToDataUrl(bytes, mimeGuess); } catch {}
   }
 
-  if (state.signingMode === 'invite') {
-    // Requester doesn't stamp/sign — go straight to choosing who must sign.
-    enterRecipients();
-  } else if (canPlaceVisually) {
-    setActive('step-place');
-    if (isPdf) await renderPdfForPlacement();
-    else       await renderImageForPlacement();
-  } else {
+  const toHashOnly = (note) => {
+    state.mode = 'hash';
+    state.stamp = null;
     setActive('step-hash-only');
     $('ds-hash-only-name').textContent = file.name;
     $('ds-hash-only-size').textContent = formatSize(file.size);
     $('ds-hash-only-hash').textContent = toHex(sha3_256(bytes));
     $('ds-hash-only-continue').disabled = false;
+    const hint = $('ds-hash-only-note');
+    if (hint) { if (note) { hint.textContent = note; hint.hidden = false; } else { hint.hidden = true; } }
+  };
+
+  if (state.signingMode === 'invite') {
+    // Requester doesn't stamp/sign — go straight to choosing who must sign.
+    enterRecipients();
+  } else if (canPlaceVisually) {
+    // A file can carry a valid %PDF/PNG/JPG magic and still be corrupt or
+    // truncated. Parsing must never strand the user on a blank Place screen:
+    // catch the failure, explain it, and fall back to a hash-only attestation.
+    try {
+      setActive('step-place');
+      if (isPdf) await renderPdfForPlacement();
+      else       await renderImageForPlacement();
+    } catch (e) {
+      const kind = isPdf ? 'PDF' : 'image';
+      toHashOnly('This file could not be opened as a ' + kind + ' (it looks corrupt or incomplete), so it gets a hash-only attestation instead of a visual signature.');
+    }
+  } else {
+    toHashOnly('');
   }
 }
 

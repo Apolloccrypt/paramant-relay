@@ -44,6 +44,7 @@
 .ds-dropzone:hover,.ds-dropzone.drag{border-color:var(--cobalt);background:rgba(11,58,106,.04)}
 .ds-dropzone p.big{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:6px}
 .ds-dropzone p.small{font-size:12px;color:var(--ink-dim)}
+.ds-doc-error{margin-top:12px;padding:10px 14px;background:#FEF2F2;border-left:3px solid #DC2626;color:#991B1B;font-size:13px;border-radius:4px}
 .ds-info-card{background:var(--bone-2);border:1px solid var(--ink-hair);padding:16px 18px;margin-bottom:18px}
 .ds-info-card dl{display:grid;grid-template-columns:160px 1fr;gap:8px 14px;margin:0;font-size:12px}
 .ds-info-card dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim)}
@@ -401,6 +402,7 @@
       <p class="small">Stays in your browser. Nothing is uploaded yet.</p>
       <input type="file" id="ds-doc-input" hidden>
     </div>
+    <p class="ds-doc-error" id="ds-doc-error" role="alert" hidden></p>
   </section>
 
   <!-- Step 2 (PDF): place stamp -->
@@ -452,6 +454,7 @@
         <dt>SHA3-256</dt>      <dd id="ds-hash-only-hash">-</dd>
       </dl>
     </div>
+    <p class="ds-doc-error" id="ds-hash-only-note" role="alert" hidden></p>
     <p class="ds-edit-hint">This file type is attested by hash: no preview, no visual editing. The full PDF editor (+ Text, + Date, highlights, notes and page management) appears when you pick a PDF file.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Back</button>
@@ -705,6 +708,6 @@
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
-<script type="module" src="/sign-flow.js?v=31"></script>
+<script type="module" src="/sign-flow.js?v=32"></script>
 </body>
 </html>
