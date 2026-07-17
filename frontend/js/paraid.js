@@ -74,7 +74,7 @@ function issueDemo() {
   const kp = ml_dsa65.keygen(rand(32));
   const did = 'did:paramant:' + b64url(sha3_256(kp.publicKey)).slice(0, 32);
   const fields = {
-    name: 'M. Beer (demo)',
+    name: 'A. de Vries (demo)',
     birthdate: '1994-03-02',
     nationality: 'NL',
     document_no: 'DEMO-8842671',

@@ -1644,7 +1644,7 @@ function _mutateUsersJson(fn) {
 // account-level fan-out + persistence of /v2/admin/keys/set-parasign: flips the
 // `parasign` flag on every member key of the account, then persists to users.json.
 // Idempotent and additive - safe to call on every paid update-plan.
-const PARASIGN_PAID_PLANS = new Set(['pro', 'licensed', 'enterprise']);
+const PARASIGN_PAID_PLANS = new Set(['pro', 'business', 'licensed', 'enterprise']);
 function grantParasignOnPaidPlan(accountId) {
   if (!accountId) return { ok: false, reason: 'no_account' };
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());

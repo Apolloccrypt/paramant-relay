@@ -51,6 +51,14 @@ const TIER_LIMITS = Object.freeze({
     view_ttl_ms: 86_400_000, // 24 h
     max_views: 10,
   }),
+  business: Object.freeze({
+    transfers_month: 2000,
+    signs_month: 1000,     // matches the pricing page: ~1,000 signatures per month
+    file_mb: 5,            // mirrors current MAX_BLOB global 5 MB
+    devices: 100,
+    view_ttl_ms: 604_800_000, // 7 d
+    max_views: 25,
+  }),
   enterprise: Object.freeze({
     transfers_month: UNLIMITED,
     signs_month: UNLIMITED,
@@ -61,11 +69,14 @@ const TIER_LIMITS = Object.freeze({
   }),
 });
 
-// Normalise a stored plan name to one of the three canonical tiers.
+// Normalise a stored plan name to one of the four canonical tiers.
+// WITHOUT the business entry a paying business account would silently fall
+// back to community caps (2 signatures a month), so this list must cover
+// every plan the pricing page sells.
 function normalisePlan(plan) {
   if (plan === 'free' || plan === 'dev') return 'community';
   if (plan === 'licensed')               return 'enterprise';
-  if (plan === 'community' || plan === 'pro' || plan === 'enterprise') return plan;
+  if (plan === 'community' || plan === 'pro' || plan === 'business' || plan === 'enterprise') return plan;
   return 'community';
 }
 
