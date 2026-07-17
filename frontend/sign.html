@@ -59,6 +59,7 @@
 .ds-edit-btn{font:inherit;font-size:12px;padding:3px 12px;border:1px solid var(--cobalt);background:#fff;color:var(--cobalt);border-radius:4px;cursor:pointer;line-height:1.4;font-weight:600}
 .ds-edit-btn:hover{background:var(--cobalt);color:#fff}
 .ds-edit-tip{font-size:11px;color:var(--ink-dim)}
+.ds-edit-hint{font-size:12px;color:var(--ink-dim);margin:0 0 10px;padding:6px 10px;border:1px dashed #cdd9e8;border-radius:4px;max-width:64ch}
 .ds-anno{position:absolute;box-sizing:border-box;z-index:5;border:1px dashed var(--cobalt);background:rgba(255,255,255,.7);color:var(--navy);font-family:'Times New Roman',Times,serif;display:flex;align-items:center;padding:2px 4px;cursor:grab;touch-action:none;overflow:hidden;white-space:pre;line-height:1.15}
 .ds-anno.editing{cursor:text;background:#fff;outline:2px solid var(--cobalt);border-style:solid}
 .ds-anno[data-type="date"]{font-family:var(--mono)}
@@ -413,6 +414,7 @@
       <button id="ds-zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="ds-zoom-fit" type="button">Fit</button>
     </div>
+    <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>This file is an image, so you can place your signature stamp only. The full editor (+ Text, + Date, highlights, notes and page management) works on PDF files: pick a PDF to use it.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
       <span class="ds-edit-label">Add to the document:</span>
       <button class="ds-edit-btn" id="ds-add-text" type="button">+ Text</button>
@@ -450,6 +452,7 @@
         <dt>SHA3-256</dt>      <dd id="ds-hash-only-hash">-</dd>
       </dl>
     </div>
+    <p class="ds-edit-hint">This file type is attested by hash: no preview, no visual editing. The full PDF editor (+ Text, + Date, highlights, notes and page management) appears when you pick a PDF file.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Continue</button>
@@ -702,6 +705,6 @@
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
-<script type="module" src="/sign-flow.js?v=27"></script>
+<script type="module" src="/sign-flow.js?v=28"></script>
 </body>
 </html>

@@ -320,6 +320,7 @@ async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();                                  // single image: no page-nav
   { const et = $('ds-edit-tools'); if (et) et.hidden = true; }   // text/date tools are PDF-only
+  { const eh = $('ds-edit-tools-hint'); if (eh) eh.hidden = false; }  // tell the user WHY the editor is absent
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -360,6 +361,7 @@ async function renderPdfForPlacement() {
   teardownPageNav();
   { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
   { const et = $('ds-edit-tools'); if (et) et.hidden = false; }   // text/date tools: PDF only
+  { const eh = $('ds-edit-tools-hint'); if (eh) eh.hidden = true; }
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
