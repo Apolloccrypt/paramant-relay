@@ -81,7 +81,7 @@ function renderWallet() {
   $('wallet-credstate').innerHTML = cred
     ? 'Credential from <b>' + esc(cred.issuerDid.slice(0, 30)) + '…</b>, sealed facts incl. age_over_18. Registry-anchored issuer.'
     : 'No credential yet. Get one from the Paramant Demo Authority.';
-  $('wallet-get-cred').disabled = !kp;
+  $('wallet-get-cred').disabled = false;
 }
 
 async function ensureHolderAndCred(status) {
