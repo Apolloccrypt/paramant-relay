@@ -250,15 +250,13 @@ select.pa-in { cursor: pointer; }
 
     <div class="pa-role" id="pa-role-wallet">
       <div class="pa-card">
-        <h2>1. Prove who you are, once</h2>
-        <p>A credential can only be issued after a trusted identity check. In a web browser that check runs through a Dutch or EU eID provider, not by reading your passport chip: a phone browser physically cannot read a passport NFC chip.</p>
+        <h2>1. Prove a live person is present</h2>
+        <p>No credential without a real check. This one is genuine and runs in your browser: your screen flashes a random light sequence and the camera confirms a live face reflects it back. A photo or a replayed video cannot pass. Nothing uploads.</p>
         <div class="state" id="wallet-idstate">Not verified yet.</div>
         <div class="pa-idmethods">
-          <button type="button" class="pa-idbtn" data-idm="idin">Verify with iDIN <span>(bank login)</span></button>
-          <button type="button" class="pa-idbtn" data-idm="digid">Verify with DigiD <span>(government)</span></button>
-          <button type="button" class="pa-idbtn" data-idm="eudi">EU Identity Wallet <span>(eIDAS 2.0)</span></button>
+          <a class="btn btn-lime" href="/liveness?return=/paraid-app">Run the camera liveness check</a>
         </div>
-        <p class="pa-warn"><b>Beta:</b> these providers are not connected to a live account yet, so this step is a stand-in that fills in sample identity data. The point is the flow: no credential is issued until you pass identity verification, and the data comes from the provider, not from you typing it. Connecting live iDIN/DigiD/EUDI needs an operator contract.</p>
+        <p class="pa-warn"><b>Honest scope:</b> liveness proves a live human is present, not yet <i>which</i> human. This unlocks a presence-level credential. Proving your name, age or nationality needs the next step, reading your passport&rsquo;s printed zone with the camera (in build), or a future iDIN / EU-wallet link. We do not fabricate those attributes.</p>
         <p class="pa-status" id="wallet-id-status"></p>
       </div>
       <div class="pa-card">
@@ -288,9 +286,9 @@ select.pa-in { cursor: pointer; }
         <h2>1. Ask a question</h2>
         <p>Pick exactly what must be proven. Only claims the credential can actually answer are listed, so free text can never ask for something the passport never sealed. A fresh nonce makes every answer one-time.</p>
         <select class="pa-in" id="req-predicate">
-          <option value="age_over_18|yes">Is 18 or older?</option>
-          <option value="nationality|NL">Has Dutch nationality?</option>
-          <option value="holds_credential|any">Holds a valid ParaID credential?</option>
+          <option value="presence_verified|yes">Is a verified live person present?</option>
+          <option value="age_over_18|yes" disabled>Is 18 or older? (needs document reading, in build)</option>
+          <option value="nationality|NL" disabled>Has Dutch nationality? (needs document reading, in build)</option>
         </select>
         <input class="pa-in" id="req-purpose" placeholder="Purpose (optional), e.g. age check at the door">
         <button type="button" class="btn btn-lime" id="req-build">Create request link</button>
@@ -371,6 +369,6 @@ select.pa-in { cursor: pointer; }
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid-app.js?v=4"></script>
+<script type="module" src="/js/paraid-app.js?v=5"></script>
 </body>
 </html>

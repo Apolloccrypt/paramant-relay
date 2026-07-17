@@ -25,7 +25,10 @@ function merkleRoot(leaves) {
   return lvl[0];
 }
 
-const FIELD_ORDER = ['name', 'birthdate', 'nationality', 'document_no', 'age_over_18', 'holder_binding'];
+// Presence tier: the only thing the camera liveness check honestly proves is
+// that a live human was present. No name, age or nationality: those come only
+// from a document read, which is a separate, higher tier. We never fabricate.
+const FIELDS_PRESENCE = ['presence_verified', 'holder_binding'];
 
 export function createIssuer({ keyFile }) {
   const raw = JSON.parse(readFileSync(keyFile, 'utf8'));
@@ -33,28 +36,25 @@ export function createIssuer({ keyFile }) {
   const publicKey = new Uint8Array(Buffer.from(raw.publicKey, 'base64'));
   const did = 'did:paramant:' + b64url(sha3_256(publicKey)).slice(0, 32);
 
-  // Issue a credential for a holder. holderBindingB64url = b64url(sha3-256(holderPk)).
-  // fields are demo values; the predicate age_over_18 is sealed by the issuer.
-  function issue({ holderBindingB64url, subject }) {
+  // Issue a presence credential for a holder that passed the liveness check.
+  // holderBindingB64url = b64url(sha3-256(holderPk)). Only two sealed fields, and
+  // both are true: a live person was present, bound to this device key.
+  function issue({ holderBindingB64url }) {
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(holderBindingB64url || '')) {
       return { ok: false, error: 'holder_binding must be a b64url sha3-256 hash' };
     }
-    const fields = {
-      name: (subject && subject.name) || 'Demo holder',
-      birthdate: '1994-03-02',
-      nationality: 'NL',
-      document_no: 'DEMO-' + hex(rand(4)).toUpperCase(),
-      age_over_18: 'yes',
-      holder_binding: holderBindingB64url,
-    };
+    const order = FIELDS_PRESENCE;
+    const fields = { presence_verified: 'yes', holder_binding: holderBindingB64url };
     const salts = {};
-    const leaves = FIELD_ORDER.map((k) => { salts[k] = rand(16); return leafHash(salts[k], k, fields[k]); });
+    const leaves = order.map((k) => { salts[k] = rand(16); return leafHash(salts[k], k, fields[k]); });
     const root = merkleRoot(leaves);
     const rootSig = ml_dsa65.sign(secretKey, root);
     return {
       ok: true,
       credential: {
         v: 1,
+        tier: 'presence',
+        fieldOrder: order,
         issuerDid: did,
         issuerPublicKey: b64(publicKey),
         fields,

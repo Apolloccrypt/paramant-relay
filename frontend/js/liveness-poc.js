@@ -144,12 +144,20 @@ function finish(samples, challenge) {
   const lumCorr = bestCorr(samples.map((s) => lum(s.em.r, s.em.g, s.em.b)), samples.map((s) => lum(s.me.r, s.me.g, s.me.b)));
 
   const score = Math.round(clamp(0.8 * colourCoherence + 0.2 * clamp(lumCorr, 0, 1), 0, 1) * 100);
+  const passed = (chVar >= 0.00002) && score >= 40;
 
   let verdict, cls;
   if (chVar < 0.00002) { verdict = 'Inconclusive: no colour change reached the camera. Face the screen straight on and retry (the screen must light your face).'; cls = 'warn'; }
-  else if (score >= 45) { verdict = 'Responds to the light challenge. Consistent with a live, present subject.'; cls = 'ok'; }
+  else if (passed) { verdict = 'Responds to the light challenge. Consistent with a live, present subject.'; cls = 'ok'; }
   else if (score >= 22) { verdict = 'Weak response. Sit closer to the screen with less room light, then retry.'; cls = 'warn'; }
   else { verdict = 'No coherent response to the challenge. A photo or a replayed video looks like this.'; cls = 'err'; }
+
+  // If the wallet sent us here to prove presence, hand the result back to it.
+  const params = new URLSearchParams(location.search);
+  const ret = params.get('return');
+  if (ret && /^\/[a-z0-9-]+$/i.test(ret)) {
+    try { localStorage.setItem('paraid.liveness.v1', JSON.stringify({ passed, score, ts: new Date().toISOString() })); } catch (_) {}
+  }
 
   const out = $('lv-result');
   out.hidden = false;
@@ -163,8 +171,15 @@ function finish(samples, challenge) {
     bar('blue light reflects back', bCorr) +
     bar('brightness follows (secondary)', lumCorr) +
     '</div>' +
-    '<p class="lv-note">Measured on colour ratio, which survives the camera&rsquo;s auto-exposure. The challenge was random and only known at capture, so a pre-recorded video cannot match it. Proof of concept: production adds face-region tracking and the document check. Best results sitting close to the screen with modest room light.</p>';
+    '<p class="lv-note">Measured on colour ratio, which survives the camera&rsquo;s auto-exposure. The challenge was random and only known at capture, so a pre-recorded video cannot match it. Proof of concept: production adds face-region tracking and the document check. Best results sitting close to the screen with modest room light.</p>' +
+    (retLink() ? '<p style="margin-top:12px">' + retLink() + '</p>' : '');
   $('lv-live').textContent = '';
+}
+
+function retLink() {
+  const ret = new URLSearchParams(location.search).get('return');
+  if (!ret || !/^\/[a-z0-9-]+$/i.test(ret)) return '';
+  return '<a class="btn btn-lime" href="' + ret + '">Return to your wallet</a>';
 }
 
 function bar(label, v) {

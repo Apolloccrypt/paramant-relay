@@ -32,7 +32,7 @@ function merklePath(leaves, target) {
 }
 function rootFromPath(leaf, path) { let h = leaf; for (const st of path) h = st.s === 'R' ? sha3_256(concat(h, fromHex(st.h))) : sha3_256(concat(fromHex(st.h), h)); return h; }
 
-const FIELD_ORDER = ['name', 'birthdate', 'nationality', 'document_no', 'age_over_18', 'holder_binding'];
+// Fallback order if a credential does not carry its own fieldOrder.
 const HOLDER_KEY = 'paraid.holder.v1';
 const CRED_KEY = 'paraid.credential.v1';
 
@@ -81,22 +81,24 @@ function renderWallet() {
   const id = loadIdentity();
   const idEl = $('wallet-idstate');
   if (idEl) idEl.innerHTML = (id && id.verified)
-    ? 'Identity verified via <b>' + esc(id.methodLabel) + '</b> (demo): ' + esc(id.name) + ', ' + esc(id.nationality) + '.'
-    : 'Not verified yet. Pick a method above.';
+    ? 'Liveness passed (score ' + esc(String(id.score)) + '/100). A live person was verified as present.'
+    : 'Not verified yet. Run the camera liveness check above.';
   $('wallet-credstate').innerHTML = cred
-    ? 'Credential from a registered issuer, sealed identity <b>' + esc(cred.fields && cred.fields.name ? cred.fields.name : '?') + '</b> (from the identity check, demo data). Answers stay attribute-minimal.'
-    : (id && id.verified ? 'Identity verified. Now get your credential.' : 'Verify your identity first, then get a credential.');
+    ? 'Presence credential from a registered issuer. It proves a verified live person holds this device key. No name, age or nationality are claimed.'
+    : (id && id.verified ? 'Liveness passed. Now get your presence credential.' : 'Pass the liveness check first, then get a credential.');
   $('wallet-get-cred').disabled = !(id && id.verified);
 }
 
 // Supported predicates: each maps to exactly one sealed field, so a request can
 // never ask for something the credential does not carry. holds_credential reveals
 // only the already-public key binding (proves a valid credential exists, no data).
+// Presence-tier credentials can honestly answer only one thing today: a live,
+// registered-issuer-verified human is present, bound to this device. Age and
+// nationality return when the document-reading tier lands (we do not fabricate).
 const PREDICATES = {
-  'age_over_18|yes': { field: 'age_over_18', label: 'Is 18 or older?' },
-  'nationality|NL': { field: 'nationality', label: 'Has Dutch nationality?' },
-  'holds_credential|any': { field: 'holder_binding', label: 'Holds a valid ParaID credential?', value: 'valid' },
+  'presence_verified|yes': { field: 'presence_verified', label: 'Is a verified live person present?' },
 };
+const FIELD_ORDER = ['presence_verified', 'holder_binding'];
 
 // ── Identity: no credential is issued without a verified identity ────────────
 const IDENTITY_KEY = 'paraid.identity.v1';
@@ -105,19 +107,23 @@ function saveIdentity(id) { localStorage.setItem(IDENTITY_KEY, JSON.stringify(id
 // Stand-in for a live eID flow (iDIN / DigiD / EU wallet). A real integration
 // redirects to the provider and returns a signed attestation; here we fill in
 // the sample identity the provider would return, clearly labelled as demo.
-const ID_METHODS = {
-  idin: { label: 'iDIN', name: 'M. de Vries', nationality: 'NL' },
-  digid: { label: 'DigiD', name: 'M. de Vries', nationality: 'NL' },
-  eudi: { label: 'EU Identity Wallet', name: 'M. de Vries', nationality: 'NL' },
-};
+// Presence verification via the real screen-flash liveness check. It proves a
+// live human, not which human, so the credential it unlocks is presence-level:
+// no name, age or nationality are asserted (we do not fabricate those).
+function readLivenessResult() {
+  try {
+    const r = JSON.parse(localStorage.getItem('paraid.liveness.v1'));
+    if (r && r.passed && r.ts && (Date.now() - new Date(r.ts).getTime()) < 10 * 60 * 1000) return r;
+  } catch (_) {}
+  return null;
+}
 
 async function ensureHolderAndCred(status) {
   const id = loadIdentity();
-  if (!id || !id.verified) throw new Error('Verify your identity first.');
+  if (!id || !id.verified) throw new Error('Pass the liveness check first.');
   let kp = loadHolder();
   if (!kp) { kp = createHolder(); status('Holder key created on this device.'); }
-  // The verified identity drives the credential; the holder does not type it.
-  const r = await fetch('/v1/paraid/issue-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ holder_binding: holderBinding(kp), subject: { name: id.name } }) });
+  const r = await fetch('/v1/paraid/issue-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ holder_binding: holderBinding(kp) }) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('issuance failed (' + r.status + ')')); }
   const { credential } = await r.json();
   saveCredential(credential);
@@ -125,17 +131,20 @@ async function ensureHolderAndCred(status) {
 }
 
 // Build an answer bundle for a specific predicate, revealing only its one field.
+// The field order travels in the credential so wallet and verifier agree.
 function buildAnswer(predicateStr, nonceB64url) {
   const kp = loadHolder();
   const cred = loadCredential();
   if (!kp || !cred) throw new Error('Set up your wallet first.');
   const spec = PREDICATES[predicateStr];
   if (!spec) throw new Error('Unknown predicate.');
-  const salts = {}; for (const k of FIELD_ORDER) salts[k] = fromB64url(cred.salts[k]);
-  const leaves = FIELD_ORDER.map((k) => leafHash(salts[k], k, cred.fields[k]));
+  if (!(spec.field in cred.fields)) throw new Error('This credential cannot answer that (it does not carry ' + spec.field + ').');
+  const order = cred.fieldOrder || FIELD_ORDER;
+  const salts = {}; for (const k of order) salts[k] = fromB64url(cred.salts[k]);
+  const leaves = order.map((k) => leafHash(salts[k], k, cred.fields[k]));
   const nonce = fromB64url(nonceB64url);
   const presenterSig = ml_dsa65.sign(kp.secretKey, concat(nonce, fromHex(cred.root)));
-  const fi = FIELD_ORDER.indexOf(spec.field), bi = FIELD_ORDER.indexOf('holder_binding');
+  const fi = order.indexOf(spec.field), bi = order.indexOf('holder_binding');
   return {
     question: spec.label, root: cred.root, rootSig: cred.rootSig,
     issuerDid: cred.issuerDid, issuerPublicKey: cred.issuerPublicKey,
@@ -149,16 +158,18 @@ function buildAnswer(predicateStr, nonceB64url) {
 }
 
 function initWallet() {
+  // Returning from the liveness page: if it passed, record it as a real
+  // presence verification (no fabricated attributes).
+  const live = readLivenessResult();
+  if (live) {
+    const prev = loadIdentity();
+    if (!prev || !prev.verified) {
+      saveIdentity({ verified: true, method: 'liveness', score: live.score, tier: 'presence' });
+      localStorage.removeItem(CRED_KEY);
+      const s = $('wallet-id-status'); if (s) s.textContent = 'Liveness passed (score ' + live.score + '/100). You can now get a presence credential.';
+    }
+  }
   renderWallet();
-  document.querySelectorAll('.pa-idbtn').forEach((btn) => btn.onclick = () => {
-    const m = ID_METHODS[btn.dataset.idm]; if (!m) return;
-    document.querySelectorAll('.pa-idbtn').forEach((b) => b.classList.remove('on'));
-    btn.classList.add('on');
-    saveIdentity({ verified: true, method: btn.dataset.idm, methodLabel: m.label, name: m.name, nationality: m.nationality });
-    localStorage.removeItem(CRED_KEY);   // a new identity needs a fresh credential
-    $('wallet-id-status').textContent = 'Verified via ' + m.label + ' (demo). You can now get a credential.';
-    renderWallet();
-  });
   $('wallet-get-cred').onclick = async () => {
     const status = (m) => { $('wallet-status').textContent = m; };
     try { await ensureHolderAndCred(status); status('Credential stored. Your wallet is ready.'); renderWallet(); }
