@@ -259,9 +259,26 @@ function initRequester() {
       ? '<b>&#10003; ' + esc(r.question) + ' ' + esc(String(r.answer).toUpperCase()) + '</b><br>issuer: ' + esc(r.registry)
       : '<b>&#10007; rejected</b><br>' + r.errors.map(esc).join('<br>') + '<br>issuer: ' + esc(r.registry);
     out.hidden = false;
+    showVerifyTransparency(bundle, r);
   };
   const m = location.hash.match(/#result=([A-Za-z0-9_-]+)/);
   if (m) { $('req-answer-in').value = location.origin + '/paraid-app#result=' + m[1]; document.querySelector('[data-role="requester"]').click(); }
+}
+
+// Verifier-side transparency: exactly what the verifier receives, checks, and
+// (importantly) does NOT learn.
+function showVerifyTransparency(bundle, r) {
+  const el = $('req-tx'); if (!el) return;
+  el.innerHTML = ''; el.hidden = false;
+  const legend = document.createElement('div');
+  legend.className = 'tx-legend';
+  legend.innerHTML = 'Colour = who gets it: <b style="color:#1746a2">received</b> &#183; <b>checked locally</b> &#183; <b style="color:#0a1626">one network call</b> &#183; <b style="color:#3a6a17">never learned</b>';
+  el.appendChild(legend);
+  txStep(el, 'in', 'You receive the answer bundle', 'answer + key binding + issuer signature + holder signature + path hashes + nonce', 'This is everything the holder sent. It did not pass through Paramant.', null);
+  txStep(el, 'local', 'Recompute the Merkle root and check the issuer signature', bundle.disclosed.key + ' = ' + bundle.disclosed.value + ', root chains to an issuer-signed value', 'Proves the fact is from a credential the issuer really signed, unchanged.', null);
+  txStep(el, 'local', 'Check the holder binding and the fresh nonce', 'holder key matches the credential, and signed your one-time nonce', 'Stops a stolen or replayed proof: it only works from the holder device, for this check.', null);
+  txStep(el, 'out', 'One call to the public issuer registry', 'GET /v1/paraid/issuers', 'Confirms the issuer is registered and not revoked. Sends nothing about the holder, the question or the answer.', null);
+  txStep(el, 'device', 'What you never learn', 'name, birthdate, document number, and everything else in the credential', 'Only the one answer and who vouched reach you. The rest stayed sealed on the holder device.', null);
 }
 
 // ── Session gate + tabs ──────────────────────────────────────────────────────
