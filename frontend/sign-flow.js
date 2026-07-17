@@ -615,6 +615,7 @@ function wireExtraMarker(el, extra, grip) {
     if (!drag) return; drag = null;
     try { el.releasePointerCapture(e.pointerId); } catch (_) {}
     el.style.cursor = 'grab';
+    swallowNextWrapClick(el.parentElement);   // don't let this land as a new seal
     commitExtraFromMarker(el, extra);
   };
   el.addEventListener('pointerup', dragUp);
@@ -651,6 +652,7 @@ function wireExtraMarker(el, extra, grip) {
   const rezUp = (e) => {
     if (!rez) return; rez = null;
     try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+    swallowNextWrapClick(el.parentElement);
     if (el.dataset.pendingSize) { extra.size = parseFloat(el.dataset.pendingSize); delete el.dataset.pendingSize; }
     commitExtraFromMarker(el, extra);
   };
@@ -659,7 +661,10 @@ function wireExtraMarker(el, extra, grip) {
   }   // if (grip): draw markers have no resize grip
 
   if (extra.type !== 'highlight' && extra.type !== 'draw') {
-    el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEditExtra(el, extra); });
+    // Both clicks of the double-click bubble to the wrap; swallow them so the
+    // seal is never placed while the user just wants to edit the text (QA #9).
+    el.addEventListener('click', () => swallowNextWrapClick(el.parentElement));
+    el.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); swallowNextWrapClick(el.parentElement); beginEditExtra(el, extra); });
   }
 }
 
@@ -1034,6 +1039,16 @@ function setupPageNav(container, total) {
   if (next && !next._wired) { next._wired = true; next.addEventListener('click', () => goTo(Math.min(total - 1, current + 1))); }
 }
 
+// After a drag/resize/edit on ANY placed object the browser fires a click that
+// bubbles to the wrap. Without this guard that click reaches onPlaceClick and
+// silently re-places the seal at the cursor (QA: stamp-resize, edit-object drag,
+// dblclick all corrupted the seal). Every interaction handler calls
+// swallowNextWrapClick(wrap) so exactly the next wrap click is eaten.
+function swallowNextWrapClick(wrap) {
+  if (!wrap) return;
+  wrap.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+}
+
 function onPlaceClick(e) {
   if (_penMode) return;                 // pen mode: pointer gestures draw, they don't place the seal
   const wrap = e.currentTarget;
@@ -1128,6 +1143,7 @@ function addStampResizeHandle(marker, wrap) {
   const up = (e) => {
     if (!rs) return; rs = null;
     try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+    swallowNextWrapClick(wrap);   // QA #1: resizing the seal used to re-place it at the cursor
     commitStampFromMarker(marker, wrap);
   };
   grip.addEventListener('pointerup', up);
