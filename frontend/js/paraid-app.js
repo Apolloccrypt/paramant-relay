@@ -78,37 +78,69 @@ function renderWallet() {
   const kp = loadHolder();
   const cred = loadCredential();
   $('wallet-keystate').textContent = kp ? 'Holder key on this device: ' + holderBinding(kp).slice(0, 16) + '…' : 'No holder key yet.';
+  const id = loadIdentity();
+  const idEl = $('wallet-idstate');
+  if (idEl) idEl.innerHTML = (id && id.verified)
+    ? 'Identity verified via <b>' + esc(id.methodLabel) + '</b> (demo): ' + esc(id.name) + ', ' + esc(id.nationality) + '.'
+    : 'Not verified yet. Pick a method above.';
   $('wallet-credstate').innerHTML = cred
-    ? 'Credential from <b>' + esc(cred.issuerDid.slice(0, 30)) + '…</b>, sealed facts incl. age_over_18. Registry-anchored issuer.'
-    : 'No credential yet. Get one from the Paramant Demo Authority.';
-  $('wallet-get-cred').disabled = false;
+    ? 'Credential from a registered issuer, sealed identity <b>' + esc(cred.fields && cred.fields.name ? cred.fields.name : '?') + '</b> (from the identity check, demo data). Answers stay attribute-minimal.'
+    : (id && id.verified ? 'Identity verified. Now get your credential.' : 'Verify your identity first, then get a credential.');
+  $('wallet-get-cred').disabled = !(id && id.verified);
 }
 
+// Supported predicates: each maps to exactly one sealed field, so a request can
+// never ask for something the credential does not carry. holds_credential reveals
+// only the already-public key binding (proves a valid credential exists, no data).
+const PREDICATES = {
+  'age_over_18|yes': { field: 'age_over_18', label: 'Is 18 or older?' },
+  'nationality|NL': { field: 'nationality', label: 'Has Dutch nationality?' },
+  'holds_credential|any': { field: 'holder_binding', label: 'Holds a valid ParaID credential?', value: 'valid' },
+};
+
+// ── Identity: no credential is issued without a verified identity ────────────
+const IDENTITY_KEY = 'paraid.identity.v1';
+function loadIdentity() { try { return JSON.parse(localStorage.getItem(IDENTITY_KEY)); } catch { return null; } }
+function saveIdentity(id) { localStorage.setItem(IDENTITY_KEY, JSON.stringify(id)); }
+// Stand-in for a live eID flow (iDIN / DigiD / EU wallet). A real integration
+// redirects to the provider and returns a signed attestation; here we fill in
+// the sample identity the provider would return, clearly labelled as demo.
+const ID_METHODS = {
+  idin: { label: 'iDIN', name: 'M. de Vries', nationality: 'NL' },
+  digid: { label: 'DigiD', name: 'M. de Vries', nationality: 'NL' },
+  eudi: { label: 'EU Identity Wallet', name: 'M. de Vries', nationality: 'NL' },
+};
+
 async function ensureHolderAndCred(status) {
+  const id = loadIdentity();
+  if (!id || !id.verified) throw new Error('Verify your identity first.');
   let kp = loadHolder();
   if (!kp) { kp = createHolder(); status('Holder key created on this device.'); }
-  const r = await fetch('/v1/paraid/issue-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ holder_binding: holderBinding(kp), subject: {} }) });
+  // The verified identity drives the credential; the holder does not type it.
+  const r = await fetch('/v1/paraid/issue-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ holder_binding: holderBinding(kp), subject: { name: id.name } }) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('issuance failed (' + r.status + ')')); }
   const { credential } = await r.json();
   saveCredential(credential);
   return { kp, credential };
 }
 
-// Build an answer bundle for a predicate, from the stored credential + holder key.
-function buildAnswer(question, nonceB64url) {
+// Build an answer bundle for a specific predicate, revealing only its one field.
+function buildAnswer(predicateStr, nonceB64url) {
   const kp = loadHolder();
   const cred = loadCredential();
   if (!kp || !cred) throw new Error('Set up your wallet first.');
+  const spec = PREDICATES[predicateStr];
+  if (!spec) throw new Error('Unknown predicate.');
   const salts = {}; for (const k of FIELD_ORDER) salts[k] = fromB64url(cred.salts[k]);
   const leaves = FIELD_ORDER.map((k) => leafHash(salts[k], k, cred.fields[k]));
   const nonce = fromB64url(nonceB64url);
   const presenterSig = ml_dsa65.sign(kp.secretKey, concat(nonce, fromHex(cred.root)));
-  const i = FIELD_ORDER.indexOf('age_over_18'), bi = FIELD_ORDER.indexOf('holder_binding');
+  const fi = FIELD_ORDER.indexOf(spec.field), bi = FIELD_ORDER.indexOf('holder_binding');
   return {
-    question, root: cred.root, rootSig: cred.rootSig,
+    question: spec.label, root: cred.root, rootSig: cred.rootSig,
     issuerDid: cred.issuerDid, issuerPublicKey: cred.issuerPublicKey,
-    disclosed: { key: 'age_over_18', value: cred.fields.age_over_18, salt: cred.salts.age_over_18 },
-    path: merklePath(leaves, i),
+    disclosed: { key: spec.field, value: cred.fields[spec.field], salt: cred.salts[spec.field] },
+    path: merklePath(leaves, fi),
     binding: { key: 'holder_binding', value: cred.fields.holder_binding, salt: cred.salts.holder_binding },
     bindingPath: merklePath(leaves, bi),
     holderPublicKey: b64(kp.publicKey), presenterSig: b64(presenterSig),
@@ -118,6 +150,15 @@ function buildAnswer(question, nonceB64url) {
 
 function initWallet() {
   renderWallet();
+  document.querySelectorAll('.pa-idbtn').forEach((btn) => btn.onclick = () => {
+    const m = ID_METHODS[btn.dataset.idm]; if (!m) return;
+    document.querySelectorAll('.pa-idbtn').forEach((b) => b.classList.remove('on'));
+    btn.classList.add('on');
+    saveIdentity({ verified: true, method: btn.dataset.idm, methodLabel: m.label, name: m.name, nationality: m.nationality });
+    localStorage.removeItem(CRED_KEY);   // a new identity needs a fresh credential
+    $('wallet-id-status').textContent = 'Verified via ' + m.label + ' (demo). You can now get a credential.';
+    renderWallet();
+  });
   $('wallet-get-cred').onclick = async () => {
     const status = (m) => { $('wallet-status').textContent = m; };
     try { await ensureHolderAndCred(status); status('Credential stored. Your wallet is ready.'); renderWallet(); }
@@ -130,7 +171,7 @@ function initWallet() {
     try { req = JSON.parse(fromB64url($('wallet-req-in').value.trim().replace(/^.*#request=/, '')).reduce((s, b) => s + String.fromCharCode(b), '')); }
     catch { try { req = JSON.parse($('wallet-req-in').value); } catch { $('wallet-answer-out').textContent = 'Could not read that request.'; return; } }
     try {
-      const bundle = buildAnswer(req.predicate || '18+?', req.nonce);
+      const bundle = buildAnswer(req.predicate || 'age_over_18|yes', req.nonce);
       const link = location.origin + '/paraid-app#result=' + b64url(te.encode(JSON.stringify(bundle)));
       $('wallet-answer-out').innerHTML = 'Answer ready. Send this back to the requester:';
       $('wallet-answer-link').value = link;
@@ -144,7 +185,7 @@ function initWallet() {
 // ── Requester role ───────────────────────────────────────────────────────────
 function initRequester() {
   $('req-build').onclick = () => {
-    const predicate = $('req-predicate').value || '18+?';
+    const predicate = $('req-predicate').value || 'age_over_18|yes';
     const req = { v: 1, predicate, purpose: $('req-purpose').value || '', nonce: b64url(rand(16)) };
     $('req-link').value = location.origin + '/paraid-app#request=' + b64url(te.encode(JSON.stringify(req)));
     $('req-out').hidden = false;

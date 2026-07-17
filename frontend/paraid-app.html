@@ -218,6 +218,14 @@
 .pa-result.ok { border-left: 3px solid #B2FF3F; }
 .pa-result.err { border-left: 3px solid #d33; }
 .pa-note { font-size: 12px; color: var(--ink-dim); line-height: 1.5; margin-top: var(--space-2); }
+.pa-warn { font-size: 12.5px; line-height: 1.55; color: var(--ink-dim); background: #fff8e6; border-left: 3px solid #d3b334; padding: 10px 12px; margin: var(--space-3) 0; border-radius: 4px; }
+.pa-warn b { color: var(--navy); }
+.pa-idmethods { display: flex; gap: 8px; flex-wrap: wrap; margin: var(--space-3) 0; }
+.pa-idbtn { flex: 1; min-width: 130px; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--navy); background: #fff; border: 1px solid var(--ink-hair); border-radius: 6px; padding: 12px 10px; cursor: pointer; text-align: left; line-height: 1.3; }
+.pa-idbtn span { display: block; font-weight: 400; font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+.pa-idbtn:hover { border-color: var(--cobalt); }
+.pa-idbtn.on { border-color: #B2FF3F; background: #f6ffe8; }
+select.pa-in { cursor: pointer; }
 </style>
 
 <div class="pa-wrap">
@@ -242,12 +250,24 @@
 
     <div class="pa-role" id="pa-role-wallet">
       <div class="pa-card">
-        <h2>1. Your device key and credential</h2>
-        <p>A holder key is generated on this device. Then you fetch a demo credential from the registered Paramant Demo Authority. In production this credential comes from your passport (NFC) at a trusted issuer.</p>
+        <h2>1. Prove who you are, once</h2>
+        <p>A credential can only be issued after a trusted identity check. In a web browser that check runs through a Dutch or EU eID provider, not by reading your passport chip: a phone browser physically cannot read a passport NFC chip.</p>
+        <div class="state" id="wallet-idstate">Not verified yet.</div>
+        <div class="pa-idmethods">
+          <button type="button" class="pa-idbtn" data-idm="idin">Verify with iDIN <span>(bank login)</span></button>
+          <button type="button" class="pa-idbtn" data-idm="digid">Verify with DigiD <span>(government)</span></button>
+          <button type="button" class="pa-idbtn" data-idm="eudi">EU Identity Wallet <span>(eIDAS 2.0)</span></button>
+        </div>
+        <p class="pa-warn"><b>Beta:</b> these providers are not connected to a live account yet, so this step is a stand-in that fills in sample identity data. The point is the flow: no credential is issued until you pass identity verification, and the data comes from the provider, not from you typing it. Connecting live iDIN/DigiD/EUDI needs an operator contract.</p>
+        <p class="pa-status" id="wallet-id-status"></p>
+      </div>
+      <div class="pa-card">
+        <h2>2. Get your credential</h2>
+        <p>Once your identity is verified, the registered issuer signs a credential bound to a key on this device. The sealed facts come from the identity check, not from you.</p>
         <div class="state" id="wallet-keystate">...</div>
         <div class="state" id="wallet-credstate">...</div>
         <div class="pa-row">
-          <button type="button" class="btn btn-lime" id="wallet-get-cred">Get my credential</button>
+          <button type="button" class="btn btn-lime" id="wallet-get-cred" disabled>Get my credential</button>
           <button type="button" class="btn" id="wallet-create-key">New device key</button>
         </div>
         <p class="pa-status" id="wallet-status"></p>
@@ -266,8 +286,12 @@
     <div class="pa-role" id="pa-role-requester" hidden>
       <div class="pa-card">
         <h2>1. Ask a question</h2>
-        <p>Build a request for a claim, with a fresh nonce so the answer cannot be an old one. Share the link with the person who must prove it.</p>
-        <input class="pa-in" id="req-predicate" value="18+?" placeholder="What do you want proven? e.g. 18+?">
+        <p>Pick exactly what must be proven. Only claims the credential can actually answer are listed, so free text can never ask for something the passport never sealed. A fresh nonce makes every answer one-time.</p>
+        <select class="pa-in" id="req-predicate">
+          <option value="age_over_18|yes">Is 18 or older?</option>
+          <option value="nationality|NL">Has Dutch nationality?</option>
+          <option value="holds_credential|any">Holds a valid ParaID credential?</option>
+        </select>
         <input class="pa-in" id="req-purpose" placeholder="Purpose (optional), e.g. age check at the door">
         <button type="button" class="btn btn-lime" id="req-build">Create request link</button>
         <div id="req-out" hidden>
@@ -347,6 +371,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid-app.js?v=3"></script>
+<script type="module" src="/js/paraid-app.js?v=4"></script>
 </body>
 </html>
