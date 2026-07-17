@@ -208,7 +208,7 @@ curl -X POST https://paramant.app/v1/envelopes \
         "webhook_url": "https://app.example.com/hooks/parasign"
       }'
 # 201 -> { "id": "env_...", "status": "sent",
-#          "signers": [ { "sign_url": "https://api.paramant.app/..." } ],
+#          "signers": [ { "sign_url": "https://paramant.app/..." } ],
 #          "webhook_secret": "..." }   # returned once, for HMAC verification
 
 # 2. The signer opens sign_url and signs ML-DSA-65 client-side (hosted ceremony).
