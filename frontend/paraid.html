@@ -226,6 +226,12 @@
 .pid-netmeter b { color: var(--navy); }
 .pid-netmeter.dirty b { color: #d33; }
 .pid-boundary-foot { font-size: 12px; line-height: 1.5; color: var(--ink-dim); margin: var(--space-3) 0 0; }
+.pid-legend { margin-top: var(--space-6); border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-4) var(--space-5); }
+.pid-legend h2 { font-size: 18px; color: var(--navy); margin: 0 0 var(--space-3); }
+.pid-legend dl { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 8px 20px; margin: 0; }
+.pid-legend dt { font-family: var(--mono); font-size: 12px; color: var(--navy); font-weight: 600; overflow-wrap: anywhere; }
+.pid-legend dd { font-size: 13px; line-height: 1.55; color: var(--ink-dim); margin: 0; }
+@media (max-width: 700px) { .pid-legend dl { grid-template-columns: 1fr; gap: 2px 0; } .pid-legend dd { margin-bottom: 10px; } }
 .pid-limits { margin-top: var(--space-6); border-top: 1px solid var(--ink-hair); padding-top: var(--space-5); max-width: 70ch; }
 .pid-limits h2 { font-size: 18px; color: var(--navy); margin: 0 0 var(--space-2); }
 .pid-limits ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); }
@@ -281,6 +287,34 @@
   </div>
 
     <p class="pid-boundary-foot">The counter above is measured live by your own browser (Performance API), not written by us. Want harder proof? Turn on airplane mode and run the demo again: everything keeps working.</p>
+  </div>
+
+  <div class="pid-legend">
+    <h2>How to read the results</h2>
+    <dl>
+      <dt>&#10003; 18+? YES</dt>
+      <dd>The answer itself, cryptographically proven, without showing the birthdate behind it.</dd>
+      <dt>issuer: did:paramant:&hellip;</dt>
+      <dd>Who vouched for the facts. The code is derived from the issuer&rsquo;s signing key, so it cannot point to anyone else.</dd>
+      <dt>issuer signature: ML-DSA-65 valid</dt>
+      <dd>The sealed set of facts really was signed by that issuer, and nothing in it was changed afterwards.</dd>
+      <dt>holder: key bound &#10003; &#183; fresh nonce &#10003;</dt>
+      <dd>The credential is locked to the key of the device showing it, and the answer was produced just now for this specific check. A stolen or replayed proof fails here.</dd>
+      <dt>fields received: age_over_18 + key binding</dt>
+      <dd>The complete list of what actually reached the verifier. Everything else stayed sealed on the device.</dd>
+      <dt>issuer registered? yes: &lt;name&gt;</dt>
+      <dd>The issuer appears in Paramant&rsquo;s public issuer registry, and every registration is anchored in the public transparency log, so it cannot be quietly added or removed.</dd>
+      <dt>issuer registered? no (demo)</dt>
+      <dd>This demo invents its own issuer inside your browser tab, so it is deliberately NOT in the public registry. Real credentials come from registered issuers only. The count shown is how many real issuers are registered today.</dd>
+      <dt>issuer registered? REVOKED</dt>
+      <dd>The issuer was withdrawn from the registry. The math of the proof may still be valid, but you should no longer trust credentials from this issuer. Revocations stay visible forever.</dd>
+      <dt>why the registry check makes 1 request</dt>
+      <dd>&ldquo;Is this issuer registered right now?&rdquo; is a question about a live, shared list (issuers get added and revoked), so your browser has to fetch that public list once. The request carries nothing about you, your document or your answer. What it buys you: the guarantee that the vouching party is a vetted, registered issuer rather than anyone who generated a key.</dd>
+      <dt>&#10007; rejected</dt>
+      <dd>One of the checks failed: tampered data, a key that does not match, an expired or foreign nonce. The verifier tells you which one.</dd>
+      <dt>network requests during demo</dt>
+      <dd>Stays 0 while you issue and prove. The optional registry check makes exactly 1 request, and the counter turning red on that click is the counter proving it works.</dd>
+    </dl>
   </div>
 
   <div class="pid-limits">
@@ -354,6 +388,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid.js?v=4"></script>
+<script type="module" src="/js/paraid.js?v=5"></script>
 </body>
 </html>

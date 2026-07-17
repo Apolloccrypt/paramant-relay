@@ -178,6 +178,7 @@ function verifyBundle() {
       '<div class="pid-row"><span>fields received</span><b>' + b.disclosed.key + ' + key binding</b></div>' +
       '<div class="pid-row"><span>issuer registered?</span><b id="pid-reg-status">not checked</b></div>' +
       '<button type="button" class="btn home-act-ghost" id="pid-reg-btn" style="margin-top:8px;font-size:12px">Check the public issuer registry (makes 1 network request)</button>' +
+      '<p class="pid-note">Why does this one check need a request? Because &ldquo;is this issuer registered <em>right now</em>?&rdquo; is a question about a shared, live list: new issuers get added and bad ones get revoked, so it cannot be answered from inside your tab. The request downloads only the public issuer list. It sends nothing about you, your document or the answer.</p>' +
       '<p class="pid-note">The verifier never saw the birthdate, name, nationality or document number. Only the sealed hashes travelled.</p>';
     const regBtn = document.getElementById('pid-reg-btn');
     if (regBtn) regBtn.addEventListener('click', checkRegistry);
@@ -198,10 +199,13 @@ async function checkRegistry() {
     const r = await fetch('/v1/paraid/issuers', { cache: 'no-store' });
     const data = await r.json();
     const found = (data.issuers || []).find((i) => i.did === state.bundle.issuerDid);
+    const activeCount = (data.issuers || []).filter((i) => i.status === 'active').length;
     if (found && found.status === 'active') {
-      s.textContent = 'yes: ' + found.label;
+      s.textContent = 'yes: ' + found.label + ' (anchored in the public log)';
+    } else if (found && found.status === 'revoked') {
+      s.textContent = 'REVOKED: this issuer was withdrawn, do not trust this credential';
     } else {
-      s.textContent = 'no: in-tab demo issuer (' + (data.issuers || []).length + ' registered issuers exist)';
+      s.textContent = 'no: this demo issuer only exists in your tab (' + activeCount + ' real issuer' + (activeCount === 1 ? ' is' : 's are') + ' registered)';
     }
   } catch {
     if (s) s.textContent = 'registry unreachable';
