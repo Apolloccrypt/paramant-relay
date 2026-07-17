@@ -2123,6 +2123,20 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J(out));
   }
+  // Substantial tier: issue from a passport MRZ. The relay re-validates the MRZ
+  // check digits and derives age_over_18 + nationality itself; only those two
+  // attributes are sealed, never name/birthdate/document number.
+  if (path === '/v1/paraid/issue-document' && req.method === 'POST') {
+    if (!paraidIssuer || !paraidIssuer.issueSubstantial) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'issuer not configured' })); }
+    if (!envCreateRateOk('paraid:' + clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'issuance quota exceeded, try later' })); }
+    let body;
+    try { body = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    const out = paraidIssuer.issueSubstantial({ holderBindingB64url: String(body.holder_binding || ''), mrzLine1: String(body.mrz_line1 || ''), mrzLine2: String(body.mrz_line2 || ''), now: new Date() });
+    if (!out.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(out)); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J(out));
+  }
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
   // Independent monitors fetch this and compare it against the live assets.

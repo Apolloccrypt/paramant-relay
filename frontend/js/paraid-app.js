@@ -97,6 +97,8 @@ function renderWallet() {
 // nationality return when the document-reading tier lands (we do not fabricate).
 const PREDICATES = {
   'presence_verified|yes': { field: 'presence_verified', label: 'Is a verified live person present?' },
+  'age_over_18|yes': { field: 'age_over_18', label: 'Is 18 or older?' },
+  'nationality|NL': { field: 'nationality', label: 'Has Dutch nationality?' },
 };
 const FIELD_ORDER = ['presence_verified', 'holder_binding'];
 
