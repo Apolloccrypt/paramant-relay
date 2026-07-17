@@ -182,8 +182,9 @@ function initWallet() {
     try { req = JSON.parse(fromB64url($('wallet-req-in').value.trim().replace(/^.*#request=/, '')).reduce((s, b) => s + String.fromCharCode(b), '')); }
     catch { try { req = JSON.parse($('wallet-req-in').value); } catch { $('wallet-answer-out').textContent = 'Could not read that request.'; return; } }
     try {
-      const bundle = buildAnswer(req.predicate || 'age_over_18|yes', req.nonce);
+      const bundle = buildAnswer(req.predicate || 'presence_verified|yes', req.nonce);
       const link = location.origin + '/paraid-app#result=' + b64url(te.encode(JSON.stringify(bundle)));
+      showAnswerTransparency(req, bundle);
       $('wallet-answer-out').innerHTML = 'Answer ready. Send this back to the requester:';
       $('wallet-answer-link').value = link;
       $('wallet-answer-link').hidden = false;
@@ -191,6 +192,49 @@ function initWallet() {
   };
   const m = location.hash.match(/#request=([A-Za-z0-9_-]+)/);
   if (m) { $('wallet-req-in').value = location.origin + '/paraid-app#request=' + m[1]; document.querySelector('[data-role="wallet"]').click(); }
+}
+
+// ── Transparency log: every step, who receives what, and why ─────────────────
+const TX_WHO = {
+  in: 'From the verifier',
+  local: 'On your device',
+  device: 'Stays on device',
+  out: 'Leaves to verifier',
+};
+function txStep(el, who, title, what, why, data) {
+  const row = document.createElement('div');
+  row.className = 'tx-step';
+  row.innerHTML =
+    '<div class="tx-who ' + who + '">' + TX_WHO[who] + '</div>' +
+    '<div class="tx-body"><p class="tx-title">' + esc(title) + '</p>' +
+    '<p class="tx-what">' + esc(what) + '</p>' +
+    (why ? '<p class="tx-why">Why: ' + esc(why) + '</p>' : '') +
+    (data ? '<pre class="tx-data">' + esc(data) + '</pre>' : '') + '</div>';
+  el.appendChild(row);
+}
+
+function showAnswerTransparency(req, bundle) {
+  const cred = loadCredential();
+  const el = $('wallet-tx');
+  el.innerHTML = '';
+  el.hidden = false;
+  const legend = document.createElement('div');
+  legend.className = 'tx-legend';
+  legend.innerHTML = 'Colour = who gets it: <b style="color:#3a6a17">stays on device</b> &#183; <b style="color:#1746a2">from verifier</b> &#183; <b style="color:#0a1626">leaves to verifier</b> &#183; <b>computed locally</b>';
+  el.appendChild(legend);
+
+  const order = (cred && cred.fieldOrder) || FIELD_ORDER;
+  const hidden = order.filter((k) => k !== bundle.disclosed.key && k !== 'holder_binding');
+
+  txStep(el, 'in', 'The verifier asks a question', PREDICATES[req.predicate] ? PREDICATES[req.predicate].label : (req.predicate || ''), 'This is the only thing they want to know. Purpose: ' + (req.purpose || 'not stated') + '.', null);
+  txStep(el, 'in', 'A fresh one-time nonce', 'nonce = ' + (req.nonce || '').slice(0, 16) + '…', 'It is random and single-use, so your answer cannot be an old one replayed.', null);
+  txStep(el, 'local', 'Open exactly one sealed fact', bundle.disclosed.key + ' = ' + bundle.disclosed.value, 'The credential is a Merkle tree; only this one leaf is opened, the rest stay sealed.', null);
+  txStep(el, 'local', 'Build the proof path to the signed root', bundle.path.length + ' hash steps up to the issuer-signed root', 'Proves this fact belongs to a credential the issuer signed, without revealing the other facts.', null);
+  txStep(el, 'device', 'Your device secret key', 'never transmitted', 'It signs the nonce but never leaves this device, so no one can impersonate you.', null);
+  txStep(el, 'local', 'Sign the nonce with your device key', 'holder signature over (nonce + root)', 'Binds the answer to this device and this exact check. Freshness + who-holds-it in one signature.', null);
+  if (hidden.length) txStep(el, 'device', 'These facts stay sealed on your device', hidden.join(', '), 'They are in the credential but never opened, so the verifier never learns them.', null);
+  txStep(el, 'out', 'This, and only this, leaves your device', 'to the verifier', 'The complete list of what the requester receives. Nothing else is sent, and it does not pass through Paramant.',
+    '{\n  answer: "' + bundle.disclosed.key + ' = ' + bundle.disclosed.value + '",\n  issuer: "' + bundle.issuerDid.slice(0, 28) + '…",\n  key_binding + issuer_signature + holder_signature + ' + bundle.path.length + ' path hashes,\n  nonce: "' + bundle.nonce.slice(0, 14) + '…"\n}');
 }
 
 // ── Requester role ───────────────────────────────────────────────────────────

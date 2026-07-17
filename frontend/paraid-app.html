@@ -226,6 +226,22 @@
 .pa-idbtn:hover { border-color: var(--cobalt); }
 .pa-idbtn.on { border-color: #B2FF3F; background: #f6ffe8; }
 select.pa-in { cursor: pointer; }
+/* Transparency log: what happens, why, and who receives it, step by step. */
+.tx-log { margin: var(--space-3) 0; border: 1px solid var(--ink-hair); border-radius: 8px; overflow: hidden; }
+.tx-step { display: grid; grid-template-columns: 92px 1fr; gap: 0; border-top: 1px solid var(--ink-hair); }
+.tx-step:first-child { border-top: none; }
+.tx-who { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 10px 8px; display: flex; align-items: flex-start; justify-content: center; text-align: center; line-height: 1.3; }
+.tx-who.device { background: #eef7e6; color: #3a6a17; }
+.tx-who.local { background: var(--bone); color: var(--ink-dim); }
+.tx-who.in { background: #e8f0fe; color: #1746a2; }
+.tx-who.out { background: #0a1626; color: #B2FF3F; }
+.tx-body { padding: 10px 12px; }
+.tx-title { font-size: 13px; font-weight: 600; color: var(--navy); margin: 0 0 2px; }
+.tx-what { font-size: 12.5px; color: var(--ink-dim); line-height: 1.45; margin: 0; }
+.tx-why { font-size: 11.5px; color: var(--ink-dim); font-style: italic; margin: 4px 0 0; }
+.tx-data { font-family: var(--mono); font-size: 11px; color: #d5e6ff; background: #0a1626; border-radius: 4px; padding: 6px 8px; margin: 6px 0 0; overflow-x: auto; white-space: pre; }
+.tx-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 10.5px; color: var(--ink-dim); padding: 8px 12px; background: var(--bone); }
+.tx-legend b { font-family: var(--mono); font-weight: 700; }
 </style>
 
 <div class="pa-wrap">
@@ -276,8 +292,8 @@ select.pa-in { cursor: pointer; }
         <input class="pa-in" id="wallet-req-in" placeholder="Paste the request link (…/paraid-app#request=…)">
         <button type="button" class="btn btn-lime" id="wallet-answer-btn">Build my answer</button>
         <p class="pa-status" id="wallet-answer-out"></p>
+        <div class="tx-log" id="wallet-tx" hidden></div>
         <input class="pa-in" id="wallet-answer-link" hidden readonly data-selectall="1">
-        <p class="pa-note">Only the answer, the public key binding and a signature over the verifier&rsquo;s nonce travel. Your name, birthdate, nationality and document number stay on this device.</p>
       </div>
     </div>
 
@@ -369,6 +385,6 @@ select.pa-in { cursor: pointer; }
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid-app.js?v=5"></script>
+<script type="module" src="/js/paraid-app.js?v=6"></script>
 </body>
 </html>
