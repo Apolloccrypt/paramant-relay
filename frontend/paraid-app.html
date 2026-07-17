@@ -257,7 +257,7 @@
         <input class="pa-in" id="wallet-req-in" placeholder="Paste the request link (…/paraid-app#request=…)">
         <button type="button" class="btn btn-lime" id="wallet-answer-btn">Build my answer</button>
         <p class="pa-status" id="wallet-answer-out"></p>
-        <input class="pa-in" id="wallet-answer-link" hidden readonly onclick="this.select()">
+        <input class="pa-in" id="wallet-answer-link" hidden readonly data-selectall="1">
         <p class="pa-note">Only the answer, the public key binding and a signature over the verifier&rsquo;s nonce travel. Your name, birthdate, nationality and document number stay on this device.</p>
       </div>
     </div>
@@ -270,7 +270,7 @@
         <input class="pa-in" id="req-purpose" placeholder="Purpose (optional), e.g. age check at the door">
         <button type="button" class="btn btn-lime" id="req-build">Create request link</button>
         <div id="req-out" hidden>
-          <input class="pa-in" id="req-link" readonly onclick="this.select()">
+          <input class="pa-in" id="req-link" readonly data-selectall="1">
           <p class="pa-note">Send this link to the holder. They answer on their own device.</p>
         </div>
       </div>
@@ -346,6 +346,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid-app.js?v=2"></script>
+<script type="module" src="/js/paraid-app.js?v=3"></script>
 </body>
 </html>

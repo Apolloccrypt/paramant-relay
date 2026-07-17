@@ -178,6 +178,7 @@ async function main() {
     document.querySelectorAll('.pa-role').forEach((x) => x.hidden = true);
     t.classList.add('on'); $('pa-role-' + t.dataset.role).hidden = false;
   }));
+  document.querySelectorAll('[data-selectall]').forEach((el) => el.addEventListener('click', () => el.select()));
   initWallet(); initRequester();
 }
 document.addEventListener('DOMContentLoaded', main);
