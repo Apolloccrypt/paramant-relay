@@ -8,10 +8,17 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 async function load() {
   try {
-    const [ctRes, hRes] = await Promise.all([
-      fetch(RELAY + '/v2/ct/log?limit=1000'),
+    // The log endpoint pages from the FRONT (from=0). Learn the size first and
+    // fetch the TAIL, otherwise a long-running relay shows its oldest thousand
+    // entries as if they were the latest (the "everything says 01 jun" bug).
+    const [sizeRes, hRes] = await Promise.all([
+      fetch(RELAY + '/v2/ct/log?limit=1'),
       fetch(RELAY + '/health', {signal: AbortSignal.timeout(4000)}).catch(() => null)
     ]);
+    const sizeD = await sizeRes.json();
+    const total = sizeD.size || 0;
+    const from  = Math.max(0, total - 1000);
+    const ctRes = await fetch(RELAY + '/v2/ct/log?from=' + from + '&limit=1000');
     const d = await ctRes.json();
     allEntries = (d.entries || []).slice().reverse();
     filtered   = allEntries;
