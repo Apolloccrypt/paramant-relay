@@ -1552,6 +1552,7 @@ function fillReview() {
     signed_at: '<set on sign>',
     disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
   };
+  _reviewProofEnv = previewEnv;
   $('ds-proof-json').textContent = JSON.stringify(previewEnv, null, 2);
 
   // Render visual previews of doc + signature so the signer sees exactly
@@ -1580,11 +1581,64 @@ async function renderReviewPreviews() {
   renderSigPreview();
 }
 
+// The proof card's coords must track the seal if it is dragged in review.
+let _reviewProofEnv = null;
+function refreshReviewProofCoords() {
+  if (!_reviewProofEnv || !_reviewProofEnv.coords) return;
+  _reviewProofEnv.coords.pageIndex = state.stamp.pageIndex;
+  _reviewProofEnv.coords.x = Math.round(state.stamp.x);
+  _reviewProofEnv.coords.y = Math.round(state.stamp.y);
+  _reviewProofEnv.coords.w = state.stamp.w;
+  _reviewProofEnv.coords.h = state.stamp.h;
+  const el = $('ds-proof-json'); if (el) el.textContent = JSON.stringify(_reviewProofEnv, null, 2);
+}
+
+// Read-only render of one annotation in the review preview, per type. Mirrors
+// renderExtraMarker geometry exactly (QA: highlight/note/draw were broken stubs).
+function renderReviewExtra(ex, wrap, ratio, pageH) {
+  if (ex.type === 'draw') {
+    if (!ex.points || !ex.points.length) return;
+    const xs = ex.points.map(p => p.x), ys = ex.points.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.style.cssText = `position:absolute;left:${minX / ratio}px;top:${(pageH - maxY) / ratio}px;` +
+      `width:${(maxX - minX) / ratio}px;height:${(maxY - minY) / ratio}px;overflow:visible;pointer-events:none`;
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('points', ex.points.map(p => ((p.x - minX) / ratio) + ',' + ((maxY - p.y) / ratio)).join(' '));
+    poly.setAttribute('fill', 'none'); poly.setAttribute('stroke', '#0B3A6A');
+    poly.setAttribute('stroke-width', String((ex.width || 2) / ratio));
+    poly.setAttribute('stroke-linecap', 'round'); poly.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(poly); wrap.appendChild(svg);
+    return;
+  }
+  const a = document.createElement('div');
+  a.className = 'ds-anno'; a.dataset.type = ex.type;
+  a.style.pointerEvents = 'none';
+  if (ex.type === 'highlight') {
+    a.style.cssText += `;left:${ex.x / ratio}px;top:${(pageH - ex.y - ex.h) / ratio}px;` +
+      `width:${ex.w / ratio}px;height:${ex.h / ratio}px`;
+  } else if (ex.type === 'note') {
+    a.style.cssText += `;left:${ex.x / ratio}px;top:${(pageH - ex.yTop) / ratio}px;` +
+      `width:${ex.w / ratio}px;font-size:${ex.size / ratio}px`;
+    a.textContent = ex.text;
+  } else {  // text / date
+    const h = extraBoxH(ex.size);
+    a.style.cssText += `;left:${ex.x / ratio}px;top:${(pageH - ex.y - h) / ratio}px;` +
+      `height:${h / ratio}px;font-size:${ex.size / ratio}px`;
+    a.textContent = ex.text;
+  }
+  wrap.appendChild(a);
+}
+
 async function renderDocPreview() {
   const pane = $('ds-review-doc-preview');
   if (!pane) return;
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
+  // Force block layout: the zoom bar must never sit in a flex ROW next to the
+  // document, or it squeezes the canvas and every seal/annotation lands at the
+  // wrong scale and position (QA cluster B). Block layout keeps canvas at 100%.
+  pane.style.display = 'block';
 
   _reviewZoom = 1;
   // A small zoom control so the signer can inspect the document + seal at the
@@ -1654,14 +1708,7 @@ async function renderDocPreview() {
       }
       for (const ex of state.extras) {
         if (ex.pageIndex !== p - 1) continue;
-        const h = extraBoxH(ex.size);
-        const a = document.createElement('div');
-        a.className = 'ds-anno';
-        a.dataset.type = ex.type;
-        a.style.cssText = `left:${ex.x / ratio}px;top:${(baseViewport.height - ex.y - h) / ratio}px;` +
-          `height:${h / ratio}px;font-size:${ex.size / ratio}px;pointer-events:none;border-style:solid;background:transparent`;
-        a.textContent = ex.text;
-        wrap.appendChild(a);
+        renderReviewExtra(ex, wrap, ratio, baseViewport.height);
       }
     }
     if (pdf.numPages > maxPages) {
@@ -1756,6 +1803,7 @@ function makeReviewStampDraggable(mock, ratio, isImage, pageH, pageIndex) {
     const w = parseFloat(mock.style.width) * ratio, h = parseFloat(mock.style.height) * ratio;
     if (isImage) state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
     else state.stamp = { pageIndex, x: natX, y: pageH - natYTop - h, w, h };
+    refreshReviewProofCoords();   // QA #6: keep the proof card's coords in sync
   };
   mock.addEventListener('pointerup', up);
   mock.addEventListener('pointercancel', up);
