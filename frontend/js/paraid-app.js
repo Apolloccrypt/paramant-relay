@@ -148,7 +148,7 @@ function buildAnswer(predicateStr, nonceB64url) {
   const presenterSig = ml_dsa65.sign(kp.secretKey, concat(nonce, fromHex(cred.root)));
   const fi = order.indexOf(spec.field), bi = order.indexOf('holder_binding');
   return {
-    question: spec.label, root: cred.root, rootSig: cred.rootSig,
+    question: spec.label, tier: cred.tier || 'presence', root: cred.root, rootSig: cred.rootSig,
     issuerDid: cred.issuerDid, issuerPublicKey: cred.issuerPublicKey,
     disclosed: { key: spec.field, value: cred.fields[spec.field], salt: cred.salts[spec.field] },
     path: merklePath(leaves, fi),
@@ -255,8 +255,9 @@ function initRequester() {
     const r = await verifyAnswer(bundle);
     const out = $('req-verify-out');
     out.className = 'pa-result ' + (r.ok ? 'ok' : 'err');
+    const tierLabel = { presence: 'presence-only (a live person, identity not checked)', substantial: 'substantial (live person + passport document check)', high: 'high (passport chip)' }[bundle.tier || 'presence'] || esc(bundle.tier || '');
     out.innerHTML = r.ok
-      ? '<b>&#10003; ' + esc(r.question) + ' ' + esc(String(r.answer).toUpperCase()) + '</b><br>issuer: ' + esc(r.registry)
+      ? '<b>&#10003; ' + esc(r.question) + ' ' + esc(String(r.answer).toUpperCase()) + '</b><br>issuer: ' + esc(r.registry) + '<br>assurance: ' + esc(tierLabel)
       : '<b>&#10007; rejected</b><br>' + r.errors.map(esc).join('<br>') + '<br>issuer: ' + esc(r.registry);
     out.hidden = false;
     showVerifyTransparency(bundle, r);
