@@ -8,7 +8,7 @@
 <meta name="description" content="Your ParaID wallet: hold a credential and prove claims like 18+? without revealing the data. Beta.">
 <meta property="og:title" content="ParaID wallet · Paramant">
 <meta property="og:description" content="Prove a claim, or ask someone to prove one. The data behind the answer never leaves the holder device.">
-<meta property="og:url" content="https://paramant.app/paraid/app">
+<meta property="og:url" content="https://paramant.app/paraid-app">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -17,7 +17,7 @@
 <meta name="twitter:title" content="ParaID wallet · Paramant">
 <meta name="twitter:description" content="Prove a claim, or ask someone to prove one. The data behind the answer never leaves the holder device.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<link rel="canonical" href="https://paramant.app/paraid/app">
+<link rel="canonical" href="https://paramant.app/paraid-app">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
@@ -229,7 +229,7 @@
   <div class="pa-gate" id="pa-gate" hidden>
     <h2 style="color:var(--navy);margin:0 0 8px">Sign in to use ParaID</h2>
     <p style="color:var(--ink-dim);font-size:14px">ParaID is tied to your Paramant account.</p>
-    <p style="margin-top:16px"><a class="btn btn-lime" href="/auth/login?next=/paraid/app">Sign in</a> &nbsp; <a class="btn" href="/paraid">Try the public demo</a></p>
+    <p style="margin-top:16px"><a class="btn btn-lime" href="/auth/login?next=/paraid-app">Sign in</a> &nbsp; <a class="btn" href="/paraid">Try the public demo</a></p>
   </div>
 
   <div id="pa-app" hidden>
@@ -254,7 +254,7 @@
       <div class="pa-card">
         <h2>2. Answer a request</h2>
         <p>Paste a request link a verifier sent you (or open their link and it lands here). Your device builds a proof that reveals only the answer.</p>
-        <input class="pa-in" id="wallet-req-in" placeholder="Paste the request link (…/paraid/app#request=…)">
+        <input class="pa-in" id="wallet-req-in" placeholder="Paste the request link (…/paraid-app#request=…)">
         <button type="button" class="btn btn-lime" id="wallet-answer-btn">Build my answer</button>
         <p class="pa-status" id="wallet-answer-out"></p>
         <input class="pa-in" id="wallet-answer-link" hidden readonly onclick="this.select()">
@@ -277,7 +277,7 @@
       <div class="pa-card">
         <h2>2. Verify the answer</h2>
         <p>Paste the answer link you got back. It is checked against the public issuer registry and revocation list, offline for the crypto and one request for the registry.</p>
-        <input class="pa-in" id="req-answer-in" placeholder="Paste the answer link (…/paraid/app#result=…)">
+        <input class="pa-in" id="req-answer-in" placeholder="Paste the answer link (…/paraid-app#result=…)">
         <button type="button" class="btn btn-lime" id="req-verify">Verify</button>
         <div class="pa-result" id="req-verify-out" hidden></div>
       </div>

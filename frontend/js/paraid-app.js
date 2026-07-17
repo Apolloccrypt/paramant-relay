@@ -131,14 +131,14 @@ function initWallet() {
     catch { try { req = JSON.parse($('wallet-req-in').value); } catch { $('wallet-answer-out').textContent = 'Could not read that request.'; return; } }
     try {
       const bundle = buildAnswer(req.predicate || '18+?', req.nonce);
-      const link = location.origin + '/paraid/app#result=' + b64url(te.encode(JSON.stringify(bundle)));
+      const link = location.origin + '/paraid-app#result=' + b64url(te.encode(JSON.stringify(bundle)));
       $('wallet-answer-out').innerHTML = 'Answer ready. Send this back to the requester:';
       $('wallet-answer-link').value = link;
       $('wallet-answer-link').hidden = false;
     } catch (e) { $('wallet-answer-out').textContent = e.message || String(e); }
   };
   const m = location.hash.match(/#request=([A-Za-z0-9_-]+)/);
-  if (m) { $('wallet-req-in').value = location.origin + '/paraid/app#request=' + m[1]; document.querySelector('[data-role="wallet"]').click(); }
+  if (m) { $('wallet-req-in').value = location.origin + '/paraid-app#request=' + m[1]; document.querySelector('[data-role="wallet"]').click(); }
 }
 
 // ── Requester role ───────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ function initRequester() {
   $('req-build').onclick = () => {
     const predicate = $('req-predicate').value || '18+?';
     const req = { v: 1, predicate, purpose: $('req-purpose').value || '', nonce: b64url(rand(16)) };
-    $('req-link').value = location.origin + '/paraid/app#request=' + b64url(te.encode(JSON.stringify(req)));
+    $('req-link').value = location.origin + '/paraid-app#request=' + b64url(te.encode(JSON.stringify(req)));
     $('req-out').hidden = false;
     sessionStorage.setItem('paraid.req.nonce', req.nonce);
   };
@@ -163,7 +163,7 @@ function initRequester() {
     out.hidden = false;
   };
   const m = location.hash.match(/#result=([A-Za-z0-9_-]+)/);
-  if (m) { $('req-answer-in').value = location.origin + '/paraid/app#result=' + m[1]; document.querySelector('[data-role="requester"]').click(); }
+  if (m) { $('req-answer-in').value = location.origin + '/paraid-app#result=' + m[1]; document.querySelector('[data-role="requester"]').click(); }
 }
 
 // ── Session gate + tabs ──────────────────────────────────────────────────────
