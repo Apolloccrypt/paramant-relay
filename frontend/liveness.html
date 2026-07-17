@@ -201,8 +201,12 @@
 .lv-head .lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); }
 .lv-stage { position: relative; background: #0a1626; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 420px; margin: 0 auto var(--space-4); box-shadow: 0 4px 20px rgba(11,58,106,.2); }
 .lv-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-.lv-flash { position: absolute; inset: 0; background: #0a1626; opacity: 0; transition: opacity .12s; pointer-events: none; mix-blend-mode: screen; }
-.lv-flash.on { opacity: .82; }
+/* Full-viewport flash: the whole screen becomes the light source. The camera
+   preview floats on top so the user stays framed while the screen lights them. */
+.lv-flash { position: fixed; inset: 0; background: #000; opacity: 0; z-index: 9990; pointer-events: none; transition: background .06s; }
+.lv-flash.on { opacity: 1; }
+body.lv-flashing .lv-stage { position: fixed; z-index: 9991; width: 180px; height: 135px; right: 16px; bottom: 16px; max-width: none; margin: 0; border: 2px solid #fff; }
+body.lv-flashing .lv-wrap > *:not(.lv-stage) { visibility: hidden; }
 .lv-live { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); min-height: 1.2em; margin-bottom: var(--space-3); }
 .lv-controls { text-align: center; margin-bottom: var(--space-4); }
 .lv-netbar { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); text-align: center; margin-top: var(--space-2); }
@@ -227,6 +231,7 @@
 @media (max-width: 480px) { .lv-bar { grid-template-columns: 1fr 80px 40px; } }
 </style>
 
+<div class="lv-flash" id="lv-flash"></div>
 <div class="lv-wrap">
   <div class="lv-head">
     <p class="lv-eyebrow">ParaID research &#183; proof of concept</p>
@@ -236,7 +241,6 @@
 
   <div class="lv-stage">
     <video id="lv-video" playsinline muted></video>
-    <div class="lv-flash" id="lv-flash"></div>
   </div>
   <p class="lv-live" id="lv-live"></p>
   <div class="lv-controls">
@@ -316,6 +320,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script src="/js/liveness-poc.js?v=1" defer></script>
+<script src="/js/liveness-poc.js?v=2" defer></script>
 </body>
 </html>

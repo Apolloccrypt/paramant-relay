@@ -56,10 +56,14 @@ async function start() {
   cv.width = 64; cv.height = 48;
   const ctx = cv.getContext('2d', { willReadFrequently: true });
 
+  // Full-screen flash: the whole viewport becomes the light source so the
+  // monitor actually illuminates the face. A small preview stays on top so the
+  // user can keep framed. Without this the screen emits almost no usable light.
   const overlay = $('lv-flash');
+  document.body.classList.add('lv-flashing');
   overlay.classList.add('on');
 
-  const STEP_MS = 260, STEPS = 16;
+  const STEP_MS = 300, STEPS = 16;
   const challenge = buildChallenge(STEPS);
   let current = challenge[0];
   const samples = [];   // { t, em:{r,g,b}, me:{r,g,b} }
@@ -115,28 +119,36 @@ function bestCorr(a, b) {
   return best;
 }
 
+// Chromaticity: colour ratios that survive the camera's auto-exposure. When the
+// screen flashes red, the face gets redder in RATIO even if the webcam pulls the
+// overall brightness back down. This is the robust liveness signal on a monitor.
+function chroma(c) { const s = c.r + c.g + c.b + 1; return { r: c.r / s, g: c.g / s, b: c.b / s }; }
+
 function finish(samples, challenge) {
   running = false;
   $('lv-flash').classList.remove('on');
+  document.body.classList.remove('lv-flashing');
   $('lv-start').disabled = false;
   if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
 
-  const emL = samples.map((s) => lum(s.em.r, s.em.g, s.em.b));
-  const meL = samples.map((s) => lum(s.me.r, s.me.g, s.me.b));
-  const meVar = (() => { const m = meL.reduce((a, b) => a + b, 0) / (meL.length || 1); return meL.reduce((a, b) => a + (b - m) * (b - m), 0) / (meL.length || 1); })();
+  const em = samples.map((s) => chroma(s.em));
+  const me = samples.map((s) => chroma(s.me));
+  // Did the measured chromaticity move at all? If not, nothing was illuminating.
+  const chVar = (() => { const arr = me.map((c) => c.r); const m = arr.reduce((a, b) => a + b, 0) / (arr.length || 1); return arr.reduce((a, b) => a + (b - m) * (b - m), 0) / (arr.length || 1); })();
 
-  const lumCorr = bestCorr(emL, meL);
-  const rCorr = bestCorr(samples.map((s) => s.em.r), samples.map((s) => s.me.r));
-  const gCorr = bestCorr(samples.map((s) => s.em.g), samples.map((s) => s.me.g));
-  const bCorr = bestCorr(samples.map((s) => s.em.b), samples.map((s) => s.me.b));
-  const colourCoherence = (rCorr + gCorr + bCorr) / 3;
+  const rCorr = bestCorr(em.map((c) => c.r), me.map((c) => c.r));
+  const gCorr = bestCorr(em.map((c) => c.g), me.map((c) => c.g));
+  const bCorr = bestCorr(em.map((c) => c.b), me.map((c) => c.b));
+  const colourCoherence = clamp((rCorr + gCorr + bCorr) / 3, 0, 1);
+  // Brightness still helps a bit as a secondary signal (dark room, phone close).
+  const lumCorr = bestCorr(samples.map((s) => lum(s.em.r, s.em.g, s.em.b)), samples.map((s) => lum(s.me.r, s.me.g, s.me.b)));
 
-  const score = Math.round(clamp(0.6 * lumCorr + 0.4 * colourCoherence, 0, 1) * 100);
+  const score = Math.round(clamp(0.8 * colourCoherence + 0.2 * clamp(lumCorr, 0, 1), 0, 1) * 100);
 
   let verdict, cls;
-  if (meVar < 4) { verdict = 'Inconclusive: the subject barely changed brightness. Dim the room or hold the phone closer, then retry.'; cls = 'warn'; }
-  else if (score >= 55) { verdict = 'Responds to the light challenge. Consistent with a live, present subject.'; cls = 'ok'; }
-  else if (score >= 30) { verdict = 'Weak response. Ambient light may be dominating, or this is not a live subject.'; cls = 'warn'; }
+  if (chVar < 0.00002) { verdict = 'Inconclusive: no colour change reached the camera. Face the screen straight on and retry (the screen must light your face).'; cls = 'warn'; }
+  else if (score >= 45) { verdict = 'Responds to the light challenge. Consistent with a live, present subject.'; cls = 'ok'; }
+  else if (score >= 22) { verdict = 'Weak response. Sit closer to the screen with less room light, then retry.'; cls = 'warn'; }
   else { verdict = 'No coherent response to the challenge. A photo or a replayed video looks like this.'; cls = 'err'; }
 
   const out = $('lv-result');
@@ -146,12 +158,12 @@ function finish(samples, challenge) {
     '<p class="lv-score">Liveness score: <b>' + score + ' / 100</b></p>' +
     '<p class="lv-verdict">' + verdict + '</p>' +
     '<div class="lv-bars">' +
-    bar('brightness tracks the flashes', lumCorr) +
-    bar('red channel response', rCorr) +
-    bar('green channel response', gCorr) +
-    bar('blue channel response', bCorr) +
+    bar('red light reflects back', rCorr) +
+    bar('green light reflects back', gCorr) +
+    bar('blue light reflects back', bCorr) +
+    bar('brightness follows (secondary)', lumCorr) +
     '</div>' +
-    '<p class="lv-note">The challenge sequence was random and only known at capture. A pre-recorded video cannot match it. This is a proof of concept: production adds face-region tracking, subsurface analysis and the document check.</p>';
+    '<p class="lv-note">Measured on colour ratio, which survives the camera&rsquo;s auto-exposure. The challenge was random and only known at capture, so a pre-recorded video cannot match it. Proof of concept: production adds face-region tracking and the document check. Best results sitting close to the screen with modest room light.</p>';
   $('lv-live').textContent = '';
 }
 
