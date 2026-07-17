@@ -74,7 +74,7 @@ function issueDemo() {
   const kp = ml_dsa65.keygen(rand(32));
   const did = 'did:paramant:' + b64url(sha3_256(kp.publicKey)).slice(0, 32);
   const fields = {
-    name: 'A. de Vries (demo)',
+    name: 'M. Beer (demo)',
     birthdate: '1994-03-02',
     nationality: 'NL',
     document_no: 'DEMO-8842671',
@@ -153,7 +153,32 @@ function verifyBundle() {
   }
 }
 
+// Live network meter: the browser's own Performance API counts every resource
+// fetch after page load. We only display that number; if the demo ever caused
+// a request, this counter would show it (and turn red). Airplane mode is the
+// zero-trust version of the same proof.
+let baselineDone = false;
+function initNetMeter() {
+  const countEl = $('pid-netcount');
+  const meterEl = $('pid-netmeter');
+  if (!countEl || !('PerformanceObserver' in window)) return;
+  let count = 0;
+  const obs = new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) {
+      if (!baselineDone) continue;          // ignore initial page assets still trickling in
+      count += 1;
+      countEl.textContent = String(count);
+      if (meterEl) meterEl.classList.add('dirty');
+    }
+  });
+  obs.observe({ type: 'resource', buffered: false });
+  // Everything loaded ~1s after load is page chrome; from then on we count.
+  window.addEventListener('load', () => setTimeout(() => { baselineDone = true; }, 1000));
+  if (document.readyState === 'complete') setTimeout(() => { baselineDone = true; }, 1000);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initNetMeter();
   $('pid-issue-btn').addEventListener('click', issueDemo);
   $('pid-answer-btn').addEventListener('click', answerPredicate);
 });

@@ -219,6 +219,13 @@
 .pid-result.err { border-left: 3px solid #d33; }
 .pid-consent { margin-top: var(--space-3); border: 1px dashed var(--ink-hair); padding: var(--space-3); font-size: 12.5px; color: var(--ink-dim); }
 .pid-consent b { color: var(--navy); }
+.pid-boundary { border: 2px dashed #B2FF3F; border-radius: 10px; padding: var(--space-3); background: rgba(178,255,63,.03); }
+.pid-boundary-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: var(--space-3); }
+.pid-boundary-label { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--navy); font-weight: 600; }
+.pid-netmeter { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.pid-netmeter b { color: var(--navy); }
+.pid-netmeter.dirty b { color: #d33; }
+.pid-boundary-foot { font-size: 12px; line-height: 1.5; color: var(--ink-dim); margin: var(--space-3) 0 0; }
 .pid-limits { margin-top: var(--space-6); border-top: 1px solid var(--ink-hair); padding-top: var(--space-5); max-width: 70ch; }
 .pid-limits h2 { font-size: 18px; color: var(--navy); margin: 0 0 var(--space-2); }
 .pid-limits ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); }
@@ -239,6 +246,11 @@
     <li><h3>3. The verifier checks offline</h3>The verifier recomputes the chain and checks the issuer signature. It learns the answer and who vouched for it. Nothing else.</li>
   </ol>
 
+  <div class="pid-boundary">
+    <div class="pid-boundary-head">
+      <span class="pid-boundary-label">&#9679; This box runs on your device only</span>
+      <span class="pid-netmeter" id="pid-netmeter">network requests during demo: <b id="pid-netcount">0</b></span>
+    </div>
   <div class="pid-demo">
     <div class="pid-panel">
       <h2>1 &#183; Demo issuer</h2>
@@ -265,6 +277,9 @@
       <p class="pid-note">Checks the proof chain and the ML-DSA-65 issuer signature. Works offline.</p>
       <div class="pid-result" id="pid-verify-out" hidden></div>
     </div>
+  </div>
+
+    <p class="pid-boundary-foot">The counter above is measured live by your own browser (Performance API), not written by us. Want harder proof? Turn on airplane mode and run the demo again: everything keeps working.</p>
   </div>
 
   <div class="pid-limits">
@@ -338,6 +353,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid.js?v=2"></script>
+<script type="module" src="/js/paraid.js?v=3"></script>
 </body>
 </html>
