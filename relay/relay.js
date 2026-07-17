@@ -32,6 +32,7 @@ const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
 const quota         = require('./lib/quota');
 const keysTable     = require('./lib/keys-table');
+const paraidRegistry = require('./lib/paraid-registry');
 
 const VERSION    = '3.0.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -1980,6 +1981,29 @@ function setHeaders(res, req) {
   res.setHeader('X-Hybrid-Mode',                'available');
 }
 
+// ── ParaID issuer registry (fase 2): file-backed, elke mutatie CT-verankerd ──
+const PARAID_REGISTRY_FILE = process.env.PARAID_REGISTRY_FILE || '/data/paraid-issuers.json';
+const paraidIssuers = paraidRegistry.createRegistry({ file: PARAID_REGISTRY_FILE });
+try { log('info', 'paraid_registry_loaded', { issuers: paraidIssuers.load() }); }
+catch (e) { log('warn', 'paraid_registry_load_error', { err: e.message }); }
+
+function ctAppendParaidIssuer(eventType, did, payload) {
+  const ts = new Date().toISOString();
+  const valueHash = crypto.createHash('sha3-256')
+    .update(eventType).update('|').update(did).update('|')
+    .update(JSON.stringify(payload || {})).digest('hex');
+  const leaf_hash = ctLeafHash(did, valueHash, ts);
+  const index = ctWindow.nextIndex();
+  const allEntries = [...ctWindow.entries, { leaf_hash }];
+  const tree_hash = ctTreeHash(allEntries);
+  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const entry = { index, type: eventType, leaf_hash, tree_hash, did, payload: payload || {}, ts, proof };
+  ctWindow.append(entry);
+  ctWrite(entry);
+  produceSth(allEntries.length, entry.tree_hash);
+  return entry;
+}
+
 function readBody(req, max = MAX_BLOB * 2) {
   return new Promise((res, rej) => {
     const c = []; let n = 0;
@@ -3190,6 +3214,47 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
     return res.end(renderPrometheus());
+  }
+
+  // ── ParaID issuer registry ─────────────────────────────────────────────────
+  // Public read: a verifier checks whether an issuer DID is operator-registered
+  // and still active. Registrations and revocations are anchored in the CT log.
+  if (path === '/v1/paraid/issuers' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    return res.end(J({ issuers: paraidIssuers.list() }));
+  }
+  // Admin writes. The public apex 404s /v2/admin at nginx; these are reached
+  // from the admin surface or the host itself.
+  if (path === '/v2/admin/paraid/issuers' && req.method === 'POST') {
+    const adminTok = (req.headers['x-admin-token'] || '').trim();
+    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 16384)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    const r = paraidIssuers.add({ label: body.label, publicKeyB64: body.public_key });
+    if (!r.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(r)); }
+    const pkHash = crypto.createHash('sha3-256').update(Buffer.from(r.issuer.public_key, 'base64')).digest('hex');
+    const ct = ctAppendParaidIssuer('paraid_issuer_added', r.issuer.did, { label: r.issuer.label, pk_hash: pkHash });
+    log('info', 'paraid_issuer_added', { did: r.issuer.did, label: r.issuer.label });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, issuer: r.issuer, ct_index: ct.index }));
+  }
+  if (path === '/v2/admin/paraid/issuers/revoke' && req.method === 'POST') {
+    const adminTok = (req.headers['x-admin-token'] || '').trim();
+    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 4096)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    const r = paraidIssuers.revoke(String(body.did || ''));
+    if (!r.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(r)); }
+    const ct = ctAppendParaidIssuer('paraid_issuer_revoked', r.issuer.did, { label: r.issuer.label });
+    log('info', 'paraid_issuer_revoked', { did: r.issuer.did });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, issuer: r.issuer, ct_index: ct.index }));
   }
 
   // ── GET /ct, /ct/ — public CT log web UI (no auth) ─────────────────────────

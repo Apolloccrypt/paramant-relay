@@ -67,20 +67,27 @@ function rootFromPath(leaf, path) {
   return h;
 }
 
-const FIELD_ORDER = ['name', 'birthdate', 'nationality', 'document_no', 'age_over_18'];
-const state = { issuer: null, credential: null, bundle: null };
+const FIELD_ORDER = ['name', 'birthdate', 'nationality', 'document_no', 'age_over_18', 'holder_binding'];
+const state = { issuer: null, holder: null, credential: null, bundle: null, verifierNonce: null };
 
 function issueDemo() {
   const kp = ml_dsa65.keygen(rand(32));
   const did = 'did:paramant:' + b64url(sha3_256(kp.publicKey)).slice(0, 32);
+  // The HOLDER key: generated on this device and bound into the credential by
+  // the issuer. In production it lives in the passkey-PRF vault (like ParaSign
+  // signing keys), so only your biometrics can use it.
+  const holder = ml_dsa65.keygen(rand(32));
   const fields = {
-    name: 'M. Beer (demo)',
+    name: 'A. de Vries (demo)',
     birthdate: '1994-03-02',
     nationality: 'NL',
     document_no: 'DEMO-8842671',
     // The issuer computes and seals the predicate at issuance, so the wallet can
     // later reveal "18+ = yes" WITHOUT touching the birthdate leaf.
     age_over_18: 'yes',
+    // Hash of the holder public key: ties the credential to this device's key,
+    // so a stolen proof bundle is useless to anyone else.
+    holder_binding: b64url(sha3_256(holder.publicKey)),
   };
   const salts = {};
   const leaves = FIELD_ORDER.map((k) => {
@@ -90,8 +97,13 @@ function issueDemo() {
   const root = merkleRoot(leaves);
   const rootSig = ml_dsa65.sign(kp.secretKey, root);
   state.issuer = { did, publicKey: kp.publicKey };
+  state.holder = holder;
   state.credential = { fields, salts, leaves, root, rootSig };
   state.bundle = null;
+  // The verifier hands out a fresh nonce for this session: the wallet must sign
+  // it into the answer, so an old bundle can never be replayed.
+  state.verifierNonce = rand(16);
+  { const n = $('pid-nonce'); if (n) n.textContent = hex(state.verifierNonce).slice(0, 16) + '…'; }
 
   $('pid-issuer-out').hidden = false;
   $('pid-issuer-did').textContent = did;
@@ -108,12 +120,19 @@ function answerPredicate() {
   const c = state.credential;
   if (!c) return;
   const k = 'age_over_18';
-  const i = FIELD_ORDER.indexOf(k);
-  const nonce = rand(16);
+  const bindKey = 'holder_binding';
+  const nonce = state.verifierNonce;
+  // The presenter proof: the holder key signs (nonce || root). Only the device
+  // that owns the bound key can produce this, and only for THIS nonce.
+  const presenterSig = ml_dsa65.sign(state.holder.secretKey, concat(nonce, c.root));
   state.bundle = {
     question: '18+?',
     disclosed: { key: k, value: c.fields[k], salt: c.salts[k] },
-    path: merklePath(c.leaves, i),
+    path: merklePath(c.leaves, FIELD_ORDER.indexOf(k)),
+    binding: { key: bindKey, value: c.fields[bindKey], salt: c.salts[bindKey] },
+    bindingPath: merklePath(c.leaves, FIELD_ORDER.indexOf(bindKey)),
+    holderPublicKey: state.holder.publicKey,
+    presenterSig,
     root: c.root,
     rootSig: c.rootSig,
     issuerDid: state.issuer.did,
@@ -121,8 +140,9 @@ function answerPredicate() {
     nonce,
   };
   $('pid-bundle-out').hidden = false;
-  $('pid-bundle-size').textContent = 'Proof bundle: 1 revealed leaf + ' + state.bundle.path.length +
-    ' path hashes + ML-DSA-65 root signature. Nonce ' + hex(nonce).slice(0, 12) + '…';
+  $('pid-bundle-size').textContent = 'Proof bundle: 2 revealed leaves (answer + key binding) + ' +
+    (state.bundle.path.length + state.bundle.bindingPath.length) +
+    ' path hashes + issuer root signature + holder signature over the verifier nonce.';
   verifyBundle();
 }
 
@@ -130,12 +150,21 @@ function verifyBundle() {
   const b = state.bundle;
   if (!b) return;
   const errors = [];
+  // 1. Answer leaf chains to the signed root.
   const leaf = leafHash(b.disclosed.salt, b.disclosed.key, b.disclosed.value);
-  const root = rootFromPath(leaf, b.path);
-  if (hex(root) !== hex(b.root)) errors.push('Merkle path does not reach the signed root');
+  if (hex(rootFromPath(leaf, b.path)) !== hex(b.root)) errors.push('answer leaf does not reach the signed root');
+  // 2. Issuer signature over the root, and the DID is bound to that exact key.
   if (!ml_dsa65.verify(b.issuerPublicKey, b.root, b.rootSig)) errors.push('ML-DSA-65 root signature invalid');
   const boundDid = 'did:paramant:' + b64url(sha3_256(b.issuerPublicKey)).slice(0, 32);
   if (boundDid !== b.issuerDid) errors.push('issuer DID not bound to this public key');
+  // 3. Holder binding: the binding leaf chains to the same root AND commits to
+  //    the presented holder key.
+  const bindLeaf = leafHash(b.binding.salt, b.binding.key, b.binding.value);
+  if (hex(rootFromPath(bindLeaf, b.bindingPath)) !== hex(b.root)) errors.push('holder-binding leaf does not reach the signed root');
+  if (b.binding.value !== b64url(sha3_256(b.holderPublicKey))) errors.push('presented holder key is not the one bound in the credential');
+  // 4. Freshness: the holder signed THIS verifier nonce together with the root.
+  if (!state.verifierNonce || hex(b.nonce) !== hex(state.verifierNonce)) errors.push('nonce mismatch: not answering this verification session');
+  if (!ml_dsa65.verify(b.holderPublicKey, concat(b.nonce, b.root), b.presenterSig)) errors.push('holder signature over nonce invalid: possible replay');
 
   const out = $('pid-verify-out');
   out.hidden = false;
@@ -144,12 +173,39 @@ function verifyBundle() {
     out.innerHTML =
       '<p class="pid-verdict">&#10003; ' + b.question + ' <b>' + b.disclosed.value.toUpperCase() + '</b></p>' +
       '<div class="pid-row"><span>issuer</span><b class="pid-mono">' + b.issuerDid.slice(0, 34) + '…</b></div>' +
-      '<div class="pid-row"><span>signature</span><b>ML-DSA-65 valid</b></div>' +
-      '<div class="pid-row"><span>fields received</span><b>only ' + b.disclosed.key + '</b></div>' +
+      '<div class="pid-row"><span>issuer signature</span><b>ML-DSA-65 valid</b></div>' +
+      '<div class="pid-row"><span>holder</span><b>key bound &#10003; &#183; fresh nonce &#10003;</b></div>' +
+      '<div class="pid-row"><span>fields received</span><b>' + b.disclosed.key + ' + key binding</b></div>' +
+      '<div class="pid-row"><span>issuer registered?</span><b id="pid-reg-status">not checked</b></div>' +
+      '<button type="button" class="btn home-act-ghost" id="pid-reg-btn" style="margin-top:8px;font-size:12px">Check the public issuer registry (makes 1 network request)</button>' +
       '<p class="pid-note">The verifier never saw the birthdate, name, nationality or document number. Only the sealed hashes travelled.</p>';
+    const regBtn = document.getElementById('pid-reg-btn');
+    if (regBtn) regBtn.addEventListener('click', checkRegistry);
   } else {
     out.className = 'pid-result err';
     out.innerHTML = '<p class="pid-verdict">&#10007; rejected</p>' + errors.map((e) => '<p class="pid-note">' + e + '</p>').join('');
+  }
+}
+
+// Opt-in registry check: is this issuer DID registered with the relay operator?
+// This is the ONE deliberate network request on this page, and the meter above
+// will count it: that is the meter proving itself.
+async function checkRegistry() {
+  const s = document.getElementById('pid-reg-status');
+  const btn = document.getElementById('pid-reg-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/v1/paraid/issuers', { cache: 'no-store' });
+    const data = await r.json();
+    const found = (data.issuers || []).find((i) => i.did === state.bundle.issuerDid);
+    if (found && found.status === 'active') {
+      s.textContent = 'yes: ' + found.label;
+    } else {
+      s.textContent = 'no: in-tab demo issuer (' + (data.issuers || []).length + ' registered issuers exist)';
+    }
+  } catch {
+    if (s) s.textContent = 'registry unreachable';
+    if (btn) btn.disabled = false;
   }
 }
 

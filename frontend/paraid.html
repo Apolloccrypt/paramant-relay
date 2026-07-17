@@ -242,8 +242,8 @@
 
   <ol class="pid-steps">
     <li><h3>1. An issuer seals the facts</h3>A trusted issuer writes each field into a salted, sealed hash and signs the set once with ML-DSA-65 (FIPS 204). The issuer identity is bound to that key as a DID.</li>
-    <li><h3>2. Your device answers</h3>The wallet opens exactly one sealed fact, the answer, and builds a proof chain to the issuer signature. You see precisely what will be shared before it leaves the device.</li>
-    <li><h3>3. The verifier checks offline</h3>The verifier recomputes the chain and checks the issuer signature. It learns the answer and who vouched for it. Nothing else.</li>
+    <li><h3>2. Your device answers</h3>The wallet opens the sealed answer plus the key binding, and signs the verifier&rsquo;s fresh nonce with the holder key. You see precisely what will be shared before it leaves the device.</li>
+    <li><h3>3. The verifier checks offline</h3>The verifier recomputes the chain, checks the issuer signature, confirms the credential is bound to the presenting device and that the answer is fresh. It learns the answer and who vouched for it. Nothing else.</li>
   </ol>
 
   <div class="pid-boundary">
@@ -266,15 +266,16 @@
       <h2>2 &#183; Your wallet (this device)</h2>
       <p class="pid-note" id="pid-wallet-hint">Issue a credential first.</p>
       <div class="pid-consent" id="pid-consent" hidden>
-        <b>Will be shared:</b> age_over_18 = yes<br>
-        <b>Stays on this device:</b> name, birthdate, nationality, document number
+        <b>Will be shared:</b> age_over_18 = yes, plus the (public) key binding and a signature over the verifier&rsquo;s nonce<br>
+        <b>Stays on this device:</b> name, birthdate, nationality, document number, and the holder key itself
       </div>
       <div id="pid-bundle-out" hidden><p class="pid-note" id="pid-bundle-size"></p></div>
       <div class="pid-btn-row"><button type="button" class="btn btn-lime" id="pid-answer-btn" disabled>Answer &ldquo;18+?&rdquo; with proof</button></div>
     </div>
     <div class="pid-panel">
       <h2>3 &#183; Verifier</h2>
-      <p class="pid-note">Checks the proof chain and the ML-DSA-65 issuer signature. Works offline.</p>
+      <p class="pid-note">Checks the proof chain, the ML-DSA-65 issuer signature, the holder-key binding and the freshness nonce. Works offline.</p>
+      <p class="pid-note">Session nonce: <span class="pid-mono" id="pid-nonce">-</span></p>
       <div class="pid-result" id="pid-verify-out" hidden></div>
     </div>
   </div>
@@ -353,6 +354,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid.js?v=3"></script>
+<script type="module" src="/js/paraid.js?v=4"></script>
 </body>
 </html>
