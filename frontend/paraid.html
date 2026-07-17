@@ -308,6 +308,8 @@
       <dd>This demo invents its own issuer inside your browser tab, so it is deliberately NOT in the public registry. Real credentials come from registered issuers only. The count shown is how many real issuers are registered today.</dd>
       <dt>issuer registered? REVOKED</dt>
       <dd>The issuer was withdrawn from the registry. The math of the proof may still be valid, but you should no longer trust credentials from this issuer. Revocations stay visible forever.</dd>
+      <dt>credential revoked by the issuer</dt>
+      <dd>The issuer is fine, but this specific credential was withdrawn (lost phone, expired document, error at issuance). Issuers publish a status list of revoked credential ids (opaque hashes, no personal data), and the verifier checks the proof&rsquo;s root against it.</dd>
       <dt>why the registry check makes 1 request</dt>
       <dd>&ldquo;Is this issuer registered right now?&rdquo; is a question about a live, shared list (issuers get added and revoked), so your browser has to fetch that public list once. The request carries nothing about you, your document or your answer. What it buys you: the guarantee that the vouching party is a vetted, registered issuer rather than anyone who generated a key.</dd>
       <dt>&#10007; rejected</dt>
@@ -388,6 +390,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script type="module" src="/js/paraid.js?v=5"></script>
+<script type="module" src="/js/paraid.js?v=6"></script>
 </body>
 </html>

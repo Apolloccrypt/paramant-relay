@@ -200,8 +200,11 @@ async function checkRegistry() {
     const data = await r.json();
     const found = (data.issuers || []).find((i) => i.did === state.bundle.issuerDid);
     const activeCount = (data.issuers || []).filter((i) => i.status === 'active').length;
-    if (found && found.status === 'active') {
-      s.textContent = 'yes: ' + found.label + ' (anchored in the public log)';
+    const rootHex = hex(state.bundle.root);
+    if (found && found.status === 'active' && (found.revoked_credentials || []).includes(rootHex)) {
+      s.textContent = 'issuer is registered, but THIS credential was revoked by the issuer: reject it';
+    } else if (found && found.status === 'active') {
+      s.textContent = 'yes: ' + found.label + ' (anchored in the public log, credential not on the revocation list)';
     } else if (found && found.status === 'revoked') {
       s.textContent = 'REVOKED: this issuer was withdrawn, do not trust this credential';
     } else {

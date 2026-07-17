@@ -3279,6 +3279,23 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, manifest_hash: body.manifest_hash, ct_index: ct.index }));
   }
+  // Revoke ONE credential of a registered issuer (status-list entry). The id is
+  // the hex SHA3-256 of the signed Merkle root: opaque, no personal data.
+  if (path === '/v2/admin/paraid/credentials/revoke' && req.method === 'POST') {
+    const adminTok = (req.headers['x-admin-token'] || '').trim();
+    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 4096)).toString()); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
+    const r = paraidIssuers.revokeCredential(String(body.issuer_did || ''), String(body.credential || '').toLowerCase());
+    if (!r.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(r)); }
+    const ct = ctAppendParaidIssuer('paraid_credential_revoked', r.issuer.did, { credential: r.credential });
+    log('info', 'paraid_credential_revoked', { did: r.issuer.did, credential: r.credential.slice(0, 16) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, issuer_did: r.issuer.did, credential: r.credential, ct_index: ct.index }));
+  }
   if (path === '/v2/admin/paraid/issuers/revoke' && req.method === 'POST') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
     if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {

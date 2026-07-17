@@ -80,19 +80,38 @@ function createRegistry({ file }) {
     return { ok: true, issuer };
   }
 
+  // Credential status list: per issuer a list of revoked credential ids (the
+  // hex SHA3-256 of the signed Merkle root; opaque, carries no personal data).
+  // Verifiers compare their bundle's root hash against this list.
+  function revokeCredential(did, credentialHex) {
+    const issuer = issuers.get(did);
+    if (!issuer) return { ok: false, error: 'unknown issuer did' };
+    if (!/^[0-9a-f]{64}$/.test(credentialHex || '')) {
+      return { ok: false, error: 'credential must be 64 hex chars (sha3-256 of the signed root)' };
+    }
+    issuer.revoked_credentials = issuer.revoked_credentials || [];
+    if (issuer.revoked_credentials.includes(credentialHex)) {
+      return { ok: false, error: 'credential already revoked' };
+    }
+    issuer.revoked_credentials.push(credentialHex);
+    persist();
+    return { ok: true, issuer, credential: credentialHex };
+  }
+
   // Public view: active AND revoked entries. Revocations must be visible,
   // otherwise "issuer disappeared" and "issuer never existed" look the same.
   function list() {
     return [...issuers.values()].map((i) => ({
       did: i.did, label: i.label, public_key: i.public_key,
       status: i.status, since: i.since,
+      revoked_credentials: i.revoked_credentials || [],
       ...(i.revoked_at ? { revoked_at: i.revoked_at } : {}),
     }));
   }
 
   function get(did) { return issuers.get(did) || null; }
 
-  return { load, add, revoke, list, get, didFromPublicKey };
+  return { load, add, revoke, revokeCredential, list, get, didFromPublicKey };
 }
 
 module.exports = { createRegistry, didFromPublicKey, MLDSA65_PK_BYTES };

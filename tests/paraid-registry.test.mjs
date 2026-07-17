@@ -61,3 +61,14 @@ test('R5 registry survives a reload from disk', async () => {
   assert.equal(reg2.load(), 1);
   assert.equal(reg2.get(r.issuer.did).label, 'Persist');
 });
+
+test('R6 credential revocation lands on the status list and is idempotent', () => {
+  const { reg } = freshRegistry();
+  const r = reg.add({ label: 'Bank', publicKeyB64: crypto.randomBytes(MLDSA65_PK_BYTES).toString('base64') });
+  const cred = crypto.randomBytes(32).toString('hex');
+  assert.equal(reg.revokeCredential(r.issuer.did, cred).ok, true);
+  assert.deepEqual(reg.list()[0].revoked_credentials, [cred]);
+  assert.equal(reg.revokeCredential(r.issuer.did, cred).ok, false);
+  assert.equal(reg.revokeCredential('did:paramant:niks', cred).ok, false);
+  assert.equal(reg.revokeCredential(r.issuer.did, 'geen-hex').ok, false);
+});
