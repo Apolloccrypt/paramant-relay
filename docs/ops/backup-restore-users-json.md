@@ -5,6 +5,11 @@ relays). This is NOT self-host customer data — self-hosters back up their
 own relays. This document covers our backup of our hosted users, for which
 Mick is the data controller.
 
+> **This backup covers accounts only.** The full signing-critical
+> state (relay identity keys, CT/Merkle logs, ParaID keys, redis) is
+> backed up separately: see `backup-restore-full.md`. That is the
+> disaster-recovery backup; this one is the narrow accounts view.
+
 ## Backup
 
 - **Schedule:** daily 03:15 (server local time) via `/etc/cron.d/paramant-backup`
