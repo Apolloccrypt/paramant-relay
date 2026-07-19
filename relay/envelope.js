@@ -462,12 +462,24 @@ class EnvelopeStore {
   // per-account index (sorted set, highest score = most recent). `limit` caps the
   // return. Used by the Business+ audit-export to enumerate an account's
   // envelopes across all its keys. An account with no index yet -> [].
-  async listAccountEnvelopeIds(accountId, { limit = 1000 } = {}) {
+  async listAccountEnvelopeIds(accountId, { limit = 1000, prune = true } = {}) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!accountId) return [];
     const n = Math.max(1, Math.min((limit | 0) || 1000, 100000));
     const ids = await this.redis.zRange(this._acctIndexKey(accountId), 0, n - 1, { REV: true });
-    return Array.isArray(ids) ? ids : [];
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    if (!prune) return ids;
+    // Lazy prune: the index is append-only at create() time, so an entry whose
+    // envelope hash has since expired past its TTL would linger in the sorted set
+    // forever (unbounded growth). Drop those on read. Fail-open on a redis hiccup:
+    // treat an errored EXISTS as present so a transient fault never hides an id.
+    const present = await Promise.all(ids.map((id) =>
+      this.redis.exists('env:' + id).then((c) => c > 0).catch(() => true)));
+    const gone = ids.filter((_, i) => !present[i]);
+    if (gone.length) {
+      try { await this.redis.zRem(this._acctIndexKey(accountId), gone); } catch { /* best effort */ }
+    }
+    return ids.filter((_, i) => present[i]);
   }
 
   // One-shot backfill of the per-account envelope index from existing env:* keys.
