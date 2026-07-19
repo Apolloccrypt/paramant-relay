@@ -699,4 +699,5 @@ module.exports = {
   authorizeReceipt, hexEqual,   // exposed for tests
   sandboxAutoSign,              // exposed for tests
   createEnvelope, getReceipt,   // exposed for tests
+  resolveStore,                 // exposed for tests (seed the side-store)
 };

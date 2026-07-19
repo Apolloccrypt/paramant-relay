@@ -278,6 +278,20 @@ function fakeRedis(hash) {
     async hGetAll() { return { ...hash }; },
     async hGet(_k, f) { return hash[f]; },
     async hSet(_k, obj) { Object.assign(hash, obj); return Object.keys(obj || {}).length; },
+    // Atomic-script seam (VOID_LUA / SIGN_LUA). scriptLoad is a no-op stub; evalSha
+    // emulates the Lua against the same fake hash so the terminal-state guards run
+    // in-test. args[0]=at, args[1]=reason for VOID; the sign script is not exercised
+    // by these route tests, so evalSha implements the void transition faithfully.
+    async scriptLoad() { return "sha-stub"; },
+    async evalSha(_sha, { arguments: args } = {}) {
+      const at = (args && args[0]) || new Date().toISOString();
+      const reason = (args && args[1]) || "";
+      if (!hash.doc_hash) return ["not_found", ""];
+      if (hash.status === "complete") return ["already_complete", ""];
+      if (hash.status === "void") return ["idem", hash.voided_at || ""];
+      hash.status = "void"; hash.voided_at = at; hash.void_reason = reason;
+      return ["void", at];
+    },
   };
 }
 
@@ -479,13 +493,13 @@ test('receipt: same-account sibling key (different key, same account_id) is auth
   const OWNER = 'psk_live_owner09';
   const fx = makeEnvelopeFixture(fs, { id: OPEN_ID, mode: 'open', ownerToken: OWNER });
   // Seed the ephemeral meta side-record as create() would (owner's account).
-  v1._meta.set(OPEN_ID, { accountId: 'acct_shared', ts: Date.now(), ttlMs: 3600_000 });
+  await v1.resolveStore({}).putMeta(OPEN_ID, { accountId: 'acct_shared', ts: Date.now(), ttlMs: 3600_000 }, 3600_000);
   const d = receiptDeps(fs, fx, {
     token: 'psk_live_sibling09', id: OPEN_ID,     // different key...
     rec: { active: true, parasign: true, account_id: 'acct_shared' }, // ...same account
   });
   await v1.route(d);
-  v1._meta.delete(OPEN_ID);
+  await v1.resolveStore({}).delMeta(OPEN_ID);
   assert.equal(d.res.statusCode, 200);
 });
 
@@ -684,23 +698,25 @@ test('document: valid key WITHOUT the parasign scope -> 403 (scope gate before o
 
 test('document: valid scoped key of ANOTHER account -> 404 even with the blob present (no leak)', async () => {
   const { store } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: 'psk_live_do3owner' });
-  v1._blobs.set(DOC_ID, { pdf: Buffer.from('%PDF-1.7 signed'), filename: 'contract.pdf' });
+  await v1.resolveStore({}).putBlob(DOC_ID, Buffer.from('%PDF-1.7 signed'), 3600_000);
+  await v1.resolveStore({}).putMeta(DOC_ID, { original_filename: 'contract.pdf' }, 3600_000);
   const d = docDeps({ token: 'psk_live_do3stranger',
     rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: DOC_ID, store });
   await v1.route(d);
-  v1._blobs.delete(DOC_ID);
+  await v1.resolveStore({}).delBlob(DOC_ID); await v1.resolveStore({}).delMeta(DOC_ID);
   assert.equal(d.res.statusCode, 404);
   assert.equal(d.res.json().error, 'not_found');
 });
 
 test('document: an authorized PARTICIPANT (valid invite token) DOES get the signed PDF -> 200', async () => {
   const { store, inviteTokens } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: 'psk_live_do4owner' });
-  v1._blobs.set(DOC_ID, { pdf: Buffer.from('%PDF-1.7 signed'), filename: 'contract.pdf' });
+  await v1.resolveStore({}).putBlob(DOC_ID, Buffer.from('%PDF-1.7 signed'), 3600_000);
+  await v1.resolveStore({}).putMeta(DOC_ID, { original_filename: 'contract.pdf' }, 3600_000);
   const d = docDeps({ token: 'psk_live_do4signer',
     rec: { active: true, parasign: true, account_id: 'acct_signer' }, id: DOC_ID, store,
     headers: { 'x-parasign-invite-token': inviteTokens[0] } });
   await v1.route(d);
-  v1._blobs.delete(DOC_ID);
+  await v1.resolveStore({}).delBlob(DOC_ID); await v1.resolveStore({}).delMeta(DOC_ID);
   assert.equal(d.res.statusCode, 200);
   assert.equal(d.res.headers['Content-Type'], 'application/pdf');
 });
@@ -708,10 +724,11 @@ test('document: an authorized PARTICIPANT (valid invite token) DOES get the sign
 test('document: the OWNER gets the signed PDF -> 200', async () => {
   const OWNER = 'psk_live_do5owner';
   const { store } = voidableStore({ id: DOC_ID, status: 'complete', ownerToken: OWNER });
-  v1._blobs.set(DOC_ID, { pdf: Buffer.from('%PDF-1.7 signed'), filename: 'contract.pdf' });
+  await v1.resolveStore({}).putBlob(DOC_ID, Buffer.from('%PDF-1.7 signed'), 3600_000);
+  await v1.resolveStore({}).putMeta(DOC_ID, { original_filename: 'contract.pdf' }, 3600_000);
   const d = docDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' }, id: DOC_ID, store });
   await v1.route(d);
-  v1._blobs.delete(DOC_ID);
+  await v1.resolveStore({}).delBlob(DOC_ID); await v1.resolveStore({}).delMeta(DOC_ID);
   assert.equal(d.res.statusCode, 200);
   assert.equal(d.res.headers['Content-Type'], 'application/pdf');
 });
@@ -751,18 +768,18 @@ function statusDeps({ token, rec, id, store, query, headers }) {
 const STATUS_ID = 'EnvStat0AAAAAAAAAAAAAAAAAAAA';
 // Seed the ephemeral side-record exactly as create() would: real signer names +
 // commercial metadata. If redaction regressed, these strings would surface.
-function seedStatusMeta(id) {
-  v1._meta.set(id, { signers: [{ name: 'Jan Jansen' }, { name: 'Piet Peters' }],
-    metadata: { quote_id: 'Q-42' }, ts: Date.now(), ttlMs: 3600_000 });
+async function seedStatusMeta(id) {
+  await v1.resolveStore({}).putMeta(id, { signers: [{ name: 'Jan Jansen' }, { name: 'Piet Peters' }],
+    metadata: { quote_id: 'Q-42' }, ts: Date.now(), ttlMs: 3600_000 }, 3600_000);
 }
 
 test('status: a scoped STRANGER key gets the PUBLIC view -> counts + per-party status, but NO names and NO metadata', async () => {
   const { store } = voidableStore({ id: STATUS_ID, status: 'sent', ownerToken: 'psk_live_st1owner' });
-  seedStatusMeta(STATUS_ID);
+  await seedStatusMeta(STATUS_ID);
   const d = statusDeps({ token: 'psk_live_st1stranger',
     rec: { active: true, parasign: true, account_id: 'acct_stranger' }, id: STATUS_ID, store });
   await v1.route(d);
-  v1._meta.delete(STATUS_ID);
+  await v1.resolveStore({}).delMeta(STATUS_ID);
   const b = d.res.json();
   assert.equal(d.res.statusCode, 200);
   // Progress oracle IS present (the feature we keep).
@@ -780,10 +797,10 @@ test('status: a scoped STRANGER key gets the PUBLIC view -> counts + per-party s
 test('status: the OWNER gets the RICH view -> signer names + creator metadata (quote_id)', async () => {
   const OWNER = 'psk_live_st2owner';
   const { store } = voidableStore({ id: STATUS_ID, status: 'sent', ownerToken: OWNER });
-  seedStatusMeta(STATUS_ID);
+  await seedStatusMeta(STATUS_ID);
   const d = statusDeps({ token: OWNER, rec: { active: true, parasign: true, account_id: 'acct_owner' }, id: STATUS_ID, store });
   await v1.route(d);
-  v1._meta.delete(STATUS_ID);
+  await v1.resolveStore({}).delMeta(STATUS_ID);
   const b = d.res.json();
   assert.equal(d.res.statusCode, 200);
   assert.equal(b.signers[0].name, 'Jan Jansen');
@@ -793,12 +810,12 @@ test('status: the OWNER gets the RICH view -> signer names + creator metadata (q
 
 test('status: an authorized PARTICIPANT (valid invite token) also gets the rich view', async () => {
   const { store, inviteTokens } = voidableStore({ id: STATUS_ID, status: 'sent', ownerToken: 'psk_live_st3owner' });
-  seedStatusMeta(STATUS_ID);
+  await seedStatusMeta(STATUS_ID);
   const d = statusDeps({ token: 'psk_live_st3signer',
     rec: { active: true, parasign: true, account_id: 'acct_signer' }, id: STATUS_ID, store,
     query: { invite_token: inviteTokens[0] } });
   await v1.route(d);
-  v1._meta.delete(STATUS_ID);
+  await v1.resolveStore({}).delMeta(STATUS_ID);
   const b = d.res.json();
   assert.equal(d.res.statusCode, 200);
   assert.equal(b.signers[0].name, 'Jan Jansen');
