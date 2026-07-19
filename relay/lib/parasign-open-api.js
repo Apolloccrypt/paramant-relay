@@ -18,10 +18,10 @@
 //   FUNCTIONAL: auth (Bearer psk_ + parasign scope), POST /v1/envelopes
 //     (create + hash + blob store + envelope.sent webhook), GET /v1/envelopes/:id
 //     (status + external status mapping), POST /v1/envelopes/:id/void
-//     (+ envelope.voided webhook), GET /document (serves the stored blob).
-//   STUB / INTERIM: /receipt returns a notary-signed *interim manifest*, not the
-//     full multi-signer .psign (needs a store method exposing raw per-party
-//     signatures). PDF stamp-worker absent -> /document serves the UNSTAMPED
+//     (+ envelope.voided webhook, atomic against signing), GET /document (serves
+//     the stored blob), GET /receipt (full multi-signer .psign: raw per-party
+//     ML-DSA-65 signatures via envStore.getForReceipt + notary counter-sig).
+//   STUB / INTERIM: PDF stamp-worker absent -> /document serves the UNSTAMPED
 //     original (X-ParaSign-Stamped: false). signer.completed / envelope.completed
 //     / envelope.declined webhooks are NOT auto-fired (the transition originates
 //     in /v2/envelopes/:id/sign, which this build does not modify); emitEvent()

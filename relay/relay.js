@@ -2151,12 +2151,22 @@ const server = http.createServer(async (req, res) => {
   // Bearer psk_ auth + parasign-scope gate (independent of the X-Api-Key path).
   // All relay internals it needs are injected; see lib/parasign-open-api.js.
   if (path === '/v1' || path.startsWith('/v1/')) {
-    const _proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
-    const _host  = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    // publicOrigin drives the sign_url handed out to signers, so it must NOT be
+    // attacker-controllable via a spoofed Host / X-Forwarded-Host header (else an
+    // attacker poisons the signing links -> phishing). Precedence:
+    //   1) PARASIGN_PUBLIC_ORIGIN — explicit operator config, always wins. Every
+    //      self-hosted / non-paramant.app deploy MUST set this.
+    //   2) the request Host, but ONLY when it is on the paramant.app allowlist,
+    //      and then forced to https (the proxy always terminates TLS in prod).
+    //   3) a hard-coded safe default otherwise.
+    const _host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    const _hostOk = /^([a-z0-9-]+\.)*paramant\.app$/i.test(_host);
+    const _publicOrigin = process.env.PARASIGN_PUBLIC_ORIGIN
+      || (_hostOk ? `https://${_host}` : 'https://paramant.app');
     return parasignOpenApi.route({
       req, res, method: req.method, path, query, clientIp,
       authHeader: req.headers['authorization'] || '',
-      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || (_host ? `${_proto}://${_host}` : ''),
+      publicOrigin: _publicOrigin,
       apiKeys,
       envStore: _envStore(),
       envCreateRateOk,
@@ -5317,7 +5327,7 @@ const server = http.createServer(async (req, res) => {
       if (!out.ok) {
         const code = out.code === 'not_found' ? 404
           : out.code === 'bad_signature' ? 400
-          : (out.code === 'closed' || out.code === 'invite_expired') ? 410
+          : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
           : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
           : 409;
         res.writeHead(code, { 'Content-Type': 'application/json' });

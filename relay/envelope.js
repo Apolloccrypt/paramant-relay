@@ -148,10 +148,21 @@ local sigComposite = ARGV[2]
 local at = ARGV[3]
 local sigField = 'p' .. pi .. '_sig'
 local atField  = 'p' .. pi .. '_signed_at'
-local existing = redis.call('HGET', key, sigField)
 local partyCount = tonumber(redis.call('HGET', key, 'party_count')) or 0
 local signedCount = tonumber(redis.call('HGET', key, 'signed_count')) or 0
 local status = redis.call('HGET', key, 'status') or ''
+-- Atomic terminal-state guard. A completed OR voided envelope is immutable and
+-- cannot take a signature. This is the AUTHORITATIVE check: the sign() wrapper's
+-- pre-read is only a fast path, so keeping the guard inside the script closes the
+-- void<->complete race (a concurrent void can no longer be overwritten by a sign
+-- that read the old status, and a signer can no longer complete a voided envelope).
+if status == 'complete' then
+  return {'closed', tostring(signedCount), tostring(partyCount), status}
+end
+if status == 'void' then
+  return {'voided', tostring(signedCount), tostring(partyCount), status}
+end
+local existing = redis.call('HGET', key, sigField)
 if existing then
   if existing == sigComposite then
     return {'idem', tostring(signedCount), tostring(partyCount), status}
@@ -169,12 +180,37 @@ end
 return {'new', tostring(signedCount), tostring(partyCount), status}
 `;
 
+// Lua script: atomic void transition. Flips a still-open envelope to 'void'.
+// Runs on the same key as SIGN_LUA, so the two can never interleave: a void and
+// a completing sign are serialised by redis, preserving the "complete is
+// immutable" invariant in BOTH directions.
+//   KEYS[1] = redis hash key (env:<id>)
+//   ARGV[1] = ISO timestamp   ARGV[2] = void reason (already truncated)
+//   Returns: { code ('not_found'|'already_complete'|'idem'|'void'), voided_at }
+const VOID_LUA = `
+local key = KEYS[1]
+local at = ARGV[1]
+local reason = ARGV[2]
+local dh = redis.call('HGET', key, 'doc_hash')
+if not dh then return {'not_found', ''} end
+local status = redis.call('HGET', key, 'status') or ''
+if status == 'complete' then return {'already_complete', ''} end
+if status == 'void' then
+  return {'idem', redis.call('HGET', key, 'voided_at') or ''}
+end
+redis.call('HSET', key, 'status', 'void')
+redis.call('HSET', key, 'voided_at', at)
+redis.call('HSET', key, 'void_reason', reason)
+return {'void', at}
+`;
+
 class EnvelopeStore {
   constructor(redisClient, { ctAppend, sigVerify } = {}) {
     this.redis = redisClient;
     this.ctAppend = ctAppend || (() => null);    // (kind, envelope_id, payload) -> ct entry
     this.sigVerify = sigVerify || (() => false); // (sig, msg, pub) -> bool
     this._signScriptSha = null;
+    this._voidScriptSha = null;
   }
 
   available() {
@@ -186,6 +222,13 @@ class EnvelopeStore {
     if (!this.available()) throw new Error('redis unavailable');
     this._signScriptSha = await this.redis.scriptLoad(SIGN_LUA);
     return this._signScriptSha;
+  }
+
+  async _loadVoidScript() {
+    if (this._voidScriptSha) return this._voidScriptSha;
+    if (!this.available()) throw new Error('redis unavailable');
+    this._voidScriptSha = await this.redis.scriptLoad(VOID_LUA);
+    return this._voidScriptSha;
   }
 
   async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg }) {
@@ -459,14 +502,21 @@ class EnvelopeStore {
   async voidEnvelope(id, reason) {
     if (!this.available()) throw new Error('redis unavailable');
     const key = 'env:' + id;
-    const h = await this.redis.hGetAll(key);
-    if (!h || !h.doc_hash) return { ok: false, code: 'not_found' };
-    if (h.status === 'complete') return { ok: false, code: 'already_complete' };
-    if (h.status === 'void') return { ok: true, code: 'idem', status: 'void', voided_at: h.voided_at || null };
     const at = new Date().toISOString();
-    await this.redis.hSet(key, { status: 'void', voided_at: at, void_reason: (reason || '').toString().slice(0, 200) });
-    try { this.ctAppend('envelope_void', id, { reason: (reason || '').toString().slice(0, 80) }); } catch {}
-    return { ok: true, code: 'void', status: 'void', voided_at: at };
+    const safeReason = (reason || '').toString().slice(0, 200);
+    // Atomic read-modify-write via VOID_LUA: the terminal-state check and the
+    // status flip happen in one redis-serialised step, so a sign() completing
+    // concurrently cannot be silently overwritten to 'void' (and vice-versa).
+    await this._loadVoidScript();
+    const [code, voidedAt] = await this.redis.evalSha(this._voidScriptSha, {
+      keys: [key],
+      arguments: [at, safeReason],
+    });
+    if (code === 'not_found') return { ok: false, code: 'not_found' };
+    if (code === 'already_complete') return { ok: false, code: 'already_complete' };
+    if (code === 'idem') return { ok: true, code: 'idem', status: 'void', voided_at: voidedAt || null };
+    try { this.ctAppend('envelope_void', id, { reason: safeReason.slice(0, 80) }); } catch {}
+    return { ok: true, code: 'void', status: 'void', voided_at: voidedAt };
   }
 
   // Sign a party slot. Idempotent: re-submitting the same (sig, pubkey)
@@ -480,7 +530,9 @@ class EnvelopeStore {
     const partyCount = parseInt(h.party_count, 10) || 0;
     const pi = parseInt(partyIndex, 10);
     if (!Number.isInteger(pi) || pi < 0 || pi >= partyCount) return { ok: false, code: 'not_found' };
+    // Fast-path terminal-state rejection (authoritative guard is in SIGN_LUA).
     if (h.status === 'complete') return { ok: false, code: 'closed' };
+    if (h.status === 'void') return { ok: false, code: 'voided' };
 
     const mode = h.binding_mode || 'open';
     const emailHash = h['p' + pi + '_email_hash'] || '';
@@ -530,6 +582,9 @@ class EnvelopeStore {
     });
     const [outcome, signedCountStr, partyCountStr, status] = result;
     if (outcome === 'conflict') return { ok: false, code: 'conflict' };
+    // Envelope reached a terminal state between the pre-read and the script.
+    if (outcome === 'closed') return { ok: false, code: 'closed' };
+    if (outcome === 'voided') return { ok: false, code: 'voided' };
     const out = {
       ok: true,
       code: outcome,             // 'new' | 'idem'
