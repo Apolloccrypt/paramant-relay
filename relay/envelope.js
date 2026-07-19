@@ -464,8 +464,22 @@ class EnvelopeStore {
     if (h.status === 'complete') return { ok: false, code: 'already_complete' };
     if (h.status === 'void') return { ok: true, code: 'idem', status: 'void', voided_at: h.voided_at || null };
     const at = new Date().toISOString();
-    await this.redis.hSet(key, { status: 'void', voided_at: at, void_reason: (reason || '').toString().slice(0, 200) });
-    try { this.ctAppend('envelope_void', id, { reason: (reason || '').toString().slice(0, 80) }); } catch {}
+    const reasonStr = (reason || '').toString();
+    // The plaintext reason may carry free-text PII, so it stays ONLY in the
+    // access-controlled, TTL'd envelope record (owner-readable). The append-only
+    // CT-log is permanent and public-shaped, so it gets a domain-separated HASH
+    // of the reason plus its length -- enough to prove "a reason was given / this
+    // reason matches" without ever committing the words themselves to the log.
+    await this.redis.hSet(key, { status: 'void', voided_at: at, void_reason: reasonStr.slice(0, 200) });
+    try {
+      this.ctAppend('envelope_void', id, reasonStr
+        ? {
+            reason_hash: crypto.createHash('sha3-256')
+              .update('paramant/void-reason/v1\x00', 'utf8').update(reasonStr, 'utf8').digest('hex'),
+            reason_len: reasonStr.length,
+          }
+        : { reason_len: 0 });
+    } catch {}
     return { ok: true, code: 'void', status: 'void', voided_at: at };
   }
 
