@@ -382,6 +382,18 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 /* Body scroll lock */
 body.nav-locked { overflow: hidden; }
 
+/* When the mobile menu is open, make the top strip + nav fully opaque so the
+   page content behind them cannot bleed through the top. On iOS Safari the nav's
+   backdrop-filter over the dark hero renders see-through, which showed the hero
+   at the top of the open menu. Matches the drawer's --bone so the top and the
+   menu form one continuous opaque surface. */
+body.nav-locked .meta-bar,
+body.nav-locked .nav {
+  background: var(--bone);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* ════════════════════════════════════════
    RESPONSIVE
    ════════════════════════════════════════ */
