@@ -4209,6 +4209,7 @@ const server = http.createServer(async (req, res) => {
     req.method === 'GET' ||
     (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
   );
+  const isBillingWebhook = path === '/v2/billing/webhook' && req.method === 'POST';
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
     const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && safeEqual(adminHeader, process.env.ADMIN_TOKEN);
@@ -4217,7 +4218,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
-  } else if (!keyData?.active && !isEnvelopePublic) {
+  } else if (!keyData?.active && !isEnvelopePublic && !isBillingWebhook) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
