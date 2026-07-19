@@ -231,7 +231,14 @@ class EnvelopeStore {
     return this._voidScriptSha;
   }
 
-  async create({ creatorPkHash, creatorApiKeyHash, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg }) {
+  // Redis key for an account's envelope index (sorted set: member = envelope id,
+  // score = created_at ms). One set per account, so a Business account with many
+  // api-keys sees every envelope it created. Persistent (no TTL) so it survives
+  // restart via AOF and outlives the per-envelope record's own TTL -- the export
+  // can then still label an expired envelope instead of silently dropping it.
+  _acctIndexKey(accountId) { return 'parasign:acct:' + accountId + ':envelopes'; }
+
+  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
@@ -271,6 +278,9 @@ class EnvelopeStore {
       recipe_version: String(recipeVersion),
       creator_pk_hash: creatorPkHash || '',
       creator_api_hash: creatorApiKeyHash || '',
+      // The creating account. Written for provenance + so a later re-backfill can
+      // resolve the account directly from the record, without a key reverse-map.
+      account_id: (accountId || '').toString().slice(0, 200),
       original_filename: (originalFilename || '').toString().slice(0, 200),
       party_count: String(parties.length),
       signed_count: '0',
@@ -294,6 +304,13 @@ class EnvelopeStore {
     }
     await this.redis.hSet(key, hash);
     await this.redis.expire(key, ttlDays * 86400);
+
+    // Per-account envelope index. Best-effort: a redis hiccup here must not fail
+    // an otherwise-created envelope, and backfillAccountIndex() repairs a miss.
+    if (accountId) {
+      try { await this.redis.zAdd(this._acctIndexKey(accountId), { score: now.getTime(), value: id }); }
+      catch { /* index miss -> recoverable via backfill */ }
+    }
 
     try { this.ctAppend('envelope_create', id, { doc_hash: docHash, party_count: parties.length, binding_mode: mode }); } catch {}
 
@@ -439,6 +456,52 @@ class EnvelopeStore {
       creator_api_hash: h.creator_api_hash || '',
       parties,
     };
+  }
+
+  // Newest-first list of the envelope ids an account created, read from the
+  // per-account index (sorted set, highest score = most recent). `limit` caps the
+  // return. Used by the Business+ audit-export to enumerate an account's
+  // envelopes across all its keys. An account with no index yet -> [].
+  async listAccountEnvelopeIds(accountId, { limit = 1000 } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!accountId) return [];
+    const n = Math.max(1, Math.min((limit | 0) || 1000, 100000));
+    const ids = await this.redis.zRange(this._acctIndexKey(accountId), 0, n - 1, { REV: true });
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  // One-shot backfill of the per-account envelope index from existing env:* keys.
+  // The index is only written at create() time, so envelopes made BEFORE it
+  // existed are absent -- this SCANs every envelope hash and (re)builds the index.
+  // Account resolution per envelope: the account_id field written into the record
+  // (new envelopes), else the injected resolveAccount(h) reverse-map (typically
+  // creator_api_hash -> account_id from users.json). An envelope whose account
+  // cannot be resolved is counted (unresolved) and skipped. Idempotent: re-adding
+  // an id only refreshes its score. Returns { scanned, indexed, unresolved }.
+  async backfillAccountIndex({ resolveAccount, dryRun = false, log } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    let cursor = '0';                                    // redis v5 wants a string cursor
+    let scanned = 0, indexed = 0, unresolved = 0;
+    do {
+      const reply = await this.redis.scan(cursor, { MATCH: 'env:*', COUNT: 200 });
+      cursor = String(reply.cursor);
+      for (const key of (reply.keys || [])) {
+        const h = await this.redis.hGetAll(key);
+        if (!h || !h.doc_hash) continue;                 // not an envelope hash
+        scanned++;
+        let acct = h.account_id || '';
+        if (!acct && typeof resolveAccount === 'function') {
+          try { acct = resolveAccount(h) || ''; } catch { acct = ''; }
+        }
+        if (!acct) { unresolved++; continue; }
+        const id = h.id || key.slice('env:'.length);
+        const score = Date.parse(h.created_at || '') || 0;
+        if (dryRun) { indexed++; continue; }
+        try { await this.redis.zAdd(this._acctIndexKey(acct), { score, value: id }); indexed++; }
+        catch (e) { if (typeof log === 'function') log('warn', 'backfill_zadd_fail', { id, err: e.message }); }
+      }
+    } while (String(cursor) !== '0');
+    return { scanned, indexed, unresolved };
   }
 
   // Party-scoped view for the co-signer: exactly what the client needs to
