@@ -391,6 +391,24 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     </section>
     <p class="dh-ops-note"><strong>Operations &middot; read-only.</strong> Live usage and activity from your account. Action controls (new keys, run, configure) arrive with self-service keys.</p>
 
+    <div class="dh-tools-head"><h2>History &amp; exports</h2></div>
+    <section class="dh-ops" aria-label="History and exports">
+      <div class="dh-ops-card" style="grid-column:1/-1">
+        <div class="dh-ops-h">Your history</div>
+        <div id="dh-hist-body"><div class="dh-ops-dim">Your sends and received envelopes (id, status, time). Available on a Pro plan or higher.</div></div>
+        <div><button type="button" class="dh-btn" id="dh-hist-load">Load history</button></div>
+      </div>
+      <div class="dh-ops-card">
+        <div class="dh-ops-h">ParaSign audit export</div>
+        <div id="dh-export-body"><div class="dh-ops-dim">Tamper-evident signing trail with the CT anchor and per-envelope .psign proofs. Available on a Business plan or higher.</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <button type="button" class="dh-btn" id="dh-export-csv">Download CSV</button>
+          <button type="button" class="dh-btn" id="dh-export-json">Download JSON</button>
+        </div>
+      </div>
+    </section>
+    <p class="dh-ops-note">History reads your per-account audit chain (id, status, time only, never a payload). The audit export bundles the full ParaSign signing trail: see the <a href="/docs#user-history">API docs</a>.</p>
+
     <details class="dh-acct" aria-label="Account details">
       <summary class="dh-acct-head" id="dh-acct-toggle">
         <h2>Manage account</h2>
@@ -493,5 +511,6 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
 <script src="/js/dashboard.js?v=1" defer></script>
+<script src="/js/dashboard-history.js?v=1" defer></script>
 </body>
 </html>
