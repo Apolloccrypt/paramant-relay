@@ -285,6 +285,73 @@
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !modal.hidden) close(); });
   })();
 
+  /* ---------- self-service ParaSign key minting ("+ New key") ---------- */
+  var PSK_API = '/api/user/developer/parasign-keys';
+  function renderPskKeys(list) {
+    var el = document.getElementById('psk-keys'); if (!el) return;
+    if (!list || !list.length) { el.textContent = ''; return; }
+    el.innerHTML = list.map(function (k) {
+      return '<div class="key-row"><span>' + esc(k.key_masked || k.kid || '—') + '</span><span class="dim">' + esc(k.mode || 'live') + (k.active === false ? ' · revoked' : '') + '</span></div>';
+    }).join('');
+  }
+  function loadPskKeys() {
+    return getJSON(PSK_API).then(function (d) { renderPskKeys((d && d.keys) || []); }).catch(function () {});
+  }
+  function pskView(name) {
+    ['confirm', 'key', 'error'].forEach(function (v) {
+      var n = document.querySelector('#psk-modal [data-psk="view-' + v + '"]');
+      if (n) n.hidden = (v !== name);
+    });
+  }
+  function openPsk() { var m = document.getElementById('psk-modal'); if (!m) return; pskView('confirm'); m.hidden = false; }
+  function closePsk() { var m = document.getElementById('psk-modal'); if (m) m.hidden = true; }
+  function mintPsk() {
+    var m = document.getElementById('psk-modal'); if (!m) return;
+    var gen = m.querySelector('[data-psk="generate"]'); if (gen) { gen.disabled = true; gen.textContent = 'Generating…'; }
+    fetch(PSK_API, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, cache: 'no-store', body: JSON.stringify({}) })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }).catch(function () { return { status: r.status, body: {} }; }); })
+      .then(function (res) {
+        if (gen) { gen.disabled = false; gen.textContent = 'Generate key'; }
+        if (res.status === 201 && res.body && res.body.key) {
+          m.querySelector('[data-psk="keyval"]').textContent = res.body.key;
+          m.querySelector('[data-psk="meta"]').textContent = 'kid ' + (res.body.kid || '—') + ' · ' + (res.body.mode || 'live') + ' · plan ' + (res.body.plan || '—');
+          pskView('key'); loadPskKeys();
+        } else if (res.status === 403) {
+          var em = m.querySelector('[data-psk="errmsg"]'); if (em) em.textContent = (res.body && res.body.message) || 'This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign.';
+          var up = m.querySelector('[data-psk="upsell"]'); if (up) up.hidden = false;
+          pskView('error');
+        } else {
+          var em2 = m.querySelector('[data-psk="errmsg"]'); if (em2) em2.textContent = 'Could not create a key (' + ((res.body && res.body.error) || ('http ' + res.status)) + '). Please try again.';
+          var up2 = m.querySelector('[data-psk="upsell"]'); if (up2) up2.hidden = true;
+          pskView('error');
+        }
+      })
+      .catch(function () {
+        if (gen) { gen.disabled = false; gen.textContent = 'Generate key'; }
+        var em3 = m.querySelector('[data-psk="errmsg"]'); if (em3) em3.textContent = 'Network error while creating the key. Please try again.';
+        var up3 = m.querySelector('[data-psk="upsell"]'); if (up3) up3.hidden = true;
+        pskView('error');
+      });
+  }
+  (function wirePsk() {
+    var btn = document.getElementById('psk-new');
+    if (btn) btn.addEventListener('click', openPsk);
+    var m = document.getElementById('psk-modal');
+    if (!m) return;
+    m.addEventListener('click', function (ev) {
+      var t = ev.target;
+      if (t === m || (t.closest && t.closest('[data-psk="close"]'))) { closePsk(); return; }
+      if (t.closest && t.closest('[data-psk="done"]')) { closePsk(); return; }
+      if (t.closest && t.closest('[data-psk="generate"]')) { mintPsk(); return; }
+      var cp = t.closest && t.closest('[data-psk="copy"]');
+      if (cp) {
+        var kv = m.querySelector('[data-psk="keyval"]'); var text = kv ? kv.textContent : '';
+        if (navigator.clipboard && text) { navigator.clipboard.writeText(text).then(function () { var o = cp.textContent; cp.textContent = 'copied'; setTimeout(function () { cp.textContent = o; }, 1200); }).catch(function () {}); }
+      }
+    });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !m.hidden) closePsk(); });
+  })();
+
   /* ---------- boot ---------- */
   function boot() {
     heartbeat('poll');
@@ -297,6 +364,7 @@
       STATE.tools = res[1].tools || []; STATE.key = res[2]; STATE.cfg = res[3] || {};
       applySnapshot(res[0]);
       connectSSE();
+      loadPskKeys();
     }).catch(function () { heartbeat('down'); elTools.innerHTML = '<div class="dim mono" style="font-size:12px">Could not load dashboard data.</div>'; });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
