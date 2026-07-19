@@ -1,11 +1,34 @@
-# Documentation placeholder examples (not real secrets)
-0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:147
-0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:344
-0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:354
+# gitleaks allowlist - herbouwd 2026-07-20 (verving een stale set van 30).
+# Alle vermeldingen zijn geverifieerde false-positives, in drie categorieen:
+#  1) test-fixtures: psk_live_signerNN in tests/*.mjs, SDK-test-secrets, admin-tests
+#  2) doc-voorbeelden: pgp_your_key / YOUR_API_KEY / psk_live_... in README/docs/help/index
+#  3) gedocumenteerd-ingetrokken DODE credentials in git-historie: RESEND_API_KEY
+#     (re_K1YQ...) in deploy/systemd/*.service, gecommit 2026-04-01, geverifieerd
+#     invalid/revoked 2026-04-15 (zie SECURITY.md 'Credential exposure remediated').
+# Formaat: commit:bestand:regel:startregel (gitleaks fingerprint).
+
+30525495c2614e799c3e90a33e892a6cb9ebf4f2:README.md:curl-auth-header:189
+30525495c2614e799c3e90a33e892a6cb9ebf4f2:README.md:curl-auth-header:206
 82f4cae2c61f7564441d20b13a18946562e0dd63:README.md:curl-auth-header:212
 82f4cae2c61f7564441d20b13a18946562e0dd63:README.md:curl-auth-header:222
 82f4cae2c61f7564441d20b13a18946562e0dd63:README.md:curl-auth-header:237
-231b07467f42fa96269ef086c4ff3f8ed617639d:frontend/docs.html:curl-auth-header:163
+9d6f49a0f9646823ad8832b40881c0e8397408ac:README.md:curl-auth-header:199
+9d6f49a0f9646823ad8832b40881c0e8397408ac:README.md:curl-auth-header:217
+d26c70c1130e00c6f2f87749d744e2d75a8e26d7:README.md:curl-auth-header:199
+d26c70c1130e00c6f2f87749d744e2d75a8e26d7:README.md:curl-auth-header:217
+9cd2febc9f6b7f9d9213718972605edaf61243f8:admin/public/vendor/xterm.js:generic-api-key:1
+07f845e655dd5c7512eea7dd4399af3723058576:admin/test/developer-config.test.js:generic-api-key:25
+eafda61ded6e9ca3aca6225db9c03aebe11aa35b:admin/test/developer-config.test.js:generic-api-key:25
+63e2834f79e35d227196ea9bb3e2e576420e7434:deploy/systemd/paramant-relay-finance.service:generic-api-key:7
+63e2834f79e35d227196ea9bb3e2e576420e7434:deploy/systemd/paramant-relay-health.service:generic-api-key:7
+63e2834f79e35d227196ea9bb3e2e576420e7434:deploy/systemd/paramant-relay-iot.service:generic-api-key:7
+63e2834f79e35d227196ea9bb3e2e576420e7434:deploy/systemd/paramant-relay-legal.service:generic-api-key:7
+0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:147
+0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:344
+0a525c9e426ffbacc612cb9a207bb693b116f284:docs/api.md:curl-auth-header:354
+4ec3c397949b399e8f7729a65d5ad1bfc9988042:docs/api.md:curl-auth-header:379
+4ec3c397949b399e8f7729a65d5ad1bfc9988042:docs/api.md:curl-auth-header:431
+4ec3c397949b399e8f7729a65d5ad1bfc9988042:docs/api.md:curl-auth-header:453
 82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:73
 82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:112
 82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:131
@@ -15,30 +38,77 @@
 82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:212
 82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:232
 82f4cae2c61f7564441d20b13a18946562e0dd63:docs/api.md:curl-auth-header:403
-6cb717bbbfe7978cdf9e5153ac2b583e21a0ba3d:frontend/docs.html:curl-auth-header:392
-
-# Documentation example PSS (pre-shared secret demo string)
+5571bc40692675ed891c0feec4b6f2c518bf5ca0:docs/parasign-open-api-spec.md:curl-auth-header:51
 19b13732281f02e2f63835d3c4a3d37f69a5261f:docs/security.md:generic-api-key:268
 19b13732281f02e2f63835d3c4a3d37f69a5261f:docs/security.md:generic-api-key:274
-
-# OT guide docs/api.md — placeholder keys plk_your_key in DID examples
-docs/api.md:curl-auth-header:379
-docs/api.md:curl-auth-header:431
-docs/api.md:curl-auth-header:453
-
-# Documentation placeholders imported 2026-04-24 from server-side
-# (paramant.app/docs/* and /help/*): all are curl examples with
-# literal 'pgp_your_key' / 'Bearer YOUR_API_KEY' / demo PSS strings
-# 'flu-vaccine-2026' and 'correct-horse-battery-staple'. Not secrets.
-frontend/docs/security.md:generic-api-key:309
-frontend/docs/security.md:generic-api-key:315
-frontend/docs/api.md:curl-auth-header:29
-frontend/docs/api.md:curl-auth-header:67
-frontend/docs/api.md:curl-auth-header:135
-frontend/docs/api.md:curl-auth-header:147
-frontend/docs/api.md:curl-auth-header:355
-frontend/docs/api.md:curl-auth-header:365
-frontend/docs/api.md:curl-auth-header:379
-frontend/docs/api.md:curl-auth-header:431
-frontend/docs/api.md:curl-auth-header:453
-frontend/help/iot-integration.html:curl-auth-header:323
+230a25058d3b5837e6d6ad9748667bda886299bc:docs/security/pq-tls.md:generic-api-key:105
+231b07467f42fa96269ef086c4ff3f8ed617639d:frontend/docs.html:curl-auth-header:163
+6545a0d2373c1039740731a14e8625b20d64d327:frontend/docs.html:curl-auth-header:625
+6545a0d2373c1039740731a14e8625b20d64d327:frontend/docs.html:curl-auth-header:635
+6cb717bbbfe7978cdf9e5153ac2b583e21a0ba3d:frontend/docs.html:curl-auth-header:392
+7ab3efb4a943e20e46e715cdccfc8b6189cd5d42:frontend/docs.html:curl-auth-header:680
+7ab3efb4a943e20e46e715cdccfc8b6189cd5d42:frontend/docs.html:curl-auth-header:758
+7ab3efb4a943e20e46e715cdccfc8b6189cd5d42:frontend/docs.html:curl-auth-header:830
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:29
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:67
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:135
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:147
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:355
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:365
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:379
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:431
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/api.md:curl-auth-header:453
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/security.md:generic-api-key:309
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/docs/security.md:generic-api-key:315
+65496942d54fb322c2cf6a8fff9db1ce98b41962:frontend/help/iot-integration.html:curl-auth-header:323
+50642e6517f179581e878719dd948f4fce2dbd98:frontend/index.html:generic-api-key:209
+a683555c1a046613b55233f5518f98060370a3b2:frontend/index.html:generic-api-key:221
+aa95af69fd96605e0405b9e08ce8075ecd421184:poc/README.md:generic-api-key:50
+614c5b1b5496a446f20d0f007b92a0d669e182cc:sdk-js/test/security-fixes.test.js:generic-api-key:16
+1cfc2ce33f501197061c30e6f4b97b5a6603a39b:sdk-py/tests/test_sdk_integration.py:generic-api-key:17
+614c5b1b5496a446f20d0f007b92a0d669e182cc:sdk-py/tests/test_security_fixes.py:generic-api-key:20
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:404
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:419
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:429
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:452
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:466
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:484
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:601
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:610
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:612
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:686
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:697
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:699
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:760
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:795
+1b4085954f40039dc22c3f84988f9bbd3ebba2c0:tests/parasign-open-api.test.mjs:generic-api-key:797
+240c269f42ca181dffd93a6b18eec4eb85f7e77b:tests/parasign-open-api.test.mjs:generic-api-key:584
+240c269f42ca181dffd93a6b18eec4eb85f7e77b:tests/parasign-open-api.test.mjs:generic-api-key:593
+240c269f42ca181dffd93a6b18eec4eb85f7e77b:tests/parasign-open-api.test.mjs:generic-api-key:595
+240c269f42ca181dffd93a6b18eec4eb85f7e77b:tests/parasign-open-api.test.mjs:generic-api-key:669
+240c269f42ca181dffd93a6b18eec4eb85f7e77b:tests/parasign-open-api.test.mjs:generic-api-key:680
+240c269f42ca181dffd93a6b18eec4eb85f7e77b:tests/parasign-open-api.test.mjs:generic-api-key:682
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:404
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:419
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:429
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:452
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:466
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:484
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:601
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:610
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:612
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:686
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:697
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:699
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:760
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:795
+6e4a08d7a3759a5b6129a694d7aaec1419b64d50:tests/parasign-open-api.test.mjs:generic-api-key:797
+d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generic-api-key:369
+d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generic-api-key:384
+d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generic-api-key:394
+d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generic-api-key:417
+d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generic-api-key:431
+d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generic-api-key:449
+ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generic-api-key:760
+ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generic-api-key:795
+ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generic-api-key:797
