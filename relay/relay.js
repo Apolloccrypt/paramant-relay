@@ -27,6 +27,9 @@ const path   = require('path');
 const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
+const totpLib       = require('./lib/totp');
+const rateLimit     = require('./lib/rate-limit');
+const authGate      = require('./lib/auth-gate');
 const userSigning   = require('./lib/user-signing');
 const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
@@ -908,31 +911,9 @@ if (TOTP_SECRET) {
   catch(e) { log('error', 'totp_secret_invalid', { err: e.message, hint: 'TOTP_SECRET must be valid Base32 (A-Z, 2-7)' }); process.exit(1); }
 }
 
-function base32Decode(s) {
-  const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = 0, value = 0, output = [];
-  s = s.toUpperCase().replace(/=+$/, '');
-  for (const c of s) {
-    const idx = alpha.indexOf(c);
-    // Fix 14: throw on invalid Base32 character instead of silently using -1
-    if (idx === -1) throw new Error(`Invalid Base32 character: '${c}'`);
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) { output.push((value >>> (bits - 8)) & 0xFF); bits -= 8; }
-  }
-  return Buffer.from(output);
-}
+function base32Decode(s) { return totpLib.base32Decode(s); }
 
-function totpCode(secret, counter, algorithm = 'sha256') {
-  const key = base32Decode(secret);
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64BE(BigInt(counter));
-  const mac = crypto.createHmac(algorithm, key).update(buf).digest();
-  const offset = mac[mac.length - 1] & 0xf;
-  const code = (mac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
-  zeroBuffer(key); zeroBuffer(mac);
-  return code.toString().padStart(6, '0');
-}
+function totpCode(secret, counter, algorithm = 'sha256') { return totpLib.totpCode(secret, counter, algorithm); }
 
 // Fix 5: used-code tracking — window = 30s each side → 3 windows × 30s = 90s expiry
 const _usedTotpCodes = new Map(); // code+counter → expiry ms
@@ -962,30 +943,8 @@ function verifyTotp(token) {
   return matched;
 }
 async function verifyTotpGeneric(token, secret, opts = {}) {
-  const { window = 1, replayKey, algorithm = 'sha256' } = opts;
-  const tokenBuf = Buffer.from(String(token || ''), 'utf8');
-  if (tokenBuf.length !== 6) return { valid: false };
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  let matched = false;
-  let matchedSlot = null;
-  for (let i = -window; i <= window; i++) {
-    const c = counter + i;
-    const expected = totpCode(secret, c, algorithm);
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
-    if (eq) { matched = true; matchedSlot = c; }
-  }
-  if (!matched) return { valid: false };
-  if (replayKey && redisClient) {
-    // Atomic one-shot per matched slot. A per-slot key (not a single replayKey
-    // that the next slot would overwrite) plus SET NX makes the get/set race-free:
-    // NX returns null when the slot was already consumed, so two concurrent uses
-    // of the same code, or reuse of a still-in-window code, are both rejected.
-    const slotKey = `${replayKey}:${matchedSlot}`;
-    const ok = await redisClient.set(slotKey, '1', { NX: true, EX: 90 }).catch(() => 'OK');
-    if (ok === null) return { valid: false };
-  }
-  return { valid: true };
+  // Delegates to the extracted pure core; redisClient is the injected replay store.
+  return totpLib.verifyTotpGeneric(token, secret, opts, redisClient);
 }
 
 
@@ -1278,7 +1237,7 @@ const sessions = new Map();
 setInterval(() => {
   const now = Date.now();
   for (const [id, s] of sessions.entries()) {
-    if (now > s.expires_ms) sessions.delete(id);
+    if (!authGate.sessionValid(s, now)) sessions.delete(id);
   }
 }, 60000);
 
@@ -1376,21 +1335,13 @@ setInterval(() => {
 
 function checkTeamRateLimit(teamId, limit) {
   if (!teamId) return true;
-  const now = Date.now();
-  const b = teamRateLimits.get(teamId) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= limit) return false;
-  b.count++; teamRateLimits.set(teamId, b); return true;
+  return rateLimit.fixedWindowAllow(teamRateLimits, teamId, limit, 60000);
 }
 
 // M2: Per-IP rate limit for /v2/admin/verify-mfa (max 5 attempts per minute)
 const mfaRateLimits = new Map(); // ip → { count, resetAt }
 function checkMfaRateLimit(ip) {
-  const now = Date.now();
-  const b = mfaRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 5) return false;
-  b.count++; mfaRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(mfaRateLimits, ip, 5, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) if (now > v.resetAt + 60000) mfaRateLimits.delete(k); }, 120_000);
 
@@ -1416,22 +1367,14 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of userMfaAttempts
 // is a 256-bit random hex, so this just caps abusive polling, not real guessing.
 const claimRateLimits = new Map();
 function claimRateOk(ip) {
-  const now = Date.now();
-  const b = claimRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 20) return false;
-  b.count++; claimRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(claimRateLimits, ip, 20, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of claimRateLimits) if (now > v.resetAt + 60000) claimRateLimits.delete(k); }, 120_000);
 
 // Per-IP rate limit for /v2/check-key (max 30/min) — prevents API key brute-force
 const checkKeyRateLimits = new Map();
 function checkKeyRateOk(ip) {
-  const now = Date.now();
-  const b = checkKeyRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 30) return false;
-  b.count++; checkKeyRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(checkKeyRateLimits, ip, 30, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of checkKeyRateLimits) if (now > v.resetAt + 60000) checkKeyRateLimits.delete(k); }, 120_000);
 
@@ -1439,11 +1382,7 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of checkKeyRateLim
 // enumeration of (pubkey → email) bindings even though only exact hash matches.
 const lookupSignerRateLimits = new Map();
 function lookupSignerRateOk(ip) {
-  const now = Date.now();
-  const b = lookupSignerRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 30) return false;
-  b.count++; lookupSignerRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(lookupSignerRateLimits, ip, 30, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of lookupSignerRateLimits) if (now > v.resetAt + 60000) lookupSignerRateLimits.delete(k); }, 120_000);
 
@@ -1454,25 +1393,13 @@ const envCreateLimits = new Map();        // apiKey  -> { count, resetAt }
 const envViewLimits   = new Map();        // ip      -> { count, resetAt }
 const envSignLimits   = new Map();        // ip      -> { count, resetAt }
 function envCreateRateOk(apiKey) {
-  const now = Date.now();
-  const b = envCreateLimits.get(apiKey) || { count: 0, resetAt: now + 3600_000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 3600_000; }
-  if (b.count >= 50) return false;          // 50/hour/key
-  b.count++; envCreateLimits.set(apiKey, b); return true;
+  return rateLimit.fixedWindowAllow(envCreateLimits, apiKey, 50, 3600_000);
 }
 function envViewRateOk(ip) {
-  const now = Date.now();
-  const b = envViewLimits.get(ip) || { count: 0, resetAt: now + 60_000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
-  if (b.count >= 30) return false;          // 30/min/ip
-  b.count++; envViewLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(envViewLimits, ip, 30, 60_000);
 }
 function envSignRateOk(ip) {
-  const now = Date.now();
-  const b = envSignLimits.get(ip) || { count: 0, resetAt: now + 60_000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60_000; }
-  if (b.count >= 10) return false;          // 10/min/ip
-  b.count++; envSignLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(envSignLimits, ip, 10, 60_000);
 }
 setInterval(() => {
   const now = Date.now();
@@ -1523,11 +1450,7 @@ function _parasignStore() {
 // Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
 const statusRateLimits = new Map();
 function statusRateOk(ip) {
-  const now = Date.now();
-  const b = statusRateLimits.get(ip) || { count: 0, resetAt: now + 60000 };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + 60000; }
-  if (b.count >= 60) return false;
-  b.count++; statusRateLimits.set(ip, b); return true;
+  return rateLimit.fixedWindowAllow(statusRateLimits, ip, 60, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of statusRateLimits) if (now > v.resetAt + 60000) statusRateLimits.delete(k); }, 120_000);
 
@@ -1996,19 +1919,7 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
 const P256_SPKI_PREFIX = Buffer.from('3059301306072a8648ce3d020106082a8648ce3d030107034200', 'hex');
 
 // ── Constant-time token comparison — prevents timing-side-channel on admin token (finding) ──
-function safeEqual(a, b) {
-  try {
-    const ba = Buffer.from(String(a || ''), 'utf8');
-    const bb = Buffer.from(String(b || ''), 'utf8');
-    if (ba.length !== bb.length) {
-      // Still do the compare to avoid length oracle, but result is always false
-      const pad = Buffer.alloc(Math.max(ba.length, bb.length));
-      crypto.timingSafeEqual(pad, pad);
-      return false;
-    }
-    return crypto.timingSafeEqual(ba, bb);
-  } catch { return false; }
-}
+function safeEqual(a, b) { return authGate.safeEqual(a, b); }
 
 // Mask a secret API key for list/observation output. Canonical implementation
 // lives in lib/keys-table.js (unit-tested); aliased here for the admin handlers.
@@ -2606,9 +2517,7 @@ const server = http.createServer(async (req, res) => {
   // ═══════════════════════════════════════════════════════════════════════
 
   function _internalOk() {
-    const tok = process.env.INTERNAL_AUTH_TOKEN;
-    return !!tok && typeof req.headers["x-internal-auth"] === "string"
-      && safeEqual(req.headers["x-internal-auth"], tok);
+    return authGate.internalAuthOk(process.env.INTERNAL_AUTH_TOKEN, req.headers["x-internal-auth"]);
   }
   function _internalReject() {
     res.writeHead(401, { "Content-Type": "application/json" });
