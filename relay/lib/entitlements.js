@@ -127,7 +127,6 @@ function _parasendEntitlement(tier) {
     }),
     features: Object.freeze({
       transfers: true,
-      priority_relay: t === 'enterprise',
     }),
   });
 }
@@ -144,9 +143,8 @@ function _parasignEntitlement(tier) {
       file_mb: tiers.tierLimitNum(row, 'file_mb'),
     }),
     features: Object.freeze({
-      // API access is the paid-tier capability; the free tier can sign in-app
-      // but the /v1 developer API is a paid entitlement (also gated separately).
-      api_access: t !== 'free',
+      // audit_export: the ParaSign signing-audit export is a Business+ capability.
+      // Enforced at GET /v2/parasign/audit-export in relay.js (403 below business).
       audit_export: t === 'business' || t === 'enterprise',
     }),
   });
