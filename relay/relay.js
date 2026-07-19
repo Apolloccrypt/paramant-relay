@@ -4733,6 +4733,17 @@ const server = http.createServer(async (req, res) => {
       ctHead: () => (sthLog.length ? sthLog[sthLog.length - 1] : null),
       verifyChain,
       query,
+      // Full per-envelope .psign export: enumerate the account's envelopes via
+      // the index and rebuild each completed one's notary-signed .psign, reusing
+      // the exact recipe GET /v1/receipt uses (parasignOpenApi.buildEnvelopePsign).
+      account: acct,
+      envStore: _envStore(),
+      metaStore: _parasignStore(),
+      buildPsign: parasignOpenApi.buildEnvelopePsign,
+      sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
+      relayIdentity,
+      canonicalJSON: parasign.canonicalJSON,
+      publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app',
     });
   }
 
@@ -5502,7 +5513,7 @@ const server = http.createServer(async (req, res) => {
         ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
-      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version });
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: out }));
