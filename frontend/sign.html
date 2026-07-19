@@ -54,6 +54,18 @@
 .ds-stamp-marker{position:absolute;border:1px solid var(--cobalt);background:#fff;pointer-events:auto;cursor:grab;touch-action:none;z-index:5;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
 .ds-stamp-resize{position:absolute;right:0;bottom:0;width:14px;height:14px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:6}
 .ds-stamp-resize::after{content:'';position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-right:1.5px solid #fff;border-bottom:1.5px solid #fff}
+/* Seal delete handle (matches the annotation × handle) */
+.ds-stamp-del{position:absolute;top:-9px;left:-9px;width:18px;height:18px;border-radius:50%;background:#b00;color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0}
+/* Repeated-seal ghosts (sign-every-page preview): faint + non-interactive */
+.ds-stamp-ghost{opacity:.42;pointer-events:none !important;cursor:default;border-style:dashed}
+.ds-stamp-ghost .ds-stamp-del,.ds-stamp-ghost .ds-stamp-resize{display:none}
+.ds-review-pane .ds-mockup-ghost{opacity:.55}
+/* Sign-every-page toggle + reuse-position row */
+.ds-seal-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ds-seal-check{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;user-select:none}
+.ds-seal-check input{width:16px;height:16px;accent-color:var(--cobalt);cursor:pointer}
+/* Sticky action bar (Back / Continue) so it stays reachable on long documents */
+.ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:linear-gradient(to top,var(--bg,#F8FAFC) 70%,rgba(248,250,252,0));border-top:1px solid var(--ink-hair)}
 /* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
 .ds-edit-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
@@ -86,7 +98,8 @@
 @media (hover: none), (pointer: coarse){
   .ds-page-bar{opacity:1}
   .ds-page-nav{top:64px}
-  .ds-anno-del,.ds-anno-edit{width:28px;height:28px;font-size:15px;top:-14px}
+  .ds-anno-del,.ds-anno-edit,.ds-stamp-del{width:28px;height:28px;font-size:15px;top:-14px}
+  .ds-stamp-del{left:-14px}
   .ds-anno-edit{left:20px}
   .ds-anno-resize,.ds-stamp-resize{width:24px;height:24px}
   .ds-page-bar button{width:34px;height:32px;font-size:14px}
@@ -444,6 +457,11 @@
       <input id="ds-page-merge-file" type="file" accept="application/pdf,.pdf" hidden>
       <span class="ds-edit-tip">Double-click a text box to edit, drag to move, corner to resize. Page buttons sit on each page.</span>
     </div>
+    <div class="ds-seal-tools" id="ds-seal-tools" hidden>
+      <label class="ds-seal-check"><input type="checkbox" id="ds-allpages"> Sign every page with this signature</label>
+      <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
+      <span class="ds-edit-tip">Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).</span>
+    </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
       <span id="ds-page-nav-label"></span>
@@ -451,7 +469,7 @@
       <button id="ds-page-nav-next" type="button" aria-label="Next page">&#8595;</button>
     </div>
     <div id="ds-pdf-canvas-list"></div>
-    <div class="ds-actions">
+    <div class="ds-actions ds-place-actions">
       <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-place-continue" type="button" disabled>Continue</button>
     </div>
@@ -722,6 +740,6 @@
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
-<script type="module" src="/sign-flow.js?v=34"></script>
+<script type="module" src="/sign-flow.js?v=35"></script>
 </body>
 </html>

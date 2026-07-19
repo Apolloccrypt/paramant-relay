@@ -26,6 +26,9 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const STAMP_PDF_W = 240;
 const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
+// Reusable placement template: ONLY the seal's relative position + scale and the
+// sign-every-page toggle. Never the signer name or the signature image (privacy).
+const PLACEMENT_TPL_KEY = 'parasign.placement.tpl.v1';
 // PDF placement view state for zoom + page-nav (PDF mode only).
 let placeState = null;        // { pdf, pages:[{page,baseViewport,wrap,canvas,task}], zoom }
 let placeRenderToken = 0;     // guards overlapping re-renders on fast zooming
@@ -40,6 +43,7 @@ const state = {
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
+  stampAllPages: false,  // PDF mode: repeat the seal on every page at the same relative spot.
   extras: [],            // PDF mode only. Types (all baked as pdf-lib vectors):
                          //   text/date : { id, type, pageIndex, x, y, size, text }        x,y = box bottom-left (points)
                          //   highlight : { id, type, pageIndex, x, y, w, h }              translucent rect over content
@@ -352,6 +356,7 @@ async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();                                  // single image: no page-nav
   { const et = $('ds-edit-tools'); if (et) et.hidden = true; }   // text/date tools are PDF-only
+  { const st = $('ds-seal-tools'); if (st) st.hidden = true; }   // sign-every-page is PDF-only
   { const eh = $('ds-edit-tools-hint'); if (eh) eh.hidden = false; }  // tell the user WHY the editor is absent
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
@@ -394,6 +399,10 @@ async function renderPdfForPlacement() {
   { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
   { const et = $('ds-edit-tools'); if (et) et.hidden = false; }   // text/date tools: PDF only
   { const eh = $('ds-edit-tools-hint'); if (eh) eh.hidden = true; }
+  // Seal tools (sign-every-page toggle + reuse-saved-position) are PDF-only.
+  { const st = $('ds-seal-tools'); if (st) st.hidden = false; }
+  { const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages; }
+  refreshApplyTplBtn();
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
@@ -481,6 +490,97 @@ async function applyPlaceZoom() {
   }
   reflowStampMarker();
   reflowExtras();                             // text/date objects follow the new scale too
+  reflowGhostStamps();                        // repeated-seal ghosts on the other pages
+}
+
+// Sign-every-page ghosts: faint, non-interactive copies of the seal on every
+// page OTHER than the one it was placed on, at the same relative position. They
+// mirror exactly what buildStampedPdf bakes when state.stampAllPages is on.
+function reflowGhostStamps() {
+  document.querySelectorAll('.ds-stamp-ghost').forEach(el => el.remove());
+  if (!state.stampAllPages || !state.stamp || !placeState || placeState.isImage) return;
+  const src = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex);
+  if (!src) return;
+  const sw = src.wrap._pdfPage.width, sh = src.wrap._pdfPage.height;
+  const fx = state.stamp.x / sw, fy = state.stamp.y / sh, fw = state.stamp.w / sw, fh = state.stamp.h / sh;
+  for (const p of placeState.pages) {
+    if (p.wrap._pdfPage.index === state.stamp.pageIndex) continue;
+    const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
+    const rect = p.wrap.querySelector('canvas').getBoundingClientRect();
+    const ratio = pw / rect.width;
+    const w = (fw * pw) / ratio, h = (fh * ph) / ratio;
+    const left = (fx * pw) / ratio;
+    const top = (ph - fy * ph - fh * ph) / ratio;
+    const g = document.createElement('div');
+    g.className = 'ds-stamp-marker ds-stamp-ghost';
+    g.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+    g.innerHTML = stampMockupHtml();
+    p.wrap.appendChild(g);
+  }
+}
+
+// ── Placement template (position/scale only) + sign-every-page toggle ────────
+function loadPlacementTemplate() {
+  try { const s = localStorage.getItem(PLACEMENT_TPL_KEY); return s ? JSON.parse(s) : null; }
+  catch (e) { return null; }
+}
+
+// Persist ONLY relative position/scale + the toggle. Never the signer name or the
+// signature image bytes/data-URL — those are personal and stay out of storage.
+function savePlacementTemplate() {
+  try {
+    if (!state.stamp || state.stamp.isImage || !placeState || placeState.isImage) return;
+    const src = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex);
+    if (!src) return;
+    const sw = src.wrap._pdfPage.width, sh = src.wrap._pdfPage.height;
+    const tpl = {
+      fx: state.stamp.x / sw, fy: state.stamp.y / sh,
+      fw: state.stamp.w / sw, fh: state.stamp.h / sh,
+      allPages: !!state.stampAllPages,
+    };
+    localStorage.setItem(PLACEMENT_TPL_KEY, JSON.stringify(tpl));
+    refreshApplyTplBtn();
+  } catch (e) { /* storage may be unavailable; non-fatal */ }
+}
+
+// Show the "Use saved position" button only when a template exists.
+function refreshApplyTplBtn() {
+  const b = $('ds-apply-tpl');
+  if (!b) return;
+  b.hidden = !loadPlacementTemplate();
+}
+
+// Drop the saved relative position/scale onto the current PDF page (the page in
+// view), no click needed, and restore the saved sign-every-page toggle.
+function applyPlacementTemplate() {
+  const tpl = loadPlacementTemplate();
+  if (!tpl || !placeState || placeState.isImage) return;
+  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
+  const p = placeState.pages[pageIdx];
+  const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
+  state.stamp = { pageIndex: p.wrap._pdfPage.index, x: tpl.fx * pw, y: tpl.fy * ph, w: tpl.fw * pw, h: tpl.fh * ph };
+  reflowStampMarker();
+  setStampAllPages(!!tpl.allPages, false);   // don't re-save; we just loaded it
+  $('ds-place-continue').disabled = false;
+  setPlaceHint(tpl.allPages
+    ? 'Applied your saved signature position to every page. Click a page to move it.'
+    : 'Applied your saved signature position. Click a page to move it.');
+}
+
+// Toggle the sign-every-page mode; re-render ghosts and persist the choice.
+function setStampAllPages(on, save = true) {
+  state.stampAllPages = !!on;
+  const cb = $('ds-allpages'); if (cb) cb.checked = state.stampAllPages;
+  reflowGhostStamps();
+  if (save) savePlacementTemplate();
+}
+
+// Remove the placed seal (explicit delete handle on the marker, QA req 4).
+function removeStamp() {
+  state.stamp = null;
+  document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
+  const cont = $('ds-place-continue'); if (cont) cont.disabled = true;
+  setPlaceHint('Signature removed. Click a page to place it again.');
 }
 
 // Re-derive the marker's pixel box from the PDF-point state.stamp at the current
@@ -637,29 +737,44 @@ function removeExtra(id) {
 // Drag to move, corner to resize (scales font size), double-click to edit text.
 function wireExtraMarker(el, extra, grip) {
   let drag = null, rez = null;
+  let lastTap = 0;   // own double-click clock: pointer-capture can suppress native dblclick
+  const editable = (extra.type === 'text' || extra.type === 'date' || extra.type === 'note');
 
   el.addEventListener('pointerdown', (e) => {
     if (el.classList.contains('editing')) return;         // editing: let the caret work
     if (e.target === grip) return;                        // resize handled below
     const wrap = el.parentElement;
     const rect = wrap.querySelector('canvas').getBoundingClientRect();
-    drag = { rect, grabX: e.clientX - (rect.left + parseFloat(el.style.left)), grabY: e.clientY - (rect.top + parseFloat(el.style.top)) };
+    drag = { rect, grabX: e.clientX - (rect.left + parseFloat(el.style.left)), grabY: e.clientY - (rect.top + parseFloat(el.style.top)), startX: e.clientX, startY: e.clientY, moved: false };
     try { el.setPointerCapture(e.pointerId); } catch (_) {}
     el.style.cursor = 'grabbing';
     e.preventDefault(); e.stopPropagation();
   });
   el.addEventListener('pointermove', (e) => {
     if (!drag) return;
+    // A few px of jitter is a click, not a drag: only past the threshold do we
+    // treat it as a move (so a plain click can still register as a double-click).
+    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 3) drag.moved = true;
     const left = Math.max(0, Math.min(drag.rect.width - el.offsetWidth, e.clientX - drag.rect.left - drag.grabX));
     const top = Math.max(0, Math.min(drag.rect.height - el.offsetHeight, e.clientY - drag.rect.top - drag.grabY));
     el.style.left = left + 'px'; el.style.top = top + 'px';
   });
   const dragUp = (e) => {
-    if (!drag) return; drag = null;
+    if (!drag) return;
+    const moved = drag.moved; drag = null;
     try { el.releasePointerCapture(e.pointerId); } catch (_) {}
     el.style.cursor = 'grab';
     swallowNextWrapClick(el.parentElement);   // don't let this land as a new seal
-    commitExtraFromMarker(el, extra);
+    if (moved) { commitExtraFromMarker(el, extra); return; }
+    // No drag: own double-click / double-tap detection (works on desktop where
+    // setPointerCapture can eat the native dblclick, and on touch as a bonus).
+    // Editable objects open inline editing; the ✎ button stays as the primary
+    // touch affordance.
+    if (editable) {
+      const now = Date.now();
+      if (now - lastTap < 400) { lastTap = 0; beginEditExtra(el, extra); }
+      else lastTap = now;
+    }
   };
   el.addEventListener('pointerup', dragUp);
   el.addEventListener('pointercancel', dragUp);
@@ -714,6 +829,7 @@ function wireExtraMarker(el, extra, grip) {
 // Inline text editing via contentEditable. On blur/Enter the text is saved back
 // to the extra and the box re-fits.
 function beginEditExtra(el, extra) {
+  if (el.classList.contains('editing')) return;   // idempotent: own + native dblclick can both fire
   el.classList.add('editing');
   el.contentEditable = 'true';
   // Drop the child controls from the editable text, restore them after.
@@ -1133,6 +1249,8 @@ function onPlaceClick(e) {
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
   renderStampMarker(wrap, left, top, stampPxW, stampPxH);
   $('ds-place-continue').disabled = false;
+  reflowGhostStamps();          // update the repeated-seal ghosts to the new spot
+  savePlacementTemplate();      // remember this position/scale for next time
   $('ds-place-hint').textContent = isImage
     ? 'Stamp placed on the image. Click another spot to move it.'
     : 'Stamp on page ' + (wrap._pdfPage.index + 1) + '. Click another spot to move it.';
@@ -1145,6 +1263,14 @@ function renderStampMarker(wrap, left, top, w, h) {
   m.innerHTML = stampMockupHtml();
   m.addEventListener('pointerdown', onStampPointerDown);   // drag to reposition
   addStampResizeHandle(m, wrap);                           // corner grip to scale
+  // Explicit delete handle (touch + mouse), matching the annotation handles so
+  // every placed object has a visible remove control (QA req 4).
+  const del = document.createElement('button');
+  del.className = 'ds-stamp-del'; del.type = 'button'; del.textContent = '×';
+  del.title = 'Remove signature'; del.setAttribute('aria-label', 'Remove the signature stamp');
+  del.addEventListener('pointerdown', e => { e.stopPropagation(); });
+  del.addEventListener('click', e => { e.stopPropagation(); removeStamp(); });
+  m.appendChild(del);
   wrap.appendChild(m);
 }
 
@@ -1161,6 +1287,8 @@ function commitStampFromMarker(marker, wrap) {
   } else {
     state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: wrap._pdfPage.height - natYTop - h, w, h };
   }
+  reflowGhostStamps();          // drag/resize moved the seal: follow with the ghosts
+  savePlacementTemplate();      // and keep the reusable template in sync
 }
 
 // A bottom-right corner grip that scales the seal uniformly (keeps its aspect
@@ -1523,7 +1651,7 @@ function signedDocMime() {
 function fillReview() {
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
   $('ds-review-mode').textContent =
-    state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
+    state.mode === 'pdf'   ? (state.stampAllPages ? 'PDF with visual stamp on every page' : 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1)) :
     state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only (SHA3-256 attestation)';
   $('ds-review-name').textContent = state.signer.name;
@@ -1720,11 +1848,16 @@ async function renderDocPreview() {
     // pages render at screen resolution to keep memory sane on long documents.
     const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
     const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
+    // Source page size for the "sign every page" relative-position math.
+    const srcVp = (await pdf.getPage(state.stamp.pageIndex + 1)).getViewport({ scale: 1 });
+    const frX = state.stamp.x / srcVp.width, frY = state.stamp.y / srcVp.height;
+    const frW = state.stamp.w / srcVp.width, frH = state.stamp.h / srcVp.height;
     for (let p = 1; p <= maxPages; p++) {
       const page = await pdf.getPage(p);
       const baseViewport = page.getViewport({ scale: 1 });
       const isSealPage = (p - 1 === state.stamp.pageIndex);
-      const superSample = isSealPage ? Math.max(2.5, hiDpiScale()) : Math.min(1.5, Math.max(1, hiDpiScale()));
+      const showSeal = isSealPage || state.stampAllPages;   // every page when the toggle is on
+      const superSample = showSeal ? Math.max(2.5, hiDpiScale()) : Math.min(1.5, Math.max(1, hiDpiScale()));
       const viewport = page.getViewport({ scale: (targetW / baseViewport.width) * superSample });
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px';
@@ -1739,15 +1872,22 @@ async function renderDocPreview() {
       zoomwrap.appendChild(wrap);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       const ratio = baseViewport.width / (wrap.getBoundingClientRect().width || targetW);   // pdf pt per displayed px
-      if (isSealPage) {
-        const left = state.stamp.x / ratio;
-        const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
+      if (showSeal) {
+        // Placed page uses exact coords; repeated pages use the same relative
+        // fraction against their own size (mirrors buildStampedPdf).
+        const sx = isSealPage ? state.stamp.x : frX * baseViewport.width;
+        const sy = isSealPage ? state.stamp.y : frY * baseViewport.height;
+        const sw = isSealPage ? state.stamp.w : frW * baseViewport.width;
+        const sh = isSealPage ? state.stamp.h : frH * baseViewport.height;
+        const left = sx / ratio;
+        const top  = (baseViewport.height - sy - sh) / ratio;
         const mock = document.createElement('div');
-        mock.className = 'ds-mockup-stamp';
-        mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
+        mock.className = 'ds-mockup-stamp' + (isSealPage ? '' : ' ds-mockup-ghost');
+        mock.style.cssText = `left:${left}px;top:${top}px;width:${sw / ratio}px;height:${sh / ratio}px`;
         mock.innerHTML = stampInnerHtml();
         wrap.appendChild(mock);
-        makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+        // Only the placed page's seal is draggable; the repeated ghosts follow it.
+        if (isSealPage) makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
       }
       for (const ex of state.extras) {
         if (ex.pageIndex !== p - 1) continue;
@@ -1847,6 +1987,8 @@ function makeReviewStampDraggable(mock, ratio, isImage, pageH, pageIndex) {
     if (isImage) state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
     else state.stamp = { pageIndex, x: natX, y: pageH - natYTop - h, w, h };
     refreshReviewProofCoords();   // QA #6: keep the proof card's coords in sync
+    // Sign-every-page: the repeated ghosts must follow the moved seal, so re-render.
+    if (!isImage && state.stampAllPages) renderDocPreview().catch(() => {});
   };
   mock.addEventListener('pointerup', up);
   mock.addEventListener('pointercancel', up);
@@ -2023,7 +2165,7 @@ function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg
 async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
   const PDFLib = await waitForPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
-  const page = pdfDoc.getPages()[stamp.pageIndex];
+  const pages = pdfDoc.getPages();
   const font     = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const fontItal = await pdfDoc.embedFont(PDFLib.StandardFonts.TimesRomanItalic);
@@ -2031,68 +2173,66 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
   const white = PDFLib.rgb(1, 1, 1);
 
-  // Outer border + SOLID WHITE body (always legible: dark text on white, not a
-  // near-transparent fill that lets the document bleed through).
-  page.drawRectangle({ x: stamp.x, y: stamp.y, width: stamp.w, height: stamp.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
-
-  // Branded top band: cobalt bar with logo + PQ badge
-  const bandH = 16;
-  page.drawRectangle({ x: stamp.x, y: stamp.y + stamp.h - bandH, width: stamp.w, height: bandH, color: navy });
-  // 'Para' + 'MANT' both white on navy (no two-tone in PDF stamp; we keep the
-  // wordmark monochrome here for legibility at small print sizes).
-  page.drawText('ParaMANT', { x: stamp.x + 8, y: stamp.y + stamp.h - 11, size: 9, font: fontBold, color: white });
-  const badge = 'POST-QUANTUM SIGNED';
-  const badgeW = fontBold.widthOfTextAtSize(badge, 6);
-  page.drawText(badge, { x: stamp.x + stamp.w - badgeW - 8, y: stamp.y + stamp.h - 10.5, size: 6, font: fontBold, color: white });
-
-  // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2
-  const footerH = 22;
-  page.drawText(signerName, { x: stamp.x + 8, y: stamp.y + 13, size: 8, font: fontBold, color: navy });
-  const dateW = font.widthOfTextAtSize(dateStr, 7);
-  page.drawText(dateStr, { x: stamp.x + stamp.w - dateW - 8, y: stamp.y + 13, size: 7, font, color: dim });
-  const cryptoLine = 'ML-DSA-65 (FIPS 204)  -  PQ ' + fingerprint8;
-  page.drawText(cryptoLine, { x: stamp.x + 8, y: stamp.y + 4, size: 6, font, color: dim });
-
-  // Middle area: signature image, or signer name in italic for the 'typed' style
-  const midY = stamp.y + footerH;
-  const midH = stamp.h - bandH - footerH;
-  const padX = 8;
-
+  // Embed the signature image ONCE, reused on every stamped page.
+  let sigEmbed = null;
   const hasImg = state.signer.sigStyle !== 'typed' && state.signer.sigImageBytes;
   if (hasImg) {
-    const embed = state.signer.sigImageType === 'jpg'
+    sigEmbed = state.signer.sigImageType === 'jpg'
       ? await pdfDoc.embedJpg(state.signer.sigImageBytes)
       : await pdfDoc.embedPng(state.signer.sigImageBytes);
-    const maxW = stamp.w - padX * 2;
-    const maxH = midH - 4;
-    const scale = Math.min(maxW / embed.width, maxH / embed.height);
-    const w = embed.width * scale;
-    const h = embed.height * scale;
-    page.drawImage(embed, {
-      x: stamp.x + (stamp.w - w) / 2,
-      y: midY + (midH - h) / 2,
-      width: w, height: h,
-    });
-  } else {
-    // Typed signature: render the name in TimesRomanItalic so it reads as
-    // a 'signature' rather than a label. Scale font to fit.
-    const maxW = stamp.w - padX * 2;
-    let fontSize = 22;
-    while (fontSize > 9 && fontItal.widthOfTextAtSize(signerName, fontSize) > maxW) fontSize -= 1;
-    const w = fontItal.widthOfTextAtSize(signerName, fontSize);
-    page.drawText(signerName, {
-      x: stamp.x + (stamp.w - w) / 2,
-      y: midY + (midH - fontSize) / 2 + 2,
-      size: fontSize, font: fontItal, color: navy,
-    });
   }
 
-  // Subtle horizontal divider above the metadata band
-  page.drawLine({
-    start: { x: stamp.x + 6, y: stamp.y + footerH - 1 },
-    end:   { x: stamp.x + stamp.w - 6, y: stamp.y + footerH - 1 },
-    thickness: 0.5, color: navy, opacity: 0.25,
-  });
+  // Paint the full Paramant seal into one box {x,y,w,h} (PDF points, bottom-left
+  // origin) on the given page. Shared so the placed page and every repeated page
+  // are byte-for-byte the same layout.
+  const paintSeal = (pg, box) => {
+    const bandH = 16, footerH = 22, padX = 8;
+    // Outer border + SOLID WHITE body (always legible: dark text on white).
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
+    // Branded cobalt top band: wordmark + PQ badge.
+    pg.drawRectangle({ x: box.x, y: box.y + box.h - bandH, width: box.w, height: bandH, color: navy });
+    pg.drawText('ParaMANT', { x: box.x + 8, y: box.y + box.h - 11, size: 9, font: fontBold, color: white });
+    const badge = 'POST-QUANTUM SIGNED';
+    const badgeW = fontBold.widthOfTextAtSize(badge, 6);
+    pg.drawText(badge, { x: box.x + box.w - badgeW - 8, y: box.y + box.h - 10.5, size: 6, font: fontBold, color: white });
+    // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2.
+    pg.drawText(signerName, { x: box.x + 8, y: box.y + 13, size: 8, font: fontBold, color: navy });
+    const dateW = font.widthOfTextAtSize(dateStr, 7);
+    pg.drawText(dateStr, { x: box.x + box.w - dateW - 8, y: box.y + 13, size: 7, font, color: dim });
+    const cryptoLine = 'ML-DSA-65 (FIPS 204)  -  PQ ' + fingerprint8;
+    pg.drawText(cryptoLine, { x: box.x + 8, y: box.y + 4, size: 6, font, color: dim });
+    // Middle area: signature image, or the name in italic for the 'typed' style.
+    const midY = box.y + footerH;
+    const midH = box.h - bandH - footerH;
+    if (sigEmbed) {
+      const maxW = box.w - padX * 2, maxH = midH - 4;
+      const scale = Math.min(maxW / sigEmbed.width, maxH / sigEmbed.height);
+      const w = sigEmbed.width * scale, h = sigEmbed.height * scale;
+      pg.drawImage(sigEmbed, { x: box.x + (box.w - w) / 2, y: midY + (midH - h) / 2, width: w, height: h });
+    } else {
+      const maxW = box.w - padX * 2;
+      let fontSize = 22;
+      while (fontSize > 9 && fontItal.widthOfTextAtSize(signerName, fontSize) > maxW) fontSize -= 1;
+      const w = fontItal.widthOfTextAtSize(signerName, fontSize);
+      pg.drawText(signerName, { x: box.x + (box.w - w) / 2, y: midY + (midH - fontSize) / 2 + 2, size: fontSize, font: fontItal, color: navy });
+    }
+    // Subtle divider above the metadata band.
+    pg.drawLine({ start: { x: box.x + 6, y: box.y + footerH - 1 }, end: { x: box.x + box.w - 6, y: box.y + footerH - 1 }, thickness: 0.5, color: navy, opacity: 0.25 });
+  };
+
+  // Stamp the placed page exactly. With "sign every page" on, stamp every other
+  // page at the same RELATIVE position/scale (robust to differing page sizes).
+  const srcSz = pages[stamp.pageIndex].getSize();
+  const fx = stamp.x / srcSz.width, fy = stamp.y / srcSz.height, fw = stamp.w / srcSz.width, fh = stamp.h / srcSz.height;
+  const targets = state.stampAllPages ? pages.map((_, i) => i) : [stamp.pageIndex];
+  for (const pi of targets) {
+    const pg = pages[pi];
+    if (!pg) continue;
+    const box = (pi === stamp.pageIndex)
+      ? { x: stamp.x, y: stamp.y, w: stamp.w, h: stamp.h }
+      : (() => { const sz = pg.getSize(); return { x: fx * sz.width, y: fy * sz.height, w: fw * sz.width, h: fh * sz.height }; })();
+    paintSeal(pg, box);
+  }
 
   // Bake the edit layer (text, date, highlight, note, pen strokes) as real
   // vectors on their pages. Additive to the seal; sharp at any zoom.
@@ -2201,7 +2341,7 @@ async function doSign() {
         : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
       origHashHex = toHex(sha3_256(state.doc.bytes));
       stampedHashHex = toHex(sha3_256(stampedBytes));
-      coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage };
+      coords = { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages) };
       docHashForEnvelope = stampedHashHex;
     } else {
       docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
@@ -2336,7 +2476,7 @@ function showDone() {
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;
   $('ds-done-mode').textContent =
-    state.mode === 'pdf'   ? 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1) :
+    state.mode === 'pdf'   ? (state.stampAllPages ? 'PDF with visual stamp on every page' : 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1)) :
     state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only attestation (SHA3-256)';
 
@@ -2664,6 +2804,10 @@ function init() {
   wireNav();
   wireLiveStampUpdates();
   wireEditTools();
+  // Restore the saved sign-every-page preference (position/scale is applied on
+  // demand via "Use saved position"; the toggle default comes along here).
+  const tpl = loadPlacementTemplate();
+  if (tpl && typeof tpl.allPages === 'boolean') state.stampAllPages = tpl.allPages;
   setActive('step-mode');
 }
 
@@ -2677,6 +2821,9 @@ function wireEditTools() {
   if (h) h.addEventListener('click', addHighlight);
   if (n) n.addEventListener('click', addNote);
   if (p) p.addEventListener('click', () => setPenMode(!_penMode));
+  // Sign-every-page toggle + reuse-saved-position.
+  const cb = $('ds-allpages'); if (cb) cb.addEventListener('change', () => setStampAllPages(cb.checked));
+  const at = $('ds-apply-tpl'); if (at) at.addEventListener('click', applyPlacementTemplate);
   wirePageTools();
 }
 
