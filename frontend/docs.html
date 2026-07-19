@@ -338,6 +338,10 @@ tr:last-child td{border-bottom:none}
     <a href="#health">GET /health</a>
     <h3>ParaSign API</h3>
     <a href="#v1-envelopes">/v1 envelopes</a>
+    <h3>Account &amp; billing API</h3>
+    <a href="#user-history">GET /v2/user/history</a>
+    <a href="#audit-export">GET /v2/parasign/audit-export</a>
+    <a href="#billing">POST /v2/billing/checkout</a>
     <h3>Self-hosting</h3>
     <a href="#selfhost-docker">Docker Compose</a>
     <a href="#selfhost-nginx">nginx &amp; TLS</a>
@@ -635,6 +639,106 @@ curl -X POST https://paramant.app/v1/envelopes \
 curl https://paramant.app/v1/envelopes/env_.../receipt \
   -H "Authorization: Bearer psk_live_..." --output quote-8842.psign</pre>
     <p>Quota: 50 envelope creations per key per hour; envelope records are held with a 30-day TTL and store only the document hash plus metadata, never the document bytes. Webhooks: set <code>webhook_url</code> and lifecycle events arrive signed with HMAC-SHA256 in the <code>X-Paramant-Sig</code> header. Receipts verify offline against the public CT log; see <a href="/verify">/verify</a>.</p>
+
+    <!-- ── Account & billing API ────────────────────────────────── -->
+    <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
+    <h2 id="user-history">GET /v2/user/history</h2>
+    <p>Your account's own send and envelope history: a read-only projection over the per-key Merkle audit chain. It returns identifiers, status and timing only, never a payload, download token or key. Authenticate with your <code>pgp_</code> key in the <code>X-Api-Key</code> header.</p>
+    <table>
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
+      <tr><td>Tier</td><td>Pro or higher on ParaSend <em>or</em> ParaSign. Free/community &rarr; <code>403</code>.</td></tr>
+      <tr><td>Query</td><td><code>?limit=</code> (default 100, max 1000)</td></tr>
+    </table>
+    <pre>GET /v2/user/history?limit=100
+X-Api-Key: pgp_xxx
+
+<span class="cm"># 200 OK</span>
+{
+  "ok": true,
+  "count": 2,
+  "entries": [
+    { "id": "9f2c1a...", "status": "downloaded_burned", "time": "2026-07-19T14:22:03.114Z", "recipient_hash": "dev-88a1", "bytes": 5242880 },
+    { "id": "b7e0d4...", "status": "sent",               "time": "2026-07-19T14:05:41.882Z", "recipient_hash": "dev-2f10", "bytes": 5242880 }
+  ]
+}</pre>
+    <p>Statuses map from the audit chain: <code>sent</code> (inbound), <code>aborted</code> (inbound aborted), <code>downloaded</code> (outbound view), <code>downloaded_burned</code> (outbound burn). Newest first, then capped to <code>limit</code>.</p>
+    <pre><span class="cm"># 401 no / invalid key</span>
+{ "error": "API key required" }
+
+<span class="cm"># 403 plan too low</span>
+{ "error": "tier_upgrade_required", "feature": "history",
+  "message": "Send history and link management require a Pro plan or higher." }</pre>
+
+    <h2 id="audit-export">GET /v2/parasign/audit-export</h2>
+    <p>The compliance half of the ParaSign paid ladder: it hands an auditor the account's tamper-evident signing trail, the Certificate-Transparency signed tree head (STH) that anchors it, and the full per-envelope <code>.psign</code> proofs for every completed envelope, as CSV or JSON. No document bytes leave the relay; the export carries hashes and signatures only.</p>
+    <table>
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
+      <tr><td>Tier</td><td>Business or higher (the <code>audit_export</code> entitlement). Pro and below &rarr; <code>403</code>.</td></tr>
+      <tr><td>Query</td><td><code>?format=csv</code> for CSV (default JSON); <code>?limit=</code> (default 1000, max 10000)</td></tr>
+    </table>
+    <pre><span class="cm"># JSON (default)</span>
+curl https://paramant.app/v2/parasign/audit-export \
+  -H "X-Api-Key: pgp_xxx"
+
+<span class="cm"># CSV, saved to a file</span>
+curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
+  -H "X-Api-Key: pgp_xxx" --output parasign_audit.csv</pre>
+    <pre><span class="cm"># 200 OK (JSON)</span>
+{
+  "ok": true,
+  "type": "parasign-audit-export",
+  "generated_at": "2026-07-19T14:30:00.000Z",
+  "chain_valid": true,
+  "ct_head": { "tree_size": 10432, "tree_hash": "sha3-256:...", "ts": "2026-07-19T14:29:00Z" },
+  "count": 2,
+  "entries": [
+    { "time": "2026-07-19T14:22:03Z", "event": "sign", "doc_hash": "b3f1...", "bytes": 82113, "device": "notary-01", "chain_hash": "a19c..." }
+  ],
+  "envelope_count": 1,
+  "envelopes": [
+    { "envelope_id": "env_9f2c...", "status": "completed", "psign": { "...": "full multi-signer .psign proof" } }
+  ]
+}</pre>
+    <p>The CSV export has one header row and one line per audit entry: <code>time,event,doc_hash,bytes,device,chain_hash</code> (the <code>.psign</code> envelope proofs are in the JSON export only). <code>chain_valid: false</code> is a tamper signal: an audit chain that failed its Merkle re-check. Envelope statuses are <code>completed</code> (full <code>.psign</code>), <code>in_progress</code>, <code>sent</code>, <code>void</code> or <code>expired_or_gone</code> (no proof).</p>
+    <pre><span class="cm"># 403 plan too low</span>
+{ "error": "tier_upgrade_required", "feature": "audit_export",
+  "message": "The ParaSign audit export requires a Business plan or higher." }</pre>
+
+    <h2 id="billing">Billing API: POST /v2/billing/checkout</h2>
+    <p>Start a Mollie payment for a ParaSend or ParaSign plan. The price is never supplied by the caller: it is looked up server-side from the billing catalog by <code>(product, plan, interval)</code>, and the webhook re-verifies the amount actually paid before granting anything. Authenticate with your <code>pgp_</code> key.</p>
+    <table>
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code> (a valid key). No key &rarr; <code>401</code>.</td></tr>
+      <tr><td>product</td><td><code>parasend</code> or <code>parasign</code></td></tr>
+      <tr><td>plan</td><td>ParaSend: <code>pro</code>. ParaSign: <code>pro</code> or <code>business</code>.</td></tr>
+      <tr><td>interval</td><td><code>monthly</code> or <code>yearly</code></td></tr>
+    </table>
+    <pre>curl -X POST https://paramant.app/v2/billing/checkout \
+  -H "X-Api-Key: pgp_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{ "product": "parasign", "plan": "business", "interval": "monthly" }'
+
+<span class="cm"># 200 OK: redirect the user to checkout_url to pay</span>
+{ "ok": true, "payment_id": "tr_XXXX", "checkout_url": "https://www.mollie.com/checkout/...", "mode": "live" }</pre>
+    <p>On a successful payment Mollie sends the user back to <code>/dashboard?billing=return</code> and calls the webhook below; the account's entitlement is granted from the webhook, never from the redirect.</p>
+    <pre><span class="cm"># 400 unknown product / plan / interval, or bad JSON</span>
+{ "error": "unknown_plan" }        <span class="cm"># also: unknown_product, unknown_interval, bad_json</span>
+<span class="cm"># 401 no / invalid key</span>
+{ "error": "unauthorized" }
+<span class="cm"># 502 the payment provider call failed</span>
+{ "error": "checkout_failed" }</pre>
+
+    <h3 id="billing-webhook">POST /v2/billing/webhook</h3>
+    <p>Called by Mollie, not by your integration. Mollie POSTs a form-encoded <code>id=tr_...</code>; the relay re-fetches that payment from Mollie (trusting only the provider, never the request body), checks the amount against the catalog and idempotently grants the entitlement. It always answers <code>200</code> once an event is handled so Mollie stops retrying; a transient fetch failure returns <code>503</code> so Mollie retries. No API key: authenticity comes from re-fetching the payment by id.</p>
+    <pre><span class="cm"># Mollie -> relay (application/x-www-form-urlencoded)</span>
+POST /v2/billing/webhook
+id=tr_XXXX
+
+<span class="cm"># 200 handled</span>          { "ok": true }
+<span class="cm"># 400 malformed payment id</span>  { "error": "bad_payment_id" }
+<span class="cm"># 503 provider fetch failed (Mollie will retry)</span>  { "error": "fetch_failed" }</pre>
 
     <!-- ── Self-hosting ─────────────────────────────────────────── -->
     <span id="self-hosting" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
