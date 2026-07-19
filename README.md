@@ -599,12 +599,14 @@ open https://relay.paramant.app/ct/
 
 | Regulation | Status | Details |
 |------------|--------|---------|
-| NIS2 (EU 2022/2555) | Ready | [Compliance page](https://paramant.app/compliance/nis2) |
-| NEN 7510 (Healthcare NL) | Ready* | [Compliance page](https://paramant.app/compliance/nen7510) |
-| IEC 62443 (Industrial IoT) | Ready | [Compliance page](https://paramant.app/compliance/iec62443) |
-| DORA (Finance EU) | Ready | NIS2 compliance covers DORA Art. 6 |
+| NIS2 (EU 2022/2555) | Self-assessed | [Compliance page](https://paramant.app/compliance/nis2) |
+| NEN 7510 (Healthcare NL) | Self-assessed* | [Compliance page](https://paramant.app/compliance/nen7510) |
+| IEC 62443 (Industrial IoT) | Self-assessed | [Compliance page](https://paramant.app/compliance/iec62443) |
+| DORA (Finance EU) | Partial | Transit encryption supports DORA Art. 6 (ICT risk management); broader DORA scope not covered |
 | EU CRA 2027 | Designed for | paramant-cra tool + CT log |
-| GDPR Art. 28 | Ready | [DPA](https://paramant.app/dpa) |
+| GDPR Art. 28 | Available | [DPA](https://paramant.app/dpa) |
+
+"Self-assessed" means Paramant's own architectural mapping to the framework, not a certification or audit by an accredited third party.
 
 *NEN 7510: finding #4 (filename in transit RAM) patched in v2.4.5 — filename encrypted in relay RAM and never written to disk.
 

@@ -10,18 +10,13 @@ All reports are treated with responsible disclosure.
 
 ### PGP key
 
-For sensitive reports, encrypt to the Paramant Security key.
+We do not currently publish a PGP key. If your report is sensitive, email
+privacy@paramant.app and we will arrange an encrypted channel.
 
-| | |
-|--|--|
-| User ID | `Paramant Security <privacy@paramant.app>` |
-| Fingerprint | `09AA 452A 69DE F4A4 EB4B  72DC 5A34 D82F DAF3 54CD` |
-| Algorithm | RSA-4096 |
-| Created | 2026-04-25 |
-| Expires | 2028-04-24 |
-| Public key | <https://paramant.app/.well-known/openpgp-key.asc> |
-
-Verify the fingerprint independently before encrypting — the link above is hosted on the same domain you are reporting against. If the fingerprint we publish in this README ever differs from the key served at the URL, treat it as a compromise of one of those channels and contact us via a separate channel before sending anything sensitive.
+When a key is published it will be served at
+<https://paramant.app/.well-known/openpgp-key.asc> and its fingerprint listed
+here. Until then, treat any PGP key that claims to be ours as unverified and
+confirm through a separate channel before sending anything sensitive.
 
 ---
 

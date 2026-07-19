@@ -324,6 +324,10 @@ code{font-family:var(--mono);font-size:11px;background:rgba(178,255,63,.06);padd
   </div>
 </div><main id="main-content">
 
+<div style="max-width:820px;margin:var(--space-5) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid #B45309;background:#FFFBEB">
+  <p style="margin:0;font-size:var(--text-sm);color:var(--ink);line-height:1.6"><strong>Self-assessment, not a certification.</strong> This page maps Paramant&rsquo;s architecture to the framework&rsquo;s requirements. Paramant is not certified or independently audited against this standard by an accredited body. The mappings and readiness statements are our own assessment and are not a certificate of conformity.</p>
+</div>
+
 <div class="summary">
   <p><strong>Bottom line:</strong> NIS2 requires organisations to protect sensitive data in transit and at rest, avoid data retention where unnecessary, and maintain an auditable trail of security-relevant events. Paramant is built around these exact obligations: <strong>no data is ever stored to disk</strong>, encryption uses post-quantum algorithms approved by NIST (FIPS 203/204), and every key registration is recorded in a tamper-evident Merkle log. The relay runs on Hetzner infrastructure in Germany &mdash; outside US CLOUD Act jurisdiction.</p>
 </div>
@@ -361,7 +365,7 @@ code{font-family:var(--mono);font-size:11px;background:rgba(178,255,63,.06);padd
   <div class="article-body">
     <p class="requirement">NIS2 Art. 23 requires early warning within 24 hours of a significant incident, and a detailed report within 72 hours. Entities must be able to demonstrate what occurred and what data was affected.</p>
     <p><strong style="color:var(--cobalt)">Audit trail:</strong> Every public key registration is appended to a Certificate Transparency-style Merkle log. Each entry records a cryptographic hash, timestamp, and tree root &mdash; making the log tamper-evident. Any modification to a past entry invalidates all subsequent tree hashes.</p>
-    <p><strong style="color:var(--cobalt)">Nothing to report:</strong> Because no payload content is ever stored, a server compromise produces no personal data breach. There is no data to exfiltrate. The obligation to notify data subjects under Art. 23(3) is structurally eliminated for transit events.</p>
+    <p><strong style="color:var(--cobalt)">Less to report:</strong> Because no payload content is ever stored, a compromise of the relay exposes no stored message content, which materially narrows the scope of a reportable incident. It does not remove your reporting duties: as the controller you remain responsible for assessing and, where required, notifying under NIS2 (to your CSIRT) and the GDPR (to the supervisory authority and, for high-risk breaches, the data subjects). We give you the technical facts for that assessment; we do not replace it.</p>
     <p><strong style="color:var(--cobalt)">Operational logs:</strong> Every relay action is logged with timestamps and sector identifiers. Logs are available for export and can feed into your existing SIEM.</p>
     <div class="pills">
       <span class="pill">CT Merkle log</span>

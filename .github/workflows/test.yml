@@ -86,6 +86,14 @@ jobs:
         working-directory: relay
         run: node --test test/*.test.js
 
+      # Root integration suites (tests/*.mjs): dependency-injected, node builtins
+      # only (no @paramant/core, no Redis, no npm install). Excludes the Playwright
+      # browser e2e (sign-full, vault-filename), which run in the sign-e2e workflow.
+      # Gates the ParaSign open-API conformance suite + key-issuance + pdf-ops that
+      # previously ran in no workflow at all.
+      - name: Root integration suites (no browser)
+        run: node --test $(ls tests/*.mjs | grep -vE 'sign-full|vault-filename')
+
   admin-unit-tests:
     name: admin - unit suite
     runs-on: ubuntu-latest
