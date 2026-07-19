@@ -89,6 +89,9 @@ const cryptoErrors = require('./crypto/errors');
 const parasign = require('./parasign');
 const envelopeMod = require('./envelope');
 const parasignOpenApi = require('./lib/parasign-open-api'); // ParaSign Open Developer-API (/v1)
+const billingCatalog  = require('./lib/billing-catalog');   // server-side price + entitlement map
+const mollie          = require('./lib/mollie');            // Mollie Payments API client
+const billing         = require('./lib/billing');           // Mollie webhook decision state machine
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -1661,6 +1664,42 @@ function grantParasignOnPaidPlan(accountId) {
   }).then(() => log('info', 'parasign_grant_on_paid_plan', { account: String(accountId).slice(0, 12), keys: members.size, changed, persisted: true }))
     .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
   return { ok: true, keys: members.size, changed };
+}
+
+// ── Per-product entitlement setter (billing) ──────────────────────────────────
+// Set ONE product's plan (plan_parasign OR plan_parasend) for an account,
+// independently of the other product, then persist. This is what the Mollie
+// webhook calls on a paid payment. Models grantParasignOnPaidPlan's account
+// fan-out + users.json persistence. Idempotent (a repeat call with the same tier
+// changes nothing -> changed:0). For parasign it also flips the `parasign` access
+// flag on when the tier is paid (non-free). NEVER touches the other product.
+function setProductPlan(accountId, product, tier) {
+  if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
+  const field = product === 'parasign' ? 'plan_parasign' : 'plan_parasend';
+  const norm = product === 'parasign'
+    ? entitlements.normaliseParasignTier(tier)
+    : entitlements.normaliseParasendTier(tier);
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return { ok: false, reason: 'no_keys' };
+  let changed = 0;
+  for (const m of members) {
+    const mv = apiKeys.get(m);
+    if (!mv) continue;
+    if (mv[field] !== norm) { mv[field] = norm; changed++; }
+    if (product === 'parasign' && norm !== 'free' && mv.parasign !== true) mv.parasign = true;
+  }
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) {
+      if ((entry.account_id || entry.key) === accountId) {
+        entry[field] = norm;
+        if (product === 'parasign' && norm !== 'free') entry.parasign = true;
+        entry.plan_updated = new Date().toISOString();
+      }
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'billing_entitlement_set', { account: String(accountId).slice(0, 12), product, tier: norm, keys: members.size, changed, persisted: true }))
+    .catch(we => log('warn', 'billing_entitlement_persist_failed', { err: we.message }));
+  return { ok: true, product, tier: norm, keys: members.size, changed };
 }
 
 // -- ParaSign /v1 key issuance -- THE single generator -------------------------
@@ -4838,12 +4877,88 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── POST /v2/billing/checkout — start a Mollie payment (authenticated) ───────
+  // The amount comes from the server-side catalog, NEVER from the request body.
+  // The caller only names product+plan+interval; it can never set a price.
+  if (path === '/v2/billing/checkout' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    let body;
+    try { body = JSON.parse((await readBody(req, 2048)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    const order = billingCatalog.resolveOrder({ product: body.product, plan: body.plan, interval: body.interval });
+    if (order.error) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: order.error })); }
+    const mode = mollie.billingMode();
+    const origin = process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app';
+    try {
+      const payment = await mollie.createPayment(mode, {
+        amount: { currency: order.currency, value: order.amount },
+        description: `Paramant ${order.product} ${order.plan} (${order.interval})`,
+        redirectUrl: `${origin}/dashboard?billing=return`,
+        webhookUrl: `${origin}/v2/billing/webhook`,
+        metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval },
+      });
+      const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
+      log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
+    } catch (e) {
+      log('error', 'billing_checkout_failed', { account: String(accountId).slice(0, 12), err: e.message, status: e.status });
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'checkout_failed' }));
+    }
+  }
+
+  // ── POST /v2/billing/webhook — Mollie payment status callback ────────────────
+  // Mollie POSTs only { id } (form-encoded). The four hard rules live in
+  // lib/billing.processPayment; here we (1) re-fetch the payment from Mollie and
+  // trust ONLY that, then pass idempotency + entitlement effects as deps. Always
+  // 200 on a handled event so Mollie stops retrying; 503 only for a transient
+  // fetch failure we want retried.
+  if (path === '/v2/billing/webhook' && req.method === 'POST') {
+    let paymentId = '';
+    try {
+      const raw = (await readBody(req, 4096)).toString();
+      paymentId = (new URLSearchParams(raw).get('id') || '').trim();
+      if (!paymentId) { try { paymentId = (JSON.parse(raw).id || '').trim(); } catch { /* not json */ } }
+    } catch { /* empty body */ }
+    if (!/^tr_[A-Za-z0-9]+$/.test(paymentId)) {
+      log('warn', 'billing_webhook_bad_id', { raw_id: String(paymentId).slice(0, 24) });
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_payment_id' }));
+    }
+    const mode = mollie.billingMode();
+    let payment;
+    try { payment = await mollie.getPayment(mode, paymentId); }
+    catch (e) {
+      log('warn', 'billing_webhook_fetch_failed', { payment_id: paymentId, err: e.message, status: e.status });
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'fetch_failed' }));
+    }
+    const _rok = () => !!(redisClient && redisClient.isReady);
+    const _idemKey = (id) => `paramant:billing:done:${id}`;
+    const outcome = await billing.processPayment(payment, {
+      setProductPlan,
+      isProcessed: async (id) => { if (!_rok()) return false; try { return !!(await redisClient.get(_idemKey(id))); } catch { return false; } },
+      markProcessed: async (id, val) => { if (!_rok()) return; try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ } },
+    });
+    // Monitoring: log every webhook with payment-id, status and outcome. The
+    // 'error' level marks the alert cases (paid but no entitlement: amount
+    // mismatch, missing metadata, or a grant that failed).
+    log(outcome.level || 'info', 'billing_webhook', {
+      payment_id: paymentId, status: payment && payment.status,
+      result: outcome.result, account: outcome.account ? String(outcome.account).slice(0, 12) : undefined,
+      product: outcome.product, reason: outcome.reason,
+    });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true }));
+  }
+
   // ── POST /v2/admin/keys/update-plan ─────────────────────────────────────────
   if (path === '/v2/admin/keys/update-plan' && req.method === 'POST') {
     if (!_internalOk()) return _internalReject();
     try {
       const { key, plan } = JSON.parse((await readBody(req, 1024)).toString());
-      const VALID_PLANS = new Set(['community','dev','pro','licensed','enterprise']);
+      // 'business' is a first-class tier in tiers.js/entitlements; without it a
+      // Business plan-change (incl. a Mollie ParaSign Business purchase) failed here.
+      const VALID_PLANS = new Set(['community','dev','pro','business','licensed','enterprise']);
       if (!key || !VALID_PLANS.has(plan)) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
       if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
       const _rec = apiKeys.get(key);
