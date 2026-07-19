@@ -105,3 +105,22 @@ jobs:
       - name: Admin unit suite
         working-directory: admin
         run: node --test test/*.test.js
+
+  gitleaks:
+    name: secrets - gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      # Full-history secret scan. The repo-root .gitleaksignore (documented
+      # curl/PSS placeholder fingerprints) is honoured automatically. Pinned to a
+      # commit SHA, not a moving tag. License-free: Apolloccrypt is a personal
+      # account and paramant-relay is public, so gitleaks-action requires no
+      # GITLEAKS_LICENSE. Fails the job (and the PR) on any unignored finding.
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
