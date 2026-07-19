@@ -1,0 +1,58 @@
+name: Build prod image (drift gate)
+
+# Toolchain-drift gate. The prod relay image is built from relay/Dockerfile, a
+# musl/Alpine multi-stage build that compiles the paramant-core Rust NAPI
+# binding against a deliberately pinned base (rust:1.95-alpine). The unit and
+# crypto suites in test.yml do NOT go through this Dockerfile, so a base or
+# toolchain bump (e.g. the rust 1.96-alpine bump that broke the vendored oqs
+# crate) stayed green in CI and only failed when the image was built after
+# merge. This job builds the exact prod Dockerfile on every PR, turning that
+# post-merge failure into a pre-merge gate.
+#
+# Do NOT bump the rust base here or in relay/Dockerfile to make this pass; the
+# 1.95-alpine pin is intentional. Fix the underlying crate/toolchain instead.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "relay/**"
+      - ".github/workflows/build-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "relay/**"
+      - ".github/workflows/build-image.yml"
+  workflow_dispatch:
+
+jobs:
+  build-prod-dockerfile:
+    name: Build relay/Dockerfile (musl, amd64)
+    runs-on: ubuntu-latest
+    # The Rust binding compile (oqs + vendored liboqs) is the slow part; give it
+    # room but cap it so a hang fails instead of burning the whole runner budget.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # amd64 only: toolchain drift (rust base, liboqs, clang) is
+      # architecture-independent, so a single native build catches it without
+      # paying for QEMU-emulated arm64. The multi-arch push stays in
+      # docker-publish.yml. Build only, never push — this is a gate.
+      - name: Build prod image (no push)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./relay
+          file: ./relay/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
