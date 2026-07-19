@@ -429,7 +429,7 @@ function rejectFingerprint() {
 // ── Globe HUD ─────────────────────────────────────────────────────────────────
 let globeInstance = null, globeOpen = false, globePollInterval = null;
 let _gUserLat = null, _gUserLng = null;  // set after geo lookup
-const RELAY_LOC = { lat: 50.1109, lng: 8.6821, label: 'Relay · Frankfurt EU/DE' };
+const RELAY_LOC = { lat: 50.1109, lng: 8.6821, label: 'Relay · Nuremberg EU/DE' };
 
 // Keyboard shortcut
 document.addEventListener('keydown', e => {
