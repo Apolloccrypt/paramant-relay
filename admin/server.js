@@ -1867,6 +1867,51 @@ api.delete("/user/developer/tool-config", authUser, developerGate, async (req, r
   } catch (e) { res.status(503).json({ error: "store_unavailable" }); }
 });
 
+// ── Self-service ParaSign /v1 API keys (developer dashboard "+ New key"). ─────
+// Proxies the logged-in session to the relay's /v2/user/parasign-keys, adding
+// X-Internal-Auth via callRelay and the session's own user_id (no IDOR). The
+// relay runs the SAME mintParasignKey generator as the admin route and enforces
+// the ParaSign entitlement (paid plan or explicit grant): a 403 here means the
+// account is not entitled, and the frontend shows a friendly upgrade note. POST
+// mints (full key returned ONCE), GET lists masked, DELETE revokes.
+api.post("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
+  const { user_id } = req.userSession;
+  const body = { user_id, test: req.body && req.body.test === true };
+  if (req.body && typeof req.body.label === "string") body.label = req.body.label.slice(0, 80);
+  try {
+    const relayRes = await callRelay("/v2/user/parasign-keys", body, "POST");
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/developer/parasign-keys POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.get("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay(`/v2/user/parasign-keys?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/developer/parasign-keys GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.delete("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
+  const { user_id } = req.userSession;
+  const kid = (req.body && (req.body.kid || req.body.key)) || "";
+  if (!kid) return res.status(400).json({ error: "missing_kid" });
+  try {
+    const relayRes = await callRelay("/v2/user/parasign-keys", { user_id, kid }, "DELETE");
+    const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(out);
+  } catch (err) {
+    console.error("[user/developer/parasign-keys DELETE]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // GET /api/user/developer/snapshot — one call for the initial dashboard render:
 // {email, plan, key_masked, quota:{transfers,signs,caps}, audit:[last 50],
 //  tools_status:{per tool}}. 3s in-memory cache per account so a refresh storm

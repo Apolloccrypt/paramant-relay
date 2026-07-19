@@ -99,6 +99,7 @@ main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) va
 .dev-step-btns{display:flex;gap:6px}
 .dev-saved{font-size:10px;color:var(--ink-dim);margin:6px 0 0;font-family:var(--mono)}
 .dev-reset{border:none;background:none;color:#1D4ED8;font-family:var(--mono);font-size:10px;cursor:pointer;text-decoration:underline;padding:0}
+.psk-warn{font-family:var(--mono);font-size:11px;line-height:1.5;color:#0B3A6A;background:#B2FF3F;border-radius:8px;padding:10px 12px;margin:0 0 14px}
 
 /* Section 4: Operations */
 .ops{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-4);align-items:start}
@@ -180,7 +181,8 @@ main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) va
       <div class="dev-card ops-card">
         <h3>API keys</h3>
         <div id="keys"><div class="key-row"><span>—</span><span class="dim">loading</span></div></div>
-        <div class="tool-actions"><button class="dev-btn" disabled title="Available with self-service keys (coming)">+ New key</button></div>
+        <div id="psk-keys" class="dim mono" style="font-size:11px;margin-top:6px"></div>
+        <div class="tool-actions"><button class="dev-btn dev-btn-go" id="psk-new" type="button">+ New key</button></div>
         <p style="font-size:11px;margin-top:8px"><a href="/docs#v1-envelopes" style="color:var(--cobalt)">ParaSign API (/v1) reference &rarr;</a> hosted signing ceremonies, webhooks, .psign receipts</p>
       </div>
       <div class="dev-card ops-card">
@@ -197,7 +199,7 @@ main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) va
   </section>
 
   <div class="wip">
-    <b>Operations dashboard.</b> Configure builds a ready-to-run command for any tool; transfer and signing tools run in your browser. Generating additional self-service API keys arrives with account-schema steps 4 and 5.
+    <b>Operations dashboard.</b> Configure builds a ready-to-run command for any tool; transfer and signing tools run in your browser. Generate self-service ParaSign API keys from the API keys panel; paid plans only, and each key is shown once.
     Tools show live status from your activity; per-run stats appear once tool runs are logged to your audit trail.
     Source: <a href="https://github.com/Apolloccrypt/paramant-solutions" target="_blank" rel="noopener">github.com/Apolloccrypt/paramant-solutions</a>
   </div>
@@ -225,7 +227,31 @@ main.dev{max-width:1180px;margin:0 auto;padding:var(--space-5) var(--space-4) va
     <a class="dev-modal-src" data-m="source" href="#" target="_blank" rel="noopener">View source &#8599;</a>
   </div>
 </div>
+<div id="psk-modal" class="dev-modal" hidden role="dialog" aria-modal="true" aria-labelledby="psk-m-title">
+  <div class="dev-modal-card">
+    <button type="button" class="dev-modal-x" data-psk="close" aria-label="Close">&times;</button>
+    <h3 id="psk-m-title">New ParaSign API key</h3>
+    <div data-psk="view-confirm">
+      <p class="dev-modal-tag">Generate a ParaSign /v1 API key bound to your account. The full key is shown once, immediately after it is created.</p>
+      <div class="tool-actions"><button type="button" class="dev-btn dev-btn-go" data-psk="generate">Generate key</button><button type="button" class="dev-btn dev-btn-go" data-psk="close">Cancel</button></div>
+    </div>
+    <div data-psk="view-key" hidden>
+      <div class="psk-warn">You will see this key only once. Copy it now and store it safely. After you close this dialog only the masked form remains, and it cannot be retrieved in full again.</div>
+      <div class="dev-step">
+        <div class="dev-step-h"><span>Your new key</span><button type="button" class="dev-copy" data-psk="copy">copy</button></div>
+        <pre class="dev-pre" data-psk="keyval"></pre>
+      </div>
+      <p class="dev-modal-tag mono" data-psk="meta"></p>
+      <div class="tool-actions"><button type="button" class="dev-btn dev-btn-go" data-psk="done">Done</button></div>
+    </div>
+    <div data-psk="view-error" hidden>
+      <p class="dev-modal-tag" data-psk="errmsg"></p>
+      <div class="tool-actions"><a class="dev-btn dev-btn-go" data-psk="upsell" href="/pricing" hidden>See plans</a><button type="button" class="dev-btn dev-btn-go" data-psk="close">Close</button></div>
+    </div>
+  </div>
+</div>
+
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/developer.js?v=5" defer></script>
+<script src="/js/developer.js?v=6" defer></script>
 </body>
 </html>
