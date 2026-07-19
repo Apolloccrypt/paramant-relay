@@ -94,6 +94,10 @@ const mollie          = require('./lib/mollie');            // Mollie Payments A
 const billing         = require('./lib/billing');           // Mollie webhook decision state machine
 const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
+const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
+const userHistory      = require('./lib/user-history');      // GET /v2/user/history (Pro+)
+const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/parasign/audit-export (Business+)
+const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -167,7 +171,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v1'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
@@ -175,7 +179,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
                '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v1'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   full:       null,
 };
 
@@ -1619,6 +1623,33 @@ function auditAppend(key, event, data = {}) {
   entry.chain_hash = auditEntryHash(entry);
   chain.push(entry);
   if (chain.length > MAX_AUDIT) chain.shift();
+}
+
+// ── Reusable Resend mailer ────────────────────────────────────────────────────
+// Fire-and-forget. Returns false (no-op) when RESEND_API_KEY is unset or there is
+// no recipient, so a caller never blocks on mail and mail stays optional. Used by
+// the ParaSend Pro transfer notifications (upload/download); the DPA and
+// inbound-claim flows keep their own richly-templated inline sends.
+function sendResendEmail({ to, subject, text, html, from, cc } = {}) {
+  const RESEND_KEY = process.env.RESEND_API_KEY || '';
+  if (!RESEND_KEY || !to) return false;
+  const payload = {
+    from: from || 'PARAMANT <privacy@paramant.app>',
+    to: Array.isArray(to) ? to : [to],
+    subject: subject || '',
+  };
+  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
+  if (html) payload.html = html;
+  if (text) payload.text = text;
+  const body = JSON.stringify(payload);
+  try {
+    const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'resend_email_sent', { id: p.id, subject }); } catch (e) {} }); });
+    req2.on('error', e => log('warn', 'resend_email_failed', { err: e.message }));
+    req2.write(body); req2.end();
+    return true;
+  } catch (e) { log('warn', 'resend_email_failed', { err: e.message }); return false; }
 }
 
 // ── ML-DSA handtekening verificatie ──────────────────────────────────────────
@@ -4440,6 +4471,8 @@ const server = http.createServer(async (req, res) => {
       stats.inbound++; stats.bytes_in += blob.length;
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
+      // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
+      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: sendResendEmail });
 
       // (Transfer already counted by the quota gate above, before storage.)
 
@@ -4539,6 +4572,12 @@ const server = http.createServer(async (req, res) => {
       { hash: outm[1].slice(0,16)+'...', bytes: blob.length, views_left: entry.views_remaining });
     log('info', burned ? 'blob_burned' : 'blob_served',
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
+    // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
+    // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
+    {
+      const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
+      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: sendResendEmail });
+    }
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
@@ -4599,6 +4638,19 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/webhook ─────────────────────────────────────────────────────────
   if (path === '/v2/webhook' && req.method === 'POST') {
+    // Webhook registration is an advertised ParaSend Pro capability. Before this
+    // gate ANY tier (incl. Free/community) could register a ghostpipe webhook.
+    // Require a live key and ParaSend Pro+ (community/free -> 403). The ParaSign
+    // /v1 completion webhooks are unaffected: they live behind the /v1 parasign
+    // scope, not this route.
+    if (!keyData || keyData.active === false) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'API key required' }));
+    }
+    if (!tierGate.isParasendProPlus(keyData)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'tier_upgrade_required', feature: 'webhooks', message: 'Webhook registration requires a Pro plan or higher.' }));
+    }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
@@ -4655,6 +4707,33 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: entries.length, chain_valid: valid, entries }));
+  }
+
+  // ── GET /v2/user/history — per-account send/link history (ParaSend/ParaSign Pro) ─
+  // Pure read-view over the per-key Merkle audit chain (no new storage). Pro+ only.
+  if (path === '/v2/user/history' && req.method === 'GET') {
+    const acct = acctOf(apiKey);
+    const memberKeys = [...(accountKeys.get(acct) || new Set([apiKey]))];
+    return userHistory.handle({
+      res, J, keyData, memberKeys,
+      auditFor: (k) => auditChain.get(k) || [],
+      query,
+    });
+  }
+
+  // ── GET /v2/parasign/audit-export — ParaSign Business signing-audit export ────
+  // Tier-gated on the audit_export entitlement (Business+). CSV or JSON export of
+  // the account's tamper-evident audit chain + the CT signed tree head.
+  if (path === '/v2/parasign/audit-export' && req.method === 'GET') {
+    const acct = acctOf(apiKey);
+    const memberKeys = [...(accountKeys.get(acct) || new Set([apiKey]))];
+    return parasignAuditExport.handle({
+      res, J, keyData, memberKeys,
+      auditFor: (k) => auditChain.get(k) || [],
+      ctHead: () => (sthLog.length ? sthLog[sthLog.length - 1] : null),
+      verifyChain,
+      query,
+    });
   }
 
   // ── POST /v2/did/register ────────────────────────────────────────────────────
