@@ -236,9 +236,12 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
   return { key, record: rec, usersEntry };
 }
 
-// Which plans carry the ParaSign entitlement without an explicit grant. `licensed`
-// is listed alongside `enterprise` so an un-normalised plan name still matches.
-const PARASIGN_ENTITLED_PLANS = new Set(['pro', 'enterprise', 'licensed']);
+// Which plans carry the ParaSign entitlement without an explicit grant. `business`
+// is a first-class paid ParaSign tier (1000 signs, audit_export), so its accounts
+// must reach the /v1 API on plan name alone -- not only via the fragile per-key
+// parasign flag. `licensed` is listed alongside `enterprise` so an un-normalised
+// plan name still matches.
+const PARASIGN_ENTITLED_PLANS = new Set(['pro', 'business', 'enterprise', 'licensed']);
 
 // Self-serve gate: may this account mint a ParaSign /v1 key? True when ANY member
 // key already carries the parasign grant (admin set-parasign / billing auto-grant),
