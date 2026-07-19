@@ -19,6 +19,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Keyless cosign signing + attestation via Sigstore Fulcio/Rekor needs an
+      # OIDC token from the workflow. Read of this token is the only new grant.
+      id-token: write
 
     steps:
       - name: Checkout
@@ -51,6 +54,7 @@ jobs:
           echo "push_latest=$([[ "$GITHUB_REF" == refs/heads/main || "$IS_RELEASE" == true ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./relay
@@ -62,9 +66,51 @@ jobs:
             ${{ steps.meta.outputs.is_release == 'true' && format('mtty001/relay:{0}', steps.meta.outputs.version) || format('mtty001/relay:sha-{0}', steps.meta.outputs.version) }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # In-registry SLSA build provenance attestation, attached to the image
+          # index by BuildKit. mode=max records the full build definition.
+          provenance: mode=max
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.head_commit.timestamp || github.run_id }}
 
       - name: Image digest
-        run: echo "Pushed ${{ steps.meta.outputs.version }} — digest available in job summary"
+        run: echo "Pushed ${{ steps.meta.outputs.version }} — digest ${{ steps.build.outputs.digest }}"
+
+      # ── Supply-chain: SBOM + cosign signature + SBOM attestation ─────────────
+      # Everything below binds to the immutable digest, never a mutable tag, so
+      # the signature and SBOM describe exactly the bytes that were pushed.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+      - name: Sign image (keyless, Sigstore OIDC)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "mtty001/relay@${DIGEST}"
+
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@df80a981bc6edbc4e220a492d3cbe9f5547a6e75 # v0.17.9
+        with:
+          image: mtty001/relay@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: relay-sbom.cdx.json
+          # Do not let a missing SBOM tool silently pass; fail the job instead.
+          upload-artifact: false
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: relay-sbom-${{ steps.meta.outputs.version }}
+          path: relay-sbom.cdx.json
+          if-no-files-found: error
+
+      - name: Attest SBOM to image (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign attest --yes \
+            --type cyclonedx \
+            --predicate relay-sbom.cdx.json \
+            "mtty001/relay@${DIGEST}"
