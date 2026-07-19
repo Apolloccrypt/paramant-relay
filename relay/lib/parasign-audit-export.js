@@ -28,7 +28,17 @@ function csvCell(v) {
 //   ctHead() -> {...}|null  — current CT signed tree head (tree_size/tree_hash/ts)
 //   verifyChain(entries)   — optional; returns bool chain integrity for a key
 //   query                  — parsed querystring ({ format, limit })
-function handle({ res, J, keyData, memberKeys, auditFor, ctHead, verifyChain, query }) {
+// Full per-envelope .psign export (all optional; absent -> chain-only, the prior
+// behaviour, so the DI unit tests stay synchronous):
+//   account                — the calling account id (index key)
+//   envStore               — EnvelopeStore (listAccountEnvelopeIds + getForReceipt)
+//   metaStore              — ParaSign side-store (getMeta) for the test marker
+//   buildPsign(...)        — parasign-open-api.buildEnvelopePsign (shared recipe)
+//   sigEngine, relayIdentity, canonicalJSON, publicOrigin — notary inputs
+async function handle({
+  res, J, keyData, memberKeys, auditFor, ctHead, verifyChain, query,
+  account, envStore, metaStore, buildPsign, sigEngine, relayIdentity, canonicalJSON, publicOrigin,
+}) {
   if (!keyData || keyData.active === false) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'API key required' }));
@@ -79,6 +89,38 @@ function handle({ res, J, keyData, memberKeys, auditFor, ctHead, verifyChain, qu
     return res.end(header + '\n' + body + '\n');
   }
 
+  // ── Full per-envelope .psign proofs ────────────────────────────────────────
+  // The complete export: enumerate the account's envelopes via the index and,
+  // for each COMPLETED one, rebuild the exact notary-signed .psign that GET
+  // /v1/receipt returns (buildPsign is that shared function). open/void/expired
+  // envelopes are labelled with no proof -- only a completed envelope has a full
+  // multi-signer .psign. The .psign carries hashes + signatures only, never the
+  // document bytes, so this stays within the zero-knowledge invariant.
+  // All-optional: without envStore/account/buildPsign this stays chain-only and
+  // fully synchronous (the DI unit tests exercise that path).
+  let envelopes = [];
+  if (envStore && account && typeof buildPsign === 'function') {
+    let ids = [];
+    try { ids = await envStore.listAccountEnvelopeIds(account, { limit }); }
+    catch { ids = []; }
+    for (const id of ids) {
+      let env = null;
+      try { env = await envStore.getForReceipt(id); } catch { env = null; }
+      if (!env) { envelopes.push({ envelope_id: id, status: 'expired_or_gone', psign: null }); continue; }
+      if (env.status !== 'complete') {
+        const st = env.status === 'void' ? 'void' : (env.signed_count > 0 ? 'in_progress' : 'sent');
+        envelopes.push({ envelope_id: id, status: st, psign: null });
+        continue;
+      }
+      let meta = null;
+      try { meta = metaStore ? await metaStore.getMeta(id) : null; } catch { meta = null; }
+      let psign = null;
+      try { psign = buildPsign({ env, meta, canonicalJSON, sigEngine, relayIdentity, publicOrigin }); }
+      catch { psign = null; }
+      envelopes.push({ envelope_id: id, status: 'completed', psign });
+    }
+  }
+
   res.writeHead(200, { 'Content-Type': 'application/json' });
   return res.end(J({
     ok: true,
@@ -88,6 +130,8 @@ function handle({ res, J, keyData, memberKeys, auditFor, ctHead, verifyChain, qu
     ct_head: sth,               // CT signed tree head: the transparency anchor
     count: entries.length,
     entries,
+    envelope_count: envelopes.length,
+    envelopes,                  // full per-envelope .psign proofs (completed only)
   }));
 }
 

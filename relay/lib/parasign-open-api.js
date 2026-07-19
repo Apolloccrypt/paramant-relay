@@ -337,6 +337,9 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   try {
     out = await envStore.create({
       creatorApiKeyHash: SHA3(Buffer.from(apiKey)),
+      // Index this envelope under the CREATING ACCOUNT (not the bare key) so the
+      // Business+ audit-export sees every envelope across the account's keys.
+      accountId: (rec && rec.account_id) || apiKey,
       docHash, parties,
       originalFilename: (d.original_filename || '').toString(),
       expiresInDays: ttlDays,
@@ -591,25 +594,16 @@ async function getDocument(deps, id, token, rec) {
 // (durable creator_api_hash / same account) or a PARTICIPANT (valid invite
 // token). An authenticated-but-unrelated key gets a generic 404 (no existence
 // leak). getForReceipt exposes the raw signatures; getRedacted is untouched.
-async function getReceipt(deps, id, token, rec) {
-  const { res, envStore, canonicalJSON, sigEngine, relayIdentity, J } = deps;
-  let env;
-  try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
-  // Generic 404 for BOTH "unknown" and "not authorized" so a valid key from
-  // another account/envelope cannot distinguish the two. Authorization runs
-  // BEFORE any state-dependent (409 not_ready) branch so state does not leak.
-  if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
-  let authorized = false;
-  try { authorized = await authorizeReceipt(deps, id, token, rec, env); }
-  catch (_) { authorized = false; }
-  if (!authorized) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
-
-  if (env.status !== 'complete') return errRes(res, 409, 'not_ready', 'Envelope is not completed yet.', J);
-  if (!sigEngine || !relayIdentity) return errRes(res, 503, 'notary_unavailable', 'Notary key not available.', J);
-
-  // Side-store meta (carries the create-time mode: psk_test_ -> "test").
-  const m = (await resolveStore(deps).getMeta(id)) || {};
-
+// Build the notary-counter-signed full multi-signer .psign for a COMPLETED
+// envelope. Shared by GET /v1/receipt AND the Business+ audit-export so both
+// emit byte-identical evidence (one definition of "what a .psign is").
+//   env  = envStore.getForReceipt(id) (carries the raw per-party signatures)
+//   meta = side-store meta or null (only /v1 envelopes have it; carries mode)
+// Does NO authorization and NO status check -- the caller gates that (receipt:
+// authorizeReceipt + completed; export: completed-only). Throws if the notary
+// sign fails (caller maps to a 500 / skips the envelope).
+function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity, publicOrigin }) {
+  const m = meta || {};
   const psign = {
     type: 'parasign-envelope-receipt',
     version: '2',
@@ -639,7 +633,7 @@ async function getReceipt(deps, id, token, rec) {
     })),
     notary: {
       relay_pk_hash: relayIdentity.pk_hash,
-      relay_pubkey_url: (deps.publicOrigin || 'https://paramant.app') + '/v2/pubkey',
+      relay_pubkey_url: (publicOrigin || 'https://paramant.app') + '/v2/pubkey',
     },
   };
   // Sandbox/test evidence marker: a psk_test_ envelope (driven to completion
@@ -648,10 +642,35 @@ async function getReceipt(deps, id, token, rec) {
   // only the create-response note. A live envelope carries NO such marker.
   if (m.mode === 'test') { psign.mode = 'test'; psign.sandbox = true; }
 
-  let notarySig;
-  try { notarySig = Buffer.from(sigEngine.sign(Buffer.from(canonicalJSON(psign), 'utf8'), relayIdentity.sk)).toString('base64'); }
-  catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
+  const notarySig = Buffer.from(
+    sigEngine.sign(Buffer.from(canonicalJSON(psign), 'utf8'), relayIdentity.sk)
+  ).toString('base64');
   psign.notary_signature = notarySig;
+  return psign;
+}
+
+async function getReceipt(deps, id, token, rec) {
+  const { res, envStore, canonicalJSON, sigEngine, relayIdentity, J } = deps;
+  let env;
+  try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
+  // Generic 404 for BOTH "unknown" and "not authorized" so a valid key from
+  // another account/envelope cannot distinguish the two. Authorization runs
+  // BEFORE any state-dependent (409 not_ready) branch so state does not leak.
+  if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+  let authorized = false;
+  try { authorized = await authorizeReceipt(deps, id, token, rec, env); }
+  catch (_) { authorized = false; }
+  if (!authorized) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+
+  if (env.status !== 'complete') return errRes(res, 409, 'not_ready', 'Envelope is not completed yet.', J);
+  if (!sigEngine || !relayIdentity) return errRes(res, 503, 'notary_unavailable', 'Notary key not available.', J);
+
+  // Side-store meta (carries the create-time mode: psk_test_ -> "test").
+  const m = (await resolveStore(deps).getMeta(id)) || {};
+
+  let psign;
+  try { psign = buildEnvelopePsign({ env, meta: m, canonicalJSON, sigEngine, relayIdentity, publicOrigin: deps.publicOrigin }); }
+  catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
 
   const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '').replace(/"/g, '');
   res.writeHead(200, {
@@ -699,5 +718,6 @@ module.exports = {
   authorizeReceipt, hexEqual,   // exposed for tests
   sandboxAutoSign,              // exposed for tests
   createEnvelope, getReceipt,   // exposed for tests
+  buildEnvelopePsign,           // shared by /v1/receipt + the audit-export
   resolveStore,                 // exposed for tests (seed the side-store)
 };
