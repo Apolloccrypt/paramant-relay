@@ -607,6 +607,9 @@ async function getReceipt(deps, id, token, rec) {
   if (env.status !== 'complete') return errRes(res, 409, 'not_ready', 'Envelope is not completed yet.', J);
   if (!sigEngine || !relayIdentity) return errRes(res, 503, 'notary_unavailable', 'Notary key not available.', J);
 
+  // Side-store meta (carries the create-time mode: psk_test_ -> "test").
+  const m = (await resolveStore(deps).getMeta(id)) || {};
+
   const psign = {
     type: 'parasign-envelope-receipt',
     version: '2',
@@ -639,12 +642,17 @@ async function getReceipt(deps, id, token, rec) {
       relay_pubkey_url: (deps.publicOrigin || 'https://paramant.app') + '/v2/pubkey',
     },
   };
+  // Sandbox/test evidence marker: a psk_test_ envelope (driven to completion
+  // by the throwaway sandbox signer) is permanently flagged INSIDE the notary-
+  // signed .psign, so the test nature travels with the evidence itself, not
+  // only the create-response note. A live envelope carries NO such marker.
+  if (m.mode === 'test') { psign.mode = 'test'; psign.sandbox = true; }
+
   let notarySig;
   try { notarySig = Buffer.from(sigEngine.sign(Buffer.from(canonicalJSON(psign), 'utf8'), relayIdentity.sk)).toString('base64'); }
   catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
   psign.notary_signature = notarySig;
 
-  const m = (await resolveStore(deps).getMeta(id)) || {};
   const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '').replace(/"/g, '');
   res.writeHead(200, {
     'Content-Type': 'application/json',
@@ -690,4 +698,5 @@ module.exports = {
   grantParaSignScope, setParaSignEnabled,
   authorizeReceipt, hexEqual,   // exposed for tests
   sandboxAutoSign,              // exposed for tests
+  createEnvelope, getReceipt,   // exposed for tests
 };
