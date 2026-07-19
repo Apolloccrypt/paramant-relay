@@ -92,6 +92,8 @@ const parasignOpenApi = require('./lib/parasign-open-api'); // ParaSign Open Dev
 const billingCatalog  = require('./lib/billing-catalog');   // server-side price + entitlement map
 const mollie          = require('./lib/mollie');            // Mollie Payments API client
 const billing         = require('./lib/billing');           // Mollie webhook decision state machine
+const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
+const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -1475,6 +1477,45 @@ setInterval(() => {
   for (const [k, v] of envSignLimits)   if (now > v.resetAt + 60_000) envSignLimits.delete(k);
 }, 120_000);
 
+// Fleet-wide envelope-create rate limit. The per-process envCreateLimits above
+// only bound ONE relay instance; behind the multi-instance deployment a client
+// got N times the intended 50/hour. This shares the counter in redis: INCR a
+// per-key hourly bucket, EXPIRE it on first hit. Fails OPEN to the per-process
+// limiter when redis is down, so an outage never hard-blocks paying integrators
+// (they still get the local 50/hour cap). The bucket rolls hourly by wall clock.
+const ENV_CREATE_LIMIT = 50;
+async function envCreateRateOkShared(apiKey) {
+  if (!redisClient || !redisClient.isReady) return envCreateRateOk(apiKey);
+  try {
+    const bucket = Math.floor(Date.now() / 3600_000);
+    const rk = `paramant:rl:envcreate:${bucket}:${apiKey}`;
+    const n = await redisClient.incr(rk);
+    if (n === 1) await redisClient.expire(rk, 3600);
+    return n <= ENV_CREATE_LIMIT;
+  } catch (e) {
+    log('warn', 'env_create_rl_redis_fail', { err: e.message });
+    return envCreateRateOk(apiKey);
+  }
+}
+
+// ── ParaSign /v1 durable side-store (documents + webhook meta) ────────────────
+// Encrypted-at-rest in redis (AES-256-GCM), in-memory fallback without a key.
+// A SINGLE instance is shared by the /v1 router and the /v2 sign path (the
+// completion-webhook emit reads the same webhook meta). Key: PARASIGN_STORE_KEY,
+// else the already-required TOTP master key.
+function _parasignStoreKey() {
+  return process.env.PARASIGN_STORE_KEY || process.env.PARAMANT_TOTP_MASTER_KEY || null;
+}
+function _parasignStore() {
+  if (!_parasignStore._inst) {
+    _parasignStore._inst = parasignStoreMod.createParaSignStore({
+      redis: redisClient, encKey: _parasignStoreKey(), log,
+    });
+    log('info', 'parasign_store_backend', { backend: _parasignStore._inst.backend });
+  }
+  return _parasignStore._inst;
+}
+
 // Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
 const statusRateLimits = new Map();
 function statusRateOk(ip) {
@@ -1666,7 +1707,7 @@ function grantParasignOnPaidPlan(accountId) {
   return { ok: true, keys: members.size, changed };
 }
 
-// ── Per-product entitlement setter (billing) ──────────────────────────────────
+// ── Per-product entitlement setter (billing) ──────────────────────────────
 // Set ONE product's plan (plan_parasign OR plan_parasend) for an account,
 // independently of the other product, then persist. This is what the Mollie
 // webhook calls on a paid payment. Models grantParasignOnPaidPlan's account
@@ -1700,6 +1741,30 @@ function setProductPlan(accountId, product, tier) {
   }).then(() => log('info', 'billing_entitlement_set', { account: String(accountId).slice(0, 12), product, tier: norm, keys: members.size, changed, persisted: true }))
     .catch(we => log('warn', 'billing_entitlement_persist_failed', { err: we.message }));
   return { ok: true, product, tier: norm, keys: members.size, changed };
+}
+
+// Per-key persistence for the ParaSign entitlement toggle. Injected into
+// lib/parasign-open-api.js so its grantParaSignScope/setParaSignEnabled are no
+// longer in-memory-only stubs: the flip on the live apiKeys record is mirrored
+// to users.json (so it survives a restart) and an audit entry records it. Write
+// runs on the serialized users-queue; returns immediately. Scoped to ONE key,
+// unlike grantParasignOnPaidPlan which fans out over a whole account.
+function _persistParaSignScope(key, { parasign, plan } = {}) {
+  if (!key) return { ok: false, reason: 'no_key' };
+  const rec = apiKeys.get(key);
+  const acct = (rec && rec.account_id) || key;
+  _mutateUsersJson(ud => {
+    for (const entry of (ud.api_keys || [])) {
+      if (entry.key === key) {
+        if (parasign !== undefined) entry.parasign = !!parasign;
+        if (plan) entry.plan = plan;
+      }
+    }
+    ud.updated = new Date().toISOString();
+  }).then(() => log('info', 'parasign_scope_persisted', { account: String(acct).slice(0, 12), parasign: !!parasign, plan: plan || null }))
+    .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
+  try { auditAppend(key, 'parasign_scope_change', { parasign: !!parasign, plan: plan || null }); } catch {}
+  return { ok: true };
 }
 
 // -- ParaSign /v1 key issuance -- THE single generator -------------------------
@@ -2209,15 +2274,30 @@ const server = http.createServer(async (req, res) => {
       publicOrigin: _publicOrigin,
       apiKeys,
       envStore: _envStore(),
-      envCreateRateOk,
+      store: _parasignStore(),
+      stamp: parasignStamp,
+      envCreateRateOk: envCreateRateOkShared,
+      persistParaSignScope: _persistParaSignScope,
       safeHttpsRequest,
       canonicalJSON: parasign.canonicalJSON,
       sigEngine: (mlDsa && registry) ? registry.getSig(0x0002) : null,
       relayIdentity,
-      // rec is the psk_ key record; entitlements.signsQuota reads plan_parasign
-      // (with legacy-plan fallback) so the /v1 API meters against the ParaSign
-      // tier, not a product-blind plan field.
-      signQuotaGate: async (accountId, rec) => quota.gateSign(redisClient, accountId, entitlements.signsQuota(rec), log),
+      // READ-ONLY gate: reject a /v1 create when the account is already over
+      // its monthly signs cap, but do NOT increment here. signs_month counts
+      // actual SIGNATURES and is incremented per accepted party-signature in the
+      // /v2/envelopes/:id/sign path; counting at create too would double-count a
+      // /v1 envelope (its signers post back through that same sign path). The
+      // LIMIT comes from entitlements (plan_parasign, legacy-plan fallback), the
+      // per-product ParaSign tier, NOT the product-blind tiers.tierLimitNum.
+      signQuotaGate: async (accountId, rec) => {
+        const limit = entitlements.signsQuota(rec || {});
+        if (!accountId || !Number.isFinite(limit)) return { allowed: true, over_limit: false };
+        try {
+          const u = await quota.readUsage(redisClient, accountId);
+          const over = u.available && Number.isFinite(u.signs_this_month) && u.signs_this_month >= limit;
+          return { allowed: !over, over_limit: over };
+        } catch { return { allowed: true, over_limit: false }; }
+      },
       readBody, J, log,
     });
   }
@@ -5202,6 +5282,11 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(410, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'gone', message: 'POST /v2/sign (legacy R017 notary) is retired; sign in your browser at /sign (R018).' }));
   }
+  // DEAD CODE (retained for reference only; guarded by `&& false`). This is the
+  // legacy R017 notary body. It held the ONLY gateSign/recordSign call in the
+  // relay, which is why signatures went uncounted for so long: the live signing
+  // path is POST /v2/envelopes/:id/sign (R018), which now meters signs itself.
+  // Do NOT re-enable without moving the metering; kept only to document history.
   if (path === '/v2/sign' && req.method === 'POST' && false) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
@@ -5324,7 +5409,7 @@ const server = http.createServer(async (req, res) => {
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
-    if (!envCreateRateOk(apiKey)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
+    if (!(await envCreateRateOkShared(apiKey))) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable (redis or crypto not ready)' })); }
     try {
@@ -5446,6 +5531,34 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'signer_not_enrolled' }));
         }
       }
+      // ── Signs-quota enforcement (was NEVER counted) ─────────────────────────
+      // This R018 route is the ONE active signing path (POST /v2/sign is retired,
+      // and the only gateSign/recordSign lived in a dead `&& false` block below).
+      // So no signature was ever metered: the dashboard signs-counter never moved
+      // and a plan's monthly signs_month cap was unenforceable. We meter the
+      // SIGNER's account (the account the enrolled key belongs to, named by the
+      // admin proxy as account_id). Pre-gate is READ-ONLY (a bare usage read) so
+      // an invalid signature that store.sign() will reject is never counted; the
+      // increment happens AFTER, and ONLY for a genuinely NEW signature, so an
+      // idempotent retry ('idem') never double-counts. Fail-open on redis trouble
+      // or an unknown account: a signer is never blocked by infra.
+      const _signerPlan = (accounts.get(accountId) && accounts.get(accountId).plan)
+        || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
+      // Signs limit from ENTITLEMENTS (plan_parasign, legacy-plan fallback),
+      // the per-product ParaSign tier -- NOT the product-blind tiers.tierLimitNum.
+      const _signerRec = accounts.get(accountId) || apiKeys.get(accountId) || { plan: _signerPlan };
+      const _signLimit = entitlements.signsQuota(_signerRec);
+      if (accountId && Number.isFinite(_signLimit)) {
+        try {
+          const _u = await quota.readUsage(redisClient, accountId);
+          if (_u.available && Number.isFinite(_u.signs_this_month) && _u.signs_this_month >= _signLimit) {
+            log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signerPlan, limit: _signLimit });
+            res.writeHead(402, { 'Content-Type': 'application/json' });
+            return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: _signerPlan, limit: _signLimit }));
+          }
+        } catch (qe) { log('warn', 'quota_sign_pregate_failed', { err: qe.message }); }
+      }
+
       // Email-bound envelopes (R018): the store accepts the signature only when
       // a trusted internal caller (the admin proxy, which verified the signer's
       // authenticated session email) asserts a matching verified_email_hash.
@@ -5463,6 +5576,33 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(code, { 'Content-Type': 'application/json' });
         return res.end(J({ error: out.code }));
       }
+
+      // Count exactly one signature per NEW accepted party-signature (signs_month
+      // is a signature counter, so multi-party envelopes count per party). An
+      // 'idem' retry does not re-count. Fire-and-forget on the shared redis.
+      if (out.code === 'new' && accountId) {
+        quota.recordSign(redisClient, accountId, log).catch(() => {});
+      }
+
+      // ── Completion webhooks (were never fired from the sign path) ───────────
+      // envelope.sent/.voided already fire from the /v1 router; the sign path (in
+      // relay.js) is where a signature actually lands, so signer.completed and
+      // envelope.completed must originate HERE. emitEvent reads the per-envelope
+      // webhook target from the same durable store; it no-ops for non-/v1
+      // envelopes (no meta record) and is HMAC-SHA256 signed like the others.
+      // Fire-and-forget so a slow/broken webhook never delays the signer's 200.
+      if (out.code === 'new') {
+        const _pdeps = { store: _parasignStore(), safeHttpsRequest, J, log };
+        parasignOpenApi.emitEvent(_pdeps, id, 'signer.completed', {
+          party_index: pi, signed_count: out.signed_count, party_count: out.party_count,
+        });
+        if (out.status === 'complete') {
+          parasignOpenApi.emitEvent(_pdeps, id, 'envelope.completed', {
+            status: 'completed', signed_count: out.signed_count, party_count: out.party_count,
+          });
+        }
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status }));
     } catch (e) {

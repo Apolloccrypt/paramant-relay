@@ -8,46 +8,48 @@
 //     it needs (envelope store, notary key, safeHttpsRequest, ...) is injected
 //     via the `deps` object at call time, so the module stays unit-testable
 //     with fakes and never reaches into relay.js closures.
-//   * The only NEW capability introduced here is the document blobstore - the
-//     one deliberate break of the "relay never sees the PDF" invariant, and it
-//     is scoped to open-API envelopes only. It is IN-MEMORY + TTL and clearly
-//     labelled as the Model-A concession; a production deploy must move it to
-//     encrypted-at-rest storage (Redis/S3) with the same TTL semantics.
+//   * The only NEW capability introduced here is the document side-store - the
+//     one deliberate break of the "relay never sees the PDF" invariant, scoped
+//     to open-API envelopes only. It is now DURABLE and ENCRYPTED-AT-REST
+//     (lib/parasign-store.js: redis + AES-256-GCM, memory fallback for tests)
+//     with the same TTL as the envelope, so a restart no longer loses documents.
 //
 // Status of the surface (honest labelling):
 //   FUNCTIONAL: auth (Bearer psk_ + parasign scope), POST /v1/envelopes
-//     (create + hash + blob store + envelope.sent webhook), GET /v1/envelopes/:id
+//     (create + hash + durable blob store + webhook_url validation +
+//     envelope.sent webhook + psk_test_ sandbox auto-signer), GET /v1/envelopes/:id
 //     (status + external status mapping), POST /v1/envelopes/:id/void
-//     (+ envelope.voided webhook, atomic against signing), GET /document (serves
-//     the stored blob), GET /receipt (full multi-signer .psign: raw per-party
-//     ML-DSA-65 signatures via envStore.getForReceipt + notary counter-sig).
-//   STUB / INTERIM: PDF stamp-worker absent -> /document serves the UNSTAMPED
-//     original (X-ParaSign-Stamped: false). signer.completed / envelope.completed
-//     / envelope.declined webhooks are NOT auto-fired (the transition originates
-//     in /v2/envelopes/:id/sign, which this build does not modify); emitEvent()
-//     is exported so that path can drive them later. Sandbox auto-signer for
-//     psk_test_ is a labelled TODO.
+//     (+ envelope.voided webhook), GET /document (serves a server-STAMPED PDF,
+//     X-ParaSign-Stamped: true; falls back to the original if pdf-lib is absent),
+//     GET /receipt (full multi-signer .psign, notary-counter-signed).
+//   DRIVEN ELSEWHERE: signer.completed / envelope.completed fire from the actual
+//     sign transition in relay.js (/v2/envelopes/:id/sign) via the exported
+//     emitEvent(); the sandbox path fires them directly for test envelopes.
+//   NOT PRODUCED YET: envelope.declined has no source transition (the sign path
+//     never declines; a dedicated decline route would drive it).
 
 const crypto = require('crypto');
+const { isSsrfSafeUrl } = require('./ssrf-guard');
+const { createParaSignStore } = require('./parasign-store');
+const envelopeMod = require('../envelope');   // pure helpers: signMessageBytes, partyEmailHash
 
 const SHA3 = (buf) => crypto.createHash('sha3-256').update(buf).digest('hex');
 const MAX_PDF_BYTES = parseInt(process.env.PARASIGN_MAX_PDF_BYTES || String(20 * 1024 * 1024), 10);
 
-// ── Model-A document blobstore (EPHEMERAL, in-memory, TTL) ────────────────────
-// id -> { pdf: Buffer, filename, ts, ttlMs }. THE Model-A concession. Not
-// durable across restarts by design in this build; production must relocate.
-const blobs = new Map();
-// id -> side-record the envelope store cannot hold (plaintext emails/names,
-// webhook target + per-envelope secret, metadata, test-flag). Also ephemeral.
-const meta = new Map();
-
-function _sweep() {
-  const now = Date.now();
-  for (const [id, b] of blobs) if (b.ttlMs && now - b.ts > b.ttlMs) blobs.delete(id);
-  for (const [id, m] of meta)  if (m.ttlMs && now - m.ts > m.ttlMs) meta.delete(id);
+// ── Durable side-store (documents + webhook meta) ─────────────────────────────
+// The blob (PDF bytes) and the meta side-record (webhook target/secret,
+// plaintext signers, metadata) used to be in-memory Maps here, lost on every
+// restart -- a still-valid envelope's GET /document returned document_gone. They
+// now live in lib/parasign-store.js: redis + AES-256-GCM at rest when the relay
+// injects a store via deps.store, else an in-memory fallback for unit tests.
+// resolveStore() prefers the injected store and lazily builds a memory-only one
+// so the module still runs stand-alone (tests) with identical TTL semantics.
+let _fallbackStore = null;
+function resolveStore(deps) {
+  if (deps && deps.store) return deps.store;
+  if (!_fallbackStore) _fallbackStore = createParaSignStore({});
+  return _fallbackStore;
 }
-const _sweepTimer = setInterval(_sweep, 300_000);
-if (_sweepTimer.unref) _sweepTimer.unref();
 
 // ── Entitlement (scope) ───────────────────────────────────────────────────────
 // A psk_ key grants the parasign scope when its key-table record says so. Three
@@ -93,20 +95,22 @@ function hexEqual(a, b) {
 // destructive/private owner-only routes (void, document) and the owner-OR-
 // participant receipt route share ONE definition of "who owns this envelope".
 // Synchronous: both owner paths are local (fingerprint + ephemeral meta).
-function isEnvelopeOwner(deps, id, token, rec, env) {
+async function isEnvelopeOwner(deps, id, token, rec, env) {
   // (a) durable owner fingerprint -- create() stored SHA3(api_key); recompute
   //     from the presented key and constant-time compare.
   if (env && env.creator_api_hash && hexEqual(SHA3(Buffer.from(token)), env.creator_api_hash)) return true;
-  // (b) same-account owner (ephemeral meta) -- a different key on the same acct.
-  const m = meta.get(id);
+  // (b) same-account owner (durable meta) -- a different key on the same acct.
   const acct = rec && rec.account_id;
-  if (m && acct && m.accountId && m.accountId === acct) return true;
+  if (acct) {
+    const m = await resolveStore(deps).getMeta(id);
+    if (m && m.accountId && m.accountId === acct) return true;
+  }
   return false;
 }
 
 async function authorizeReceipt(deps, id, token, rec, env) {
   // (a)+(b) OWNER (durable fingerprint or same-account).
-  if (isEnvelopeOwner(deps, id, token, rec, env)) return true;
+  if (await isEnvelopeOwner(deps, id, token, rec, env)) return true;
   // (c) participant invite token (header preferred; query fallback).
   const hdr = (deps.req && deps.req.headers && deps.req.headers['x-parasign-invite-token']) || '';
   const q = (deps.query && (deps.query.invite_token || deps.query.t)) || '';
@@ -118,24 +122,28 @@ async function authorizeReceipt(deps, id, token, rec, env) {
   return false;
 }
 
-// ── Entitlement hooks (STUBS - wire to billing + admin) ───────────────────────
+// ── Entitlement hooks (persistent) ────────────────────────────────────────────
 // Grant point: call from the billing-success handler once a plan that includes
 // ParaSign is paid. Toggle point: call from an admin route to enable/disable per
-// key. Both mutate the live apiKeys record; persistence to users.json is the
-// caller's job (mirror the setup-mint _mutateUsersJson pattern). TODO: persist.
-function grantParaSignScope(apiKeys, key, plan) {
+// key. Both flip the live apiKeys record AND persist durably: relay.js injects a
+// `persist(key, { parasign, plan })` callback (deps.persistParaSignScope) that
+// mirrors the flip into users.json on the serialized write-queue and writes an
+// audit entry -- so the grant survives a restart instead of evaporating with the
+// in-memory record. Without a persist callback (unit tests) they still flip the
+// live record so behaviour is unchanged; only durability is added.
+function grantParaSignScope(apiKeys, key, plan, persist) {
   const rec = apiKeys.get(key);
   if (!rec) return false;
   rec.parasign = true;
   if (plan) rec.plan = plan;
-  // TODO(entitlement): persist rec to users.json + emit an audit entry.
+  if (typeof persist === 'function') { try { persist(key, { parasign: true, plan }); } catch { /* logged by caller */ } }
   return true;
 }
-function setParaSignEnabled(apiKeys, key, enabled) {
+function setParaSignEnabled(apiKeys, key, enabled, persist) {
   const rec = apiKeys.get(key);
   if (!rec) return false;
   rec.parasign = !!enabled;
-  // TODO(entitlement): persist + audit.
+  if (typeof persist === 'function') { try { persist(key, { parasign: !!enabled }); } catch { /* logged by caller */ } }
   return true;
 }
 
@@ -161,7 +169,7 @@ const errRes = (res, code, error, message, J) => jsonRes(res, code, { error, mes
 //   X-Paramant-Sig = hex HMAC_SHA256(webhook_secret, raw_body). Adds a unique
 //   X-Paramant-Delivery so clients can dedupe replays.
 async function emitEvent(deps, id, event, extra) {
-  const m = meta.get(id);
+  const m = await resolveStore(deps).getMeta(id);
   if (!m || !m.webhook_url) return { skipped: 'no_webhook' };
   const payload = deps.J({
     event, id, ts: new Date().toISOString(),
@@ -247,7 +255,9 @@ async function route(deps) {
 // ── POST /v1/envelopes ────────────────────────────────────────────────────────
 async function createEnvelope(deps, apiKey, mode, rec) {
   const { res, apiKeys, envStore, envCreateRateOk, readBody, J, publicOrigin } = deps;
-  if (!envCreateRateOk(apiKey)) {
+  const store = resolveStore(deps);
+  // envCreateRateOk is now the fleet-wide (redis-backed) limiter, so await it.
+  if (!(await envCreateRateOk(apiKey))) {
     return jsonRes(res, 429, { error: 'rate_limited', message: 'Envelope create quota exceeded (50/hour/key).' }, J, { 'Retry-After': '3600' });
   }
 
@@ -287,6 +297,21 @@ async function createEnvelope(deps, apiKey, mode, rec) {
   const bindingMode = (d.binding_mode === 'open') ? 'open' : 'email';
   const ttlDays = Number.isFinite(d.ttl_days) ? d.ttl_days : undefined;
 
+  // 2c) webhook_url validation at CREATE (was a silent failure at emit time). An
+  //     integrator that passes a bad target now learns immediately with a 400,
+  //     instead of getting a 201 and never receiving events. Require an explicit
+  //     https URL and let the same SSRF guard that gates delivery reject internal
+  //     targets (loopback/RFC1918/metadata/non-443) up front.
+  let webhookUrl = null;
+  if (d.webhook_url !== undefined && d.webhook_url !== null && d.webhook_url !== '') {
+    const w = String(d.webhook_url);
+    if (!/^https:\/\//i.test(w) || !isSsrfSafeUrl(w)) {
+      return errRes(res, 400, 'invalid_webhook_url',
+        'webhook_url must be a public https URL (rejected by the SSRF guard). / webhook_url moet een publieke https-URL zijn (geweigerd door de SSRF-guard).', J);
+    }
+    webhookUrl = w;
+  }
+
   // 2b) Entitlement metering. Count this create against the account's monthly
   //     ParaSign signing quota for its plan (tiers.js signs_month). This is what
   //     ties a psk_ key to the paid entitlement layer: over the plan cap -> 402
@@ -321,42 +346,59 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     return errRes(res, 400, 'create_failed', e.message, J);
   }
 
-  // 4) side-records: blob (Model-A) + meta (webhook/metadata/plaintext).
-  const webhookUrl = (typeof d.webhook_url === 'string' && d.webhook_url) ? d.webhook_url : null;
+  // 4) side-records: blob + meta, both DURABLE + encrypted-at-rest (redis) with
+  //    the same TTL as the envelope. A restart no longer loses the document.
   const webhookSecret = webhookUrl ? crypto.randomBytes(32).toString('hex') : null;
   const ttlMs = (out.expires_at ? (new Date(out.expires_at).getTime() - Date.now()) : 30 * 86400_000);
-  blobs.set(out.id, { pdf, filename: (d.original_filename || 'document.pdf').toString(), ts: Date.now(), ttlMs });
-  meta.set(out.id, {
-    apiKey, accountId: (rec && rec.account_id) || apiKey, mode,
+  const metaObj = {
+    accountId: (rec && rec.account_id) || apiKey, mode,
     webhook_url: webhookUrl, webhook_secret: webhookSecret,
     metadata: (d.metadata && typeof d.metadata === 'object') ? d.metadata : {},
     signers: signers.map((s, i) => ({ index: i, name: (s.name || ''), email: (s.email || ''), order: s.order || (i + 1) })),
     original_filename: (d.original_filename || '').toString(),
-    ts: Date.now(), ttlMs,
-  });
+  };
+  try {
+    await store.putBlob(out.id, pdf, ttlMs);
+    await store.putMeta(out.id, metaObj, ttlMs);
+  } catch (e) {
+    return errRes(res, 503, 'store_unavailable', 'Could not persist the document side-store.', J);
+  }
 
   const origin = publicOrigin || '';
+
+  // 5) envelope.sent webhook (functional).
+  emitEvent(deps, out.id, 'envelope.sent', { status: 'sent', signer_count: signers.length });
+
+  // 6) Sandbox auto-signer (psk_test_ only). A test envelope is driven to
+  //    completion by a throwaway ML-DSA-65 signer per party, so an integrator can
+  //    exercise the full create -> completed -> receipt flow programmatically with
+  //    no human. It consumes NO signs quota (it drives envStore.sign directly, not
+  //    the metered /v2 sign path) and fires the same completion webhooks.
+  let sandbox = null;
+  if (mode === 'test') {
+    try { sandbox = await sandboxAutoSign(deps, out, signers, bindingMode, docHash); }
+    catch (e) { sandbox = { error: e.message, signedIndices: [], status: 'sent' }; }
+  }
+  const signedSet = new Set((sandbox && sandbox.signedIndices) || []);
+
   const signerOut = out.party_links.map((pl, i) => ({
     index: pl.party_index,
     name: signers[i] ? (signers[i].name || null) : null,
     email: signers[i] ? (signers[i].email || null) : null,
     order: signers[i] ? (signers[i].order || (i + 1)) : (i + 1),
-    status: 'pending',
+    status: signedSet.has(pl.party_index) ? 'completed' : 'pending',
     sign_url: origin + pl.sign_path,
   }));
-
-  // 5) envelope.sent webhook (functional).
-  emitEvent(deps, out.id, 'envelope.sent', { status: 'sent', signer_count: signerOut.length });
-
-  // TODO(sandbox): psk_test_ envelopes should be auto-signed by a throwaway
-  // ML-DSA sandbox signer so integrators can test end-to-end without a human.
+  const finalStatus = (sandbox && sandbox.status === 'complete') ? 'completed' : 'sent';
   const sandboxNote = (mode === 'test')
-    ? 'sandbox auto-signer not yet wired (TODO); this test envelope behaves like a live one'
+    ? (sandbox && !sandbox.error
+        ? `sandbox auto-signed ${signedSet.size}/${signers.length} parties with a throwaway ML-DSA-65 signer`
+        : `sandbox auto-signer unavailable (${(sandbox && sandbox.error) || 'no signing engine'}); test envelope behaves like a live one`)
     : undefined;
 
   return jsonRes(res, 201, {
     id: out.id,
-    status: 'sent',
+    status: finalStatus,
     mode,
     doc_hash: docHash,
     binding_mode: out.binding_mode,
@@ -364,9 +406,52 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     expires_at: out.expires_at,
     signers: signerOut,
     webhook_secret: webhookSecret,     // returned ONCE, for HMAC verification
-    metadata: meta.get(out.id).metadata,
+    metadata: metaObj.metadata,
+    documents: finalStatus === 'completed'
+      ? { signed_pdf: `/v1/envelopes/${out.id}/document`, receipt: `/v1/envelopes/${out.id}/receipt` }
+      : null,
     _sandbox_note: sandboxNote,
   }, J);
+}
+
+// ── Sandbox auto-signer (psk_test_) ───────────────────────────────────────────
+// Signs every party slot of a TEST envelope with a fresh throwaway ML-DSA-65
+// keypair so the integrator's create call returns an already-completed envelope
+// (full create -> completed -> receipt loop with no human). Uses the injected
+// signing engine (deps.sigEngine: generateKeyPair/sign) and the envelope module's
+// pure recipe helpers to build the exact per-slot message the store verifies. For
+// email-bound slots it presents internalTrusted + the matching verifiedEmailHash
+// (sandbox stands in for the trusted admin proxy); open slots verify the v4
+// signer-bound recipe. Best-effort per slot; a slot that fails stays pending.
+async function sandboxAutoSign(deps, out, signers, bindingMode, docHash) {
+  const sig = deps.sigEngine;
+  if (!sig || typeof sig.generateKeyPair !== 'function' || typeof sig.sign !== 'function') {
+    return { error: 'no_signing_engine', signedIndices: [], status: 'sent' };
+  }
+  const { signMessageBytes, partyEmailHash } = envelopeMod;
+  const recipe = (bindingMode === 'open') ? 4 : (out.recipe_version || (bindingMode === 'email' ? 2 : 1));
+  const signedIndices = [];
+  let status = 'sent', lastSignedCount = 0, partyCount = signers.length;
+  for (let i = 0; i < signers.length; i++) {
+    try {
+      const kp = sig.generateKeyPair();
+      const pubB64 = Buffer.from(kp.publicKey).toString('base64');
+      const emailHash = partyEmailHash((signers[i] && signers[i].email) || '');
+      const msg = signMessageBytes(out.id, docHash, i, emailHash, recipe, pubB64);
+      const sigB64 = Buffer.from(sig.sign(msg, kp.secretKey)).toString('base64');
+      const r = await deps.envStore.sign(out.id, i, pubB64, sigB64, { internalTrusted: true, verifiedEmailHash: emailHash });
+      if (r && r.ok && r.code === 'new') {
+        signedIndices.push(i);
+        lastSignedCount = r.signed_count;
+        status = r.status;
+        emitEvent(deps, out.id, 'signer.completed', { party_index: i, signed_count: r.signed_count, party_count: r.party_count });
+      }
+    } catch (_e) { /* leave this slot pending; best effort */ }
+  }
+  if (status === 'complete') {
+    emitEvent(deps, out.id, 'envelope.completed', { status: 'completed', signed_count: lastSignedCount, party_count: partyCount });
+  }
+  return { signedIndices, status, signed_count: lastSignedCount, party_count: partyCount };
 }
 
 // ── GET /v1/envelopes/:id ─────────────────────────────────────────────────────
@@ -387,7 +472,7 @@ async function getEnvelope(deps, id, token, rec) {
   let authorized = false;
   try { authorized = await authorizeReceipt(deps, id, token, rec, env); }
   catch (_) { authorized = false; }
-  const m = meta.get(id) || {};
+  const m = (await resolveStore(deps).getMeta(id)) || {};
   const ext = externalStatus(env);
   const nameFor = (i) => (m.signers && m.signers[i]) ? m.signers[i].name : (env.parties[i] && env.parties[i].label) || null;
   const body = {
@@ -437,18 +522,58 @@ async function getDocument(deps, id, token, rec) {
   catch (_) { authorized = false; }
   if (!authorized) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
   if (env.status !== 'complete') return errRes(res, 409, 'not_ready', 'Envelope is not completed yet.', J);
-  const b = blobs.get(id);
-  if (!b) return errRes(res, 404, 'document_gone', 'Document blob expired or unavailable (ephemeral Model-A store).', J);
-  // STUB: no stamp-worker in this build -> the ORIGINAL (unstamped) PDF is
-  // returned. X-ParaSign-Stamped: false makes that explicit to the caller.
-  const fname = (b.filename || 'document.pdf').replace(/"/g, '');
+  const store = resolveStore(deps);
+  const original = await store.getBlob(id);
+  if (!original) return errRes(res, 404, 'document_gone', 'Document blob expired or unavailable.', J);
+  const m = (await store.getMeta(id)) || {};
+  const fname = (m.original_filename || 'document.pdf').replace(/"/g, '') || 'document.pdf';
+
+  // STAMP-WORKER. Bake a visible signature block + verification info into the
+  // PDF server-side (lib/parasign-stamp.js via pdf-lib). The cryptographic
+  // .psign (GET /receipt) stays the source of truth; this is the human-readable
+  // artifact. The stamped result is cached in the store so repeated downloads
+  // do not re-bake. If stamping is unavailable (pdf-lib missing / malformed
+  // PDF) we fall back to the ORIGINAL bytes and flag X-ParaSign-Stamped: false
+  // so a download is never blocked by the cosmetic layer.
+  let outPdf = null, stamped = false;
+  try {
+    const cached = await store.getStamped(id);
+    if (cached) { outPdf = cached; stamped = true; }
+  } catch (_) { /* ignore cache read errors */ }
+  if (!outPdf && deps.stamp && typeof deps.stamp.stampPdf === 'function') {
+    try {
+      const verifyBase = (deps.publicOrigin || 'https://paramant.app');
+      const baked = await deps.stamp.stampPdf(original, {
+        envelopeId: env.id,
+        docHash: env.doc_hash,
+        parties: (env.parties || []).map(p => ({
+          index: p.index,
+          label: (m.signers && m.signers[p.index] && m.signers[p.index].name) || p.label || null,
+          status: p.status,
+          signed_at: p.signed_at || null,
+        })),
+        completedAt: env.completed_at || null,
+        verifyUrl: verifyBase + '/verify',
+      });
+      if (baked && baked.length) {
+        outPdf = Buffer.from(baked);
+        stamped = true;
+        const ttlMs = (env.expires_at ? (new Date(env.expires_at).getTime() - Date.now()) : 30 * 86400_000);
+        try { await store.putStamped(id, outPdf, ttlMs); } catch (_) { /* cache best-effort */ }
+      }
+    } catch (e) {
+      deps.log && deps.log('warn', 'parasign_stamp_failed', { id, err: e.message });
+    }
+  }
+  if (!outPdf) { outPdf = original; stamped = false; }
+
   res.writeHead(200, {
     'Content-Type': 'application/pdf',
-    'Content-Length': b.pdf.length,
+    'Content-Length': outPdf.length,
     'Content-Disposition': `attachment; filename="${fname}"`,
-    'X-ParaSign-Stamped': 'false',
+    'X-ParaSign-Stamped': stamped ? 'true' : 'false',
   });
-  return res.end(b.pdf);
+  return res.end(outPdf);
 }
 
 // ── GET /v1/envelopes/:id/receipt ─────────────────────────────────────────────
@@ -519,7 +644,7 @@ async function getReceipt(deps, id, token, rec) {
   catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
   psign.notary_signature = notarySig;
 
-  const m = meta.get(id) || {};
+  const m = (await resolveStore(deps).getMeta(id)) || {};
   const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '').replace(/"/g, '');
   res.writeHead(200, {
     'Content-Type': 'application/json',
@@ -543,7 +668,7 @@ async function voidEnvelope(deps, id, token, rec) {
   let env;
   try { env = await envStore.getForReceipt(id); } catch (e) { return errRes(res, 503, 'store_unavailable', e.message, J); }
   if (!env) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
-  if (!isEnvelopeOwner(deps, id, token, rec, env)) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
+  if (!(await isEnvelopeOwner(deps, id, token, rec, env))) return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
   let reason = '';
   try { const d = JSON.parse((await readBody(deps.req, 4096)).toString() || '{}'); reason = (d.reason || '').toString(); } catch (_) {}
   let out;
@@ -552,6 +677,10 @@ async function voidEnvelope(deps, id, token, rec) {
   if (!out.ok && out.code === 'not_found') return errRes(res, 404, 'not_found', 'Unknown envelope.', J);
   if (!out.ok && out.code === 'already_complete') return errRes(res, 409, 'already_complete', 'A completed envelope cannot be voided.', J);
   if (!out.ok) return errRes(res, 409, out.code || 'conflict', 'Void rejected.', J);
+  // A void envelope's document can never be downloaded (status != complete), so
+  // drop the stored PDF + any stamped copy immediately (PII minimisation). The
+  // small meta record is kept (TTL'd) so the webhook can still fire.
+  try { await resolveStore(deps).delBlob(id); } catch (_) { /* best effort */ }
   emitEvent(deps, id, 'envelope.voided', { status: 'void', reason });
   return jsonRes(res, 200, { id, status: 'void', voided_at: out.voided_at }, J);
 }
@@ -560,5 +689,5 @@ module.exports = {
   route, emitEvent, hasParaSignScope, externalStatus,
   grantParaSignScope, setParaSignEnabled,
   authorizeReceipt, hexEqual,   // exposed for tests
-  _blobs: blobs, _meta: meta,   // exposed for tests / diagnostics
+  sandboxAutoSign,              // exposed for tests
 };
