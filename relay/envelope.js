@@ -507,6 +507,10 @@ class EnvelopeStore {
     // Atomic read-modify-write via VOID_LUA: the terminal-state check and the
     // status flip happen in one redis-serialised step, so a sign() completing
     // concurrently cannot be silently overwritten to 'void' (and vice-versa).
+    // The plaintext reason lands ONLY in the access-controlled, TTL'd envelope
+    // record (void_reason is set inside the script). The append-only CT-log is
+    // permanent and public-shaped, so it gets a domain-separated HASH of the
+    // reason plus its length -- never the words themselves.
     await this._loadVoidScript();
     const [code, voidedAt] = await this.redis.evalSha(this._voidScriptSha, {
       keys: [key],
@@ -515,7 +519,15 @@ class EnvelopeStore {
     if (code === 'not_found') return { ok: false, code: 'not_found' };
     if (code === 'already_complete') return { ok: false, code: 'already_complete' };
     if (code === 'idem') return { ok: true, code: 'idem', status: 'void', voided_at: voidedAt || null };
-    try { this.ctAppend('envelope_void', id, { reason: safeReason.slice(0, 80) }); } catch {}
+    try {
+      this.ctAppend('envelope_void', id, safeReason
+        ? {
+            reason_hash: crypto.createHash('sha3-256')
+              .update('paramant/void-reason/v1\x00', 'utf8').update(safeReason, 'utf8').digest('hex'),
+            reason_len: safeReason.length,
+          }
+        : { reason_len: 0 });
+    } catch {}
     return { ok: true, code: 'void', status: 'void', voided_at: voidedAt };
   }
 
