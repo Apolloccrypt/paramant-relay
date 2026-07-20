@@ -52,7 +52,7 @@
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
       '<strong>You\'ve used both signatures this month.</strong>' +
       '<span>Free gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
-      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures per month, then EUR 0.40 each. No cap, no block. Unlimited transfers. API access.</span>' +
+      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures per month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.</span>' +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">Upgrade to Pro</a>' +
         '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>Maybe later</button>' +
@@ -61,14 +61,13 @@
       '</div>';
   }
 
-  // Pro hard cap: signing pauses until the reset; nothing else stops working.
+  // Pro hard cap at 1,000, the Pro ceiling: the upgrade moment. Business includes 1,000.
   function hardCapHtml(data) {
-    var limit = data && isFinite(Number(data.limit)) ? Number(data.limit) : 1000;
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
-      '<strong>You\'ve reached the hard cap of ' + limit + ' signatures this month.</strong>' +
-      '<span>Signing is paused until ' + resetDate(data) + '. Receiving and verification keep working.</span>' +
+      '<strong>You\'ve reached 1,000 signatures this month, the Pro ceiling.</strong>' +
+      '<span>Business gives you 1,000 included at EUR 299/month, which is already cheaper than what you\'re paying in overage.</span>' +
       '<span class="pa-quota-actions">' +
-        '<a class="btn btn-primary" href="/pricing">Compare plans</a>' +
+        '<a class="btn btn-primary" href="/pricing">Upgrade to Business</a>' +
       '</span>' +
       '</div>';
   }
@@ -111,7 +110,7 @@
     var over = Number(quota.overage_count);
     if (included === 100 && isFinite(over) && over >= 1) {
       return '<div class="pa-sign-note" role="status">' +
-        '<span>You\'ve passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice.</span>' +
+        '<span>You\'ve passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 per month.</span>' +
         '<span>Signing more than 600 a month? Business (EUR 299) works out cheaper. <a href="/pricing">Compare plans</a></span>' +
         '</div>';
     }

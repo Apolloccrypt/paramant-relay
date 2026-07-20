@@ -58,7 +58,8 @@ const PARASIGN_COPY = [
   'No card required',
   // PRO - EUR 49/month
   'EUR 49<',
-  '100 signatures per month, then EUR 0.40 each',
+  '100 signatures per month, then EUR 0.40 each, up to 1,000',
+  'Past 1,000 a month, Business is cheaper anyway',
   'Unlimited transfers - API access',
   'Annual: EUR 499 (two months free)',
   // BUSINESS - EUR 299/month
@@ -66,6 +67,7 @@ const PARASIGN_COPY = [
   '1,000 signatures per month',
   'Named support, response within one business day',
   "We help you answer your customers' security questionnaires",
+  'Exportable audit log with CT tree head (CSV or JSON)',
   'Annual: EUR 2,990 (two months free)',
   // ENTERPRISE - Let's talk
   "Let's talk",
@@ -81,6 +83,15 @@ ok('four ParaSign tier cards carry the agreed copy verbatim');
 assert(html.includes('Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.'),
   'missing the security/volume line under the ParaSign cards');
 ok('security/volume line present under the cards');
+
+// The FAQ names the Business exportable audit log, matching the card.
+assert(html.includes('with named support and an exportable audit log'),
+  'FAQ must state the Business exportable audit log');
+ok('FAQ names the Business exportable audit log');
+
+// The false "No cap, no block" claim never appears on the pricing page.
+assert(!/No cap, no block/i.test(html), 'pricing page must not carry the No cap, no block claim');
+ok('no "No cap, no block" claim on the pricing page');
 
 // ParaSend keeps its displayed excl-btw amounts.
 for (const s of ['&euro;15<', 'or &euro;150/yr']) {

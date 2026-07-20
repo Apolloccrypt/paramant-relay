@@ -15,6 +15,9 @@ const sandbox = { window: {}, document: { addEventListener() {} } };
 vm.runInNewContext(src, sandbox);
 const q = sandbox.window.paQuotaUpgrade;
 
+// The false "No cap, no block" claim must be gone from the source entirely.
+assert(!src.includes('No cap, no block'), 'No cap, no block must be gone from quota-upgrade.js');
+
 let passed = 0;
 function ok(name) { passed++; console.log('  ok -', name); }
 
@@ -41,7 +44,7 @@ for (const s of [
   "You've used both signatures this month.",
   'Free gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
   'Pro - EUR 49/month',
-  '100 signatures per month, then EUR 0.40 each. No cap, no block. Unlimited transfers. API access.',
+  '100 signatures per month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.',
   'Upgrade to Pro',
   'Maybe later',
   'Your limit resets on 2026-08-01.',
@@ -64,10 +67,11 @@ ok('reset_date falls back client-side and is never interpolated raw');
 
 // ── Pro hard cap 402 ────────────────────────────────────────────────────────
 const cap = q.html({ error: 'monthly_sign_hard_cap_reached', plan: 'pro', limit: 1000, overage_count: 900, reset_date: '2026-08-01' });
-assert(cap.includes('1000 signatures'), 'hard cap card shows the limit');
-assert(cap.includes('2026-08-01'), 'hard cap card shows the reset date');
-assert(cap.includes('Compare plans') && cap.includes('href="/pricing"'), 'hard cap card links to /pricing');
-ok('pro hard cap renders its own card');
+assert(cap.includes('1,000 signatures this month, the Pro ceiling'), 'hard cap card names the Pro ceiling');
+assert(cap.includes('Business gives you 1,000 included at EUR 299/month, which is already cheaper than what you\'re paying in overage.'), 'hard cap card pitches Business verbatim');
+assert(cap.includes('Upgrade to Business') && cap.includes('href="/pricing"'), 'Upgrade to Business links to /pricing');
+assert(!cap.includes('No cap, no block'), 'the false No cap, no block claim is gone');
+ok('pro hard cap renders the upgrade card verbatim, linking to /pricing');
 
 // ── Old backend: transfers keep the prior notice ────────────────────────────
 const legacy = q.html({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: 'free', limit: 10 });
@@ -84,7 +88,7 @@ ok('free second signature renders the inline notice verbatim');
 
 const over = q.signNotice({ used: 101, included: 100, overage_count: 1, overage_rate_eur: 0.4, hard_cap: 1000, reset_date: '2026-08-01' });
 for (const s of [
-  "You've passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice.",
+  "You've passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 per month.",
   'Signing more than 600 a month? Business (EUR 299) works out cheaper.',
   'Compare plans',
 ]) {
