@@ -99,6 +99,7 @@ const parasignStoreMod = require('./lib/parasign-store');    // durable encrypte
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
 const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
 const userHistory      = require('./lib/user-history');      // GET /v2/user/history (Pro+)
+const usagePurpose     = require('./lib/usage-purpose');     // POST /v2/user/usage-purpose (internal)
 const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/parasign/audit-export (Business+)
 const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
 
@@ -2678,6 +2679,28 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /v2/user/usage-purpose: store the one-time dashboard survey answer
+  // ("What do you use Paramant for?") on the account key record. Internal,
+  // X-Internal-Auth only: the admin server proxies the authenticated user
+  // session through this (same trust model as the TOTP endpoints above).
+  // A second call overwrites (last answer wins; see lib/usage-purpose.js).
+  if (req.method === "POST" && path === "/v2/user/usage-purpose") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { user_id, purpose } = JSON.parse((await readBody(req, 4096)).toString());
+      const out = usagePurpose.setUsagePurpose({ apiKeys, mutateUsersJson: _mutateUsersJson }, user_id, purpose);
+      if (out.status === 200) {
+        const _acct = (apiKeys.get(user_id) || {}).account_id || user_id;
+        log('info', 'usage_purpose_set', { account: String(_acct).slice(0, 12), purpose });
+      }
+      res.writeHead(out.status, { "Content-Type": "application/json" });
+      return res.end(J(out.body));
+    } catch (err) {
+      console.error("[user/usage-purpose]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // Account-bound signing identity (ML-DSA-65 public-key enrollment)
   // ═══════════════════════════════════════════════════════════════════════
@@ -4851,7 +4874,8 @@ const server = http.createServer(async (req, res) => {
     const reveal = query.reveal === '1' || query.reveal === 'true';
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
       key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
-      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null /*MARK:parasign_list*/
+      kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
+      usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4874,7 +4898,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
       account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
-      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null }));/*MARK:parasign_reveal*/
+      active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
+      usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null }));/*MARK:parasign_reveal*/
   }
 
   // ── GET /v2/admin/usage[/:account_id] — Phase 4 read-only observation ────

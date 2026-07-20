@@ -122,6 +122,21 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-modal-dismiss { margin-top: var(--space-2); background: transparent; border: none; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; padding: 8px 10px; border-radius: 8px; }
 .dh-modal-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
 
+/* One-time usage-purpose question (hidden once answered or skipped) */
+.dh-purpose { border: 1px solid rgba(11,58,106,0.10); border-radius: 16px; background: var(--bone); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.03); }
+.dh-purpose-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
+.dh-purpose h2 { font-family: var(--sans); font-size: 18px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 2px; }
+.dh-purpose-sub { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 var(--space-3); }
+.dh-purpose-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-2); }
+.dh-purpose-opt { text-align: left; cursor: pointer; font: inherit; padding: var(--space-3) var(--space-4); border-radius: 14px; border: 1px solid rgba(11,58,106,0.10); background: var(--bone); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.dh-purpose-opt:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--lime); box-shadow: 0 4px 14px rgba(11,58,106,0.08); }
+.dh-purpose-opt:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.dh-purpose-opt:disabled { opacity: .55; cursor: default; }
+.dh-purpose-opt strong { display: block; font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.dh-purpose-opt span { display: block; font-family: var(--sans); font-size: 12px; line-height: 1.45; color: var(--ink-dim); }
+.dh-purpose-foot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+.dh-purpose-note { font-family: var(--sans); font-size: 12px; color: #B91C1C; }
+
 /* Operations -- read-only live cards (keys, usage, activity) */
 .dh-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
 .dh-ops-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: 14px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.03); }
@@ -342,6 +357,25 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       <button class="dh-onb-dismiss" type="button" data-pa-action="dismiss-onboarding" aria-label="Dismiss this tip">Got it</button>
     </aside>
 
+    <!-- One-time question: shown by dashboard.js only while /api/user/me returns
+         usage_purpose: null. Answering or skipping posts to
+         /api/user/usage-purpose and hides it for good (server-side, per account). -->
+    <aside class="dh-purpose" id="dh-purpose" aria-label="One quick question" hidden>
+      <span class="dh-purpose-kicker">One quick question</span>
+      <h2>What do you use Paramant for?</h2>
+      <p class="dh-purpose-sub">One tap, asked once. It helps us build the right things first.</p>
+      <div class="dh-purpose-opts">
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="personal"><strong>Personal use</strong><span>My own files and documents.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="organisation"><strong>For my organisation</strong><span>My company, practice or team.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="client_management"><strong>I manage this for clients</strong><span>IT service provider / MSP.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="research_journalism"><strong>Research or journalism</strong><span>Sources, evidence, publications.</span></button>
+      </div>
+      <div class="dh-purpose-foot">
+        <button type="button" class="dh-modal-dismiss" data-pa-purpose="skipped">Skip</button>
+        <span class="dh-purpose-note" id="dh-purpose-note" hidden></span>
+      </div>
+    </aside>
+
     <section class="dh-flagship" aria-label="Primary actions">
       <a class="dh-flag-card" href="/parashare" aria-label="Send a file via ParaShare">
         <span class="dh-flag-icon" aria-hidden="true">&rarr;</span>
@@ -510,7 +544,7 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script src="/js/dashboard.js?v=1" defer></script>
+<script src="/js/dashboard.js?v=2" defer></script>
 <script src="/js/dashboard-history.js?v=1" defer></script>
 </body>
 </html>

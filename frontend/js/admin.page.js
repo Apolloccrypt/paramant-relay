@@ -171,7 +171,7 @@ function filterUsers(){
   const totp=document.getElementById('u-totp').value;
   const status=document.getElementById('u-status').value;
   let filtered=allUsers;
-  if(q)filtered=filtered.filter(u=>(u.email||'').toLowerCase().includes(q)||(u.label||'').toLowerCase().includes(q));
+  if(q)filtered=filtered.filter(u=>(u.email||'').toLowerCase().includes(q)||(u.label||'').toLowerCase().includes(q)||(u.usage_purpose||'').toLowerCase().includes(q));
   if(plan)filtered=filtered.filter(u=>(u.plan||'community')===plan);
   if(totp)filtered=filtered.filter(u=>u.totp_status===totp);
   if(status==='active')filtered=filtered.filter(u=>u.active);
@@ -179,6 +179,14 @@ function filterUsers(){
   document.getElementById('u-table-wrap').innerHTML=usersTable(filtered);
 }
 
+// Usage-purpose survey answer (dashboard question). 'organisation' and
+// 'client_management' are the sales-relevant ones, so they get the accent.
+const PURPOSE_LABELS={personal:'Personal use',organisation:'Organisation',client_management:'Manages for clients',research_journalism:'Research/journalism',skipped:'Skipped'};
+function purposeLine(u){
+  if(!u.usage_purpose)return '';
+  const hot=u.usage_purpose==='organisation'||u.usage_purpose==='client_management';
+  return '<div class="mono" style="font-size:11px;color:'+(hot?'#0B3A6A;font-weight:600':'#475569')+'" title="Usage purpose ('+esc(u.usage_purpose_at?u.usage_purpose_at.split('T')[0]:'')+')">use: '+esc(PURPOSE_LABELS[u.usage_purpose]||u.usage_purpose)+'</div>';
+}
 function usersTable(users){
   if(!users.length)return '<div class="empty">No users match filters</div>';
   return '<table class="tbl" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
@@ -187,7 +195,7 @@ function usersTable(users){
       const hasE=!!u.email,hasTotp=hasE&&u.totp_status!=='none',isRevoked=!u.active;
       return '<tr>'+
         '<td><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
-        '</td>'+
+        purposeLine(u)+'</td>'+
         '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
         '<td>'+totpBadge(u)+'</td>'+
         '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+

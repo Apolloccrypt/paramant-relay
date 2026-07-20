@@ -61,6 +61,8 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       created, totp_status,
       totp_required: meta.totp_required === true,
       totp_required_at: meta.totp_required_at || null,
+      usage_purpose: k.usage_purpose || null,
+      usage_purpose_at: k.usage_purpose_at || null,
     };
   }));
   return users.filter(Boolean);

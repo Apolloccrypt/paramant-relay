@@ -1790,10 +1790,31 @@ api.get("/user/me", authUser, async (req, res) => {
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
       session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      // One-time dashboard survey: null while unanswered -> the dashboard
+      // shows the usage-purpose question; any stored value hides it forever.
+      usage_purpose: user?.usage_purpose ?? null,
     });
   } catch (err) {
     console.error("[user/me]", err.message);
     res.status(503).json({ error: "user_data_unavailable" });
+  }
+});
+
+// POST /api/user/usage-purpose: one-time dashboard survey ("What do you use
+// Paramant for?"). Same authUser cookie middleware as /api/user/me; forwarded
+// to the relay's internal /v2/user/usage-purpose which stores purpose +
+// timestamp on the account key record. A second call overwrites (last answer
+// wins; the dashboard only asks while the field is empty).
+api.post("/user/usage-purpose", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const purpose = req.body && typeof req.body.purpose === "string" ? req.body.purpose : "";
+  try {
+    const r = await callRelay("/v2/user/usage-purpose", { user_id, purpose });
+    const body = await r.json().catch(() => ({}));
+    return res.status(r.status).json(body);
+  } catch (e) {
+    console.error("[user/usage-purpose]", e.message);
+    return res.status(502).json({ error: "relay_unreachable" });
   }
 });
 

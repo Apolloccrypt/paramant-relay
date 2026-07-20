@@ -97,6 +97,7 @@
     }
 
     applyOnboardingState();
+    initPurposeCard(data);
 
     hide(loading);
     hide(errBox);
@@ -131,6 +132,41 @@
         if (hint) hint.hidden = true;
         try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
       }
+    });
+  }
+
+  // One-time usage-purpose question. Server-driven: /api/user/me returns
+  // usage_purpose (null while unanswered). Answering or skipping posts to
+  // /api/user/usage-purpose; the server stores it on the account, so the card
+  // never returns on any device. On a failed save the card stays and the
+  // buttons re-enable (never lose the answer silently).
+  function initPurposeCard(data) {
+    var card = document.getElementById('dh-purpose');
+    if (!card) return;
+    if (data.usage_purpose) { card.hidden = true; return; }
+    card.hidden = false;
+    if (card._wired) return;
+    card._wired = 1;
+    card.addEventListener('click', function (ev) {
+      var t = ev.target.closest && ev.target.closest('[data-pa-purpose]');
+      if (!t) return;
+      var purpose = t.getAttribute('data-pa-purpose');
+      var btns = card.querySelectorAll('[data-pa-purpose]');
+      var i;
+      for (i = 0; i < btns.length; i++) btns[i].disabled = true;
+      fetch('/api/user/usage-purpose', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ purpose: purpose })
+      }).then(function (r) {
+        if (!r.ok) throw new Error('http_' + r.status);
+        card.hidden = true;
+      }).catch(function () {
+        for (i = 0; i < btns.length; i++) btns[i].disabled = false;
+        var note = document.getElementById('dh-purpose-note');
+        if (note) { note.hidden = false; note.textContent = 'Could not save right now. Try again, or skip.'; }
+      });
     });
   }
 

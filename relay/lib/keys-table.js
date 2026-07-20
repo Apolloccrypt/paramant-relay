@@ -68,7 +68,11 @@ function parseAccountFields(rawKey) {
   // WITHOUT downgrading, so an un-migrated key still gets correct entitlements.
   const plan_parasend = rawKey.plan_parasend || entitlements.derivePlanParasend(rawKey.plan);
   const plan_parasign = rawKey.plan_parasign || entitlements.derivePlanParasign(rawKey.plan, parasign);
-  return { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign };
+  // Usage-purpose survey answer (growth): rehydrated so it survives a
+  // users.json reload. null (not undefined) keeps the admin JSON shape stable.
+  const usage_purpose = typeof rawKey.usage_purpose === 'string' ? rawKey.usage_purpose : null;
+  const usage_purpose_at = rawKey.usage_purpose_at || null;
+  return { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign, usage_purpose, usage_purpose_at };
 }
 
 // Pick a kid not already present in `taken` (anything with a .has(kid) method:
