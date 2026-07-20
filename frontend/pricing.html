@@ -40,8 +40,19 @@
 .faq-a{font-size:var(--text-base);color:var(--ink);line-height:1.75}
 .faq-a a{color:var(--cobalt)}
 .trial-cta{border:1px solid var(--ink-hair);padding:var(--space-7);display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-8)}
+.tier-grid.tier-grid-4{grid-template-columns:repeat(4,1fr)}
+.tier-grid.tier-grid-4 .tier-card{min-height:380px}
+@media(max-width:1279px){
+  .tier-grid.tier-grid-4{grid-template-columns:repeat(2,1fr)}
+}
 @media(max-width:1023px){
   .tier-grid{grid-template-columns:1fr}
+}
+@media(max-width:1023px) and (min-width:768px){
+  .tier-grid.tier-grid-4{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:767px){
+  .tier-grid.tier-grid-4{grid-template-columns:1fr}
 }
 @media(max-width:640px){
   .trial-cta{flex-direction:column;align-items:flex-start}
@@ -315,7 +326,6 @@
         <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For one-off browser-encrypted sends. No tracking.</p>
         <ul class="tier-features">
           <li>AES-256-GCM, browser-generated key</li>
-          <li>5 MB per file</li>
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
           <li>10 uploads per hour per IP</li>
@@ -359,7 +369,7 @@
           <li>Up to 100 reads per link</li>
           <li>Unlimited registered devices</li>
           <li>Dedicated relay on our infra or yours</li>
-          <li>Configurable file size limits per tenant (default 5 MB, tested up to 50 MB on dedicated deployments)</li>
+          <li>Configurable limits per tenant</li>
           <li>IEC 62443 / NIS2 / NEN 7510 documentation</li>
           <li>Signed Data Processing Agreement (GDPR Art. 28)</li>
           <li>SLA 99.9%, priority incident response</li>
@@ -369,6 +379,7 @@
       </div>
 
     </div>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;18.15/mo or &euro;181.50/yr.</p>
   </div>
 </section>
 
@@ -382,61 +393,66 @@
         Document signing on the same post-quantum core, priced separately from ParaSend. New: a <strong>developer API</strong> (from Pro) with its own <a href="/docs#parasign" style="color:var(--cobalt)">documentation</a> and webhooks, so you can plug signing straight into your own apps and quotes.
       </p>
     </div>
-    <div class="tier-grid">
+    <div class="tier-grid tier-grid-4">
 
       <div class="tier-card">
         <div class="tier-name">Free</div>
-        <div class="tier-price">&euro;0</div>
-        <div class="tier-price-note">Forever &middot; no card required</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For occasional post-quantum signing.</p>
+        <div class="tier-price">EUR 0</div>
+        <div class="tier-price-note">Forever</div>
         <ul class="tier-features">
           <li>2 signatures per month</li>
-          <li>SES (simple electronic signature)</li>
-          <li>Client-side encryption</li>
-          <li>ML-DSA-65 (FIPS 204)</li>
-          <li>Public CT-log verification</li>
+          <li>Unlimited receiving</li>
+          <li>Full post-quantum crypto - Public verification log</li>
+          <li>No card required</li>
         </ul>
-        <a href="/dashboard" class="btn btn-primary" style="display:block;text-align:center">Open your dashboard &rarr;</a>
+        <a href="/dashboard" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Open your dashboard &rarr;</a>
       </div>
 
       <div class="tier-card featured">
         <div class="tier-name">Pro</div>
-        <div class="tier-price">&euro;49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
-        <div class="tier-price-note">or &euro;499/yr &middot; excl. btw</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For professionals who sign regularly.</p>
+        <div class="tier-price">EUR 49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
+        <div class="tier-price-note">excl. btw</div>
         <ul class="tier-features">
-          <li>~100 signatures per month</li>
-          <li>SES + AES (advanced e-signature)</li>
-          <li>API access &amp; docs</li>
-          <li>Webhooks</li>
-          <li>Send history</li>
-          <li>Email support</li>
+          <li>100 signatures per month, then EUR 0.40 each</li>
+          <li>Unlimited transfers - API access</li>
+          <li>Annual: EUR 499 (two months free)</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSign Pro &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto;margin-bottom:8px">Get ParaSign Pro &rarr;</a>
         <a href="https://payment-links.mollie.com/payment/iYKTBMtf9WeWZMc3HSTWj" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;499/yr &rarr;</a>
       </div>
 
       <div class="tier-card">
         <div class="tier-name">Business</div>
-        <div class="tier-price">&euro;299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
+        <div class="tier-price">EUR 299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
         <div class="tier-price-note">excl. btw</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For teams with volume and compliance needs.</p>
         <ul class="tier-features">
-          <li>Everything in Pro</li>
-          <li>~1,000 signatures per month</li>
-          <li>Audit export</li>
-          <li>Priority support</li>
+          <li>1,000 signatures per month</li>
+          <li>Named support, response within one business day</li>
+          <li>We help you answer your customers' security questionnaires</li>
+          <li>Annual: EUR 2,990 (two months free)</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSign Business &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto;margin-bottom:8px">Get ParaSign Business &rarr;</a>
         <a href="https://payment-links.mollie.com/payment/Npj56fkDJ8npWprUYnXBN" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;2,990/yr &rarr;</a>
+      </div>
+
+      <div class="tier-card">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price">Let's talk</div>
+        <div class="tier-price-note">Per organisation</div>
+        <ul class="tier-features">
+          <li>Dedicated relay instance - Sector relay (health, legal, finance)</li>
+          <li>SLA with service credits - Self-hosting licence - Audit support</li>
+        </ul>
+        <a href="mailto:privacy@paramant.app?subject=ParaSign+Enterprise" class="btn btn-secondary" style="display:block;text-align:center;margin-top:auto">Contact &rarr;</a>
       </div>
 
     </div>
     <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
-        <strong>Enterprise from &euro;1,499/mo</strong> · unlimited signatures, dedicated relay, SLA. QES coming via an EU QTSP partner. <a href="mailto:privacy@paramant.app?subject=ParaSign+Enterprise" style="color:var(--cobalt)">Contact us</a>.
+        Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.
       </p>
     </div>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;59.29/mo or &euro;603.79/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
   </div>
 </section>
 
@@ -446,7 +462,7 @@
 
     <div class="prose-section">
       <h3>Limits</h3>
-      <p>Every tier stores transfers in RAM with a 5 MB default per file. What differs by tier is how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure the 5 MB default upward within the RAM budget of their deployment.</p>
+      <p>Every tier stores transfers in RAM. What differs by tier is how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure limits within the RAM budget of their deployment.</p>
     </div>
 
     <div class="prose-section">
@@ -462,6 +478,11 @@
     <div class="prose-section">
       <h3>Support</h3>
       <p>Free tier is self-service via public documentation and the CT log. Pro tier includes email support with published response targets. Enterprise customers get a named contact, a 99.9% SLA, priority incident handling, and deployment assistance for air-gapped and regulated environments.</p>
+    </div>
+
+    <div class="prose-section">
+      <h3>Roadmap</h3>
+      <p>Coming to paid plans: multiple users per account, and sending from your own domain. Tell us what you need first: <a href="mailto:privacy@paramant.app?subject=Roadmap" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
     </div>
 
   </div>
@@ -491,12 +512,6 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Why is the file size limited to 5 MB?</p>
-      <div class="faq-a">RAM-only storage is finite. 5 MB covers every document that matters: contracts, medical referrals, legal filings, sensor payloads, firmware chunks. The limit is a consequence of the architecture, not an upsell gate. Enterprise customers with dedicated relays can configure higher limits.</div>
-    </div>
-
-
-    <div class="faq-item">
       <p class="faq-q">Can I self-host Paramant for free?</p>
       <div class="faq-a">Yes. The relay is available on <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> under BUSL-1.1. Community self-hosting is free forever. The license prevents competitors from reselling the relay as a managed service without a commercial license. See the <a href="/license">license page</a> for full terms.</div>
     </div>
@@ -508,7 +523,7 @@
 
     <div class="faq-item">
       <p class="faq-q">How does ParaSign pricing work?</p>
-      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Free covers 2 signatures a month with SES; Pro (&euro;49/mo or &euro;499/yr) raises this to ~100 with SES + AES, API access, webhooks and email support; Business (&euro;299/mo) adds audit export and ~1,000 signatures. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. Signatures are advanced (AES), not qualified (QES). QES is coming via an EU QTSP partner.</div>
+      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Free covers 2 signatures a month; Pro (&euro;49/mo or &euro;499/yr) includes 100 a month, then &euro;0.40 each, with API access; Business (&euro;299/mo) includes 1,000 a month with named support. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. Signatures are advanced (AES), not qualified (QES). QES is coming via an EU QTSP partner.</div>
     </div>
 
     <div class="faq-item">
