@@ -23,7 +23,7 @@ ENV LIBCLANG_PATH=/usr/lib
 # (also-musl) node:22-alpine runtime.
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
-ARG PARAMANT_CORE_COMMIT=dc454d47880ab54e6f1483433580abab894b854e
+ARG PARAMANT_CORE_COMMIT=45a3d3521adda7924692d58be5db60d5b094371f
 WORKDIR /build
 RUN git clone https://github.com/Apolloccrypt/paramant-core.git \
  && cd paramant-core && git checkout "${PARAMANT_CORE_COMMIT}" \
