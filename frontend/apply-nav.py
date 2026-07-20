@@ -119,6 +119,7 @@ NEW_FOOTER = '''\
           <a href="/privacy">Privacy Policy</a>
           <a href="/dpa">Data Processing Agreement</a>
           <a href="/partners">Partners</a>
+          <a href="/about">About Paramant</a>
           <a href="mailto:privacy@paramant.app">Contact</a>
           <a href="/signup">Create account</a>
           <a href="/auth/login">Sign in</a>
