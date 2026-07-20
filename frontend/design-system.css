@@ -3011,3 +3011,30 @@ a.skip-link:focus-visible,
 }
 .pa-quota-upsell .btn { margin-top: 4px; }
 
+
+/* Actions row inside the quota upgrade card (Upgrade to Pro / Maybe later),
+   rendered by js/quota-upgrade.js on the sign 402. */
+.pa-quota-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* ── Inline sign-quota notice ─────────────────────────────────────────────────
+   Rendered by js/quota-upgrade.js signNotice() after a successful sign:
+   free second signature, pro overage. Informational, not an error. */
+.pa-sign-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 10px 14px;
+  max-width: 560px;
+  border: 1px solid rgba(11, 58, 106, 0.14);
+  border-left: 3px solid var(--lime, #B2FF3F);
+  background: var(--bone, #FAF7F0);
+  text-align: left;
+}
+.pa-sign-note span {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink, #0B1622);
+}
+.pa-sign-note a { color: var(--cobalt, #1D4ED8); }
