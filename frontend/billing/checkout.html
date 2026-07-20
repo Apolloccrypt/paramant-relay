@@ -5,83 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Checkout — Paramant</title>
 <meta name="robots" content="noindex, nofollow">
+<meta http-equiv="refresh" content="0;url=/pricing">
+<link rel="canonical" href="https://paramant.app/pricing">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
 <style>
   body { background: var(--bone); }
-  .checkout-wrap { max-width: 480px; margin: var(--space-10) auto; padding: 0 var(--space-5); }
-  .checkout-header { margin-bottom: var(--space-7); }
-  .checkout-header a { font-family: var(--mono); font-size: var(--text-xs); color: var(--cobalt); text-decoration: none; letter-spacing: .1em; text-transform: uppercase; }
-  .checkout-card { background: #fff; border: 1.5px solid var(--ink-hair); padding: var(--space-7); }
-  .checkout-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--ink-hair); }
-  .checkout-row:last-of-type { border-bottom: none; }
-  .checkout-label { font-size: var(--text-sm); color: var(--ink-dim); }
-  .checkout-val { font-weight: 700; color: var(--navy); }
-  .checkout-total { font-size: var(--text-lg); color: var(--cobalt); font-weight: 800; }
-  .checkout-actions { display: flex; gap: var(--space-3); margin-top: var(--space-6); }
-  .checkout-actions .btn { flex: 1; text-align: center; }
-  #state-loading { text-align: center; padding: var(--space-8); color: var(--ink-dim); }
-  #state-error { display: none; }
-  #state-checkout { display: none; }
-  .plan-badge { display: inline-block; background: var(--cobalt); color: #fff; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; padding: 3px 8px; }
+  .checkout-wrap { max-width: 480px; margin: var(--space-10) auto; padding: 0 var(--space-5); text-align: center; }
+  .checkout-wrap h1 { font-size: var(--text-xl); margin-bottom: var(--space-4); }
+  .checkout-wrap p { font-size: var(--text-base); color: var(--ink-dim); line-height: 1.7; margin-bottom: var(--space-6); }
 </style>
 </head>
 <body>
 
 <div class="checkout-wrap">
-  <div class="checkout-header">
-    <a href="/pricing">&larr; Back to pricing</a>
-    <h1 style="margin-top:var(--space-4);font-size:var(--text-xl)">Confirm upgrade</h1>
-  </div>
-
-  <div id="state-loading">Loading checkout…</div>
-
-  <div id="state-error" class="stub-banner" style="display:none">
-    <strong>Checkout not found.</strong> This link may have expired (links last 1 hour).
-    <a href="/pricing" style="display:block;margin-top:8px">Return to pricing</a>
-  </div>
-
-  <div id="state-checkout">
-    <div class="stub-banner" style="margin-bottom:var(--space-5)">
-      <strong>⚠ STUB CHECKOUT — no real payment processed.</strong>
-      <br>This is a placeholder. When Mollie is integrated this screen redirects to Mollie&rsquo;s hosted payment page. Clicking Confirm activates the plan immediately with no charge.
-    </div>
-
-    <div class="checkout-card">
-      <div style="margin-bottom:var(--space-5)">
-        <span class="plan-badge" id="plan-badge">Pro</span>
-      </div>
-      <div class="checkout-row">
-        <span class="checkout-label">Plan</span>
-        <span class="checkout-val" id="plan-name">—</span>
-      </div>
-      <div class="checkout-row">
-        <span class="checkout-label">Billing period</span>
-        <span class="checkout-val" id="plan-period">—</span>
-      </div>
-      <div class="checkout-row">
-        <span class="checkout-label">Account</span>
-        <span class="checkout-val" id="plan-email" style="font-family:var(--mono);font-size:var(--text-sm)">—</span>
-      </div>
-      <div class="checkout-row">
-        <span class="checkout-label">Total</span>
-        <span class="checkout-total" id="plan-amount">€0</span>
-      </div>
-    </div>
-
-    <p style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.6">
-      After confirming: your plan activates immediately, a confirmation email is sent, and your API key is upgraded. Cancel any time from your account page.
-    </p>
-
-    <div class="checkout-actions">
-      <a href="/pricing" class="btn btn-secondary">Cancel</a>
-      <button id="confirm-btn" class="btn btn-primary">Confirm upgrade</button>
-    </div>
-    <div id="confirm-error" style="color:#dc2626;font-size:var(--text-sm);margin-top:var(--space-3);display:none"></div>
-  </div>
+  <h1>Redirecting to pricing</h1>
+  <p>Checkout has moved. You are being sent to the pricing page.</p>
+  <a href="/pricing" class="btn btn-primary">Go to pricing &rarr;</a>
 </div>
 
-<script src="/js/billing-checkout.js?v=1"></script>
 </body>
 </html>

@@ -25,6 +25,9 @@
 .tier-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin-bottom:var(--space-4)}
 .tier-price{font-family:var(--mono);font-size:var(--text-3xl);font-weight:700;color:var(--navy);margin-bottom:var(--space-2)}
 .tier-price-note{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-6)}
+.tier-price-note .incl{color:var(--navy);font-weight:700}
+.yearly-alt{display:inline-block;margin-top:var(--space-2);font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.04em;color:var(--cobalt);text-decoration:underline;text-underline-offset:3px}
+.yearly-alt:hover{color:var(--navy)}
 .tier-features{list-style:none;margin-bottom:var(--space-6)}
 .tier-features li{font-family:var(--mono);font-size:var(--text-sm);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid var(--ink-hair);line-height:1.5}
 .tier-features li:last-child{border-bottom:none}
@@ -337,7 +340,7 @@
       <div class="tier-card featured">
         <div class="tier-name">Pro</div>
         <div class="tier-price">&euro;15<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
-        <div class="tier-price-note">or &euro;150/yr &middot; excl. btw</div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">&euro;18,15/mo incl. 21%</span><br>&euro;15/mo or &euro;150/yr excl.</div>
         <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
         <ul class="tier-features">
           <li>Everything in Free</li>
@@ -353,9 +356,8 @@
      ParaSend Pro   monthly 18.15 zvsE7pxE5kLaYxC8j4rDH | yearly 181.50 drRnrb7hky6bjkvea5ipk
      ParaSign Pro   monthly 59.29 tY9CRhMfcJSi4s9nU3s6D | yearly 603.79 iYKTBMtf9WeWZMc3HSTWj
      ParaSign Bus.  monthly 361.79 L9iVQXjtxwjrF9M8qdGYm | yearly 3617.90 Npj56fkDJ8npWprUYnXBN -->
-        <a href="https://payment-links.mollie.com/payment/zvsE7pxE5kLaYxC8j4rDH" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSend Pro &rarr;</a>
-        <a href="https://payment-links.mollie.com/payment/drRnrb7hky6bjkvea5ipk" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;150/yr &rarr;</a>
-        <div id="pricing-error" style="display:none;padding:10px 14px;background:#FEF2F2;border-left:3px solid #DC2626;color:#991B1B;margin:12px 0;font-size:13px" role="alert" aria-live="polite"></div>
+        <a href="https://payment-links.mollie.com/payment/zvsE7pxE5kLaYxC8j4rDH" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get ParaSend Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;18,15/mo incl.</span></a>
+        <div style="text-align:center"><a href="https://payment-links.mollie.com/payment/drRnrb7hky6bjkvea5ipk" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;181,50/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -411,21 +413,21 @@
       <div class="tier-card featured">
         <div class="tier-name">Pro</div>
         <div class="tier-price">EUR 49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw</div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">EUR 59,29/mo incl. 21%</span></div>
         <ul class="tier-features">
           <li>100 signatures per month, then EUR 0.40 each, up to 1,000</li>
           <li>Past 1,000 a month, Business is cheaper anyway</li>
           <li>Unlimited transfers - API access</li>
           <li>Annual: EUR 499 (two months free)</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto;margin-bottom:8px">Get ParaSign Pro &rarr;</a>
-        <a href="https://payment-links.mollie.com/payment/iYKTBMtf9WeWZMc3HSTWj" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;499/yr &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Pro &rarr; <span style="font-weight:400;opacity:.85">EUR 59,29/mo incl.</span></a>
+        <div style="text-align:center"><a href="https://payment-links.mollie.com/payment/iYKTBMtf9WeWZMc3HSTWj" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 603,79/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
         <div class="tier-name">Business</div>
         <div class="tier-price">EUR 299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw</div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">EUR 361,79/mo incl. 21%</span></div>
         <ul class="tier-features">
           <li>1,000 signatures per month</li>
           <li>Named support, response within one business day</li>
@@ -433,8 +435,8 @@
           <li>Exportable audit log with CT tree head (CSV or JSON)</li>
           <li>Annual: EUR 2,990 (two months free)</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto;margin-bottom:8px">Get ParaSign Business &rarr;</a>
-        <a href="https://payment-links.mollie.com/payment/Npj56fkDJ8npWprUYnXBN" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;2,990/yr &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">EUR 361,79/mo incl.</span></a>
+        <div style="text-align:center"><a href="https://payment-links.mollie.com/payment/Npj56fkDJ8npWprUYnXBN" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 3.617,90/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -604,7 +606,6 @@
 
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script src="/js/pricing.inline1.js?v=1"></script>
 <script src="/js/pricing-billing.js?v=1" defer></script>
 </body>
 </html>

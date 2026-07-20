@@ -1,10 +1,13 @@
 'use strict';
 // The pricing page shows the four ParaSign tiers (Free / Pro / Business /
-// Enterprise) with the agreed copy, keeps all six paid checkout buttons wired
+// Enterprise) with the agreed copy, keeps all six paid checkout links wired
 // for the API-first billing flow (data-billing-* attributes resolvable in the
 // server catalog, static Mollie link as fallback), states that checkout
-// charges incl. 21% btw, and no longer claims a 5 MB file limit.
-// Run: node relay/test/pricing-page.test.js (exits non-zero on failure).
+// charges incl. 21% btw, shows the incl-btw amount up-front on every paid card,
+// keeps one primary monthly CTA per tier with the yearly option demoted to a
+// secondary link, and no longer claims a 5 MB file limit. It also checks the
+// dead billing/checkout.html stub now redirects to /pricing with no "no charge"
+// copy. Run: node relay/test/pricing-page.test.js (exits non-zero on failure).
 
 const assert = require('assert');
 const fs = require('fs');
@@ -107,5 +110,30 @@ ok('page states excl. btw and that checkout charges incl. 21% btw');
 // The outdated 5 MB file-limit claim is gone.
 assert(!/5\s?MB/i.test(html), 'pricing page still claims a 5 MB limit');
 ok('no 5 MB claim left on the pricing page');
+
+// Every paid card shows the incl-btw amount up-front, next to the excl price,
+// so the amount on Mollie's page does not surprise the buyer.
+const INCL_ONCARD = ['&euro;18,15/mo incl', 'EUR 59,29/mo incl', 'EUR 361,79/mo incl'];
+for (const s of INCL_ONCARD) {
+  assert(html.includes(s), 'paid card must show its btw-incl amount up-front: ' + s);
+}
+ok('every paid card shows the incl-btw amount next to the excl price');
+
+// One primary monthly CTA per paid tier; the yearly variant is a secondary link,
+// not an equal button. All six data-billing-* links stay wired for pricing-billing.js.
+const monthlyPrimary = (html.match(/data-billing-interval="monthly"\s+class="btn btn-primary/g) || []).length;
+assert.strictEqual(monthlyPrimary, 3, 'expected 3 primary monthly CTAs, got ' + monthlyPrimary);
+const yearlyAlts = (html.match(/data-billing-interval="yearly"\s+class="yearly-alt"/g) || []).length;
+assert.strictEqual(yearlyAlts, 3, 'expected 3 yearly options demoted to secondary links, got ' + yearlyAlts);
+assert(!/data-billing-interval="yearly"\s+class="btn/.test(html), 'no yearly variant may still be an equal btn');
+ok('one primary monthly CTA per tier, yearly demoted to a secondary link');
+
+// The dead stub checkout page no longer serves the "no charge" lie; it redirects.
+const checkoutHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'billing', 'checkout.html'), 'utf8');
+assert(!/no charge/i.test(checkoutHtml), 'checkout.html must not claim "no charge"');
+assert(!/activates immediately/i.test(checkoutHtml), 'checkout.html must not claim "activates immediately"');
+assert(!/stub checkout/i.test(checkoutHtml), 'checkout.html must not carry the STUB CHECKOUT banner');
+assert(/<meta[^>]+http-equiv="refresh"[^>]+url=\/pricing/i.test(checkoutHtml), 'checkout.html must redirect to /pricing');
+ok('billing/checkout.html redirects to /pricing with no stub-payment copy');
 
 console.log('pricing-page: ' + passed + ' checks passed');
