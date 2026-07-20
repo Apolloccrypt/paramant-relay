@@ -156,10 +156,10 @@ function renderUsers(el,users,counts){
       '<span class="pag-info">Page '+pg.page+' of '+pg.total_pages+' ('+pg.total_items+' users)</span>'+
       '<button data-click="usersPage" data-page="'+(pg.page+1)+'" '+(pg.has_next?'':'disabled')+' aria-label="Next page">Next &#8594;</button>'+
       '<select aria-label="Rows per page" data-change="usersPageSize">'+
-        '<option value="25" '+(pg.page_size==25?'selected':'')+'>25/page</option>'+
-        '<option value="50" '+(pg.page_size==50?'selected':'')+'>50/page</option>'+
-        '<option value="100" '+(pg.page_size==100?'selected':'')+'>100/page</option>'+
-        '<option value="200" '+(pg.page_size==200?'selected':'')+'>200/page</option>'+
+        '<option value="25" '+(pg.page_size===25?'selected':'')+'>25/page</option>'+
+        '<option value="50" '+(pg.page_size===50?'selected':'')+'>50/page</option>'+
+        '<option value="100" '+(pg.page_size===100?'selected':'')+'>100/page</option>'+
+        '<option value="200" '+(pg.page_size===200?'selected':'')+'>200/page</option>'+
       '</select>'+
     '</div>'+
     '</div>';

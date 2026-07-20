@@ -3,9 +3,11 @@
   "version": "3.0.0",
   "private": true,
   "scripts": {
-    "build": "bash build.sh"
+    "build": "bash build.sh",
+    "lint": "eslint 'relay/*.js' 'relay/lib/**/*.js' 'relay/lib/**/*.mjs' 'admin/*.js' 'admin/lib/**/*.js' 'frontend/js/**/*.js'"
   },
   "devDependencies": {
+    "eslint": "^10.7.0",
     "javascript-obfuscator": "^5.4.1",
     "playwright": "^1.61.0",
     "terser": "^5.31.0"

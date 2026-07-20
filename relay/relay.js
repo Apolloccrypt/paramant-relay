@@ -5361,6 +5361,7 @@ const server = http.createServer(async (req, res) => {
   // relay, which is why signatures went uncounted for so long: the live signing
   // path is POST /v2/envelopes/:id/sign (R018), which now meters signs itself.
   // Do NOT re-enable without moving the metering; kept only to document history.
+  // eslint-disable-next-line no-constant-condition -- deliberate dead-code guard (legacy R017 notary, kept for reference)
   if (path === '/v2/sign' && req.method === 'POST' && false) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }

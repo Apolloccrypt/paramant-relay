@@ -124,3 +124,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
           GITLEAKS_ENABLE_SUMMARY: "true"
+
+  lint:
+    name: lint - eslint bug guardrail
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      # Only ESLint is needed here; skip Playwright's browser download to stay fast.
+      - name: Install dev deps
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      # Correctness guardrail: no-sequences (the comma-operator gate bug that
+      # made a POST auth gate swallow every request), no-cond-assign, eqeqeq,
+      # no-fallthrough, no-unsafe-negation, no-constant-condition. Any hit
+      # fails the build.
+      - name: ESLint bug guardrail
+        run: npm run lint
