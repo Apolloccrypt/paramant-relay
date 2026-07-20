@@ -1304,19 +1304,16 @@ const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/l
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
-const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
 const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest (unauthenticated)
-// Sweep both per-IP rate-limit maps hourly so they cannot grow without bound
+// Sweep the trial per-IP rate-limit map hourly so it cannot grow without bound
 // on attacker-rotated IPs (the limit windows already expire entries logically;
-// this reclaims the memory). Mirrors the dpaIpRequests sweep. Use each map's
-// own window: trial = 24h (DAY_MS at the call site), anon-inbound = 1h.
+// this reclaims the memory). Mirrors the dpaIpRequests sweep. Uses its own
+// window: trial = 24h (DAY_MS at the call site).
 setInterval(() => {
   const now = Date.now();
   const trialCut = now - 86_400_000; // 24h
-  const anonCut  = now - 3_600_000;  // 1h
   for (const [k, times] of trialIpRequests) { const kept = times.filter(t => t > trialCut); if (kept.length) trialIpRequests.set(k, kept); else trialIpRequests.delete(k); }
-  for (const [k, times] of anonInboundIpRequests) { const kept = times.filter(t => t > anonCut); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
 }, 3_600_000);
 
 // Team rate limit tracking
@@ -1328,7 +1325,6 @@ const teamRateLimits = new Map(); // team_id → { count, resetAt }
 setInterval(() => {
   const now = Date.now();
   const HOUR = 3_600_000;
-  for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
   for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
   for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
   for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
@@ -4088,82 +4084,14 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
-  // ── POST /v2/anon-inbound — Keyless upload for magic-link flow ───────────────
-  // No API key required. Rate limited by IP. Sender encrypts AES-256-GCM client-side;
-  // the decryption key travels in the URL fragment only — relay never sees it.
-  // DEPRECATED 2026-05-28 (relay): the anonymous tier is being retired. The endpoint
-  // continues to serve sdk-js 3.x callers but advertises retirement via the
-  // Deprecation + Sunset response headers (RFC 8594 / draft-ietf-httpapi-deprecation).
-  // Removal happens in a future major release after telemetry shows traffic has
-  // drained.
-  if (path === '/v2/anon-inbound' && req.method === 'POST') {
-    // Sticky headers: every writeHead() below will inherit these unless it
-    // explicitly overrides them, so 200/400/409/413/429/503 all carry them.
-    res.setHeader('Deprecation', 'true');
-    res.setHeader('Sunset', 'Wed, 31 Dec 2026 00:00:00 GMT');
-    res.setHeader('Link', '<https://paramant.app/parashare>; rel="successor-version"');
-    const ANON_MAX = 5 * 1024 * 1024;
-    const ANON_RPH = parseInt(process.env.ANON_RATE_PER_HOUR || '10');
-    const HOUR_MS  = 3_600_000;
-    const ip       = getClientIp(req);
-    const now      = Date.now();
-    const ipTimes  = (anonInboundIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
-    if (ipTimes.length >= ANON_RPH) {
-      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
-      return res.end(J({ error: 'Rate limit: max ' + ANON_RPH + ' uploads per hour. Try again later.' }));
-    }
-    if (!ramOk()) {
-      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '10' });
-      return res.end(J({ error: 'Relay at capacity. Retry in 10 seconds.' }));
-    }
-    inFlightInbound++;
-    try {
-      const body = await readBody(req, ANON_MAX * 2);
-      const d    = JSON.parse(body.toString());
-      const { hash, payload, ttl_ms, enc_meta } = d;
-      if (!hash || !payload)            { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
-      if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
-      if (blobStore.has(hash))           { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
-      const blob = Buffer.from(payload, 'base64');
-      if (blob.length > ANON_MAX)        { res.writeHead(413); return res.end(J({ error: 'Max 5MB on anonymous uploads' })); }
-      try { peekInboundBlob(blob); }
-      catch(e) {
-        const mapped = mapCryptoErrorToHttp(e);
-        if (mapped) {
-          log('warn', 'anon_inbound_wire_v1_reject', { status: mapped.status, err: e.code || e.name });
-          res.writeHead(mapped.status, { 'Content-Type': 'application/json' });
-          return res.end(J(mapped.body));
-        }
-        throw e;
-      }
-      let safeEncMeta = null;
-      if (enc_meta !== undefined && enc_meta !== null) {
-        const em = String(enc_meta);
-        if (em.length > 2048 || !/^[A-Za-z0-9+/=]+$/.test(em)) { res.writeHead(400); return res.end(J({ error: 'enc_meta must be base64, max 2048 chars' })); }
-        safeEncMeta = em;
-      }
-      const ttl     = Math.min(parseInt(ttl_ms || TTL_MS), 86_400_000); // max 24h for anon
-      const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, {
-        blob, ts: now, ttl, size: blob.length,
-        apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
-        ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
-                    tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null,
-                    ts: ctEntry.ts },
-      });
-      setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
-      ipTimes.push(now);
-      anonInboundIpRequests.set(ip, ipTimes);
-      const dlToken = require('crypto').randomBytes(24).toString('hex');
-      downloadTokens.set(dlToken, { hash, key: null, expires_ms: now + ttl, used: false, enc_meta: safeEncMeta, file_size: blob.length });
-      incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
-      stats.inbound++; stats.bytes_in += blob.length;
-      log('info', 'anon_blob_stored', { hash: hash.slice(0, 16), size: blob.length });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, hash, download_token: dlToken, ttl_ms: ttl, size: blob.length }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
-    finally { inFlightInbound--; }
-  }
+  // -- POST /v2/anon-inbound -- CLOSED (keyless tier retired 2026-07-20) --------
+  // No standalone keyless handler any more: the path falls through to the
+  // API-key gate below (401 without a valid X-Api-Key) and is then served by the
+  // authenticated POST /v2/inbound handler, so it runs the identical
+  // getEntitlements + gateTransfer quota checks. A keyless, quota-free upload
+  // route is a paywall bypass and an abuse vector on a RAM-only relay. gp.drop()
+  // (Python and JS SDK) already uploads through /v2/inbound; the only client that
+  // still targeted this path was sdk-js sendAnonymous(), deprecated since 3.2.0.
 
   // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
   // All other paths: require a valid X-Api-Key (pgp_ key in users.json)
@@ -4252,7 +4180,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── POST /v2/inbound — Upload versleuteld blok + optioneel ML-DSA handtekening
-  if (path === '/v2/inbound' && req.method === 'POST') {
+  if ((path === '/v2/inbound' || path === '/v2/anon-inbound') && req.method === 'POST') {
     if (!ramOk()) {
       const r = ramStatus();
       res.writeHead(503, {
