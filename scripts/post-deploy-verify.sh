@@ -113,6 +113,24 @@ check "/admin/settings.html reachable" "200" "$(http_code "$SITE/admin/settings.
 check "/admin/cli.html reachable"      "200" "$(http_code "$SITE/admin/cli.html")" no
 
 note ""
+note "== add-in / ParaShare surfaces (scripts/addin-smoke.sh) =="
+ADDIN_SMOKE="$(cd "$(dirname "$0")" && pwd)/addin-smoke.sh"
+if [ -x "$ADDIN_SMOKE" ]; then
+  # addin-smoke.sh writes its own PASS/FAIL detail into the report; fold its
+  # exit status into one rolled-up check here. Passes SITE through; add-in host
+  # and optional PARAMANT_SMOKE_KEY come from its own defaults/env.
+  if "$ADDIN_SMOKE" "$SITE" >>"$REPORT" 2>&1; then
+    note "PASS: addin-smoke.sh (all add-in checks passed)"
+    PASS=$((PASS+1))
+  else
+    note "FAIL: addin-smoke.sh (see report for the failing add-in checks)"
+    FAIL=$((FAIL+1))
+  fi
+else
+  skip "addin-smoke.sh not found or not executable"
+fi
+
+note ""
 note "== well-known / hygiene =="
 PGP=$($CURL "$SITE/.well-known/openpgp-key.asc" 2>/dev/null)
 if printf '%s' "$PGP" | grep -q "PLACEHOLDER"; then
