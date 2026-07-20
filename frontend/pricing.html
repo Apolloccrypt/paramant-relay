@@ -343,8 +343,8 @@
      ParaSend Pro   monthly 18.15 zvsE7pxE5kLaYxC8j4rDH | yearly 181.50 drRnrb7hky6bjkvea5ipk
      ParaSign Pro   monthly 59.29 tY9CRhMfcJSi4s9nU3s6D | yearly 603.79 iYKTBMtf9WeWZMc3HSTWj
      ParaSign Bus.  monthly 361.79 L9iVQXjtxwjrF9M8qdGYm | yearly 3617.90 Npj56fkDJ8npWprUYnXBN -->
-        <a href="https://payment-links.mollie.com/payment/zvsE7pxE5kLaYxC8j4rDH" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSend Pro &rarr;</a>
-        <a href="https://payment-links.mollie.com/payment/drRnrb7hky6bjkvea5ipk" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;150/yr &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/zvsE7pxE5kLaYxC8j4rDH" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSend Pro &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/drRnrb7hky6bjkvea5ipk" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;150/yr &rarr;</a>
         <div id="pricing-error" style="display:none;padding:10px 14px;background:#FEF2F2;border-left:3px solid #DC2626;color:#991B1B;margin:12px 0;font-size:13px" role="alert" aria-live="polite"></div>
       </div>
 
@@ -412,8 +412,8 @@
           <li>Send history</li>
           <li>Email support</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSign Pro &rarr;</a>
-        <a href="https://payment-links.mollie.com/payment/iYKTBMtf9WeWZMc3HSTWj" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;499/yr &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSign Pro &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/iYKTBMtf9WeWZMc3HSTWj" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;499/yr &rarr;</a>
       </div>
 
       <div class="tier-card">
@@ -427,8 +427,8 @@
           <li>Audit export</li>
           <li>Priority support</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSign Business &rarr;</a>
-        <a href="https://payment-links.mollie.com/payment/Npj56fkDJ8npWprUYnXBN" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;2,990/yr &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:8px">Get ParaSign Business &rarr;</a>
+        <a href="https://payment-links.mollie.com/payment/Npj56fkDJ8npWprUYnXBN" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="btn btn-secondary" style="display:block;text-align:center;font-size:var(--text-sm)">Pay yearly &middot; &euro;2,990/yr &rarr;</a>
       </div>
 
     </div>
@@ -588,5 +588,6 @@
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
 <script src="/js/pricing.inline1.js?v=1"></script>
+<script src="/js/pricing-billing.js?v=1" defer></script>
 </body>
 </html>
