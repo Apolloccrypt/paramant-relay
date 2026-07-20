@@ -1,38 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Page not found — PARAMANT</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#0B3A6A">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,sans-serif;background:#F8FAFC;color:#1E293B;display:flex;flex-direction:column;min-height:100vh}
-    main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 24px;text-align:center}
-    .wrap{max-width:480px}
-    .code{font-size:80px;font-weight:700;color:#0B3A6A;letter-spacing:-.04em;line-height:1;margin-bottom:16px;font-family:ui-monospace,monospace}
-    h1{font-size:20px;font-weight:600;margin-bottom:12px}
-    p{color:#64748B;font-size:15px;line-height:1.7;margin-bottom:28px}
-    .links{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
-    .links a{color:#1D4ED8;text-decoration:none;font-size:14px;padding:8px 16px;border:1px solid #BFDBFE;border-radius:2px}
-    .links a:hover{background:#EFF6FF}
-    footer{padding:20px 24px;text-align:center;font-size:11px;color:#94A3B8;border-top:1px solid #E2E8F0}
-  </style>
-<style>.skip-link{position:absolute;top:-200px;left:0;background:#0B3A6A;color:#F8FAFC;padding:12px 20px;z-index:10000;text-decoration:none;font-size:13px;font-family:system-ui,sans-serif;border:2px solid #B2FF3F;transition:top 120ms ease}.skip-link:focus,.skip-link:focus-visible{top:0;outline:none}.skip-link:focus:hover{background:#1D4ED8}</style>
+<title>About &middot; PARAMANT</title>
+<meta name="description" content="Paramant is privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What the product is, how you can check it yourself, and the company behind it: Paramantis Solutions B.V.">
+<meta property="og:title" content="About &middot; PARAMANT">
+<meta property="og:description" content="Privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What Paramant is, how to verify it, and the company behind it.">
+<meta property="og:url" content="https://paramant.app/about">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="About &middot; PARAMANT">
+<meta name="twitter:description" content="Privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What Paramant is, how to verify it, and the company behind it.">
+<link rel="canonical" href="https://paramant.app/about">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+
 <link rel="stylesheet" href="/design-system.css?v=19">
 <link rel="stylesheet" href="/nav.css?v=15">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
-<link rel="stylesheet" href="/parapear.css?v=1">
 <style>
-  main .wrap .parapear-block { max-width: 560px; margin: 0 auto 28px; text-align: left; }
+.about-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
+.about-band:first-of-type{border-top:none}
+.about-band h2{font-size:var(--text-2xl);letter-spacing:-.02em;margin-bottom:var(--space-2)}
+.about-band .mono-eyebrow{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)}
+.about-lede{font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.about-band p{font-size:var(--text-base);color:var(--ink);line-height:1.8;max-width:680px;margin-top:var(--space-4)}
+.about-band p a{color:var(--cobalt)}
+.about-band p strong{color:var(--navy)}
+.check-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
+.check-card{background:var(--bone);padding:var(--space-5) var(--space-5)}
+.check-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
+.check-card p{margin-top:var(--space-2);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
+.check-card a{color:var(--cobalt)}
+.scope-note{border-left:3px solid var(--lime);background:var(--bone);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);padding:var(--space-4) var(--space-5);margin-top:var(--space-5);max-width:680px}
+.scope-note p{margin-top:0}
+.person-card{border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone);padding:var(--space-6);margin-top:var(--space-5);max-width:680px}
+.person-card p{margin-top:0}
+.person-card p + p{margin-top:var(--space-4)}
+@media(max-width:640px){.check-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
+
+<div class="meta-bar">
+  <span class="">build 3.0.0</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
 <nav class="nav">
   <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
 
@@ -189,28 +213,81 @@
 
   <a href="/help" class="nav-mobile-standalone">Help</a>
 </div>
-<script src="/nav.js?v=12" defer></script>
-<main id="main-content">
-  <div class="wrap">
-    <aside class="parapear-block" aria-label="Page not found">
-      <img class="parapear-img" src="/assets/parapear/parapear-warn.png" alt="" aria-hidden="true" loading="lazy" decoding="async" width="120" height="120">
-      <div class="parapear-bubble">
-        <span class="parapear-kicker">404</span>
-        This page does not exist. The link may be outdated, or there is a typo. <a href="/dashboard">Back to your dashboard?</a>
+
+
+<!-- HERO -->
+<section style="padding:var(--space-10) 0 var(--space-6)" id="main-content" tabindex="-1">
+  <div class="container-md">
+    <div class="sec-head">
+      <span class="num">00</span>
+      <h2>About Paramant</h2>
+      <span class="mono-eyebrow">Company, mission, and how to check us</span>
+    </div>
+    <p class="about-lede">Paramant is privacy-first, post-quantum document signing and encrypted transfer, built to stay verifiable and to keep working under EU jurisdiction. You should not have to trust us. You should be able to check.</p>
+  </div>
+</section>
+
+<!-- WHAT PARAMANT IS -->
+<section class="about-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">01 / Mission</span>
+    <h2 style="margin-top:var(--space-2)">What Paramant is</h2>
+    <p>Two products on one post-quantum core. <strong>ParaSend</strong> encrypts files in your browser or SDK before they ever leave your device; the relay only holds fixed-size ciphertext in RAM and destroys it on read. <strong>ParaSign</strong> signs documents with ML-DSA-65 (FIPS 204) and records every signature in a public transparency log.</p>
+    <p>The design goals stay constant: privacy first, post-quantum by default, and EU-sovereign infrastructure with no US parent and no US CLOUD Act exposure. The aim is not to ask for your trust, but to remove the need for it.</p>
+  </div>
+</section>
+
+<!-- HOW YOU CAN CHECK US -->
+<section class="about-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">02 / Technique &amp; transparency</span>
+    <h2 style="margin-top:var(--space-2)">How you can check us</h2>
+    <p>Every claim on this site is meant to be checkable, not taken on faith. Four things make that possible:</p>
+    <div class="check-grid">
+      <div class="check-card">
+        <div class="k">Post-quantum signatures</div>
+        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.</p>
       </div>
-    </aside>
-    <div class="code">404</div>
-    <h1>Page not found</h1>
-    <p>The link you followed may be outdated, or you typed the URL incorrectly.</p>
-    <div class="links">
-      <a href="/dashboard">Dashboard</a>
-      <a href="/">Home</a>
-      <a href="/security">Security</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/help">Help</a>
+      <div class="check-card">
+        <div class="k">Public transparency log</div>
+        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/ct-log">CT Log</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Offline-verifiable documents</div>
+        <p>A signed document verifies without contacting us. Check one on the <a href="/verify">verify page</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Source-available code</div>
+        <p>The relay is source-available. Read it on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> and run it yourself.</p>
+      </div>
+    </div>
+    <div class="scope-note">
+      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES). We state exactly what it is and what it is not.</p>
     </div>
   </div>
-</main>
+</section>
+
+<!-- BEHIND PARAMANT -->
+<section class="about-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">03 / Who is behind Paramant</span>
+    <h2 style="margin-top:var(--space-2)">Behind Paramant</h2>
+    <div class="person-card">
+      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher (<a href="https://hackedemia.nl" target="_blank" rel="noopener">Hackedemia</a>). Paramantis Solutions B.V. is the contracting and responsible party; the founder is the origin of the work, not the service itself.</p>
+      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take us at our word, you can verify it. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
+    </div>
+  </div>
+</section>
+
+<!-- RESPONSIBLE DISCLOSURE -->
+<section class="about-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">04 / Responsible disclosure</span>
+    <h2 style="margin-top:var(--space-2)">Found a security issue?</h2>
+    <p>We publish a machine-readable <a href="/.well-known/security.txt">security.txt</a> (RFC 9116) and a full <a href="/security#responsible-disclosure">disclosure policy</a>. Reports reach us at <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, in Dutch or English.</p>
+  </div>
+</section>
+
 <footer>
   <div class="container-lg">
     <div class="footer-grid">
@@ -267,6 +344,9 @@
     </div>
   </div>
 </footer>
+
+
+<script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
 </body>
 </html>
