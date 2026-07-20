@@ -1,11 +1,14 @@
 'use strict';
 // Pure TOTP core (RFC 6238), extracted verbatim from relay.js so the monolith
 // and its tests share ONE implementation instead of a hand-copied duplicate.
-// Behaviour-identical to the former inline functions: SHA-256 default, ±window
-// slot scan evaluated in full (no early exit), constant-time compare, and a
-// per-slot SET NX replay guard. relay.js now delegates base32Decode / totpCode /
-// verifyTotpGeneric here; the in-process verifyTotp (single master secret) keeps
-// its own _usedTotpCodes replay map and only reuses totpCode.
+// Dual-verify: a code is accepted if it matches under SHA-256 OR SHA-1 (the RFC
+// 6238 default), so every standard authenticator app works. The +/-window slot
+// scan is evaluated in full for both algorithms (no early exit), the compare
+// stays constant-time, and the per-slot SET NX replay guard is unchanged. On a
+// match the algorithm that matched is returned so call sites can flag SHA-1 use.
+// relay.js delegates base32Decode / totpCode / verifyTotpGeneric here; the
+// in-process verifyTotp (single master secret) keeps its own _usedTotpCodes
+// replay map and is dual-verify too.
 const crypto = require('crypto');
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -55,40 +58,52 @@ function totpCode(secret, counter, algorithm = 'sha256') {
   return code.toString().padStart(6, '0');
 }
 
-// Pure ±window slot match. Returns the matched counter slot, or null. Scans the
-// full window every time (never short-circuits) to avoid a timing oracle, exactly
-// as the inline relay.js loop did.
+// Pure +/-window slot match. Returns { slot, algorithm } for the matched counter
+// slot, or null. By default it dual-verifies: it tries SHA-256 AND SHA-1 (the RFC
+// 6238 default) so codes from any standard authenticator app are accepted. An
+// explicit `algorithm` (or `algorithms`) opt narrows the set, so single-algorithm
+// callers and tests still work. The full window is scanned for every algorithm
+// (never short-circuits) to avoid a timing oracle, exactly as the inline relay.js
+// loop did. If a code matches under BOTH algorithms (rare), the strongest wins:
+// SHA-256 is reported over SHA-1.
 function matchTotpSlot(token, secret, opts = {}) {
-  const { window = 1, algorithm = 'sha256', now = Date.now() } = opts;
+  const { window = 1, algorithm, algorithms, now = Date.now() } = opts;
   const tokenBuf = Buffer.from(String(token || ''), 'utf8');
   if (tokenBuf.length !== 6) return null;
+  const algs = algorithms || (algorithm ? [algorithm] : ['sha256', 'sha1']);
   const counter = Math.floor(now / 1000 / 30);
-  let matchedSlot = null;
-  for (let i = -window; i <= window; i++) {
-    const c = counter + i;
-    const expected = totpCode(secret, c, algorithm);
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
-    if (eq) matchedSlot = c;
+  let matched = null;
+  for (const alg of algs) {
+    for (let i = -window; i <= window; i++) {
+      const c = counter + i;
+      const expected = totpCode(secret, c, alg);
+      const expectedBuf = Buffer.from(expected, 'utf8');
+      const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
+      // Full scan, no early exit. Keep the strongest match: SHA-256 over SHA-1.
+      if (eq && (matched === null || alg === 'sha256')) matched = { slot: c, algorithm: alg };
+    }
   }
-  return matchedSlot;
+  return matched;
 }
 
 // Verify with an injected replay store (Redis-shaped: async set(key,val,{NX,EX})
-// returning 'OK' or null). Behaviour-identical to relay.js verifyTotpGeneric:
-// no store or no replayKey => match-only; a per-slot NX key rejects reuse of a
-// still-in-window code; a store error fails OPEN (.catch => 'OK') so a Redis
-// blip never locks out a legitimate first use.
+// returning 'OK' or null). Dual-verify by default (SHA-256 OR SHA-1). Behaviour-
+// identical to the former relay.js verifyTotpGeneric for the replay path: no store
+// or no replayKey => match-only; a per-slot NX key rejects reuse of a still-in-
+// window code; a store error fails OPEN (.catch => 'OK') so a Redis blip never
+// locks out a legitimate first use. On success returns { valid:true, algorithm },
+// where algorithm is 'sha256' or 'sha1' (the one that matched); on no match returns
+// { valid:false }.
 async function verifyTotpGeneric(token, secret, opts = {}, store = null) {
-  const { window = 1, replayKey, algorithm = 'sha256', now } = opts;
-  const matchedSlot = matchTotpSlot(token, secret, { window, algorithm, now: now ?? Date.now() });
-  if (matchedSlot === null) return { valid: false };
+  const { window = 1, replayKey, algorithm, algorithms, now } = opts;
+  const matched = matchTotpSlot(token, secret, { window, algorithm, algorithms, now: now ?? Date.now() });
+  if (matched === null) return { valid: false };
   if (replayKey && store) {
-    const slotKey = `${replayKey}:${matchedSlot}`;
+    const slotKey = `${replayKey}:${matched.slot}`;
     const ok = await store.set(slotKey, '1', { NX: true, EX: 90 }).catch(() => 'OK');
     if (ok === null) return { valid: false };
   }
-  return { valid: true };
+  return { valid: true, algorithm: matched.algorithm };
 }
 
 module.exports = {

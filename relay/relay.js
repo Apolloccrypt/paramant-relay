@@ -925,20 +925,24 @@ function verifyTotp(token) {
   const tokenBuf = Buffer.from(String(token || ''), 'utf8');
   if (tokenBuf.length !== 6) return false;
   const counter = Math.floor(Date.now() / 1000 / 30);
-  // Fix 5a: evaluate ALL windows — never short-circuit (constant-time scan)
+  // Dual-verify: accept a code valid under SHA-256 OR SHA-1 (the RFC 6238 default),
+  // so admin login works with Google/Microsoft Authenticator and iCloud Keychain.
+  // Both algorithm passes and every window run in full (never short-circuit) so the
+  // scan stays constant-time, and the per-slot replay guard is preserved unchanged.
   let matched = false;
-  for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
-    const c = counter + i;
-    const expected = totpCode(TOTP_SECRET, c);
-    const expectedBuf = Buffer.from(expected, 'utf8');
-    // Fix 5b: timingSafeEqual (lengths guaranteed equal — both are 6-char strings)
-    const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
-    if (eq) {
-      // Fix 5c: reject reused codes — key = token + counter slot
-      const useKey = `${token}:${c}`;
-      if (_usedTotpCodes.has(useKey)) { matched = false; continue; }
-      _usedTotpCodes.set(useKey, (c + 2) * 30 * 1000); // expire after 2 windows past use
-      matched = true;
+  for (const algorithm of ['sha256', 'sha1']) {
+    for (let i = -TOTP_WINDOW; i <= TOTP_WINDOW; i++) {
+      const c = counter + i;
+      const expected = totpCode(TOTP_SECRET, c, algorithm);
+      const expectedBuf = Buffer.from(expected, 'utf8');
+      const eq = tokenBuf.length === expectedBuf.length && crypto.timingSafeEqual(tokenBuf, expectedBuf);
+      if (eq) {
+        // Fix 5c: reject reused codes: key = token + counter slot
+        const useKey = `${token}:${c}`;
+        if (_usedTotpCodes.has(useKey)) { matched = false; continue; }
+        _usedTotpCodes.set(useKey, (c + 2) * 30 * 1000); // expire after 2 windows past use
+        matched = true;
+      }
     }
   }
   return matched;
@@ -2586,10 +2590,16 @@ const server = http.createServer(async (req, res) => {
       const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
-        algorithm: "sha256", window: 1,
+        window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
-      if (result && result.valid) userMfaAttemptReset(user_id);
+      if (result && result.valid) {
+        userMfaAttemptReset(user_id);
+        // Dual-verify accepted this code. If it validated under SHA-1, record a
+        // structured, countable event (never the code or the secret) so SHA-1-app
+        // usage is measurable in the logs. This is the login/verify path.
+        if (result.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "login" });
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
@@ -2735,7 +2745,7 @@ const server = http.createServer(async (req, res) => {
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
-        algorithm: "sha256", window: 1,
+        window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
       if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
@@ -2747,6 +2757,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { "Content-Type": "application/json" });
         return res.end(J({ error: e.message }));
       }
+      if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       const ctEntry = ctAppendSigningPkEvent("signing_pk_enrolled", user_id, result.entry.pk_hash_sha3);
       log("info", "signing_pk_enrolled", {
         user_id: String(user_id).slice(0, 12) + "…",
@@ -2762,6 +2773,7 @@ const server = http.createServer(async (req, res) => {
         enrolled_at: result.entry.enrolled_at,
         reenrolled: result.reenrolled,
         ct_index: ctEntry.index,
+        totp_algorithm: totpResult.algorithm,
       }));
     } catch (err) {
       console.error("[user/signing-key POST]", err.message);
@@ -2804,10 +2816,11 @@ const server = http.createServer(async (req, res) => {
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
-        algorithm: "sha256", window: 1,
+        window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
       if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       let result;
       try {
         result = await userSigning.revokeSigningPk(redisClient, user_id, pk_hash_sha3);

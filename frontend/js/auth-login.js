@@ -9,6 +9,23 @@
   const _rv = params.get('next') || params.get('return') || '/dashboard';
   const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
 
+  // Non-blocking, dismissible note shown after a successful login when the account's
+  // authenticator app produced a SHA-1 code (accepted via dual-verify). Login already
+  // succeeded (the session cookie is set); this only nudges toward a SHA-256 app
+  // before continuing. It never blocks the sign-in.
+  function showSha1Notice(dest) {
+    const notice = document.getElementById('sha1-notice');
+    if (!notice) { window.location = dest; return; }
+    if (form) form.hidden = true;
+    if (errorDiv) errorDiv.classList.remove('visible');
+    notice.hidden = false;
+    const cont = document.getElementById('sha1-continue');
+    if (cont) {
+      cont.setAttribute('href', dest);
+      cont.addEventListener('click', function(ev) { ev.preventDefault(); window.location = dest; });
+    }
+  }
+
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     errorDiv.classList.remove('visible');
@@ -27,6 +44,11 @@
       });
 
       if (res.ok) {
+        // Login succeeded. If the authenticator app used a SHA-1 code, show a
+        // soft, dismissible note before continuing; otherwise redirect as before.
+        let body = null;
+        try { body = await res.json(); } catch (_) { /* non-JSON, ignore */ }
+        if (body && body.totp_algorithm === 'sha1') { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
         errorDiv.textContent = 'Invalid email or code.';
