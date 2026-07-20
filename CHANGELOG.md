@@ -149,6 +149,50 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [3.0.1] - 2026-07-20
+
+Integration release: signing-path and billing-path correctness fixes, the
+payment bypass closed, and new bug-guardrail plus auth-contract test coverage.
+
+### Fixed
+- **Sign path 401 regression (comma-operator bug).** The create-envelope auth
+  gate read `if (path === '/v2/envelopes','/v2/billing' && ...)`, which the comma
+  operator collapses to the truthy string `'/v2/billing'`, so the gate matched
+  EVERY POST. The keyless internal `POST /v2/envelopes/:id/sign` fell into it and
+  returned 401 "API key required", which surfaced to logged-in users as "Please
+  sign in to sign documents". The gate now matches only its own route, so the sign
+  handler is reachable again.
+
+### Security
+- **Stub-checkout payment bypass removed.** The placeholder billing checkout that
+  could grant entitlements without a real payment now returns `410 Gone`; the
+  Mollie-backed checkout is the only path to a paid plan.
+- **Inbound content-hash verification.** Inbound blobs are rejected unless
+  `sha256(blob) === hash`, so a stored ciphertext cannot be swapped for content
+  that does not match its declared hash.
+- **DID-auth gated by entitlements.** DID-authenticated principals pass the same
+  entitlement checks as API-key principals; a DID login cannot reach a capability
+  the account is not entitled to.
+
+### Added
+- **TOTP dual-verify (SHA-256 and SHA-1).** One-time codes verify against both
+  HMAC-SHA-256 and HMAC-SHA-1, so authenticator apps that only implement SHA-1
+  keep working; a soft notice flags SHA-1-only enrollments.
+- **Tiered pricing with overage.** ParaSend and ParaSign Pro and Business tiers
+  with metered overage accounting and quota/overage gates.
+- **ESLint bug guardrail plus CI lint gate.** `eslint.config.js` enables the
+  correctness rules that would have caught the comma-operator bug (`no-sequences`,
+  `eqeqeq`, `no-cond-assign`, `no-fallthrough`, `no-unsafe-negation`,
+  `no-constant-condition`); a `lint` job in `.github/workflows/test.yml` runs
+  `npm run lint` on every push and pull request.
+- **Route-auth contract tests plus post-deploy sign smoke.**
+  `relay/test/route-auth-contract.test.js` boots the relay and asserts the
+  per-route auth contract over real HTTP (the sign route is never 401);
+  `scripts/sign-smoke.sh` and `scripts/post-deploy-verify.sh` run the same
+  read-only checks against a live base after deploy.
+
+---
+
 ## [3.0.0] - 2026-05-27
 
 Major-version bump for the M5b paramant-core integration. 3.0.0 is now the

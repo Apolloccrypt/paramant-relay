@@ -112,11 +112,38 @@ footer{border-top:1px solid rgba(11,58,106,.1);padding:40px 48px;display:flex;al
       <li>Prometheus + Grafana monitoring via Tailscale-only access</li>
       <li>Outlook add-in (<code>addin.paramant.app</code>): source scaffold done</li>
       <li>Chrome Web Store public listing</li>
-      <li>Mollie integration for billing (currently stub mode)</li>
       <li>Team accounts + SSO</li>
       <li>WebAuthn / Passkey second-factor option</li>
       <li>Admin email preview modal with per-user send actions</li>
       <li>Public status page</li>
+    </ul>
+  </section>
+
+  <!-- ── v3.0.0 (2026-07-20) ──────────────────────────────────── -->
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.0.0</h2>
+      <span class="release-date">20 July 2026</span>
+    </div>
+    <p class="release-summary">Self-service billing goes live, pricing gets tiers, and the site navigation is simplified to three verbs.</p>
+
+    <h3><span class="badge badge-added">Added</span></h3>
+    <ul>
+      <li><strong>Self-service checkout with Mollie</strong>: upgrade and manage your plan straight from the site, no sales call needed.</li>
+      <li><strong>Tiered pricing with overage</strong>: ParaSend and ParaSign now have Pro and Business tiers with metered overage, so you only pay for what you use beyond your plan.</li>
+      <li><strong>New <a href="/about">About Paramant</a> page</strong>: who builds Paramant and why.</li>
+    </ul>
+
+    <h3><span class="badge badge-changed">Changed</span></h3>
+    <ul>
+      <li><strong>Simplified navigation</strong>: every page now leads with the three things you do here, Send, Sign and Verify, plus Docs. Everything else moved to a full site map in the footer.</li>
+      <li><strong>Sign in with any authenticator app</strong>: both SHA-256 and SHA-1 one-time-code apps are supported, so your existing authenticator just works.</li>
+      <li><strong>Relay is source-available under BUSL-1.1</strong>: read, audit and self-host the relay source.</li>
+    </ul>
+
+    <h3><span class="badge badge-security">Security</span></h3>
+    <ul>
+      <li>Security and reliability hardening across the signing and billing paths.</li>
     </ul>
   </section>
 
