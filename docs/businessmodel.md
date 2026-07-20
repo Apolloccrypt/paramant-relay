@@ -143,7 +143,7 @@ Free + Pro OT tiers exist for engineer evaluation before procurement.
 - BUSL-1.1 for community self-hosted — prevents competitors from reselling
 
 ## Business continuity
-Open source under BUSL-1.1. Managed service shutdown does not affect self-hosted operators. Source code permanently available on GitHub.
+Source-available under BUSL-1.1. Managed service shutdown does not affect self-hosted operators. Source code permanently available on GitHub.
 
 ---
 

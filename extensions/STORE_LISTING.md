@@ -39,7 +39,7 @@ What makes it private:
 Sign in with your Paramant API key. Works in Chrome and Chromium 120+ on Gmail and Outlook
 on the web. Native desktop Outlook is supported by the separate Paramant Outlook add-in.
 
-Paramant is open source: https://github.com/Apolloccrypt/paramant-relay
+Paramant is source-available: https://github.com/Apolloccrypt/paramant-relay
 
 ## Permissions justification (for store review)
 

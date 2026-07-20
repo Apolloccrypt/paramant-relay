@@ -411,7 +411,7 @@ pre{font-family:var(--mono)}
   <div class="article-body">
     <p class="requirement">IEC 62443-2-3 addresses patch management and the security of supplier relationships. IEC 62443-2-1 requires a documented security program for the IACS components in use.</p>
     <p><strong style="color:var(--cobalt)">Minimal attack surface:</strong> The relay binary has 22 runtime dependencies, all present in the public npm registry with reproducible builds. The Docker image is built from Alpine Linux with a non-root relay process and a read-only filesystem. No shell access is exposed at runtime.</p>
-    <p><strong style="color:var(--cobalt)">Publicly audited:</strong> The relay software is open source under BUSL-1.1. An independent security audit (RAPTOR methodology, April 2026) is available and documents all findings and remediations. Operators can verify that findings have been addressed before deployment.</p>
+    <p><strong style="color:var(--cobalt)">Publicly audited:</strong> The relay software is source-available under BUSL-1.1. An independent security audit (RAPTOR methodology, April 2026) is available and documents all findings and remediations. Operators can verify that findings have been addressed before deployment.</p>
     <p><strong style="color:var(--cobalt)">Versioned releases:</strong> All relay releases are tagged, signed, and published on GitHub and Docker Hub (<code>mtty001/relay</code>). Patch history is publicly traceable. Operators receive upgrade paths without hidden changes.</p>
     <div class="pills">
       <span class="pill">22 dependencies</span>
@@ -420,7 +420,7 @@ pre{font-family:var(--mono)}
       <span class="pill">Versioned Docker releases</span>
     </div>
     <div class="oneliner">
-      <p><strong>IEC 62443-2-3 requires</strong> supply chain security and patch management &mdash; <strong>paramant delivers</strong> open-source code, a public audit, and versioned releases with traceable patch history.</p>
+      <p><strong>IEC 62443-2-3 requires</strong> supply chain security and patch management &mdash; <strong>paramant delivers</strong> source-available code, a public audit, and versioned releases with traceable patch history.</p>
     </div>
   </div>
 </div>
@@ -537,7 +537,7 @@ Level 1  Field devices     ─────────────────�
     <tr>
       <td>IEC 62443-2-3</td>
       <td>Supply chain / patch management</td>
-      <td><span class="check">&#10003;</span> Open source, RAPTOR audit, versioned tagged releases</td>
+      <td><span class="check">&#10003;</span> Source-available, RAPTOR audit, versioned tagged releases</td>
     </tr>
     <tr>
       <td>ML-DSA relay ID</td>
