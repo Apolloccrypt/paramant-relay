@@ -56,6 +56,17 @@ const PARASIGN_TIER_TO_TIERS = Object.freeze({
   enterprise: 'enterprise',
 });
 
+// ── ParaSign metered overage (Mick's tier brief) ─────────────────────────────
+// Pro is the ONLY tier that meters past its included quota instead of blocking:
+// 100 signs included, EUR 0.40 per sign from the 101st, and a HARD stop at
+// 1000 signs per calendar month (402, never a silent run-up). Free and Business
+// block at their included quota; enterprise runs to its config ceiling. These
+// numbers live HERE (the single entitlements source), not in the sign paths.
+const PARASIGN_OVERAGE = Object.freeze({
+  pro: Object.freeze({ rate_eur: 0.40, hard_cap: 1000 }),
+});
+const NO_OVERAGE = Object.freeze({ rate_eur: null, hard_cap: null });
+
 // Turn a raw tiers.js metered value into a finite number (Infinity/-1 -> ceiling).
 function _meteredFinite(v) {
   return tiers.isUnlimited(v) ? ENTERPRISE_MONTHLY_CEILING : v;
@@ -139,6 +150,10 @@ function _parasignEntitlement(tier) {
     quotas: Object.freeze({
       signs_month: _meteredFinite(tiers.tierLimit(row, 'signs_month')),
     }),
+    // overage: how the tier behaves PAST quotas.signs_month. rate_eur/hard_cap
+    // are null for tiers that simply block at the quota (free, business,
+    // enterprise); pro meters at rate_eur per sign up to hard_cap.
+    overage: PARASIGN_OVERAGE[t] || NO_OVERAGE,
     limits: Object.freeze({
       file_mb: tiers.tierLimitNum(row, 'file_mb'),
     }),
@@ -183,6 +198,9 @@ function getEntitlements(account) {
 // Convenience: the metered monthly quota a gate should enforce, per product.
 function transfersQuota(account) { return getEntitlements(account).parasend.quotas.transfers_month; }
 function signsQuota(account)     { return getEntitlements(account).parasign.quotas.signs_month; }
+// Convenience: the ParaSign overage policy ({ rate_eur, hard_cap }, nulls when
+// the tier blocks at its quota instead of metering).
+function signsOverage(account)   { return getEntitlements(account).parasign.overage; }
 
 // ── users.json migration ──────────────────────────────────────────────────────
 // migrateUserEntry: return a NEW api_keys entry with plan_parasend/plan_parasign
@@ -225,6 +243,7 @@ module.exports = {
   getEntitlements,
   transfersQuota,
   signsQuota,
+  signsOverage,
   migrateUserEntry,
   migrateUsersData,
   // exposed for tests/tooling

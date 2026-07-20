@@ -159,6 +159,26 @@ function showCta(html) {
   cta.innerHTML = html;
 }
 
+// Inline sign-quota notice on the done step (free: second signature used;
+// pro: overage running). The quota block is optional in the 200 response --
+// an older backend sends none and nothing is shown (signNotice returns '').
+function renderQuotaNote(quota) {
+  const q = window.paQuotaUpgrade;
+  const html = q && q.signNotice ? q.signNotice(quota) : '';
+  if (!html) return;
+  const host = document.getElementById('step-done');
+  if (!host) return;
+  let div = document.getElementById('cs-quota-note');
+  if (!div) {
+    div = document.createElement('div');
+    div.id = 'cs-quota-note';
+    const sub = host.querySelector('.sub');
+    if (sub && sub.nextSibling) host.insertBefore(div, sub.nextSibling);
+    else host.appendChild(div);
+  }
+  div.innerHTML = html;
+}
+
 async function loadSession() {
   try {
     const r = await fetch('/api/user/account', { credentials: 'include' });
@@ -397,6 +417,7 @@ async function doSign() {
     $('done-status').textContent = data.status || '-';
     $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + ' signed';
     $('done-pk').textContent = __signKey.fingerprint;
+    renderQuotaNote(data.quota);
     showStep('step-done');
   } catch (e) {
     // Zeroize any unconsumed ephemeral secret and drop it so a retry re-prompts

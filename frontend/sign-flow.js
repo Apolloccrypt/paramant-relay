@@ -2418,7 +2418,7 @@ async function doSign() {
       };
     }
 
-    state.result = { stampedBytes, envelope, fingerprint };
+    state.result = { stampedBytes, envelope, fingerprint, quota: submitted.quota };
     showDone();
   } catch (e) {
     // Zeroize any unconsumed ephemeral secret (error before it was handed to the signer).
@@ -2463,9 +2463,29 @@ function downloadBytes(bytes, name, mime) {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
 }
 
+// Inline sign-quota notice on the done step (free: second signature used;
+// pro: overage running). The quota block is optional in the 200 response --
+// an older backend sends none and nothing is shown (signNotice returns '').
+function renderSignQuotaNotice(quota) {
+  const host = document.getElementById('step-done');
+  if (!host) return;
+  const old = document.getElementById('ds-quota-note');
+  if (old) old.remove();
+  const q = window.paQuotaUpgrade;
+  const html = q && q.signNotice ? q.signNotice(quota) : '';
+  if (!html) return;
+  const div = document.createElement('div');
+  div.id = 'ds-quota-note';
+  div.innerHTML = html;
+  const h = host.querySelector('h2');
+  if (h && h.nextSibling) host.insertBefore(div, h.nextSibling);
+  else host.appendChild(div);
+}
+
 function showDone() {
   setActive('step-done');
   const r = state.result;
+  renderSignQuotaNotice(r && r.quota);
   if (state.signingMode === 'invite') { showDoneInvite(r); return; }
 
   // Success banner: the signature was produced locally (the private key never
