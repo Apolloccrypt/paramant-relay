@@ -700,19 +700,63 @@ Generates a new set of backup codes and invalidates all previous ones.
 
 ### POST /api/user/billing/checkout
 
-Initiates a Stripe checkout session (stub — Stripe integration pending).
+Creates a pending plan-change order and returns an internal confirmation URL. This flow does not charge a payment method (see the `stub_notice` field on billing status); paid ParaSend and ParaSign upgrades are billed through the Mollie checkout on the relay, see [Billing (Mollie)](#billing-mollie) below.
+
+```bash
+curl -X POST https://paramant.app/api/user/billing/checkout \
+  -H "Cookie: paramant_user_session=<token>" \
+  -H "Content-Type: application/json" \
+  -d '{"plan_id":"pro","period":"monthly"}'
+# {"checkout_url":"/billing/checkout/<token>","expires_at":"2026-…"}
+```
+
+The order expires after one hour. `GET /api/user/billing/checkout/:token` returns the pending order (`plan_id`, `plan_name`, `period`, `amount_eur`, `email`, `status`). `POST /api/user/billing/checkout/:token/confirm` applies the plan change and returns `{"success":true,"new_plan":"pro","effective_from":"…"}`.
 
 ### POST /api/user/billing/cancel
 
-Cancels the active subscription.
+Schedules a downgrade at the end of the current billing period. Returns `{"scheduled_downgrade_at":"…"}`.
 
 ### GET /api/user/billing/status
 
-Returns current plan and subscription state.
+Returns current plan and subscription state: `current_plan`, `period`, `amount_eur`, `next_billing_date`, `cancellation_scheduled_at`.
 
 ### GET /api/user/billing/history
 
-Returns billing history.
+Returns the most recent billing events (plan changes, scheduled cancellations, downgrades).
+
+---
+
+## Billing (Mollie)
+
+Paid ParaSend and ParaSign plans are billed through [Mollie](https://www.mollie.com). The relay creates the payment and grants the entitlement from the webhook. Prices come from the server-side catalog (`relay/lib/billing-catalog.js`); the caller can never set an amount.
+
+### POST /v2/billing/checkout — Start a Mollie payment
+
+Requires an API key. The body names a product, plan, and interval; the price is looked up server-side.
+
+```bash
+curl -X POST https://relay.paramant.app/v2/billing/checkout \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"product":"parasign","plan":"pro","interval":"monthly"}'
+# {"ok":true,"payment_id":"tr_…","checkout_url":"https://www.mollie.com/checkout/…","mode":"live"}
+```
+
+| Field | Values |
+|-------|--------|
+| `product` | `parasend`, `parasign` |
+| `plan` | `pro` (parasend); `pro` or `business` (parasign) |
+| `interval` | `monthly`, `yearly` |
+
+Redirect the buyer to `checkout_url` to complete the payment; Mollie then redirects back to `/dashboard?billing=return`. `mode` is `live` or `test`, controlled by `BILLING_MODE` and which Mollie key (`MOLLIE_API_KEY` / `MOLLIE_TEST_API_KEY`) is configured.
+
+Errors: `401 unauthorized` (missing or invalid API key), `400 bad_json` / `unknown_product` / `unknown_plan` / `unknown_interval`, `502 checkout_failed` (Mollie unreachable or rejected the payment).
+
+### POST /v2/billing/webhook — Mollie status callback
+
+Called by Mollie with `id=tr_…` (form-encoded). The relay ignores everything else in the webhook body, re-fetches the payment from the Mollie API as the only source of truth, verifies the amount actually paid against the catalog, and grants the product tier idempotently. Responds `200` on every handled event, `400 bad_payment_id` for a malformed id, and `503` on a transient Mollie fetch failure (so Mollie retries).
+
+Not intended to be called by clients.
 
 ---
 
