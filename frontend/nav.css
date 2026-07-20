@@ -561,3 +561,13 @@ nav.nav .nav-link-btn:hover {
 /* Beeldmerk-logo: de blauwe P met lime stip als de P van Paramant. */
 nav.nav .nav-logo { display: inline-flex; align-items: center; gap: 0; color: var(--ink); font-weight: 600; }
 nav.nav .nav-logo-mark { height: 20px; width: 20px; border-radius: 4px; margin-right: 1px; display: block; }
+
+/* Utility cluster far right: Pricing + the auth block (#nav-auth). Groups both
+   to the right edge; #nav-auth's own margin-left:auto is neutralised inside so
+   the two hug together. Pricing folds into the mobile menu below 1024px, the
+   same breakpoint that hides .nav-links. */
+nav.nav .nav-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+nav.nav .nav-right .nav-auth { margin-left: 0; }
+@media (max-width: 1023px) {
+  nav.nav .nav-right .nav-pricing { display: none; }
+}
