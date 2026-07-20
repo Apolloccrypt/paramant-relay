@@ -424,6 +424,9 @@ select:focus{border-color:var(--cobalt)}
   <span class="eyebrow">PARASHARE</span>
   <h1>Encrypted file relay</h1>
   <p class="lede">End-to-end encrypted file transfer. The receiver's browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees plaintext.</p>
+  <div class="warn" style="margin-top:16px">
+    <strong>Outlook attachments, encrypted before they leave your machine.</strong> The add-in encrypts in your browser and puts the key in the link fragment, which never reaches our server. Same architecture as the web app: we relay it, we can't read it, and it's gone after delivery.
+  </div>
 </div>
 </section>
 
