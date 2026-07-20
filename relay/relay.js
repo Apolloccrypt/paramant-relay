@@ -2231,14 +2231,24 @@ const server = http.createServer(async (req, res) => {
       // /v2/envelopes/:id/sign path; counting at create too would double-count a
       // /v1 envelope (its signers post back through that same sign path). The
       // LIMIT comes from entitlements (plan_parasign, legacy-plan fallback), the
-      // per-product ParaSign tier, NOT the product-blind tiers.tierLimitNum.
+      // per-product ParaSign tier, never the product-blind tiers.js helpers.
+      // Decision is shared with the R018 sign path (quota.signGateDecision):
+      // tiers without overage block at the included quota; Pro meters overage
+      // and only blocks at its hard cap.
       signQuotaGate: async (accountId, rec) => {
-        const limit = entitlements.signsQuota(rec || {});
-        if (!accountId || !Number.isFinite(limit)) return { allowed: true, over_limit: false };
+        const ent = entitlements.getEntitlements(rec || {}).parasign;
+        if (!accountId || !Number.isFinite(ent.quotas.signs_month)) return { allowed: true, over_limit: false };
         try {
           const u = await quota.readUsage(redisClient, accountId);
-          const over = u.available && Number.isFinite(u.signs_this_month) && u.signs_this_month >= limit;
-          return { allowed: !over, over_limit: over };
+          if (!u.available || !Number.isFinite(u.signs_this_month)) return { allowed: true, over_limit: false };
+          const dec = quota.signGateDecision(u.signs_this_month, ent);
+          return {
+            allowed: dec.allowed, over_limit: !dec.allowed,
+            reason: dec.reason, plan: ent.tier, limit: dec.limit,
+            used: u.signs_this_month,
+            overage_count: Math.max(0, u.signs_this_month - ent.quotas.signs_month),
+            reset_date: quota.nextResetDate(),
+          };
         } catch { return { allowed: true, over_limit: false }; }
       },
       readBody, J, log,
@@ -5569,17 +5579,41 @@ const server = http.createServer(async (req, res) => {
       // or an unknown account: a signer is never blocked by infra.
       const _signerPlan = (accounts.get(accountId) && accounts.get(accountId).plan)
         || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
-      // Signs limit from ENTITLEMENTS (plan_parasign, legacy-plan fallback),
-      // the per-product ParaSign tier -- NOT the product-blind tiers.tierLimitNum.
+      // Signs limit + overage policy from ENTITLEMENTS (plan_parasign,
+      // legacy-plan fallback), the per-product ParaSign tier -- never the
+      // product-blind tiers.js helpers. Tier behaviour (Mick's brief):
+      //   free      2 included, blocks at 2
+      //   pro       100 included, overage EUR 0.40/sign from the 101st,
+      //             HARD stop at 1000 (402, never a silent run-up)
+      //   business  1000 included, blocks at 1000
+      //   enterprise config ceiling, unchanged
+      // The block/meter decision itself is quota.signGateDecision, shared with
+      // the /v1 create gate so both paths can never diverge.
       const _signerRec = accounts.get(accountId) || apiKeys.get(accountId) || { plan: _signerPlan };
-      const _signLimit = entitlements.signsQuota(_signerRec);
-      if (accountId && Number.isFinite(_signLimit)) {
+      const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
+      const _signIncluded = _signEnt.quotas.signs_month;
+      const _signOverage = _signEnt.overage; // { rate_eur, hard_cap }, nulls when the tier blocks at its quota
+      const _signMetered = _signOverage.rate_eur != null && Number.isFinite(_signOverage.hard_cap);
+      let _signUsed = null; // best-effort count this month, feeds the 200 quota field
+      if (accountId && Number.isFinite(_signIncluded)) {
         try {
           const _u = await quota.readUsage(redisClient, accountId);
-          if (_u.available && Number.isFinite(_u.signs_this_month) && _u.signs_this_month >= _signLimit) {
-            log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signerPlan, limit: _signLimit });
-            res.writeHead(402, { 'Content-Type': 'application/json' });
-            return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: _signerPlan, limit: _signLimit }));
+          if (_u.available && Number.isFinite(_u.signs_this_month)) {
+            _signUsed = _u.signs_this_month;
+            const _dec = quota.signGateDecision(_signUsed, _signEnt);
+            if (!_dec.allowed) {
+              log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: _dec.reason, limit: _dec.limit, used: _signUsed });
+              res.writeHead(402, { 'Content-Type': 'application/json' });
+              if (_dec.reason === 'hard_cap') {
+                return res.end(J({ error: 'monthly_sign_hard_cap_reached', dimension: 'signs_month',
+                  plan: _signEnt.tier, limit: _dec.limit,
+                  overage_count: Math.max(0, _signUsed - _signIncluded),
+                  reset_date: quota.nextResetDate() }));
+              }
+              return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
+                plan: _signEnt.tier, limit: _dec.limit, used: _signUsed,
+                reset_date: quota.nextResetDate() }));
+            }
           }
         } catch (qe) { log('warn', 'quota_sign_pregate_failed', { err: qe.message }); }
       }
@@ -5603,10 +5637,15 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Count exactly one signature per NEW accepted party-signature (signs_month
-      // is a signature counter, so multi-party envelopes count per party). An
-      // 'idem' retry does not re-count. Fire-and-forget on the shared redis.
+      // is a signature counter, so multi-party envelopes count per party), plus
+      // one billable overage sign once past the included quota. An 'idem' retry
+      // never reaches recordSignTiered, so neither counter double-counts on
+      // retry. Awaited (single INCR) so the 200 below reports fresh numbers;
+      // fail-open: a redis hiccup never blocks the signer's 200.
       if (out.code === 'new' && accountId) {
-        quota.recordSign(redisClient, accountId, log).catch(() => {});
+        const _r = await quota.recordSignTiered(redisClient, accountId, _signIncluded, log);
+        if (_r.counted) _signUsed = _r.used;
+        else if (_signUsed != null) _signUsed += 1; // count failed: still reflect this sign best-effort
       }
 
       // ── Completion webhooks (were never fired from the sign path) ───────────
@@ -5628,8 +5667,23 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      // API contract with the dashboard: every successful sign response carries
+      // a `quota` field so the frontend can render usage without a second call.
+      // Overage fields are null for tiers that block at their quota (free,
+      // business, enterprise); only Pro meters. Omitted entirely when there is
+      // no account or redis could not be read (fail-open, field is best-effort).
+      const _quotaField = (accountId && _signUsed != null && Number.isFinite(_signIncluded)) ? {
+        used: _signUsed,
+        included: _signIncluded,
+        overage_count: _signMetered ? Math.max(0, _signUsed - _signIncluded) : null,
+        overage_rate_eur: _signMetered ? _signOverage.rate_eur : null,
+        hard_cap: _signMetered ? _signOverage.hard_cap : null,
+        reset_date: quota.nextResetDate(),
+      } : null;
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status }));
+      return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status,
+        ...(_quotaField ? { quota: _quotaField } : {}) }));
     } catch (e) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
