@@ -16,6 +16,7 @@ const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
 const { buildRecipientParties } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
+const { billingStubGone } = require('./lib/billing-stub');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -2531,94 +2532,18 @@ api.get("/user/billing/plans", (req, res) => {
   res.json({ plans: PLANS });
 });
 
-api.post("/user/billing/checkout", authUser, async (req, res) => {
-  const { plan_id, period } = req.body || {};
-  if (!plan_id || !['monthly', 'yearly'].includes(period)) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-  const plan = PLANS.find(p => p.id === plan_id);
-  if (!plan || plan.id === 'community') return res.status(400).json({ error: 'invalid_plan' });
-  if (plan.price_monthly_eur === null) return res.status(400).json({ error: 'enterprise_contact_sales' });
-
-  const amount = period === 'yearly' ? plan.price_yearly_eur : plan.price_monthly_eur;
-  const token = crypto.randomBytes(20).toString('hex');
-  const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
-
-  await redis().set(
-    `paramant:user:checkout:${token}`,
-    JSON.stringify({
-      user_id: req.userSession.user_id,
-      email: req.userSession.email,
-      plan_id,
-      plan_name: plan.name,
-      period,
-      amount_eur: amount,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    }),
-    { EX: 3600 }
-  );
-
-  // PLACEHOLDER: replace this block with a Mollie payment (mollieClient.payments.create) when integrating Mollie
-  res.json({ checkout_url: `/billing/checkout/${token}`, expires_at: expiresAt });
-});
-
-api.get("/user/billing/checkout/:token", authUser, async (req, res) => {
-  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
-  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
-  const s = JSON.parse(raw);
-  if (s.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
-  res.json({ plan_id: s.plan_id, plan_name: s.plan_name, period: s.period, amount_eur: s.amount_eur, email: s.email, status: s.status });
-});
-
-api.post("/user/billing/checkout/:token/confirm", authUser, async (req, res) => {
-  const raw = await redis().get(`paramant:user:checkout:${req.params.token}`);
-  if (!raw) return res.status(404).json({ error: 'checkout_not_found' });
-  const session = JSON.parse(raw);
-  if (session.user_id !== req.userSession.user_id) return res.status(403).json({ error: 'forbidden' });
-  if (session.status !== 'pending') return res.status(409).json({ error: 'already_processed' });
-
-  // Get current plan for audit log
-  const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
-  const currentKey = (keysRes.body?.keys || []).find(k => k.key === session.user_id);
-  const fromPlan = currentKey?.plan || 'community';
-
-  // PLACEHOLDER: replace with Mollie webhook handling (re-fetch payment status) when integrating Mollie
-  const updateRes = await callRelay("/v2/admin/keys/update-plan", { key: session.user_id, plan: session.plan_id });
-  if (!updateRes.ok) {
-    console.error('[billing] update-plan failed:', updateRes.status);
-    return res.status(502).json({ error: 'plan_update_failed' });
-  }
-
-  // (cross-sector /v2/reload-users trigger removed: update-plan already mutates
-  // the relay's in-memory apiKeys directly. The reload was the cause of the
-  // 2026-05-08 wipe race against the concurrent users.json write.)
-
-  const now = new Date().toISOString();
-  const nextBilling = session.period === 'yearly'
-    ? new Date(Date.now() + 365 * 86_400_000).toISOString()
-    : new Date(Date.now() + 30 * 86_400_000).toISOString();
-
-  await redis().set(
-    `paramant:user:billing:${session.user_id}`,
-    JSON.stringify({ plan: session.plan_id, period: session.period, amount_eur: session.amount_eur, activated_at: now, next_billing_date: nextBilling })
-  );
-
-  await logAuditEvent(session.user_id, 'plan_changed', {
-    from: fromPlan, to: session.plan_id, period: session.period, amount_eur: session.amount_eur, via: 'stub_checkout',
-  });
-
-  await redis().set(
-    `paramant:user:checkout:${req.params.token}`,
-    JSON.stringify({ ...session, status: 'completed', completed_at: now }),
-    { EX: 3600 }
-  );
-
-  try { await sendBillingConfirmation(session.email, session.plan_id, session.amount_eur, session.period); }
-  catch (err) { console.error('[billing] confirmation email failed:', err.message); }
-
-  res.json({ success: true, new_plan: session.plan_id, effective_from: now });
-});
+// -- Billing stub checkout -- HARD-DISABLED 2026-07-20 ------------------------
+// SECURITY: these three endpoints were a no-payment plan-grant bypass. The
+// confirm step called /v2/admin/keys/update-plan (admin-privileged) after only
+// checking the checkout was 'pending', so any logged-in free user could grant
+// themselves Pro for 0 euro. The ONLY path to a paid plan is now the Mollie flow
+// on the relay: POST /v2/billing/checkout creates a real payment and
+// /v2/billing/webhook grants the tier ONLY after Mollie confirms 'paid' with a
+// matching amount (relay lib/billing.processPayment). These endpoints grant
+// nothing and are kept as 410 Gone so any stale client gets a clean signal.
+api.post("/user/billing/checkout", authUser, billingStubGone);
+api.get("/user/billing/checkout/:token", authUser, billingStubGone);
+api.post("/user/billing/checkout/:token/confirm", authUser, billingStubGone);
 
 api.post("/user/billing/cancel", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
