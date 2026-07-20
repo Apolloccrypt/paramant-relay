@@ -123,6 +123,23 @@ else
   PASS=$((PASS+1))
 fi
 
+note ""
+note "== CRITICAL: sign-path smoke (2026-07-20 regression) =="
+# Detects "sign handler unreachable (401)" before a customer does. Read-only:
+# probes a dummy envelope id and keyless/sessionless endpoints, mutates nothing.
+SIGN_SMOKE="$(dirname "$0")/sign-smoke.sh"
+if [ -x "$SIGN_SMOKE" ]; then
+  if "$SIGN_SMOKE" "$SITE" >>"$REPORT" 2>&1; then
+    note "PASS: sign-smoke (sign handler reachable, gates intact)"
+    PASS=$((PASS+1))
+  else
+    note "FAIL: sign-smoke (sign handler may be 401 / a gate too broad) - see $REPORT"
+    FAIL=$((FAIL+1)); CRITICAL=$((CRITICAL+1))
+  fi
+else
+  skip "sign-smoke.sh missing or not executable at $SIGN_SMOKE"
+fi
+
 {
   echo ""
   echo "## Summary"
