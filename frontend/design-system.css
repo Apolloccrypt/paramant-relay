@@ -2980,3 +2980,34 @@ a.skip-link:focus-visible,
   text-underline-offset: 2px;
 }
 .app-warning__link:hover { color: #7F1D1D; }
+
+/* ── Quota upgrade notice ─────────────────────────────────────────────────────
+   Rendered by js/quota-upgrade.js when the relay answers 402
+   monthly_*_quota_reached. A purchase moment, not an error dump. */
+.pa-quota-upsell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 480px;
+  padding: var(--space-4, 16px) var(--space-5, 20px);
+  border: 1px solid rgba(11, 58, 106, 0.14);
+  border-radius: 14px;
+  background: var(--bone, #FAF7F0);
+  box-shadow: 0 4px 14px rgba(11, 58, 106, 0.06);
+  text-align: left;
+}
+.pa-quota-upsell strong {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink, #0B1622);
+}
+.pa-quota-upsell span {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-dim, #5A6B7A);
+}
+.pa-quota-upsell .btn { margin-top: 4px; }
+

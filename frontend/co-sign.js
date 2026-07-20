@@ -402,6 +402,14 @@ async function doSign() {
     // Zeroize any unconsumed ephemeral secret and drop it so a retry re-prompts
     // for a fresh code (a PRF __signKey stays cached for a one-tap retry).
     if (__ephemeralSigner) { try { __ephemeralSigner.dispose(); } catch { /* best-effort */ } __ephemeralSigner = null; }
+    // Free monthly signing limit (relay 402, dimension/plan/limit passed
+    // through by the admin proxy): a purchase moment, not an error dump.
+    if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
+      setStatus('err', 'Free monthly signing limit reached.');
+      showCta(window.paQuotaUpgrade.html(e.data));
+      $('sign-confirm').disabled = false;
+      return;
+    }
     let msg;
     if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link — your sign-in passkey becomes your signing key.';
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;

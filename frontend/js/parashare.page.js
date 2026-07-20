@@ -379,6 +379,11 @@ async function confirmFingerprint() {
           signal: AbortSignal.timeout(120000)
         });
         const ud = await ur.json();
+        // Free monthly transfer limit: keep the relay's 402 JSON on the error
+        // so the catch below renders the upgrade notice instead of a raw error.
+        if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
+          const qe = new Error(ud.error); qe.quota = ud; throw qe;
+        }
         if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
         tokens.push(ud.download_token);
       }
@@ -415,8 +420,14 @@ async function confirmFingerprint() {
     showStep('step-done');
 
   } catch(e) {
-    $('enc-status').textContent = 'Error: ' + e.message;
-    $('enc-status').className = 'status-line err';
+    if (e && e.quota && window.paQuotaUpgrade) {
+      // Quota reached is a purchase moment, not an error dump. Server JSON only.
+      $('enc-status').className = 'status-line';
+      $('enc-status').innerHTML = window.paQuotaUpgrade.html(e.quota);
+    } else {
+      $('enc-status').textContent = 'Error: ' + e.message;
+      $('enc-status').className = 'status-line err';
+    }
   }
 }
 

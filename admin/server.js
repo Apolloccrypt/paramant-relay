@@ -1639,7 +1639,12 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
       account_id: act.account_id,
     }, "POST");
     const body = await r.json().catch(() => ({}));
-    if (r.status !== 200) return res.status(r.status).json({ error: body.error || "sign_failed" });
+    if (r.status !== 200) {
+      // 402 quota: pass the relay JSON through unchanged (dimension/plan/
+      // limit) so the frontend can render the upgrade notice.
+      if (r.status === 402) return res.status(402).json(body);
+      return res.status(r.status).json({ error: body.error || "sign_failed" });
+    }
     try { logAuditEvent(String(user_id).slice(0, 12) + "…", "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
     return res.json({ ok: true, signed_count: body.signed_count, party_count: body.party_count, status: body.status });
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }

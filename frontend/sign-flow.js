@@ -2426,6 +2426,13 @@ async function doSign() {
     $('ds-sign-status').className = 'ds-banner err';
     // A failed signing attempt is urgent and actionable: announce it assertively.
     $('ds-sign-status').setAttribute('aria-live', 'assertive');
+    // Free monthly signing limit (relay 402, dimension/plan/limit passed
+    // through by the admin proxy): a purchase moment, not an error dump.
+    if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
+      $('ds-sign-status').innerHTML = window.paQuotaUpgrade.html(e.data);
+      $('ds-sign-now').disabled = false;
+      return;
+    }
     // Map to an actionable message. A passkey/provider error (e.g. Firefox's
     // opaque "AuthenticatorError" from a PRF assertion) has no e.status/e.code,
     // so it lands in the final else with a recovery path — never the raw engine
