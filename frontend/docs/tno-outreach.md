@@ -16,7 +16,7 @@
 
 Dear ACQuA team,
 
-I am writing because Paramant addresses something that is almost entirely absent from current PQC migration discussions: an operational, open-source file relay running today on ML-KEM-768 (NIST FIPS 203) and ML-DSA-65 (FIPS 204), fully within EU jurisdiction.
+I am writing because Paramant addresses something that is almost entirely absent from current PQC migration discussions: an operational, source-available file relay running today on ML-KEM-768 (NIST FIPS 203) and ML-DSA-65 (FIPS 204), fully within EU jurisdiction.
 
 **What Paramant is**
 
@@ -30,7 +30,7 @@ ACQuA focuses on the practical deployability of post-quantum cryptography — ex
 
 - Applies ML-KEM-768 to a realistic use case (file transfer in healthcare and critical infrastructure)
 - Falls fully within NIS2 Annex I/II and NEN 7510-2
-- Is verifiable via a public CT log and open source code
+- Is verifiable via a public CT log and source-available code
 - Is in use today, not in two years
 
 **What we propose**
