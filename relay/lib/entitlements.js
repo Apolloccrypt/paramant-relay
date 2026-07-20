@@ -81,6 +81,48 @@ function normaliseParasignTier(t) {
   return PARASIGN_TIERS.includes(t) ? t : 'free';
 }
 
+// Which users.json / apiKeys record field carries a product's tier.
+const PRODUCT_PLAN_FIELD = Object.freeze({
+  parasend: 'plan_parasend',
+  parasign: 'plan_parasign',
+});
+
+// ── Admin per-product grant primitives ───────────────────────────────────────
+// These back the fine-grained admin path (POST /v2/admin/keys/set-product-plan)
+// so exactly ONE product's tier moves, with the unified `plan` and the other
+// product left alone. Kept HERE (the single product/tier source) so the relay
+// endpoint and billing's setProductPlan share one rule.
+
+// Strict gate for an admin request. Unlike normalise*Tier (which FLOORS an
+// unknown tier to the product's base, silently under-granting), this REJECTS an
+// unknown product or a tier that is not a real member of that product's ladder,
+// so a typo returns 400 instead of quietly landing on the floor tier. Returns
+// { ok:true, product, tier } or { ok:false, error }.
+function validateProductPlan(product, tier) {
+  if (product !== 'parasend' && product !== 'parasign') return { ok: false, error: 'invalid_product' };
+  const ladder = product === 'parasign' ? PARASIGN_TIERS : PARASEND_TIERS;
+  if (typeof tier !== 'string' || !ladder.includes(tier)) return { ok: false, error: 'invalid_tier' };
+  return { ok: true, product, tier };
+}
+
+// Apply ONE product's tier to a single account/key record IN PLACE and report
+// what moved. This is the field-level mutation shared by billing's
+// setProductPlan (relay.js): it writes only PRODUCT_PLAN_FIELD[product], flips
+// the `parasign` ACCESS flag on when parasign lands on a paid (non-free) tier,
+// and NEVER touches the other product's field or the unified `plan`. `tier` is
+// normalised (idempotent), so passing an already-normalised value is safe.
+// Returns { field, tier, changed, parasignGranted }; `changed` reflects the
+// plan-field move only (an already-set access flag is not a plan change).
+function applyProductTier(rec, product, tier) {
+  const field = PRODUCT_PLAN_FIELD[product];
+  const norm = product === 'parasign' ? normaliseParasignTier(tier) : normaliseParasendTier(tier);
+  let changed = false;
+  if (rec[field] !== norm) { rec[field] = norm; changed = true; }
+  let parasignGranted = false;
+  if (product === 'parasign' && norm !== 'free' && rec.parasign !== true) { rec.parasign = true; parasignGranted = true; }
+  return { field, tier: norm, changed, parasignGranted };
+}
+
 // ── Migration: legacy single `plan` (+ parasign flag) -> per-product plan ─────
 // These are pure and additive. They NEVER downgrade: the derived per-product
 // tier grants at least the effective level the account has today.
@@ -240,6 +282,9 @@ module.exports = {
   derivePlanParasign,
   normaliseParasendTier,
   normaliseParasignTier,
+  PRODUCT_PLAN_FIELD,
+  validateProductPlan,
+  applyProductTier,
   getEntitlements,
   transfersQuota,
   signsQuota,

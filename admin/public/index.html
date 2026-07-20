@@ -321,16 +321,39 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
     <div class="mbody">
       <div class="mc"><label>Current plan</label><span id="cp-current" style="font-size:12px;font-family:var(--ff-mono);color:#475569"></span></div>
       <div class="mc">
-        <label for="cp-plan">New plan</label>
+        <label for="cp-plan">New plan (coarse: bumps BOTH products)</label>
         <select id="cp-plan">
           <option value="community">community</option>
           <option value="pro">pro</option>
           <option value="enterprise">enterprise</option>
         </select>
+        <div style="font-size:11px;color:#92400e;margin-top:4px">Sets ParaSign AND ParaSend together. For one product only, use "Per-product tier" below.</div>
       </div>
       <div class="mc" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="cp-notify" checked>
         <label for="cp-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
+      </div>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:18px 0 14px">
+      <div class="mc" style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Per-product tier (recommended)</div>
+      <div class="mc" style="font-size:12px;color:#475569;margin-top:0">Sets one product only. Leaves the unified plan above and the other product untouched. Use this for a ParaSign-only or ParaSend-only customer; the coarse "New plan" above bumps BOTH products.</div>
+      <div class="mc"><label>Current</label><span id="pp-current" style="font-size:12px;font-family:var(--ff-mono);color:#475569"></span></div>
+      <div class="mc">
+        <label for="pp-product">Product</label>
+        <select id="pp-product" data-change="ppProductChange">
+          <option value="parasign">ParaSign</option>
+          <option value="parasend">ParaSend</option>
+        </select>
+      </div>
+      <div class="mc">
+        <label for="pp-tier">Tier</label>
+        <select id="pp-tier"></select>
+      </div>
+      <div class="mc" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="pp-notify">
+        <label for="pp-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
+      </div>
+      <div class="mc" style="margin-bottom:0">
+        <button class="btn pri" id="pp-btn" data-click="doSetProductPlan" style="width:100%">Save product tier</button>
       </div>
     </div>
     <div class="mfoot">

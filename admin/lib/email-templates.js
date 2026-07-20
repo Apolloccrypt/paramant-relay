@@ -309,6 +309,49 @@ https://paramant.app`;
   };
 }
 
+// ── 4b. PER-PRODUCT PLAN CHANGE ───────────────────────────────────────────────
+// Sent when an admin sets a SINGLE product's tier (ParaSign or ParaSend) without
+// touching the other product or the unified plan. Deliberately carries NO
+// "beta / no charge / stub" language: this is a scoped entitlement change, not a
+// billing-stub confirmation. productName is a display name ("ParaSign"),
+// tierName the tier ("Pro"); both are constants from the caller.
+function productPlanChangeEmail({ productName, tierName }) {
+  const safeProduct = escHtml(productName || 'your product');
+  const safeTier = escHtml(tierName || '');
+  const preheader = `Your ${safeProduct} plan is now ${safeTier}.`;
+
+  const text = `Hi,
+
+Your ${productName} plan has been updated.
+
+Product: ${productName}
+Tier:    ${tierName}
+
+Only your ${productName} entitlement changed. Your other Paramant products
+and their tiers are unaffected.
+
+Questions? Reply to this email.
+
+Paramant
+https://paramant.app`;
+
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${safeProduct} plan updated to ${safeTier}</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your ${safeProduct} plan has been updated.</p>
+    <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Product</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${safeProduct}</td></tr>
+      <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Tier</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${safeTier}</span></td></tr>
+    </table>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Only your ${safeProduct} entitlement changed. Your other Paramant products and their tiers are unaffected.</p>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions? Reply to this email.</p>
+  `);
+
+  return {
+    ...wrap(text, html, { refId: 'product-plan-' + Date.now() }),
+    subject: `Paramant ${productName} plan updated to ${tierName}`,
+  };
+}
+
 // ── 5. BILLING CANCELLATION ───────────────────────────────────────────────────
 function billingCancellationEmail({ planName, cancelDate }) {
   const preheader = `Your ${planName} plan ends on ${cancelDate}.`;
@@ -649,6 +692,7 @@ module.exports = {
   welcomeEmail,
   parasignOnboardingEmail, /*MARK:parasign_export*/
   billingConfirmationEmail,
+  productPlanChangeEmail,
   billingCancellationEmail,
   accountDeletionEmail,
   sendEmail,

@@ -1675,7 +1675,6 @@ function grantParasignOnPaidPlan(accountId) {
 // flag on when the tier is paid (non-free). NEVER touches the other product.
 function setProductPlan(accountId, product, tier) {
   if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
-  const field = product === 'parasign' ? 'plan_parasign' : 'plan_parasend';
   const norm = product === 'parasign'
     ? entitlements.normaliseParasignTier(tier)
     : entitlements.normaliseParasendTier(tier);
@@ -1685,14 +1684,14 @@ function setProductPlan(accountId, product, tier) {
   for (const m of members) {
     const mv = apiKeys.get(m);
     if (!mv) continue;
-    if (mv[field] !== norm) { mv[field] = norm; changed++; }
-    if (product === 'parasign' && norm !== 'free' && mv.parasign !== true) mv.parasign = true;
+    // Single field-level rule (writes only this product's field + the parasign
+    // access flag; never the other product or the unified `plan`).
+    if (entitlements.applyProductTier(mv, product, norm).changed) changed++;
   }
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
       if ((entry.account_id || entry.key) === accountId) {
-        entry[field] = norm;
-        if (product === 'parasign' && norm !== 'free') entry.parasign = true;
+        entitlements.applyProductTier(entry, product, norm);
         entry.plan_updated = new Date().toISOString();
       }
     }
@@ -4924,6 +4923,11 @@ const server = http.createServer(async (req, res) => {
     const keys = [...apiKeys.entries()].map(([k, v]) => ({
       key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
       kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
+      // Per-product truth for the admin panel: the stored per-product tier, or a
+      // no-downgrade derivation from the legacy plan for un-migrated records
+      // (mirrors getEntitlements' fallback) so an operator never sees a blank.
+      plan_parasign: v.plan_parasign || entitlements.derivePlanParasign(v.plan, v.parasign),
+      plan_parasend: v.plan_parasend || entitlements.derivePlanParasend(v.plan),
       usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
@@ -4948,6 +4952,8 @@ const server = http.createServer(async (req, res) => {
     return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
       account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
       active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
+      plan_parasign: v.plan_parasign || entitlements.derivePlanParasign(v.plan, v.parasign),
+      plan_parasend: v.plan_parasend || entitlements.derivePlanParasend(v.plan),
       usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null }));/*MARK:parasign_reveal*/
   }
 
@@ -5134,6 +5140,35 @@ const server = http.createServer(async (req, res) => {
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
       applyKeyLimitEnforcement();
       res.writeHead(200); return res.end(J({ ok: true, key, plan }));
+    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── POST /v2/admin/keys/set-product-plan ────────────────────────────────────
+  // Fine-grained sibling of /v2/admin/keys/update-plan: moves ONE product's tier
+  // (plan_parasign OR plan_parasend) on the target key's account and leaves the
+  // unified `plan` AND the other product untouched. Same internal-auth gate as
+  // update-plan. Body { key, product, tier }. An unknown product, or a tier that
+  // is not on that product's ladder, is rejected 400 (never silently floored to
+  // the base tier). Delegates the account fan-out + users.json persistence to
+  // setProductPlan - the exact block the Mollie webhook uses - so there is one
+  // per-product entitlement path, not a second copy.
+  if (path === '/v2/admin/keys/set-product-plan' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const { key, product, tier } = JSON.parse((await readBody(req, 1024)).toString());
+      if (!key) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
+      const v = entitlements.validateProductPlan(product, tier);
+      if (!v.ok) { res.writeHead(400); return res.end(J({ error: v.error })); }
+      if (!apiKeys.has(key)) { res.writeHead(404); return res.end(J({ error: 'key_not_found' })); }
+      const accountId = acctOf(key);
+      // EXPLICITLY does not set the unified `plan` and does not touch the other
+      // product; setProductPlan writes only plan_<product> (+ the parasign access
+      // flag on a paid parasign tier).
+      const out = setProductPlan(accountId, v.product, v.tier);
+      if (!out.ok) { res.writeHead(422); return res.end(J({ error: out.reason || 'not_applied' })); }
+      try { auditAppend(key, 'admin_product_plan_changed', { product: v.product, tier: out.tier, keys: out.keys }); } catch {}
+      log('info', 'admin_product_plan_changed', { account: String(accountId).slice(0, 12), product: v.product, tier: out.tier, keys: out.keys, changed: out.changed });
+      res.writeHead(200); return res.end(J({ ok: true, key, product: v.product, tier: out.tier }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 

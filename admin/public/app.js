@@ -222,13 +222,14 @@ function usersTable(users){
       return '<tr>'+
         '<td data-label="User"><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
         purposeLine(u)+'</td>'+
-        '<td data-label="Plan"><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span>'+(u.parasign?' <span class="chip active" title="ParaSign /v1 API enabled">ParaSign</span>':'')+'</td>'+ /*MARK:parasign_badge*/
+        '<td data-label="Plan"><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span>'+(u.parasign?' <span class="chip active" title="ParaSign /v1 API enabled">ParaSign</span>':'')+
+          '<div class="mono" style="font-size:10px;color:#475569" title="Per-product tiers">sign:'+esc(u.plan_parasign||'—')+' · send:'+esc(u.plan_parasend||'—')+'</div></td>'+ /*MARK:parasign_badge*/
         '<td data-label="TOTP">'+totpBadge(u)+'</td>'+
         '<td data-label="Status"><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
         '<td data-label="Created" class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
         '<td class="actions"><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" data-click="toggleMenu" data-menu="m'+i+'">···</button>'+
-          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'" data-parasign="'+(u.parasign?'true':'false')+'">'+ /*MARK:parasign_dataset*/
+          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'" data-parasign="'+(u.parasign?'true':'false')+'" data-pp-sign="'+esc(u.plan_parasign||'')+'" data-pp-send="'+esc(u.plan_parasend||'')+'">'+ /*MARK:parasign_dataset*/
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="details">View details</button>'+
             '<div class="ag-lbl">Email</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="welcome"'+(hasE?'':' disabled')+'>Send welcome</button>'+
@@ -302,7 +303,7 @@ function uAction(action,btn){
     case 'welcome': openEmailPreviewModal('welcome',key,email); break;
     case 'setup':   openEmailPreviewModal('setup',key,email); break;
     case 'reset-totp': openEmailPreviewModal('reset-confirm',key,email); break;
-    case 'plan':    openChangePlanModal(key,email,plan); break;
+    case 'plan':    openChangePlanModal(key,email,plan,m.dataset.ppSign,m.dataset.ppSend); break;
     case 'revoke-sessions':
       if(!confirm('Revoke all sessions for '+(email||key.slice(0,20)+'…')+'?'))return;
       api('/admin/revoke-sessions',{method:'POST',body:JSON.stringify({key})}).then(r=>{
@@ -532,10 +533,31 @@ async function doSendEmail(){
   closeModal('mo-email');document.getElementById('ep-send-btn').textContent='Send email →';
   toast(r.ok?'Email sent':'Send failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
 }
-function openChangePlanModal(key,email,currentPlan){
-  _ms.plan={key,email};
+// Per-product tier ladders. MUST mirror relay/lib/entitlements.js
+// (PARASIGN_TIERS / PARASEND_TIERS); the relay re-validates, this only shapes UI.
+const PP_TIERS={parasign:['free','pro','business','enterprise'],parasend:['community','pro','enterprise']};
+function ppFillTiers(){
+  const p=document.getElementById('pp-product').value;
+  document.getElementById('pp-tier').innerHTML=(PP_TIERS[p]||[]).map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+}
+function ppProductChange(){
+  ppFillTiers();
+  const p=document.getElementById('pp-product').value;
+  const cur=p==='parasign'?(_ms.plan&&_ms.plan.ppSign):(_ms.plan&&_ms.plan.ppSend);
+  if(cur&&(PP_TIERS[p]||[]).includes(cur))document.getElementById('pp-tier').value=cur;
+}
+function openChangePlanModal(key,email,currentPlan,ppSign,ppSend){
+  _ms.plan={key,email,ppSign:ppSign||'',ppSend:ppSend||''};
   document.getElementById('cp-current').textContent=currentPlan||'community';
   document.getElementById('cp-plan').value=currentPlan||'community';
+  document.getElementById('pp-current').textContent='ParaSign: '+(ppSign||'—')+'  ·  ParaSend: '+(ppSend||'—');
+  document.getElementById('pp-product').value='parasign';
+  document.getElementById('pp-notify').checked=false;
+  ppFillTiers();
+  // Preselect the tier dropdown to the product's CURRENT tier so the operator
+  // sees where it stands before moving it.
+  const cur=document.getElementById('pp-product').value==='parasign'?ppSign:ppSend;
+  if(cur&&(PP_TIERS.parasign.includes(cur)||PP_TIERS.parasend.includes(cur)))document.getElementById('pp-tier').value=cur;
   openModal('mo-plan');setTimeout(()=>document.getElementById('cp-plan').focus(),50);
 }
 async function doChangePlan(){
@@ -547,6 +569,18 @@ async function doChangePlan(){
   closeModal('mo-plan');document.getElementById('cp-btn').disabled=false;
   toast(r.ok?'Plan → '+new_plan:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;loadUsers();}
+}
+async function doSetProductPlan(){
+  const {key}=_ms.plan||{};if(!key)return;
+  const product=document.getElementById('pp-product').value;
+  const tier=document.getElementById('pp-tier').value;
+  const notify=document.getElementById('pp-notify').checked;
+  const btn=document.getElementById('pp-btn');btn.disabled=true;
+  const r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify})});
+  btn.disabled=false;
+  const label=(product==='parasign'?'ParaSign':'ParaSend')+' → '+tier;
+  toast(r.ok?label:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  if(r.ok){closeModal('mo-plan');LOADED.users=false;loadUsers();}
 }
 function openDisableKeyModal(key,email){
   _ms.disable={key,email};
@@ -606,10 +640,15 @@ async function openUserDetailsModal(key){
   const r=await api('/admin/user-details/'+key);
   if(!r.ok){document.getElementById('mo-details-body').innerHTML='<div class="empty">Error: '+(r.data?.error||'unknown')+'</div>';return;}
   const d=r.data;
+  const ppSign=esc(d.plan_parasign||'—'),ppSend=esc(d.plan_parasend||'—');
+  const apiChip=d.parasign?'<span class="chip active">enabled</span>':'<span class="chip none">off</span>';
   document.getElementById('mo-details-body').innerHTML=
     '<div class="g2" style="margin-bottom:16px">'+
       '<div><div class="sc-lbl">Email</div><div class="mono" style="font-size:12px">'+esc(d.email||'—')+'</div></div>'+
-      '<div><div class="sc-lbl">Plan</div><span class="badge '+(d.plan||'community')+'">'+(d.plan||'community')+'</span></div>'+
+      '<div><div class="sc-lbl">Plan (unified)</div><span class="badge '+(d.plan||'community')+'">'+(d.plan||'community')+'</span></div>'+
+      '<div><div class="sc-lbl">ParaSign tier</div><span class="badge '+ppSign+'">'+ppSign+'</span></div>'+
+      '<div><div class="sc-lbl">ParaSend tier</div><span class="badge '+ppSend+'">'+ppSend+'</span></div>'+
+      '<div><div class="sc-lbl">ParaSign /v1 API</div>'+apiChip+'</div>'+
       '<div><div class="sc-lbl">TOTP</div><span class="chip '+(d.totp_status||'none')+'">'+(d.totp_status||'none')+'</span></div>'+
       '<div><div class="sc-lbl">Sessions</div><div class="sc-val" style="font-size:20px">'+(d.active_sessions||0)+'</div></div>'+
       '<div><div class="sc-lbl">Status</div><span class="chip '+(d.active?'active':'revoked')+'">'+(d.active?'active':'revoked')+'</span></div>'+
@@ -682,6 +721,8 @@ act('click', 'closeModal', (el) => closeModal(el.dataset.modal));
 act('click', 'epTab', (el) => epTab(el.dataset.arg, el));
 act('click', 'doSendEmail', () => doSendEmail());
 act('click', 'doChangePlan', () => doChangePlan());
+act('click', 'doSetProductPlan', () => doSetProductPlan());
+act('change', 'ppProductChange', () => ppProductChange());
 act('click', 'doDisableKey', () => doDisableKey());
 act('click', 'doDeleteAccount', () => doDeleteAccount());
 act('click', 'doForceTotpRequirement', () => doForceTotpRequirement());

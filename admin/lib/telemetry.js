@@ -57,6 +57,10 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       email: meta.email || k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
       parasign: k.parasign === true, /*MARK:parasign_user*/
+      // Per-product tiers so the panel shows the ParaSign/ParaSend truth, not just
+      // the coarse unified plan. Relay always fills these (stored or derived).
+      plan_parasign: k.plan_parasign || null,
+      plan_parasend: k.plan_parasend || null,
       active: k.active !== false, revoked_at: k.revoked_at || null,
       created, totp_status,
       totp_required: meta.totp_required === true,

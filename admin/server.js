@@ -2880,6 +2880,39 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
   } catch (err) { console.error('[admin/change-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 
+// ── POST /admin/set-product-plan — fine-grained per-product tier grant ────────
+// Sibling of /admin/change-plan that moves ONE product's tier (ParaSign OR
+// ParaSend) WITHOUT bumping the coarse unified plan or the other product.
+// Proxies to the relay's /v2/admin/keys/set-product-plan (same X-Internal-Auth
+// path as change-plan via callRelay), then reloads users fleet-wide so the
+// entitlement is observable at once. An unknown product or a tier not on that
+// product's ladder is rejected 400. Optional notify uses the per-product mail
+// (productPlanChangeEmail) - NO billing-stub / no-charge language.
+api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
+  const { key, product, tier, notify = false } = req.body || {};
+  const LADDERS = { parasign: ['free', 'pro', 'business', 'enterprise'], parasend: ['community', 'pro', 'enterprise'] };
+  if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
+  if (!LADDERS[product]) return res.status(400).json({ error: 'invalid_product', valid: Object.keys(LADDERS) });
+  if (!LADDERS[product].includes(tier)) return res.status(400).json({ error: 'invalid_tier', valid: LADDERS[product] });
+  if (!await checkAdminRl('set_product_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const meta = await getAdminKeyMeta(key);
+    const r = await callRelay('/v2/admin/keys/set-product-plan', { key, product, tier });
+    if (!r.ok) {
+      let body = null; try { body = await r.json(); } catch {}
+      return res.status(r.status === 400 || r.status === 404 ? r.status : 502).json({ error: body?.error || 'relay_error' });
+    }
+    await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
+    const productName = product === 'parasign' ? 'ParaSign' : 'ParaSend';
+    const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+    if (notify && meta.email) {
+      emailTemplates.sendEmail(meta.email, emailTemplates.productPlanChangeEmail({ productName, tierName })).catch(e => console.error('[admin/set-product-plan] email:', e.message));
+    }
+    try { await logAuditEvent(key, 'admin_product_plan_changed', { product, tier, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    res.json({ ok: true, key, product, tier, email_sent: !!(notify && meta.email) });
+  } catch (err) { console.error('[admin/set-product-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
+});
+
 // ── POST /admin/set-parasign - grant/revoke the ParaSign /v1 API entitlement ──
 // Admin override for the `parasign` scope, alongside the automatic grant on
 // payment. Fans the flag out to every sector (like disable-key) so the grant is
@@ -3012,6 +3045,11 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
       email: meta.email || k.email || null,
       label: k.label || null,
       plan: k.plan || 'community',
+      // Per-product tiers (relay fills these, stored or derived) so the detail
+      // view shows the ParaSign/ParaSend truth, not just the unified plan.
+      plan_parasign: k.plan_parasign || null,
+      plan_parasend: k.plan_parasend || null,
+      parasign: k.parasign === true,
       sectors: k.sectors || [],
       active: k.active !== false,
       revoked_at: k.revoked_at || null,
