@@ -23,12 +23,17 @@ Three credential types are in use across different API surfaces:
 | Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints — admin panel only |
 
 > **DID fallback semantics.** When a request carries no API key but a valid
-> `X-DID` + `X-DID-Signature` pair, the relay authenticates the device and
-> processes the request **as a `pro`-plan principal** attributed to that
-> device. An enrolled device credential is therefore a full data-plane
-> credential in its own right, not merely an attribution label: treat device
-> private keys with the same care as API keys, and revoke the DID enrollment
-> when a device is retired or compromised.
+> `X-DID` + `X-DID-Signature` pair, the relay authenticates the device **as the
+> API key the DID was enrolled under**: the request runs with that owner's real
+> plan and entitlements, and monthly quotas (`transfers_month`, `signs_month`)
+> count on the owner's account exactly as if the owner's `X-Api-Key` had been
+> sent, including the same `402` responses over quota. A keyless enrollment
+> (e.g. an `inv_` receiver session), a revoked enrollment, or an enrollment
+> whose owner key is revoked or deleted grants no principal (`401`). An
+> enrolled device credential is therefore a full data-plane credential for the
+> owner's account, not merely an attribution label: treat device private keys
+> with the same care as API keys, and revoke the DID enrollment when a device
+> is retired or compromised.
 
 CT log and STH endpoints are **public** — no credential required.
 
@@ -379,7 +384,8 @@ Ghost Pipe supports W3C-compatible decentralised identifiers (`did:paramant:`) f
 
 Note that an enrolled DID is also an **authentication fallback**: a request
 without an API key but with a valid `X-DID` + `X-DID-Signature` is accepted
-and runs under the `pro` plan, attributed to the device (see Authentication).
+and runs under the plan and quotas of the API key the DID was enrolled under
+(see Authentication).
 
 ### POST /v2/did/register — Enroll a device
 

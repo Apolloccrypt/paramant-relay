@@ -39,4 +39,30 @@ function sessionValid(sess, now = Date.now()) {
   return !!sess && !(now > sess.expires_ms);
 }
 
-module.exports = { safeEqual, internalAuthOk, sessionValid };
+// ── DID-auth principal ────────────────────────────────────────────────────────
+// The ONE decision that turns a verified DID enrollment into a request
+// principal. A DID never mints its own plan: it authenticates strictly as the
+// API key it was ENROLLED under, so entitlements (lib/entitlements
+// getEntitlements) and the monthly quota gates (transfers_month, signs_month)
+// resolve against the OWNER's real plan and account_id, byte-identical to a
+// request that sends the owner's X-Api-Key itself.
+//
+// Refused (returns null, request falls through to the normal 401 gate):
+//   - no enrollment / keyless enrollment (e.g. 'inv_' receiver-session DIDs)
+//   - enrollment marked revoked (revoked flag or revoked_at timestamp)
+//   - owner key unknown (deleted/rotated) or not active (revoked)
+//
+// `getKeyRecord` is injected (key -> api-key record) so the decision stays pure
+// and unit-testable without the relay monolith.
+function didPrincipal(didEntry, getKeyRecord) {
+  if (!didEntry || !didEntry.key) return null;
+  if (didEntry.revoked === true || didEntry.revoked_at) return null;
+  const owner = (typeof getKeyRecord === 'function') ? getKeyRecord(didEntry.key) : null;
+  if (!owner || !owner.active) return null;
+  const keyData = { ...owner, label: didEntry.device_id };
+  // Quota counters key on account_id: always the OWNER's key, never the device.
+  if (!keyData.account_id) keyData.account_id = didEntry.key;
+  return keyData;
+}
+
+module.exports = { safeEqual, internalAuthOk, sessionValid, didPrincipal };
