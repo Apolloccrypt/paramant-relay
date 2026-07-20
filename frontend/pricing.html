@@ -315,7 +315,6 @@
         <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For one-off browser-encrypted sends. No tracking.</p>
         <ul class="tier-features">
           <li>AES-256-GCM, browser-generated key</li>
-          <li>5 MB per file</li>
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
           <li>10 uploads per hour per IP</li>
@@ -359,7 +358,7 @@
           <li>Up to 100 reads per link</li>
           <li>Unlimited registered devices</li>
           <li>Dedicated relay on our infra or yours</li>
-          <li>Configurable file size limits per tenant (default 5 MB, tested up to 50 MB on dedicated deployments)</li>
+          <li>Configurable limits per tenant</li>
           <li>IEC 62443 / NIS2 / NEN 7510 documentation</li>
           <li>Signed Data Processing Agreement (GDPR Art. 28)</li>
           <li>SLA 99.9%, priority incident response</li>
@@ -369,6 +368,7 @@
       </div>
 
     </div>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;18.15/mo or &euro;181.50/yr.</p>
   </div>
 </section>
 
@@ -419,7 +419,7 @@
       <div class="tier-card">
         <div class="tier-name">Business</div>
         <div class="tier-price">&euro;299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
-        <div class="tier-price-note">excl. btw</div>
+        <div class="tier-price-note">or &euro;2,990/yr &middot; excl. btw</div>
         <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For teams with volume and compliance needs.</p>
         <ul class="tier-features">
           <li>Everything in Pro</li>
@@ -432,6 +432,7 @@
       </div>
 
     </div>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;59.29/mo or &euro;603.79/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
     <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
         <strong>Enterprise from &euro;1,499/mo</strong> · unlimited signatures, dedicated relay, SLA. QES coming via an EU QTSP partner. <a href="mailto:privacy@paramant.app?subject=ParaSign+Enterprise" style="color:var(--cobalt)">Contact us</a>.
@@ -446,7 +447,7 @@
 
     <div class="prose-section">
       <h3>Limits</h3>
-      <p>Every tier stores transfers in RAM with a 5 MB default per file. What differs by tier is how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure the 5 MB default upward within the RAM budget of their deployment.</p>
+      <p>Every tier stores transfers in RAM. What differs by tier is how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure limits within the RAM budget of their deployment.</p>
     </div>
 
     <div class="prose-section">
@@ -489,12 +490,6 @@
       <p class="faq-q">What happens to my file after the recipient downloads it?</p>
       <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped immediately on download (burn-on-read) or on TTL expiry. Nothing persists after expiry on any tier. There is no disk storage.</div>
     </div>
-
-    <div class="faq-item">
-      <p class="faq-q">Why is the file size limited to 5 MB?</p>
-      <div class="faq-a">RAM-only storage is finite. 5 MB covers every document that matters: contracts, medical referrals, legal filings, sensor payloads, firmware chunks. The limit is a consequence of the architecture, not an upsell gate. Enterprise customers with dedicated relays can configure higher limits.</div>
-    </div>
-
 
     <div class="faq-item">
       <p class="faq-q">Can I self-host Paramant for free?</p>
