@@ -112,6 +112,15 @@ export async function uploadAttachment(att, opts) {
     });
     return { success: true, shareUrl: result.shareUrl, expiresAt: result.expiresAt, totalChunks: result.totalChunks };
   } catch (err) {
+    // Monthly transfer quota (HTTP 402): carry the structured fields through so the
+    // taskpane renders a real upgrade notice instead of a bare failure string.
+    if (err?.code === 'quota_reached') {
+      return {
+        success: false, code: 'quota_reached', message: String(err.message || ''),
+        plan: err.plan ?? null, limit: err.limit ?? null,
+        upgradeUrl: err.upgradeUrl || 'https://paramant.app/pricing',
+      };
+    }
     return { success: false, message: String(err?.message || err) };
   }
 }

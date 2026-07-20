@@ -73,6 +73,24 @@ function wireLoginForms() {
 
 function showFormError(el, msg) { el.textContent = msg; el.classList.add('visible'); }
 
+// Reveal the 402 upgrade notice with the plan/limit from the relay body. Text is
+// set via textContent and the link target is a fixed paramant.app URL, so no inline
+// script is introduced (the taskpane runs under the add-in host CSP).
+function showQuotaNotice(info) {
+  const box  = document.getElementById('quota-notice');
+  const body = document.getElementById('quota-notice-text');
+  const link = document.getElementById('quota-notice-link');
+  const text = document.getElementById('progress-text');
+  if (text) { text.textContent = ''; text.classList.remove('failed'); }
+  if (!box || !body || !link) return;
+  const planPart = info.plan ? ` on the ${info.plan} plan` : '';
+  body.textContent = (info.limit || info.limit === 0)
+    ? `You have used all ${info.limit} monthly transfer${info.limit === 1 ? '' : 's'}${planPart}. Upgrade to send more.`
+    : `You have used this month's transfer allowance${planPart}. Upgrade to send more.`;
+  link.href = info.upgradeUrl || 'https://paramant.app/pricing';
+  box.classList.remove('hidden');
+}
+
 // ── Session status ──────────────────────────────────────────────────────────────────
 function showStatus(session) {
   const label = session.email || (session.plan ? `Signed in · ${session.plan}` : 'Signed in');
@@ -130,8 +148,12 @@ async function encryptAll(attachments) {
 
     const result = await uploadAttachment(att, { ttlMs, onProgress: p => setOverall(p.fraction || 0) });
     if (!result.success) {
-      text.textContent = friendly(result.message, att.name);
-      text.classList.add('failed');
+      if (result.code === 'quota_reached') {
+        showQuotaNotice(result);
+      } else {
+        text.textContent = friendly(result.message, att.name);
+        text.classList.add('failed');
+      }
       btn.disabled = false;
       return;
     }

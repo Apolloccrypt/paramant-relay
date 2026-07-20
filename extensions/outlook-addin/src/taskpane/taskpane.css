@@ -247,6 +247,27 @@ h3 {
 
 .progress-text.failed { color: #b91c1c; }
 
+/* 402 monthly-transfer-quota upgrade notice */
+.quota-notice {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(29, 78, 216, 0.06);
+  border-left: 3px solid var(--cobalt);
+}
+.quota-notice.hidden { display: none; }
+.quota-notice strong { display: block; color: var(--navy); font-size: 13px; }
+.quota-notice p { margin: 6px 0 10px; color: var(--ink-mid); font-size: 12px; }
+.quota-notice .quota-upgrade {
+  display: inline-block;
+  padding: 8px 14px;
+  background: var(--navy);
+  color: var(--bone);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+}
+.quota-notice .quota-upgrade:hover { background: var(--cobalt); }
+
 /* Login: rolling-out banner + mode header */
 .banner { padding: 12px 14px; margin-bottom: 20px; font-size: 13px; line-height: 1.5; color: var(--ink-mid); }
 .banner p { margin: 0; }

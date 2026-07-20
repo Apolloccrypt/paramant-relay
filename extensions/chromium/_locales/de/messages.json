@@ -8,6 +8,8 @@
   "err_network":    { "message": "Netzwerkfehler. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut." },
   "err_upload":     { "message": "Upload fehlgeschlagen. Bitte erneut versuchen." },
   "err_incomplete": { "message": "Upload nicht abgeschlossen. Bitte erneut versuchen." },
+  "err_quota":      { "message": "Monatliches Transferlimit erreicht. Upgraden Sie Ihren Tarif, um mehr zu senden." },
+  "cta_upgrade":    { "message": "Tarif upgraden" },
   "success_inserted": { "message": "Verschlüsselter Link eingefügt" },
 
   "link_title":     { "message": "Verschlüsselter Anhang über Paramant" },

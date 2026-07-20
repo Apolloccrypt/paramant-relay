@@ -193,3 +193,24 @@
   animation: paramant-spin 0.7s linear infinite;
   flex-shrink: 0;
 }
+
+/* 402 monthly-transfer-quota upgrade melding (showUpgrade) */
+.paramant-upload-upgrade {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.paramant-upgrade-text { line-height: 1.35; }
+
+.paramant-upgrade-link {
+  align-self: flex-start;
+  padding: 5px 12px;
+  background: #B2FF3F;
+  color: #0B3A6A;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+.paramant-upgrade-link:hover { background: #C6FF6B; }

@@ -8,6 +8,8 @@
   "err_network":    { "message": "Network error. Check your connection and try again." },
   "err_upload":     { "message": "Upload failed. Please try again." },
   "err_incomplete": { "message": "Upload did not finish. Please try again." },
+  "err_quota":      { "message": "Monthly transfer limit reached. Upgrade your plan to send more." },
+  "cta_upgrade":    { "message": "Upgrade plan" },
   "success_inserted": { "message": "Encrypted link inserted" },
 
   "link_title":     { "message": "Encrypted attachment via Paramant" },
