@@ -347,8 +347,9 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
 
   // Bind the PUBLIC key to the account, gated by the TOTP code (relay verifies it).
   say('Linking your signing key to your account…');
+  let enrolRes = null;
   try {
-    await _postJSON('/api/user/account/signing-key', { pk_b64, label: label || 'Signing key', totp: code });
+    enrolRes = await _postJSON('/api/user/account/signing-key', { pk_b64, label: label || 'Signing key', totp: code });
   } catch (e) {
     kp.secretKey.fill(0);   // bind failed — drop the secret, nothing was stored
     const errCode = (e && e.data && e.data.error) || '';
@@ -364,6 +365,8 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
   return {
     signer,
     signKey: { pk_b64, fingerprint: pk_hash.slice(0, 16), ephemeral: true, hasPrf: false },
+    // Surfaced so the sign flow can show a soft SHA-1 note (dual-verify accepted it).
+    totpAlgorithm: (enrolRes && enrolRes.totp_algorithm) || null,
   };
 }
 

@@ -38,6 +38,7 @@ let _drag = null;             // active stamp drag-reposition gesture
 let _reviewZoom = 1;          // zoom factor of the review document preview
 
 const state = {
+  totpSha1: false,       // set true when the last TOTP-gated enrol used a SHA-1 code (dual-verify)
   signingMode: null,     // 'alone' | 'cosign' | 'invite' (chosen on step-mode)
   mode: null,            // 'pdf' | 'image' | 'hash'
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
@@ -2304,6 +2305,7 @@ async function doSign() {
   $('ds-sign-now').disabled = true;
   $('ds-sign-status').hidden = false;
   $('ds-sign-status').className = 'ds-banner';
+  state.totpSha1 = false;   // reset per sign; set only if a SHA-1 TOTP enrol happens below
   // Progress updates are non-urgent: announce them politely.
   $('ds-sign-status').setAttribute('aria-live', 'polite');
   const status = (t) => { $('ds-sign-status').textContent = t; };
@@ -2327,7 +2329,10 @@ async function doSign() {
       const code = await promptTotp('ds-pass');
       if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
       status('Setting up your signing key…');
-      ({ signKey, signer: ephemeralSigner } = await enrolEphemeralSigningKeyWithTotp({ label: state.signer.name || 'Signing key', totp: code, onStatus: status }));
+      const _enrol = await enrolEphemeralSigningKeyWithTotp({ label: state.signer.name || 'Signing key', totp: code, onStatus: status });
+      signKey = _enrol.signKey;
+      ephemeralSigner = _enrol.signer;
+      if (_enrol.totpAlgorithm === 'sha1') state.totpSha1 = true;
     }
     const fingerprint = signKey.fingerprint;
     const dateStr = new Date().toISOString().slice(0, 19) + 'Z';
@@ -2482,6 +2487,28 @@ function renderSignQuotaNotice(quota) {
   else host.appendChild(div);
 }
 
+// Non-blocking, dismissible note shown after a successful sign when the account's
+// authenticator app produced a SHA-1 code (accepted via dual-verify). Purely
+// informational: the signature already succeeded. Encourages a SHA-256 app.
+function renderTotpSha1Note(afterEl) {
+  if (!afterEl || !afterEl.parentNode) return;
+  if (document.getElementById('ds-sha1-note')) return;
+  const note = document.createElement('div');
+  note.id = 'ds-sha1-note';
+  note.className = 'ds-note';
+  note.setAttribute('role', 'note');
+  const p = document.createElement('p');
+  p.innerHTML = 'Signed. Your authenticator app uses SHA-1. For the strongest setup, switch to a SHA-256 app such as Raivo (iOS) or Aegis (Android). <a href="/help/authenticator-apps">See the app list</a>.';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ds-note-dismiss';
+  btn.textContent = 'Dismiss';
+  btn.addEventListener('click', () => note.remove());
+  note.appendChild(p);
+  note.appendChild(btn);
+  afterEl.parentNode.insertBefore(note, afterEl.nextSibling);
+}
+
 function showDone() {
   setActive('step-done');
   const r = state.result;
@@ -2499,6 +2526,8 @@ function showDone() {
       '<div><strong>Signed locally with ML-DSA-65.</strong>' +
       ' <span>Your private key never left this browser. The envelope below is self-contained and verifiable offline.</span></div>';
   }
+
+  if (state.totpSha1) renderTotpSha1Note(sb);
 
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;

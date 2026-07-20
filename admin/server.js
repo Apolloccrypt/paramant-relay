@@ -1021,6 +1021,9 @@ api.post("/user/login", async (req, res) => {
     success: true,
     email: user.email,
     session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+    // Dual-verify: surface the algorithm so the login page can show a soft SHA-1
+    // note. Login already succeeded; this never blocks sign-in.
+    totp_algorithm: result.algorithm === "sha1" ? "sha1" : "sha256",
   });
 });
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Authenticator apps — PARAMANT Help</title>
-<meta name="description" content="Paramant uses SHA-256 TOTP. Supported apps: Authy, 1Password, Aegis, Raivo, Bitwarden, Ente Auth, 2FAS. Google Authenticator and Microsoft Authenticator are not supported.">
+<meta name="description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup we recommend a SHA-256 app: Authy, 1Password, Aegis, Raivo, Bitwarden, Ente Auth, or 2FAS.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -294,21 +294,21 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <h1>Authenticator <em>apps</em></h1>
-  <p class="lead">Paramant uses SHA-256 TOTP. Here's what works and what doesn't.</p>
+  <p class="lead">Every standard authenticator app works with Paramant. A SHA-256 app gives you the strongest setup.</p>
 
-  <h2>Why SHA-256</h2>
-  <p>Paramant's relay uses SHA-256 for TOTP verification instead of the older SHA-1 default specified in RFC 6238. SHA-1 is not broken for HMAC use, but it does not belong in a stack that positions itself around post-quantum key exchange and FIPS 203 primitives. Consistency matters. Our MFA layer holds the same cryptographic standard as the rest of the transport.</p>
+  <h2>Why we recommend SHA-256</h2>
+  <p>Paramant's relay accepts both SHA-256 and SHA-1 TOTP codes, so every standard authenticator app works. We recommend SHA-256 because it keeps the MFA layer on the same cryptographic standard as the rest of the transport, which is built around post-quantum key exchange and FIPS 203 primitives. HMAC-SHA1 is not broken and RFC 6238 uses it as the default, so a SHA-1 app is perfectly safe to use. SHA-256 is simply the stronger, more consistent choice.</p>
 
-  <h2>Supported apps</h2>
-  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS and Android, open source), and 2FAS all support SHA-256 TOTP. Any of these will work with the QR code shown on the setup page.</p>
+  <h2>Recommended apps (SHA-256)</h2>
+  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS and Android, open source), and 2FAS all support SHA-256 TOTP. Any of these will work with the QR code shown on the setup page and give you the strongest setup.</p>
   <div class="tip"><p>Not sure which to pick? Aegis on Android and Raivo on iOS are open source, store codes locally, and have no cloud dependency. 1Password and Bitwarden are good choices if you already use a password manager.</p></div>
 
-  <h2>Not supported</h2>
-  <p>Google Authenticator, Microsoft Authenticator, and the authenticator built into iCloud Keychain only support SHA-1 TOTP. The QR code will scan successfully, but the codes generated will never match what the server expects. If you see "Invalid code" repeatedly while using one of these apps, this is why.</p>
-  <div class="warn"><p>Scanning the QR with an unsupported app will appear to work at first. The codes it generates will always fail verification at login.</p></div>
+  <h2>Also works (SHA-1)</h2>
+  <p>Google Authenticator, Microsoft Authenticator, and the authenticator built into iCloud Keychain use SHA-1 TOTP. Paramant accepts SHA-1 codes, so these apps work fine. For the strongest setup we still recommend one of the SHA-256 apps above.</p>
+  <div class="tip"><p>Already using Google Authenticator? It keeps working. Switching to a SHA-256 app such as Raivo or Aegis is a small upgrade, not a requirement.</p></div>
 
-  <h2>Migrating from Google Authenticator</h2>
-  <p>If you currently use Google Authenticator for other services, you can keep using it for those and install a second app (Aegis on Android, Raivo on iOS) specifically for Paramant. Having multiple authenticator apps on one device is supported and common.</p>
+  <h2>Upgrading to a SHA-256 app</h2>
+  <p>Google Authenticator works with Paramant. For the strongest setup you can keep it for your other services and add a SHA-256 app (Aegis on Android, Raivo on iOS) specifically for Paramant. Having multiple authenticator apps on one device is supported and common.</p>
 
   <hr class="divider">
 

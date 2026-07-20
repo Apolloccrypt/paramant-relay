@@ -540,10 +540,11 @@ TOTP_SECRET=YOUR_BASE32_SECRET
 # Scan the QR code or enter the secret in Aegis / Google Authenticator / Authy
 ```
 
-> **Note:** PARAMANT uses **TOTP-SHA256** (RFC 6238 with HMAC-SHA256). When
-> manually entering the secret in an authenticator app, select **SHA-256** as the
-> algorithm if the app exposes that option. Aegis supports this. Google
-> Authenticator defaults to SHA-1 and will generate incorrect codes.
+> **Note:** PARAMANT verifies both **HMAC-SHA256** and **HMAC-SHA1** TOTP codes
+> (RFC 6238), so every standard authenticator app works, including Google
+> Authenticator. For the strongest setup, pick a SHA-256 app (Aegis, Raivo, 2FAS,
+> Authy, 1Password, Bitwarden, Ente Auth) and select **SHA-256** as the algorithm
+> if the app exposes that option.
 
 ---
 

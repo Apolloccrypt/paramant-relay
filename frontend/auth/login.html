@@ -40,6 +40,9 @@
 .auth-link { background: none; border: none; color: var(--navy); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
 .auth-link:hover { opacity: .75; }
 #code-fields { margin-top: 4px; }
+.auth-note { max-width: 380px; margin: var(--space-3) auto 0; padding: 14px 18px; border: 1px solid var(--ink-hair, #E2E8F0); border-radius: 8px; background: #F8FAFC; color: #334155; font-size: 14px; line-height: 1.55; }
+.auth-note p { margin: 0 0 10px; }
+.auth-note a { color: var(--navy); }
 </style>
 </head>
 <body>
@@ -225,6 +228,11 @@
     <button type="button" class="auth-link" id="passkey-crossdevice-btn">Use a passkey on another device</button>
   </div>
 </form>
+
+<div id="sha1-notice" class="auth-note" hidden role="note">
+  <p><strong>Signed in.</strong> Your authenticator app uses SHA-1. For the strongest setup, switch to a SHA-256 app such as Raivo (iOS) or Aegis (Android). <a href="/help/authenticator-apps">See the app list</a>.</p>
+  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue to your account</a>
+</div>
 
 <p class="footer-text auth-foot">
   Lost your authenticator? <a href="/auth/backup">Use a backup code</a><br>
