@@ -5469,7 +5469,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // POST /v2/envelopes -- create a new envelope.
-  if (path === '/v2/envelopes','/v2/billing' && req.method === 'POST') {
+  if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     if (!(await envCreateRateOkShared(apiKey))) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'Envelope creation quota exceeded for this key (50/hour).' })); }
     const store = _envStore();
