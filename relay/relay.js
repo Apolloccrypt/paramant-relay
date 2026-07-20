@@ -2118,9 +2118,13 @@ const server = http.createServer(async (req, res) => {
   // per-endpoint INVITE_RE pubkey-exchange bypass, never as a general auth subject.
   // (Previously any valid DID-auth forged {plan:'pro',active:true}, which let an
   // anonymous attacker self-register an inv_ DID and ride it into a pro session.)
-  const didOwner = (didAuthEntry && didAuthEntry.key) ? apiKeys.get(didAuthEntry.key) : null;
+  // The decision itself lives in lib/auth-gate didPrincipal (pure, unit-tested):
+  // it also refuses a revoked enrollment (revoked/revoked_at on the registry
+  // entry) and guarantees account_id = owner key, so getEntitlements and the
+  // transfers_month/signs_month gates below run against the owner's REAL plan,
+  // identical to a request carrying the owner's X-Api-Key.
   const keyData = apiKeys.get(apiKey)
-    || ((didOwner && didOwner.active) ? { ...didOwner, label: didAuthEntry.device_id } : null);
+    || authGate.didPrincipal(didAuthEntry, (k) => apiKeys.get(k));
   // account_id is what Phase 3 counters key on: the owning API key (1:1 today),
   // or for DID-auth the key the DID was registered under — never the device id.
   if (keyData && !keyData.account_id) keyData.account_id = apiKey || (didAuthEntry && didAuthEntry.key) || null;
@@ -4679,11 +4683,16 @@ const server = http.createServer(async (req, res) => {
         }
         times.push(now); invDidIpRequests.set(ipKey, times);
       }
+      // The key a new enrollment binds to: the presented API key, or for a
+      // DID-authenticated register the key the AUTHENTICATING DID was enrolled
+      // under (keyData.account_id). Binding to '' here would mint a keyless
+      // enrollment from an authenticated session AND skip the per-key cap.
+      const ownerKey = apiKey || (keyData && keyData.account_id) || '';
       // Rate limit: max 500 DIDs per API key to prevent RAM DoS. Counter is O(1)
       // (didKeyCounts) instead of an O(n) scan of the whole registry per request.
       const MAX_DID_PER_KEY = 500;
-      if (apiKey) {
-        const keyDidCount = didKeyCounts.get(apiKey) || 0;
+      if (ownerKey) {
+        const keyDidCount = didKeyCounts.get(ownerKey) || 0;
         if (keyDidCount >= MAX_DID_PER_KEY) {
           res.writeHead(429); return res.end(J({ error: `DID limit reached. Max ${MAX_DID_PER_KEY} DIDs per API key.` }));
         }
@@ -4691,9 +4700,11 @@ const server = http.createServer(async (req, res) => {
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
       const _didIsNew = !didRegistry.has(did); // overwrite of same did must not double-count
-      didRegistry.set(did, { device_id: d.device_id, key: apiKey, doc, ts: new Date().toISOString() });
-      if (_didIsNew && apiKey) didKeyCounts.set(apiKey, (didKeyCounts.get(apiKey) || 0) + 1);
-      const _didPlan = keyData?.plan || 'pro';
+      didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc, ts: new Date().toISOString() });
+      if (_didIsNew && ownerKey) didKeyCounts.set(ownerKey, (didKeyCounts.get(ownerKey) || 0) + 1);
+      // Pubkey TTL follows the authenticated plan; an ANONYMOUS (keyless inv_)
+      // registration gets the free-tier TTL, never the pro default.
+      const _didPlan = keyData ? (keyData.plan || 'pro') : 'free';
       pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
@@ -4705,7 +4716,10 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /v2/did ──────────────────────────────────────────────────────────────
   if (path === '/v2/did' && req.method === 'GET') {
-    const dids = [...didRegistry.values()].filter(e => e.key === apiKey).map(e => ({ did: e.doc.id, device: e.device_id, ts: e.ts }));
+    // Same owner resolution as everywhere: the API key, or for DID-auth the key
+    // the DID enrolled under. Never '' (which would match keyless inv_ entries).
+    const _didListKey = apiKey || (keyData && keyData.account_id) || null;
+    const dids = [...didRegistry.values()].filter(e => _didListKey && e.key === _didListKey).map(e => ({ did: e.doc.id, device: e.device_id, ts: e.ts }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: dids.length, dids }));
   }
