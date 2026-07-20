@@ -227,7 +227,7 @@ NEW_FOOTER = '''\
 </footer>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=19">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=14">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=15">'
 NAV_JS    = '<script src="/nav.js?v=12" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js" defer></script>'
 
