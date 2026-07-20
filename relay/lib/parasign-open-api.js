@@ -326,10 +326,16 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     try { g = await deps.signQuotaGate(meteredAccount, rec || {}); }
     catch (_e) { g = { allowed: true }; }
     if (g && g.allowed === false && g.over_limit) {
-      return jsonRes(res, 402, {
-        error: 'monthly_sign_quota_reached',
-        message: 'Monthly ParaSign signing quota reached for this plan. Upgrade to continue. / Maandelijkse ParaSign-ondertekenlimiet voor dit plan bereikt; upgrade om door te gaan.',
-      }, J, { 'Retry-After': '86400' });
+      // Same 402 contract as the R018 sign path. reason 'hard_cap' is the Pro
+      // metered tier hitting its hard stop; anything else is a plain quota block.
+      const body = g.reason === 'hard_cap'
+        ? { error: 'monthly_sign_hard_cap_reached',
+            plan: g.plan, limit: g.limit, overage_count: g.overage_count, reset_date: g.reset_date,
+            message: 'Monthly ParaSign hard cap reached; no further signs are metered this month. / Maandelijkse ParaSign-harde-limiet bereikt; deze maand worden geen extra ondertekeningen meer gemeten.' }
+        : { error: 'monthly_sign_quota_reached',
+            ...(g.plan !== undefined ? { plan: g.plan, limit: g.limit, used: g.used, reset_date: g.reset_date } : {}),
+            message: 'Monthly ParaSign signing quota reached for this plan. Upgrade to continue. / Maandelijkse ParaSign-ondertekenlimiet voor dit plan bereikt; upgrade om door te gaan.' };
+      return jsonRes(res, 402, body, J, { 'Retry-After': '86400' });
     }
   }
 
