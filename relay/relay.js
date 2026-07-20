@@ -4148,6 +4148,12 @@ const server = http.createServer(async (req, res) => {
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
       if (blobStore.has(hash))           { res.writeHead(409); return res.end(J({ error: 'Hash already in use' })); }
       const blob = Buffer.from(payload, 'base64');
+      // Bind the committed hash to the actual bytes: the hash is written into the
+      // CT-log leaf and the signed delivery receipt, so an unverified claim would
+      // let a caller mint a relay-signed, CT-anchored proof for bytes the relay
+      // never held. The honest client sends hash = sha256(payload bytes), so this
+      // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
+      if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
       if (blob.length > ANON_MAX)        { res.writeHead(413); return res.end(J({ error: 'Max 5MB on anonymous uploads' })); }
       try { peekInboundBlob(blob); }
       catch(e) {
@@ -4352,6 +4358,12 @@ const server = http.createServer(async (req, res) => {
       }
 
       const blob = Buffer.from(payload, 'base64');
+      // Bind the committed hash to the actual bytes: the hash is written into the
+      // CT-log leaf and the signed delivery receipt, so an unverified claim would
+      // let a caller mint a relay-signed, CT-anchored proof for bytes the relay
+      // never held. The honest client sends hash = sha256(payload bytes), so this
+      // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
+      if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
       const planMaxSize = MAX_BLOB;
       if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
 
