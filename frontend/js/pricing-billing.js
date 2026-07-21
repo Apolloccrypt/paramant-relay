@@ -1,11 +1,18 @@
-/* Pricing buttons: API-checkout first, static Mollie payment link as fallback.
+/* Pricing buttons: API-checkout only. Never an unattributable payment.
  *
  * Signed-in buyers (session cookie) get a Mollie payment created via
- * POST /v2/billing/checkout, so the webhook can grant their tier automatically
- * (no manual reconciliation). Anyone else -- or any failure at all, including
- * billing not being configured on the server -- falls through to the static
- * payment link the button already points at. Dormant by construction: until
- * the server has a Mollie key, every click behaves exactly as before.
+ * POST /v2/billing/checkout, which carries metadata {accountId, product, plan,
+ * interval}. The webhook needs that metadata to grant the tier: without it
+ * lib/billing.js refuses with 'missing_metadata' and the buyer gets nothing.
+ *
+ * This used to fall back to the static Mollie payment link in the button's href
+ * on ANY failure, including "not signed in". Those links carry no metadata, so
+ * the money arrived and the grant never happened -- silently, with the buyer
+ * left staring at the free-tier wall. That is exactly what happened to the
+ * first paying customer (2026-07-21). A checkout we cannot attribute is now
+ * refused loudly instead: sign-in first, or a visible error, never a charge we
+ * cannot honour. The href stays as a real link so it survives without JS, but
+ * every scripted click goes through checkout.
  *
  * CSP-safe: external file, no inline script. Same session->key bridge as
  * dashboard-history.js (/api/user/account/key, never persisted).
@@ -51,6 +58,23 @@
     });
   }
 
+  /* Inline, next to the button that failed. No alert(): a modal on a pricing
+   * page reads as a browser problem rather than an answer. */
+  function showError(btn, text) {
+    var id = 'billing-error-' + (btn.getAttribute('data-billing-product') || 'x') + '-' +
+             (btn.getAttribute('data-billing-interval') || 'x');
+    var box = document.getElementById(id);
+    if (!box) {
+      box = document.createElement('div');
+      box.id = id;
+      box.setAttribute('role', 'alert');
+      box.style.cssText = 'margin-top:.6rem;font-size:.85rem;line-height:1.4;color:#8a1c1c;' +
+        'background:#fdeaea;border:1px solid #f0bcbc;border-radius:6px;padding:.5rem .6rem';
+      if (btn.parentNode) btn.parentNode.insertBefore(box, btn.nextSibling);
+    }
+    box.textContent = text;
+  }
+
   Array.prototype.forEach.call(buttons, function (btn) {
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
@@ -59,11 +83,21 @@
       btn.setAttribute('aria-busy', 'true');
       checkout(btn).then(function (url) {
         window.location.href = url;
-      }).catch(function () {
-        /* Not signed in, billing dormant, or any hiccup: static link. */
+      }).catch(function (err) {
         btn.textContent = orig;
         btn.removeAttribute('aria-busy');
-        window.location.href = btn.href;
+        var msg = String((err && err.message) || '');
+        /* No session: send them to sign-in and straight back here. An account
+         * is what makes the payment attributable, so it is a precondition, not
+         * an obstacle to route around. */
+        if (msg.indexOf('key_http_401') === 0 || msg.indexOf('key_http_403') === 0 ||
+            msg === 'key_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
+            msg.indexOf('checkout_http_403') === 0) {
+          window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
+          return;
+        }
+        showError(btn, 'Could not start checkout. Nothing has been charged. ' +
+          'Please try again, or mail privacy@paramant.app and we will sort it out.');
       });
     });
   });
