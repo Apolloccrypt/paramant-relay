@@ -1308,6 +1308,15 @@ footer {
   align-items: start;
 }
 
+/* Slim footer: company identity + legal only. The five-column version carried
+   ~30 links (trust, self-host, connect, downloads) that duplicated the nav and
+   made the page end in noise. Business info and legal are what a footer is
+   actually for; everything else has a home in the navigation. */
+.footer-grid.footer-slim {
+  grid-template-columns: minmax(260px, 2fr) 1fr;
+  gap: var(--space-10, var(--space-8));
+}
+
 .footer-col-label,
 .foot-col-head {
   font-family: var(--mono);
@@ -1356,6 +1365,9 @@ footer {
 }
 @media (max-width: 600px) {
   .foot-grid, .footer-grid { grid-template-columns: 1fr; }
+  /* .footer-grid.footer-slim outranks the bare .footer-grid rule above, so the
+     slim variant needs its own stacking rule or it stays two-up on a phone. */
+  .footer-grid.footer-slim { grid-template-columns: 1fr; gap: var(--space-6); }
 }
 
 
