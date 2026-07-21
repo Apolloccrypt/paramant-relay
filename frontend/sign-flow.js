@@ -2269,19 +2269,23 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     // fits at the floor size is dropped rather than overprinted.
     const k = Math.max(0.5, Math.min(1, Math.min(box.h / 64, box.w / 190)));
     const bandH = 16 * k, footerH = 22 * k, padX = 8 * k;
-    const sWord = 9 * k, sBadge = 6 * k, sName = 8 * k, sDate = 7 * k, sCrypto = 6 * k;
+    const sWord = 9 * k, sBadge = 4.6 * k, sName = 8 * k, sDate = 7 * k, sCrypto = 6 * k;
     // Outer border + SOLID WHITE body (always legible: dark text on white).
     pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
     // Branded cobalt top band: wordmark + PQ badge.
     pg.drawRectangle({ x: box.x, y: box.y + box.h - bandH, width: box.w, height: bandH, color: navy });
     const wordW = fontBold.widthOfTextAtSize('ParaMANT', sWord);
     pg.drawText('ParaMANT', { x: box.x + padX, y: box.y + box.h - bandH + (bandH - sWord) / 2 + 0.5, size: sWord, font: fontBold, color: white });
+    // The badge is a QUALIFIER, not a second wordmark. At 6pt bold in full white it
+    // competed with ParaMANT for the eye and made the band read as two headlines.
+    // Smaller, regular weight, and held back in opacity so it supports the mark
+    // instead of shouting over it. Dropped entirely when it would crowd the mark:
+    // a cramped band is worse than no badge, and the seal still says ML-DSA-65 in
+    // the footer.
     const badge = 'POST-QUANTUM SIGNED';
-    const badgeW = fontBold.widthOfTextAtSize(badge, sBadge);
-    // Only paint the badge when it clears the wordmark; overprinting it was the
-    // scrambled top band people saw on narrow stamps.
-    if (padX + wordW + 6 * k + badgeW + padX <= box.w) {
-      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font: fontBold, color: white });
+    const badgeW = font.widthOfTextAtSize(badge, sBadge);
+    if (padX + wordW + 14 * k + badgeW + padX <= box.w) {
+      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font, color: white, opacity: 0.72 });
     }
     // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2.
     const row1Y = box.y + footerH - sName - 1.5 * k;

@@ -215,7 +215,7 @@ const phase4 = await page.evaluate(async () => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
   for (let i = 0; i < 200 && document.getElementById('step-place').hidden; i++) await sleep(20);
   document.getElementById('ds-seal-sheet').click();
-  const mod = await import('/sign-flow.js?v=38');
+  const mod = await import('/sign-flow.js?v=39');
   const output = await mod.buildStampedPdf(sourceBytes, null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const outPdf = await window.PDFLib.PDFDocument.load(output);
   const rendered = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
