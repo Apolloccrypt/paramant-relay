@@ -142,14 +142,14 @@
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt('Type DELETE to confirm account deletion:');
+    const answer = prompt('Type DELETE to confirm deactivation of account access:');
     if (answer !== 'DELETE') return;
     const res = await fetch('/api/user/account', {
       method: 'DELETE',
       credentials: 'include',
     });
     if (res.ok) {
-      alert('Account deleted.');
+      alert('Account access deactivated. Your stored account record and personal data have not been deleted.');
       window.location = '/';
     }
   });

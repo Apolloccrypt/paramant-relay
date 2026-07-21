@@ -330,7 +330,7 @@ function initRequester() {
     const r = await verifyAnswer(bundle);
     const out = $('req-verify-out');
     out.className = 'pa-result ' + (r.ok ? 'ok' : 'err');
-    const tierLabel = { presence: 'presence-only (a live person, identity not checked)', substantial: 'substantial (live person + passport document check)', high: 'high (passport chip)' }[bundle.tier || 'presence'] || esc(bundle.tier || '');
+    const tierLabel = { presence: 'presence-only (a live person, identity not checked)', substantial: 'MRZ-derived (format and ICAO check digits only; no liveness or genuine-document verification)', high: 'high (passport chip)' }[bundle.tier || 'presence'] || esc(bundle.tier || '');
     out.innerHTML = r.ok
       ? '<b>&#10003; ' + esc(r.question) + ' ' + esc(String(r.answer).toUpperCase()) + '</b><br>issuer: ' + esc(r.registry) + '<br>assurance: ' + esc(tierLabel)
       : '<b>&#10007; rejected</b><br>' + r.errors.map(esc).join('<br>') + '<br>issuer: ' + esc(r.registry);

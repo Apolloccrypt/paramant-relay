@@ -215,7 +215,7 @@ function usersTable(users){
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="force-totp">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
 '<div class="ag-lbl danger">Destructive</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="disable" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Delete account</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Deactivate account access</button>'+
           '</div>'+
         '</div></td>'+
       '</tr>';
@@ -554,7 +554,7 @@ async function doDeleteAccount(){
   document.getElementById('da-btn').disabled=true;
   const r=await api('/admin/delete-account',{method:'POST',body:JSON.stringify({key,confirm:'DELETE',notify})});
   closeModal('mo-delete');
-  toast(r.ok?'Account deleted':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  toast(r.ok?'Account access deactivated; stored data was not deleted':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;setTimeout(loadUsers,800);}
 }
 async function openUserDetailsModal(key){
@@ -647,4 +647,3 @@ act('click','closeCreateKey',(el)=>{const m=el.closest('[data-modal]');if(m)m.re
 act('change','filterUsers',()=>filterUsers());act('input','filterUsers',()=>filterUsers());
 act('change','usersPageSize',(el)=>loadUsers(1,parseInt(el.value,10)));
 act('input','confirmDelete',(el)=>{const b=document.getElementById('da-btn');if(b)b.disabled=el.value!=='DELETE';});
-

@@ -442,12 +442,12 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </section>
 
 <section class="acct-card danger">
-  <div class="acct-kicker">Delete account &middot; permanent, cannot undo</div>
-  <h2>Delete account.</h2>
+  <div class="acct-kicker">Deactivate account access</div>
+  <h2>Deactivate account.</h2>
   <p class="acct-lead">
-    Deletes your account, revokes your API key, and removes your TOTP secret. Any in-flight transfers are immediately invalidated.
+    Makes your API key unusable, signs out active sessions, and removes your TOTP secret. Your stored account record and personal data are not deleted.
   </p>
-  <button type="button" class="btn btn-danger" id="delete-account">Delete account permanently</button>
+  <button type="button" class="btn btn-danger" id="delete-account">Deactivate account access</button>
 </section>
 
 </div><!-- /state-account -->
@@ -456,7 +456,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script src="/js/account.inline1.js?v=1"></script>
+<script src="/js/account.inline1.js?v=2"></script>
 
 <script src="/js/account.inline2.js?v=1"></script>
 <script type="module" src="/js/passkey.js?v=3"></script>

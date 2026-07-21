@@ -220,9 +220,9 @@
 
 <div class="doc-wrap">
   <div class="doc-head">
-    <p class="doc-eyebrow">ParaID &#183; document tier (substantial)</p>
-    <h1>Prove your age from your passport</h1>
-    <p class="lede">Read your passport&rsquo;s machine-readable zone with the camera. Your device checks the digits, works out only whether you are 18 or older and your nationality, and the registered issuer signs those two facts. Your name, birthdate and document number never leave the device.</p>
+    <p class="doc-eyebrow">ParaID &#183; MRZ-derived credential</p>
+    <h1>Derive an age claim from MRZ text</h1>
+    <p class="lede">Enter the machine-readable zone text. The format and ICAO check digits are checked, then age_over_18 and nationality are derived and signed. This does not verify a live person or a genuine passport. Your name, birthdate and document number are not included in the credential.</p>
   </div>
 
   <p class="doc-warn" id="doc-liveness-warn" hidden><b>First prove a live person is present.</b> Run the <a href="/liveness?return=/paraid-document">liveness check</a>, then come back here.</p>
@@ -247,8 +247,8 @@
   </div>
 
   <div class="doc-card">
-    <h2>3. Get your substantial credential</h2>
-    <button type="button" class="btn btn-lime" id="doc-issue" disabled>Issue credential from this passport</button>
+    <h2>3. Get your MRZ-derived credential</h2>
+    <button type="button" class="btn btn-lime" id="doc-issue" disabled>Issue credential from this MRZ</button>
     <p class="doc-status" id="doc-status"></p>
     <p id="doc-done" hidden><a class="btn btn-lime" href="/paraid-app">Return to your wallet</a></p>
   </div>
@@ -256,7 +256,7 @@
   <div class="doc-how">
     <ol>
       <li><b>Why the check digits matter.</b> Every MRZ field carries a weighted check digit and there is a composite over the whole line. One wrong character fails a check, so a garbled or edited MRZ is rejected. Integrity without a chip read.</li>
-      <li><b>Honest scope.</b> The camera cannot read the passport chip (that needs NFC and an app), so this is the eIDAS &ldquo;substantial&rdquo; tier, not &ldquo;high&rdquo;. It combines the live person (liveness) with a self-consistent document. A forged document with valid check digits is the residual risk, which the chip read would close.</li>
+      <li><b>Honest scope.</b> The relay checks only the submitted MRZ format and ICAO check digits. It does not verify liveness, possession of a passport, document authenticity, or the passport chip. Fabricated MRZ text with valid check digits can pass.</li>
       <li><b>What is sealed.</b> Only age_over_18 and nationality. The issuer derives them and signs them; it never receives or stores your name, birthdate or document number.</li>
     </ol>
   </div>
