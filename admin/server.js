@@ -2801,7 +2801,42 @@ async function getAdminKeyMeta(key_id) {
     active: k.active !== false,
     sectors: k.sectors || [],
     parasign: k.parasign === true, /*MARK:parasign_meta*/
+    account_id: k.account_id || key_id,
   };
+}
+
+async function mutatePlanFleet(endpoint, body) {
+  const run = sectors => eachSector(sectors, async s => {
+    const response = await callRelay(endpoint, body, 'POST', s);
+    let responseBody = null; try { responseBody = await response.json(); } catch {}
+    return { status: response.status, ok: response.ok, error: responseBody?.error || null };
+  });
+  const initial = await run(Object.keys(SECTORS));
+  const retrySectors = Object.entries(initial).filter(([, r]) => !r?.ok).map(([s]) => s);
+  const retried = retrySectors.length ? await run(retrySectors) : {};
+  const results = { ...initial, ...retried };
+  return { results, retried: retrySectors, failed: Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'sector_unreachable' })) };
+}
+
+async function readEntitlementsFleet(accountId) {
+  const results = await eachSector(Object.keys(SECTORS), async s => {
+    const response = await callRelay(`/v2/admin/entitlements/${encodeURIComponent(accountId)}`, null, 'GET', s);
+    let body = null; try { body = await response.json(); } catch {}
+    return { status: response.status, ok: response.ok && body?.ok === true, entitlements: body?.entitlements || null, error: body?.error || null };
+  });
+  const failed = Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'read_back_failed' }));
+  return { results, failed };
+}
+
+function verifyEntitlementsFleet(readBack, expected) {
+  const mismatched = [];
+  for (const [sector, result] of Object.entries(readBack.results)) {
+    if (!result?.ok) continue;
+    for (const [product, tier] of Object.entries(expected)) {
+      if (result.entitlements?.[product]?.tier !== tier) mismatched.push({ sector, product, expected: tier, actual: result.entitlements?.[product]?.tier || null });
+    }
+  }
+  return mismatched;
 }
 
 async function checkAdminRl(scope, id, limit) {
@@ -2869,19 +2904,18 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
   if (!await checkAdminRl('change_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const meta = await getAdminKeyMeta(key);
-    const results = await eachSector(Object.keys(SECTORS), async s => {
-      const response = await callRelay('/v2/admin/keys/update-plan', { key, plan: new_plan }, 'POST', s);
-      return { status: response.status, ok: response.ok };
-    });
-    const sectorsUpdated = Object.entries(results).filter(([, r]) => r?.ok).map(([s]) => s);
-    if (!sectorsUpdated.length) return res.status(502).json({ error: 'relay_error', results });
+    const mutation = await mutatePlanFleet('/v2/admin/keys/update-plan', { key, plan: new_plan });
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
-    if (notify && meta.email) {
+    const readBack = await readEntitlementsFleet(meta.account_id);
+    const derived = { community: { parasign: 'free', parasend: 'community' }, pro: { parasign: 'pro', parasend: 'pro' }, enterprise: { parasign: 'enterprise', parasend: 'enterprise' } };
+    const mismatched = verifyEntitlementsFleet(readBack, derived[new_plan] || {});
+    const allOk = mutation.failed.length === 0 && readBack.failed.length === 0 && mismatched.length === 0;
+    if (allOk && notify && meta.email) {
       const planName = new_plan.charAt(0).toUpperCase() + new_plan.slice(1);
       emailTemplates.sendEmail(meta.email, emailTemplates.billingConfirmationEmail({ planName, period: 'admin', amountStr: 'admin-provisioned', stub: true })).catch(e => console.error('[admin/change-plan] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_plan_changed', { from: meta.plan, to: new_plan, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ok: true, from: meta.plan, to: new_plan, sectors_updated: sectorsUpdated, sector_count: Object.keys(SECTORS).length, email_sent: !!(notify && meta.email) });
+    res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', from: meta.plan, to: new_plan, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
   } catch (err) { console.error('[admin/change-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 
@@ -2902,24 +2936,18 @@ api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
   if (!await checkAdminRl('set_product_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const meta = await getAdminKeyMeta(key);
-    const results = await eachSector(Object.keys(SECTORS), async s => {
-      const response = await callRelay('/v2/admin/keys/set-product-plan', { key, product, tier }, 'POST', s);
-      let body = null; try { body = await response.json(); } catch {}
-      return { status: response.status, ok: response.ok, error: body?.error };
-    });
-    const sectorsUpdated = Object.entries(results).filter(([, r]) => r?.ok).map(([s]) => s);
-    if (!sectorsUpdated.length) {
-      const rejected = Object.values(results).find(r => r?.status === 400 || r?.status === 404);
-      return res.status(rejected?.status || 502).json({ error: rejected?.error || 'relay_error', results });
-    }
+    const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier });
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
+    const readBack = await readEntitlementsFleet(meta.account_id);
+    const mismatched = verifyEntitlementsFleet(readBack, { [product]: tier });
+    const allOk = mutation.failed.length === 0 && readBack.failed.length === 0 && mismatched.length === 0;
     const productName = product === 'parasign' ? 'ParaSign' : 'ParaSend';
     const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
-    if (notify && meta.email) {
+    if (allOk && notify && meta.email) {
       emailTemplates.sendEmail(meta.email, emailTemplates.productPlanChangeEmail({ productName, tierName })).catch(e => console.error('[admin/set-product-plan] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_product_plan_changed', { product, tier, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ok: true, key, product, tier, sectors_updated: sectorsUpdated, sector_count: Object.keys(SECTORS).length, email_sent: !!(notify && meta.email) });
+    res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', key, product, tier, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
   } catch (err) { console.error('[admin/set-product-plan]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 

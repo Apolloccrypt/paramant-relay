@@ -5202,6 +5202,22 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  const entitlementRead = path.match(/^\/v2\/admin\/entitlements\/([^/]+)$/);
+  if (entitlementRead && req.method === 'GET') {
+    if (!_internalOk()) return _internalReject();
+    let requested;
+    try { requested = decodeURIComponent(entitlementRead[1]); }
+    catch { res.writeHead(400); return res.end(J({ error: 'invalid_account_id' })); }
+    const accountId = apiKeys.has(requested) ? acctOf(requested) : requested;
+    if (!accounts.has(accountId) && !accountKeys.has(accountId)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'account_not_found' }));
+    }
+    const record = entitlementRecordOf(accountId);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, account_id: accountId, entitlements: entitlements.getEntitlements(record) }));
+  }
+
   // ── POST /v2/admin/keys/set-parasign - grant/revoke the ParaSign /v1 API ────
   // Admin override for the `parasign` entitlement, alongside the automatic grant
   // on payment. Sets the flag on the target key AND every sibling key of its

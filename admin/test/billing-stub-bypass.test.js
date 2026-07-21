@@ -73,7 +73,7 @@ test('legitimate admin change-plan path is left intact', () => {
     'admin/change-plan endpoint must still exist',
   );
   assert.ok(
-    src.includes("callRelay('/v2/admin/keys/update-plan', { key, plan: new_plan }, 'POST', s)"),
+    src.includes("mutatePlanFleet('/v2/admin/keys/update-plan', { key, plan: new_plan })"),
     'admin/change-plan must still reach update-plan',
   );
 });

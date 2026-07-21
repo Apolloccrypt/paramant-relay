@@ -21,15 +21,29 @@ test('callRelay can address a named sector and keeps internal authentication', (
   assert.match(helper, /"X-Internal-Auth": INTERNAL_TOKEN/);
 });
 
+test('fleet helper retries only failed sectors and reports remaining failures', () => {
+  const helper = routeSource('async function mutatePlanFleet(', 'async function readEntitlementsFleet(');
+  assert.match(helper, /retrySectors/);
+  assert.match(helper, /await run\(retrySectors\)/);
+  assert.match(helper, /failed:/);
+});
+
+test('read-back queries effective entitlements on every sector', () => {
+  const helper = routeSource('async function readEntitlementsFleet(', 'function verifyEntitlementsFleet(');
+  assert.match(helper, /eachSector\(Object\.keys\(SECTORS\)/);
+  assert.match(helper, /\/v2\/admin\/entitlements\//);
+  assert.match(helper, /entitlements: body\?\.entitlements/);
+});
+
 for (const [name, endpoint, nextMarker] of [
   ['change-plan', '/v2/admin/keys/update-plan', '// ── POST /admin/set-product-plan'],
   ['set-product-plan', '/v2/admin/keys/set-product-plan', '// ── POST /admin/set-parasign'],
 ]) {
   test(`${name} fans its mutation out to every relay sector`, () => {
     const route = routeSource(`api.post('/admin/${name}'`, nextMarker);
-    assert.match(route, /eachSector\(Object\.keys\(SECTORS\)/);
-    assert.ok(route.includes(`callRelay('${endpoint}'`));
-    assert.match(route, /'POST', s/);
-    assert.match(route, /sectors_updated/);
+    assert.ok(route.includes(`mutatePlanFleet('${endpoint}'`));
+    assert.match(route, /readEntitlementsFleet/);
+    assert.match(route, /partial_failure/);
+    assert.match(route, /res\.status\(allOk \? 200 : 207\)/);
   });
 }

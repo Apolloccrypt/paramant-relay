@@ -84,6 +84,11 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 | `POST` | `/admin/resend-setup` | `{ key }` | Resend TOTP setup link |
 | `POST` | `/admin/change-plan` | `{ key, new_plan, notify }` | Change the legacy plan on every relay sector (`community`/`pro`/`enterprise`/`trial`) |
 | `POST` | `/admin/set-product-plan` | `{ key, product, tier, notify }` | Change one product tier on every relay sector without changing the legacy plan |
+
+Plan mutations retry failed sectors once. They return HTTP 207 with `ok:false`,
+`failed_sectors`, and `read_back_failed` unless every mutation and effective
+entitlement read-back succeeds. `entitlements_by_sector` contains the gate's
+effective ParaSign and ParaSend result for every relay.
 | `POST` | `/admin/revoke-sessions` | `{ key }` | Revoke all sessions |
 | `POST` | `/admin/disable-key` | `{ key, reason, notify }` | Disable API key |
 | `POST` | `/admin/delete-account` | `{ key, confirm: "DELETE", notify }` | Delete account |
