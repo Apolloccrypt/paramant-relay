@@ -157,7 +157,7 @@
     hamburger.setAttribute('aria-expanded', 'false');
     hamburger.setAttribute('aria-label', 'Open menu');
     unlockScroll();
-    hamburger.focus();
+    hamburger.focus({ preventScroll: true });
   }
 
   hamburger.addEventListener('click', function (e) {
