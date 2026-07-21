@@ -1764,8 +1764,14 @@ function mintParasignKey(accountId, opts = {}) {
   const anchorRec = apiKeys.get(accountId);
   const plan = opts.plan || (acct && acct.plan) || (anchorRec && anchorRec.plan) || 'community';
   const email = (acct && acct.email) || (anchorRec && anchorRec.email) || '';
+  // The new key inherits the account's EFFECTIVE per-product tiers, resolved
+  // over every key the account holds. Minting used to pass the legacy `plan`
+  // only, which silently issued a free-tier ParaSign key to a paying account.
+  const eff = entitlementRecordOf(accountId) || {};
   const built = keysTable.buildParasignKeyRecord({
     accountId, plan, email, label: opts.label, test: !!opts.test,
+    planParasign: opts.planParasign || eff.plan_parasign,
+    planParasend: opts.planParasend || eff.plan_parasend,
     randomHex: crypto.randomBytes(32).toString('hex'),
   });
   const { key, record, usersEntry } = built;

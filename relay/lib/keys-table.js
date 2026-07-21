@@ -95,6 +95,13 @@ function assignKid(taken, key, log) {
 // is_primary/scope (set via parseAccountFields at load). Assigns each value a
 // stable `kid`. First-writer fills the account record; an explicit primary key
 // always wins primary_api_key.
+// Highest of two tiers on a product ladder; unknown/absent values never win.
+function _higherTier(order, cur, next) {
+  if (!next || order.indexOf(next) < 0) return cur;
+  if (!cur || order.indexOf(cur) < 0) return next;
+  return order.indexOf(next) > order.indexOf(cur) ? next : cur;
+}
+
 function rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log) {
   accounts.clear();
   accountKeys.clear();
@@ -105,6 +112,16 @@ function rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log) {
       accounts.set(account_id, { account_id, plan: v.plan, email: v.email || '', primary_api_key: null, label: v.label || '' });
     }
     const acct = accounts.get(account_id);
+    // Carry the PER-PRODUCT plans into the summary as well, taking the highest
+    // tier any key of the account holds. Without this the summary only ever had
+    // the legacy `plan`, so a paid ParaSign grant was invisible to anything
+    // reading accounts -- the bug that put a paying customer back behind the
+    // free 2-signature wall. It also means the mirror setProductPlan writes
+    // survives a restart and POST /v2/admin/keys/reload instead of being
+    // silently dropped on the next rebuild.
+    acct.plan_parasign = _higherTier(entitlements.PARASIGN_TIERS, acct.plan_parasign, v.plan_parasign);
+    acct.plan_parasend = _higherTier(entitlements.PARASEND_TIERS, acct.plan_parasend, v.plan_parasend);
+    if (v.parasign) acct.parasign = true;
     if (v.is_primary || !acct.primary_api_key) acct.primary_api_key = v.is_primary ? key : (acct.primary_api_key || key);
     if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
     accountKeys.get(account_id).add(key);
@@ -214,14 +231,25 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
 // keeps scope+parasign). A minted product key is never an account primary.
 //   randomHex: caller-supplied cryptographic hex (relay: crypto.randomBytes(32)).
 //   test:      psk_test_ (sandbox) vs psk_live_.
-function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt }) {
+function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt, planParasign, planParasend }) {
   if (!accountId) throw new Error('accountId required');
   if (!randomHex || typeof randomHex !== 'string') throw new Error('randomHex required');
   const key = (test ? 'psk_test_' : 'psk_live_') + randomHex;
   const created = createdAt || new Date().toISOString();
   const normPlan = (typeof plan === 'string' && plan) ? plan : 'community';
+  // INHERIT the account's per-product tiers. Without these the new key only
+  // carried the legacy `plan`, which for a ParaSign customer stays 'community'
+  // (setProductPlan deliberately never touches it). parseAccountFields would
+  // then derive plan_parasign = free on the next load and the /v1 gate would put
+  // a paying account back on 2 signatures: the exact incident, reproduced by
+  // nothing more than minting a fresh key. Callers pass the merged account
+  // record's tiers; absent, we fall back to deriving from the legacy plan.
+  const normParasign = entitlements.normaliseParasignTier(planParasign || entitlements.derivePlanParasign(normPlan, true));
+  const normParasend = entitlements.normaliseParasendTier(planParasend || entitlements.derivePlanParasend(normPlan));
   const rec = {
     plan: normPlan,
+    plan_parasign: normParasign,
+    plan_parasend: normParasend,
     label: (typeof label === 'string' ? label.slice(0, 128) : '') || 'parasign-api',
     email: email || '',
     active: true,
@@ -235,6 +263,7 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
   // users.json persisted entry (subset the loader re-hydrates via parseAccountFields).
   const usersEntry = {
     key, plan: rec.plan, label: rec.label, email: rec.email, active: true, created,
+    plan_parasign: normParasign, plan_parasend: normParasend,
     account_id: accountId, is_primary: false, scope: 'parasign', parasign: true, product: 'parasign',
   };
   return { key, record: rec, usersEntry };
