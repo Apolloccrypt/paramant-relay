@@ -426,6 +426,7 @@ body.nav-locked .nav {
    RESPONSIVE
    ════════════════════════════════════════ */
 @media (max-width: 1023px) {
+  .meta-bar { display: none; }
   nav.nav { padding: 0 24px; }
   nav.nav .nav-links { display: none !important; }
   nav.nav .nav-hamburger { display: flex; }

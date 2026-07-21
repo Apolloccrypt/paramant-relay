@@ -33,7 +33,24 @@ const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').a
 ok('public navigation has four clear destinations', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Security','Pricing','Docs']), publicDesktop.join(', '));
 ok('public homepage actions enter real product routes', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/parashare','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
 await publicPage.locator('#nav-hamburger').click();
+await publicPage.waitForFunction(() => {
+  const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
+  const menu = document.querySelector('#nav-mobile')?.getBoundingClientRect();
+  return nav && menu && Math.abs(menu.top - nav.bottom) < 0.5;
+});
 const publicMobile = await publicPage.locator('#nav-mobile a').allInnerTexts();
+const publicMobileGeometry = await publicPage.evaluate(() => {
+  const meta = document.querySelector('.meta-bar');
+  const nav = document.querySelector('nav.nav').getBoundingClientRect();
+  const menu = document.querySelector('#nav-mobile').getBoundingClientRect();
+  return {
+    metaDisplay: meta ? getComputedStyle(meta).display : 'absent',
+    navTop: nav.top,
+    navBottom: nav.bottom,
+    menuTop: menu.top,
+  };
+});
+ok('mobile menu has no technical strip or gap above it', publicMobileGeometry.metaDisplay === 'none' && publicMobileGeometry.navTop === 0 && Math.abs(publicMobileGeometry.menuTop - publicMobileGeometry.navBottom) < 0.5, JSON.stringify(publicMobileGeometry));
 ok('public mobile menu matches desktop without legacy groups', publicMobile.map((item) => item.toLowerCase()).join(',') === publicDesktop.map((item) => item.toLowerCase()).join(',') && await publicPage.locator('#nav-mobile .nav-mobile-group').count() === 0, publicMobile.join(', '));
 ok('public mobile menu fits the phone viewport', await publicPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await publicPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 await publicPage.close();
