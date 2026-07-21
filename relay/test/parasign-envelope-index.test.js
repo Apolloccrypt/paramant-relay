@@ -101,7 +101,11 @@ async function main() {
     assert.ok(r.ok && r.status === 'complete', 'envelope completed');
 
     const notaryKp = eng.generateKeyPair();
-    const relayIdentity = { sk: notaryKp.secretKey, pk_hash: crypto.createHash('sha3-256').update(Buffer.from(notaryKp.publicKey)).digest('hex') };
+    const relayIdentity = {
+      sk: notaryKp.secretKey,
+      pk: notaryKp.publicKey,
+      pk_hash: crypto.createHash('sha3-256').update(Buffer.from(notaryKp.publicKey)).digest('hex'),
+    };
     const exportDeps = (keyData) => ({
       res: fakeRes(), J, keyData, memberKeys: [], auditFor: () => [], ctHead: () => null, verifyChain: () => true, query: {},
       account: ACCT, envStore: store, metaStore: null, buildPsign: openApi.buildEnvelopePsign,
@@ -117,6 +121,7 @@ async function main() {
     assert.strictEqual(ent.envelope_id, out.id, 'export lists the created envelope');
     assert.strictEqual(ent.status, 'completed', 'completed envelope labelled completed');
     assert.ok(ent.psign && ent.psign.notary_signature, '.psign is notary-signed');
+    assert.strictEqual(ent.psign.notary.relay_public_key, Buffer.from(notaryKp.publicKey).toString('base64'), '.psign embeds the relay public key');
     assert.strictEqual(ent.psign.envelope_id, out.id, '.psign carries the envelope id');
     assert.strictEqual(ent.psign.document_hash, docHash, '.psign carries the doc hash');
     assert.ok(Array.isArray(ent.psign.parties) && ent.psign.parties[0].signature, '.psign has raw party signatures');
