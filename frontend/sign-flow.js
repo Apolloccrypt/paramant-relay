@@ -36,6 +36,7 @@ let _pageNavObserver = null;  // IntersectionObserver for the "page X of N" indi
 let _placeCurrentPage = 0;    // most-visible page index (for where a new text/date lands)
 let _drag = null;             // active stamp drag-reposition gesture
 let _reviewZoom = 1;          // zoom factor of the review document preview
+let _activeEditTool = null;   // text | date | highlight | note | pen; null means select/move seals
 
 const state = {
   totpSha1: false,       // set true when the last TOTP-gated enrol used a SHA-1 code (dual-verify)
@@ -712,62 +713,75 @@ let _extraSeq = 0;
 // Height of a text box in PDF points for a given font size.
 function extraBoxH(size) { return size * TEXT_LINE_H; }
 
-// The page the user is currently looking at (updated by the page-nav observer),
-// so a new text/date object lands on the page in view, not always page 1.
-function addExtra(type) {
-  if (!placeState || placeState.isImage) return;
-  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
-  const p = placeState.pages[pageIdx];
-  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
-  const size = Math.round(Math.max(12, Math.min(pageW, pageH) * 0.035));   // sane default per page size
-  const h = extraBoxH(size);
-  const text = type === 'date' ? new Date().toISOString().slice(0, 10) : 'Text';
-  const extra = {
-    id: ++_extraSeq, type, pageIndex: pageIdx,
-    x: Math.round(pageW * 0.12),                 // a little in from the left
-    y: Math.round(pageH * 0.82 - h),             // near the top of the page
-    size, text,
-  };
-  state.extras.push(extra);
-  const el = renderExtraMarker(extra);
-  // Continue stays gated on the SEAL (the signature) being placed - extras are
-  // optional additions, not a substitute for signing.
-  if (el && type === 'text') beginEditExtra(el, extra);   // let the user type straight away
+const EDIT_TOOL_IDS = {
+  text: 'ds-add-text', date: 'ds-add-date', highlight: 'ds-add-highlight',
+  note: 'ds-add-note', pen: 'ds-tool-pen',
+};
+
+function editToolPrompt(tool) {
+  return {
+    text: 'Text tool active. Click the PDF where the text should appear.',
+    date: 'Date tool active. Click the PDF where the date should appear.',
+    highlight: 'Highlight tool active. Click the PDF, then drag and resize the highlight.',
+    note: 'Note tool active. Click the PDF where the note should appear.',
+    pen: 'Draw tool active. Draw anywhere on the PDF. Seals and existing objects stay visible but cannot block the pen.',
+  }[tool] || '';
 }
 
-// A highlight starts as a translucent bar near the top of the visible page;
-// drag it over the passage, corner-resize to fit.
-function addHighlight() {
-  if (!placeState || placeState.isImage) return;
-  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
-  const p = placeState.pages[pageIdx];
-  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
-  const w = Math.round(pageW * 0.36);
-  const h = Math.round(Math.max(14, pageH * 0.028));
-  const extra = {
-    id: ++_extraSeq, type: 'highlight', pageIndex: pageIdx,
-    x: Math.round(pageW * 0.32), y: Math.round(pageH * 0.72), w, h,
-  };
-  state.extras.push(extra);
-  renderExtraMarker(extra);
+function setEditTool(tool) {
+  const next = tool && _activeEditTool === tool ? null : tool;
+  _activeEditTool = next;
+  _penMode = next === 'pen';
+  for (const [name, id] of Object.entries(EDIT_TOOL_IDS)) {
+    const button = $(id);
+    if (!button) continue;
+    const active = name === next;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+  const list = $('ds-pdf-canvas-list');
+  if (list) {
+    list.classList.toggle('pen-mode', _penMode);
+    list.classList.toggle('edit-tool-active', !!next);
+  }
+  if (next) setPlaceHint(editToolPrompt(next));
+  else if (state.stamp) setPlaceHint('Select an object to move it, or choose a tool to add something.');
+  else setPlaceHint('Click a page to drop the signature stamp.');
 }
 
-// A sticky note: filled box, text wraps to the box width, anchored at its top
-// edge so the box can grow downward while you type without drifting.
-function addNote() {
-  if (!placeState || placeState.isImage) return;
-  const pageIdx = Math.max(0, Math.min(_placeCurrentPage, placeState.pages.length - 1));
-  const p = placeState.pages[pageIdx];
-  const pageW = p.wrap._pdfPage.width, pageH = p.wrap._pdfPage.height;
-  const size = Math.round(Math.max(9, Math.min(pageW, pageH) * 0.022));
-  const extra = {
-    id: ++_extraSeq, type: 'note', pageIndex: pageIdx,
-    x: Math.round(pageW * 0.58), yTop: Math.round(pageH * 0.85),
-    w: Math.round(pageW * 0.28), size, text: 'Note',
-  };
+// Place the selected tool where the user clicks. Fixed top-of-page defaults
+// made +Date and +Text appear outside the visible viewport on long pages.
+function placeExtraAt(type, wrap, clientX, clientY) {
+  if (!placeState || placeState.isImage || !wrap || !wrap._pdfPage) return null;
+  const rect = wrap.querySelector('canvas').getBoundingClientRect();
+  const ratio = wrap._pdfPage.width / rect.width;
+  const pageW = wrap._pdfPage.width, pageH = wrap._pdfPage.height;
+  const clickX = Math.max(0, Math.min(pageW, (clientX - rect.left) * ratio));
+  const clickYTop = Math.max(0, Math.min(pageH, (clientY - rect.top) * ratio));
+  const pageIndex = wrap._pdfPage.index;
+  let extra;
+  if (type === 'highlight') {
+    const w = Math.round(pageW * 0.30), h = Math.round(Math.max(14, pageH * 0.028));
+    extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, pageW - w), y: Math.max(0, pageH - clickYTop - h), w, h };
+  } else if (type === 'note') {
+    const size = Math.round(Math.max(9, Math.min(pageW, pageH) * 0.022));
+    const w = Math.round(pageW * 0.28);
+    extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, pageW - w), yTop: pageH - clickYTop, w, size, text: 'Note' };
+  } else {
+    const size = Math.round(Math.max(12, Math.min(pageW, pageH) * 0.035));
+    const h = extraBoxH(size);
+    const text = type === 'date' ? new Date().toISOString().slice(0, 10) : 'Text';
+    const estimatedW = size * (type === 'date' ? 7.4 : 5);
+    extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, Math.max(0, pageW - estimatedW)), y: Math.max(0, pageH - clickYTop - h), size, text };
+  }
   state.extras.push(extra);
   const el = renderExtraMarker(extra);
-  if (el) beginEditExtra(el, extra);
+  setEditTool(null);
+  const label = type === 'date' ? 'Date' : type[0].toUpperCase() + type.slice(1);
+  setPlaceHint(label + ' added. Drag to move it, use the corner to resize, or use its edit and delete buttons.');
+  if (el && (type === 'text' || type === 'note')) beginEditExtra(el, extra);
+  else if (el) { el.tabIndex = -1; el.focus({ preventScroll: true }); }
+  return el;
 }
 
 function extraWrapFor(pageIndex) {
@@ -1008,31 +1022,24 @@ const PEN_STROKE_PT = 2;             // stroke width in PDF points
 let _penMode = false;
 let _penStroke = null;               // live stroke: { wrap, ratio, pts:[{px,py}], svg, poly }
 
-function setPenMode(on) {
-  _penMode = !!on;
-  const b = $('ds-tool-pen');
-  if (b) { b.classList.toggle('active', _penMode); b.setAttribute('aria-pressed', String(_penMode)); }
-  const list = $('ds-pdf-canvas-list');
-  if (list) list.classList.toggle('pen-mode', _penMode);
-}
-
 function onPenDown(e) {
   if (!_penMode || !placeState || placeState.isImage || _penStroke) return;
   const wrap = e.currentTarget;
-  if (e.target.closest('.ds-anno') || e.target.closest('.ds-page-bar') || e.target.closest('.ds-stamp-marker')) return;
   const canvas = wrap.querySelector('canvas');
   const rect = canvas.getBoundingClientRect();
-  const svg = document.createElementNS(SVGNS, 'svg');
-  svg.setAttribute('class', 'ds-pen-live');
-  const poly = document.createElementNS(SVGNS, 'polyline');
-  poly.setAttribute('fill', 'none');
-  poly.setAttribute('stroke', '#0b3a6a');
-  poly.setAttribute('stroke-width', String(PEN_STROKE_PT * (rect.width / wrap._pdfPage.width)));
-  poly.setAttribute('stroke-linecap', 'round');
-  poly.setAttribute('stroke-linejoin', 'round');
-  svg.appendChild(poly);
-  wrap.appendChild(svg);
-  _penStroke = { wrap, rect, pts: [{ px: e.clientX - rect.left, py: e.clientY - rect.top }], svg, poly };
+  const live = document.createElement('canvas');
+  live.className = 'ds-pen-live';
+  const density = Math.max(1, window.devicePixelRatio || 1);
+  live.width = Math.max(1, Math.round(rect.width * density));
+  live.height = Math.max(1, Math.round(rect.height * density));
+  const ctx = live.getContext('2d');
+  ctx.setTransform(density, 0, 0, density, 0, 0);
+  ctx.strokeStyle = '#0b3a6a';
+  ctx.lineWidth = PEN_STROKE_PT * (rect.width / wrap._pdfPage.width);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  wrap.appendChild(live);
+  _penStroke = { wrap, rect, pts: [{ px: e.clientX - rect.left, py: e.clientY - rect.top }], live, ctx };
   try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
   e.preventDefault(); e.stopPropagation();
 }
@@ -1040,11 +1047,17 @@ function onPenDown(e) {
 function onPenMove(e) {
   const s = _penStroke;
   if (!s) return;
-  const px = e.clientX - s.rect.left, py = e.clientY - s.rect.top;
-  const last = s.pts[s.pts.length - 1];
-  if (Math.hypot(px - last.px, py - last.py) < 1.5) return;   // decimate micro-moves
-  s.pts.push({ px, py });
-  s.poly.setAttribute('points', s.pts.map(p => p.px + ',' + p.py).join(' '));
+  const events = (typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents()) || [e];
+  for (const ev of (events.length ? events : [e])) {
+    const px = ev.clientX - s.rect.left, py = ev.clientY - s.rect.top;
+    const last = s.pts[s.pts.length - 1];
+    if (Math.hypot(px - last.px, py - last.py) < 1.5) continue;
+    s.ctx.beginPath();
+    s.ctx.moveTo(last.px, last.py);
+    s.ctx.lineTo(px, py);
+    s.ctx.stroke();
+    s.pts.push({ px, py });
+  }
 }
 
 function onPenUp(e) {
@@ -1052,7 +1065,7 @@ function onPenUp(e) {
   if (!s) return;
   _penStroke = null;
   try { s.wrap.releasePointerCapture(e.pointerId); } catch (_) {}
-  s.svg.remove();
+  s.live.remove();
   if (s.pts.length < 2) return;                               // a bare tap is not a stroke
   const ratio = s.wrap._pdfPage.width / s.rect.width;         // pdf points per CSS px
   const pageH = s.wrap._pdfPage.height;
@@ -1308,8 +1321,13 @@ function swallowNextWrapClick(wrap) {
 
 function onPlaceClick(e) {
   if (_penMode) return;                 // pen mode: pointer gestures draw, they don't place the seal
-  if (!hasInlineSeal() && state.mode === 'pdf') return;
   const wrap = e.currentTarget;
+  if (_activeEditTool && state.mode === 'pdf') {
+    placeExtraAt(_activeEditTool, wrap, e.clientX, e.clientY);
+    e.preventDefault(); e.stopPropagation();
+    return;
+  }
+  if (!hasInlineSeal() && state.mode === 'pdf') return;
   const canvas = wrap.querySelector('canvas');
   const rect = canvas.getBoundingClientRect();
   const isImage = !!wrap._pdfPage.isImage;
@@ -1442,11 +1460,14 @@ function onStampPointerDown(e) {
   const rect = wrap.querySelector('canvas').getBoundingClientRect();
   _drag = {
     marker, wrap, rect,
+    startLeft: parseFloat(marker.style.left), startTop: parseFloat(marker.style.top),
     grabX: e.clientX - (rect.left + parseFloat(marker.style.left)),
     grabY: e.clientY - (rect.top + parseFloat(marker.style.top)),
     w: parseFloat(marker.style.width), h: parseFloat(marker.style.height), moved: false,
+    left: parseFloat(marker.style.left), top: parseFloat(marker.style.top), frame: 0,
   };
   try { marker.setPointerCapture(e.pointerId); } catch (_) {}
+  marker.classList.add('dragging');
   marker.style.cursor = 'grabbing';
   marker.addEventListener('pointermove', onStampPointerMove);
   marker.addEventListener('pointerup', onStampPointerUp);
@@ -1457,21 +1478,31 @@ function onStampPointerDown(e) {
 function onStampPointerMove(e) {
   if (!_drag) return;
   _drag.moved = true;
-  const left = Math.max(0, Math.min(_drag.rect.width - _drag.w, e.clientX - _drag.rect.left - _drag.grabX));
-  const top = Math.max(0, Math.min(_drag.rect.height - _drag.h, e.clientY - _drag.rect.top - _drag.grabY));
-  _drag.marker.style.left = left + 'px';
-  _drag.marker.style.top = top + 'px';
+  _drag.left = Math.max(0, Math.min(_drag.rect.width - _drag.w, e.clientX - _drag.rect.left - _drag.grabX));
+  _drag.top = Math.max(0, Math.min(_drag.rect.height - _drag.h, e.clientY - _drag.rect.top - _drag.grabY));
+  if (_drag.frame) return;
+  _drag.frame = requestAnimationFrame(() => {
+    if (!_drag) return;
+    _drag.frame = 0;
+    const dx = _drag.left - _drag.startLeft, dy = _drag.top - _drag.startTop;
+    _drag.marker.style.transform = `translate3d(${dx}px,${dy}px,0)`;
+  });
 }
 
 function onStampPointerUp(e) {
   if (!_drag) return;
-  const { marker, wrap, moved } = _drag;
+  const { marker, wrap, moved, left, top, frame } = _drag;
+  if (frame) cancelAnimationFrame(frame);
   marker.removeEventListener('pointermove', onStampPointerMove);
   marker.removeEventListener('pointerup', onStampPointerUp);
   marker.removeEventListener('pointercancel', onStampPointerUp);
   try { marker.releasePointerCapture(e.pointerId); } catch (_) {}
+  marker.classList.remove('dragging');
   marker.style.cursor = 'grab';
   if (moved) {
+    marker.style.left = left + 'px';
+    marker.style.top = top + 'px';
+    marker.style.transform = '';
     commitStampFromMarker(marker, wrap);
     // Swallow the click the browser fires after pointerup so onPlaceClick on the
     // wrap does not ALSO re-place the stamp at the cursor.
@@ -3081,12 +3112,15 @@ function init() {
 // plus the page tools (merge/export). Additive to the seal.
 function wireEditTools() {
   const t = $('ds-add-text'), d = $('ds-add-date');
-  if (t) t.addEventListener('click', () => addExtra('text'));
-  if (d) d.addEventListener('click', () => addExtra('date'));
+  if (t) t.addEventListener('click', () => setEditTool('text'));
+  if (d) d.addEventListener('click', () => setEditTool('date'));
   const h = $('ds-add-highlight'), n = $('ds-add-note'), p = $('ds-tool-pen');
-  if (h) h.addEventListener('click', addHighlight);
-  if (n) n.addEventListener('click', addNote);
-  if (p) p.addEventListener('click', () => setPenMode(!_penMode));
+  if (h) h.addEventListener('click', () => setEditTool('highlight'));
+  if (n) n.addEventListener('click', () => setEditTool('note'));
+  if (p) p.addEventListener('click', () => setEditTool('pen'));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _activeEditTool) { e.preventDefault(); setEditTool(null); }
+  });
   // Sign-every-page toggle + reuse-saved-position.
   const cb = $('ds-allpages'); if (cb) cb.addEventListener('change', () => setStampAllPages(cb.checked));
   for (const placement of ['inline', 'sheet', 'both']) {

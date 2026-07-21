@@ -56,6 +56,7 @@
 .ds-page-wrap{position:relative;margin-bottom:14px;cursor:crosshair}
 .ds-page-wrap canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff}
 .ds-stamp-marker{position:absolute;border:1px solid var(--cobalt);background:#fff;pointer-events:auto;cursor:grab;touch-action:none;z-index:5;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
+.ds-stamp-marker.dragging{will-change:transform}
 .ds-stamp-resize{position:absolute;right:0;bottom:0;width:28px;height:28px;padding:0;background:var(--cobalt);border:0;border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:6;box-shadow:-1px -1px 3px rgba(0,0,0,.2)}
 .ds-stamp-resize::after{content:'';position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-right:1.5px solid #fff;border-bottom:1.5px solid #fff}
 /* Seal delete handle (matches the annotation × handle) */
@@ -82,28 +83,30 @@
 .ds-sheet-seal{width:min(390px,78%);height:135px;border:1px solid var(--cobalt);background:#fff;display:flex;flex-direction:column;overflow:hidden}
 @media(max-width:640px){.ds-signature-sheet-preview{min-height:360px;padding:12% 7%}.ds-sheet-fields{grid-template-columns:1fr;gap:3px}.ds-sheet-fields dd{margin-bottom:8px}.ds-sheet-seal{width:100%;height:110px}}
 /* Sticky action bar (Back / Continue) so it stays reachable on long documents */
-.ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:linear-gradient(to top,var(--bg,#F8FAFC) 70%,rgba(248,250,252,0));border-top:1px solid var(--ink-hair)}
+.ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:linear-gradient(to top,var(--bg,#F8FAFC) 70%,rgba(248,250,252,0));border-top:1px solid var(--ink-hair);pointer-events:none}
+.ds-place-actions>*{pointer-events:auto}
 /* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
 .ds-edit-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
 .ds-edit-btn{font:inherit;font-size:12px;padding:3px 12px;border:1px solid var(--cobalt);background:#fff;color:var(--cobalt);border-radius:4px;cursor:pointer;line-height:1.4;font-weight:600}
-.ds-edit-btn:hover{background:var(--cobalt);color:#fff}
+.ds-edit-btn:hover,.ds-edit-btn.active{background:var(--cobalt);color:#fff}
+.ds-edit-btn:focus-visible{outline:3px solid rgba(29,78,216,.35);outline-offset:2px}
 .ds-edit-tip{font-size:11px;color:var(--ink-dim)}
 .ds-edit-hint{font-size:12px;color:var(--ink-dim);margin:0 0 10px;padding:6px 10px;border:1px dashed #cdd9e8;border-radius:4px;max-width:64ch}
-.ds-anno{position:absolute;box-sizing:border-box;z-index:5;border:1px dashed var(--cobalt);background:rgba(255,255,255,.7);color:var(--navy);font-family:'Times New Roman',Times,serif;display:flex;align-items:center;padding:2px 4px;cursor:grab;touch-action:none;overflow:hidden;white-space:pre;line-height:1.15}
+.ds-anno{position:absolute;box-sizing:border-box;z-index:5;border:1px dashed var(--cobalt);background:rgba(255,255,255,.88);color:var(--navy);font-family:'Times New Roman',Times,serif;display:flex;align-items:center;padding:2px 4px;cursor:grab;touch-action:none;overflow:visible;white-space:pre;line-height:1.15}
 .ds-anno.editing{cursor:text;background:#fff;outline:2px solid var(--cobalt);border-style:solid}
-.ds-anno[data-type="date"]{font-family:var(--mono)}
-.ds-anno-del{position:absolute;top:-9px;left:-9px;width:18px;height:18px;border-radius:50%;background:#b00;color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0}
-.ds-anno-resize{position:absolute;right:0;bottom:0;width:12px;height:12px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:7}
+.ds-anno[data-type="date"]{font-family:var(--mono);border:2px solid var(--cobalt);background:#fff;box-shadow:0 2px 7px rgba(11,58,106,.18)}
+.ds-anno-del{position:absolute;top:-14px;left:-14px;width:28px;height:28px;border-radius:50%;background:#b00020;color:#fff;border:2px solid #fff;font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.ds-anno-resize{position:absolute;right:-8px;bottom:-8px;width:24px;height:24px;background:var(--cobalt);border:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:7;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 /* Annotation types: highlight (translucent bar), note (sticky, wrapping), draw (pen stroke) */
 .ds-anno[data-type="highlight"]{background:rgba(255,214,61,.42);border:1px dashed rgba(191,146,7,.85);padding:0}
 .ds-anno[data-type="note"]{background:#fff7c9;border:1px solid #d3b334;white-space:normal;line-height:1.35;align-items:flex-start;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:4px 6px}
 .ds-anno-draw{background:transparent;border:1px dashed transparent;padding:0}
 .ds-anno-draw:hover,.ds-anno-draw:focus-within{border-color:var(--cobalt)}
 .ds-anno-draw svg{display:block;width:100%;height:100%;pointer-events:none}
-.ds-pen-live{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:6;pointer-events:none}
-#ds-pdf-canvas-list.pen-mode .ds-page-wrap{cursor:crosshair}
-#ds-tool-pen.active{background:var(--cobalt);color:#fff}
+.ds-page-wrap canvas.ds-pen-live{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;z-index:6;pointer-events:none}
+#ds-pdf-canvas-list.pen-mode .ds-page-wrap{cursor:crosshair;touch-action:none}
+#ds-pdf-canvas-list.edit-tool-active .ds-stamp-marker,#ds-pdf-canvas-list.edit-tool-active .ds-anno,#ds-pdf-canvas-list.edit-tool-active .ds-page-bar{pointer-events:none}
 .ds-edit-sep{width:1px;height:18px;background:var(--ink-hair);margin:0 2px}
 /* Per-page action bar (move / rotate / delete) */
 .ds-page-bar{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:8;opacity:.3;transition:opacity .15s}
@@ -731,6 +734,6 @@
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=41"></script>
+<script type="module" src="/sign-flow.js?v=42"></script>
 </body>
 </html>

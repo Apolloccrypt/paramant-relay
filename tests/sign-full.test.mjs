@@ -216,7 +216,7 @@ const phase4 = await page.evaluate(async () => {
   for (let i = 0; i < 200 && document.getElementById('step-place').hidden; i++) await sleep(20);
   document.getElementById('ds-seal-sheet').click();
   const sheetPreview = document.querySelector('.ds-signature-sheet-preview');
-  const mod = await import('/sign-flow.js?v=41');
+  const mod = await import('/sign-flow.js?v=42');
   const output = await mod.buildStampedPdf(sourceBytes, null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const outPdf = await window.PDFLib.PDFDocument.load(output);
   const rendered = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
@@ -245,8 +245,8 @@ const phase4 = await page.evaluate(async () => {
   };
 });
 
-// Phase 4b: the PDF pen's live SVG must cover the whole rendered page before
-// pointerup. Stamp controls must remain fully visible inside the clipped seal.
+// Phase 4b: pointer tools stay live before release, even over the seal. Date is
+// placed where the user clicks instead of at a fixed, potentially hidden spot.
 const penWrap = page.locator('#step-place .ds-page-wrap').first();
 await penWrap.scrollIntoViewIfNeeded();
 const stampControls = await page.evaluate(() => {
@@ -262,22 +262,96 @@ const stampWidthBeforeKey = await page.locator('.ds-stamp-marker').evaluate(el =
 await page.locator('.ds-stamp-resize').press('ArrowRight');
 const stampWidthAfterKey = await page.locator('.ds-stamp-marker').evaluate(el => el.getBoundingClientRect().width);
 stampControls.keyboardResized = stampWidthAfterKey > stampWidthBeforeKey;
-await page.locator('#ds-seal-sheet').click();
-await page.locator('#ds-tool-pen').click();
-const penBox = await penWrap.boundingBox();
-const penY = Math.max(80, Math.min(600, penBox.y + 220));
-await page.mouse.move(penBox.x + penBox.width * 0.58, penY);
+
+const stampBeforeDrag = await page.locator('.ds-stamp-marker').boundingBox();
+await page.mouse.move(stampBeforeDrag.x + stampBeforeDrag.width / 2, stampBeforeDrag.y + stampBeforeDrag.height / 2);
 await page.mouse.down();
-await page.mouse.move(penBox.x + penBox.width * 0.90, penY + 60, { steps: 12 });
-await page.locator('.ds-pen-live').waitFor();
+await page.mouse.move(stampBeforeDrag.x + stampBeforeDrag.width / 2 + 90, stampBeforeDrag.y + stampBeforeDrag.height / 2 + 35, { steps: 12 });
+await page.waitForTimeout(30);
+const stampDrag = await page.locator('.ds-stamp-marker').evaluate((el, before) => {
+  const r = el.getBoundingClientRect();
+  const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+  return { dx: r.left - before.x, dy: r.top - before.y, transform: el.style.transform, transformX: matrix.m41, transformY: matrix.m42, leftDuringDrag: el.style.left };
+}, stampBeforeDrag);
+await page.mouse.up();
+
+await page.locator('#ds-tool-pen').click();
+await penWrap.scrollIntoViewIfNeeded();
+const stampForPen = await page.locator('.ds-stamp-marker').boundingBox();
+const penBox = await penWrap.boundingBox();
+const penStartX = stampForPen.x + stampForPen.width / 2;
+const penStartY = stampForPen.y + stampForPen.height / 2;
+await page.mouse.move(penStartX, penStartY);
+const penDebug = await page.evaluate(({ x, y }) => ({
+  pressed: document.getElementById('ds-tool-pen').getAttribute('aria-pressed'),
+  listClass: document.getElementById('ds-pdf-canvas-list').className,
+  markerPointer: getComputedStyle(document.querySelector('.ds-stamp-marker')).pointerEvents,
+  hit: document.elementFromPoint(x, y)?.className || document.elementFromPoint(x, y)?.tagName || null,
+}), { x: penStartX, y: penStartY });
+await page.mouse.down();
+await page.mouse.move(Math.min(penBox.x + penBox.width * 0.92, penStartX + 260), penStartY + 60, { steps: 80 });
+await page.waitForTimeout(100);
+if (await page.locator('.ds-pen-live').count() === 0) throw new Error('pen did not start: ' + JSON.stringify(penDebug));
 const penLive = await page.evaluate(() => {
   const wrap = document.querySelector('#step-place .ds-page-wrap');
   const canvas = wrap.querySelector('canvas').getBoundingClientRect();
-  const svg = wrap.querySelector('.ds-pen-live').getBoundingClientRect();
-  const points = wrap.querySelector('.ds-pen-live polyline').points.numberOfItems;
-  return { canvas: { width:canvas.width, height:canvas.height }, svg: { width:svg.width, height:svg.height }, points };
+  const liveEl = wrap.querySelector('.ds-pen-live');
+  const live = liveEl.getBoundingClientRect();
+  const pixels = liveEl.getContext('2d').getImageData(0, 0, liveEl.width, liveEl.height).data;
+  let ink = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) ink++;
+  const marker = wrap.querySelector('.ds-stamp-marker').getBoundingClientRect();
+  const hit = document.elementFromPoint(marker.left + marker.width / 2, marker.top + marker.height / 2);
+  return { canvas: { width:canvas.width, height:canvas.height }, live: { width:live.width, height:live.height, tag:liveEl.tagName }, ink, stampBlocksPen: !!(hit && hit.closest('.ds-stamp-marker')) };
 });
 await page.mouse.up();
+const committedDraws = await page.locator('.ds-anno-draw').count();
+await page.locator('#ds-tool-pen').click();
+
+await page.locator('#ds-add-date').click();
+const dateArmed = await page.locator('#ds-add-date').getAttribute('aria-pressed');
+const dateHint = await page.locator('#ds-place-hint').innerText();
+await penWrap.scrollIntoViewIfNeeded();
+const dateBox = await penWrap.boundingBox();
+const dateX = dateBox.x + dateBox.width * 0.68;
+const dateY = Math.max(100, Math.min(650, dateBox.y + 320));
+await page.mouse.click(dateX, dateY);
+const datePlaced = await page.locator('.ds-anno[data-type="date"]').evaluate((el, target) => {
+  const r = el.getBoundingClientRect();
+  return { text: el.firstChild.textContent, left:r.left, top:r.top, nearClick: Math.abs(r.left - target.x) < 45 && Math.abs(r.top - target.y) < 45, activeAfter: document.getElementById('ds-add-date').getAttribute('aria-pressed'), hint: document.getElementById('ds-place-hint').textContent };
+}, { x: dateX, y: dateY });
+
+await page.locator('#ds-add-text').click();
+await penWrap.scrollIntoViewIfNeeded();
+let toolBox = await penWrap.boundingBox();
+await page.mouse.click(toolBox.x + toolBox.width * 0.22, Math.max(100, Math.min(650, toolBox.y + 430)));
+await page.locator('.ds-anno[data-type="text"].editing').fill('Placed text');
+await page.locator('.ds-anno[data-type="text"].editing').press('Enter');
+
+await page.locator('#ds-add-note').click();
+await penWrap.scrollIntoViewIfNeeded();
+toolBox = await penWrap.boundingBox();
+await page.mouse.click(toolBox.x + toolBox.width * 0.46, Math.max(100, Math.min(650, toolBox.y + 510)));
+await page.locator('.ds-anno[data-type="note"].editing').fill('Placed note');
+await page.locator('.ds-anno[data-type="note"].editing').press('Enter');
+
+await page.locator('#ds-add-highlight').click();
+await penWrap.scrollIntoViewIfNeeded();
+toolBox = await penWrap.boundingBox();
+await page.mouse.click(toolBox.x + toolBox.width * 0.18, Math.max(100, Math.min(650, toolBox.y + 590)));
+const placedTools = await page.evaluate(() => Object.fromEntries(['date','text','note','highlight'].map(type => {
+  const el = document.querySelector('.ds-anno[data-type="' + type + '"]');
+  const r = el && el.getBoundingClientRect();
+  return [type, { count: document.querySelectorAll('.ds-anno[data-type="' + type + '"]').length, width: r && r.width, height: r && r.height, text: el && el.firstChild && el.firstChild.textContent }];
+})));
+const datePdf = await page.evaluate(async () => {
+  document.getElementById('ds-seal-sheet').click();
+  const source = await window.PDFLib.PDFDocument.create();
+  source.addPage([300, 400]).drawText('Tool export proof', { x: 30, y: 350, size: 14 });
+  const mod = await import('/sign-flow.js?v=42');
+  const output = await mod.buildStampedPdf(await source.save(), null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
+  const parsed = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
+  return (await (await parsed.getPage(1)).getTextContent()).items.map(i => i.str).join(' ');
+});
 
 // Phase 5: real pointer movement paints before pointerup, and the cropped PNG
 // becomes available without the former fixed 250 ms wait.
@@ -337,9 +411,11 @@ await new Promise(r => server.close(r));
 const all = [...phase1, ...phase2a, ...phase2b1, ...phase2b2, ...phase2c, ...phase3,
   { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('Source SHA3-256') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
   { name: 'P5 inline seal plus separate sheet renders both outputs', pass: phase4.bothPreview && phase4.bothPages === 2 && phase4.bothPage1.includes('Demo signer') && phase4.bothPage2.includes('ParaSign signature sheet'), detail: JSON.stringify(phase4) },
-  { name: 'P6 PDF pen live overlay covers middle and right before release', pass: penLive.points > 1 && penLive.svg.width >= penLive.canvas.width * 0.99 && penLive.svg.height >= penLive.canvas.height * 0.99, detail: JSON.stringify(penLive) },
+  { name: 'P6 stamp drag follows the pointer before release through a transform', pass: stampDrag.transformX > 50 && stampDrag.transformY > 20 && /translate3d/.test(stampDrag.transform), detail: JSON.stringify(stampDrag) },
   { name: 'P7 stamp delete and resize controls are visible and keyboard reachable', pass: stampControls.deleteVisible.width >= 28 && stampControls.deleteVisible.height >= 28 && stampControls.resizeVisible.width >= 28 && stampControls.resizeVisible.height >= 28 && stampControls.resizeTag === 'BUTTON' && /arrow keys/i.test(stampControls.resizeLabel) && stampControls.keyboardResized, detail: JSON.stringify(stampControls) },
-  { name: 'P8 signature canvas stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /ready/i.test(phase5.status), detail: JSON.stringify(phase5) }];
+  { name: 'P8 PDF pen canvas covers the page and draws through the visible stamp', pass: penLive.live.tag === 'CANVAS' && penLive.ink > 0 && penLive.live.width >= penLive.canvas.width * 0.99 && penLive.live.height >= penLive.canvas.height * 0.99 && !penLive.stampBlocksPen && committedDraws === 1, detail: JSON.stringify({ penLive, committedDraws }) },
+  { name: 'P9 edit tools arm, place visibly and export their content', pass: dateArmed === 'true' && /Click the PDF/.test(dateHint) && datePlaced.nearClick && datePlaced.activeAfter === 'false' && /added/i.test(datePlaced.hint) && Object.values(placedTools).every(v => v.count === 1 && v.width > 10 && v.height > 8) && datePdf.includes(datePlaced.text) && datePdf.includes('Placed text') && datePdf.includes('Placed note'), detail: JSON.stringify({ dateArmed, dateHint, datePlaced, placedTools, datePdf }) },
+  { name: 'P10 signature canvas stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /ready/i.test(phase5.status), detail: JSON.stringify(phase5) }];
 let passed = 0;
 console.log('\n================ ParaSign signing — FULL functional test ================');
 for (const t of all) { console.log(`  ${t.pass ? 'PASS' : 'FAIL'}  ${t.name}${t.detail ? '   (' + t.detail + ')' : ''}`); if (t.pass) passed++; }
