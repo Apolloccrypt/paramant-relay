@@ -567,7 +567,9 @@ async function doChangePlan(){
   document.getElementById('cp-btn').disabled=true;
   const r=await api('/admin/change-plan',{method:'POST',body:JSON.stringify({key,new_plan,notify})});
   closeModal('mo-plan');document.getElementById('cp-btn').disabled=false;
-  toast(r.ok?'Plan → '+new_plan:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  const sectors=r.data?.sectors_updated?.length;
+  const fleet=sectors?' · '+sectors+'/'+r.data.sector_count+' sectors':'';
+  toast(r.ok?'Plan → '+new_plan+fleet:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;loadUsers();}
 }
 async function doSetProductPlan(){
@@ -579,7 +581,9 @@ async function doSetProductPlan(){
   const r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify})});
   btn.disabled=false;
   const label=(product==='parasign'?'ParaSign':'ParaSend')+' → '+tier;
-  toast(r.ok?label:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  const sectors=r.data?.sectors_updated?.length;
+  const fleet=sectors?' · '+sectors+'/'+r.data.sector_count+' sectors':'';
+  toast(r.ok?label+fleet:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
   if(r.ok){closeModal('mo-plan');LOADED.users=false;loadUsers();}
 }
 function openDisableKeyModal(key,email){
