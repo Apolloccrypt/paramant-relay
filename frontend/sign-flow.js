@@ -1394,8 +1394,11 @@ function commitStampFromMarker(marker, wrap) {
 // ratio). The screen top-left stays pinned, so only width/height - and, for a
 // PDF, the bottom-left y - change. Min 60px wide, capped at the page width.
 function addStampResizeHandle(marker, wrap) {
-  const grip = document.createElement('div');
+  const grip = document.createElement('button');
   grip.className = 'ds-stamp-resize';
+  grip.type = 'button';
+  grip.title = 'Resize signature stamp';
+  grip.setAttribute('aria-label', 'Resize signature stamp. Use arrow keys to adjust.');
   marker.appendChild(grip);
   let rs = null;
   grip.addEventListener('pointerdown', (e) => {
@@ -1418,6 +1421,18 @@ function addStampResizeHandle(marker, wrap) {
   };
   grip.addEventListener('pointerup', up);
   grip.addEventListener('pointercancel', up);
+  grip.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
+    const w0 = parseFloat(marker.style.width), h0 = parseFloat(marker.style.height);
+    const aspect = h0 / w0;
+    const maxW = wrap.getBoundingClientRect().width - parseFloat(marker.style.left);
+    const delta = (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1) * (e.shiftKey ? 10 : 2);
+    const w = Math.max(60, Math.min(maxW, w0 + delta));
+    marker.style.width = w + 'px';
+    marker.style.height = (w * aspect) + 'px';
+    commitStampFromMarker(marker, wrap);
+  });
 }
 
 // ── Drag the placed stamp to reposition (coexists with click-to-place) ──────

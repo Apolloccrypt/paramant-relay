@@ -56,10 +56,11 @@
 .ds-page-wrap{position:relative;margin-bottom:14px;cursor:crosshair}
 .ds-page-wrap canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#fff}
 .ds-stamp-marker{position:absolute;border:1px solid var(--cobalt);background:#fff;pointer-events:auto;cursor:grab;touch-action:none;z-index:5;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:var(--navy)}
-.ds-stamp-resize{position:absolute;right:0;bottom:0;width:14px;height:14px;background:var(--cobalt);border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:6}
+.ds-stamp-resize{position:absolute;right:0;bottom:0;width:28px;height:28px;padding:0;background:var(--cobalt);border:0;border-top:2px solid #fff;border-left:2px solid #fff;cursor:nwse-resize;touch-action:none;z-index:6;box-shadow:-1px -1px 3px rgba(0,0,0,.2)}
 .ds-stamp-resize::after{content:'';position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-right:1.5px solid #fff;border-bottom:1.5px solid #fff}
 /* Seal delete handle (matches the annotation × handle) */
-.ds-stamp-del{position:absolute;top:-9px;left:-9px;width:18px;height:18px;border-radius:50%;background:#b00;color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0}
+.ds-stamp-del{position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:50%;background:#b00020;color:#fff;border:2px solid #fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:7;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.ds-stamp-del:focus-visible,.ds-stamp-resize:focus-visible{outline:3px solid #fff;outline-offset:1px;box-shadow:0 0 0 5px var(--cobalt)}
 /* Repeated-seal ghosts (sign-every-page preview): faint + non-interactive */
 .ds-stamp-ghost{opacity:.42;pointer-events:none !important;cursor:default;border-style:dashed}
 .ds-stamp-ghost .ds-stamp-del,.ds-stamp-ghost .ds-stamp-resize{display:none}
@@ -100,7 +101,7 @@
 .ds-anno-draw{background:transparent;border:1px dashed transparent;padding:0}
 .ds-anno-draw:hover,.ds-anno-draw:focus-within{border-color:var(--cobalt)}
 .ds-anno-draw svg{display:block;width:100%;height:100%;pointer-events:none}
-.ds-pen-live{position:absolute;inset:0;z-index:6;pointer-events:none}
+.ds-pen-live{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:6;pointer-events:none}
 #ds-pdf-canvas-list.pen-mode .ds-page-wrap{cursor:crosshair}
 #ds-tool-pen.active{background:var(--cobalt);color:#fff}
 .ds-edit-sep{width:1px;height:18px;background:var(--ink-hair);margin:0 2px}
@@ -114,10 +115,11 @@
 @media (hover: none), (pointer: coarse){
   .ds-page-bar{opacity:1}
   .ds-page-nav{top:64px}
-  .ds-anno-del,.ds-anno-edit,.ds-stamp-del{width:28px;height:28px;font-size:15px;top:-14px}
-  .ds-stamp-del{left:-14px}
+  .ds-anno-del,.ds-anno-edit{width:28px;height:28px;font-size:15px;top:-14px}
+  .ds-stamp-del{width:32px;height:32px;font-size:20px;top:4px;left:4px}
   .ds-anno-edit{left:20px}
-  .ds-anno-resize,.ds-stamp-resize{width:24px;height:24px}
+  .ds-anno-resize{width:24px;height:24px}
+  .ds-stamp-resize{width:32px;height:32px}
   .ds-page-bar button{width:34px;height:32px;font-size:14px}
   .ds-page-nav button{padding:6px 12px}
   .ds-page-nav input{width:54px;padding:6px 4px}

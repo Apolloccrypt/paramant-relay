@@ -245,6 +245,40 @@ const phase4 = await page.evaluate(async () => {
   };
 });
 
+// Phase 4b: the PDF pen's live SVG must cover the whole rendered page before
+// pointerup. Stamp controls must remain fully visible inside the clipped seal.
+const penWrap = page.locator('#step-place .ds-page-wrap').first();
+await penWrap.scrollIntoViewIfNeeded();
+const stampControls = await page.evaluate(() => {
+  const marker = document.querySelector('.ds-stamp-marker');
+  const del = marker.querySelector('.ds-stamp-del');
+  const resize = marker.querySelector('.ds-stamp-resize');
+  const box = (el) => { const r = el.getBoundingClientRect(); return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
+  const mr = box(marker), dr = box(del), rr = box(resize);
+  const visible = (r) => ({ width: Math.max(0, Math.min(r.right, mr.right) - Math.max(r.left, mr.left)), height: Math.max(0, Math.min(r.bottom, mr.bottom) - Math.max(r.top, mr.top)) });
+  return { deleteBox: dr, deleteVisible: visible(dr), resizeBox: rr, resizeVisible: visible(rr), resizeTag: resize.tagName, resizeLabel: resize.getAttribute('aria-label') };
+});
+const stampWidthBeforeKey = await page.locator('.ds-stamp-marker').evaluate(el => el.getBoundingClientRect().width);
+await page.locator('.ds-stamp-resize').press('ArrowRight');
+const stampWidthAfterKey = await page.locator('.ds-stamp-marker').evaluate(el => el.getBoundingClientRect().width);
+stampControls.keyboardResized = stampWidthAfterKey > stampWidthBeforeKey;
+await page.locator('#ds-seal-sheet').click();
+await page.locator('#ds-tool-pen').click();
+const penBox = await penWrap.boundingBox();
+const penY = Math.max(80, Math.min(600, penBox.y + 220));
+await page.mouse.move(penBox.x + penBox.width * 0.58, penY);
+await page.mouse.down();
+await page.mouse.move(penBox.x + penBox.width * 0.90, penY + 60, { steps: 12 });
+await page.locator('.ds-pen-live').waitFor();
+const penLive = await page.evaluate(() => {
+  const wrap = document.querySelector('#step-place .ds-page-wrap');
+  const canvas = wrap.querySelector('canvas').getBoundingClientRect();
+  const svg = wrap.querySelector('.ds-pen-live').getBoundingClientRect();
+  const points = wrap.querySelector('.ds-pen-live polyline').points.numberOfItems;
+  return { canvas: { width:canvas.width, height:canvas.height }, svg: { width:svg.width, height:svg.height }, points };
+});
+await page.mouse.up();
+
 // Phase 5: real pointer movement paints before pointerup, and the cropped PNG
 // becomes available without the former fixed 250 ms wait.
 const drawPage = await ctx.newPage();
@@ -303,7 +337,9 @@ await new Promise(r => server.close(r));
 const all = [...phase1, ...phase2a, ...phase2b1, ...phase2b2, ...phase2c, ...phase3,
   { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('Source SHA3-256') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
   { name: 'P5 inline seal plus separate sheet renders both outputs', pass: phase4.bothPreview && phase4.bothPages === 2 && phase4.bothPage1.includes('Demo signer') && phase4.bothPage2.includes('ParaSign signature sheet'), detail: JSON.stringify(phase4) },
-  { name: 'P6 pointer stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /ready/i.test(phase5.status), detail: JSON.stringify(phase5) }];
+  { name: 'P6 PDF pen live overlay covers middle and right before release', pass: penLive.points > 1 && penLive.svg.width >= penLive.canvas.width * 0.99 && penLive.svg.height >= penLive.canvas.height * 0.99, detail: JSON.stringify(penLive) },
+  { name: 'P7 stamp delete and resize controls are visible and keyboard reachable', pass: stampControls.deleteVisible.width >= 28 && stampControls.deleteVisible.height >= 28 && stampControls.resizeVisible.width >= 28 && stampControls.resizeVisible.height >= 28 && stampControls.resizeTag === 'BUTTON' && /arrow keys/i.test(stampControls.resizeLabel) && stampControls.keyboardResized, detail: JSON.stringify(stampControls) },
+  { name: 'P8 signature canvas stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /ready/i.test(phase5.status), detail: JSON.stringify(phase5) }];
 let passed = 0;
 console.log('\n================ ParaSign signing — FULL functional test ================');
 for (const t of all) { console.log(`  ${t.pass ? 'PASS' : 'FAIL'}  ${t.name}${t.detail ? '   (' + t.detail + ')' : ''}`); if (t.pass) passed++; }
