@@ -293,6 +293,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>How ParaSign document delivery works</h2>
 <p>When you request signatures, your browser encrypts the document with AES-256-GCM before upload. The signing relay stores the encrypted capsule with the envelope until its expiry. The relay does not receive document plaintext or the document key. The personal signing link contains the key in its URL fragment; browsers do not send that fragment to the relay.</p>
+<p>When a signer places a visible seal or date, the relay stores the signed field type, page number and normalized coordinates in the envelope. It does not receive document text, a drawn signature image or free-form field content. The placement is covered by the signer&rsquo;s ML-DSA-65 signature.</p>
 <p>The recipient must also sign in with the exact invited email address. The link alone cannot retrieve the ciphertext. If you choose Paramant email delivery, Resend processes the recipient address, message and complete signing link. It does not receive document plaintext. You can instead create links without sending email.</p>
 
 <h2>What we process</h2>

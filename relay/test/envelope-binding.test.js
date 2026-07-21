@@ -8,7 +8,7 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const {
-  EnvelopeStore, signMessageBytes, partyEmailHash,
+  EnvelopeStore, signMessageBytes, normaliseAppearance, appearanceHash, partyEmailHash,
 } = require('../envelope');
 
 let passed = 0;
@@ -81,6 +81,18 @@ async function main() {
   assert.ok(!v4a.equals(signMessageBytes(ID, DOC, 0)), 'v4 differs from the unbound v1 recipe');
   ok('signMessageBytes v4 signer-pubkey commitment');
 
+  // 3c. recipe v5 commits to a canonical, bounded visual placement manifest.
+  const APPEARANCE = normaliseAppearance({ version: 1, fields: [
+    { type: 'seal', page_index: 0, x: 0.4, y: 0.7, w: 0.36, h: 0.105 },
+    { type: 'date', page_index: 0, x: 0.4, y: 0.82, w: 0.22, h: 0.055 },
+  ] });
+  const APPEARANCE_HASH = appearanceHash(APPEARANCE);
+  const v5a = signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, APPEARANCE_HASH);
+  const v5b = signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, appearanceHash({ version: 1, fields: [] }));
+  assert.ok(!v5a.equals(v5b), 'v5 changes when the signed placement changes');
+  assert.throws(() => normaliseAppearance({ version: 1, fields: [{ type: 'text', page_index: 0, x: 0, y: 0, w: .2, h: .1 }] }), /type/);
+  ok('signMessageBytes v5 appearance commitment');
+
   // 4. sign(): email-bound slot rejects a public (non-internal) caller
   {
     const store = new EnvelopeStore(fakeRedis(emailHashOf(EMAIL_HASH)), { sigVerify: () => true });
@@ -128,6 +140,46 @@ async function main() {
     const internalReal = await store.sign(ID, 0, 'cHVi', 'c2ln', { internalTrusted: true, verifiedEmailHash: EMAIL_HASH });
     assert.strictEqual(internalReal.code, 'email_mismatch', 'a real email can never claim an empty-hash slot either');
     ok('sign() empty-email slot is fail-closed (audit 1.1 dead-end unsignable)');
+  }
+
+  // 6c. recipe v5 verifies and returns the exact normalized appearance it binds.
+  {
+    const hash = { ...emailHashOf(EMAIL_HASH), recipe_version: '5' };
+    let seenMsg = null;
+    const store = new EnvelopeStore(fakeRedis(hash), {
+      sigVerify: (_sig, msg) => { seenMsg = msg; return true; },
+    });
+    const r = await store.sign(ID, 0, PUB_A, 'c2ln', {
+      internalTrusted: true,
+      verifiedEmailHash: EMAIL_HASH,
+      appearance: APPEARANCE,
+    });
+    assert.strictEqual(r.ok, true);
+    assert.deepStrictEqual(r.appearance, APPEARANCE);
+    assert.strictEqual(r.appearance_hash, APPEARANCE_HASH);
+    assert.ok(seenMsg.equals(signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, APPEARANCE_HASH)));
+    ok('sign() recipe v5 binds normalized appearance');
+  }
+
+  // 6d. Both the public status and full receipt carry the signed placement.
+  {
+    const hash = {
+      ...emailHashOf(EMAIL_HASH),
+      recipe_version: '5',
+      status: 'complete',
+      signed_count: '1',
+      p0_label: 'Signer Demo',
+      p0_sig: 'c2ln:' + PUB_A,
+      p0_signed_at: '2026-07-21T12:00:00.000Z',
+      p0_appearance: JSON.stringify(APPEARANCE),
+      p0_appearance_hash: APPEARANCE_HASH,
+    };
+    const store = new EnvelopeStore(fakeRedis(hash), {});
+    const publicView = await store.getRedacted(ID);
+    const receipt = await store.getForReceipt(ID);
+    assert.deepStrictEqual(publicView.parties[0].appearance, APPEARANCE);
+    assert.strictEqual(receipt.parties[0].appearance_hash, APPEARANCE_HASH);
+    ok('signed appearance survives status and receipt read-back');
   }
 
   // 7. sign(): open envelope (no binding_mode) works via the public path but is

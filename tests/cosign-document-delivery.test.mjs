@@ -32,13 +32,17 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const ENV_ID = 'env_demo_abcdefghijklmnop';
 const TOKEN = 't'.repeat(43);
 await page.goto(ORIGIN + '/__proof');
+await page.addScriptTag({ url: ORIGIN + '/vendor/pdf-lib/pdf-lib.min.js' });
 const fixture = await page.evaluate(async ({ envelopeId }) => {
   const pqc = await import('/vendor/paramant-pqc.js');
   const delivery = await import('/js/parasign-document-capsule.js?v=1');
-  const bytes = new TextEncoder().encode('generic invoice document for co-sign test');
+  const pdf = await window.PDFLib.PDFDocument.create();
+  const pdfPage = pdf.addPage([595, 842]);
+  pdfPage.drawText('Generic agreement for recipient placement test', { x: 50, y: 780, size: 16 });
+  const bytes = new Uint8Array(await pdf.save());
   const docHash = Array.from(pqc.sha3_256(bytes)).map((b) => b.toString(16).padStart(2, '0')).join('');
   const out = await delivery.encryptDocumentCapsule({
-    bytes, filename: 'invoice-demo.txt', mime: 'text/plain', envelopeId, docHash,
+    bytes, filename: 'agreement-demo.pdf', mime: 'application/pdf', envelopeId, docHash,
   });
   return { capsule: Array.from(out.capsule), fragment: out.fragment, docHash };
 }, { envelopeId: ENV_ID });
@@ -51,7 +55,7 @@ await page.route('https://health.paramant.app/v2/envelopes/**', (route) => {
   if (url.pathname.endsWith('/view')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
     envelope: {
-      id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'invoice-demo.txt',
+      id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'agreement-demo.pdf', recipe_version: 5,
       created_at: '2026-07-21T12:00:00.000Z', expires_at: '2026-08-20T12:00:00.000Z',
       status: 'sent', signed_count: 0, party_count: 1,
       parties: [{ index: 0, label: 'Signer Demo', status: 'pending' }],
@@ -96,10 +100,32 @@ ok('verified delivered document enables signing', state.signDisabled === false, 
 ok('phone viewport has no horizontal overflow', state.overflow <= 1, state.overflow);
 ok('document endpoint read once', documentReads === 1, documentReads);
 
+await page.locator('#appearance-seal').click();
+await page.locator('.doc-page[data-page-index="0"] .appearance-layer').click({ position: { x: 160, y: 90 } });
+await page.locator('#appearance-date').click();
+await page.locator('.doc-page[data-page-index="0"] .appearance-layer').click({ position: { x: 160, y: 170 } });
+let appearanceState = await page.evaluate(() => ({
+  fields: Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((node) => ({ text: node.textContent, left: node.style.left, top: node.style.top })),
+  draft: Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((value) => value && value.includes('"fields"')) || '',
+}));
+ok('recipient places a visible signature and date on the PDF', appearanceState.fields.length === 2 && appearanceState.fields.some((field) => /Paramant signed/i.test(field.text)) && appearanceState.fields.some((field) => /2026|2027/i.test(field.text)), JSON.stringify(appearanceState));
+ok('placement draft stores coordinates only for refresh recovery', /"type":"seal"/.test(appearanceState.draft) && !/example\.com|agreement/i.test(appearanceState.draft), appearanceState.draft);
+if (process.env.PARAMANT_COSIGN_SCREENSHOT_PATH) await page.screenshot({ path:process.env.PARAMANT_COSIGN_SCREENSHOT_PATH, fullPage:true });
+const renderedPdf = await page.evaluate(async () => {
+  const raw = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((value) => value && value.includes('"fields"'));
+  const mod = await import('/co-sign.js?v=19');
+  const bytes = await mod.buildSignedPdf({ appearance: JSON.parse(raw), signed_at: '2026-07-21T12:00:00.000Z' });
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
+  const text = (await (await pdf.getPage(1)).getTextContent()).items.map((item) => item.str).join(' ');
+  return { size: bytes.length, pages: pdf.numPages, text };
+});
+ok('download renderer bakes the signed seal and date into a PDF', renderedPdf.size > 500 && renderedPdf.pages === 1 && /PARAMANT SIGNED/.test(renderedPdf.text) && /2026-07-21/.test(renderedPdf.text), JSON.stringify(renderedPdf));
+
 await page.reload({ waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult();
-state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, signDisabled: document.querySelector('#sign-confirm')?.disabled }));
-ok('refresh retrieves and verifies the document again', documentReads === 2 && /matched/i.test(state.delivery) && state.signDisabled === false, JSON.stringify({ documentReads, ...state }));
+await page.waitForFunction(() => document.querySelectorAll('.appearance-field:not(.prior)').length === 2);
+state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, signDisabled: document.querySelector('#sign-confirm')?.disabled, fields: document.querySelectorAll('.appearance-field:not(.prior)').length }));
+ok('refresh retrieves the document and restores placed fields', documentReads === 2 && /matched/i.test(state.delivery) && state.signDisabled === false && state.fields === 2, JSON.stringify({ documentReads, ...state }));
 
 const keyStart = '#doc=v1.'.length;
 const badFragment = fixture.fragment.slice(0, keyStart) +
@@ -128,7 +154,7 @@ await anonPage.route('https://health.paramant.app/v2/envelopes/**', (route) => {
   if (url.pathname.endsWith('/view')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
     envelope: {
-      id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'invoice-demo.txt',
+      id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'agreement-demo.pdf', recipe_version: 5,
       created_at: '2026-07-21T12:00:00.000Z', expires_at: '2026-08-20T12:00:00.000Z',
       status: 'sent', signed_count: 0, party_count: 1,
       parties: [{ index: 0, label: 'Signer Demo', status: 'pending' }],

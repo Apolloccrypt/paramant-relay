@@ -14,7 +14,7 @@ const crypto = require('crypto');
 // message; signMessageBytes is the single source of that construction (shared
 // with the relay's own party-sign path). envelope.js is pure (crypto only), no
 // require cycle.
-const { signMessageBytes } = require('./envelope');
+const { signMessageBytes, appearanceHash } = require('./envelope');
 
 // Domain separation for the single-signer notary message (pentest #3/#4).
 // Until v2, the signer signed the BARE 32-byte document hash, so an ML-DSA
@@ -117,6 +117,14 @@ function verifyDocEnvelopeV3(input, deps) {
   if (env.party_email_hash == null) {
     errors.push('missing party_email_hash (cannot reconstruct the signed message offline)');
   }
+  const recipeVersion = Number(env.recipe_version) || 3;
+  let visualHash = '';
+  if (recipeVersion >= 5) {
+    try {
+      visualHash = appearanceHash(env.appearance);
+      if (env.appearance_hash !== visualHash) errors.push('appearance_hash mismatch');
+    } catch (e) { errors.push('invalid appearance manifest: ' + e.message); }
+  }
 
   if (errors.length === 0) {
     try {
@@ -125,7 +133,9 @@ function verifyDocEnvelopeV3(input, deps) {
         signedHash,
         mp.party_index != null ? mp.party_index : 0,
         env.party_email_hash || '',
-        3,
+        recipeVersion,
+        signerPk,
+        visualHash,
       );
       const ok = deps.sigVerify(
         Buffer.from(env.signature || '', 'base64'),
@@ -146,7 +156,7 @@ function verifyEnvelope(input, deps) {
   const errors = [];
   const env = input.envelope;
   if (!env || typeof env !== 'object') return { valid: false, errors: ['missing or invalid envelope'] };
-  if (env.version === 'parasign-doc-3' || String(env.recipe_version) === '3') {
+  if (env.version === 'parasign-doc-3' || Number(env.recipe_version) >= 3) {
     return verifyDocEnvelopeV3(input, deps);
   }
   if (env.version !== '1' && env.version !== '2') errors.push('unsupported envelope version: ' + env.version);

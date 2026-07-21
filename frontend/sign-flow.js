@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=13';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=14';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=1';
 
@@ -2715,16 +2715,25 @@ async function doSign() {
     // produced (in memory) when the code was entered, so just use it.
     const signer = ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: signKey.vaultId, rpId: location.hostname });
     ephemeralSigner = null;   // consumed — `signer` owns it now and disposes below
+    const appearance = { version: 1, fields: [] };
     let sigB64;
     try {
-      const message = buildDocSignMessage({ envelopeId: env.id, docHash: docHashForEnvelope, partyIndex: 0, emailHash: act.email_hash });
+      const message = buildDocSignMessage({
+        envelopeId: env.id,
+        docHash: docHashForEnvelope,
+        partyIndex: 0,
+        emailHash: act.email_hash,
+        recipeVersion: act.recipe_version,
+        signerPublicKey: signKey.pk_b64,
+        appearance,
+      });
       sigB64 = toB64(await signer.sign(message));
     } finally {
       signer.dispose();   // zeroize — the secret never outlives this block
     }
 
     status('Recording your signature...');
-    const submitted = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64 });
+    const submitted = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance });
 
     // 4) v3 .psign receipt. The authoritative, CT-logged signature record is the
     //    relay envelope; this file points at it (envelope_id + party 0).
@@ -2732,7 +2741,7 @@ async function doSign() {
     let envelope;
     if (state.mode === 'pdf' || state.mode === 'image') {
       envelope = {
-        version: 'parasign-doc-3', recipe_version: 3, sign_domain: 'paramant/parasign/doc/v1',
+        version: 'parasign-doc-3', recipe_version: act.recipe_version || 3, sign_domain: 'paramant/parasign/doc/v1',
         algorithm: 'ML-DSA-65', hash_algorithm: 'SHA3-256',
         original_filename: state.doc.name, stamped_filename: state.mode === 'image' ? signedImageName() : 'signed-' + state.doc.name,
         original_hash: origHashHex, stamped_hash: stampedHashHex, coords,
@@ -2743,17 +2752,21 @@ async function doSign() {
         signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
         party_email_hash: act.email_hash || '',
+        appearance,
+        appearance_hash: submitted.appearance_hash || null,
         signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };
     } else {
       envelope = {
-        version: 'parasign-doc-3', recipe_version: 3, sign_domain: 'paramant/parasign/doc/v1',
+        version: 'parasign-doc-3', recipe_version: act.recipe_version || 3, sign_domain: 'paramant/parasign/doc/v1',
         algorithm: 'ML-DSA-65', hash_algorithm: 'SHA3-256',
         original_filename: state.doc.name, document_hash: docHashForEnvelope,
         signer_name: state.signer.name,
         signer_public_key: signKey.pk_b64, signer_pk_fingerprint: fingerprint,
         party_email_hash: act.email_hash || '',
+        appearance,
+        appearance_hash: submitted.appearance_hash || null,
         signature: sigB64, signed_at: dateStr, multiparty: mp,
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       };

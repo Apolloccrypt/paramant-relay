@@ -1519,7 +1519,7 @@ api.get("/user/account/webauthn/credentials", authUser, async (req, res) => {
 
 // POST /api/user/envelopes (authUser) — create a signing envelope SAME-ORIGIN
 // (replaces the old direct browser -> health.paramant.app POST, audit #2).
-// recipe_version 3 (domain-prefixed). Party 0 is the signer themselves (their
+// recipe_version 5 (domain, signer key and visual placement bound). Party 0 is the signer themselves (their
 // session email), so a self-sign (no recipients) still gets an envelope and
 // goes through the per-document activation gate (R018: every signature is a
 // passkey-PRF activation; no separate weaker self-sign route). The relay is
@@ -1552,7 +1552,7 @@ api.post("/user/envelopes", authUser, async (req, res) => {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
-      body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 3, creator_public_key: creatorPublicKey }),
+      body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 5, creator_public_key: creatorPublicKey }),
     });
     const body = await rr.json().catch(() => ({}));
     if (rr.status !== 200) return res.status(rr.status).json({ error: body.error || "envelope_create_failed" });
@@ -1623,6 +1623,33 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     const capsuleHash = rr.headers.get("x-capsule-sha256");
     if (capsuleHash) res.setHeader("X-Capsule-Sha256", capsuleHash);
     return res.send(Buffer.from(await rr.arrayBuffer()));
+  } catch (error) {
+    return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+  }
+});
+
+// GET /api/user/envelopes/:id/receipt -- final proof for an authenticated
+// recipient. The relay rechecks invite token, party index and verified email.
+api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  const partyIndex = Number(req.query.p);
+  const token = (req.query.t || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ error: "invalid_invitation" });
+  }
+  const emailHash = partyEmailHashAdmin(req.userSession.email);
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = Buffer.from(await rr.arrayBuffer());
+    res.status(rr.status);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Type", rr.headers.get("content-type") || "application/json");
+    const disposition = rr.headers.get("content-disposition");
+    if (disposition) res.setHeader("Content-Disposition", disposition);
+    return res.send(body);
   } catch (error) {
     return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
   }
@@ -1767,9 +1794,15 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
 // POST /api/user/sign/submit (authUser) — ATOMIC CONSUME + forward to relay sign.
 api.post("/user/sign/submit", authUser, async (req, res) => {
   const { user_id } = req.userSession;
-  const { activation_id, signer_public_key, signature } = req.body || {};
+  const { activation_id, signer_public_key, signature, appearance } = req.body || {};
   if (!activation_id || typeof activation_id !== "string") return res.status(400).json({ error: "activation_id_required" });
   if (!signer_public_key || !signature) return res.status(400).json({ error: "signature_required" });
+  let appearanceSize = 0;
+  try { appearanceSize = Buffer.byteLength(JSON.stringify(appearance ?? {}), "utf8"); }
+  catch { return res.status(400).json({ error: "invalid_appearance" }); }
+  if (appearanceSize > 4096 || (appearance !== undefined && (!appearance || typeof appearance !== "object" || Array.isArray(appearance)))) {
+    return res.status(400).json({ error: "invalid_appearance" });
+  }
 
   // ── ATOMIC one-shot consume. GETDEL returns the record AND deletes it in one
   // round-trip: of two concurrent submits with the same activation_id, exactly
@@ -1790,6 +1823,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
   try {
     const r = await callRelay(`/v2/envelopes/${encodeURIComponent(act.envelope_id)}/sign`, {
       party_index: act.party_index, signer_public_key, signature, verified_email_hash: act.email_hash,
+      appearance,
       // Crypto M1: the account this activation was issued to, so the relay can
       // pin the submitted key to that account's enrolled signing keys.
       account_id: act.account_id,
@@ -1802,7 +1836,16 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
       return res.status(r.status).json({ error: body.error || "sign_failed" });
     }
     try { logAuditEvent(String(user_id).slice(0, 12) + "…", "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
-    return res.json({ ok: true, signed_count: body.signed_count, party_count: body.party_count, status: body.status });
+    return res.json({
+      ok: true,
+      signed_count: body.signed_count,
+      party_count: body.party_count,
+      status: body.status,
+      signed_at: body.signed_at,
+      appearance: body.appearance,
+      appearance_hash: body.appearance_hash,
+      quota: body.quota,
+    });
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
 });
 

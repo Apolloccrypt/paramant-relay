@@ -7,7 +7,8 @@ Status: Accepted
 Deciders: Mick (project owner)
 
 Relates to: paramant-core ADR-0021 (cross-impl ML-DSA-65 byte-equivalence),
-R013 (CT-log usage), Sg1 step 2 (cross-impl verify, live).
+R013 (CT-log usage), R020 (signed visual placement), Sg1 step 2
+(cross-impl verify, live).
 
 ## Context
 
@@ -34,8 +35,9 @@ only the document hash.
   hash locally, and sends only `{document_hash, signature, public_key}` to the
   relay. The private signing key and document plaintext never leave the client.
   A later request-signatures flow may persist a separately encrypted document
-  capsule until envelope expiry; this envelope format still carries hashes and
-  signatures only.
+  capsule until envelope expiry. A recipe 5 multi-party receipt also carries a
+  signed visual-placement manifest with field types and normalized coordinates,
+  as defined in R020. It carries no document text or drawn signature image.
 - **Relay (notary):** verifies the signer's signature against the supplied
   public key and hash; if valid, appends a `parasign` entry to the CT log and
   counter-signs the full envelope with the relay-identity key

@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=13';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=14';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
 import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=1';
 
@@ -68,6 +68,30 @@ let __signKey = null;       // { vaultId, pk_b64, fingerprint, hasPrf } — PUBL
 let __ephemeralSigner = null; // set when signing via the TOTP fallback (in-memory key, no vault)
 let __hashMatches = null;   // null = no file opened yet, true/false after a local hash check
 let __blindAck = false;     // user explicitly opted to sign without opening the document
+let __documentBytes = null; // verified source bytes, retained only for this page session
+let __appearanceTool = '';
+let __appearance = { version: 1, fields: [] };
+let __signedPdfBytes = null;
+
+function appearanceDraftKey() {
+  return __envelope ? 'paramant.cosign.appearance.v1:' + __envelope.id + ':' + __partyIndex : '';
+}
+
+function loadAppearanceDraft() {
+  try {
+    const raw = sessionStorage.getItem(appearanceDraftKey());
+    return raw ? normaliseSigningAppearance(JSON.parse(raw)) : { version: 1, fields: [] };
+  } catch { return { version: 1, fields: [] }; }
+}
+
+function saveAppearanceDraft() {
+  try {
+    const key = appearanceDraftKey();
+    if (!key) return;
+    if (__appearance.fields.length) sessionStorage.setItem(key, JSON.stringify(__appearance));
+    else sessionStorage.removeItem(key);
+  } catch { /* session storage unavailable */ }
+}
 
 // ---------- boot ----------
 async function init() {
@@ -147,6 +171,15 @@ function renderEnvelope() {
   const me = e.parties[__partyIndex] || {};
   $('me-label').textContent = (me.label || 'party ' + (__partyIndex + 1));
   $('verify-file').onchange = onVerifyFile;
+  $('appearance-seal').onclick = () => armAppearanceTool('seal');
+  $('appearance-date').onclick = () => armAppearanceTool('date');
+  $('appearance-clear').onclick = () => {
+    __appearance = { version: 1, fields: [] };
+    saveAppearanceDraft();
+    __appearanceTool = '';
+    setAppearanceHelp('Your visible fields were cleared. You can place them again or sign without a visible mark.', false);
+    renderAppearanceOverlays();
+  };
 }
 
 // ---------- preconditions: the v3 chain needs a logged-in invitee + a passkey key ----------
@@ -180,6 +213,13 @@ function renderQuotaNote(quota) {
     else host.appendChild(div);
   }
   div.innerHTML = html;
+}
+
+async function refreshEnvelopeStatus() {
+  try {
+    const response = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(__envelope.id), { cache: 'no-store' });
+    if (response.ok) __envelope = (await response.json()).envelope || __envelope;
+  } catch { /* the accepted sign result remains authoritative */ }
 }
 
 async function loadSession() {
@@ -293,6 +333,9 @@ async function verifyAndRenderDocument(buf, source) {
   const h = toHex(sha3_256(buf));
   __hashMatches = (h === __envelope.doc_hash);
   __blindAck = false;   // an opened file supersedes any earlier blind-sign override
+  __documentBytes = __hashMatches ? new Uint8Array(buf) : null;
+  __appearance = __hashMatches ? loadAppearanceDraft() : { version: 1, fields: [] };
+  __appearanceTool = '';
   const b = $('verify-result');
   b.hidden = false;
   if (__hashMatches) {
@@ -305,6 +348,8 @@ async function verifyAndRenderDocument(buf, source) {
     b.textContent = 'Hash mismatch. The file you opened differs from the one in this envelope - do not sign it. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';
   }
   await renderDocPreview(buf);
+  const editor = $('appearance-editor');
+  if (editor) editor.hidden = !(__hashMatches && isPdfBytes(buf) && Number(__envelope.recipe_version) >= 5);
   refreshSignGate();
 }
 
@@ -345,7 +390,8 @@ async function renderPdfPreview(bytes, host) {
     const cssScale = targetWidth / base.width;
     const viewport = page.getViewport({ scale: cssScale * dpr });
     const wrap = document.createElement('div');
-    wrap.className = 'doc-page';
+    wrap.className = 'doc-page appearance-page';
+    wrap.dataset.pageIndex = String(i - 1);
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
@@ -353,6 +399,10 @@ async function renderPdfPreview(bytes, host) {
     canvas.style.height = Math.floor(base.height * cssScale) + 'px';
     canvas.style.display = 'block';
     wrap.appendChild(canvas);
+    const layer = document.createElement('div');
+    layer.className = 'appearance-layer';
+    wrap.appendChild(layer);
+    wrap.addEventListener('click', placeAppearanceField);
     host.appendChild(wrap);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   }
@@ -361,6 +411,7 @@ async function renderPdfPreview(bytes, host) {
   meta.textContent = pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
     (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
   host.appendChild(meta);
+  renderAppearanceOverlays();
 }
 
 async function renderImagePreview(bytes, mime, host) {
@@ -373,6 +424,165 @@ async function renderImagePreview(bytes, mime, host) {
   img.src = url;
   wrap.appendChild(img);
   host.appendChild(wrap);
+}
+
+function setAppearanceHelp(message, active) {
+  const help = $('appearance-help');
+  if (!help) return;
+  help.textContent = message;
+  help.classList.toggle('active', !!active);
+}
+
+function armAppearanceTool(type) {
+  if (!__documentBytes || !isPdfBytes(__documentBytes)) return;
+  __appearanceTool = type;
+  setAppearanceHelp(type === 'seal'
+    ? 'Signature selected. Click the PDF where your verified Paramant seal should appear.'
+    : 'Date selected. Click the PDF where the signing date should appear.', true);
+}
+
+function placeAppearanceField(event) {
+  if (!__appearanceTool || !__hashMatches) return;
+  if (event.target.closest('.appearance-field')) return;
+  const page = event.currentTarget;
+  const rect = page.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const size = __appearanceTool === 'seal' ? { w: 0.36, h: 0.105 } : { w: 0.22, h: 0.055 };
+  const px = (event.clientX - rect.left) / rect.width;
+  const py = (event.clientY - rect.top) / rect.height;
+  const field = {
+    type: __appearanceTool,
+    page_index: Number(page.dataset.pageIndex),
+    x: Math.max(0, Math.min(1 - size.w, px - size.w / 2)),
+    y: Math.max(0, Math.min(1 - size.h, py - size.h / 2)),
+    w: size.w,
+    h: size.h,
+  };
+  __appearance = normaliseSigningAppearance({
+    version: 1,
+    fields: __appearance.fields.filter((item) => item.type !== field.type).concat(field),
+  });
+  saveAppearanceDraft();
+  __appearanceTool = '';
+  setAppearanceHelp(field.type === 'seal'
+    ? 'Your signature seal is placed. Drag is not needed: choose Place my signature again to move it.'
+    : 'The signing date is placed. Choose Place date again to move it.', false);
+  renderAppearanceOverlays();
+}
+
+function appearanceText(type, party, current) {
+  if (type === 'date') return current ? new Date().toISOString().slice(0, 10) : String(party.signed_at || '').slice(0, 10);
+  return 'Paramant signed · ' + String(party.label || 'Signer');
+}
+
+function addAppearanceNode(layer, field, party, current) {
+  const node = document.createElement('div');
+  node.className = 'appearance-field ' + field.type + (current ? '' : ' prior');
+  node.style.left = (field.x * 100) + '%';
+  node.style.top = (field.y * 100) + '%';
+  node.style.width = (field.w * 100) + '%';
+  node.style.height = (field.h * 100) + '%';
+  node.textContent = appearanceText(field.type, party, current);
+  if (current) {
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'appearance-remove';
+    remove.setAttribute('aria-label', 'Remove ' + field.type + ' field');
+    remove.textContent = '×';
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      __appearance = { version: 1, fields: __appearance.fields.filter((item) => item.type !== field.type) };
+      saveAppearanceDraft();
+      renderAppearanceOverlays();
+    });
+    node.appendChild(remove);
+  }
+  layer.appendChild(node);
+}
+
+function renderAppearanceOverlays() {
+  const pages = Array.from(document.querySelectorAll('#doc-preview .doc-page[data-page-index]'));
+  if (!pages.length) return;
+  for (const page of pages) {
+    const layer = page.querySelector('.appearance-layer');
+    if (layer) layer.innerHTML = '';
+  }
+  const add = (field, party, current) => {
+    const page = pages.find((node) => Number(node.dataset.pageIndex) === Number(field.page_index));
+    const layer = page && page.querySelector('.appearance-layer');
+    if (layer) addAppearanceNode(layer, field, party, current);
+  };
+  for (const party of (__envelope?.parties || [])) {
+    if (party.index === __partyIndex || party.status !== 'signed' || !party.appearance) continue;
+    for (const field of (party.appearance.fields || [])) add(field, party, false);
+  }
+  const me = (__envelope?.parties || [])[__partyIndex] || {};
+  for (const field of (__appearance.fields || [])) add(field, me, true);
+}
+
+function downloadBytes(bytes, filename, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function safePdfText(value, max) {
+  return String(value || '').replace(/[\r\n\t]+/g, ' ').slice(0, max);
+}
+
+export async function buildSignedPdf(currentResult) {
+  if (!__documentBytes || !isPdfBytes(__documentBytes) || !window.PDFLib) return null;
+  const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+  const pdf = await PDFDocument.load(__documentBytes, { ignoreEncryption: false });
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const records = [];
+  for (const party of (__envelope.parties || [])) {
+    if (party.index === __partyIndex || party.status !== 'signed' || !party.appearance) continue;
+    records.push({ party, appearance: party.appearance });
+  }
+  const currentParty = (__envelope.parties || [])[__partyIndex] || {};
+  records.push({
+    party: {
+      ...currentParty,
+      signed_at: currentResult.signed_at,
+      signer_pk_hash: (__signKey?.fingerprint || ''),
+    },
+    appearance: currentResult.appearance || __appearance,
+  });
+  const pages = pdf.getPages();
+  for (const record of records) {
+    for (const field of (record.appearance.fields || [])) {
+      const page = pages[field.page_index];
+      if (!page) continue;
+      const { width, height } = page.getSize();
+      const x = field.x * width;
+      const y = height - ((field.y + field.h) * height);
+      const w = field.w * width;
+      const h = field.h * height;
+      if (field.type === 'date') {
+        const text = safePdfText(String(record.party.signed_at || '').slice(0, 10), 10);
+        page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.22, .32, .48), borderWidth: 1 });
+        page.drawText(text, { x: x + 5, y: y + Math.max(4, h * .3), size: Math.max(7, Math.min(11, h * .32)), font: regular, color: rgb(.04, .18, .35) });
+      } else {
+        const label = safePdfText(record.party.label || 'Signer', 70);
+        const fingerprint = safePdfText(record.party.signer_pk_hash || '', 16);
+        const date = safePdfText(record.party.signed_at || '', 24);
+        page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.08, .31, .84), borderWidth: 1.4 });
+        const titleSize = Math.max(7, Math.min(11, h * .22));
+        const bodySize = Math.max(6, Math.min(9, h * .16));
+        page.drawText('PARAMANT SIGNED', { x: x + 6, y: y + h - titleSize - 5, size: titleSize, font: bold, color: rgb(.08, .31, .84) });
+        page.drawText(label, { x: x + 6, y: y + h * .38, size: bodySize, font: regular, color: rgb(.04, .18, .35), maxWidth: Math.max(20, w - 12) });
+        page.drawText((date ? date.slice(0, 10) : '') + (fingerprint ? ' · ' + fingerprint : ''), { x: x + 6, y: y + 5, size: Math.max(5, bodySize - 1), font: regular, color: rgb(.32, .42, .55), maxWidth: Math.max(20, w - 12) });
+      }
+    }
+  }
+  return new Uint8Array(await pdf.save());
 }
 
 // ---------- WYSIWYS gate: you cannot sign until you have opened the document (or explicitly accept signing blind) ----------
@@ -415,6 +625,9 @@ async function doSign() {
   if (__blindAck && __hashMatches !== true) {
     if (!confirm('You have not opened the document - you would be signing its hash blind. Continue?')) return;
   }
+  if (__documentBytes && isPdfBytes(__documentBytes) && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
+    if (!confirm('Sign without a visible mark on the PDF? Your cryptographic signature will still be recorded.')) return;
+  }
   $('sign-confirm').disabled = true;
   $('sign-cta').hidden = true;
 
@@ -456,9 +669,18 @@ async function doSign() {
     // produced (in memory) when the code was entered, so just use it.
     const signer = __ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: __signKey.vaultId, rpId: location.hostname });
     __ephemeralSigner = null;   // consumed — `signer` owns it now and disposes below
+    const appearance = normaliseSigningAppearance(__appearance);
     let sigB64;
     try {
-      const message = buildDocSignMessage({ envelopeId: __envelope.id, docHash: __envelope.doc_hash, partyIndex: __partyIndex, emailHash: act.email_hash });
+      const message = buildDocSignMessage({
+        envelopeId: __envelope.id,
+        docHash: __envelope.doc_hash,
+        partyIndex: __partyIndex,
+        emailHash: act.email_hash,
+        recipeVersion: act.recipe_version,
+        signerPublicKey: __signKey.pk_b64,
+        appearance,
+      });
       sigB64 = toB64(await signer.sign(message));
     } finally {
       signer.dispose();   // zeroize — the secret never outlives this block
@@ -467,13 +689,35 @@ async function doSign() {
     // 3) Submit. The admin consumes the activation atomically (GETDEL) and
     //    forwards to the relay sign with the verified email binding.
     setStatus('', 'Recording your signature...');
-    const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64 });
+    const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance });
 
     $('done-env-id').textContent = __envelope.id;
     $('done-status').textContent = data.status || '-';
     $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + ' signed';
     $('done-pk').textContent = __signKey.fingerprint;
     renderQuotaNote(data.quota);
+    await refreshEnvelopeStatus();
+    __signedPdfBytes = await buildSignedPdf(data).catch(() => null);
+    const download = $('done-download-pdf');
+    const note = $('done-download-note');
+    if (__signedPdfBytes && download) {
+      download.hidden = false;
+      if (note) note.hidden = false;
+      download.onclick = () => {
+        const source = (__envelope.original_filename || 'document.pdf').replace(/\.pdf$/i, '');
+        downloadBytes(__signedPdfBytes, source + '-signed.pdf', 'application/pdf');
+      };
+    }
+    const proof = $('done-download-proof');
+    const proofWait = $('done-proof-wait');
+    if (data.status === 'complete' && proof) {
+      proof.hidden = false;
+      proof.href = '/api/user/envelopes/' + encodeURIComponent(__envelope.id) + '/receipt?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
+      if (proofWait) proofWait.hidden = true;
+    } else if (proofWait) {
+      proofWait.hidden = false;
+    }
+    try { sessionStorage.removeItem(appearanceDraftKey()); } catch { /* unavailable */ }
     showStep('step-done');
   } catch (e) {
     // Zeroize any unconsumed ephemeral secret and drop it so a retry re-prompts

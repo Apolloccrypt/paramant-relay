@@ -74,7 +74,7 @@ function makeDeps(over = {}) {
     }, over.envStore || {}),
     canonicalJSON: (o) => JSON.stringify(o),
     sigEngine: { sign: () => Buffer.from('notarysig') },
-    relayIdentity: { pk_hash: 'relaypkhash', sk: Buffer.from('sk') },
+    relayIdentity: { pk_hash: 'relaypkhash', pk: Buffer.from('relay-public-key'), sk: Buffer.from('sk') },
     readBody: async () => Buffer.from(over.body || '{}'),
     J, log: () => {},
   }, over.deps || {});
@@ -137,6 +137,7 @@ async function main() {
     const psign = d.res.json();
     assert.strictEqual(psign.type, 'parasign-envelope-receipt');
     assert.strictEqual(psign.parties[0].signature, 'SIG', 'raw per-party signature present');
+    assert.strictEqual(psign.notary.relay_public_key, Buffer.from('relay-public-key').toString('base64'));
     assert.ok(psign.notary_signature, 'notary counter-signature present');
     ok('receipt by owner (fingerprint) -> 200 full .psign');
   }

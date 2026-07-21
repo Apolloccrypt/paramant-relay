@@ -216,7 +216,7 @@ const phase4 = await page.evaluate(async () => {
   for (let i = 0; i < 200 && document.getElementById('step-place').hidden; i++) await sleep(20);
   document.getElementById('ds-seal-sheet').click();
   const sheetPreview = document.querySelector('.ds-signature-sheet-preview');
-  const mod = await import('/sign-flow.js?v=47');
+  const mod = await import('/sign-flow.js?v=48');
   const output = await mod.buildStampedPdf(sourceBytes, null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const outPdf = await window.PDFLib.PDFDocument.load(output);
   const rendered = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
@@ -347,7 +347,7 @@ const datePdf = await page.evaluate(async () => {
   document.getElementById('ds-seal-sheet').click();
   const source = await window.PDFLib.PDFDocument.create();
   source.addPage([300, 400]).drawText('Tool export proof', { x: 30, y: 350, size: 14 });
-  const mod = await import('/sign-flow.js?v=47');
+  const mod = await import('/sign-flow.js?v=48');
   const output = await mod.buildStampedPdf(await source.save(), null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const parsed = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
   return (await (await parsed.getPage(1)).getTextContent()).items.map(i => i.str).join(' ');

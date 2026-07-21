@@ -123,7 +123,50 @@ function safeTextEqual(stored, provided) {
 //     Binding the pubkey turns each open-slot signature into a genuine, non-
 //     forgeable commitment to the exact key that produced it.
 //       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash || signer_pub)
-function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion, signerPubB64) {
+//   recipeVersion 5 (signed visual placement): like v4, with a canonical
+//     appearance-manifest hash APPENDED. The manifest contains only field type,
+//     page and normalized coordinates. Signer label, timestamp and key identity
+//     remain envelope data, so the placement adds no document text to the relay.
+//       sha3_256("paramant/parasign/doc/v1" || 0x00 || id || doc || pi || email_hash || signer_pub || appearance_hash)
+function normaliseAppearance(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  if (source.version !== undefined && source.version !== 1) throw new Error('unsupported appearance version');
+  const input = source.fields === undefined ? [] : source.fields;
+  if (!Array.isArray(input) || input.length > 8) throw new Error('invalid appearance fields');
+  const fields = input.map((field) => {
+    if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error('invalid appearance field');
+    const type = String(field.type || '');
+    if (type !== 'seal' && type !== 'date') throw new Error('invalid appearance type');
+    const pageIndex = Number(field.page_index);
+    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) throw new Error('invalid appearance page');
+    const clean = { type, page_index: pageIndex };
+    for (const name of ['x', 'y', 'w', 'h']) {
+      const n = Number(field[name]);
+      if (!Number.isFinite(n) || n < 0 || n > 1) throw new Error('invalid appearance coordinate');
+      clean[name] = Math.round(n * 1000000) / 1000000;
+    }
+    if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) {
+      throw new Error('appearance field outside page');
+    }
+    return clean;
+  });
+  return { version: 1, fields };
+}
+
+function canonicalAppearance(value) {
+  return JSON.stringify(normaliseAppearance(value));
+}
+
+function appearanceHash(value) {
+  return crypto.createHash('sha3-256').update(canonicalAppearance(value), 'utf8').digest('hex');
+}
+
+function storedAppearance(raw) {
+  try { return normaliseAppearance(JSON.parse(raw || '')); }
+  catch { return { version: 1, fields: [] }; }
+}
+
+function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex, recipeVersion, signerPubB64, appearanceHashHex) {
   const v = Number(recipeVersion) || 1;
   const h = crypto.createHash('sha3-256');
   if (v >= 3) {
@@ -143,6 +186,9 @@ function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex,
     // an empty signer key before reaching here).
     h.update(Buffer.from(signerPubB64 || '', 'base64'));
   }
+  if (v >= 5) {
+    h.update(Buffer.from(appearanceHashHex || '', 'hex'));
+  }
   return h.digest();
 }
 
@@ -151,14 +197,20 @@ function signMessageBytes(envelopeId, docHashHex, partyIndex, partyEmailHashHex,
 // ARGV[1] = party index (string)
 // ARGV[2] = signature b64 + ':' + pubkey b64 (composite to keep field count low)
 // ARGV[3] = ISO timestamp
+// ARGV[4] = canonical appearance manifest JSON
+// ARGV[5] = appearance manifest SHA3-256
 // Returns: { newOrIdem ('new'|'idem'|'conflict'), signedCount, partyCount, status }
 const SIGN_LUA = `
 local key = KEYS[1]
 local pi = ARGV[1]
 local sigComposite = ARGV[2]
 local at = ARGV[3]
+local appearance = ARGV[4]
+local appearanceHash = ARGV[5]
 local sigField = 'p' .. pi .. '_sig'
 local atField  = 'p' .. pi .. '_signed_at'
+local appearanceField = 'p' .. pi .. '_appearance'
+local appearanceHashField = 'p' .. pi .. '_appearance_hash'
 local partyCount = tonumber(redis.call('HGET', key, 'party_count')) or 0
 local signedCount = tonumber(redis.call('HGET', key, 'signed_count')) or 0
 local status = redis.call('HGET', key, 'status') or ''
@@ -182,6 +234,10 @@ if existing then
 end
 redis.call('HSET', key, sigField, sigComposite)
 redis.call('HSET', key, atField,  at)
+if appearance ~= '' then
+  redis.call('HSET', key, appearanceField, appearance)
+  redis.call('HSET', key, appearanceHashField, appearanceHash)
+end
 signedCount = redis.call('HINCRBY', key, 'signed_count', 1)
 if signedCount >= partyCount then
   redis.call('HSET', key, 'status', 'complete')
@@ -274,10 +330,10 @@ class EnvelopeStore {
     // signed via the trusted admin proxy (verified_email_hash + X-Internal-Auth);
     // 'open' = the legacy public flow (any holder of env_id+party_index signs).
     const mode = bindingMode === 'email' ? 'email' : 'open';
-    // Explicit recipeVersion (1-3) wins; else default by binding mode. The
+    // Explicit recipeVersion (1-5) wins; else default by binding mode. The
     // per-document PRF activation flow (R018) creates v3 (domain-prefixed)
     // envelopes; open=1, email=2 stay the defaults for existing flows.
-    const recipeVersion = (Number.isInteger(recipeVersionArg) && recipeVersionArg >= 1 && recipeVersionArg <= 3)
+    const recipeVersion = (Number.isInteger(recipeVersionArg) && recipeVersionArg >= 1 && recipeVersionArg <= 5)
       ? recipeVersionArg
       : (mode === 'email' ? 2 : 1);
 
@@ -360,6 +416,8 @@ class EnvelopeStore {
         status: sig ? 'signed' : (h['p' + i + '_status'] || 'pending'),
         signed_at: h['p' + i + '_signed_at'] || null,
         signer_pk_hash: sig ? crypto.createHash('sha3-256').update(Buffer.from(sig.split(':')[1] || '', 'base64')).digest('hex') : null,
+        appearance: sig && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null,
+        appearance_hash: sig ? (h['p' + i + '_appearance_hash'] || null) : null,
       });
     }
     return {
@@ -452,6 +510,8 @@ class EnvelopeStore {
         signer_pk_hash: pkB64
           ? crypto.createHash('sha3-256').update(Buffer.from(pkB64, 'base64')).digest('hex')
           : null,
+        appearance: composite && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null,
+        appearance_hash: composite ? (h['p' + i + '_appearance_hash'] || null) : null,
       });
     }
     return {
@@ -601,6 +661,8 @@ class EnvelopeStore {
         email_hash: h['p' + pi + '_email_hash'] || '',
         status: sig ? 'signed' : (h['p' + pi + '_status'] || 'pending'),
         signed_at: h['p' + pi + '_signed_at'] || null,
+        appearance: sig && h['p' + pi + '_appearance'] ? storedAppearance(h['p' + pi + '_appearance']) : null,
+        appearance_hash: sig ? (h['p' + pi + '_appearance_hash'] || null) : null,
       },
     };
   }
@@ -753,7 +815,19 @@ class EnvelopeStore {
     const storedRecipe = parseInt(h.recipe_version, 10) || 1;
     const effectiveRecipe = (mode === 'open') ? 4 : storedRecipe;
     if (effectiveRecipe >= 4 && !signerPubB64) return { ok: false, code: 'bad_signature' };
-    const msg = signMessageBytes(id, h.doc_hash, pi, emailHash, effectiveRecipe, signerPubB64);
+    let appearance = null;
+    let appearanceJson = '';
+    let appearanceHashHex = '';
+    if (effectiveRecipe >= 5) {
+      try {
+        appearance = normaliseAppearance(opts.appearance);
+        appearanceJson = JSON.stringify(appearance);
+        appearanceHashHex = crypto.createHash('sha3-256').update(appearanceJson, 'utf8').digest('hex');
+      } catch {
+        return { ok: false, code: 'invalid_appearance' };
+      }
+    }
+    const msg = signMessageBytes(id, h.doc_hash, pi, emailHash, effectiveRecipe, signerPubB64, appearanceHashHex);
     let verified = false;
     try {
       verified = !!this.sigVerify(Buffer.from(signatureB64, 'base64'), msg, Buffer.from(signerPubB64, 'base64'));
@@ -765,7 +839,7 @@ class EnvelopeStore {
     await this._loadScript();
     const result = await this.redis.evalSha(this._signScriptSha, {
       keys: [key],
-      arguments: [String(pi), composite, at],
+      arguments: [String(pi), composite, at, appearanceJson, appearanceHashHex],
     });
     const [outcome, signedCountStr, partyCountStr, status] = result;
     if (outcome === 'conflict') return { ok: false, code: 'conflict' };
@@ -778,12 +852,16 @@ class EnvelopeStore {
       signed_count: parseInt(signedCountStr, 10),
       party_count: parseInt(partyCountStr, 10),
       status,
+      signed_at: at,
+      appearance,
+      appearance_hash: appearanceHashHex || null,
     };
     if (outcome === 'new') {
       try {
         this.ctAppend('envelope_sign', id, {
           party_index: pi,
           signer_pk_hash: crypto.createHash('sha3-256').update(Buffer.from(signerPubB64, 'base64')).digest('hex'),
+          appearance_hash: appearanceHashHex || undefined,
         });
         if (status === 'complete') this.ctAppend('envelope_complete', id, { signed_count: out.signed_count });
       } catch {}
@@ -792,4 +870,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS, SIGN_INVITE_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, normaliseAppearance, canonicalAppearance, appearanceHash, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS, SIGN_INVITE_TTL_DAYS };

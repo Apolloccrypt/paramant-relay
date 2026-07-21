@@ -5745,6 +5745,42 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Participant receipt for the signed-in web flow. Internal-auth plus the
+  // invite capability and verified email hash are all required. This lets a
+  // recipient save the final proof without exposing the owner-only endpoint.
+  const envParticipantReceiptMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/participant-receipt$/);
+  if (envParticipantReceiptMatch && req.method === 'GET') {
+    if (!_internalOk()) return _internalReject();
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    const partyIndex = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
+    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString();
+    try {
+      const party = await store.getForParty(envParticipantReceiptMatch[1], partyIndex, token);
+      if (!party || !envelopeMod.safeHexEqual(party.party.email_hash, verifiedEmailHash)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' }));
+      }
+      const env = await store.getForReceipt(envParticipantReceiptMatch[1]);
+      if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      if (env.status !== 'complete') { res.writeHead(409, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_ready' })); }
+      if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'notary_unavailable' })); }
+      const psign = parasignOpenApi.buildEnvelopePsign({
+        env, meta: null, canonicalJSON: parasign.canonicalJSON,
+        sigEngine: registry.getSig(0x0002), relayIdentity,
+        publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+      });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="Paramant-${envParticipantReceiptMatch[1]}.psign"`,
+        'Cache-Control': 'private, no-store',
+      });
+      return res.end(J(psign));
+    } catch {
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'receipt_failed' }));
+    }
+  }
+
   // GET /v2/envelopes/:id -- redacted public status.
   if (req.method === 'GET' && path.startsWith('/v2/envelopes/')) {
     if (!envViewRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
@@ -5757,9 +5793,13 @@ const server = http.createServer(async (req, res) => {
     // to the exact key. Email/PRF slots stay email/document-hash bound (v2/v3).
     const recipeFor = (v, mode) => (mode || 'open') === 'open'
       ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes || signer_public_key_bytes)'
-      : (v >= 2
-        ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
-        : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)');
+      : (v >= 5
+        ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes || signer_public_key_bytes || appearance_hash_bytes)'
+        : v >= 3
+          ? 'sha3_256("paramant/parasign/doc/v1" || 0x00 || envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
+          : v >= 2
+            ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
+            : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)');
     try {
       // ?p=<i>&t=<invite_token> -> party-scoped view. For email-bound envelopes
       // the token must match (getForParty returns null otherwise); for open
@@ -5905,10 +5945,14 @@ const server = http.createServer(async (req, res) => {
       // caller cannot set it, so it can never satisfy an email-bound slot.
       const internalTrusted = _internalOk();
       const verifiedEmailHash = (d.verified_email_hash || '').toString();
-      const out = await store.sign(id, pi, signerPub, sig, { internalTrusted, verifiedEmailHash });
+      const out = await store.sign(id, pi, signerPub, sig, {
+        internalTrusted,
+        verifiedEmailHash,
+        appearance: d.appearance,
+      });
       if (!out.ok) {
         const code = out.code === 'not_found' ? 404
-          : out.code === 'bad_signature' ? 400
+          : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
           : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
           : 409;
@@ -5963,6 +6007,7 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, idempotent: out.code === 'idem', signed_count: out.signed_count, party_count: out.party_count, status: out.status,
+        signed_at: out.signed_at, appearance: out.appearance, appearance_hash: out.appearance_hash,
         ...(_quotaField ? { quota: _quotaField } : {}) }));
     } catch (e) {
       res.writeHead(400, { 'Content-Type': 'application/json' });

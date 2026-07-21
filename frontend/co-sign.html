@@ -76,6 +76,16 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .doc-page{margin:0 auto 12px;max-width:100%}
 .doc-page:last-child{margin-bottom:0}
 .doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#fff}
+.doc-page.appearance-page{position:relative;cursor:crosshair}
+.appearance-layer{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
+.appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid var(--cobalt);background:rgba(255,255,255,.94);color:var(--ink);padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(11,58,106,.16);pointer-events:auto}
+.appearance-field.date{border-color:#64748b;font-family:var(--mono);font-weight:500}
+.appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
+.appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:var(--cobalt);color:#fff;font:700 13px/1 var(--sans);cursor:pointer}
+.appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.appearance-tools .btn{width:auto;min-width:120px}
+.appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
+.appearance-help.active{color:var(--cobalt);font-weight:600}
 .doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
 .review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
 .blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
@@ -107,7 +117,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-cosign">
   <h1>Co-sign envelope</h1>
-  <p class="sub">Review the delivered document and add your signature. Decryption and ML-DSA-65 signing happen locally. The relay receives ciphertext, your public key and the resulting signature, never document plaintext or your private key.</p>
+  <p class="sub">Review the delivered document and add your signature. Decryption and ML-DSA-65 signing happen locally. The relay receives ciphertext, your public key, the resulting signature and signed field coordinates, never document plaintext or your private key.</p>
 
   <div class="disclaimer">
     <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
@@ -143,6 +153,14 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
       <div class="doc-preview" id="doc-preview" hidden></div>
+      <div id="appearance-editor" hidden>
+        <div class="appearance-tools" role="toolbar" aria-label="Visible signature fields">
+          <button class="btn btn-outline" id="appearance-seal" type="button">Place my signature</button>
+          <button class="btn btn-outline" id="appearance-date" type="button">Place date</button>
+          <button class="btn btn-outline" id="appearance-clear" type="button">Clear my fields</button>
+        </div>
+        <p class="appearance-help" id="appearance-help">Choose a field, then click the page where it should appear. These positions are covered by your cryptographic signature.</p>
+      </div>
     </div>
   </div>
 
@@ -188,6 +206,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
         <span class="tag green">ML-DSA-65</span>
         <span class="tag green">Zero-knowledge</span>
       </div>
+      <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Download PDF copy with visible marks</button>
+      <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Download final .psign proof</a>
+      <p class="review-gate" id="done-download-note" hidden>This is a visual working copy. The final .psign proves the original delivered PDF plus each signed placement. Keep the original, this copy and the .psign together.</p>
+      <p class="review-gate" id="done-proof-wait" hidden>The final .psign proof becomes available after every invited signer has signed.</p>
     </div>
   </div>
   <a href="/" class="btn btn-outline">Back to home</a>
@@ -196,7 +218,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </main>
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
+<script src="/vendor/pdf-lib/pdf-lib.min.js"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/co-sign.js?v=18"></script>
+<script type="module" src="/co-sign.js?v=19"></script>
 </body>
 </html>

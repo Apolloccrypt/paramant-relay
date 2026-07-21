@@ -35,25 +35,62 @@ function b64EncodeStd(u8) {
   for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
   return btoa(s);
 }
+function b64DecodeStd(value) {
+  const bin = atob(String(value || ''));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 function toHex(u8) {
   let s = '';
   for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0');
   return s;
 }
 
-// Reconstruct EXACTLY the relay's recipe-v3 sign-message:
-//   sha3_256("paramant/parasign/doc/v1" || 0x00 || envId || docHash || pi || emailHash)
-// This is what binds a signature to THIS document (doc_hash), party and email.
-export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash }) {
+export function normaliseSigningAppearance(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  if (source.version !== undefined && source.version !== 1) throw new Error('Unsupported signature appearance version.');
+  const input = source.fields === undefined ? [] : source.fields;
+  if (!Array.isArray(input) || input.length > 8) throw new Error('Invalid signature appearance.');
+  const fields = input.map((field) => {
+    if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error('Invalid signature appearance field.');
+    const type = String(field.type || '');
+    if (type !== 'seal' && type !== 'date') throw new Error('Invalid signature appearance field type.');
+    const pageIndex = Number(field.page_index);
+    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) throw new Error('Invalid signature appearance page.');
+    const clean = { type, page_index: pageIndex };
+    for (const name of ['x', 'y', 'w', 'h']) {
+      const n = Number(field[name]);
+      if (!Number.isFinite(n) || n < 0 || n > 1) throw new Error('Invalid signature appearance coordinate.');
+      clean[name] = Math.round(n * 1000000) / 1000000;
+    }
+    if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) {
+      throw new Error('Signature appearance is outside the page.');
+    }
+    return clean;
+  });
+  return { version: 1, fields };
+}
+
+export function signingAppearanceHash(value) {
+  return sha3_256(new TextEncoder().encode(JSON.stringify(normaliseSigningAppearance(value))));
+}
+
+// Reconstruct exactly the relay's versioned document-signing message. Recipe 5
+// binds both the enrolled signing key and a canonical visual-placement manifest.
+export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash, recipeVersion = 3, signerPublicKey = '', appearance }) {
   const enc = new TextEncoder();
-  return sha3_256(concatBytes([
+  const parts = [
     enc.encode(SIGN_DOMAIN_DOC),
     new Uint8Array([0]),
     enc.encode(String(envelopeId)),
     hexToBytes(docHash),
     enc.encode(String(partyIndex)),
     hexToBytes(emailHash || ''),
-  ]));
+  ];
+  if (Number(recipeVersion) >= 4) parts.push(b64DecodeStd(signerPublicKey));
+  if (Number(recipeVersion) >= 5) parts.push(signingAppearanceHash(appearance));
+  return sha3_256(concatBytes(parts));
 }
 
 // v4 signing-key resolution — the SINGLE definition of "what a signing key is",
@@ -423,6 +460,6 @@ export function requestSignActivation({ envelopeId, partyIndex, docHash, inviteT
 }
 // Submit the signature; the admin consumes the activation atomically + forwards
 // to the relay. Returns { ok, signed_count, party_count, status }.
-export function submitSignature({ activationId, signerPublicKey, signature }) {
-  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature });
+export function submitSignature({ activationId, signerPublicKey, signature, appearance }) {
+  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature, appearance });
 }

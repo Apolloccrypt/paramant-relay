@@ -636,9 +636,12 @@ function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity
       public_key: p.pk_b64 || null,   // raw ML-DSA-65 signer public key (base64)
       signature: p.sig_b64 || null,   // raw ML-DSA-65 per-party signature (base64)
       signer_pk_hash: p.signer_pk_hash,
+      appearance: p.appearance || null,
+      appearance_hash: p.appearance_hash || null,
     })),
     notary: {
       relay_pk_hash: relayIdentity.pk_hash,
+      relay_public_key: relayIdentity.pk.toString('base64'),
       relay_pubkey_url: (publicOrigin || 'https://paramant.app') + '/v2/pubkey',
     },
   };

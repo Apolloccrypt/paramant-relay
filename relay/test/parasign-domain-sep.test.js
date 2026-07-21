@@ -9,6 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const parasign = require('../parasign');
+const { signMessageBytes, appearanceHash } = require('../envelope');
 
 // Mock signature scheme: a "signature" IS the exact bytes that were signed.
 //   sign(msg)            -> msg            (Buffer)
@@ -98,4 +99,26 @@ test('unsupported envelope version is rejected', () => {
   const r = parasign.verifyEnvelope({ envelope: tampered }, deps);
   assert.equal(r.valid, false);
   assert.ok(r.errors.some(e => /unsupported envelope version/.test(e)), JSON.stringify(r.errors));
+});
+
+test('recipe 5 offline proof verifies the signed visual placement and rejects tampering', () => {
+  const publicKey = Buffer.from('generic-signing-key').toString('base64');
+  const emailHash = crypto.createHash('sha3-256').update('demo@example.com').digest('hex');
+  const appearance = { version: 1, fields: [
+    { type: 'seal', page_index: 0, x: .4, y: .7, w: .36, h: .105 },
+  ] };
+  const envelopeId = 'env_demo_recipe5';
+  const message = signMessageBytes(envelopeId, docHashHex, 0, emailHash, 5, publicKey, appearanceHash(appearance));
+  const envelope = {
+    version: 'parasign-doc-3', recipe_version: 5, algorithm: 'ML-DSA-65',
+    document_hash: docHashHex, signer_public_key: publicKey,
+    party_email_hash: emailHash, appearance, appearance_hash: appearanceHash(appearance),
+    signature: signOver(message), multiparty: { envelope_id: envelopeId, party_index: 0 },
+  };
+  assert.equal(parasign.verifyEnvelope({ envelope, documentHashHex: docHashHex }, deps).valid, true);
+  const tampered = JSON.parse(JSON.stringify(envelope));
+  tampered.appearance.fields[0].x = .2;
+  const result = parasign.verifyEnvelope({ envelope: tampered, documentHashHex: docHashHex }, deps);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => /appearance_hash mismatch/.test(error)), JSON.stringify(result.errors));
 });
