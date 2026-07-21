@@ -641,7 +641,7 @@ function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity
     })),
     notary: {
       relay_pk_hash: relayIdentity.pk_hash,
-      relay_public_key: relayIdentity.pk.toString('base64'),
+      relay_public_key: Buffer.from(relayIdentity.pk).toString('base64'),
       relay_pubkey_url: (publicOrigin || 'https://paramant.app') + '/v2/pubkey',
     },
   };
