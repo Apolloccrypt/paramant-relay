@@ -32,6 +32,12 @@ await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 ok('public navigation has four clear destinations', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Security','Pricing','Docs']), publicDesktop.join(', '));
 ok('public homepage actions enter real product routes', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/parashare','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
+  background: getComputedStyle(node).backgroundColor,
+  backdropFilter: getComputedStyle(node).backdropFilter,
+  webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
+}));
+ok('mobile navigation is opaque before opening the menu', publicMobilePaint.background === 'rgb(248, 250, 252)' && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => {
   const nav = document.querySelector('nav.nav')?.getBoundingClientRect();

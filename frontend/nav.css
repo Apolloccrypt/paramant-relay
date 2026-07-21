@@ -427,7 +427,12 @@ body.nav-locked .nav {
    ════════════════════════════════════════ */
 @media (max-width: 1023px) {
   .meta-bar { display: none; }
-  nav.nav { padding: 0 24px; }
+  nav.nav {
+    padding: 0 24px;
+    background: var(--bone);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
   nav.nav .nav-links { display: none !important; }
   nav.nav .nav-hamburger { display: flex; }
 }
