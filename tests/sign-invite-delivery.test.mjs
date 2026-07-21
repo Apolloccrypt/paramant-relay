@@ -58,6 +58,11 @@ await page.route(`**/api/user/envelopes/${ENV_ID}/invitations`, async (route) =>
 const checks = [];
 function ok(name, condition, detail = '') { checks.push({ name, pass: !!condition, detail: String(detail) }); }
 
+const directPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await directPage.goto(ORIGIN + '/sign?mode=alone', { waitUntil: 'domcontentloaded' });
+ok('dashboard deep link enters self-signing directly', await directPage.locator('#step-doc').isVisible() && await directPage.locator('.ds-stepper li[data-step="recipients"]').isHidden(), await directPage.locator('main').innerText());
+await directPage.close();
+
 await page.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
 ok('landing leads with the request-signatures workflow', await page.locator('.ds-mode-card').first().getAttribute('data-mode') === 'invite' && await page.locator('.ds-mode-card').first().getAttribute('class').then((value) => value.includes('primary')), await page.locator('.ds-mode-card').first().innerText());
 ok('technical stepper stays hidden until a workflow is chosen', await page.locator('#ds-stepper').isHidden(), 'hidden');

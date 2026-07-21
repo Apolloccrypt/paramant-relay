@@ -11,7 +11,6 @@
 (function () {
   'use strict';
 
-  var ONBOARDING_KEY = 'paramant.onboarding.dismissed.v1';
   var KEYSETUP_KEY = 'paramant.keysetup.dismissed.v1';
   var LOGIN_URL = '/auth/login?next=' + encodeURIComponent('/dashboard');
 
@@ -26,6 +25,12 @@
   function txt(sel, value) {
     var nodes = root.querySelectorAll('[data-dh="' + sel + '"]');
     for (var i = 0; i < nodes.length; i++) nodes[i].textContent = value;
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
   }
 
   function fmtDate(iso) {
@@ -49,27 +54,6 @@
     return h + 'h ' + (r < 10 ? '0' + r : r) + 'm';
   }
 
-  function emailLocal(email) {
-    if (!email) return '';
-    var at = email.indexOf('@');
-    return at > 0 ? email.slice(0, at) : email;
-  }
-
-  function applyOnboardingState() {
-    try {
-      if (localStorage.getItem(ONBOARDING_KEY) === '1') {
-        var hint = root.querySelector('[data-pa-onboarding]');
-        if (hint) hint.hidden = true;
-      } else {
-        var firstHint = root.querySelector('[data-pa-onboarding]');
-        if (firstHint) firstHint.hidden = false;
-      }
-    } catch (_) {
-      var openHint = root.querySelector('[data-pa-onboarding]');
-      if (openHint) openHint.hidden = false;
-    }
-  }
-
   function showError(detail) {
     hide(loading);
     hide(root);
@@ -80,23 +64,15 @@
   function render(data) {
     var email = data.email || '';
     var plan  = data.plan  || 'standard';
-    var label = data.label || emailLocal(email) || 'there';
 
     txt('email',        email);
     txt('email-full',   email || '--');
     txt('plan',         plan);
     txt('plan-strong',  plan);
-    txt('api-key',      data.api_key_masked || '--');
     txt('created',      fmtDate(data.created_at));
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));
 
-    var h1 = document.getElementById('dh-h1');
-    if (h1 && h1.childNodes.length && h1.childNodes[0].nodeType === 3) {
-      h1.childNodes[0].nodeValue = 'Welcome back, ' + label;
-    }
-
-    applyOnboardingState();
     initPurposeCard(data);
 
     hide(loading);
@@ -106,6 +82,7 @@
 
     checkKeySetup();
     loadOperations();
+    loadDocuments();
   }
 
   function wireActions() {
@@ -126,13 +103,116 @@
           .then(function () { location.href = '/auth/login'; });
         return;
       }
-      if (act === 'dismiss-onboarding') {
+      if (act === 'documents-refresh') {
         ev.preventDefault();
-        var hint = t.closest('[data-pa-onboarding]');
-        if (hint) hint.hidden = true;
-        try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
+        loadDocuments();
       }
     });
+  }
+
+  // Account-scoped signing worklist. This is relay-measured lifecycle metadata,
+  // not browser-inferred success. Document bytes, hashes, invite capabilities
+  // and recipient email hashes are intentionally absent from the response.
+  var documents = [];
+  var documentFilter = 'open';
+
+  function documentState(doc) {
+    if (doc.status === 'complete') return 'completed';
+    if (doc.status === 'void') return 'cancelled';
+    return Number(doc.signed_count || 0) > 0 ? 'in_progress' : 'waiting';
+  }
+
+  function documentMatches(doc, filter) {
+    var state = documentState(doc);
+    if (filter === 'all') return true;
+    if (filter === 'open') return state === 'waiting' || state === 'in_progress';
+    return state === filter;
+  }
+
+  function documentLabel(state) {
+    return ({
+      waiting: 'Waiting for signatures',
+      in_progress: 'In progress',
+      completed: 'Completed',
+      cancelled: 'Cancelled'
+    })[state] || 'Open';
+  }
+
+  function renderDocumentCounts() {
+    var counts = { open: 0, completed: 0, cancelled: 0, all: documents.length };
+    documents.forEach(function (doc) {
+      var state = documentState(doc);
+      if (state === 'waiting' || state === 'in_progress') counts.open += 1;
+      if (state === 'completed') counts.completed += 1;
+      if (state === 'cancelled') counts.cancelled += 1;
+    });
+    Object.keys(counts).forEach(function (key) {
+      var node = document.querySelector('[data-doc-count="' + key + '"]');
+      if (node) node.textContent = String(counts[key]);
+    });
+  }
+
+  function renderDocuments() {
+    var list = document.getElementById('dh-documents');
+    if (!list) return;
+    renderDocumentCounts();
+    var visible = documents.filter(function (doc) { return documentMatches(doc, documentFilter); });
+    if (!visible.length) {
+      var empty = documentFilter === 'open'
+        ? ['No open requests', 'Start a signing request when you need someone to sign a document.']
+        : ['Nothing here yet', 'Documents in this state will appear here automatically.'];
+      list.innerHTML = '<div class="dh-empty"><strong>' + empty[0] + '</strong><span>' + empty[1] + '</span></div>';
+      return;
+    }
+    list.innerHTML = visible.map(function (doc) {
+      var state = documentState(doc);
+      var total = Math.max(0, Number(doc.party_count || 0));
+      var signed = Math.max(0, Math.min(total, Number(doc.signed_count || 0)));
+      var pct = total ? Math.round((signed / total) * 100) : 0;
+      var name = doc.original_filename || 'Signing request';
+      var reference = String(doc.id || '').slice(0, 10);
+      return '<article class="dh-document">' +
+        '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
+        '<span>Created ' + esc(fmtDate(doc.created_at)) + (reference ? ' · Ref ' + esc(reference) : '') + '</span></div>' +
+        '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
+        '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
+        '</article>';
+    }).join('');
+  }
+
+  function loadDocuments() {
+    var list = document.getElementById('dh-documents');
+    var refresh = document.getElementById('dh-documents-refresh');
+    if (!list) return;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    fetch('/api/user/documents', {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) throw new Error('http_' + r.status);
+      return r.json();
+    }).then(function (body) {
+      documents = Array.isArray(body.documents) ? body.documents : [];
+      renderDocuments();
+    }).catch(function () {
+      list.innerHTML = '<div class="dh-empty"><strong>Document status is unavailable</strong><span>Your documents are unchanged. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>';
+    }).finally(function () {
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    });
+  }
+
+  function wireDocumentFilters() {
+    var filters = document.querySelectorAll('[data-doc-filter]');
+    for (var i = 0; i < filters.length; i++) {
+      filters[i].addEventListener('click', function () {
+        documentFilter = this.getAttribute('data-doc-filter') || 'open';
+        for (var j = 0; j < filters.length; j++) {
+          filters[j].setAttribute('aria-pressed', filters[j] === this ? 'true' : 'false');
+        }
+        renderDocuments();
+      });
+    }
   }
 
   // One-time usage-purpose question. Server-driven: /api/user/me returns
@@ -232,7 +312,6 @@
   // Fed by GET /api/user/dashboard/overview (authUser). Polled every 5s so the
   // usage bars stay current; the audit feed and key are refreshed on the same tick.
   var opsAudit = [], opsFilter = '', opsPollTimer = 0;
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function fmtTime(ts) {
     if (!ts) return '--:--:--';
     var d = new Date(ts);
@@ -303,6 +382,7 @@
 
   function start() {
     wireActions();
+    wireDocumentFilters();
 
     var ctrl = ('AbortController' in window) ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 10000) : 0;

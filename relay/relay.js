@@ -2754,6 +2754,28 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /v2/user/envelopes: account-scoped signing worklist for the normal
+  // dashboard. Internal only. The admin proxy supplies user_id from the
+  // authenticated session, never from browser-controlled account input. POST
+  // keeps today's key-shaped user_id out of access-log query strings.
+  if (req.method === "POST" && path === "/v2/user/envelopes") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || "").toString();
+      const limit = Math.max(1, Math.min(parseInt(input.limit || "100", 10) || 100, 250));
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: "invalid_user_id" })); }
+      const store = _envStore();
+      if (!store) { res.writeHead(503); return res.end(J({ error: "envelope_store_unavailable" })); }
+      const documents = await store.listAccountEnvelopes(userId, { limit });
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, documents, count: documents.length }));
+    } catch (err) {
+      console.error("[user/envelopes GET]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // Account-bound signing identity (ML-DSA-65 public-key enrollment)
   // ═══════════════════════════════════════════════════════════════════════

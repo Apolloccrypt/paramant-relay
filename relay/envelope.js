@@ -499,6 +499,41 @@ class EnvelopeStore {
     return ids.filter((_, i) => present[i]);
   }
 
+  // Dashboard-safe summaries for envelopes created by one account. The account
+  // index is the primary lookup, so this stays O(account envelopes) and never
+  // scans the fleet-wide env:* keyspace. New records carry account_id and are
+  // checked again before exposure. Legacy indexed records may not carry that
+  // field, so their already account-scoped index membership remains the proof.
+  async listAccountEnvelopes(accountId, { limit = 100 } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!accountId) return [];
+    const ids = await this.listAccountEnvelopeIds(accountId, { limit, prune: true });
+    const rows = await Promise.all(ids.map(async (id) => {
+      const storedAccount = await this.redis.hGet('env:' + id, 'account_id');
+      if (storedAccount && !safeTextEqual(storedAccount, accountId)) return null;
+      const env = await this.getRedacted(id);
+      if (!env) return null;
+      return {
+        id: env.id,
+        original_filename: env.original_filename,
+        status: env.status,
+        created_at: env.created_at,
+        expires_at: env.expires_at,
+        completed_at: env.completed_at,
+        voided_at: env.voided_at,
+        party_count: env.party_count,
+        signed_count: env.signed_count,
+        parties: env.parties.map((party) => ({
+          index: party.index,
+          label: party.label,
+          status: party.status,
+          signed_at: party.signed_at,
+        })),
+      };
+    }));
+    return rows.filter(Boolean);
+  }
+
   // One-shot backfill of the per-account envelope index from existing env:* keys.
   // The index is only written at create() time, so envelopes made BEFORE it
   // existed are absent -- this SCANs every envelope hash and (re)builds the index.

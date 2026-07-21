@@ -2237,6 +2237,22 @@ api.get("/user/dashboard/overview", authUser, async (req, res) => {
   }
 });
 
+// GET /api/user/documents: the logged-in account's ParaSign worklist. The
+// browser cannot choose an account id. The relay returns metadata and signer
+// progress only, never document bytes, invite tokens or email hashes.
+api.get("/user/documents", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/envelopes", { user_id, limit: 100 }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/documents GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
 // The browser talks to admin (session-cookie); admin forwards to relay with
 // the internal-auth token. user_id is taken from the session, never from the

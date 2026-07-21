@@ -26,6 +26,9 @@ function fakeRedis(hash, evalResult) {
     async set(k, value) { values.set(k, value); return 'OK'; },
     async get(k) { return values.get(k) || null; },
     async del(k) { return values.delete(k) ? 1 : 0; },
+    async zRange() { return [hash.id || ID]; },
+    async exists() { return 1; },
+    async zRem() { return 0; },
     async scriptLoad() { return 'sha-stub'; },
     async evalSha() { return evalResult || ['new', '1', '1', 'complete']; },
   };
@@ -280,6 +283,30 @@ async function main() {
     await store.deleteDocumentCapsule(ID);
     assert.strictEqual((await store.getDocumentCapsule(ID, 0, token, EMAIL_HASH)).code, 'not_found', 'deleted capsule is unavailable');
     ok('document capsule is creator-write and recipient-identity-read');
+  }
+
+  // 12. The account dashboard gets lifecycle metadata only. Even though the
+  //     stored envelope carries email hashes, invite tokens and a document hash,
+  //     none of those capabilities leave listAccountEnvelopes().
+  {
+    const account = 'acct_demo';
+    const hash = {
+      id: ID, doc_hash: DOC, account_id: account, original_filename: 'Agreement.pdf',
+      status: 'sent', binding_mode: 'email', recipe_version: '3',
+      created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString(),
+      party_count: '1', signed_count: '0', p0_label: 'Signer Demo',
+      p0_email_hash: EMAIL_HASH, p0_status: 'pending', p0_invite_token: 'secret-invite-token',
+    };
+    const store = new EnvelopeStore(fakeRedis(hash), {});
+    const rows = await store.listAccountEnvelopes(account, {});
+    assert.strictEqual(rows.length, 1, 'owner sees its indexed envelope');
+    assert.strictEqual(rows[0].original_filename, 'Agreement.pdf', 'summary carries the display filename');
+    assert.strictEqual(rows[0].parties[0].label, 'Signer Demo', 'summary carries the display label');
+    assert.ok(!JSON.stringify(rows).includes(DOC), 'summary omits document hash');
+    assert.ok(!JSON.stringify(rows).includes(EMAIL_HASH), 'summary omits recipient email hash');
+    assert.ok(!JSON.stringify(rows).includes('secret-invite-token'), 'summary omits invite token');
+    assert.deepStrictEqual(await store.listAccountEnvelopes('acct_other', {}), [], 'stored account mismatch rejected');
+    ok('dashboard worklist is account-scoped and capability-free');
   }
 }
 

@@ -16,11 +16,9 @@
 <style>
 /* Dashboard. Client-side rendered from /api/user/me JSON. Auth-gate stays
    hard: on 401 the loader hard-redirects to /auth/login?next=/dashboard
-   before any tool-surface markup is revealed. The placeholder shown during
-   the fetch carries no user data and no enumerated tool routes.
-   Design: design-system tokens only. Apple-style: generous whitespace,
-   soft elevation (shadows, not borders), one lime accent on the flagship
-   cards, sober monochrome elsewhere. */
+   before any account data is revealed. The placeholder shown during the fetch
+   carries no user data. The signed-in view is a document workspace with one
+   primary action, two secondary actions and relay-measured status. */
 .nav-cta, a.nav-cta, .nav .nav-cta { color: var(--navy) !important; }
 
 main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); min-height: 70vh; }
@@ -76,6 +74,67 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-tool:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 .dh-tool h3 { font-family: var(--sans); font-size: 16px; font-weight: 600; margin: 0; color: var(--ink); letter-spacing: -.005em; }
 .dh-tool p { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+
+/* Document workspace */
+.dh-mission { max-width: 680px; margin: 0; font-family: var(--sans); font-size: 17px; line-height: 1.6; color: var(--ink-dim); }
+.dh-person { display: block; margin-top: 8px; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); }
+.dh-start { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .825fr)); gap: var(--space-3); margin-bottom: var(--space-7); }
+.dh-start-card { min-height: 172px; display: flex; flex-direction: column; padding: 24px; border: 1px solid rgba(11,58,106,.09); border-radius: 20px; background: rgba(255,255,255,.72); color: var(--ink); text-decoration: none; box-shadow: 0 10px 30px rgba(11,58,106,.045); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.dh-start-card.primary { background: var(--cobalt); color: #fff; border-color: var(--cobalt); box-shadow: 0 16px 36px rgba(35,80,216,.18); }
+.dh-start-card:hover { transform: translateY(-2px); border-color: rgba(35,80,216,.38); box-shadow: 0 16px 34px rgba(11,58,106,.09); }
+.dh-start-card:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
+.dh-start-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: rgba(35,80,216,.08); color: var(--cobalt); font-size: 21px; margin-bottom: auto; }
+.dh-start-card.primary .dh-start-icon { background: rgba(255,255,255,.14); color: #fff; }
+.dh-start-card h2 { margin: 20px 0 5px; font: 600 19px/1.25 var(--sans); letter-spacing: -.01em; color: inherit; }
+.dh-start-card p { margin: 0; font: 14px/1.5 var(--sans); color: var(--ink-dim); }
+.dh-start-card.primary p { color: rgba(255,255,255,.78); }
+.dh-start-link { margin-top: 16px; font: 600 13px/1 var(--sans); color: inherit; }
+.dh-workspace { margin-bottom: var(--space-7); border: 1px solid rgba(11,58,106,.09); border-radius: 22px; background: rgba(255,255,255,.76); box-shadow: 0 12px 34px rgba(11,58,106,.045); overflow: hidden; }
+.dh-workspace-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 26px 28px 18px; }
+.dh-workspace-head h2 { margin: 0 0 5px; font: 600 24px/1.2 var(--sans); letter-spacing: -.015em; color: var(--ink); }
+.dh-workspace-head p { margin: 0; font: 14px/1.5 var(--sans); color: var(--ink-dim); }
+.dh-refresh { flex: 0 0 auto; border: 1px solid var(--ink-hair); border-radius: 10px; background: transparent; color: var(--ink); padding: 9px 13px; font: 600 13px/1 var(--sans); cursor: pointer; }
+.dh-refresh:hover { border-color: var(--cobalt); color: var(--cobalt); }
+.dh-refresh:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.dh-filters { display: flex; gap: 6px; padding: 0 28px 17px; overflow-x: auto; }
+.dh-filter { border: 0; border-radius: 999px; padding: 8px 12px; background: transparent; color: var(--ink-dim); font: 600 13px/1 var(--sans); white-space: nowrap; cursor: pointer; }
+.dh-filter[aria-pressed="true"] { background: rgba(35,80,216,.09); color: var(--cobalt); }
+.dh-filter:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.dh-documents { border-top: 1px solid var(--ink-hair); }
+.dh-document { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 22px; align-items: center; padding: 18px 28px; border-bottom: 1px solid var(--ink-hair); }
+.dh-document:last-child { border-bottom: 0; }
+.dh-document-name { min-width: 0; }
+.dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.3 var(--sans); color: var(--ink); }
+.dh-document-name span { display: block; margin-top: 4px; font: 12px/1.4 var(--sans); color: var(--ink-dim); }
+.dh-document-progress { min-width: 96px; }
+.dh-document-progress span { display: block; margin-bottom: 5px; font: 12px/1 var(--sans); color: var(--ink-dim); }
+.dh-progress { width: 96px; height: 5px; overflow: hidden; border-radius: 99px; background: var(--ink-hair); }
+.dh-progress i { display: block; height: 100%; border-radius: inherit; background: var(--cobalt); }
+.dh-status { display: inline-flex; align-items: center; gap: 7px; min-width: 108px; font: 600 12px/1 var(--sans); color: var(--ink); }
+.dh-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d59a21; }
+.dh-status.completed::before { background: #1b9b63; }
+.dh-status.cancelled::before { background: #8794a5; }
+.dh-empty { padding: 42px 28px; text-align: center; }
+.dh-empty strong { display: block; margin-bottom: 6px; font: 600 16px/1.3 var(--sans); color: var(--ink); }
+.dh-empty span { display: block; max-width: 520px; margin: 0 auto; font: 14px/1.55 var(--sans); color: var(--ink-dim); }
+.dh-invites { display: flex; gap: 14px; align-items: flex-start; margin: 0 28px 24px; padding: 16px 18px; border-radius: 14px; background: rgba(35,80,216,.055); }
+.dh-invites-icon { color: var(--cobalt); font-size: 18px; line-height: 1; }
+.dh-invites strong { display: block; margin-bottom: 3px; font: 600 13px/1.35 var(--sans); color: var(--ink); }
+.dh-invites span { display: block; font: 13px/1.5 var(--sans); color: var(--ink-dim); }
+.dh-quiet-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: var(--space-7); padding: 0 2px; }
+.dh-quiet-links a { color: var(--ink-dim); font: 600 13px/1.4 var(--sans); text-decoration: none; }
+.dh-quiet-links a:hover { color: var(--cobalt); text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 760px) {
+  .dh-start { grid-template-columns: 1fr; }
+  .dh-start-card { min-height: 148px; }
+  .dh-document { grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 16px 18px; }
+  .dh-document-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+  .dh-document-progress span { margin: 0; }
+  .dh-progress { flex: 1; width: auto; }
+  .dh-workspace-head { padding: 22px 18px 16px; }
+  .dh-filters { padding: 0 18px 14px; }
+  .dh-invites { margin: 0 18px 18px; }
+}
 
 /* Account block -- compact, expandable */
 .dh-acct { border-radius: 16px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.04); overflow: hidden; }
@@ -169,11 +228,8 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- Canonical site chrome (same nav + mobile drawer that every page uses).
-     The Products dropdown text necessarily lists tool names; this is global
-     navigation, not dashboard content. The dashboard tool-surface markup
-     (action cards, account block, paste-key) is NOT present in this static
-     file — it is server-rendered only by the auth-gated
-     /api/user/dashboard-fragment route. -->
+     Account content starts hidden below and is revealed only after the
+     session-authenticated /api/user/me request succeeds. -->
 <nav class="nav">
   <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
 
@@ -344,18 +400,13 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
   <div id="dh-root" hidden>
     <header class="dh-hero" aria-labelledby="dh-h1">
-      <h1 id="dh-h1">Your Paramant<small data-dh="email"></small></h1>
+      <div>
+        <h1 id="dh-h1">Important documents, under control.</h1>
+        <p class="dh-mission">Send, sign and prove important documents. Private by design.</p>
+        <span class="dh-person" data-dh="email"></span>
+      </div>
       <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
     </header>
-
-    <aside class="dh-onb" data-pa-onboarding aria-label="Getting started" hidden>
-      <img src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="92" height="92">
-      <div class="dh-onb-text">
-        <span class="dh-onb-kicker">Welcome</span>
-        Everything lives here. Pick a flagship below to start, or open <strong>More tools</strong> for the full set. Recipients never need an account.
-      </div>
-      <button class="dh-onb-dismiss" type="button" data-pa-action="dismiss-onboarding" aria-label="Dismiss this tip">Got it</button>
-    </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
          usage_purpose: null. Answering or skipping posts to
@@ -376,72 +427,56 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       </div>
     </aside>
 
-    <section class="dh-flagship" aria-label="Primary actions">
-      <a class="dh-flag-card" href="/parashare" aria-label="Send a file via ParaShare">
-        <span class="dh-flag-icon" aria-hidden="true">&rarr;</span>
-        <h2>Send a file</h2>
-        <p>Encrypt in your browser, share a signed link, burn after one read. ML-KEM-768 hybrid key wrap, ML-DSA-65 signed receipt.</p>
-        <span class="dh-flag-cta">Open ParaShare</span>
-        <span class="dh-flag-meta">Client-side &middot; signed &middot; burn-on-read</span>
+    <section class="dh-start" aria-label="Start a document workflow">
+      <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Request signatures">
+        <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
+        <h2>Request signatures</h2>
+        <p>Send a secure document, invite the right people and follow every signature.</p>
+        <span class="dh-start-link">Start a request &rarr;</span>
       </a>
-      <a class="dh-flag-card" href="/sign" aria-label="Sign a document with ParaSign">
-        <span class="dh-flag-icon" aria-hidden="true">&#9998;</span>
-        <h2>Sign a document</h2>
-        <p>Post-quantum ML-DSA-65 signatures with self-contained .psign envelopes. CT-log notarised, verifiable without an account.</p>
-        <span class="dh-flag-cta">Open ParaSign</span>
-        <span class="dh-flag-meta">FIPS 204 &middot; .psign envelope &middot; CT-log notarised</span>
+      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Sign a document yourself">
+        <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
+        <h2>Sign it yourself</h2>
+        <p>Add your signature and download the result immediately.</p>
+        <span class="dh-start-link">Open signing &rarr;</span>
+      </a>
+      <a class="dh-start-card" href="/parashare" aria-label="Send a file securely">
+        <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
+        <h2>Send securely</h2>
+        <p>Deliver a file privately without adding a signature workflow.</p>
+        <span class="dh-start-link">Send a file &rarr;</span>
       </a>
     </section>
 
-    <div class="dh-tools-head"><h2>More tools</h2></div>
-    <section class="dh-tools" aria-label="More tools">
-      <a class="dh-tool" href="/get"><span class="dh-chip live">Live</span><h3>Receive a file</h3><p>Open a secure link someone sent you. Decryption happens locally.</p></a>
-      <a class="dh-tool" href="/parashare"><span class="dh-chip live">Live</span><h3>ParaShare</h3><p>Verified, signed delivery with receipts. Multi-recipient. Sector audit log.</p></a>
-      <a class="dh-tool" href="/verify"><span class="dh-chip live">Live</span><h3>Verify a signature</h3><p>Check a .psign envelope against its document. Local hash, relay-side math.</p></a>
-      <a class="dh-tool" href="/vault"><span class="dh-chip live">Live</span><h3>Lock a file</h3><p>Encrypt any file into a <code>.prmnt</code> with a passphrase. Opens only with the passphrase. Fully on your device.</p></a>
-      <a class="dh-tool" href="/ct-log"><span class="dh-chip live">Live</span><h3>Transparency log</h3><p>Browse the public CT log and signed tree heads. Every signature is anchored here.</p></a>
-      <div class="dh-tool dh-tool-off"><span class="dh-chip soon">In development</span><h3>Notarize a bundle</h3><p>One post-quantum signature over a whole evidence folder.</p></div>
-      <div class="dh-tool dh-tool-off"><span class="dh-chip soon">In development</span><h3>Registered send</h3><p>Send with an offline-verifiable proof of filing, anchored in the CT log.</p></div>
-      <div class="dh-tool dh-tool-off"><span class="dh-chip soon">In development</span><h3>Templates</h3><p>Curated Paramant templates for common flows, plus private ones you build for your own org.</p></div>
-    </section>
-
-    <div class="dh-tools-head"><h2>Operations</h2></div>
-    <section class="dh-ops" id="dh-ops" aria-label="Operations">
-      <div class="dh-ops-card">
-        <div class="dh-ops-h">API keys</div>
-        <div id="dh-ops-keys"><div class="dh-ops-dim">Loading...</div></div>
-        <div><button type="button" class="dh-btn" disabled title="Available with self-service keys (coming)">+ New key</button></div>
-      </div>
-      <div class="dh-ops-card">
-        <div class="dh-ops-h">Usage &middot; this month</div>
-        <div id="dh-ops-usage"><div class="dh-ops-dim">Loading...</div></div>
-      </div>
-      <div class="dh-ops-card">
-        <div class="dh-ops-h">Activity timeline</div>
-        <input id="dh-ops-filter" class="dh-ops-filter" type="text" placeholder="Filter events..." aria-label="Filter activity">
-        <div id="dh-ops-timeline" class="dh-ops-tl"><div class="dh-ops-dim">Loading...</div></div>
-        <div><button type="button" class="dh-btn" disabled title="Full history coming soon">View all</button></div>
-      </div>
-    </section>
-    <p class="dh-ops-note"><strong>Operations &middot; read-only.</strong> Live usage and activity from your account. Action controls (new keys, run, configure) arrive with self-service keys.</p>
-
-    <div class="dh-tools-head"><h2>History &amp; exports</h2></div>
-    <section class="dh-ops" aria-label="History and exports">
-      <div class="dh-ops-card" style="grid-column:1/-1">
-        <div class="dh-ops-h">Your history</div>
-        <div id="dh-hist-body"><div class="dh-ops-dim">Your sends and received envelopes (id, status, time). Available on a Pro plan or higher.</div></div>
-        <div><button type="button" class="dh-btn" id="dh-hist-load">Load history</button></div>
-      </div>
-      <div class="dh-ops-card">
-        <div class="dh-ops-h">ParaSign audit export</div>
-        <div id="dh-export-body"><div class="dh-ops-dim">Tamper-evident signing trail with the CT anchor and per-envelope .psign proofs. Available on a Business plan or higher.</div></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-          <button type="button" class="dh-btn" id="dh-export-csv">Download CSV</button>
-          <button type="button" class="dh-btn" id="dh-export-json">Download JSON</button>
+    <section class="dh-workspace" aria-labelledby="dh-documents-title">
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-documents-title">Open documents</h2>
+          <p>Signing requests you created, with the status the relay actually reports.</p>
         </div>
+        <button class="dh-refresh" type="button" id="dh-documents-refresh">Refresh</button>
+      </div>
+      <div class="dh-filters" role="group" aria-label="Filter documents">
+        <button class="dh-filter" type="button" data-doc-filter="open" aria-pressed="true">Open <span data-doc-count="open">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="completed" aria-pressed="false">Completed <span data-doc-count="completed">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Cancelled <span data-doc-count="cancelled">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="all" aria-pressed="false">All <span data-doc-count="all">0</span></button>
+      </div>
+      <div class="dh-documents" id="dh-documents" aria-live="polite">
+        <div class="dh-empty"><strong>Loading your documents</strong><span>Reading status from your account.</span></div>
+      </div>
+      <div class="dh-invites">
+        <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
+        <div><strong>Looking for a request sent to you?</strong><span>Open the personal invitation in your email. Your account is checked before the encrypted document opens.</span></div>
       </div>
     </section>
-    <p class="dh-ops-note">History reads your per-account audit chain (id, status, time only, never a payload). The audit export bundles the full ParaSign signing trail: see the <a href="/docs#user-history">API docs</a>.</p>
+
+    <nav class="dh-quiet-links" aria-label="Other document actions">
+      <a href="/verify">Verify a signed document</a>
+      <a href="/get">Open a secure delivery</a>
+      <a href="/vault">Protect a file with a passphrase</a>
+      <a href="/developer">ParaSign API</a>
+    </nav>
 
     <details class="dh-acct" aria-label="Account details">
       <summary class="dh-acct-head" id="dh-acct-toggle">
@@ -452,7 +487,6 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
         <div class="dh-acct-grid">
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Plan</div><div class="dh-acct-val" data-dh="plan">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Email</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">API key</div><div class="dh-acct-val mono" data-dh="api-key">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Member since</div><div class="dh-acct-val" data-dh="created">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Backup codes left</div><div class="dh-acct-val" data-dh="backup">--</div></div>
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Session expires</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
@@ -510,7 +544,6 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=2" defer></script>
-<script src="/js/dashboard.js?v=2" defer></script>
-<script src="/js/dashboard-history.js?v=1" defer></script>
+<script src="/js/dashboard.js?v=3" defer></script>
 </body>
 </html>

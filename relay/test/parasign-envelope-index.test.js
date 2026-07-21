@@ -82,6 +82,20 @@ async function main() {
     assert.ok(ids.includes(out.id), 'created envelope id is in the account index');
     ok('create() adds the envelope to the per-account index');
 
+    const dashboardRows = await store.listAccountEnvelopes(ACCT, {});
+    assert.strictEqual(dashboardRows.length, 1, 'dashboard lists one account envelope');
+    assert.strictEqual(dashboardRows[0].id, out.id, 'dashboard summary carries the envelope id');
+    assert.strictEqual(dashboardRows[0].status, 'sent', 'unsigned envelope stays sent');
+    assert.strictEqual(dashboardRows[0].signed_count, 0, 'unsigned envelope has no signatures');
+    assert.ok(!Object.hasOwn(dashboardRows[0], 'doc_hash'), 'dashboard summary omits document hash');
+    assert.ok(!Object.hasOwn(dashboardRows[0].parties[0], 'email_hash'), 'dashboard summary omits email hash');
+    ok('dashboard summary exposes status metadata without capabilities or hashes');
+
+    const OTHER = 'acct_other_' + rnd;
+    await rc.zAdd(store._acctIndexKey(OTHER), { score: Date.now(), value: out.id });
+    assert.deepStrictEqual(await store.listAccountEnvelopes(OTHER, {}), [], 'stored account mismatch is rejected');
+    ok('dashboard summary rejects a cross-account index entry');
+
     // 2) complete it, then the Business+ export returns its full .psign ---------
     const r = await completeOpenEnvelope(store, eng, out, docHash);
     assert.ok(r.ok && r.status === 'complete', 'envelope completed');
@@ -148,13 +162,14 @@ async function main() {
       await rc.del('env:' + legacy.id);
       await rc.del(store._acctIndexKey(ACCT));
       await rc.del(store._acctIndexKey(ACCT2));
+      await rc.del(store._acctIndexKey('acct_other_' + rnd));
     } catch { /* best effort */ }
   } finally {
     try { await rc.quit(); } catch {}
   }
 
   console.log(`\nparasign-envelope-index: ${passed} checks passed`);
-  if (passed < 5) process.exit(1);
+  if (passed < 7) process.exit(1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

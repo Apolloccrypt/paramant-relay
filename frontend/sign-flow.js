@@ -3254,7 +3254,14 @@ function init() {
   // demand via "Use saved position"; the toggle default comes along here).
   const tpl = loadPlacementTemplate();
   if (tpl && typeof tpl.allPages === 'boolean') state.stampAllPages = tpl.allPages;
-  setActive('step-mode');
+  const requestedMode = new URLSearchParams(location.search).get('mode');
+  if (['alone', 'cosign', 'invite'].includes(requestedMode)) {
+    state.signingMode = requestedMode;
+    setStepperForMode(requestedMode);
+    setActive('step-doc');
+  } else {
+    setActive('step-mode');
+  }
 }
 
 // Edit toolbar (step-place, PDF mode): text, date, highlight, note, pen,

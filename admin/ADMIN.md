@@ -130,6 +130,24 @@ command to run instead.
 
 ---
 
+## User document worklist
+
+`GET /api/user/documents` is the session-authenticated ParaSign worklist used by
+the normal dashboard. The browser cannot provide an account id. Admin derives it
+from the session and calls the internal relay endpoint `POST /v2/user/envelopes`.
+The account id stays in the JSON body because it is also a secret-shaped primary
+key in the current account model and must not enter access-log query strings.
+The response contains filenames, lifecycle status, timestamps and signer counts.
+It never contains document bytes, document hashes, email hashes, invite tokens or
+decryption keys.
+
+The lookup uses the per-account envelope index. It does not scan all Redis keys.
+New envelope records are checked against their stored `account_id` before they
+are returned. Legacy records without that field rely on their backfilled,
+account-scoped index membership.
+
+---
+
 ## Redis key layout (admin-relevant)
 
 | Key | Type | Content |
