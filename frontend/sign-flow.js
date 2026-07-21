@@ -1516,6 +1516,9 @@ function initDrawCanvas() {
 
   function start(ev) {
     ev.preventDefault();
+    // Capture the pointer: a stroke that briefly leaves the canvas (normal at
+    // writing speed) keeps drawing instead of being cut off mid-letter.
+    try { cv.setPointerCapture(ev.pointerId); } catch {}
     drawing = true;
     last = pos(ev); mid = last; grow(last);
     // A filled dot so a single tap leaves a mark (a lone quadratic never strokes).
@@ -1524,10 +1527,7 @@ function initDrawCanvas() {
     ctx.arc(last.x, last.y, ctx.lineWidth / 2, 0, Math.PI * 2);
     ctx.fill();
   }
-  function move(ev) {
-    if (!drawing) return;
-    ev.preventDefault();
-    const p = pos(ev);
+  function segment(p) {
     // Quadratic curve through the running midpoint: smooth, ink-like strokes
     // instead of the visibly faceted straight lineTo segments used before.
     const m = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
@@ -1537,10 +1537,29 @@ function initDrawCanvas() {
     ctx.stroke();
     last = p; mid = m; grow(p);
   }
-  async function end(ev) {
+  function move(ev) {
+    if (!drawing) return;
+    ev.preventDefault();
+    // Draw every COALESCED point, not just the one the browser surfaced. A fast
+    // stroke can hide 3-8 samples behind a single pointermove; skipping them is
+    // what made handwriting look laggy and angular instead of following the pen.
+    const pts = (typeof ev.getCoalescedEvents === 'function' ? ev.getCoalescedEvents() : null) || [ev];
+    for (const e of (pts.length ? pts : [ev])) segment(pos(e));
+  }
+  function end(ev) {
     if (!drawing) return;
     drawing = false;
-    await exportSignature();
+    try { cv.releasePointerCapture(ev.pointerId); } catch {}
+    // Export DEBOUNCED. It used to run on every pointerup, so lifting the pen
+    // between letters blocked the thread on a full-canvas PNG encode and the
+    // ink appeared to arrive late. Nothing downstream needs the bytes before
+    // the user moves on from this pane.
+    scheduleExport();
+  }
+  let exportTimer = null;
+  function scheduleExport() {
+    if (exportTimer) clearTimeout(exportTimer);
+    exportTimer = setTimeout(() => { exportTimer = null; exportSignature(); }, 250);
   }
 
   // Export a TIGHTLY CROPPED PNG of just the ink (+ small padding) so the seal
@@ -1583,9 +1602,13 @@ function initDrawCanvas() {
   cv.addEventListener('pointermove', move);
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
-  cv.addEventListener('pointerleave', end);
+  // No pointerleave handler: with pointer capture the stroke follows the pen
+  // past the canvas edge, and ending on leave used to chop letters in half.
 
-  $('ds-sig-clear').addEventListener('click', () => { paint(); ink = null; clearSig(); });
+  $('ds-sig-clear').addEventListener('click', () => {
+    if (exportTimer) { clearTimeout(exportTimer); exportTimer = null; }
+    paint(); ink = null; clearSig();
+  });
 }
 
 // ---- image upload ----
@@ -2187,21 +2210,41 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
   // origin) on the given page. Shared so the placed page and every repeated page
   // are byte-for-byte the same layout.
   const paintSeal = (pg, box) => {
-    const bandH = 16, footerH = 22, padX = 8;
+    // The chrome SCALES with the box. The bands and type sizes used to be fixed
+    // (16pt band, 22pt footer, 9/8/7/6pt text), which meant a small stamp had
+    // no middle area left at all: wordmark, badge, signer name and the crypto
+    // line printed straight on top of each other, and the seal read as "one big
+    // frame instead of a signature" (field report 2026-07-21). k is the linear
+    // scale against the size the layout was drawn for; anything that no longer
+    // fits at the floor size is dropped rather than overprinted.
+    const k = Math.max(0.5, Math.min(1, Math.min(box.h / 64, box.w / 190)));
+    const bandH = 16 * k, footerH = 22 * k, padX = 8 * k;
+    const sWord = 9 * k, sBadge = 6 * k, sName = 8 * k, sDate = 7 * k, sCrypto = 6 * k;
     // Outer border + SOLID WHITE body (always legible: dark text on white).
     pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
     // Branded cobalt top band: wordmark + PQ badge.
     pg.drawRectangle({ x: box.x, y: box.y + box.h - bandH, width: box.w, height: bandH, color: navy });
-    pg.drawText('ParaMANT', { x: box.x + 8, y: box.y + box.h - 11, size: 9, font: fontBold, color: white });
+    const wordW = fontBold.widthOfTextAtSize('ParaMANT', sWord);
+    pg.drawText('ParaMANT', { x: box.x + padX, y: box.y + box.h - bandH + (bandH - sWord) / 2 + 0.5, size: sWord, font: fontBold, color: white });
     const badge = 'POST-QUANTUM SIGNED';
-    const badgeW = fontBold.widthOfTextAtSize(badge, 6);
-    pg.drawText(badge, { x: box.x + box.w - badgeW - 8, y: box.y + box.h - 10.5, size: 6, font: fontBold, color: white });
+    const badgeW = fontBold.widthOfTextAtSize(badge, sBadge);
+    // Only paint the badge when it clears the wordmark; overprinting it was the
+    // scrambled top band people saw on narrow stamps.
+    if (padX + wordW + 6 * k + badgeW + padX <= box.w) {
+      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font: fontBold, color: white });
+    }
     // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2.
-    pg.drawText(signerName, { x: box.x + 8, y: box.y + 13, size: 8, font: fontBold, color: navy });
-    const dateW = font.widthOfTextAtSize(dateStr, 7);
-    pg.drawText(dateStr, { x: box.x + box.w - dateW - 8, y: box.y + 13, size: 7, font, color: dim });
+    const row1Y = box.y + footerH - sName - 1.5 * k;
+    const nameW = fontBold.widthOfTextAtSize(signerName, sName);
+    pg.drawText(signerName, { x: box.x + padX, y: row1Y, size: sName, font: fontBold, color: navy });
+    const dateW = font.widthOfTextAtSize(dateStr, sDate);
+    if (padX + nameW + 6 * k + dateW + padX <= box.w) {
+      pg.drawText(dateStr, { x: box.x + box.w - dateW - padX, y: row1Y, size: sDate, font, color: dim });
+    }
     const cryptoLine = 'ML-DSA-65 (FIPS 204)  -  PQ ' + fingerprint8;
-    pg.drawText(cryptoLine, { x: box.x + 8, y: box.y + 4, size: 6, font, color: dim });
+    if (font.widthOfTextAtSize(cryptoLine, sCrypto) + padX * 2 <= box.w) {
+      pg.drawText(cryptoLine, { x: box.x + padX, y: box.y + 4 * k, size: sCrypto, font, color: dim });
+    }
     // Middle area: signature image, or the name in italic for the 'typed' style.
     const midY = box.y + footerH;
     const midH = box.h - bandH - footerH;
@@ -2212,8 +2255,10 @@ async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprin
       pg.drawImage(sigEmbed, { x: box.x + (box.w - w) / 2, y: midY + (midH - h) / 2, width: w, height: h });
     } else {
       const maxW = box.w - padX * 2;
-      let fontSize = 22;
-      while (fontSize > 9 && fontItal.widthOfTextAtSize(signerName, fontSize) > maxW) fontSize -= 1;
+      // Cap on the middle area too, not just on width: a 22pt name in a 12pt
+      // gap is what pushed the typed signature over the bands.
+      let fontSize = Math.max(6, Math.min(22, midH - 4));
+      while (fontSize > 6 && fontItal.widthOfTextAtSize(signerName, fontSize) > maxW) fontSize -= 1;
       const w = fontItal.widthOfTextAtSize(signerName, fontSize);
       pg.drawText(signerName, { x: box.x + (box.w - w) / 2, y: midY + (midH - fontSize) / 2 + 2, size: fontSize, font: fontItal, color: navy });
     }

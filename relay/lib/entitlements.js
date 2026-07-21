@@ -237,6 +237,37 @@ function getEntitlements(account) {
   };
 }
 
+// mergeAccountRecord(acctRec, keyRecs) -> one record safe to hand to
+// getEntitlements, or null when the account is unknown.
+//
+// Why this exists: an account is stored in TWO places. The accounts summary
+// ({account_id, plan, email, primary_api_key, label}) never carries the
+// per-product plans; those are written onto the api-key records (plan_parasign,
+// plan_parasend, parasign) when a payment lands. A gate that reads only the
+// summary therefore cannot see a paid upgrade at all and silently derives the
+// tier from the legacy `plan` -- which is how a paying Pro account kept hitting
+// the 2-signature free wall on the ParaSign web sign path (2026-07-21).
+//
+// The HIGHEST tier any key of the account holds wins, so a stale free key can
+// never hold a paid account down. Never mutates its inputs.
+function mergeAccountRecord(acctRec, keyRecs) {
+  const keys = Array.isArray(keyRecs) ? keyRecs.filter(Boolean) : [];
+  if (!acctRec && keys.length === 0) return null;
+  const merged = Object.assign({}, acctRec || {});
+  const higher = (order, cur, next) => {
+    if (!next || order.indexOf(next) < 0) return cur;
+    if (!cur || order.indexOf(cur) < 0) return next;
+    return order.indexOf(next) > order.indexOf(cur) ? next : cur;
+  };
+  for (const rec of keys) {
+    if (!merged.plan) merged.plan = rec.plan;
+    merged.plan_parasign = higher(PARASIGN_TIERS, merged.plan_parasign, rec.plan_parasign);
+    merged.plan_parasend = higher(PARASEND_TIERS, merged.plan_parasend, rec.plan_parasend);
+    if (rec.parasign) merged.parasign = true;
+  }
+  return merged;
+}
+
 // Convenience: the metered monthly quota a gate should enforce, per product.
 function transfersQuota(account) { return getEntitlements(account).parasend.quotas.transfers_month; }
 function signsQuota(account)     { return getEntitlements(account).parasign.quotas.signs_month; }
@@ -286,6 +317,7 @@ module.exports = {
   validateProductPlan,
   applyProductTier,
   getEntitlements,
+  mergeAccountRecord,
   transfersQuota,
   signsQuota,
   signsOverage,

@@ -1306,6 +1306,21 @@ const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/l
 // keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
 // ones — behaviour-neutral now, account-shared once a second key is added.
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
+// Resolve the record an ENTITLEMENT decision must read. The accounts map is a
+// summary ({account_id, plan, email, primary_api_key, label}) and never carries
+// the per-product plans: setProductPlan writes plan_parasign/plan_parasend onto
+// the apiKeys records (and users.json), not here. A gate that reads accounts
+// alone therefore misses a paid upgrade entirely and falls back to legacy
+// `plan` -> free. That is exactly what the ParaSign web sign gate did: a paying
+// Pro account kept hitting the 2-signature free wall. Merge both, taking the
+// HIGHEST per-product tier any key of the account carries so a stale free key
+// can never hold a paid account down.
+function entitlementRecordOf(accountId) {
+  if (!accountId) return null;
+  const acct = accounts.get(accountId);
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  return entitlements.mergeAccountRecord(acct, [...members].map(m => apiKeys.get(m)));
+}
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
@@ -1687,6 +1702,15 @@ function setProductPlan(accountId, product, tier) {
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
     if (entitlements.applyProductTier(mv, product, norm).changed) changed++;
+  }
+  // Mirror onto the accounts summary too. Readers that only hold an account_id
+  // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
+  // but keeping the summary in step means a stale accounts record can never
+  // outvote a paid grant on any future read path either.
+  const _acct = accounts.get(accountId);
+  if (_acct) {
+    entitlements.applyProductTier(_acct, product, norm);
+    _acct.plan_updated = new Date().toISOString();
   }
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
@@ -5663,7 +5687,9 @@ const server = http.createServer(async (req, res) => {
       //   enterprise config ceiling, unchanged
       // The block/meter decision itself is quota.signGateDecision, shared with
       // the /v1 create gate so both paths can never diverge.
-      const _signerRec = accounts.get(accountId) || apiKeys.get(accountId) || { plan: _signerPlan };
+      // entitlementRecordOf merges the accounts summary with the per-product
+      // plans on the account's keys; reading `accounts` alone hid paid upgrades.
+      const _signerRec = entitlementRecordOf(accountId) || { plan: _signerPlan };
       const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
       const _signIncluded = _signEnt.quotas.signs_month;
       const _signOverage = _signEnt.overage; // { rate_eur, hard_cap }, nulls when the tier blocks at its quota
