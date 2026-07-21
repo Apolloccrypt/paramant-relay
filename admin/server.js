@@ -2253,6 +2253,48 @@ api.get("/user/documents", authUser, async (req, res) => {
   }
 });
 
+// Owner actions for the account-scoped document worklist. The browser supplies
+// only an envelope id; the relay receives the session account's own API key and
+// performs the durable account_id ownership check again.
+api.post("/user/documents/:id/cancel", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(404).json({ error: "not_found" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/documents cancel]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+api.get("/user/documents/:id/receipt", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(404).json({ error: "not_found" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/receipt`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = Buffer.from(await rr.arrayBuffer());
+    res.status(rr.status);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Type", rr.headers.get("content-type") || "application/json");
+    const disposition = rr.headers.get("content-disposition");
+    if (disposition) res.setHeader("Content-Disposition", disposition);
+    return res.send(body);
+  } catch (err) {
+    console.error("[user/documents receipt]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──
 // The browser talks to admin (session-cookie); admin forwards to relay with
 // the internal-auth token. user_id is taken from the session, never from the

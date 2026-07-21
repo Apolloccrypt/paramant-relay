@@ -106,6 +106,16 @@
       if (act === 'documents-refresh') {
         ev.preventDefault();
         loadDocuments();
+        return;
+      }
+      if (act === 'document-close') {
+        ev.preventDefault();
+        closeDocumentDialog();
+        return;
+      }
+      if (act === 'document-cancel') {
+        ev.preventDefault();
+        cancelDocument(t.getAttribute('data-document-id'), t);
       }
     });
   }
@@ -115,6 +125,7 @@
   // and recipient email hashes are intentionally absent from the response.
   var documents = [];
   var documentFilter = 'open';
+  var documentDialogReturnFocus = null;
 
   function documentState(doc) {
     if (doc.status === 'complete') return 'completed';
@@ -171,13 +182,87 @@
       var pct = total ? Math.round((signed / total) * 100) : 0;
       var name = doc.original_filename || 'Signing request';
       var reference = String(doc.id || '').slice(0, 10);
-      return '<article class="dh-document">' +
+      return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
         '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
         '<span>Created ' + esc(fmtDate(doc.created_at)) + (reference ? ' · Ref ' + esc(reference) : '') + '</span></div>' +
         '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
         '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
-        '</article>';
+        '</button>';
     }).join('');
+  }
+
+  function documentById(id) {
+    for (var i = 0; i < documents.length; i++) if (documents[i].id === id) return documents[i];
+    return null;
+  }
+
+  function closeDocumentDialog() {
+    var dialog = document.getElementById('dh-document-dialog');
+    if (dialog) dialog.hidden = true;
+    if (documentDialogReturnFocus && typeof documentDialogReturnFocus.focus === 'function') documentDialogReturnFocus.focus();
+    documentDialogReturnFocus = null;
+  }
+
+  function openDocumentDialog(id) {
+    var doc = documentById(id);
+    var dialog = document.getElementById('dh-document-dialog');
+    var title = document.getElementById('dh-document-dialog-title');
+    var body = document.getElementById('dh-document-dialog-body');
+    if (!doc || !dialog || !body || !title) return;
+    documentDialogReturnFocus = document.activeElement;
+    var state = documentState(doc);
+    var total = Math.max(0, Number(doc.party_count || 0));
+    var signed = Math.max(0, Math.min(total, Number(doc.signed_count || 0)));
+    title.textContent = doc.original_filename || 'Signing request';
+    var parties = Array.isArray(doc.parties) ? doc.parties : [];
+    var partyText = parties.length ? parties.map(function (p) {
+      return esc(p.label || ('Signer ' + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? 'signed' : p.status === 'viewed' ? 'opened' : 'waiting');
+    }).join('<br>') : signed + ' of ' + total + ' signed';
+    var help = state === 'completed'
+      ? 'The relay keeps the cryptographic proof, not a plaintext copy of your document. Download the .psign proof here. Keep it next to your locally saved signed document. You can verify both later in Paramant.'
+      : state === 'cancelled'
+        ? 'This request is closed. Existing signatures remain in the audit record, but nobody can add another signature.'
+        : 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.';
+    var actions = '';
+    if (state === 'completed') actions += '<a class="dh-btn" href="/api/user/documents/' + encodeURIComponent(doc.id) + '/receipt" download>Download .psign proof</a>';
+    if (state === 'waiting' || state === 'in_progress') actions += '<button class="dh-btn danger" type="button" data-pa-action="document-cancel" data-document-id="' + esc(doc.id) + '">Cancel request</button>';
+    actions += '<a class="dh-btn" href="/verify">Verify a document</a>';
+    body.innerHTML = '<dl class="dh-doc-kv">' +
+      '<dt>Status</dt><dd>' + esc(documentLabel(state)) + '</dd>' +
+      '<dt>Reference</dt><dd>' + esc(doc.id || '') + '</dd>' +
+      '<dt>Created</dt><dd>' + esc(fmtDate(doc.created_at)) + '</dd>' +
+      '<dt>Expires</dt><dd>' + esc(fmtDate(doc.expires_at)) + '</dd>' +
+      '<dt>Signers</dt><dd>' + partyText + '</dd></dl>' +
+      '<div class="dh-doc-help">' + esc(help) + '</div>' +
+      '<div class="dh-doc-actions">' + actions + '</div><div class="dh-doc-message" id="dh-doc-message" aria-live="polite"></div>';
+    dialog.hidden = false;
+    var close = dialog.querySelector('[data-pa-action="document-close"]');
+    if (close) close.focus();
+  }
+
+  function cancelDocument(id, button) {
+    var doc = documentById(id);
+    if (!doc || !confirm('Cancel this signing request? Nobody will be able to add another signature.')) return;
+    if (button) button.disabled = true;
+    var message = document.getElementById('dh-doc-message');
+    if (message) message.textContent = 'Cancelling request...';
+    fetch('/api/user/documents/' + encodeURIComponent(id) + '/cancel', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (!r.ok) throw new Error(body.error || ('http_' + r.status));
+        return body;
+      });
+    }).then(function () {
+      doc.status = 'void';
+      renderDocuments();
+      openDocumentDialog(id);
+    }).catch(function (err) {
+      if (button) button.disabled = false;
+      if (message) message.textContent = err.message === 'already_complete'
+        ? 'This request completed before cancellation. Refresh to see the final status.'
+        : 'Could not cancel this request. Try again.';
+    });
   }
 
   function loadDocuments() {
@@ -213,6 +298,22 @@
         renderDocuments();
       });
     }
+  }
+
+  function wireDocumentList() {
+    var list = document.getElementById('dh-documents');
+    var dialog = document.getElementById('dh-document-dialog');
+    if (!list) return;
+    list.addEventListener('click', function (ev) {
+      var row = ev.target.closest && ev.target.closest('[data-document-id]');
+      if (row && row.classList.contains('dh-document')) openDocumentDialog(row.getAttribute('data-document-id'));
+    });
+    if (dialog) dialog.addEventListener('click', function (ev) {
+      if (ev.target === dialog) closeDocumentDialog();
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && dialog && !dialog.hidden) closeDocumentDialog();
+    });
   }
 
   // One-time usage-purpose question. Server-driven: /api/user/me returns
@@ -383,6 +484,7 @@
   function start() {
     wireActions();
     wireDocumentFilters();
+    wireDocumentList();
 
     var ctrl = ('AbortController' in window) ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 10000) : 0;

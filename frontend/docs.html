@@ -380,7 +380,7 @@ tr:last-child td{border-bottom:none}
     <p>Version 3.0.0 keeps the wire format, API surface and crypto guarantees of 2.5.x: every 2.5.x client stays compatible: and focuses on the operator and self-host experience. The headline change is structural: the post-quantum primitives now live in their own audited library.</p>
     <ul>
       <li><strong>paramant-core crypto split (M5b).</strong> Server-side ML-DSA-65 signing is now provided by <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: a standalone, audit-ready Rust library (BUSL-1.1) the relay consumes through its <code>@paramant/core</code> NAPI binding. Client-side ML-KEM-768 still runs in the browser/SDK; the relay never holds a key. See <a href="#crypto">Crypto stack</a>.</li>
-      <li><strong>Cards-per-product dashboard.</strong> The user dashboard is rebuilt around per-product cards, drawing on the existing <code>/v2/check-key</code>, monitor and audit endpoints: no new trust surface.</li>
+      <li><strong>Document workspace.</strong> The user dashboard starts document flows, shows account-owned signing requests and exposes owner actions without adding a new trust surface.</li>
       <li><strong>Refreshed interactive UI.</strong> Dark mode (top-right toggle), real-time status updates and a mobile-friendly layout across the dashboard.</li>
       <li><strong>First-run setup wizard.</strong> A web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: admin token, TOTP enrolment and the first key from the browser (ADR R005).</li>
       <li><strong>Visual admin config.</strong> <code>/admin/settings</code> exposes relay configuration in the panel, so common changes no longer require editing <code>.env</code> and restarting.</li>
@@ -1145,7 +1145,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
 <script src="/js/docs.inline1.js?v=1"></script>
 <script src="/nav.js?v=12" defer></script>
-<script src="/js/nav-auth.js?v=2" defer></script>
+<script src="/js/nav-auth.js?v=4" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#f5f7fb;color:#0b3a6a;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none!important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ParaSign API · Paramant</title>
+<title>Developer settings · Paramant</title>
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0b3a6a">
@@ -54,13 +54,15 @@ pre{margin:0;padding:20px;background:#0d1d33;color:#d7e7f8;overflow:auto;font-fa
 <a href="#main" class="skip-link">Skip to main content</a>
 <nav class="nav">
   <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
-  <ul class="nav-links"><li><a href="/dashboard" class="nav-link">Dashboard</a></li><li><a href="/developer" class="nav-link nav-link-strong">Developer</a></li><li><a href="/docs#v1-envelopes" class="nav-link">API docs</a></li></ul>
-  <div class="nav-auth"><a href="/account" class="nav-signin">Account</a></div>
+  <ul class="nav-links"><li><a href="/dashboard" class="nav-link">Documents</a></li><li><a href="/developer" class="nav-link nav-link-strong">Developer settings</a></li><li><a href="/docs#v1-envelopes" class="nav-link">API docs</a></li></ul>
+  <div class="nav-auth" id="nav-auth"><a href="/account" class="nav-signin">Account</a></div>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
 </nav>
+<div class="nav-mobile" id="nav-mobile"><a href="/dashboard" class="nav-mobile-standalone">Documents</a><a href="/developer" class="nav-mobile-standalone" aria-current="page">Developer settings</a></div>
 
 <main id="main" class="dev">
   <header class="hero">
-    <div><p class="eyebrow">Developer · ParaSign API</p><h1>Build signing into your product.</h1><p class="lede">Create secure signing requests, follow every signer and retrieve an offline-verifiable proof. Everything needed to connect and operate the ParaSign API is here.</p></div>
+    <div><p class="eyebrow">Settings · ParaSign API</p><h1>Build signing into your product.</h1><p class="lede">Create secure signing requests, follow every signer and retrieve an offline-verifiable proof. Everything needed to connect and operate the ParaSign API is here.</p></div>
     <div class="account"><span class="status-dot" id="api-status-dot"></span><span data-dv="email">Loading account</span><span>·</span><strong data-dv="plan">--</strong></div>
   </header>
 
@@ -142,6 +144,7 @@ curl -X POST https://paramant.app/v1/envelopes \
 </div>
 
 <script src="/nav.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=4" defer></script>
 <script src="/js/developer.js?v=7" defer></script>
 </body>
 </html>

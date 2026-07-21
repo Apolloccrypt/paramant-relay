@@ -22,3 +22,16 @@ test('secret-shaped user id never enters the relay query string', () => {
   assert.match(relaySource, /req\.method === "POST" && path === "\/v2\/user\/envelopes"/);
   assert.match(relaySource, /if \(!_internalOk\(\)\) return _internalReject\(\)/);
 });
+
+test('document cancel and receipt stay session-authenticated and relay-owned', () => {
+  const cancel = adminSource.match(/api\.post\("\/user\/documents\/:id\/cancel"[\s\S]*?\n\}\);/);
+  const receipt = adminSource.match(/api\.get\("\/user\/documents\/:id\/receipt"[\s\S]*?\n\}\);/);
+  assert.ok(cancel && receipt, 'dashboard owner action routes exist');
+  assert.match(cancel[0], /authUser/);
+  assert.match(receipt[0], /authUser/);
+  assert.match(cancel[0], /"X-Api-Key": proxyApiKey\(req\.userSession\)/);
+  assert.match(receipt[0], /"X-Api-Key": proxyApiKey\(req\.userSession\)/);
+  assert.match(relaySource, /envCancelMatch[\s\S]*?store\.isOwner\(envCancelMatch\[1\], acctOf\(apiKey\)\)/);
+  assert.match(relaySource, /envCancelMatch[\s\S]*?store\.deleteDocumentCapsule\(envCancelMatch\[1\]\)/);
+  assert.match(relaySource, /envReceiptMatch[\s\S]*?store\.isOwner\(envReceiptMatch\[1\], acctOf\(apiKey\)\)/);
+});

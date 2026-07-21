@@ -5690,6 +5690,61 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Account-owner actions for envelopes created from the signed-in web app.
+  // These v2 envelopes use the account's pgp_ key, so the psk_-only /v1
+  // receipt and void routes cannot serve the dashboard. Ownership is checked
+  // against the durable account_id before state or evidence is returned.
+  const envCancelMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/cancel$/);
+  if (envCancelMatch && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      if (!(await store.isOwner(envCancelMatch[1], acctOf(apiKey)))) {
+        res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' }));
+      }
+      const out = await store.voidEnvelope(envCancelMatch[1], 'Cancelled by the account owner');
+      if (!out.ok) {
+        const status = out.code === 'already_complete' ? 409 : out.code === 'not_found' ? 404 : 409;
+        res.writeHead(status, { 'Content-Type': 'application/json' }); return res.end(J({ error: out.code }));
+      }
+      try { await store.deleteDocumentCapsule(envCancelMatch[1]); } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, id: envCancelMatch[1], status: 'void', voided_at: out.voided_at || null }));
+    } catch {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' }));
+    }
+  }
+
+  const envReceiptMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/receipt$/);
+  if (envReceiptMatch && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      if (!(await store.isOwner(envReceiptMatch[1], acctOf(apiKey)))) {
+        res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' }));
+      }
+      const env = await store.getForReceipt(envReceiptMatch[1]);
+      if (!env) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      if (env.status !== 'complete') { res.writeHead(409, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_ready' })); }
+      if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'notary_unavailable' })); }
+      const psign = parasignOpenApi.buildEnvelopePsign({
+        env, meta: null, canonicalJSON: parasign.canonicalJSON,
+        sigEngine: registry.getSig(0x0002), relayIdentity,
+        publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+      });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="Paramant-${envReceiptMatch[1]}.psign"`,
+        'Cache-Control': 'private, no-store',
+      });
+      return res.end(J(psign));
+    } catch {
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'receipt_failed' }));
+    }
+  }
+
   // GET /v2/envelopes/:id -- redacted public status.
   if (req.method === 'GET' && path.startsWith('/v2/envelopes/')) {
     if (!envViewRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }

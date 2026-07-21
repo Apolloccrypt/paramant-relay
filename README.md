@@ -91,8 +91,8 @@ admin features landing in the 3.0.0 release.
   scripts — admin token, TOTP and first key from the browser (ADR R005).
 - **Visual admin config + in-browser CLI.** `/admin/settings` edits relay config
   without touching `.env`; `/admin/cli` is a web terminal for debugging without SSH.
-- **Cards-per-product dashboard.** The user dashboard is rebuilt around per-product
-  cards with dark mode, real-time updates and a mobile layout.
+- **Document workspace.** The user dashboard starts signing and delivery flows,
+  lists account-owned envelopes and exposes lifecycle actions on desktop and mobile.
 - **Crypto-mode negotiation.** `/v2/capabilities` advertises a compact `core` mode
   (2 algorithms) by default; extended sets are opt-in via `CRYPTO_MODE` (ADR R006).
 - **Add-on architecture (spec).** Container-isolated integrations that work on
@@ -122,7 +122,7 @@ Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 | User accounts with TOTP (no password required) | Live — [paramant.app/signup](https://paramant.app/signup) |
 | Admin dashboard (Overview, Users, Audit, Billing, Relay) | Live — `/admin/` |
 | Resend TOTP setup link | Live — admin panel |
-| Developer API keys | Live — [paramant.app/request-key](https://paramant.app/request-key) |
+| ParaSign developer settings and API keys | Live at [paramant.app/developer](https://paramant.app/developer) |
 | Billing | Operator-managed. Hosted paramant.app uses Mollie; bundled admin tool has Stripe device-sync hooks |
 | Chromium browser extension | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
@@ -176,6 +176,12 @@ When an envelope completes, ParaSign issues a .psign receipt: a compact, canonic
 | Relay notary countersignature | that the relay witnessed the ceremony and logged it |
 
 A .psign is independently verifiable with no call back to the relay: re-check each ML-DSA-65 signature against the signer public key, verify the notary countersignature against the relay public key, and confirm the envelope's inclusion in the public CT log (the same SHA3-256 Merkle tree that backs file transfers). You verify the math, not the operator.
+
+The signed-in document workspace reads account-scoped envelope metadata. An owner
+can cancel an open request and download the `.psign` proof for a completed request.
+Cancellation removes the encrypted document capsule immediately. The workspace
+does not claim to recover plaintext. Users keep the signed document and proof
+together and can verify them later in Paramant.
 
 ### Zero-knowledge scope
 
