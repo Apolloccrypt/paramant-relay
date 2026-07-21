@@ -50,11 +50,11 @@ function validateAndShow() {
   }
   const age = ageFromMrzDob(r.fields.dob, new Date());
   out.className = 'doc-validate ok';
-  out.innerHTML = '<b>&#10003; MRZ valid</b> (all check digits pass)<br>' +
+  out.innerHTML = '<b>&#10003; MRZ internally consistent</b> (all check digits pass)<br>' +
     'Derived on this device: <b>18 or older: ' + (age >= 18 ? 'yes' : 'no') + '</b>, nationality <b>' + esc(r.fields.nationality) + '</b>.<br>' +
     '<span class="doc-dim">Read but NOT sent: name (' + esc(r.fields.surname) + '), birthdate, document number.</span>';
   $('doc-issue').disabled = !livenessPassed();
-  if (!livenessPassed()) out.innerHTML += '<br><span class="doc-warn">Pass the <a href="/liveness?return=/paraid-document">liveness check</a> first.</span>';
+  if (!livenessPassed()) out.innerHTML += '<br><span class="doc-warn">Complete the separate <a href="/liveness?return=/paraid-document">browser presence step</a> first. It does not verify the document holder.</span>';
   return { l1, l2, r, age };
 }
 
@@ -62,7 +62,7 @@ async function issue() {
   const v = validateAndShow();
   if (!v) return;
   const kp = loadHolder();
-  $('doc-status').textContent = 'Asking the registered issuer to sign a substantial credential…';
+  $('doc-status').textContent = 'Asking the registered issuer to sign the MRZ-derived claims...';
   try {
     const resp = await fetch('/v1/paraid/issue-document', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -73,7 +73,7 @@ async function issue() {
     localStorage.setItem('paraid.credential.v1', JSON.stringify(credential));
     localStorage.setItem('paraid.identity.v1', JSON.stringify({ verified: true, method: 'document', tier: 'substantial' }));
     if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
-    $('doc-status').innerHTML = '<b>Done.</b> Your wallet now holds a substantial credential proving age_over_18 = ' + esc(credential.fields.age_over_18) + ' and nationality = ' + esc(credential.fields.nationality) + ', with only those two attributes sealed.';
+    $('doc-status').innerHTML = '<b>Done.</b> Your wallet now holds a credential recording age_over_18 = ' + esc(credential.fields.age_over_18) + ' and nationality = ' + esc(credential.fields.nationality) + ' as derived from the entered MRZ data. This is not a document-authenticity result.';
     $('doc-done').hidden = false;
   } catch (e) { $('doc-status').textContent = 'Could not issue: ' + (e.message || e); }
 }

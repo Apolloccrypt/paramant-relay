@@ -389,11 +389,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-delete" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-delete-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-delete-title" class="mt">Delete account</span>
+      <span id="mo-delete-title" class="mt">Deactivate account</span>
       <button class="close-mo" data-click="closeModal" data-modal="mo-delete" aria-label="Close">&times;</button>
     </div>
     <div class="mbody">
-      <p style="font-size:13px;color:#dc2626;font-weight:600;margin:0 0 10px">This action is irreversible.</p>
+      <p style="font-size:13px;color:#dc2626;font-weight:600;margin:0 0 10px">This blocks the account key and removes active sessions and TOTP.</p>
       <div id="da-recent-warn" style="display:none;background:#FEF2F2;border-left:3px solid #DC2626;padding:10px 12px;margin:0 0 12px;font-size:12px;color:#991B1B;border-radius:3px"><strong>Heads up:</strong> this account is less than 24 hours old. Are you sure it isn't a real tester?</div>
       <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,.08);padding:12px 14px;margin:0 0 12px;border-radius:3px">
         <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:12px">
@@ -406,13 +406,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
       </div>
       <div class="mc" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="da-notify" checked>
-        <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deletion confirmation email</label>
+        <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deactivation confirmation email</label>
       </div>
-      <div class="mc" style="margin-top:10px"><label>Type DELETE to confirm</label><input type="text" id="da-confirm" placeholder="DELETE" autocomplete="off" data-input="confirmDelete"></div>
+      <div class="mc" style="margin-top:10px"><label>Type DEACTIVATE to confirm</label><input type="text" id="da-confirm" placeholder="DEACTIVATE" autocomplete="off" data-input="confirmDelete"></div>
     </div>
     <div class="mfoot">
       <button class="btn" data-click="closeModal" data-modal="mo-delete">Cancel</button>
-      <button class="btn danger" id="da-btn" data-click="doDeleteAccount">Delete account</button>
+      <button class="btn danger" id="da-btn" data-click="doDeleteAccount">Deactivate account</button>
     </div>
   </div>
 </div>

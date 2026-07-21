@@ -200,6 +200,34 @@ nav.nav .nav-link.active {
 }
 nav.nav .nav-link.active::after { transform: scaleX(1); }
 
+/* One secondary navigation for account, billing and developer settings. */
+.settings-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 0 24px;
+  padding: 4px;
+  border: 1px solid var(--ink-hair);
+  border-radius: 12px;
+  background: rgba(255,255,255,.62);
+}
+.settings-tabs a {
+  flex: 0 0 auto;
+  padding: 9px 13px;
+  border-radius: 8px;
+  color: var(--ink-dim);
+  font: 600 12px/1 var(--sans);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.settings-tabs a:hover { color: var(--cobalt); background: rgba(35,80,216,.05); }
+.settings-tabs a[aria-current="page"] { color: var(--cobalt); background: rgba(35,80,216,.1); }
+.settings-tabs a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+@media (max-width:520px) {
+  .settings-tabs { gap:2px; padding:3px; }
+  .settings-tabs a { padding:8px; font-size:11px; }
+}
+
 /* ════════════════════════════════════════
    HAMBURGER
    ════════════════════════════════════════ */

@@ -245,7 +245,7 @@ function usersTable(users){
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="parasign-onboard"'+(hasE?'':' disabled')+'>Send ParaSign onboarding</button>'+
 '<div class="ag-lbl danger">Destructive</div>'+ /*MARK:parasign_menu*/
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="disable" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Delete account</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Deactivate account</button>'+
           '</div>'+
         '</div></td>'+
       '</tr>';
@@ -640,12 +640,12 @@ function _relTime(iso){
 }
 async function doDeleteAccount(){
   const {key}=_ms.del||{};if(!key)return;
-  if(document.getElementById('da-confirm').value!=='DELETE')return;
+  if(document.getElementById('da-confirm').value!=='DEACTIVATE')return;
   const notify=document.getElementById('da-notify').checked;
   document.getElementById('da-btn').disabled=true;
   const r=await api('/admin/delete-account',{method:'POST',body:JSON.stringify({key,confirm:'DELETE',notify})});
   closeModal('mo-delete');
-  toast(r.ok?'Account deleted':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  toast(r.ok?'Account deactivated':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;setTimeout(loadUsers,800);}
 }
 async function openUserDetailsModal(key){
@@ -752,4 +752,4 @@ act('click', 'closeCreateKey', (el) => { const m = el.closest('[data-modal]'); i
 act('change', 'filterUsers', () => filterUsers());
 act('input', 'filterUsers', () => filterUsers());
 act('change', 'usersPageSize', (el) => loadUsers(1, parseInt(el.value, 10)));
-act('input', 'confirmDelete', (el) => { const b = document.getElementById('da-btn'); if (b) b.disabled = el.value !== 'DELETE'; });
+act('input', 'confirmDelete', (el) => { const b = document.getElementById('da-btn'); if (b) b.disabled = el.value !== 'DEACTIVATE'; });

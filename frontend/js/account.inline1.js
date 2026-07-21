@@ -142,14 +142,14 @@
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt('Type DELETE to confirm account deletion:');
-    if (answer !== 'DELETE') return;
+    const answer = prompt('Type DEACTIVATE to confirm account deactivation:');
+    if (answer !== 'DEACTIVATE') return;
     const res = await fetch('/api/user/account', {
       method: 'DELETE',
       credentials: 'include',
     });
     if (res.ok) {
-      alert('Account deleted.');
+      alert('Account deactivated. Its key can no longer be used.');
       window.location = '/';
     }
   });

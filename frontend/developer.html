@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0b3a6a">
 <link rel="stylesheet" href="/design-system.css?v=21">
-<link rel="stylesheet" href="/nav.css?v=15">
+<link rel="stylesheet" href="/nav.css?v=16">
 <style>
 *{box-sizing:border-box}
 body{background:linear-gradient(180deg,#f8faff 0,#f5f7fb 460px)}
@@ -61,6 +61,11 @@ pre{margin:0;padding:20px;background:#0d1d33;color:#d7e7f8;overflow:auto;font-fa
 <div class="nav-mobile" id="nav-mobile"><a href="/dashboard" class="nav-mobile-standalone">Documents</a><a href="/developer" class="nav-mobile-standalone" aria-current="page">Developer settings</a></div>
 
 <main id="main" class="dev">
+  <nav class="settings-tabs" aria-label="Settings sections">
+    <a href="/account">Account &amp; security</a>
+    <a href="/account#billing-section">Plan &amp; billing</a>
+    <a href="/developer" aria-current="page">Developer settings</a>
+  </nav>
   <header class="hero">
     <div><p class="eyebrow">Settings · ParaSign API</p><h1>Build signing into your product.</h1><p class="lede">Create secure signing requests, follow every signer and retrieve an offline-verifiable proof. Everything needed to connect and operate the ParaSign API is here.</p></div>
     <div class="account"><span class="status-dot" id="api-status-dot"></span><span data-dv="email">Loading account</span><span>·</span><strong data-dv="plan">--</strong></div>

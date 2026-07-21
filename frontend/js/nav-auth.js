@@ -103,6 +103,7 @@
   }
 
   setNavigation(PUBLIC_NAV, 'Primary');
+  container.innerHTML = '<span class="nav-signin" aria-hidden="true">Checking session</span>';
 
   (async function check() {
     try {

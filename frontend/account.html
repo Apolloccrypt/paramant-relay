@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=19">
-<link rel="stylesheet" href="/nav.css?v=15">
+<link rel="stylesheet" href="/nav.css?v=16">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <meta property="og:title" content="Your account · Paramant">
 <meta property="og:description" content="Your account — Paramant">
@@ -105,6 +105,13 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 .acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
 .acct-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: var(--space-2); }
 .acct-card .info-row:first-of-type { border-top: 0; }
+.acct-advanced > summary { display:flex; flex-direction:column; gap:3px; cursor:pointer; list-style:none; }
+.acct-advanced > summary::-webkit-details-marker { display:none; }
+.acct-advanced > summary::after { content:'Show'; align-self:flex-start; margin-top:8px; color:var(--cobalt); font:600 12px/1 var(--sans); }
+.acct-advanced[open] > summary::after { content:'Hide'; }
+.acct-advanced > summary strong { color:var(--ink); font:600 16px/1.25 var(--sans); }
+.acct-advanced > summary span { color:var(--ink-dim); font:13px/1.5 var(--sans); }
+.acct-advanced-body { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--ink-hair); }
 @media (max-width: 680px) { .acct-grid2 { grid-template-columns: 1fr; gap: var(--space-4); } main.acct { padding: var(--space-5) var(--space-3) var(--space-6); } }
 </style>
 </head>
@@ -280,17 +287,23 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 
 <div id="state-account" class="hidden">
 
+<nav class="settings-tabs" aria-label="Settings sections">
+  <a href="/account" aria-current="page">Account &amp; security</a>
+  <a href="/account#billing-section">Plan &amp; billing</a>
+  <a href="/developer">Developer settings</a>
+</nav>
+
 <header class="acct-hero">
   <div>
-    <h1>Welcome, <em id="account-email">&mdash;</em></h1>
-    <div class="acct-session">Session ends in <span id="session-timer">&mdash;</span>. Renew by signing out and back in.</div>
+    <h1>Account settings</h1>
+    <div class="acct-session"><strong id="account-email">&mdash;</strong><br>Session ends in <span id="session-timer">&mdash;</span>. Renew by signing out and back in.</div>
   </div>
   <span class="acct-plan"><strong id="plan-chip">&mdash;</strong><span>plan</span></span>
 </header>
 
-<section class="acct-card">
-  <div class="acct-kicker">API key &middot; for automation</div>
-  <h2>Your API key.</h2>
+<details class="acct-card acct-advanced">
+  <summary><strong>Advanced account key</strong><span>For legacy SDK, script and IoT access. Normal document use does not need this.</span></summary>
+  <div class="acct-advanced-body">
   <div class="info-row">
     <div class="info-label">Key</div>
     <div class="info-value">
@@ -305,7 +318,8 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
   <p class="small mt-3">
     Use this key in scripts, SDKs, and IoT devices: send it in the <code>X-Api-Key</code> HTTP header. See <a href="/docs">API documentation</a>.
   </p>
-</section>
+  </div>
+</details>
 
 <section class="acct-card">
   <div class="acct-kicker">Security &middot; authenticator and backups</div>
@@ -412,9 +426,6 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
   <div id="billing-loading" style="color:var(--ink-dim);font-size:var(--text-sm)">Loading billing status…</div>
 
   <div id="billing-content" class="hidden">
-    <div class="stub-banner" style="margin-bottom:var(--space-4)">
-      <strong>Stub mode.</strong> No real payments are charged. Mollie integration pending.
-    </div>
     <div class="info-row">
       <div class="info-label">Current plan</div>
       <div class="info-value">
@@ -442,12 +453,12 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 </section>
 
 <section class="acct-card danger">
-  <div class="acct-kicker">Delete account &middot; permanent, cannot undo</div>
-  <h2>Delete account.</h2>
+  <div class="acct-kicker">Deactivate account &middot; blocks future access</div>
+  <h2>Deactivate account.</h2>
   <p class="acct-lead">
-    Deletes your account, revokes your API key, and removes your TOTP secret. Any in-flight transfers are immediately invalidated.
+    Deactivates your account and makes its API key unusable. Your sessions and TOTP setup are removed. The account record is retained.
   </p>
-  <button type="button" class="btn btn-danger" id="delete-account">Delete account permanently</button>
+  <button type="button" class="btn btn-danger" id="delete-account">Deactivate account</button>
 </section>
 
 </div><!-- /state-account -->

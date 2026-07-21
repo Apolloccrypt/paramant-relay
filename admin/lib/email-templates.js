@@ -398,46 +398,48 @@ https://paramant.app`;
 
 // ── 6. ACCOUNT DELETION ───────────────────────────────────────────────────────
 function accountDeletionEmail({ email, deletedAt, reason }) {
-  const preheader = 'Your Paramant account has been deleted.';
+  const preheader = 'Your Paramant account has been deactivated.';
   const dateStr = formatTS(typeof deletedAt === 'number' ? deletedAt : Date.parse(deletedAt));
 
   const text = `Hi,
 
-Your Paramant account (${email}) was deleted on ${dateStr}.
+Your Paramant account (${email}) was deactivated on ${dateStr}.
+
+Its API key can no longer be used. Active sessions and the TOTP setup were removed. Some account records are retained.
 
 What this means:
 - API key no longer works
 - Active sessions terminated
-- Personal data removed from our systems
-- Audit logs retained for 90 days per compliance policy
-- Files already relayed are not affected (end-to-end encrypted)
+- Account record and audit entries retained
+
+For a separate personal-data erasure request, contact privacy@paramant.app.
 
 Reason: ${reason || 'not specified'}
 
-If this was a mistake or you want to return later, sign up again
-at https://paramant.app/signup with a new account.
+If this was a mistake or you want to restore access, contact
+support@paramant.app.
 
 Paramant
 https://paramant.app`;
 
   const html = htmlShell(preheader, `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deleted</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deleted on <strong>${dateStr}</strong>.</p>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deactivated</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deactivated on <strong>${dateStr}</strong>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Its API key can no longer be used. Active sessions and the TOTP setup were removed. Some account records are retained.</p>
     <h2 style="margin:24px 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What this means</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>API key no longer works</li>
       <li>Active sessions terminated</li>
-      <li>Personal data removed from our systems</li>
-      <li>Audit logs retained for 90 days per compliance policy</li>
-      <li>Files already relayed are not affected (end-to-end encrypted)</li>
+      <li>Account record and audit entries retained</li>
     </ul>
+    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">For a separate personal-data erasure request, contact <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:12px 16px;margin:0 0 24px 0;">
       <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason ? escHtml(reason) : 'not specified'}</p>
     </div>
-    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to return later, <a href="https://paramant.app/signup" style="color:#1D4ED8;">sign up again</a> with a new account.</p>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to restore access, contact <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
   `);
 
-  return { ...wrap(text, html, { refId: 'deletion-' + Date.now() }), subject: 'Your Paramant account has been deleted' };
+  return { ...wrap(text, html, { refId: 'deletion-' + Date.now() }), subject: 'Your Paramant account has been deactivated' };
 }
 
 // ── SIGNUP VERIFICATION EMAIL ────────────────────────────────────────────────

@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ParaID document check · Paramant</title>
-<meta name="description" content="Read your passport MRZ with the camera and prove your age, sealing only age_over_18 and nationality.">
-<meta property="og:title" content="ParaID document check · Paramant">
-<meta property="og:description" content="Camera passport check: your name and birthdate never leave the device.">
+<title>ParaID MRZ consistency check · Paramant</title>
+<meta name="description" content="Check MRZ check digits locally and derive age and nationality from the data you enter.">
+<meta property="og:title" content="ParaID MRZ consistency check · Paramant">
+<meta property="og:description" content="Local MRZ consistency check. It does not verify document authenticity.">
 <meta property="og:url" content="https://paramant.app/paraid-document">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ParaID document check · Paramant">
-<meta name="twitter:description" content="Camera passport check: your name and birthdate never leave the device.">
+<meta name="twitter:title" content="ParaID MRZ consistency check · Paramant">
+<meta name="twitter:description" content="Local MRZ consistency check. It does not verify document authenticity.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/paraid-document">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -220,15 +220,15 @@
 
 <div class="doc-wrap">
   <div class="doc-head">
-    <p class="doc-eyebrow">ParaID &#183; document tier (substantial)</p>
-    <h1>Prove your age from your passport</h1>
-    <p class="lede">Read your passport&rsquo;s machine-readable zone with the camera. Your device checks the digits, works out only whether you are 18 or older and your nationality, and the registered issuer signs those two facts. Your name, birthdate and document number never leave the device.</p>
+    <p class="doc-eyebrow">ParaID &#183; MRZ consistency</p>
+    <h1>Check the data in an MRZ</h1>
+    <p class="lede">Enter the two machine-readable lines. Your device recalculates their check digits and derives whether the entered birthdate is 18 or older and the entered nationality. This does not verify the document, its chip, its holder or a live person.</p>
   </div>
 
-  <p class="doc-warn" id="doc-liveness-warn" hidden><b>First prove a live person is present.</b> Run the <a href="/liveness?return=/paraid-document">liveness check</a>, then come back here.</p>
+  <p class="doc-warn" id="doc-liveness-warn" hidden><b>Complete the separate browser presence step first.</b> Its result is stored locally and does not bind this MRZ to a document holder. <a href="/liveness?return=/paraid-document">Open the presence step</a>.</p>
 
   <div class="doc-card">
-    <h2>1. Point the camera at the passport</h2>
+    <h2>1. Use the camera as a reading aid</h2>
     <div class="doc-stage">
       <video id="doc-video" playsinline muted></video>
       <div class="doc-guide"></div>
@@ -247,17 +247,17 @@
   </div>
 
   <div class="doc-card">
-    <h2>3. Get your substantial credential</h2>
-    <button type="button" class="btn btn-lime" id="doc-issue" disabled>Issue credential from this passport</button>
+    <h2>3. Seal the derived claims</h2>
+    <button type="button" class="btn btn-lime" id="doc-issue" disabled>Issue credential from entered MRZ data</button>
     <p class="doc-status" id="doc-status"></p>
     <p id="doc-done" hidden><a class="btn btn-lime" href="/paraid-app">Return to your wallet</a></p>
   </div>
 
   <div class="doc-how">
     <ol>
-      <li><b>Why the check digits matter.</b> Every MRZ field carries a weighted check digit and there is a composite over the whole line. One wrong character fails a check, so a garbled or edited MRZ is rejected. Integrity without a chip read.</li>
-      <li><b>Honest scope.</b> The camera cannot read the passport chip (that needs NFC and an app), so this is the eIDAS &ldquo;substantial&rdquo; tier, not &ldquo;high&rdquo;. It combines the live person (liveness) with a self-consistent document. A forged document with valid check digits is the residual risk, which the chip read would close.</li>
-      <li><b>What is sealed.</b> Only age_over_18 and nationality. The issuer derives them and signs them; it never receives or stores your name, birthdate or document number.</li>
+      <li><b>What the check digits do.</b> They detect many typing and reading errors in the MRZ data. Passing them means the entered characters are internally consistent.</li>
+      <li><b>What they do not do.</b> They do not prove that a passport exists, is authentic, belongs to the user or was read from its chip. The separate browser presence result is also not bound to a passport.</li>
+      <li><b>What is sealed.</b> Only age_over_18 and nationality derived from the entered lines. The issuer receives the MRZ lines to recalculate those claims, but does not store them in the credential.</li>
     </ol>
   </div>
 </div>
@@ -287,6 +287,6 @@
 </footer>
 <script src="/nav.js?v=12" defer></script>
 <script src="/js/nav-auth.js?v=4" defer></script>
-<script type="module" src="/js/paraid-document.js?v=1"></script>
+<script type="module" src="/js/paraid-document.js?v=2"></script>
 </body>
 </html>
