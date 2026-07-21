@@ -49,7 +49,7 @@ check() {
 # contains NAME HAYSTACK NEEDLE [critical=yes|no]
 contains() {
   local name="$1" hay="$2" needle="$3" critical="${4:-no}"
-  if printf '%s' "$hay" | grep -q "$needle"; then
+  if [[ "$hay" == *"$needle"* ]]; then
     note "PASS: $name (found '$needle')"
     PASS=$((PASS+1))
   else
@@ -115,7 +115,7 @@ check "/admin/cli.html reachable"      "200" "$(http_code "$SITE/admin/cli.html"
 note ""
 note "== well-known / hygiene =="
 PGP=$($CURL "$SITE/.well-known/openpgp-key.asc" 2>/dev/null)
-if printf '%s' "$PGP" | grep -q "PLACEHOLDER"; then
+if [[ "$PGP" == *"PLACEHOLDER"* ]]; then
   note "FAIL: PGP placeholder still live"
   FAIL=$((FAIL+1))
 else
