@@ -215,23 +215,95 @@ const phase4 = await page.evaluate(async () => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
   for (let i = 0; i < 200 && document.getElementById('step-place').hidden; i++) await sleep(20);
   document.getElementById('ds-seal-sheet').click();
-  const mod = await import('/sign-flow.js?v=39');
+  const sheetPreview = document.querySelector('.ds-signature-sheet-preview');
+  const mod = await import('/sign-flow.js?v=40');
   const output = await mod.buildStampedPdf(sourceBytes, null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const outPdf = await window.PDFLib.PDFDocument.load(output);
   const rendered = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
   const text = (await (await rendered.getPage(2)).getTextContent()).items.map(i => i.str).join(' ');
+  const finalSheetPreview = document.querySelector('.ds-signature-sheet-preview');
+
+  document.getElementById('ds-seal-inline').click();
+  const wrap = document.querySelector('.ds-page-wrap');
+  const rect = wrap.getBoundingClientRect();
+  wrap.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+  document.getElementById('ds-seal-both').click();
+  const bothPreview = document.querySelector('.ds-signature-sheet-preview');
+  const bothOutput = await mod.buildStampedPdf(sourceBytes, { pageIndex: 0, x: 75, y: 80, w: 150, h: 52 }, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
+  const bothPdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(bothOutput) }).promise;
+  const bothPage1 = (await (await bothPdf.getPage(1)).getTextContent()).items.map(i => i.str).join(' ');
+  const bothPage2 = (await (await bothPdf.getPage(2)).getTextContent()).items.map(i => i.str).join(' ');
   return {
     continued: document.getElementById('ds-place-continue').disabled === false,
     pages: outPdf.getPageCount(),
     text,
+    sheetPreview: !!sheetPreview && !!finalSheetPreview && /Extra final page 2/.test(finalSheetPreview.textContent),
+    bothPreview: !!bothPreview && !document.querySelector('.ds-stamp-marker').hidden,
+    bothPages: bothPdf.numPages,
+    bothPage1,
+    bothPage2,
   };
 });
+
+// Phase 5: real pointer movement paints before pointerup, and the cropped PNG
+// becomes available without the former fixed 250 ms wait.
+const drawPage = await ctx.newPage();
+await drawPage.bringToFront();
+await drawPage.goto(`${ORIGIN}/sign.html`, { waitUntil: 'domcontentloaded' });
+await drawPage.locator('[data-mode="alone"]').click();
+await drawPage.evaluate(async () => {
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  while (!window.PDFLib || !window.pdfjsLib) await sleep(20);
+  const source = await window.PDFLib.PDFDocument.create();
+  source.addPage([300, 400]).drawText('Pointer test', { x: 30, y: 350, size: 14 });
+  const sourceBytes = await source.save();
+  const transfer = new DataTransfer();
+  transfer.items.add(new File([sourceBytes], 'pointer-source.pdf', { type: 'application/pdf' }));
+  const input = document.getElementById('ds-doc-input');
+  input.files = transfer.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await drawPage.locator('#step-place:not([hidden])').waitFor();
+await drawPage.locator('#ds-seal-sheet').click();
+await drawPage.locator('#ds-place-continue').click();
+await drawPage.locator('#ds-signer-name').fill('Demo signer');
+await drawPage.locator('#ds-tab-drawn').click();
+const drawCanvas = drawPage.locator('#ds-sig-canvas');
+await drawCanvas.scrollIntoViewIfNeeded();
+const drawBox = await drawCanvas.boundingBox();
+const countInk = () => drawPage.evaluate(() => {
+  const canvas = document.getElementById('ds-sig-canvas');
+  const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  let ink = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (pixels[i] < 100 && pixels[i + 1] < 150 && pixels[i + 2] < 180) ink++;
+  }
+  return ink;
+});
+await drawPage.mouse.move(drawBox.x + 40, drawBox.y + 90);
+await drawPage.mouse.down();
+await drawPage.mouse.move(drawBox.x + 150, drawBox.y + 35, { steps: 12 });
+await drawPage.mouse.move(drawBox.x + 260, drawBox.y + 100, { steps: 12 });
+const inkDuringPointerDown = await countInk();
+const exportStartedAt = Date.now();
+await drawPage.mouse.up();
+while (Date.now() - exportStartedAt < 1000 && await drawPage.locator('#ds-identity-continue').isDisabled()) {
+  await drawPage.waitForTimeout(10);
+}
+const exportDelayMs = Date.now() - exportStartedAt;
+const phase5 = {
+  inkDuringPointerDown,
+  exportDelayMs,
+  status: await drawPage.locator('#ds-sig-draw-status').innerText(),
+};
 
 await browser.close();
 await new Promise(r => server.close(r));
 
 const all = [...phase1, ...phase2a, ...phase2b1, ...phase2b2, ...phase2c, ...phase3,
-  { name: 'P4 separate sheet appends a referenced page without a placed seal', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('Source SHA3-256'), detail: JSON.stringify(phase4) }];
+  { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('Source SHA3-256') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
+  { name: 'P5 inline seal plus separate sheet renders both outputs', pass: phase4.bothPreview && phase4.bothPages === 2 && phase4.bothPage1.includes('Demo signer') && phase4.bothPage2.includes('ParaSign signature sheet'), detail: JSON.stringify(phase4) },
+  { name: 'P6 pointer stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /ready/i.test(phase5.status), detail: JSON.stringify(phase5) }];
 let passed = 0;
 console.log('\n================ ParaSign signing — FULL functional test ================');
 for (const t of all) { console.log(`  ${t.pass ? 'PASS' : 'FAIL'}  ${t.name}${t.detail ? '   (' + t.detail + ')' : ''}`); if (t.pass) passed++; }

@@ -45,7 +45,7 @@ const state = {
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
   stampAllPages: false,  // PDF mode: repeat the seal on every page at the same relative spot.
-  signatureSheet: false, // PDF mode: append a referenced signature sheet instead of stamping a source page.
+  sealPlacement: 'inline', // PDF mode: inline, sheet, or both.
   pdfPageCount: null,    // PDF source page count, used to identify the appended sheet in the receipt.
   extras: [],            // PDF mode only. Types (all baked as pdf-lib vectors):
                          //   text/date : { id, type, pageIndex, x, y, size, text }        x,y = box bottom-left (points)
@@ -65,6 +65,24 @@ const state = {
   envelope: null,        // populated when recipients.length > 0 after POST /v2/envelopes
   result: null,          // { stampedBytes?, envelope, fingerprint }
 };
+
+function hasSignatureSheet() {
+  return state.sealPlacement === 'sheet' || state.sealPlacement === 'both';
+}
+
+function hasInlineSeal() {
+  return state.sealPlacement === 'inline' || state.sealPlacement === 'both';
+}
+
+function describePdfMode() {
+  if (state.sealPlacement === 'sheet') return 'PDF with a separate referenced signature sheet';
+  const inline = state.stampAllPages
+    ? 'visual stamp on every page'
+    : 'visual stamp on page ' + (state.stamp.pageIndex + 1);
+  return state.sealPlacement === 'both'
+    ? 'PDF with ' + inline + ' and a separate referenced signature sheet'
+    : 'PDF with ' + inline;
+}
 
 // ====================================================================
 // Utilities
@@ -292,7 +310,7 @@ async function onDocChosen(file) {
   state.imageType = null;
   state.extras = [];        // fresh document: drop any text/date objects from a prior file
   state.stamp = null;       // fresh document: drop the previous file's seal (QA: ghost stamp)
-  state.signatureSheet = false;
+  state.sealPlacement = 'inline';
   state.pdfPageCount = null;
 
   const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
@@ -399,7 +417,7 @@ async function renderImageForPlacement() {
 // ====================================================================
 
 async function renderPdfForPlacement() {
-  $('ds-place-continue').disabled = !state.signatureSheet;
+  $('ds-place-continue').disabled = hasInlineSeal() && !state.stamp;
   teardownPageNav();
   { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
   { const et = $('ds-edit-tools'); if (et) et.hidden = false; }   // text/date tools: PDF only
@@ -407,7 +425,7 @@ async function renderPdfForPlacement() {
   // Seal tools (sign-every-page toggle + reuse-saved-position) are PDF-only.
   { const st = $('ds-seal-tools'); if (st) st.hidden = false; }
   { const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages; }
-  { const radio = $(state.signatureSheet ? 'ds-seal-sheet' : 'ds-seal-inline'); if (radio) radio.checked = true; }
+  { const radio = $('ds-seal-' + state.sealPlacement); if (radio) radio.checked = true; }
   refreshApplyTplBtn();
   updateSignatureSheetControls();
   const pdfjs = await waitForPdfjs();
@@ -450,6 +468,7 @@ async function renderPdfForPlacement() {
 
   await applyPlaceZoom();                 // initial render == fit-to-width (zoom 1)
   setupPageNav(container, maxPages);
+  updateSignatureSheetControls();
 }
 
 // Fit-to-width base scale (the original targetWidth logic), times the zoom factor.
@@ -583,32 +602,73 @@ function setStampAllPages(on, save = true) {
   if (save) savePlacementTemplate();
 }
 
-function updateSignatureSheetControls() {
-  const sheet = !!state.signatureSheet;
-  const allPages = $('ds-allpages'); if (allPages) allPages.disabled = sheet;
-  const allPagesLabel = $('ds-allpages-label'); if (allPagesLabel) allPagesLabel.hidden = sheet;
-  const applyTpl = $('ds-apply-tpl'); if (applyTpl) applyTpl.hidden = sheet || !loadPlacementTemplate();
-  const tip = $('ds-seal-tip');
-  if (tip) tip.textContent = sheet
-    ? 'Adds one final page with your seal, the source filename, page count and SHA3-256 source hash. The original pages remain unstamped.'
-    : 'Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).';
-  const hint = $('ds-place-hint');
-  if (hint && sheet) hint.textContent = 'A referenced signature sheet will be added as the final PDF page.';
-  const cont = $('ds-place-continue'); if (cont) cont.disabled = !sheet && !state.stamp;
-  document.querySelectorAll('.ds-stamp-marker').forEach(el => { el.hidden = sheet; });
+function buildSignatureSheetPreview() {
+  const preview = document.createElement('section');
+  preview.className = 'ds-signature-sheet-preview';
+  preview.setAttribute('aria-label', 'Preview of the extra signature sheet');
+  const sourceHash = toHex(sha3_256(state.doc.bytes));
+  const finalPage = (state.pdfPageCount || 0) + 1;
+  preview.innerHTML =
+    '<div class="ds-sheet-page-tag">Extra final page ' + finalPage + '</div>' +
+    '<h3 class="ds-sheet-title">ParaSign signature sheet</h3>' +
+    '<p class="ds-sheet-sub">This page will be appended behind the source document when you sign.</p>' +
+    '<dl class="ds-sheet-fields">' +
+      '<dt>Source file</dt><dd>' + escapeHtml(state.doc.name) + '</dd>' +
+      '<dt>Source pages</dt><dd>' + escapeHtml(String(state.pdfPageCount || 0)) + '</dd>' +
+      '<dt>Source SHA3-256</dt><dd>' + escapeHtml(sourceHash) + '</dd>' +
+    '</dl>' +
+    '<div class="ds-sheet-seal-label">Visible signature</div>' +
+    '<div class="ds-sheet-seal">' + stampMockupHtml() + '</div>';
+  return preview;
 }
 
-function setSignatureSheet(on) {
-  state.signatureSheet = !!on;
-  if (state.signatureSheet) state.stampAllPages = false;
-  const inline = $('ds-seal-inline'); if (inline) inline.checked = !state.signatureSheet;
-  const sheet = $('ds-seal-sheet'); if (sheet) sheet.checked = state.signatureSheet;
+function renderPlacementSheetPreview() {
+  const container = $('ds-pdf-canvas-list');
+  if (!container) return;
+  container.querySelectorAll('.ds-signature-sheet-preview').forEach(el => el.remove());
+  if (!hasSignatureSheet() || state.mode !== 'pdf' || !state.doc) return;
+  const preview = buildSignatureSheetPreview();
+  container.appendChild(preview);
+}
+
+function refreshVisibleSealPreviews() {
+  reflowStampMarker();
+  reflowGhostStamps();
+  renderPlacementSheetPreview();
+}
+
+function updateSignatureSheetControls() {
+  const sheetOnly = state.sealPlacement === 'sheet';
+  const withSheet = hasSignatureSheet();
+  const allPages = $('ds-allpages'); if (allPages) allPages.disabled = sheetOnly;
+  const allPagesLabel = $('ds-allpages-label'); if (allPagesLabel) allPagesLabel.hidden = sheetOnly;
+  const applyTpl = $('ds-apply-tpl'); if (applyTpl) applyTpl.hidden = sheetOnly || !loadPlacementTemplate();
+  const tip = $('ds-seal-tip');
+  if (tip) tip.textContent = sheetOnly
+    ? 'Adds one final page with your seal and source details. The original pages remain unstamped.'
+    : withSheet
+      ? 'Keeps the placed seal in the document and adds one final page with the seal and source details.'
+      : 'Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).';
+  const hint = $('ds-place-hint');
+  if (hint && sheetOnly) hint.textContent = 'Preview below: page ' + ((state.pdfPageCount || 0) + 1) + ' will be added as the final PDF page.';
+  else if (hint && withSheet) hint.textContent = 'The placed seal stays here. Preview below: page ' + ((state.pdfPageCount || 0) + 1) + ' will also be added.';
+  const cont = $('ds-place-continue'); if (cont) cont.disabled = hasInlineSeal() && !state.stamp;
+  document.querySelectorAll('.ds-stamp-marker').forEach(el => { el.hidden = sheetOnly; });
+  renderPlacementSheetPreview();
+}
+
+function setSealPlacement(placement) {
+  state.sealPlacement = ['inline', 'sheet', 'both'].includes(placement) ? placement : 'inline';
+  if (state.sealPlacement === 'sheet') state.stampAllPages = false;
+  for (const option of ['inline', 'sheet', 'both']) {
+    const radio = $('ds-seal-' + option); if (radio) radio.checked = state.sealPlacement === option;
+  }
   const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages;
   updateSignatureSheetControls();
   reflowGhostStamps();
-  if (!state.signatureSheet) {
+  if (hasInlineSeal()) {
     reflowStampMarker();
-    setPlaceHint(state.stamp ? 'Click a page to move the signature stamp.' : 'Click a page to drop the signature stamp.');
+    if (!hasSignatureSheet()) setPlaceHint(state.stamp ? 'Click a page to move the signature stamp.' : 'Click a page to drop the signature stamp.');
   }
 }
 
@@ -616,7 +676,7 @@ function setSignatureSheet(on) {
 function removeStamp() {
   state.stamp = null;
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
-  const cont = $('ds-place-continue'); if (cont) cont.disabled = !state.signatureSheet;
+  const cont = $('ds-place-continue'); if (cont) cont.disabled = hasInlineSeal();
   setPlaceHint('Signature removed. Click a page to place it again.');
 }
 
@@ -624,7 +684,7 @@ function removeStamp() {
 // display width. Never mutates state.stamp.
 function reflowStampMarker() {
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
-  if (state.signatureSheet && state.mode === 'pdf') return;
+  if (!hasInlineSeal() && state.mode === 'pdf') return;
   if (!state.stamp || !placeState) return;
   let wrap;
   if (placeState.isImage) wrap = placeState.wrap;
@@ -1073,7 +1133,7 @@ async function runPageOp(fn) {
       state.doc.size = state.doc.bytes.length;
       await renderPdfForPlacement();
       // The seal gate: re-disable Continue when the op removed the stamp.
-      $('ds-place-continue').disabled = !state.signatureSheet && !state.stamp;
+      $('ds-place-continue').disabled = hasInlineSeal() && !state.stamp;
     }
   } catch (err) {
     setPlaceHint('Page operation failed: ' + err.message);
@@ -1248,7 +1308,7 @@ function swallowNextWrapClick(wrap) {
 
 function onPlaceClick(e) {
   if (_penMode) return;                 // pen mode: pointer gestures draw, they don't place the seal
-  if (state.signatureSheet && state.mode === 'pdf') return;
+  if (!hasInlineSeal() && state.mode === 'pdf') return;
   const wrap = e.currentTarget;
   const canvas = wrap.querySelector('canvas');
   const rect = canvas.getBoundingClientRect();
@@ -1507,6 +1567,7 @@ function selectSigStyle(style) {
     $('ds-sig-panel-' + k).hidden = (k !== style);
   }
   refreshIdentityValid();
+  refreshVisibleSealPreviews();
 }
 
 // ---- drawn-signature canvas (pointer + touch), HiDPI + smoothed ----
@@ -1537,6 +1598,8 @@ function initDrawCanvas() {
   let last = null;          // previous raw point (backing-store coords)
   let mid = null;           // previous midpoint the curve passed through
   let ink = null;           // drawn bounding box, for a tight crop on export
+  let exportGeneration = 0; // prevents an older async PNG export winning a later stroke
+  const drawStatus = $('ds-sig-draw-status');
 
   function pos(ev) {
     const r = cv.getBoundingClientRect();
@@ -1554,6 +1617,8 @@ function initDrawCanvas() {
 
   function start(ev) {
     ev.preventDefault();
+    exportGeneration++;
+    if (drawStatus) drawStatus.textContent = 'Drawing. The line above follows your pointer.';
     // Capture the pointer: a stroke that briefly leaves the canvas (normal at
     // writing speed) keeps drawing instead of being cut off mid-letter.
     try { cv.setPointerCapture(ev.pointerId); } catch {}
@@ -1588,22 +1653,15 @@ function initDrawCanvas() {
     if (!drawing) return;
     drawing = false;
     try { cv.releasePointerCapture(ev.pointerId); } catch {}
-    // Export DEBOUNCED. It used to run on every pointerup, so lifting the pen
-    // between letters blocked the thread on a full-canvas PNG encode and the
-    // ink appeared to arrive late. Nothing downstream needs the bytes before
-    // the user moves on from this pane.
-    scheduleExport();
-  }
-  let exportTimer = null;
-  function scheduleExport() {
-    if (exportTimer) clearTimeout(exportTimer);
-    exportTimer = setTimeout(() => { exportTimer = null; exportSignature(); }, 250);
+    if (drawStatus) drawStatus.textContent = 'Preparing the signature preview.';
+    const generation = ++exportGeneration;
+    exportSignature(generation);
   }
 
   // Export a TIGHTLY CROPPED PNG of just the ink (+ small padding) so the seal
   // embeds a signature that fills its band, not a stamp-sized mostly-white image
   // with a tiny scribble. pdf-lib preserves aspect ratio when it scales this in.
-  async function exportSignature() {
+  async function exportSignature(generation) {
     if (!ink) { clearSig(); return; }
     const pad = ctx.lineWidth * 1.5;
     const x0 = Math.max(0, Math.floor(ink.minX - pad));
@@ -1619,10 +1677,15 @@ function initDrawCanvas() {
     const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
     if (!blob) return;
     const bytes = new Uint8Array(await blob.arrayBuffer());
+    if (generation !== exportGeneration) { bytes.fill(0); return; }
+    const dataUrl = await bytesToDataUrl(bytes, 'image/png');
+    if (generation !== exportGeneration) { bytes.fill(0); return; }
     state.signer.sigImageBytes = bytes;
     state.signer.sigImageType = 'png';
-    state.signer.sigImageDataUrl = await bytesToDataUrl(bytes, 'image/png');
+    state.signer.sigImageDataUrl = dataUrl;
     refreshIdentityValid();
+    refreshVisibleSealPreviews();
+    if (drawStatus) drawStatus.textContent = 'Signature ready. Continue to review it in the seal.';
   }
 
   function clearSig() {
@@ -1644,8 +1707,10 @@ function initDrawCanvas() {
   // past the canvas edge, and ending on leave used to chop letters in half.
 
   $('ds-sig-clear').addEventListener('click', () => {
-    if (exportTimer) { clearTimeout(exportTimer); exportTimer = null; }
+    exportGeneration++;
     paint(); ink = null; clearSig();
+    refreshVisibleSealPreviews();
+    if (drawStatus) drawStatus.textContent = 'Cleared. Your line appears here while you draw.';
   });
 }
 
@@ -1670,6 +1735,7 @@ function initImageUpload() {
     img.src = state.signer.sigImageDataUrl;
     img.style.display = 'block';
     refreshIdentityValid();
+    refreshVisibleSealPreviews();
   });
 }
 
@@ -1713,7 +1779,7 @@ function signedDocMime() {
 function fillReview() {
   $('ds-review-doc').textContent  = state.doc.name + ' (' + formatSize(state.doc.size) + ')';
   $('ds-review-mode').textContent =
-    state.mode === 'pdf'   ? (state.signatureSheet ? 'PDF with a separate referenced signature sheet' : state.stampAllPages ? 'PDF with visual stamp on every page' : 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1)) :
+    state.mode === 'pdf'   ? describePdfMode() :
     state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only (SHA3-256 attestation)';
   $('ds-review-name').textContent = state.signer.name;
@@ -1758,9 +1824,11 @@ function fillReview() {
     stamped_filename: state.mode === 'image' ? '<signed image>' : 'signed-' + state.doc.name,
     original_hash: docHashHex,
     stamped_hash: '<computed when the document is stamped>',
-    coords: state.signatureSheet
+    coords: state.sealPlacement === 'sheet'
       ? { signature_sheet: true, pageIndex: '<appended final page>', source_hash: docHashHex, name: state.signer.name, date: '<set on sign>' }
-      : { pageIndex: state.stamp.pageIndex, x: Math.round(state.stamp.x), y: Math.round(state.stamp.y), w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: '<set on sign>' },
+      : state.sealPlacement === 'both'
+        ? { signature_sheet: true, pageIndex: '<appended final page>', source_hash: docHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: Math.round(state.stamp.x), y: Math.round(state.stamp.y), w: state.stamp.w, h: state.stamp.h }, name: state.signer.name, date: '<set on sign>' }
+        : { pageIndex: state.stamp.pageIndex, x: Math.round(state.stamp.x), y: Math.round(state.stamp.y), w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: '<set on sign>' },
     signature_style: state.signer.sigStyle,
     signature_image_hash: state.signer.sigImageBytes ? toHex(sha3_256(state.signer.sigImageBytes)) : null,
     signer_public_key: '<base64 of your ML-DSA-65 public key>',
@@ -1820,12 +1888,13 @@ async function renderReviewPreviews() {
 let _reviewProofEnv = null;
 function refreshReviewProofCoords() {
   if (!_reviewProofEnv || !_reviewProofEnv.coords) return;
-  if (state.signatureSheet) return;
-  _reviewProofEnv.coords.pageIndex = state.stamp.pageIndex;
-  _reviewProofEnv.coords.x = Math.round(state.stamp.x);
-  _reviewProofEnv.coords.y = Math.round(state.stamp.y);
-  _reviewProofEnv.coords.w = state.stamp.w;
-  _reviewProofEnv.coords.h = state.stamp.h;
+  if (state.sealPlacement === 'sheet') return;
+  const coords = state.sealPlacement === 'both' ? _reviewProofEnv.coords.inline_seal : _reviewProofEnv.coords;
+  coords.pageIndex = state.stamp.pageIndex;
+  coords.x = Math.round(state.stamp.x);
+  coords.y = Math.round(state.stamp.y);
+  coords.w = state.stamp.w;
+  coords.h = state.stamp.h;
   const el = $('ds-proof-json'); if (el) el.textContent = JSON.stringify(_reviewProofEnv, null, 2);
 }
 
@@ -1908,13 +1977,9 @@ async function renderDocPreview() {
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     pane.appendChild(zoomwrap);
-    if (state.signatureSheet) {
-      const card = document.createElement('div');
-      card.className = 'ds-info-card';
-      card.innerHTML = '<dl><dt>Final page</dt><dd>Separate signature sheet</dd>' +
-        '<dt>Source file</dt><dd>' + escapeHtml(state.doc.name) + '</dd>' +
-        '<dt>Source SHA3-256</dt><dd>' + escapeHtml(toHex(sha3_256(state.doc.bytes))) + '</dd></dl>';
-      pane.appendChild(card);
+    if (state.sealPlacement === 'sheet') {
+      zoomwrap.appendChild(buildSignatureSheetPreview());
+      buildReviewZoom(zoomwrap);
       return;
     }
     // Review shows EVERY page (capped), each with its own annotations, and the
@@ -1975,6 +2040,7 @@ async function renderDocPreview() {
       more.textContent = '+ ' + (pdf.numPages - maxPages) + ' more pages not previewed here; all pages are in the signed file.';
       zoomwrap.appendChild(more);
     }
+    if (hasSignatureSheet()) zoomwrap.appendChild(buildSignatureSheetPreview());
     buildReviewZoom(zoomwrap);
     return;
   }
@@ -2320,7 +2386,7 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     pg.drawLine({ start: { x: box.x + 6, y: box.y + footerH - 1 }, end: { x: box.x + box.w - 6, y: box.y + footerH - 1 }, thickness: 0.5, color: navy, opacity: 0.25 });
   };
 
-  if (state.signatureSheet) {
+  if (hasSignatureSheet()) {
     const sheet = pdfDoc.addPage([595.28, 841.89]);
     const sourceHash = toHex(sha3_256(origBytes));
     sheet.drawText('ParaSign signature sheet', { x: 54, y: 770, size: 22, font: fontBold, color: navy });
@@ -2343,7 +2409,8 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     sheet.drawText('Visible signature', { x: 54, y: 520, size: 12, font: fontBold, color: navy });
     paintSeal(sheet, { x: 54, y: 355, w: 390, h: 135 });
     sheet.drawText('Verify the signed PDF together with its .psign file. Later co-signers are recorded in the envelope, not added to this PDF page.', { x: 54, y: 320, size: 9, font, color: dim, maxWidth: 487, lineHeight: 13 });
-  } else {
+  }
+  if (hasInlineSeal()) {
     // Stamp the placed page exactly. With "sign every page" on, stamp every other
     // page at the same RELATIVE position/scale (robust to differing page sizes).
     const srcSz = pages[stamp.pageIndex].getSize();
@@ -2470,9 +2537,11 @@ async function doSign() {
         : await buildStampedImage(state.doc.bytes, state.stamp, state.signer.name, dateStr, fingerprint, state.imageType);
       origHashHex = toHex(sha3_256(state.doc.bytes));
       stampedHashHex = toHex(sha3_256(stampedBytes));
-      coords = state.mode === 'pdf' && state.signatureSheet
+      coords = state.mode === 'pdf' && state.sealPlacement === 'sheet'
         ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, name: state.signer.name, date: dateStr }
-        : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages) };
+        : state.mode === 'pdf' && state.sealPlacement === 'both'
+          ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, all_pages: !!state.stampAllPages }, name: state.signer.name, date: dateStr }
+          : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages) };
       docHashForEnvelope = stampedHashHex;
     } else {
       docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
@@ -2658,7 +2727,7 @@ function showDone() {
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;
   $('ds-done-mode').textContent =
-    state.mode === 'pdf'   ? (state.signatureSheet ? 'PDF with a separate referenced signature sheet' : state.stampAllPages ? 'PDF with visual stamp on every page' : 'PDF with visual stamp on page ' + (state.stamp.pageIndex + 1)) :
+    state.mode === 'pdf'   ? describePdfMode() :
     state.mode === 'image' ? 'Image with visual stamp baked in (' + (state.imageType || '').toUpperCase() + ')' :
                              'Hash-only attestation (SHA3-256)';
 
@@ -2832,9 +2901,10 @@ async function renderSignedPreview() {
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
-  const firstPreviewPage = state.signatureSheet ? pdf.numPages - 1 : state.stamp.pageIndex;
+  const firstPreviewPage = state.sealPlacement === 'sheet' ? pdf.numPages - 1 : state.stamp.pageIndex;
   const idxs = [firstPreviewPage];
-  if (!state.signatureSheet && firstPreviewPage + 1 < pdf.numPages) idxs.push(firstPreviewPage + 1);
+  if (state.sealPlacement === 'both') idxs.push(pdf.numPages - 1);
+  else if (state.sealPlacement === 'inline' && firstPreviewPage + 1 < pdf.numPages) idxs.push(firstPreviewPage + 1);
   for (const idx of idxs) {
     const page = await pdf.getPage(idx + 1);
     const baseViewport = page.getViewport({ scale: 1 });
@@ -2973,10 +3043,8 @@ function wireLiveStampUpdates() {
   // placement marker in step-place so the name shown there reflects what
   // will end up in the stamp. Attached once at init.
   $('ds-signer-name').addEventListener('input', () => {
-    if (state.mode !== 'pdf' || !state.stamp) return;
-    document.querySelectorAll('.ds-stamp-marker').forEach(el => {
-      el.innerHTML = stampMockupHtml();
-    });
+    if (state.mode !== 'pdf') return;
+    refreshVisibleSealPreviews();
   });
 }
 
@@ -3006,8 +3074,10 @@ function wireEditTools() {
   if (p) p.addEventListener('click', () => setPenMode(!_penMode));
   // Sign-every-page toggle + reuse-saved-position.
   const cb = $('ds-allpages'); if (cb) cb.addEventListener('change', () => setStampAllPages(cb.checked));
-  const inline = $('ds-seal-inline'); if (inline) inline.addEventListener('change', () => { if (inline.checked) setSignatureSheet(false); });
-  const sheet = $('ds-seal-sheet'); if (sheet) sheet.addEventListener('change', () => { if (sheet.checked) setSignatureSheet(true); });
+  for (const placement of ['inline', 'sheet', 'both']) {
+    const radio = $('ds-seal-' + placement);
+    if (radio) radio.addEventListener('change', () => { if (radio.checked) setSealPlacement(placement); });
+  }
   const at = $('ds-apply-tpl'); if (at) at.addEventListener('click', applyPlacementTemplate);
   wirePageTools();
 }

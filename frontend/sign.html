@@ -70,6 +70,16 @@
 .ds-seal-check input{width:16px;height:16px;accent-color:var(--cobalt);cursor:pointer}
 .ds-seal-choice{display:flex;gap:12px;flex-wrap:wrap;width:100%}
 .ds-seal-choice .ds-seal-check{padding:8px 10px;border:1px solid var(--ink-hair);border-radius:8px;background:#fff}
+.ds-signature-sheet-preview{width:100%;max-width:820px;min-height:420px;aspect-ratio:210/297;background:#fff;border:2px solid var(--cobalt);box-shadow:0 8px 24px rgba(11,58,106,.1);margin:18px auto 22px;padding:7% 8%;box-sizing:border-box;cursor:default;position:relative;color:var(--navy)}
+.ds-sheet-page-tag{position:absolute;right:18px;top:16px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--cobalt);background:rgba(29,78,216,.07);padding:5px 8px}
+.ds-sheet-title{font-size:clamp(18px,3vw,28px);font-weight:700;margin:18px 0 6px}
+.ds-sheet-sub{font-size:12px;color:var(--ink-dim);line-height:1.5;padding-bottom:16px;border-bottom:1px solid var(--ink-hair)}
+.ds-sheet-fields{display:grid;grid-template-columns:120px 1fr;gap:8px 14px;margin:22px 0;font-family:var(--mono);font-size:11px;text-align:left}
+.ds-sheet-fields dt{text-transform:uppercase;letter-spacing:.05em;color:var(--ink-dim)}
+.ds-sheet-fields dd{margin:0;word-break:break-all;color:var(--navy)}
+.ds-sheet-seal-label{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);margin:18px 0 8px}
+.ds-sheet-seal{width:min(390px,78%);height:135px;border:1px solid var(--cobalt);background:#fff;display:flex;flex-direction:column;overflow:hidden}
+@media(max-width:640px){.ds-signature-sheet-preview{min-height:360px;padding:12% 7%}.ds-sheet-fields{grid-template-columns:1fr;gap:3px}.ds-sheet-fields dd{margin-bottom:8px}.ds-sheet-seal{width:100%;height:110px}}
 /* Sticky action bar (Back / Continue) so it stays reachable on long documents */
 .ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:linear-gradient(to top,var(--bg,#F8FAFC) 70%,rgba(248,250,252,0));border-top:1px solid var(--ink-hair)}
 /* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
@@ -467,6 +477,7 @@
       <div class="ds-seal-choice" role="radiogroup" aria-label="Signature placement">
         <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-inline" value="inline" checked> Place the seal in the document</label>
         <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Add a separate signature sheet</label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> Place the seal and add the sheet</label>
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
@@ -545,6 +556,7 @@
       <div class="ds-sig-panel" id="ds-sig-panel-drawn" role="tabpanel" aria-labelledby="ds-tab-drawn" tabindex="0" hidden>
         <p class="ds-hint">Draw with mouse or finger. Use a steady stroke - the result is rendered as PNG and embedded in the PDF.</p>
         <canvas id="ds-sig-canvas" width="500" height="160" role="img" aria-label="Signature drawing area - draw your signature with mouse or finger"></canvas>
+        <p class="ds-hint" id="ds-sig-draw-status" aria-live="polite">Your line appears here while you draw.</p>
         <div class="ds-actions" style="margin-top:8px">
           <button class="btn btn-tertiary" id="ds-sig-clear" type="button">Clear</button>
         </div>
@@ -717,6 +729,6 @@
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=39"></script>
+<script type="module" src="/sign-flow.js?v=40"></script>
 </body>
 </html>
