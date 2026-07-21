@@ -68,6 +68,8 @@
 .ds-seal-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .ds-seal-check{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;user-select:none}
 .ds-seal-check input{width:16px;height:16px;accent-color:var(--cobalt);cursor:pointer}
+.ds-seal-choice{display:flex;gap:12px;flex-wrap:wrap;width:100%}
+.ds-seal-choice .ds-seal-check{padding:8px 10px;border:1px solid var(--ink-hair);border-radius:8px;background:#fff}
 /* Sticky action bar (Back / Continue) so it stays reachable on long documents */
 .ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:linear-gradient(to top,var(--bg,#F8FAFC) 70%,rgba(248,250,252,0));border-top:1px solid var(--ink-hair)}
 /* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
@@ -462,9 +464,13 @@
       <span class="ds-edit-tip">Double-click a text box to edit, drag to move, corner to resize. Page buttons sit on each page.</span>
     </div>
     <div class="ds-seal-tools" id="ds-seal-tools" hidden>
-      <label class="ds-seal-check"><input type="checkbox" id="ds-allpages"> Sign every page with this signature</label>
+      <div class="ds-seal-choice" role="radiogroup" aria-label="Signature placement">
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-inline" value="inline" checked> Place the seal in the document</label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Add a separate signature sheet</label>
+      </div>
+      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
-      <span class="ds-edit-tip">Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).</span>
+      <span class="ds-edit-tip" id="ds-seal-tip">Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
@@ -711,6 +717,6 @@
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=37"></script>
+<script type="module" src="/sign-flow.js?v=38"></script>
 </body>
 </html>

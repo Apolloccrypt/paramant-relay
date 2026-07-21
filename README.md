@@ -154,6 +154,8 @@ Every transfer is hashed into a SHA3-256 Merkle tree. The relay signs each tree 
 
 ParaSign is the second product on the PARAMANT relay: post-quantum document signing, alongside the encrypted file transfer described above. Same relay, same notary invariant, a different job. Instead of moving a file and burning it, ParaSign proves who signed what, and when, with a signature that survives the arrival of quantum computers.
 
+For PDF files, the browser can place the visible seal on one page, repeat it on every page, or append a separate signature sheet. The sheet includes the visible signer seal, source filename, source page count, signing time and SHA3-256 source hash. Later co-signers remain part of the cryptographic `.psign` envelope and are not retroactively painted into the PDF.
+
 - Post-quantum signatures. Every signature is ML-DSA-65 (NIST FIPS 204). No RSA and no ECDSA on the signing path.
 - Envelopes. A signing request is an envelope: one document, one or more signers, an optional signing order, and a TTL.
 - Multi-signer. Route a single document to several signers; the envelope completes only when every party has signed.
