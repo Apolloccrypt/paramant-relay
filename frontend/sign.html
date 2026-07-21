@@ -5,9 +5,9 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign a document · Paramant</title>
-<meta name="description" content="Sign documents with ML-DSA-65 (FIPS 204). Private key and document never leave your browser.">
+<meta name="description" content="Sign documents with ML-DSA-65 (FIPS 204). Private keys and document plaintext stay in the browser.">
 <meta property="og:title" content="Sign a document · Paramant">
-<meta property="og:description" content="Sign a document with a post-quantum ML-DSA-65 signature, right in your browser. Your key and the document never leave your device.">
+<meta property="og:description" content="Sign a document with a post-quantum ML-DSA-65 signature in your browser. Your private key and document plaintext never leave your device.">
 <meta property="og:url" content="https://paramant.app/sign">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -15,7 +15,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Sign a document · Paramant">
-<meta name="twitter:description" content="Sign a document with a post-quantum ML-DSA-65 signature, right in your browser. Your key and the document never leave your device.">
+<meta name="twitter:description" content="Sign a document with a post-quantum ML-DSA-65 signature in your browser. Your private key and document plaintext never leave your device.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -29,11 +29,11 @@
 .ds-note p{margin:0 0 8px}
 .ds-note a{color:#0B3A6A}
 .ds-note-dismiss{margin:0;background:none;border:0;padding:0;color:#0B3A6A;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}
-.ds-wrap{max-width:880px;margin:48px auto;padding:0 24px}
-.ds-head{margin-bottom:28px}
+.ds-wrap{max-width:980px;margin:46px auto 64px;padding:0 24px}
+.ds-head{margin-bottom:30px;max-width:740px}
 .ds-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
-.ds-title{font-size:32px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px;color:var(--navy)}
-.ds-lede{font-size:14px;color:var(--ink-dim);line-height:1.7;max-width:620px}
+.ds-title{font-size:clamp(34px,5vw,52px);font-weight:700;letter-spacing:-.04em;line-height:1.05;margin-bottom:14px;color:var(--navy)}
+.ds-lede{font-size:16px;color:var(--ink-dim);line-height:1.65;max-width:690px}
 .ds-stepper{list-style:none;display:flex;gap:8px;padding:0;margin:0 0 32px;border-bottom:1px solid var(--ink-hair);counter-reset:dsstep}
 .ds-stepper li{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding:14px 0;border-bottom:2px solid transparent;counter-increment:dsstep;text-align:center}
 .ds-stepper li::before{content:counter(dsstep);display:inline-block;width:20px;height:20px;border:1px solid var(--ink-hair);border-radius:50%;line-height:18px;font-size:10px;margin-right:6px;font-weight:700}
@@ -206,6 +206,20 @@
 .ds-party-link-row .ds-pl-url{font-family:var(--mono);font-size:11px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ds-party-link-row .ds-pl-copy{padding:6px 14px;background:var(--cobalt);color:#fff;border:0;font-family:var(--mono);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700}
 .ds-party-link-row .ds-pl-copy.copied{background:var(--lime);color:var(--navy)}
+.ds-delivery-card{margin:18px 0 4px;padding:16px;border:1px solid var(--ink-hair);border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(11,58,106,.05)}
+.ds-delivery-card legend{padding:0 6px;font-size:14px;font-weight:700;color:var(--navy)}
+.ds-delivery-option{display:grid;grid-template-columns:20px 1fr;gap:9px;align-items:start;padding:10px;border-radius:8px;cursor:pointer}
+.ds-delivery-option:has(input:checked){background:rgba(29,78,216,.06)}
+.ds-delivery-option input{margin-top:3px;accent-color:var(--cobalt)}
+.ds-delivery-option strong{display:block;font-size:13px;color:var(--navy);margin-bottom:2px}
+.ds-delivery-option span{display:block;font-size:12px;line-height:1.5;color:var(--ink-dim)}
+.ds-delivery-fields{display:grid;gap:12px;margin:10px 0 0 29px;padding-top:12px;border-top:1px solid var(--ink-hair)}
+.ds-security-details{margin-top:12px;border-top:1px solid var(--ink-hair);padding-top:12px}
+.ds-security-details summary{cursor:pointer;color:var(--cobalt);font-size:12px;font-weight:700}
+.ds-security-details[open] summary{margin-bottom:6px}
+.ds-textarea{min-height:84px;resize:vertical;line-height:1.5}
+.ds-invite-status{font-family:var(--mono);font-size:10px;margin-top:5px;color:var(--ink-dim)}
+.ds-invite-status.ok{color:#087443}.ds-invite-status.err{color:#b42318}
 @media(max-width:640px){.ds-recipient-row,.ds-party-link-row{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-party-link-row .ds-pl-url{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-all}.ds-party-link-row .ds-pl-copy{width:100%;padding:12px 14px}.ds-recipient-row .ds-rm{padding:10px 12px}}
 @media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
@@ -217,11 +231,25 @@
   .ds-stepper li::before{display:block;margin:0 auto 4px}
   .ds-info-card dl{grid-template-columns:1fr}
 }
-.ds-modes{display:grid;gap:12px;margin-top:8px}
-.ds-mode-card{display:flex;flex-direction:column;gap:4px;text-align:left;padding:18px 20px;border:1px solid var(--ink-hair);background:var(--bone);cursor:pointer;transition:all 140ms ease;width:100%;font-family:inherit}
-.ds-mode-card:hover{border-color:var(--cobalt);background:rgba(11,58,106,.04)}
-.ds-mode-t{font-size:16px;font-weight:700;color:var(--navy)}
+.ds-mode-intro{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:18px}
+.ds-mode-intro h2{font-size:22px;margin:0 0 5px}
+.ds-mode-intro .ds-sub{margin:0}
+.ds-mode-safe{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;color:#087443;white-space:nowrap}
+.ds-mode-safe::before{content:'';width:8px;height:8px;border-radius:50%;background:#20a66a}
+.ds-modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+.ds-mode-card{display:grid;grid-template-columns:44px 1fr auto;gap:14px;text-align:left;align-items:center;padding:21px;border:1px solid #dfe7f1;border-radius:16px;background:#fff;cursor:pointer;transition:transform 140ms ease,border-color 140ms ease,box-shadow 140ms ease;width:100%;font-family:inherit;box-shadow:0 7px 24px rgba(11,58,106,.045)}
+.ds-mode-card:hover{border-color:#9bb8e8;box-shadow:0 13px 35px rgba(11,58,106,.1);transform:translateY(-2px)}
+.ds-mode-card:focus-visible{outline:3px solid rgba(20,87,217,.2);outline-offset:3px}
+.ds-mode-card.primary{grid-column:1/-1;background:linear-gradient(135deg,#fff 0,#f2f7ff 100%);border-color:#a9c1eb;padding:26px 24px}
+.ds-mode-icon{width:44px;height:44px;border-radius:12px;background:#eff4fb;color:var(--cobalt);display:flex;align-items:center;justify-content:center}
+.ds-mode-card.primary .ds-mode-icon{background:var(--cobalt);color:#fff}
+.ds-mode-icon svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ds-mode-copy{display:flex;flex-direction:column;gap:4px}
+.ds-mode-t{font-size:17px;font-weight:700;color:var(--navy);letter-spacing:-.01em}
 .ds-mode-d{font-size:13px;color:var(--ink-dim);line-height:1.5}
+.ds-mode-go{font-size:20px;color:var(--cobalt);transition:transform 140ms ease}.ds-mode-card:hover .ds-mode-go{transform:translateX(3px)}
+.ds-mode-badge{display:inline-flex;width:max-content;margin-bottom:3px;padding:4px 8px;border-radius:999px;background:#e7f6ed;color:#087443;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:640px){.ds-mode-intro{align-items:flex-start;flex-direction:column}.ds-modes{grid-template-columns:1fr}.ds-mode-card.primary{grid-column:auto}.ds-mode-safe{white-space:normal}.ds-mode-card{padding:18px;grid-template-columns:40px 1fr auto}.ds-mode-icon{width:40px;height:40px}.ds-head{margin-bottom:24px}}
 /* PDF placement: zoom toolbar + page-nav (the stamp marker stays pointer-events:none) */
 .ds-zoom{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .ds-zoom button{font:inherit;padding:2px 10px;border:1px solid var(--ink-hair);background:#fff;border-radius:4px;cursor:pointer;line-height:1.4}
@@ -240,14 +268,6 @@
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
-
 <nav class="nav">
   <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
 
@@ -408,12 +428,12 @@
 <main id="main-content" role="main">
 <div class="ds-wrap">
   <header class="ds-head">
-    <p class="ds-kicker">ParaSign - post-quantum signature</p>
-    <h1 class="ds-title">Sign a document</h1>
-    <p class="ds-lede">Pick a document, place your signature where you want it, and sign locally. The document, the private key, and the signature never leave your browser unless you ask the relay to counter-sign.</p>
+    <p class="ds-kicker">ParaSign · secure document workflow</p>
+    <h1 class="ds-title">Get an important document signed.</h1>
+    <p class="ds-lede">Sign it yourself, work together or send it to others. Your document stays private and every completed signature comes with independently verifiable proof.</p>
   </header>
 
-  <ol class="ds-stepper" aria-label="Sign progress">
+  <ol class="ds-stepper" id="ds-stepper" aria-label="Sign progress" hidden>
     <li data-step="doc" class="active">Document</li>
     <li data-step="place">Place</li>
     <li data-step="recipients">Co-signers</li>
@@ -423,20 +443,22 @@
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
-    <h2>What do you want to do?</h2>
-    <p class="ds-sub">Choose how this document gets signed. You can start over anytime.</p>
+    <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">Choose a workflow. You can change it before sending.</p></div><span class="ds-mode-safe">Private key stays on your device</span></div>
     <div class="ds-modes">
+      <button type="button" class="ds-mode-card primary" data-mode="invite">
+        <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Recommended for business</span><span class="ds-mode-t">Request signatures</span><span class="ds-mode-d">Email a secure document to one or more people and follow their progress.</span></span>
+        <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
+      </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
-        <span class="ds-mode-t">Sign it myself</span>
-        <span class="ds-mode-d">Just my signature. Nothing to send.</span>
+        <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h5"/><path d="m6 16 9-9 3 3-9 9H6z"/></svg></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Sign it myself</span><span class="ds-mode-d">Add your signature and download the result immediately.</span></span>
+        <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="cosign">
-        <span class="ds-mode-t">Sign together</span>
-        <span class="ds-mode-d">I sign, and I invite others to add their signatures too.</span>
-      </button>
-      <button type="button" class="ds-mode-card" data-mode="invite">
-        <span class="ds-mode-t">Request signatures</span>
-        <span class="ds-mode-d">Send this document for others to sign. I’m not signing it myself.</span>
+        <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c.5-4 2-6 5-6s4.5 2 5 6"/><path d="M14 14c3-1 5 1 6 4"/></svg></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Sign together</span><span class="ds-mode-d">Sign first, then invite others to add their signatures.</span></span>
+        <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
     </div>
   </section>
@@ -523,13 +545,33 @@
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Add co-signers (optional)</h2>
-    <p class="ds-sub">Adding someone here makes this a multi-party signature. <strong>After you sign, you'll get a personal co-sign link for each person</strong> to send them yourself (along with the signed file). Each co-signer needs their email address here: the invite is cryptographically bound to it, so it must be the exact address they sign in with. Add no one to sign just for yourself.</p>
+    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. Paramant delivers the encrypted document with the request, so recipients do not need a separate copy.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
     <div class="ds-actions" style="margin-top:8px">
       <button class="btn btn-tertiary" id="ds-add-recipient" type="button">+ Add recipient</button>
     </div>
+
+    <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
+      <legend>Email invitation</legend>
+      <p class="ds-usage-p">Paramant emails each recipient a personal link. They must sign in with the invited email address before the document opens.</p>
+      <div class="ds-delivery-fields" id="ds-delivery-fields">
+        <label><span class="ds-label">Email subject</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
+        <label><span class="ds-label">Message (optional)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Add context, a reference or the requested deadline."></textarea></label>
+      </div>
+      <details class="ds-security-details">
+        <summary>Security settings</summary>
+        <label class="ds-delivery-option">
+          <input type="radio" name="ds-delivery-mode" value="email" checked>
+          <span><strong>Send invitations by email</strong><span>Recommended. The link works only for the invited Paramant account.</span></span>
+        </label>
+        <label class="ds-delivery-option">
+          <input type="radio" name="ds-delivery-mode" value="copy">
+          <span><strong>Create links without sending email</strong><span>No email is sent. You share each personal link yourself.</span></span>
+        </label>
+      </details>
+    </fieldset>
 
     <div class="ds-banner" id="ds-recipients-hint" hidden></div>
 
@@ -682,8 +724,10 @@
 
     <div class="ds-usage-card" id="ds-party-links-card" hidden>
       <h3 class="ds-proof-h">Share with your recipients</h3>
-      <p class="ds-usage-p">Each recipient signs at their own URL. Mail them the signed PDF + their personal link. Recipients verify the document hash locally before signing - their signature is added to the envelope on the relay.</p>
+      <p class="ds-usage-p" id="ds-party-links-copy">Each recipient gets a personal link. The encrypted document opens and is verified in their browser before signing is enabled.</p>
+      <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
       <div class="ds-party-links" id="ds-party-links"></div>
+      <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Retry failed emails</button>
       <p class="ds-usage-p" style="font-size:11px;color:var(--ink-dim)">Status of all parties is visible at any time via <a id="ds-envelope-status-link" href="#">the envelope status page</a>.</p>
     </div>
 
@@ -734,6 +778,6 @@
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=42"></script>
+<script type="module" src="/sign-flow.js?v=45"></script>
 </body>
 </html>

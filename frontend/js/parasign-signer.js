@@ -404,9 +404,17 @@ async function _postJSON(url, body) {
   if (!r.ok) { const e = new Error((data && data.error) || ('http_' + r.status)); e.status = r.status; e.data = data; throw e; }
   return data;
 }
-// Create the envelope (party 0 = self). Returns { envelope: { id, party_links, ... } }.
-export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey }) {
-  return _postJSON('/api/user/envelopes', { doc_hash: docHash, recipients: recipients || [], original_filename: originalFilename, signer_label: signerLabel, creator_public_key: creatorPublicKey });
+// Create the envelope. Self-sign/co-sign include the requester as party 0;
+// request-signatures sets includeRequester=false and contains recipients only.
+export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey, includeRequester = true }) {
+  return _postJSON('/api/user/envelopes', {
+    doc_hash: docHash,
+    recipients: recipients || [],
+    original_filename: originalFilename,
+    signer_label: signerLabel,
+    creator_public_key: creatorPublicKey,
+    include_requester: includeRequester,
+  });
 }
 // Authorize + issue the per-document activation (pre-unlock gate). Returns
 // { activation_id, email_hash, recipe_version }.

@@ -662,6 +662,42 @@ ${BASE_URL}`;
   };
 }
 
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, documentName, expiresAt, subject, message, envelopeId, partyIndex }) {
+  const safeSubject = String(subject || '').trim().slice(0, 140) || `Signature requested for ${documentName || 'a document'}`;
+  const greeting = recipientLabel ? `Hi ${recipientLabel},` : 'Hi,';
+  const sender = senderLabel || 'A Paramant user';
+  const expiry = expiresAt ? formatTS(expiresAt) : '7 days after creation';
+  const note = String(message || '').trim().slice(0, 1000);
+  const text = `${greeting}
+
+${sender} has asked you to review and sign ${documentName || 'a document'}.
+The document is encrypted. The complete personal link below opens it in your
+browser, verifies it against the signing request and enables signing.
+
+Review and sign:
+${inviteUrl}
+
+${note ? `Message from the sender:\n${note}\n\n` : ''}Sign in with this invited email address to open the document. Do not forward the link.
+Signing closes at ${expiry}.
+
+Paramant
+${BASE_URL}`;
+  const html = htmlShell(`Review and sign ${documentName || 'a document'} in Paramant.`, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signature requested</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(greeting)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(sender)}</strong> has asked you to review and sign <strong>${escHtml(documentName || 'a document')}</strong>.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The document is encrypted. The personal link opens it in your browser and verifies it against the signing request before signing is enabled.</p>
+    ${note ? `<div style="margin:20px 0;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;line-height:1.6;color:#334155;">${escHtml(note).replace(/\n/g, '<br>')}</div>` : ''}
+    ${btn(inviteUrl, 'Review and sign')}
+    <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>Sign in with this invited email address to open the document. Do not forward the link.</strong></p>
+    <p style="margin:0;color:#64748b;font-size:12px;">Signing closes at ${escHtml(expiry)}.</p>
+  `);
+  return {
+    ...wrap(text, html, { refId: 'sign-' + refIdHash(`${envelopeId}:${partyIndex}`) }),
+    subject: safeSubject,
+  };
+}
+
 async function sendEmail(to, templateResult) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('RESEND_API_KEY not set');
@@ -691,6 +727,7 @@ module.exports = {
   resetConfirmationEmail,
   welcomeEmail,
   parasignOnboardingEmail, /*MARK:parasign_export*/
+  signingInviteEmail,
   billingConfirmationEmail,
   productPlanChangeEmail,
   billingCancellationEmail,

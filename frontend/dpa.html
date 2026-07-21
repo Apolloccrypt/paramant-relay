@@ -305,15 +305,15 @@ input:focus{border-color:var(--cobalt)}
   </table>
 
   <h2 id="subject">2. Subject matter and scope</h2>
-  <p>This agreement governs the processing of personal data by PARAMANT on behalf of the Controller in connection with the PARAMANT relay service, including all sector relays: healthcare, legal, finance, IoT, and general.</p>
-  <p>PARAMANT acts exclusively as a processor. The Controller determines the purposes and means of processing. The subject matter is the secure, transient relay of encrypted files and associated metadata between authenticated parties.</p>
+  <p>This agreement governs the processing of personal data by PARAMANT on behalf of the Controller in connection with the PARAMANT relay and signing services, including all sector relays: healthcare, legal, finance, IoT, and general.</p>
+  <p>PARAMANT acts exclusively as a processor. The Controller determines the purposes and means of processing. The subject matter is secure relay of encrypted files, encrypted document delivery for signing requests and associated metadata between authenticated parties.</p>
 
   <h2 id="nature">3. Nature, purpose, and duration of processing</h2>
   <table>
     <tbody>
-      <tr><td>Nature</td><td>Transient encrypted relay — payloads stored in RAM only, destroyed after first retrieval (burn-on-read) or TTL expiry. No payload data written to disk.</td></tr>
-      <tr><td>Purpose</td><td>Secure point-to-point file transfer as instructed by the Controller</td></tr>
-      <tr><td>Duration</td><td>Coterminous with the service subscription. Payload data destroyed within TTL regardless (max 24h Professional, max 7 days Enterprise).</td></tr>
+      <tr><td>Nature</td><td>Ghost Pipe and ParaShare payloads are stored in RAM only and destroyed after retrieval or TTL expiry. ParaSign request documents are encrypted in the browser and may be persisted as ciphertext until the signing envelope expires.</td></tr>
+      <tr><td>Purpose</td><td>Secure point-to-point file transfer and encrypted delivery of documents for signing as instructed by the Controller</td></tr>
+      <tr><td>Duration</td><td>Coterminous with the service subscription. Transfer payloads are destroyed within their transfer TTL. ParaSign ciphertext and envelope records are destroyed at envelope expiry.</td></tr>
       <tr><td>Personal data categories</td><td>Any personal data embedded in transferred files (content encrypted, invisible to processor); API key contact email; device identifiers (hashed in CT log)</td></tr>
       <tr><td>Data subjects</td><td>Any natural persons whose data appears in files transferred via the service</td></tr>
     </tbody>
@@ -336,8 +336,8 @@ input:focus{border-color:var(--cobalt)}
   <table>
     <thead><tr><th>Sub-processor</th><th>Location</th><th>Purpose</th><th>Data transferred</th></tr></thead>
     <tbody>
-      <tr><td>Hetzner Online GmbH</td><td>Germany (NBG1)</td><td>Infrastructure hosting</td><td>Encrypted payloads in RAM only; no persistent writes of payload data to Hetzner storage</td></tr>
-      <tr><td>Resend Inc.</td><td>US (SCC applied)</td><td>Transactional email (API key delivery only)</td><td>Email address and API key on trial key request; no file content</td></tr>
+      <tr><td>Hetzner Online GmbH</td><td>Germany (NBG1)</td><td>Infrastructure hosting</td><td>Encrypted transfer payloads in RAM; encrypted ParaSign document capsules may persist until envelope expiry</td></tr>
+      <tr><td>Resend Inc.</td><td>US (SCC applied)</td><td>Transactional email, including optional signing invitations</td><td>Email address and message; for an optional signing invitation, the complete personal access link; no document plaintext</td></tr>
     </tbody>
   </table>
   <p>PARAMANT will notify the Controller at least 14 days in advance of any intended changes to sub-processors, giving the Controller the opportunity to object.</p>
@@ -351,7 +351,7 @@ input:focus{border-color:var(--cobalt)}
     <tbody>
       <tr><td>Encryption in transit</td><td>TLS 1.3 minimum on all relay endpoints</td></tr>
       <tr><td>End-to-end encryption of content</td><td>File payloads encrypted client-side with ML-KEM-768 + ECDH P-256 hybrid (NIST FIPS 203). Relay holds only ciphertext.</td></tr>
-      <tr><td>Encryption at rest</td><td>Not applicable — payloads never written to disk (RAM-only)</td></tr>
+      <tr><td>Encryption at rest</td><td>Ghost Pipe and ParaShare payloads remain RAM-only. ParaSign request documents are stored only as browser-encrypted AES-256-GCM capsules; the relay does not receive the decryption key.</td></tr>
       <tr><td>Data minimisation</td><td>Filenames not stored in plaintext (enc_meta ciphertext only); device IDs hashed SHA3-256 in CT log; no logging of payload content</td></tr>
       <tr><td>Access control</td><td>API key authentication on all relay endpoints; admin panel protected with TOTP MFA and per-IP rate limiting (5 attempts/min)</td></tr>
       <tr><td>Audit logging</td><td>Certificate Transparency log — transfer hashes and device key commitments, no payload content; tamper-evident Merkle tree</td></tr>

@@ -32,7 +32,10 @@ only the document hash.
 - **Signer (client):** holds a 32-byte ML-DSA-65 seed (the private key,
   mnemonic-derivable). Hashes the document locally with SHA3-256, signs the
   hash locally, and sends only `{document_hash, signature, public_key}` to the
-  relay. The private key and the document bytes never leave the client.
+  relay. The private signing key and document plaintext never leave the client.
+  A later request-signatures flow may persist a separately encrypted document
+  capsule until envelope expiry; this envelope format still carries hashes and
+  signatures only.
 - **Relay (notary):** verifies the signer's signature against the supplied
   public key and hash; if valid, appends a `parasign` entry to the CT log and
   counter-signs the full envelope with the relay-identity key

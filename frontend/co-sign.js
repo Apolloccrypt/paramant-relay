@@ -18,8 +18,9 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=12';
+import { LocalVaultSigner, buildDocSignMessage, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=13';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
+import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -103,8 +104,10 @@ async function init() {
     } catch {}
 
     renderEnvelope();
-    await prepareSigning();
     showStep('step-cosign');
+    await prepareSigning();
+    if (__session) await loadDeliveredDocument(envId, partyIndex);
+    else setDeliveryStatus('warn', 'Sign in with the invited email address to open this encrypted document.');
   } catch (e) {
     showError(e.message || 'Network error');
   }
@@ -203,7 +206,9 @@ async function prepareSigning() {
   __session = await loadSession();
   if (!__session) {
     setStatus('warn', 'Sign in as the recipient this invite was sent to, then return here to sign.');
-    const ret = encodeURIComponent(location.pathname + location.search);
+    // Preserve the fragment: it contains the document decryption key and is not
+    // sent to either Paramant or the identity provider.
+    const ret = encodeURIComponent(location.pathname + location.search + location.hash);
     showCta('<a class="btn" href="/auth/login?return=' + ret + '">Sign in to continue</a>');
     return;
   }
@@ -236,6 +241,55 @@ async function onVerifyFile(ev) {
   const f = ev.target.files && ev.target.files[0];
   if (!f) return;
   const buf = new Uint8Array(await f.arrayBuffer());
+  await verifyAndRenderDocument(buf, 'manual');
+}
+
+function setDeliveryStatus(kind, msg) {
+  const b = $('document-delivery-status');
+  if (!b) return;
+  b.hidden = false;
+  b.className = 'banner' + (kind ? ' ' + kind : '');
+  b.textContent = msg;
+}
+
+async function loadDeliveredDocument(envId, partyIndex) {
+  let key;
+  try { key = parseDocumentKeyFragment(location.hash); }
+  catch (e) {
+    setDeliveryStatus('err', e.message + ' Choose the document manually below.');
+    return;
+  }
+  if (!key) {
+    setDeliveryStatus('warn', 'This signing link does not contain an encrypted document key. Ask the sender for the complete link, or choose the document manually below.');
+    return;
+  }
+  key.fill(0); // decryptDocumentCapsule parses a fresh copy when it needs it.
+  setDeliveryStatus('', 'Downloading the encrypted document...');
+  try {
+    const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
+    const r = await fetch(url, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(60000) });
+    if (r.status === 401) throw new Error('Sign in with the invited email address to open this document.');
+    if (r.status === 403) throw new Error('This invitation belongs to a different email address. Sign in with the invited address.');
+    if (r.status === 404) throw new Error('The encrypted document is unavailable. It may be an older request or the link may be incomplete.');
+    if (r.status === 410) throw new Error('This signing request or its document has expired. Ask the sender for a new request.');
+    if (!r.ok) throw new Error('The encrypted document could not be downloaded (HTTP ' + r.status + ').');
+    const capsule = new Uint8Array(await r.arrayBuffer());
+    let delivered;
+    try {
+      delivered = await decryptDocumentCapsule({ capsule, fragment: location.hash, envelopeId: envId, docHash: __envelope.doc_hash });
+    } finally {
+      capsule.fill(0);
+    }
+    await verifyAndRenderDocument(delivered.bytes, 'delivery');
+    if (__hashMatches) {
+      setDeliveryStatus('ok', 'Encrypted document loaded, decrypted and matched to this signing request.');
+    }
+  } catch (e) {
+    setDeliveryStatus('err', (e.message || 'Automatic document loading failed.') + ' Choose the document manually below.');
+  }
+}
+
+async function verifyAndRenderDocument(buf, source) {
   const h = toHex(sha3_256(buf));
   __hashMatches = (h === __envelope.doc_hash);
   __blindAck = false;   // an opened file supersedes any earlier blind-sign override
@@ -243,7 +297,9 @@ async function onVerifyFile(ev) {
   b.hidden = false;
   if (__hashMatches) {
     b.className = 'banner ok';
-    b.textContent = 'Hash matches. This is the exact document in this envelope - what you see below is what you sign.';
+    b.textContent = source === 'delivery'
+      ? 'Hash matches. This is the document delivered with this signing request.'
+      : 'Hash matches. This is the exact document in this envelope - what you see below is what you sign.';
   } else {
     b.className = 'banner err';
     b.textContent = 'Hash mismatch. The file you opened differs from the one in this envelope - do not sign it. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';

@@ -16,10 +16,16 @@ function ok(name) { passed++; console.log('  ok -', name); }
 
 // ── minimal in-memory redis double (only the methods sign()/getForParty use) ──
 function fakeRedis(hash, evalResult) {
+  const values = new Map();
   return {
     isReady: true,
     async hGetAll() { return { ...hash }; },
     async hGet(_k, f) { return hash[f]; },
+    async hSet(_k, fields) { Object.assign(hash, fields); return 1; },
+    async ttl() { return 3600; },
+    async set(k, value) { values.set(k, value); return 'OK'; },
+    async get(k) { return values.get(k) || null; },
+    async del(k) { return values.delete(k) ? 1 : 0; },
     async scriptLoad() { return 'sha-stub'; },
     async evalSha() { return evalResult || ['new', '1', '1', 'complete']; },
   };
@@ -244,6 +250,36 @@ async function main() {
     assert.strictEqual((await emptyStore.sign(ID, 0, '', 'c2ln')).code, 'bad_signature', 'empty signer key rejected');
 
     ok('sign() open-mode signer binding blocks key substitution + legacy replay');
+  }
+
+  // 11. Envelope document delivery stores ciphertext only for the creator and
+  //     returns it only to a party holding the matching invite token.
+  {
+    const token = crypto.randomBytes(32).toString('base64url');
+    const account = 'acct_demo';
+    const capsule = crypto.randomBytes(128);
+    const capsuleHash = crypto.createHash('sha256').update(capsule).digest('hex');
+    const redis = fakeRedis({
+      id: ID, doc_hash: DOC, account_id: account, status: 'sent',
+      binding_mode: 'email', recipe_version: '3', created_at: new Date().toISOString(),
+      party_count: '1', signed_count: '0', p0_email_hash: EMAIL_HASH,
+      p0_status: 'pending', p0_invite_token: token,
+    });
+    const store = new EnvelopeStore(redis, {});
+    assert.strictEqual(await store.isOwner(ID, account), true, 'creator owns envelope');
+    assert.strictEqual(await store.isOwner(ID, 'acct_other'), false, 'different account does not own envelope');
+    assert.strictEqual((await store.putDocumentCapsule(ID, 'acct_other', capsule, capsuleHash)).code, 'not_owner', 'different account cannot upload');
+    assert.strictEqual((await store.putDocumentCapsule(ID, account, capsule, '0'.repeat(64))).code, 'hash_mismatch', 'incorrect capsule hash rejected');
+    const put = await store.putDocumentCapsule(ID, account, capsule, capsuleHash);
+    assert.strictEqual(put.ok, true, 'creator stores encrypted capsule');
+    assert.strictEqual((await store.getDocumentCapsule(ID, 0, 'wrong', EMAIL_HASH)).code, 'not_found', 'wrong invite token cannot read');
+    assert.strictEqual((await store.getDocumentCapsule(ID, 0, token, '0'.repeat(64))).code, 'not_authorized', 'wrong authenticated email cannot read');
+    const got = await store.getDocumentCapsule(ID, 0, token, EMAIL_HASH);
+    assert.strictEqual(got.ok, true, 'matching invite token and authenticated email read capsule');
+    assert.ok(got.capsule.equals(capsule), 'retrieved ciphertext is byte-identical');
+    await store.deleteDocumentCapsule(ID);
+    assert.strictEqual((await store.getDocumentCapsule(ID, 0, token, EMAIL_HASH)).code, 'not_found', 'deleted capsule is unavailable');
+    ok('document capsule is creator-write and recipient-identity-read');
   }
 }
 

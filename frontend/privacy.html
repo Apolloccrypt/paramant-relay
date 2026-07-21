@@ -280,7 +280,7 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: June 17, 2026</p>
+<p class="updated">Last updated: July 21, 2026</p>
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
@@ -291,11 +291,17 @@ footer a{color:var(--ink);text-decoration:none}
 <p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
 <p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
+<h2>How ParaSign document delivery works</h2>
+<p>When you request signatures, your browser encrypts the document with AES-256-GCM before upload. The signing relay stores the encrypted capsule with the envelope until its expiry. The relay does not receive document plaintext or the document key. The personal signing link contains the key in its URL fragment; browsers do not send that fragment to the relay.</p>
+<p>The recipient must also sign in with the exact invited email address. The link alone cannot retrieve the ciphertext. If you choose Paramant email delivery, Resend processes the recipient address, message and complete signing link. It does not receive document plaintext. You can instead create links without sending email.</p>
+
 <h2>What we process</h2>
 <table>
 <thead><tr><th>Data</th><th>Purpose</th><th>Storage</th><th>Shared</th></tr></thead>
 <tbody>
 <tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
+<tr><td>ParaSign encrypted document capsule</td><td>Deliver the document with a signing request</td><td>Redis &middot; expires with the envelope</td><td>Hosting provider stores ciphertext only</td></tr>
+<tr><td>Personal ParaSign invitation link</td><td>Bind one recipient to one encrypted document and signing slot</td><td>Processed during delivery; not written to application logs</td><td>Resend only when you choose email delivery</td></tr>
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
 <tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
@@ -316,7 +322,7 @@ footer a{color:var(--ink);text-decoration:none}
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
 <li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments when enabled, listed below)</li>
-<li>Write file data to disk at any point</li>
+<li>Write Ghost Pipe or ParaShare transfer payloads to disk. ParaSign request documents are different: their encrypted capsule may be persisted until the envelope expires.</li>
 <li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
 
@@ -347,7 +353,7 @@ footer a{color:var(--ink);text-decoration:none}
 <p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking:</p>
 <ul>
 <li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
-<li><strong>Resend</strong>: transactional email only (account verification, signing invites, billing notices). It receives the recipient address and the message we send; it is never used for marketing.</li>
+<li><strong>Resend</strong>: transactional email only (account verification, optional signing invites, billing notices). For a signing invite it receives the recipient address, message and complete personal link. Opening the encrypted document additionally requires the invited Paramant account. Resend does not receive document plaintext and is never used for marketing.</li>
 <li><strong>Mollie</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Mollie (a Dutch company, EU jurisdiction, GDPR-native) handles payment data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
 </ul>
 

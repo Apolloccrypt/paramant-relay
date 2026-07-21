@@ -5,9 +5,9 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Co-sign this envelope · Paramant</title>
-<meta name="description" content="Sign a multi-party envelope. Post-quantum (ML-DSA-65), zero-knowledge: the relay never sees the document or your private key.">
+<meta name="description" content="Review and sign an encrypted document with ML-DSA-65. The relay never sees document plaintext or your private key.">
 <meta property="og:title" content="Co-sign this envelope · Paramant">
-<meta property="og:description" content="Someone has asked you to co-sign this document. Add your post-quantum signature in your browser. The relay never sees the file or your private key.">
+<meta property="og:description" content="Someone has asked you to co-sign an encrypted document. Review and add your post-quantum signature in your browser.">
 <meta property="og:url" content="https://paramant.app/co-sign">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-cosign.png">
@@ -16,7 +16,7 @@
 <meta property="og:image:alt" content="Co-sign this envelope: a signed document with a post-quantum verified seal.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Co-sign this envelope · Paramant">
-<meta name="twitter:description" content="Someone has asked you to co-sign this document. Add your post-quantum signature in your browser. The relay never sees the file or your private key.">
+<meta name="twitter:description" content="Someone has asked you to co-sign an encrypted document. Review and add your post-quantum signature in your browser.">
 <meta name="twitter:image" content="https://paramant.app/og-cosign.png">
 <meta name="robots" content="noindex,nofollow">
 <link rel="canonical" href="https://paramant.app/co-sign">
@@ -107,7 +107,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-cosign">
   <h1>Co-sign envelope</h1>
-  <p class="sub">Sign your acknowledgement for this multi-party document. The signature is produced locally in your browser (ML-DSA-65). The relay only learns your public key and the resulting signature - never your private key, never the document bytes.</p>
+  <p class="sub">Review the delivered document and add your signature. Decryption and ML-DSA-65 signing happen locally. The relay receives ciphertext, your public key and the resulting signature, never document plaintext or your private key.</p>
 
   <div class="disclaimer">
     <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
@@ -137,8 +137,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Review what you are signing</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">The relay never received this document - by design it only holds the hash. Open the copy you were sent out-of-band so you can read exactly what you are about to sign. It is hashed locally (SHA3-256), matched against the envelope hash above, and rendered here in your browser. The file is never uploaded.</p>
-      <label class="file-cta" for="verify-file" id="verify-file-cta">Open the document (PDF, PNG or JPG) - never uploaded</label>
+      <p class="sub" style="margin-bottom:12px">The encrypted document is retrieved only after you sign in with the invited email address, then decrypted in this browser. Its SHA3-256 hash must match the signing request before signing is enabled. The relay does not receive the document key or plaintext.</p>
+      <div class="banner" id="document-delivery-status">Loading the encrypted document...</div>
+      <label class="file-cta" for="verify-file" id="verify-file-cta">Choose the document manually if automatic loading fails</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
       <div class="doc-preview" id="doc-preview" hidden></div>
@@ -196,6 +197,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/co-sign.js?v=17"></script>
+<script type="module" src="/co-sign.js?v=18"></script>
 </body>
 </html>

@@ -2049,7 +2049,7 @@ function setHeaders(res, req) {
   res.setHeader('Access-Control-Allow-Origin',  allowOrigin);
   res.setHeader('Vary',                         'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key, X-Dsa-Signature, X-Capsule-Sha256, Authorization, X-DID, X-DID-Signature, X-DID-TS, X-DID-Nonce');
   res.setHeader('Cache-Control',                'no-store, no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options',       'nosniff');
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
@@ -5584,6 +5584,87 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
+    }
+  }
+
+  // POST /v2/envelopes/:id/document -- creator uploads the browser-encrypted
+  // document capsule. The relay stores ciphertext only. Authorization is the
+  // envelope creator's account, resolved from its API key.
+  const envDocumentMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/document$/);
+  if (envDocumentMatch && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const maxCapsule = MAX_BLOB + 8192;
+    const declared = parseInt(req.headers['content-length'] || '0', 10);
+    if (declared > maxCapsule) { res.writeHead(413, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'document_too_large', max_bytes: MAX_BLOB })); }
+    try {
+      const capsule = await readBody(req, maxCapsule);
+      const capsuleSha256 = (req.headers['x-capsule-sha256'] || '').toString().trim().toLowerCase();
+      const out = await store.putDocumentCapsule(envDocumentMatch[1], acctOf(apiKey), capsule, capsuleSha256);
+      if (!out.ok) {
+        const status = out.code === 'not_owner' ? 403 : out.code === 'hash_mismatch' ? 400 : out.code === 'expired' ? 410 : 404;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: out.code }));
+      }
+      log('info', 'envelope_document_stored', { id: envDocumentMatch[1], bytes: out.size });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, sha256: out.sha256, size: out.size, expires_in: out.expires_in }));
+    } catch (e) {
+      const tooLarge = /too large/i.test(e.message || '');
+      res.writeHead(tooLarge ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: tooLarge ? 'document_too_large' : e.message, max_bytes: MAX_BLOB }));
+    }
+  }
+
+  // GET /v2/envelopes/:id/document -- ciphertext read requires both the invite
+  // capability and an internal assertion of the authenticated recipient email.
+  // A copied or intercepted link alone is therefore insufficient.
+  if (envDocumentMatch && req.method === 'GET') {
+    if (!_internalOk()) return _internalReject();
+    if (!envViewRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
+    const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
+    const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
+    try {
+      const out = await store.getDocumentCapsule(envDocumentMatch[1], pi, token, verifiedEmailHash);
+      if (!out.ok) {
+        const status = out.code === 'not_authorized' ? 403 : out.code === 'invite_expired' || out.code === 'voided' ? 410 : 404;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: out.code }));
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': out.capsule.length,
+        'Cache-Control': 'private, no-store',
+        'X-Capsule-Sha256': out.sha256,
+      });
+      return res.end(out.capsule);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // GET /v2/envelopes/:id/owner-check -- narrow account-ownership proof for
+  // authenticated services that send invitations. It reveals no envelope data.
+  const envOwnerMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/owner-check$/);
+  if (envOwnerMatch && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+    try {
+      if (!(await store.isOwner(envOwnerMatch[1], acctOf(apiKey)))) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'not_found' }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true }));
+    } catch {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'store_unavailable' }));
     }
   }
 

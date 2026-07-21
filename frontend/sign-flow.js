@@ -11,8 +11,9 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=12';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=13';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
+import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=1';
 
 // Read-only public relay host, used ONLY for the "view envelope status" link on
 // the done screen. The signing path itself is same-origin via the admin
@@ -63,6 +64,10 @@ const state = {
     docImageDataUrl: null, // pre-computed data: URL when doc is a viewable image
   },
   recipients: [],        // [{label, email}]; if empty -> single-party local sign only
+  deliveryMode: 'email', // invite flow: 'email' convenience or 'copy' zero-knowledge link sharing
+  inviteSubject: '',
+  inviteMessage: '',
+  inviteDelivery: null,  // { ok, failed_party_indexes, results }
   envelope: null,        // populated when recipients.length > 0 after POST /v2/envelopes
   result: null,          // { stampedBytes?, envelope, fingerprint }
 };
@@ -206,6 +211,7 @@ function setStepperForMode(mode) {
     invite: ['doc', 'recipients', 'sign'],
   }[mode] || ['doc', 'place', 'recipients', 'identity', 'sign'];
   document.querySelectorAll('.ds-stepper li').forEach(li => { li.hidden = !steps.includes(li.dataset.step); });
+  const stepper = $('ds-stepper'); if (stepper) stepper.hidden = false;
   const signLi = document.querySelector('.ds-stepper li[data-step="sign"]');
   if (signLi) signLi.textContent = (mode === 'invite') ? 'Send' : 'Sign';
 }
@@ -215,7 +221,46 @@ function enterRecipients() {
   const cont = $('ds-recipients-continue');
   if (cont) { cont.textContent = (state.signingMode === 'invite') ? 'Send for signature' : 'Continue'; cont.disabled = false; }
   const hint = $('ds-recipients-hint'); if (hint) hint.hidden = true;
+  const delivery = $('ds-invite-delivery');
+  if (delivery) delivery.hidden = state.signingMode !== 'invite';
+  if (state.signingMode === 'invite' && !state.inviteSubject && state.doc) {
+    state.inviteSubject = 'Please sign: ' + state.doc.name;
+    const subject = $('ds-invite-subject'); if (subject) subject.value = state.inviteSubject;
+  }
   renderRecipients();
+}
+
+function commitInviteDeliveryFromDom() {
+  const selected = document.querySelector('input[name="ds-delivery-mode"]:checked');
+  state.deliveryMode = selected ? selected.value : 'email';
+  state.inviteSubject = ($('ds-invite-subject')?.value || '').trim();
+  state.inviteMessage = ($('ds-invite-message')?.value || '').trim();
+}
+
+async function deliverInviteEmails(partyIndexes) {
+  const mp = state.result?.envelope?.multiparty;
+  if (!mp) throw new Error('The signing request is unavailable.');
+  const wanted = Array.isArray(partyIndexes) ? new Set(partyIndexes) : null;
+  const invitations = mp.party_links
+    .filter((p) => !wanted || wanted.has(p.party_index))
+    .map((p) => ({
+      party_index: p.party_index,
+      email: state.recipients[p.party_index]?.email || '',
+      label: state.recipients[p.party_index]?.label || '',
+      invite_url: location.origin + p.sign_path,
+    }));
+  const response = await fetch('/api/user/envelopes/' + encodeURIComponent(mp.envelope_id) + '/invitations', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invitations, subject: state.inviteSubject, message: state.inviteMessage }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (response.status !== 200 && response.status !== 207) {
+    const failed = invitations.map((item) => item.party_index);
+    return { ok: false, partial_failure: false, failed_party_indexes: failed, results: failed.map((party_index) => ({ party_index, ok: false })), error: body.error || 'email_delivery_failed' };
+  }
+  return body;
 }
 
 function showRecipientsHint(msg, isErr) {
@@ -224,9 +269,10 @@ function showRecipientsHint(msg, isErr) {
   el.textContent = msg; el.hidden = false; el.className = isErr ? 'ds-banner err' : 'ds-banner';
 }
 
-// Invite-to-sign: create the envelope WITHOUT the requester signing (party 0 is
-// the requester; they never run the activation). Recipients (parties 1..N) sign
-// at their own /co-sign links, shown on the done screen.
+// Invite-to-sign: the requester coordinates but is not a signer. The envelope
+// therefore contains recipients only. Its document is encrypted in this browser
+// and uploaded as an opaque capsule. The key is appended to each personal link
+// as a URL fragment, which never reaches the relay.
 async function sendForSignature() {
   const cont = $('ds-recipients-continue');
   if (cont) cont.disabled = true;
@@ -239,8 +285,49 @@ async function sendForSignature() {
       originalFilename: state.doc.name,
       signerLabel: 'Requester',
       creatorPublicKey: '',   // the requester does not sign
+      includeRequester: false,
     });
-    state.envelope = created.envelope;
+    const envelope = created.envelope;
+    showRecipientsHint('Encrypting the document for the recipients…', false);
+    const mime = state.mode === 'pdf' ? 'application/pdf'
+      : state.imageType === 'png' ? 'image/png'
+      : state.imageType === 'jpg' ? 'image/jpeg'
+      : 'application/octet-stream';
+    const encrypted = await encryptDocumentCapsule({
+      bytes: state.doc.bytes,
+      filename: state.doc.name,
+      mime,
+      envelopeId: envelope.id,
+      docHash: docHashForEnvelope,
+    });
+    showRecipientsHint('Uploading the encrypted document…', false);
+    let upload;
+    try {
+      upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelope.id) + '/document', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Capsule-Sha256': encrypted.capsuleSha256,
+        },
+        body: encrypted.capsule,
+      });
+    } finally {
+      encrypted.capsule.fill(0);
+    }
+    const uploadBody = await upload.json().catch(() => ({}));
+    if (!upload.ok) {
+      const err = new Error(uploadBody.error === 'document_too_large'
+        ? 'This document is too large for encrypted co-sign delivery (maximum 5 MB).'
+        : (uploadBody.error || 'Could not store the encrypted document.'));
+      err.status = upload.status;
+      throw err;
+    }
+    envelope.party_links = (envelope.party_links || []).map((p) => ({
+      ...p,
+      sign_path: p.sign_path + encrypted.fragment,
+    }));
+    state.envelope = envelope;
     state.result = {
       stampedBytes: null,
       fingerprint: '',
@@ -249,15 +336,23 @@ async function sendForSignature() {
         original_filename: state.doc.name,
         document_hash: docHashForEnvelope,
         multiparty: {
-          envelope_id: created.envelope.id,
-          party_count: created.envelope.party_count,
-          party_links: created.envelope.party_links,
-          expires_at: created.envelope.expires_at,
+          envelope_id: envelope.id,
+          party_count: envelope.party_count,
+          party_links: envelope.party_links,
+          expires_at: envelope.expires_at,
         },
         disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
       },
     };
+    commitInviteDeliveryFromDom();
+    if (state.deliveryMode === 'email') {
+      showRecipientsHint('Sending personal email invitations…', false);
+      state.inviteDelivery = await deliverInviteEmails();
+    } else {
+      state.inviteDelivery = null;
+    }
     showDone();
+    clearSensitiveDocState();
   } catch (e) {
     if (cont) cont.disabled = false;
     showRecipientsHint((e && e.status === 401) ? 'Please sign in first (open /auth/login), then return here.' : ((e && e.message) ? e.message : 'Could not create the request.'), true);
@@ -2850,14 +2945,22 @@ function clearSensitiveDocState() {
 // Invite-to-sign done screen: there is no signed document (the requester didn't
 // sign) — show the per-recipient signing links to share.
 function showDoneInvite(r) {
+  const delivery = state.inviteDelivery;
+  const emailMode = state.deliveryMode === 'email';
+  const emailOk = emailMode && delivery?.ok;
+  const emailPartial = emailMode && delivery && !delivery.ok;
   const sb = $('ds-success-banner');
   if (sb) {
-    sb.hidden = false; sb.className = 'ds-success';
-    sb.innerHTML = '<div class="ds-success-icon" aria-hidden="true">&#10003;</div>' +
-      '<div><strong>Signing request created.</strong> <span>Send each person their link below — they verify the document hash and sign on the relay. Nothing is uploaded.</span></div>';
+    sb.hidden = false; sb.className = emailPartial ? 'ds-banner err' : 'ds-success';
+    sb.innerHTML = emailPartial
+      ? '<strong>Request created, but not every email was delivered.</strong> Use Retry or copy the failed personal links below.'
+      : '<div class="ds-success-icon" aria-hidden="true">&#10003;</div>' +
+        `<div><strong>${emailOk ? 'Invitations sent.' : 'Signing request ready.'}</strong> <span>The encrypted document opens automatically and is decrypted only in each recipient's browser.</span></div>`;
   }
-  const h = document.querySelector('#step-done h2'); if (h) h.textContent = 'Sent for signature';
-  const sub = document.querySelector('#step-done .ds-sub'); if (sub) sub.textContent = 'Each signer below gets a personal link. Share it with them; follow progress on the envelope status page.';
+  const h = document.querySelector('#step-done h2'); if (h) h.textContent = emailOk ? 'Sent for signature' : 'Ready for signature';
+  const sub = document.querySelector('#step-done .ds-sub'); if (sub) sub.textContent = emailOk
+    ? 'Every recipient received a personal signing link by email. You can still copy a link below.'
+    : 'Each signer has a personal link containing the document key. Share the complete link and follow progress below.';
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
   ['ds-dl-pdf', 'ds-dl-psign'].forEach(id => { const el = $(id); if (el) el.hidden = true; });
   const info = document.querySelector('#step-done .ds-info-card'); if (info) info.hidden = true;
@@ -2871,17 +2974,41 @@ function renderPartyLinks(mp) {
   if (!card || !list) return;
   card.hidden = false;
   list.innerHTML = '';
-  // Skip party 0 (sender, already signed). Show 1..N.
-  const links = mp.party_links.filter(p => p.party_index > 0);
+  // A request-signatures envelope contains recipients only. A normal co-sign
+  // envelope contains the already-signed sender as party 0, so omit that link.
+  const inviteOnly = state.signingMode === 'invite';
+  const links = inviteOnly ? mp.party_links : mp.party_links.filter(p => p.party_index > 0);
   if (links.length === 0) { card.hidden = true; return; }
 
+  const result = $('ds-invite-delivery-result');
+  const retry = $('ds-invite-retry');
+  const deliveryByParty = new Map((state.inviteDelivery?.results || []).map((item) => [item.party_index, item]));
+  if (result) {
+    if (state.deliveryMode === 'copy') {
+      result.hidden = false; result.className = 'ds-banner';
+      result.textContent = 'Email delivery was not used. Copy each complete personal link below.';
+    } else if (state.inviteDelivery?.ok) {
+      result.hidden = false; result.className = 'ds-banner ok';
+      result.textContent = 'All email invitations were delivered to the mail provider.';
+    } else if (state.inviteDelivery) {
+      const failedCount = state.inviteDelivery.failed_party_indexes?.length || 0;
+      result.hidden = false; result.className = 'ds-banner err';
+      result.textContent = failedCount + ' email invitation' + (failedCount === 1 ? '' : 's') + ' could not be delivered. Retry or copy the personal link.';
+    } else {
+      result.hidden = true;
+    }
+  }
+  if (retry) retry.hidden = !(state.inviteDelivery?.failed_party_indexes?.length);
+
   for (const p of links) {
-    const recipient = state.recipients[p.party_index - 1] || { label: 'Recipient ' + p.party_index };
+    const recipientIndex = inviteOnly ? p.party_index : p.party_index - 1;
+    const recipient = state.recipients[recipientIndex] || { label: 'Recipient ' + (recipientIndex + 1) };
     const fullUrl = location.origin + p.sign_path;
+    const deliveryStatus = deliveryByParty.get(p.party_index);
     const row = document.createElement('div');
     row.className = 'ds-party-link-row';
     row.innerHTML =
-      `<div class="ds-pl-label">${escapeHtml(recipient.label)}${recipient.email ? '<div style="font-size:10px;color:var(--ink-dim);font-weight:400">' + escapeHtml(recipient.email) + '</div>' : ''}</div>` +
+      `<div class="ds-pl-label">${escapeHtml(recipient.label)}${recipient.email ? '<div style="font-size:10px;color:var(--ink-dim);font-weight:400">' + escapeHtml(recipient.email) + '</div>' : ''}${deliveryStatus ? '<div class="ds-invite-status ' + (deliveryStatus.ok ? 'ok' : 'err') + '">' + (deliveryStatus.ok ? 'Email sent' : 'Email failed') + '</div>' : ''}</div>` +
       `<div class="ds-pl-url" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>` +
       `<button class="ds-pl-copy" type="button">Copy link</button>`;
     const btn = row.querySelector('.ds-pl-copy');
@@ -2912,6 +3039,22 @@ function renderPartyLinks(mp) {
     statusLink.href = RELAY_PUBLIC + '/v2/envelopes/' + mp.envelope_id;
     statusLink.textContent = 'envelope ' + mp.envelope_id.slice(0, 10) + '... on the relay';
   }
+}
+
+async function retryFailedInviteEmails() {
+  const retry = $('ds-invite-retry');
+  const failed = state.inviteDelivery?.failed_party_indexes || [];
+  if (!failed.length) return;
+  if (retry) { retry.disabled = true; retry.textContent = 'Retrying…'; }
+  const retried = await deliverInviteEmails(failed);
+  const previous = new Map((state.inviteDelivery?.results || []).map((item) => [item.party_index, item]));
+  for (const item of retried.results || []) previous.set(item.party_index, item);
+  const results = Array.from(previous.values()).sort((a, b) => a.party_index - b.party_index);
+  const failed_party_indexes = results.filter((item) => !item.ok).map((item) => item.party_index);
+  state.inviteDelivery = { ok: failed_party_indexes.length === 0, partial_failure: failed_party_indexes.length > 0, failed_party_indexes, results };
+  if (retry) { retry.disabled = false; retry.textContent = 'Retry failed emails'; }
+  renderPartyLinks(state.result.envelope.multiparty);
+  showDoneInvite(state.result);
 }
 
 async function renderSignedPreview() {
@@ -2986,6 +3129,7 @@ function wireNav() {
   });
   $('ds-recipients-continue').addEventListener('click', () => {
     commitRecipientsFromDom();
+    commitInviteDeliveryFromDom();
     // Audit 1.1: every envelope is email-bound, so every co-signer needs a
     // valid email or their invite is a guaranteed dead end. Block here.
     const rErr = validateRecipients();
@@ -2998,6 +3142,11 @@ function wireNav() {
     }
   });
   $('ds-add-recipient').addEventListener('click', addRecipientRow);
+  document.querySelectorAll('input[name="ds-delivery-mode"]').forEach((radio) => radio.addEventListener('change', () => {
+    commitInviteDeliveryFromDom();
+    const fields = $('ds-delivery-fields'); if (fields) fields.hidden = state.deliveryMode !== 'email';
+  }));
+  const retryInvite = $('ds-invite-retry'); if (retryInvite) retryInvite.addEventListener('click', retryFailedInviteEmails);
   $('ds-identity-back').addEventListener('click', () => {
     if (state.signingMode === 'alone') setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only');
     else setActive('step-recipients');

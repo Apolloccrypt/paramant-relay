@@ -1,7 +1,9 @@
 // Multi-party envelope state machine (R-?) for ParaSign Model 2.
 //
-// The relay never sees the document. The creator's client computes
-// SHA3-256 over the original PDF and POSTs the hash + party list. Each
+// The relay never sees document plaintext. The creator's client computes
+// SHA3-256 over the original document and POSTs the hash + party list. For
+// delivered signing requests it may also store a browser-encrypted document
+// capsule whose decryption key exists only in the invite URL fragment. Each
 // party gets a co-sign URL, fetches the envelope, signs (ML-DSA-65) over
 // (sha3_256(doc_hash || envelope.id || party_index)), and POSTs the
 // signature back. The relay verifies, stores it atomically, and emits a
@@ -11,7 +13,8 @@
 // HSETNX (idempotency) or a Lua script (sign + completion check).
 //
 // Zero-knowledge invariants enforced here:
-//   * the relay only stores hex doc_hash, never document bytes
+//   * the relay stores hex doc_hash and, when delivery is enabled, ciphertext
+//     only; it never receives document plaintext or its decryption key
 //   * recipient signatures are verified server-side, but the relay never
 //     learns the private key (only the signature + public key)
 //   * unknown envelope IDs return a generic 404 (no leak distinguishing
@@ -32,6 +35,7 @@ const MAX_TTL_DAYS = 365;
 // envelope's created_at (= when the sender created it and sent the invites).
 // The record is still kept 30d for verification; only the signable window is 7d.
 const SIGN_INVITE_TTL_DAYS = 7;
+const DOCUMENT_CAPSULE_PREFIX = 'envdoc:';
 // Domain-separation label for ParaSign document signatures (recipe v3, R018 /
 // pentest H3). MUST stay byte-identical across relay + SDK + core.
 const SIGN_DOMAIN_DOC = 'paramant/parasign/doc/v1';
@@ -83,6 +87,13 @@ function safeHexEqual(a, b) {
 function safeTokenEqual(stored, provided) {
   if (!stored || typeof provided !== 'string' || provided.length === 0) return false;
   const a = Buffer.from(stored);
+  const b = Buffer.from(provided);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function safeTextEqual(stored, provided) {
+  if (!stored || typeof provided !== 'string' || provided.length === 0) return false;
+  const a = Buffer.from(String(stored));
   const b = Buffer.from(provided);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
@@ -368,6 +379,12 @@ class EnvelopeStore {
     };
   }
 
+  async isOwner(id, accountId) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const stored = await this.redis.hGet('env:' + id, 'account_id');
+    return safeTextEqual(stored, accountId);
+  }
+
   // Constant-time check of a per-party invite token against the stored value.
   async checkInviteToken(id, partyIndex, token) {
     if (!this.available()) throw new Error('redis unavailable');
@@ -551,6 +568,54 @@ class EnvelopeStore {
         signed_at: h['p' + pi + '_signed_at'] || null,
       },
     };
+  }
+
+  // Durable encrypted document delivery for a signing envelope. The browser
+  // encrypts before upload; Redis receives only an opaque capsule. The
+  // decryption key exists solely in the invite URL fragment and is never sent
+  // to this store. Storage expires with the envelope record.
+  async putDocumentCapsule(id, accountId, capsule, capsuleSha256) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!Buffer.isBuffer(capsule) || capsule.length === 0) throw new Error('document capsule required');
+    if (!/^[0-9a-f]{64}$/.test(String(capsuleSha256 || ''))) throw new Error('invalid capsule hash');
+    const envKey = 'env:' + id;
+    const h = await this.redis.hGetAll(envKey);
+    if (!h || !h.doc_hash) return { ok: false, code: 'not_found' };
+    if (!safeTextEqual(h.account_id, accountId)) return { ok: false, code: 'not_owner' };
+    const actual = crypto.createHash('sha256').update(capsule).digest('hex');
+    if (!safeHexEqual(actual, capsuleSha256)) return { ok: false, code: 'hash_mismatch' };
+    const ttl = await this.redis.ttl(envKey);
+    if (!Number.isFinite(ttl) || ttl <= 0) return { ok: false, code: 'expired' };
+    await this.redis.set(DOCUMENT_CAPSULE_PREFIX + id, capsule.toString('base64'), { EX: ttl });
+    await this.redis.hSet(envKey, {
+      document_capsule_sha256: actual,
+      document_capsule_size: String(capsule.length),
+      document_capsule_at: new Date().toISOString(),
+    });
+    return { ok: true, sha256: actual, size: capsule.length, expires_in: ttl };
+  }
+
+  async getDocumentCapsule(id, partyIndex, token, verifiedEmailHash) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const party = await this.getForParty(id, partyIndex, token);
+    if (!party) return { ok: false, code: 'not_found' };
+    if (!/^[0-9a-f]{64}$/.test(String(verifiedEmailHash || '')) || !safeHexEqual(party.party.email_hash, verifiedEmailHash)) {
+      return { ok: false, code: 'not_authorized' };
+    }
+    if (party.binding_mode === 'email' && party.sign_expires_at && Date.parse(party.sign_expires_at) < Date.now()) {
+      return { ok: false, code: 'invite_expired' };
+    }
+    if (party.status === 'void') return { ok: false, code: 'voided' };
+    const encoded = await this.redis.get(DOCUMENT_CAPSULE_PREFIX + id);
+    if (!encoded) return { ok: false, code: 'not_found' };
+    const capsule = Buffer.from(encoded, 'base64');
+    const sha256 = crypto.createHash('sha256').update(capsule).digest('hex');
+    return { ok: true, capsule, sha256 };
+  }
+
+  async deleteDocumentCapsule(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    await this.redis.del(DOCUMENT_CAPSULE_PREFIX + id);
   }
 
   async markViewed(id, partyIndex) {

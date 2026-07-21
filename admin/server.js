@@ -14,7 +14,7 @@ const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
-const { buildRecipientParties } = require('./lib/recipient-binding');
+const { buildRecipientParties, RECIPIENT_EMAIL_RE } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
 const { billingStubGone } = require('./lib/billing-stub');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
@@ -1533,8 +1533,13 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   const recipients = Array.isArray(req.body?.recipients) ? req.body.recipients : [];
   const originalFilename = (req.body?.original_filename || "").toString().slice(0, 200);
   const creatorPublicKey = (req.body?.creator_public_key || "").toString();
-  // Party 0 = the signer (self), bound to their verified session email.
-  const parties = [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }];
+  // Self-sign and co-sign include the requester as party 0. Request-signatures
+  // can explicitly omit them: the requester is then the owner/coordinator, not
+  // an unsigned party that would keep the envelope open forever.
+  const includeRequester = req.body?.include_requester !== false;
+  const parties = includeRequester
+    ? [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }]
+    : [];
   // Audit 1.1: every envelope is binding_mode:"email", so a co-signer slot with
   // an empty/invalid email hashes to a value the co-signer can never match ->
   // a guaranteed 403 dead end. Require a valid email per recipient and refuse
@@ -1542,6 +1547,7 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   const built = buildRecipientParties(recipients);
   if (built.error) return res.status(400).json({ error: built.error });
   for (const p of built.parties) parties.push(p);
+  if (parties.length === 0) return res.status(400).json({ error: "recipient_required" });
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
@@ -1555,6 +1561,151 @@ api.post("/user/envelopes", authUser, async (req, res) => {
     console.error("[user/envelopes POST]", e.message);
     return res.status(502).json({ error: "relay_unreachable" });
   }
+});
+
+// POST /api/user/envelopes/:id/document (authUser) -- forward an opaque,
+// browser-encrypted document capsule to the envelope's relay. application/octet-
+// stream deliberately bypasses the global JSON parser and gets a narrow limit.
+api.post("/user/envelopes/:id/document", authUser,
+  express.raw({ type: "application/octet-stream", limit: "6mb" }), async (req, res) => {
+    const id = (req.params.id || "").toString();
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "document_capsule_required" });
+    const capsuleSha256 = (req.headers["x-capsule-sha256"] || "").toString().trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(capsuleSha256)) return res.status(400).json({ error: "invalid_capsule_hash" });
+    try {
+      const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Capsule-Sha256": capsuleSha256,
+          "X-Api-Key": proxyApiKey(req.userSession),
+        },
+        body: req.body,
+        signal: AbortSignal.timeout(30000),
+      });
+      const body = await rr.json().catch(() => ({}));
+      if (!rr.ok) return res.status(rr.status).json({ error: body.error || "document_upload_failed", max_bytes: body.max_bytes });
+      return res.json(body);
+    } catch (e) {
+      console.error("[user/envelopes document POST]", e.message);
+      return res.status(502).json({ error: e.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+    }
+  });
+
+// GET /api/user/envelopes/:id/document -- authenticated recipient delivery.
+// The relay requires the invite capability plus this proxy's verified session
+// email assertion. The browser never sends its fragment key to either server.
+api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  const partyIndex = Number(req.query.p);
+  const token = (req.query.t || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ error: "invalid_invitation" });
+  }
+  const emailHash = partyEmailHashAdmin(req.userSession.email);
+  try {
+    const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+    if (!partyView.ok) return res.status(partyView.status === 410 ? 410 : 404).json({ error: "invitation_not_found" });
+    const env = (await partyView.json()).envelope;
+    if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
+      method: "GET",
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!rr.ok) {
+      const body = await rr.json().catch(() => ({}));
+      return res.status(rr.status).json({ error: body.error || "document_download_failed" });
+    }
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Cache-Control", "private, no-store");
+    const capsuleHash = rr.headers.get("x-capsule-sha256");
+    if (capsuleHash) res.setHeader("X-Capsule-Sha256", capsuleHash);
+    return res.send(Buffer.from(await rr.arrayBuffer()));
+  } catch (error) {
+    return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+  }
+});
+
+// POST /api/user/envelopes/:id/invitations -- optional convenience delivery.
+// The document stays encrypted, but email delivery necessarily processes the
+// complete personal URL, including its fragment key. The UI states this before
+// sending and keeps manual link sharing as the zero-knowledge alternative.
+api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
+  const invitations = Array.isArray(req.body?.invitations) ? req.body.invitations : [];
+  if (invitations.length < 1 || invitations.length > 20) return res.status(400).json({ error: "invalid_invitations" });
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `invite:ip:${ip}`, 40, 3600))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `invite:acct:${webauthn.scopeHash(req.userSession.user_id)}`, 60, 3600))) return res.status(429).json({ error: "rate_limited" });
+
+  try {
+    const owner = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/owner-check`, {
+      method: "GET",
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (owner.status === 404) return res.status(404).json({ error: "envelope_not_found" });
+    if (!owner.ok) return res.status(owner.status === 401 ? 401 : 502).json({ error: "owner_check_failed" });
+  } catch {
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+
+  const siteOrigin = new URL(SITE_URL).origin;
+  const checked = [];
+  for (const item of invitations) {
+    const email = (item?.email || "").toString().trim().toLowerCase().slice(0, 200);
+    const label = (item?.label || "").toString().trim().slice(0, 80);
+    const inviteUrlText = (item?.invite_url || "").toString().trim();
+    const partyIndex = Number(item?.party_index);
+    if (!RECIPIENT_EMAIL_RE.test(email) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || inviteUrlText.length > 2048) {
+      return res.status(400).json({ error: "invalid_invitation" });
+    }
+    let inviteUrl;
+    try { inviteUrl = new URL(inviteUrlText); }
+    catch { return res.status(400).json({ error: "invalid_invite_url" }); }
+    const token = inviteUrl.searchParams.get("t") || "";
+    const fragment = inviteUrl.hash.slice(1);
+    if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token) || !/^doc=v1\.[A-Za-z0-9_-]{43}$/.test(fragment)) {
+      return res.status(400).json({ error: "invalid_invite_url" });
+    }
+    let env;
+    try {
+      const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+      if (!partyView.ok) return res.status(400).json({ error: "invalid_invitation" });
+      env = (await partyView.json()).envelope;
+    } catch {
+      return res.status(502).json({ error: "relay_unreachable" });
+    }
+    if (!env?.party || env.party.email_hash !== partyEmailHashAdmin(email)) return res.status(400).json({ error: "recipient_mismatch" });
+    checked.push({ email, label, inviteUrl: inviteUrl.href, partyIndex, env });
+  }
+
+  const subject = (req.body?.subject || "").toString().trim().slice(0, 140);
+  const message = (req.body?.message || "").toString().trim().slice(0, 1000);
+  const senderLabel = req.userSession.email;
+  const results = await Promise.all(checked.map(async (item) => {
+    try {
+      await emailTemplates.sendEmail(item.email, emailTemplates.signingInviteEmail({
+        inviteUrl: item.inviteUrl,
+        recipientLabel: item.label,
+        senderLabel,
+        documentName: item.env.original_filename,
+        expiresAt: item.env.sign_expires_at,
+        subject,
+        message,
+        envelopeId: id,
+        partyIndex: item.partyIndex,
+      }));
+      return { party_index: item.partyIndex, ok: true };
+    } catch {
+      return { party_index: item.partyIndex, ok: false, error: "email_delivery_failed" };
+    }
+  }));
+  const failed = results.filter((item) => !item.ok).map((item) => item.party_index);
+  return res.status(failed.length ? 207 : 200).json({ ok: failed.length === 0, partial_failure: failed.length > 0, failed_party_indexes: failed, results });
 });
 
 // ── Per-document signing activation (R018: per-document PRF activation) ───────
@@ -1908,7 +2059,8 @@ api.delete("/user/developer/tool-config", authUser, developerGate, async (req, r
 api.post("/user/developer/parasign-keys", authUser, developerGate, async (req, res) => {
   const { user_id } = req.userSession;
   const body = { user_id, test: req.body && req.body.test === true };
-  if (req.body && typeof req.body.label === "string") body.label = req.body.label.slice(0, 80);
+  const requestedLabel = req.body && req.body.label;
+  if (typeof requestedLabel === "string") body.label = requestedLabel.slice(0, 80);
   try {
     const relayRes = await callRelay("/v2/user/parasign-keys", body, "POST");
     const out = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
@@ -3307,6 +3459,7 @@ app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'p
   app.use((err, req, res, next) => {
     console.error('[unhandled error]', err.message);
     if (res.headersSent) return next(err);
+    if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'payload_too_large' });
     res.status(500).json({ error: 'internal_error' });
   });
 

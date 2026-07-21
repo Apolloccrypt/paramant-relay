@@ -9,6 +9,8 @@
 
 Ghost Pipe is a zero-plaintext, burn-on-read file transport. The relay is an _untrusted intermediary_: it stores only encrypted ciphertext and has no access to keys or plaintext. This document explains the four-layer key verification system that protects transfers even when the relay is fully compromised.
 
+ParaSign signing requests use a separate delivery lifecycle. The sender's browser encrypts the document with AES-256-GCM and uploads an opaque capsule tied to the envelope. The capsule can persist until envelope expiry so recipients can reopen it and recover after refresh. The document key is in the invite URL fragment and is not sent in relay requests. Ciphertext retrieval requires both the invite token and an authenticated session for the exact invited email address. A copied link or a session alone is insufficient. Optional Paramant email delivery processes the complete link but cannot retrieve ciphertext without the recipient identity check.
+
 ---
 
 ## Threat model
