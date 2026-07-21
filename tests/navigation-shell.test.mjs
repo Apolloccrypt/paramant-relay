@@ -59,6 +59,32 @@ const publicMobileGeometry = await publicPage.evaluate(() => {
 ok('mobile menu has no technical strip or gap above it', publicMobileGeometry.metaDisplay === 'none' && publicMobileGeometry.navTop === 0 && Math.abs(publicMobileGeometry.menuTop - publicMobileGeometry.navBottom) < 0.5, JSON.stringify(publicMobileGeometry));
 ok('public mobile menu matches desktop without legacy groups', publicMobile.map((item) => item.toLowerCase()).join(',') === publicDesktop.map((item) => item.toLowerCase()).join(',') && await publicPage.locator('#nav-mobile .nav-mobile-group').count() === 0, publicMobile.join(', '));
 ok('public mobile menu fits the phone viewport', await publicPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await publicPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+await publicPage.locator('#nav-hamburger').click();
+await publicPage.evaluate(() => {
+  document.documentElement.style.scrollBehavior = 'auto';
+  window.scrollTo(0, 450);
+});
+await publicPage.waitForFunction(() => window.scrollY === 450);
+await publicPage.evaluate(() => document.querySelector('#nav-hamburger').click());
+await publicPage.waitForFunction(() => {
+  const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
+  const menu = document.querySelector('#nav-mobile')?.getBoundingClientRect();
+  return getComputedStyle(document.body).position === 'fixed' && nav && menu && Math.abs(menu.top - nav.bottom) < 0.5;
+});
+const scrolledMenuGeometry = await publicPage.evaluate(() => {
+  const nav = document.querySelector('nav.nav').getBoundingClientRect();
+  const menu = document.querySelector('#nav-mobile').getBoundingClientRect();
+  return {
+    navTop: nav.top,
+    navBottom: nav.bottom,
+    menuTop: menu.top,
+    bodyPosition: getComputedStyle(document.body).position,
+    bodyTop: getComputedStyle(document.body).top,
+  };
+});
+ok('mobile menu stays attached when opened after scrolling', scrolledMenuGeometry.navTop === 0 && Math.abs(scrolledMenuGeometry.menuTop - scrolledMenuGeometry.navBottom) < 0.5 && scrolledMenuGeometry.bodyPosition === 'fixed' && scrolledMenuGeometry.bodyTop === '-450px', JSON.stringify(scrolledMenuGeometry));
+await publicPage.evaluate(() => document.querySelector('#nav-hamburger').click());
+ok('closing the mobile menu restores the page position', await publicPage.evaluate(() => window.scrollY === 450 && getComputedStyle(document.body).position !== 'fixed'), await publicPage.evaluate(() => JSON.stringify({ scrollY:window.scrollY, bodyPosition:getComputedStyle(document.body).position })));
 await publicPage.close();
 
 const homePage = await browser.newPage({ viewport:{ width:390, height:844 } });

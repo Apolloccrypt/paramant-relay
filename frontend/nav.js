@@ -7,8 +7,17 @@
   var closeBtn  = document.querySelector('.nav-mobile-close');
 
   // ── Helpers ───────────────────────────────────────────
-  function lockScroll()   { document.body.classList.add('nav-locked'); }
-  function unlockScroll() { document.body.classList.remove('nav-locked'); }
+  var lockedScrollY = 0;
+  function lockScroll() {
+    lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.style.setProperty('--nav-lock-top', (-lockedScrollY) + 'px');
+    document.body.classList.add('nav-locked');
+  }
+  function unlockScroll() {
+    document.body.classList.remove('nav-locked');
+    document.body.style.removeProperty('--nav-lock-top');
+    window.scrollTo(0, lockedScrollY);
+  }
 
   // ── Desktop dropdowns ─────────────────────────────────
   var dropdowns = Array.from(document.querySelectorAll('nav.nav .nav-dropdown'));

@@ -408,7 +408,14 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 }
 
 /* Body scroll lock */
-body.nav-locked { overflow: hidden; }
+body.nav-locked {
+  position: fixed;
+  top: var(--nav-lock-top, 0);
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
 
 /* When the mobile menu is open, make the top strip + nav fully opaque so the
    page content behind them cannot bleed through the top. On iOS Safari the nav's
@@ -420,6 +427,12 @@ body.nav-locked .nav {
   background: var(--bone);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+body.nav-locked .nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 /* ════════════════════════════════════════
