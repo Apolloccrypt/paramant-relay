@@ -80,7 +80,7 @@ jobs:
       # Everything below binds to the immutable digest, never a mutable tag, so
       # the signature and SBOM describe exactly the bytes that were pushed.
       - name: Install cosign
-        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign image (keyless, Sigstore OIDC)
         env:
