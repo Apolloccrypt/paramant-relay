@@ -146,6 +146,39 @@ async function main() {
     ok('re-processing without a marker asks for the same grant (setter is idempotent)');
   }
 
+  // ── classification of a failed re-fetch decides Mollie's retry behaviour ────
+  {
+    const keyMissing = billing.classifyFetchError(new Error('mollie_key_missing:live'));
+    assert.strictEqual(keyMissing.retry, true, 'a missing key must still be retried once it is set');
+    assert.strictEqual(keyMissing.level, 'error', 'a missing key is an alert, not a warning');
+    assert.strictEqual(keyMissing.reason, 'mollie_key_missing');
+    ok('missing MOLLIE_API_KEY -> retryable, logged at error level');
+  }
+  {
+    const rejected = billing.classifyFetchError(Object.assign(new Error('mollie_get_failed'), { status: 401 }));
+    assert.strictEqual(rejected.retry, true);
+    assert.strictEqual(rejected.level, 'error', 'a rejected key must be as loud as a missing one');
+    ok('rejected Mollie key (401) -> retryable, error level');
+  }
+  {
+    for (const status of [404, 410, 422]) {
+      const permanent = billing.classifyFetchError(Object.assign(new Error('mollie_get_failed'), { status }));
+      assert.strictEqual(permanent.retry, false, `${status} can never resolve, so do not ask Mollie to retry`);
+      assert.strictEqual(permanent.level, 'warn');
+      assert.strictEqual(permanent.reason, `mollie_permanent:${status}`);
+    }
+    ok('unknown payment id (404/410/422) -> not retryable, acknowledged');
+  }
+  {
+    const transient = billing.classifyFetchError(Object.assign(new Error('mollie_get_failed'), { status: 502 }));
+    assert.strictEqual(transient.retry, true, 'a Mollie outage must be retried');
+    assert.strictEqual(transient.level, 'warn');
+    const timeout = billing.classifyFetchError(new Error('mollie_timeout'));
+    assert.strictEqual(timeout.retry, true, 'a timeout must be retried');
+    assert.strictEqual(timeout.reason, 'mollie_timeout');
+    ok('Mollie 5xx and timeout -> retryable, warn level');
+  }
+
   console.log(`\nPASS billing: ${passed} checks`);
 }
 

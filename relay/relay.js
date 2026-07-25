@@ -5142,7 +5142,14 @@ const server = http.createServer(async (req, res) => {
     let payment;
     try { payment = await mollie.getPayment(mode, paymentId); }
     catch (e) {
-      log('warn', 'billing_webhook_fetch_failed', { payment_id: paymentId, err: e.message, status: e.status });
+      const f = billing.classifyFetchError(e);
+      log(f.level, 'billing_webhook_fetch_failed', {
+        payment_id: paymentId, err: e.message, status: e.status, reason: f.reason, retry: f.retry });
+      if (!f.retry) {
+        // Permanent: acknowledge so Mollie stops retrying an event we can never
+        // resolve. Nothing was granted; the warn log above is the trail.
+        res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, ignored: 'unknown_payment' }));
+      }
       res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'fetch_failed' }));
     }
     const _rok = () => !!(redisClient && redisClient.isReady);
@@ -6355,6 +6362,15 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2',
       relay_identity: relayIdentity ? relayIdentity.pk_hash.slice(0,16)+'…' : 'none' });
+  // Say it once, loudly, at boot: without a key for the active billing mode
+  // every checkout and every webhook fails, and the only earlier symptom was a
+  // 503 on a public endpoint that nobody watches. Never log the key itself.
+  {
+    const _bm = mollie.billingMode();
+    const _bk = mollie.apiKeyFor(_bm);
+    log(_bk ? 'info' : 'error', 'billing_config', {
+      mode: _bm, key_present: !!_bk, key_prefix: _bk ? _bk.slice(0, 5) : null });
+  }
   // Register to the relay registry after a short delay to let the server fully bind
   if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
 });
