@@ -6,7 +6,14 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 FAIL=0
 
-INLINE=$(grep -rnoE '<script([[:space:]][^>]*)?>' --include=*.html frontend/ | grep -v 'src=' || true)
+# Uitzondering: een script-element met een type dat GEEN JavaScript-MIME-type is
+# (application/ld+json) is voor de browser een data-block. Het wordt nooit
+# uitgevoerd, dus script-src raakt het niet en het kan per definitie niet "dood"
+# zijn in de browser. Structured data MOET inline staan; een externe ld+json via
+# src bestaat niet. Alles wat wel JavaScript is, blijft verboden.
+INLINE=$(grep -rnoE '<script([[:space:]][^>]*)?>' --include=*.html frontend/ \
+  | grep -v 'src=' \
+  | grep -viE 'type=("|.)?application/ld\+json' || true)
 if [ -n "$INLINE" ]; then
   echo "FOUT: inline <script> gevonden (CSP script-src 'self' weigert dit):"
   echo "$INLINE"
