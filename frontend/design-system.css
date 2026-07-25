@@ -3050,3 +3050,10 @@ a.skip-link:focus-visible,
   color: var(--ink, #0B1622);
 }
 .pa-sign-note a { color: var(--cobalt, #1D4ED8); }
+
+/* Heading LEVEL vs heading SIZE. A page needs exactly one h1 for search engines
+   and screen readers, but the visual hierarchy does not always match the
+   document hierarchy. These two classes let the level be corrected without
+   changing how anything looks. */
+h2.paramant-h1 { font-size: var(--text-5xl); font-weight: 800; letter-spacing: -.035em; line-height: 0.94; }
+h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacing: -.02em; line-height: inherit; }
