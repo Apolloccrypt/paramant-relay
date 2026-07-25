@@ -81,4 +81,30 @@ async function processPayment(payment, deps) {
   return { result: 'ignored', level: 'info', account: accountId, product, reason: `status_${status}` };
 }
 
-module.exports = { processPayment };
+// A failed re-fetch of the payment is not one thing, and the answer decides
+// what Mollie does next. Mollie retries a webhook for about a day, so:
+//   - no API key, a rejected key, a 5xx or a timeout -> a retry can still land
+//     once the config or Mollie is fixed. Ask for one (503).
+//   - 404 / 410 / 422 -> this payment id will never resolve. A retry cannot
+//     help, so accept the event and stop the hammering (200).
+// Answering 503 for everything did both wrong: it kept Mollie retrying a
+// webhook that could never succeed, and it hid a missing MOLLIE_API_KEY behind
+// the same body as an id that simply does not exist. The wire body stays
+// 'fetch_failed' for every retryable case so a public prober learns nothing
+// about our config; the distinction lives in the log, at the right level.
+function classifyFetchError(err) {
+  const msg = (err && err.message) || '';
+  const status = err && err.status;
+  if (msg.startsWith('mollie_key_missing')) {
+    return { retry: true, level: 'error', reason: 'mollie_key_missing' };
+  }
+  if (status === 401 || status === 403) {
+    return { retry: true, level: 'error', reason: `mollie_key_rejected:${status}` };
+  }
+  if (status === 404 || status === 410 || status === 422) {
+    return { retry: false, level: 'warn', reason: `mollie_permanent:${status}` };
+  }
+  return { retry: true, level: 'warn', reason: status ? `mollie_${status}` : (msg || 'fetch_error') };
+}
+
+module.exports = { processPayment, classifyFetchError };
