@@ -5,7 +5,8 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>About &middot; PARAMANT</title>
-<meta name="description" content="Paramant is privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What the product is, how you can check it yourself, and the company behind it: Paramantis Solutions B.V.">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Paramant is privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What the product is, how you can check it yourself...">
 <meta property="og:title" content="About &middot; PARAMANT">
 <meta property="og:description" content="Privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What Paramant is, how to verify it, and the company behind it.">
 <meta property="og:url" content="https://paramant.app/about">
@@ -22,7 +23,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=19">
+<link rel="stylesheet" href="/design-system.css?v=22">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
@@ -46,6 +47,27 @@
 .person-card p + p{margin-top:var(--space-4)}
 @media(max-width:640px){.check-grid{grid-template-columns:1fr}}
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/about#webpage",
+      "url": "https://paramant.app/about",
+      "name": "About - PARAMANT",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Paramant is privacy-first, post-quantum document signing and encrypted transfer under EU jurisdiction. What the product is, how you can check it yourself..."
+    }
+  ]
+}
+</script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -220,7 +242,7 @@
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
-      <h2>About Paramant</h2>
+      <h1 class="paramant-h2">About Paramant</h1>
       <span class="mono-eyebrow">Company, mission, and how to check us</span>
     </div>
     <p class="about-lede">Paramant is privacy-first, post-quantum document signing and encrypted transfer, built to stay verifiable and to keep working under EU jurisdiction. You should not have to trust us. You should be able to check.</p>

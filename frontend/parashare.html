@@ -5,13 +5,14 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Encrypted file transfer · Paramant</title>
+<meta property="og:site_name" content="Paramant">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=20">
+<link rel="stylesheet" href="/design-system.css?v=22">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <link rel="stylesheet" href="/parapear.css?v=1">
@@ -253,6 +254,38 @@ select:focus{border-color:var(--cobalt)}
   .nav-help { display: none; }
 }
 </style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/parashare#webpage",
+      "url": "https://paramant.app/parashare",
+      "name": "Encrypted file transfer · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download."
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://paramant.app/parashare#software",
+      "name": "Paramant",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web browser",
+      "url": "https://paramant.app/parashare",
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -503,7 +536,7 @@ select:focus{border-color:var(--cobalt)}
 
 <!-- STEP 2: Waiting for receiver -->
 <div class="step" id="step-waiting">
-  <h1>Share this link</h1>
+  <h2 class="paramant-h1">Share this link</h2>
   <p class="sub">Send this link to the receiver. Their browser will generate a keypair. You'll see their fingerprint appear below &mdash; verify it with them before sending.</p>
   <div class="ps-guide">
     <span class="ps-guide-kicker">Step 2 of 5 &middot; Share</span>
@@ -545,7 +578,7 @@ select:focus{border-color:var(--cobalt)}
 
 <!-- STEP 3: Encrypting & uploading -->
 <div class="step" id="step-encrypting">
-  <h1>Encrypting &amp; sending</h1>
+  <h2 class="paramant-h1">Encrypting &amp; sending</h2>
   <p class="sub">File is being encrypted with the receiver's ML-KEM-768 public key. The relay will never see the plaintext or the key.</p>
   <div class="ps-guide">
     <span class="ps-guide-kicker">Step 4 of 5 &middot; Encrypt &amp; send</span>
@@ -565,7 +598,7 @@ select:focus{border-color:var(--cobalt)}
 <!-- STEP 4: Done -->
 <!-- Thunderbird FileLink download mode — shown when ?t=&n=&c=&r= + #k= are present -->
 <div class="step" id="step-tb-download">
-  <h1 id="tb-dl-title">Downloading…</h1>
+  <h2 class="paramant-h1" id="tb-dl-title">Downloading…</h2>
   <p class="sub" id="tb-dl-sub">Decrypting file — key never left your browser.</p>
   <div class="card">
     <div class="card-head"><div class="dot" id="tb-dl-dot"></div><div class="card-head-title">Secure FileLink Download</div></div>
@@ -590,7 +623,7 @@ select:focus{border-color:var(--cobalt)}
     </div>
   </aside>
 
-  <h1>Sent.</h1>
+  <h2 class="paramant-h1">Sent.</h2>
   <p class="sub">The receiver can now download the file. After one download it is permanently destroyed.</p>
 
   <div class="card">
