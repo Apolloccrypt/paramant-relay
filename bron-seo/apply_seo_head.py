@@ -98,7 +98,7 @@ def trim(text, limit=158):
     if len(text) <= limit:
         return text
     cut = text[:limit]
-    return cut.rsplit(" ", 1)[0].rstrip(",;:-") + "..."
+    return cut.rsplit(" ", 1)[0].rstrip(" ,;:-.") + "..."
 
 
 ORG = {
