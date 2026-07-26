@@ -2,19 +2,15 @@ name: sign-e2e
 
 # Functional test of the ParaSign signing subsystem in real Chromium with a
 # WebAuthn virtual authenticator (tests/sign-full.test.mjs). Self-contained: it
-# serves frontend/ and stubs /api, so no backend/Redis is needed. Path-gated so it
-# only runs when the signing frontend (or the test) changes.
+# serves frontend/ and stubs /api, so no backend/Redis is needed.
+#
+# No longer path-gated: this is a required status check, and a skipped check
+# never reports, so the pull request would wait on it forever.
 on:
   push:
-    paths:
-      - 'frontend/**'
-      - 'tests/sign-full.test.mjs'
-      - '.github/workflows/sign-e2e.yml'
+    branches: [main]
   pull_request:
-    paths:
-      - 'frontend/**'
-      - 'tests/sign-full.test.mjs'
-      - '.github/workflows/sign-e2e.yml'
+    branches: [main]
 
 jobs:
   sign-e2e:
