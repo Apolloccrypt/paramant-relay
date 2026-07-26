@@ -75,6 +75,45 @@ test('every module script is loaded with type="module"', () => {
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
 
+// Loading the module correctly is only half of it: its own imports must resolve
+// as the browser resolves them. A relative specifier is resolved against the
+// importing file, not against the page. When the inline block of parashare.html
+// was extracted to js/parashare.inline1.js during the CSP hardening (042b4c5,
+// 2026-07-02), its `./crypto-bridge.js` moved with it and started pointing at
+// /js/crypto-bridge.js, which does not exist. The import 404s, the module never
+// runs, window._cryptoBridge stays unset and parashare.page.js aborts with
+// "WASM crypto module not loaded". Sending a file, the core product, was dead
+// with no build error and nothing red in CI. ontvang.inline1.js survived only
+// because it imports the same file as /crypto-bridge.js, document-root absolute.
+const STATIC_IMPORT = /(?:^|\n)\s*(?:import\s[^'"]*?from\s*|import\s*)['"]([^'"]+)['"]/g;
+
+function jsFiles(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : jsFiles(full);
+    return entry.isFile() && entry.name.endsWith('.js') ? [full] : [];
+  });
+}
+
+test('every import inside a frontend module resolves to a file that exists', () => {
+  const offenders = [];
+  for (const file of jsFiles(FRONTEND)) {
+    if (!isModuleSource(file)) continue;
+    const src = fs.readFileSync(file, 'utf8');
+    for (const [, spec] of src.matchAll(STATIC_IMPORT)) {
+      if (/^(https?:)?\/\//.test(spec)) continue;               // third party
+      const clean = spec.split('?')[0].split('#')[0];
+      const target = clean.startsWith('/')
+        ? path.join(FRONTEND, clean)                             // document root
+        : path.resolve(path.dirname(file), clean);               // next to the importer
+      if (!fs.existsSync(target)) {
+        offenders.push(`${path.relative(FRONTEND, file)} imports '${spec}' -> ${path.relative(FRONTEND, target)} does not exist`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
+
 // The inverse mistake is cheap to catch here too: a page that declares
 // type="module" for a file with no module syntax is harmless but usually means
 // the file was meant to export something and does not.
