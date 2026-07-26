@@ -29,3 +29,12 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run signing functional suite
         run: node tests/sign-full.test.mjs
+
+      # Every other root suite that drives a browser. They import playwright, so
+      # the no-install unit job could never run them, and they were on no other
+      # workflow either: cosign appearance and delivery, the developer and user
+      # dashboards, the navigation shell, multi-verify and invite delivery had
+      # no CI at all. Selected by import, so a new browser suite is picked up
+      # here the day it is written. product-heartbeat has its own workflow.
+      - name: Browser suites
+        run: node --test $(grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat')
