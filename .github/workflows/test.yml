@@ -109,7 +109,10 @@ jobs:
       # Gates the ParaSign open-API conformance suite + key-issuance + pdf-ops that
       # previously ran in no workflow at all.
       - name: Root integration suites (no browser)
-        run: node --test $(grep -L "from 'playwright'" tests/*.mjs)
+        # transfer-canary is excluded too: it talks to the live relay, so it
+        # measures production, not this commit. It runs hourly in the
+        # product-heartbeat workflow.
+        run: node --test $(grep -L "from 'playwright'" tests/*.mjs | grep -v transfer-canary)
 
   admin-unit-tests:
     name: admin - unit suite
