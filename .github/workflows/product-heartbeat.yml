@@ -12,17 +12,17 @@ name: product-heartbeat
 # The July 2026 breaks (relative import 404, module loaded as classic script,
 # CSP-blocked signup) were all invisible to the Node suites and loud in a
 # browser console. This is the gate that sees them.
+#
+# Deliberately NOT path-gated. A required status check that is skipped never
+# reports, and a pull request then waits forever on a check that will not run.
+# A gate that only guards the changes it expects is not a gate: the ParaSend
+# break came from a CSP commit, and the signup break from an nginx rule. One
+# minute of CI per push buys a gate that is always there.
 on:
   push:
-    paths:
-      - 'frontend/**'
-      - 'tests/product-heartbeat.test.mjs'
-      - '.github/workflows/product-heartbeat.yml'
+    branches: [main]
   pull_request:
-    paths:
-      - 'frontend/**'
-      - 'tests/product-heartbeat.test.mjs'
-      - '.github/workflows/product-heartbeat.yml'
+    branches: [main]
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -52,6 +52,9 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
@@ -64,6 +67,56 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Heartbeat against paramant.app
-        run: node --test tests/product-heartbeat.test.mjs
+        id: beat
+        # shell: bash sets pipefail. Without it the pipe into tee would hand the
+        # step tee's exit code and every failure would be reported as green.
+        shell: bash
+        run: node --test tests/product-heartbeat.test.mjs 2>&1 | tee /tmp/heartbeat.log
         env:
           PARAMANT_BASE_URL: https://paramant.app
+
+      # An hourly job that turns red in a tab nobody opens is not an alarm. A
+      # red run opens an issue with the failing output; a green run closes it
+      # again, so the issue list tracks the site instead of collecting noise.
+      - name: Open an issue when production is down
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('/tmp/heartbeat.log', 'utf8').split('\n')
+              .filter(l => /^(✖|not ok|  AssertionError|ℹ fail)/.test(l)).slice(0, 40).join('\n');
+            const title = 'Production heartbeat is failing';
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'heartbeat',
+            });
+            const body = [
+              `The hourly heartbeat against https://paramant.app failed.`,
+              ``,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ``,
+              '```',
+              log || 'see the run log',
+              '```',
+            ].join('\n');
+            if (open.data.length) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['heartbeat'] });
+            }
+
+      - name: Close the issue when production is healthy again
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'heartbeat',
+            });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: `Heartbeat green again as of run ${context.runId}. Closing.`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed' });
+            }

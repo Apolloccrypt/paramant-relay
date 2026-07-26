@@ -71,6 +71,16 @@ jobs:
         working-directory: relay
         run: node --test $(find crypto -name '*.test.js')
 
+      # inbound-hash-verify spawns a real relay.js, so it needs the installed
+      # dependencies and belongs here, not in the no-install unit job. It sat in
+      # that job from 2026-07-20 and failed every single run with "relay did not
+      # become healthy in time", which is what a missing `redis` module looks
+      # like through a spawn with stdio ignored. Thirty red runs in a row on
+      # main, and a suite nobody trusts is a suite nobody reads.
+      - name: Relay integration suite (needs deps)
+        working-directory: relay
+        run: node --test test/inbound-hash-verify.test.js
+
   relay-unit-tests:
     name: relay - unit suite (no native deps)
     runs-on: ubuntu-latest
@@ -82,17 +92,24 @@ jobs:
       # Pure-JS units: account-split schema (keys-table), static-serve, envelope
       # binding, webauthn helpers. No @paramant/core build and no Redis, so the
       # relay/test suite that previously had zero CI coverage now gates here.
+      # inbound-hash-verify is excluded: it spawns a real relay.js and needs the
+      # installed dependencies, so it runs in the crypto job above.
       - name: Relay unit suite
         working-directory: relay
-        run: node --test test/*.test.js
+        run: node --test $(ls test/*.test.js | grep -v inbound-hash-verify)
 
       # Root integration suites (tests/*.mjs): dependency-injected, node builtins
-      # only (no @paramant/core, no Redis, no npm install). Excludes the Playwright
-      # browser e2e (sign-full, vault-filename), which run in the sign-e2e workflow.
+      # only (no @paramant/core, no Redis, no npm install). The browser suites are
+      # excluded by what they import, not by a hand-kept list of names: this job
+      # installs nothing, so a file importing playwright can only fail here. That
+      # list had drifted, and six suites (cosign x2, developer dashboard,
+      # navigation shell, multi-verify, invite delivery, user dashboard) were
+      # failing on every run because they were never on it. They now run in the
+      # sign-e2e workflow, which installs Chromium.
       # Gates the ParaSign open-API conformance suite + key-issuance + pdf-ops that
       # previously ran in no workflow at all.
       - name: Root integration suites (no browser)
-        run: node --test $(ls tests/*.mjs | grep -vE 'sign-full|vault-filename')
+        run: node --test $(grep -L "from 'playwright'" tests/*.mjs)
 
   admin-unit-tests:
     name: admin - unit suite

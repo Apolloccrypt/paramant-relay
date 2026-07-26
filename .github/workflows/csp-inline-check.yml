@@ -1,9 +1,10 @@
 name: CSP inline-script check
 
+# Not path-gated: this is a required status check, and a skipped check never
+# reports, so the pull request would wait on it forever. The scan takes seconds.
 on:
   pull_request:
-    paths:
-      - 'frontend/**'
+    branches: [main]
   push:
     branches: [main]
 
