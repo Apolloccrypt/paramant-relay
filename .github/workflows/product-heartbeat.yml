@@ -75,6 +75,18 @@ jobs:
         env:
           PARAMANT_BASE_URL: https://paramant.app
 
+      # The heartbeat proves the pages initialise; the canary proves the product
+      # works: a real blob through the real relay, back byte for byte, then gone.
+      # It covers what a browser cannot see, the relay process, nginx, the rate
+      # limits, the CT append. always() so a dead page never hides a dead relay.
+      - name: Transfer canary against the live relay
+        if: always()
+        shell: bash
+        run: node --test tests/transfer-canary.test.mjs 2>&1 | tee -a /tmp/heartbeat.log
+        env:
+          PARAMANT_RELAY_URL: https://relay.paramant.app
+          PARAMANT_API_KEY: ${{ secrets.PARAMANT_CANARY_KEY }}
+
       # An hourly job that turns red in a tab nobody opens is not an alarm. A
       # red run opens an issue with the failing output; a green run closes it
       # again, so the issue list tracks the site instead of collecting noise.
