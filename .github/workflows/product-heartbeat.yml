@@ -1,0 +1,69 @@
+name: product-heartbeat
+
+# Does the site still DO anything, in a real browser (tests/product-heartbeat.test.mjs).
+#
+# Runs twice, on purpose:
+#   build   on every frontend change, against the checkout. Catches a break
+#           before it is merged.
+#   live    hourly and on demand, against https://paramant.app. Catches a break
+#           that only exists on production: a half-finished deploy, an nginx
+#           rule, a file in the docroot that no longer matches the commit.
+#
+# The July 2026 breaks (relative import 404, module loaded as classic script,
+# CSP-blocked signup) were all invisible to the Node suites and loud in a
+# browser console. This is the gate that sees them.
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - 'tests/product-heartbeat.test.mjs'
+      - '.github/workflows/product-heartbeat.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'tests/product-heartbeat.test.mjs'
+      - '.github/workflows/product-heartbeat.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: heartbeat — this checkout
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps (browsers installed separately)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Heartbeat against frontend/
+        run: node --test tests/product-heartbeat.test.mjs
+
+  live:
+    name: heartbeat — production
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps (browsers installed separately)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Heartbeat against paramant.app
+        run: node --test tests/product-heartbeat.test.mjs
+        env:
+          PARAMANT_BASE_URL: https://paramant.app
