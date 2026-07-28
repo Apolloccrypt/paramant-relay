@@ -113,7 +113,9 @@ ok('placement draft stores coordinates only for refresh recovery', /"type":"seal
 if (process.env.PARAMANT_COSIGN_SCREENSHOT_PATH) await page.screenshot({ path:process.env.PARAMANT_COSIGN_SCREENSHOT_PATH, fullPage:true });
 const renderedPdf = await page.evaluate(async () => {
   const raw = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((value) => value && value.includes('"fields"'));
-  const mod = await import('/co-sign.js?v=19');
+  // Read the url off the page: a repeated ?v= here becomes a second module
+  // instance the day co-sign.html bumps its cache-buster.
+  const mod = await import(document.querySelector('script[src*="co-sign.js"]').getAttribute('src'));
   const bytes = await mod.buildSignedPdf({ appearance: JSON.parse(raw), signed_at: '2026-07-21T12:00:00.000Z' });
   const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
   const text = (await (await pdf.getPage(1)).getTextContent()).items.map((item) => item.str).join(' ');

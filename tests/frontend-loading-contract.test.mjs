@@ -197,7 +197,53 @@ test('no page references a local asset with a relative path', () => {
     `  leading slash.\n\n  ` + sins.join('\n  ') + '\n');
 });
 
-// ── 4. every local script a page loads actually exists ───────────────────────
+// ── 4. tests never hardcode a cache-buster ───────────────────────────────────
+
+// A module's identity is its full url, query string included. Load the same
+// file under two different ?v= values and you get two INSTANCES, each with its
+// own state. Whoever holds the wrong one is talking to a module nobody else
+// uses, and it fails as "why is this null".
+//
+// That is not theory. tests/sign-full.test.mjs imported '/sign-flow.js?v=48'
+// while sign.html had moved to ?v=49, so buildStampedPdf ran on a fresh
+// instance that had never opened a document. One red CI run, 2026-07-28.
+//
+// So: one file, one cache-buster, everywhere. Bump it in one place and every
+// reference has to follow, which is exactly the coupling we want to be loud.
+test('each frontend file uses one and the same ?v= everywhere', () => {
+  const ROOT = path.join(FRONTEND, '..');
+  const REF = /['"`](\/[\w./-]+\.(?:js|mjs|css))\?v=(\d+)/g;
+  const seen = new Map();                                       // path -> Map(v -> [where])
+
+  const scan = (file, label) => {
+    for (const m of strip(fs.readFileSync(file, 'utf8')).matchAll(REF)) {
+      if (!seen.has(m[1])) seen.set(m[1], new Map());
+      const byV = seen.get(m[1]);
+      if (!byV.has(m[2])) byV.set(m[2], new Set());
+      byV.get(m[2]).add(label);
+    }
+  };
+  for (const f of pages) scan(f, rel(f));
+  for (const f of ourScripts) scan(f, rel(f));
+  for (const f of fs.readdirSync(path.join(ROOT, 'tests')).filter((n) => n.endsWith('.mjs'))) {
+    scan(path.join(ROOT, 'tests', f), `tests/${f}`);
+  }
+
+  const sins = [];
+  for (const [file, byV] of seen) {
+    if (byV.size < 2) continue;
+    const detail = [...byV].map(([v, where]) => `v=${v} in ${[...where].join(', ')}`).join('  |  ');
+    sins.push(`${file}: ${detail}`);
+  }
+  assert.deepEqual(sins.sort(), [],
+    `\n  Two cache-busters for one file means two module instances with separate\n` +
+    `  state. Pick one value and use it everywhere. In a test, the safest form is\n` +
+    `  to read the url off the page rather than repeat it:\n` +
+    `    await import(document.querySelector('script[src*="thing.js"]').getAttribute('src'))\n\n  ` +
+    sins.join('\n  ') + '\n');
+});
+
+// ── 5. every local script a page loads actually exists ───────────────────────
 
 test('every local script tag resolves to a file that exists', () => {
   const sins = [];
