@@ -109,6 +109,35 @@ progress: () => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test(
 Verified to fail on the broken code before it was written into a passing state.
 A gate that was never seen failing is not a gate.
 
+## Rule 4 — one file, one cache-buster
+
+A module's identity is its **full URL, query string included**. Load the same
+file under two `?v=` values and the browser gives you two *instances*, each with
+its own state. Whoever holds the wrong one is talking to a module nobody else
+uses.
+
+```js
+// sign.html loads /sign-flow.js?v=49
+const mod = await import('/sign-flow.js?v=48');   // ✗ a second, empty instance
+```
+
+That is what turned `sign-e2e` red the moment the cache-busters were bumped:
+`buildStampedPdf` ran on an instance that had never opened a document, and it
+surfaced as `Cannot read properties of null (reading 'pageIndex')` — nowhere
+near the cause. Checking for it found two older cases that had been sitting
+there for weeks: `sign-full` drove `parasign-signer.js` at `v=11` and `vault.js`
+at `v=4` while the application had moved to `v=14` and `v=5`.
+
+In a test, do not repeat the URL at all. Read it off the page:
+
+```js
+await import(document.querySelector('script[src*="sign-flow.js"]').getAttribute('src'));
+```
+
+The gate requires a single `?v=` per file across `frontend/` and `tests/`. Bump
+it in one place and every reference has to follow, which is the point: the
+coupling exists either way, so make it loud.
+
 ## Where each rule is enforced
 
 | Rule | Gate | Cost | Runs in |
@@ -116,6 +145,7 @@ A gate that was never seen failing is not a gate.
 | Sticky readiness | `frontend-loading-contract.test.mjs` | ~200 ms, no browser | Root integration suites |
 | ready.js loaded first and blocking | `frontend-loading-contract.test.mjs` | ~200 ms | Root integration suites |
 | Absolute paths in entry points | `frontend-loading-contract.test.mjs` | ~200 ms | Root integration suites |
+| One cache-buster per file | `frontend-loading-contract.test.mjs` | ~200 ms | Root integration suites |
 | Modules loaded as modules | `frontend-module-scripts.test.mjs` | ~100 ms | Root integration suites |
 | The page actually works | `product-heartbeat.test.mjs` | ~20 s, Chromium | product-heartbeat, hourly against production |
 
