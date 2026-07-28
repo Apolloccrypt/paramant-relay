@@ -49,8 +49,11 @@ async function genFingerprint(kyberPubHex, ecdhPubHex) {
 const params = new URLSearchParams(location.search);
 const sessionToken = params.get('s');
 const RELAY_API = RELAY_SECTORS[params.get('r')] || RELAY_SECTORS.health;
-if (!sessionToken || !/^inv_[a-zA-Z0-9]{32}$/.test(sessionToken)) {
-  window.addEventListener('mlkem-ready', () => showError('Invalid or missing session token'));
+const tokenValid = !!sessionToken && /^inv_[a-zA-Z0-9]{32}$/.test(sessionToken);
+if (!tokenValid) {
+  // A bad link is a bad link whether or not the crypto library ever arrives, so
+  // say so now instead of waiting on a signal that may never come.
+  showError('Invalid or missing session token');
 }
 
 // ── State ──
@@ -61,7 +64,19 @@ let ws = null;
 
 // ── Main flow ──
 async function init() {
-  // Guard: if ML-KEM library failed to load, refuse to proceed
+  // Wait for the ML-KEM library, however late it arrives. This used to be a
+  // bare 'mlkem-ready' listener, which never fired for us: the loader is a
+  // module higher up the page, so it announced itself before this deferred file
+  // had registered anything, and receiving a file hung on "Generating
+  // keypair..." for three weeks. ready.within() is sticky, so the order of the
+  // two scripts no longer decides whether the product works.
+  try {
+    await window.ready.within('mlkem', 20000, 'ML-KEM-768 library');
+  } catch {
+    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
+    return;
+  }
+  // Loaded, but is it the real thing? Refuse to fall back to weaker crypto.
   if (typeof ml_kem768 === 'undefined' || !ml_kem768?.keygen) {
     showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
     return;
@@ -353,8 +368,8 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
   showStep('step-done');
   if (ws) ws.close();
 }
-window.addEventListener('mlkem-ready', () => {
-  if (sessionToken) init();
-});
+// init() waits for the ML-KEM library itself, so there is nothing to listen for
+// and no event left to miss.
+if (tokenValid) init();
 
 act('click','reload',()=>location.reload());

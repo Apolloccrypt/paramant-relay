@@ -73,9 +73,9 @@ CRED_ID = await page.evaluate(async () => {
 });
 
 const phase1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=11');
+  const m = await import('/js/parasign-signer.js?v=14');
   const pqc = await import('/vendor/paramant-pqc.js');
-  const vault = await import('/vendor/vault.js?v=4');
+  const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const eqU8 = (a,b) => a.length===b.length && a.every((x,i)=>x===b[i]);
   const hex = (u8) => Array.from(u8).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -120,9 +120,9 @@ const phase1 = await page.evaluate(async () => {
 
 // Phase 2a: ensureSigningKey branching + ephemeral TOTP enrol (admin stubbed ok).
 const phase2a = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=11');
+  const m = await import('/js/parasign-signer.js?v=14');
   const pqc = await import('/vendor/paramant-pqc.js');
-  const vault = await import('/vendor/vault.js?v=4');
+  const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   const base = { envelopeId:'env_test_000000000001', docHash:'a'.repeat(64), partyIndex:0, emailHash:'' };
@@ -146,14 +146,14 @@ const phase2a = await page.evaluate(async () => {
 // Phase 2b: TOTP enrol error mapping (admin stub returns relay 403s).
 totpResp = { status: 403, body: { error: 'invalid_totp' } };
 const phase2b1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=11');
+  const m = await import('/js/parasign-signer.js?v=14');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J1 relay 403 invalid_totp -> totp_invalid', c==='totp_invalid', c);
   return T;
 });
 totpResp = { status: 403, body: { error: 'no_totp_setup' } };
 const phase2b2 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=11');
+  const m = await import('/js/parasign-signer.js?v=14');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J2 relay 403 no_totp_setup -> totp_unavailable', c==='totp_unavailable', c);
   return T;
@@ -163,7 +163,7 @@ totpResp = { status: 200, body: { ok: true } };
 // Phase 2c: server 409 no_passkey path.
 noPasskeyMode = true;
 const phase2c = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=11');
+  const m = await import('/js/parasign-signer.js?v=14');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   await delDB();
@@ -216,7 +216,11 @@ const phase4 = await page.evaluate(async () => {
   for (let i = 0; i < 200 && document.getElementById('step-place').hidden; i++) await sleep(20);
   document.getElementById('ds-seal-sheet').click();
   const sheetPreview = document.querySelector('.ds-signature-sheet-preview');
-  const mod = await import('/sign-flow.js?v=48');
+  // Import the exact url the page loaded. A hardcoded ?v= silently becomes a
+  // SECOND module instance the moment sign.html bumps its cache-buster, with
+  // its own empty state, and buildStampedPdf then stamps a document nobody
+  // opened. Cost one red CI run on 2026-07-28 to find.
+  const mod = await import(document.querySelector('script[src*="sign-flow.js"]').getAttribute('src'));
   const output = await mod.buildStampedPdf(sourceBytes, null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const outPdf = await window.PDFLib.PDFDocument.load(output);
   const rendered = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
@@ -347,7 +351,11 @@ const datePdf = await page.evaluate(async () => {
   document.getElementById('ds-seal-sheet').click();
   const source = await window.PDFLib.PDFDocument.create();
   source.addPage([300, 400]).drawText('Tool export proof', { x: 30, y: 350, size: 14 });
-  const mod = await import('/sign-flow.js?v=48');
+  // Import the exact url the page loaded. A hardcoded ?v= silently becomes a
+  // SECOND module instance the moment sign.html bumps its cache-buster, with
+  // its own empty state, and buildStampedPdf then stamps a document nobody
+  // opened. Cost one red CI run on 2026-07-28 to find.
+  const mod = await import(document.querySelector('script[src*="sign-flow.js"]').getAttribute('src'));
   const output = await mod.buildStampedPdf(await source.save(), null, 'Demo signer', '2026-07-21T12:00:00Z', '01234567');
   const parsed = await window.pdfjsLib.getDocument({ data: new Uint8Array(output) }).promise;
   return (await (await parsed.getPage(1)).getTextContent()).items.map(i => i.str).join(' ');

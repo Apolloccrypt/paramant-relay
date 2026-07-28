@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
+     before every module and deferred script that signals or awaits. -->
+<script src="/js/ready.js?v=1"></script>
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign a document · Paramant</title>
@@ -808,10 +811,10 @@
 </footer>
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=4" defer></script>
-<script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=2"></script>
+<script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=2" defer></script>
-<script type="module" src="/sign-flow.js?v=48"></script>
+<script type="module" src="/sign-flow.js?v=49"></script>
 </body>
 </html>
