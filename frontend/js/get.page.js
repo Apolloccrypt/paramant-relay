@@ -47,11 +47,9 @@ function formatSize(n) {
 }
 
 async function waitForPdfjs() {
-  if (window.__pdfjsLib) return window.__pdfjsLib;
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('PDF.js failed to load')), 10000);
-    window.addEventListener('pdfjs:ready', () => { clearTimeout(t); resolve(window.__pdfjsLib); }, { once: true });
-  });
+  // Sticky signal, so it does not matter whether the loader module ran before
+  // or after this file. See js/ready.js.
+  return window.ready.within('pdfjs', 10000, 'PDF.js');
 }
 
 async function renderPdfPreview(bytes, name) {

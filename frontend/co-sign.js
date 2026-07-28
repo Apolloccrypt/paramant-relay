@@ -52,11 +52,9 @@ function guessMimeFromMagic(bytes) {
 }
 function isPdfBytes(b) { return b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; }
 function waitForPdfjs() {
-  if (window.__pdfjsLib) return Promise.resolve(window.__pdfjsLib);
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('PDF.js failed to load')), 10000);
-    window.addEventListener('pdfjs:ready', () => { clearTimeout(t); resolve(window.__pdfjsLib); }, { once: true });
-  });
+  // Sticky signal, so it does not matter whether the loader module ran before
+  // or after this file. See js/ready.js.
+  return window.ready.within('pdfjs', 10000, 'PDF.js');
 }
 
 // ---------- state ----------

@@ -53,8 +53,19 @@ const PAGES = [
   {
     url: '/ontvang.html',
     what: 'ParaSend, receiving a file',
+    // A well-formed token that no relay will accept. Enough to make the page
+    // run its real client-side work: generate the keypair and show the
+    // fingerprint. Whether the relay then knows the token is not our business
+    // here.
+    query: '?s=inv_00000000000000000000000000000000',
     heartbeat: () => typeof window._cryptoBridge?.decryptBlob === 'function',
     because: 'window._cryptoBridge.decryptBlob is missing, so ontvang.page.js throws "WASM crypto bridge not ready"',
+    // The globals above were all present on 2026-07-28 while the page sat on
+    // "Generating keypair..." forever: a lost readiness event meant init() was
+    // never called. Loaded is not the same as working, so this asserts the user
+    // actually gets somewhere.
+    progress: () => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test(document.getElementById('fp-display')?.textContent?.trim() || ''),
+    stuck: 'keygen never completed: no fingerprint on screen, so receiving a file is dead',
   },
   { url: '/index.html',   what: 'homepage' },
   { url: '/pricing.html', what: 'pricing, the paid funnel' },
@@ -120,7 +131,12 @@ for (const page of PAGES) {
       }
     });
 
-    const resp = await tab.goto(origin + page.url, { waitUntil: 'networkidle', timeout: 45000 });
+    // A page with a progress check opens a relay connection and keeps polling,
+    // so it never goes network-idle. The request and response handlers above
+    // stay attached either way, and the progress poll below keeps the page open
+    // long enough for a late 404 to still be caught.
+    const settled = page.progress ? 'load' : 'networkidle';
+    const resp = await tab.goto(origin + page.url + (page.query || ''), { waitUntil: settled, timeout: 45000 });
     assert.ok(resp?.ok(), `${page.url} did not load: HTTP ${resp?.status()}`);
     await tab.waitForTimeout(1200);   // let deferred modules and wasm settle
 
@@ -129,9 +145,25 @@ for (const page of PAGES) {
       assert.ok(alive, `${page.what} is dead: ${page.because}`);
     }
 
+    // Rule 5: does the page get the user anywhere? Every global can be present
+    // and correct while the page does nothing at all, which is precisely how
+    // /ontvang hung for three weeks. Poll rather than sleep: keygen is fast on a
+    // laptop and slow on a loaded CI runner.
+    if (page.progress) {
+      const moved = await tab.waitForFunction(page.progress, null, { timeout: 25000, polling: 250 })
+        .then(() => true).catch(() => false);
+      assert.ok(moved, `${page.what} does not work: ${page.stuck}`);
+    }
+
+    // The relay is a separate host with its own gate (tests/transfer-canary),
+    // and the test token is deliberately one no relay will accept, so a refused
+    // socket to it says nothing about the frontend. Filtering this is only safe
+    // BECAUSE the progress check above already proved the page did its work.
+    const RELAY_NOISE = /wss?:\/\/[^ ]*relay\.paramant\.app|WebSocket connection to/;
+
     // A console error the page recovers from is still a break waiting to be
     // reported by a user, so it fails here too. Drop the noise, not the signal.
-    const real = problems.filter((p) => !/favicon|\/api\/|401|403|Failed to load resource: the server responded with a status of 40[13]/.test(p));
+    const real = problems.filter((p) => !/favicon|\/api\/|401|403|Failed to load resource: the server responded with a status of 40[13]/.test(p) && !RELAY_NOISE.test(p));
     assert.deepEqual(real, [], `\n  ${page.url}\n  ${real.join('\n  ')}\n`);
 
     await ctx.close();
