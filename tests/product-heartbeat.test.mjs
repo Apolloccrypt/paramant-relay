@@ -49,6 +49,7 @@ const PAGES = [
     // on production from 2026-07-02 until 2026-07-26.
     heartbeat: () => typeof window._cryptoBridge?.encryptBlob === 'function',
     because: 'window._cryptoBridge.encryptBlob is missing, so the send aborts with "WASM crypto module not loaded"',
+    progressNote: 'encryption only starts once a signed-in user picks a file. The real path is covered end to end by tests/transfer-canary.test.mjs, which pushes a file through the live relay every hour.',
   },
   {
     url: '/ontvang.html',
@@ -67,17 +68,81 @@ const PAGES = [
     progress: () => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test(document.getElementById('fp-display')?.textContent?.trim() || ''),
     stuck: 'keygen never completed: no fingerprint on screen, so receiving a file is dead',
   },
-  { url: '/index.html',   what: 'homepage' },
-  { url: '/pricing.html', what: 'pricing, the paid funnel' },
-  { url: '/signup.html',  what: 'signup' },
-  { url: '/sign.html',    what: 'ParaSign' },
-  { url: '/verify.html',  what: 'signature verification' },
-  { url: '/paraid.html',  what: 'ParaID' },
+  // Measured on production 2026-07-28: of the remaining pages, only /sign
+  // changes anything on screen after load. The others render their content from
+  // the HTML and only start doing work once the user acts, so a progress check
+  // there would assert a thing the page was never going to do. That is stated
+  // per page rather than left blank — see the coverage test below.
+  {
+    url: '/index.html',
+    what: 'homepage',
+    progressNote: 'static content, no load-time work to observe. The stuck-text rule below still applies.',
+  },
+  {
+    url: '/pricing.html',
+    what: 'pricing, the paid funnel',
+    progressNote: 'prices are in the HTML. The plan buttons go to checkout, which a heartbeat must not click.',
+  },
+  {
+    url: '/signup.html',
+    what: 'signup',
+    progressNote: 'the proof-of-work captcha only fetches its challenge on submit, and submitting would create an account on production every hour. Covered by tests/e2e-auth-flow.sh.',
+  },
+  {
+    url: '/sign.html',
+    what: 'ParaSign',
+    // The page asks the relay which signing key you have and rewrites this line
+    // with the answer. It is the same shape as the account page that sat on
+    // "Checking your account..." forever before 7da4e39, so it is exactly the
+    // kind of line that hangs.
+    progress: () => {
+      const t = document.getElementById('ds-signing-identity')?.textContent?.trim() || '';
+      return t.length > 0 && !/^checking\b/i.test(t);
+    },
+    stuck: 'the signing identity line never resolved, so the page is still asking the relay who you are',
+  },
+  {
+    url: '/verify.html',
+    what: 'signature verification',
+    progressNote: 'verification needs a .psign file dropped in. Covered by tests/parasign-multi-verify.test.mjs.',
+  },
+  {
+    url: '/paraid.html',
+    what: 'ParaID',
+    progressNote: 'the wallet demo issues its credential on a button press; the session nonce placeholder ("-") is filled then, by design (js/paraid.js:106).',
+  },
 ];
 
 // Only our own static assets. A 401 on /api/* without a session is correct
 // behaviour, not a break, and third party hosts are not ours to police.
 const OUR_ASSET = /\.(js|mjs|css|wasm|woff2?|svg|png|webp|ico)(\?|$)/i;
+
+// A page that finished loading must not still be telling the user to wait. This
+// runs on EVERY page, needs no per-page knowledge, and covers pages nobody has
+// written a progress check for — including ones added after this was written.
+//
+// It is the shape all four July 2026 breaks had in common: the page ends up
+// parked on a status line while its console stays clean. "Generating
+// keypair..." (/ontvang, 26 days) and "Checking your account..." (account page,
+// before 7da4e39) would both have been caught here.
+//
+// Deliberately verbs, not punctuation: an em dash or a bare "-" is a normal
+// empty-value placeholder in a table and says nothing about being stuck.
+const STUCK_TEXT = /\b(loading|checking|generating|verifying|connecting|initialising|initializing|please wait)\b[^.!?]*(\.\.\.|…)\s*$/i;
+
+async function stuckOnScreen(tab) {
+  return tab.evaluate((src) => {
+    const re = new RegExp(src.slice(1, src.lastIndexOf('/')), 'i');
+    const found = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.children.length) continue;                  // leaf nodes only
+      if (!el.offsetParent) continue;                    // must be visible
+      const t = (el.textContent || '').trim();
+      if (t && t.length <= 80 && re.test(t)) found.push(`${el.id ? '#' + el.id : el.tagName.toLowerCase()}: "${t}"`);
+    }
+    return found;
+  }, STUCK_TEXT.toString());
+}
 
 const BASE = process.env.PARAMANT_BASE_URL?.replace(/\/$/, '');
 let server = null;
@@ -155,6 +220,13 @@ for (const page of PAGES) {
       assert.ok(moved, `${page.what} does not work: ${page.stuck}`);
     }
 
+    // Rule 6: nobody is left staring at a "...". Applies to every page, with or
+    // without a progress check of its own.
+    const stuck = await stuckOnScreen(tab);
+    assert.deepEqual(stuck, [],
+      `\n  ${page.url} is still asking the user to wait after it finished loading:\n  ` +
+      stuck.join('\n  ') + `\n  Whatever should have replaced this text never ran.\n`);
+
     // The relay is a separate host with its own gate (tests/transfer-canary),
     // and the test token is deliberately one no relay will accept, so a refused
     // socket to it says nothing about the frontend. Filtering this is only safe
@@ -169,3 +241,16 @@ for (const page of PAGES) {
     await ctx.close();
   });
 }
+
+// Coverage, stated out loud. A page with neither a progress check nor a written
+// reason is a page nobody decided about, and that silence is what let /ontvang
+// stay broken for 26 days behind a green suite. Adding a page to PAGES now
+// forces the question.
+test('every page either checks progress or says why it does not', () => {
+  const undecided = PAGES.filter((p) => !p.progress && !p.progressNote).map((p) => p.url);
+  assert.deepEqual(undecided, [],
+    `\n  These pages have no progress check and no note explaining why:\n  ` +
+    undecided.join('\n  ') +
+    `\n\n  Add progress+stuck if the page does load-time work the user waits on,\n` +
+    `  or progressNote saying where that work is covered instead.\n`);
+});

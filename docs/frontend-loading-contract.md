@@ -109,6 +109,33 @@ progress: () => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test(
 Verified to fail on the broken code before it was written into a passing state.
 A gate that was never seen failing is not a gate.
 
+Only two pages do load-time work the user waits on (`/ontvang`, `/sign`), so
+only those two carry a hand-written check. Rather than leave the rest blank,
+every page states either a `progress` check or a `progressNote` saying where its
+work is covered instead, and a test fails if a page has neither. Silence about
+coverage is what let `/ontvang` stay broken for 26 days behind a green suite.
+
+Covering the pages nobody wrote a check for, there is one rule that needs no
+per-page knowledge: **a page that finished loading must not still be telling the
+user to wait.**
+
+```js
+const STUCK_TEXT = /\b(loading|checking|generating|verifying|connecting|...)\b[^.!?]*(\.\.\.|…)\s*$/i;
+```
+
+It matches verbs, not punctuation, because a bare `-` or an em dash is a normal
+empty-value placeholder. Pointed at the broken build with the per-page check
+disabled, it reports:
+
+```
+/ontvang.html is still asking the user to wait after it finished loading:
+  #keygen-title: "Generating keypair..."
+  #keygen-status: "Generating ML-KEM-768 + ECDH P-256 keypair in your browser..."
+```
+
+Both July hangs — "Generating keypair..." and "Checking your account..." — would
+have been caught by that one line, on a page nobody had thought about yet.
+
 ## Rule 4 — one file, one cache-buster
 
 A module's identity is its **full URL, query string included**. Load the same
