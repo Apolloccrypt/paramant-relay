@@ -536,7 +536,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tr><td>CVEs mitigated</td><td>CVE-2023-51767, CVE-2025-26465, CVE-2025-26466, CVE-2025-32728</td></tr>
     </tbody>
   </table>
-  <p style="margin-top:12px"><a href="https://github.com/Apolloccrypt/ParamantOS" target="_blank" rel="noopener">ParamantOS on GitHub &rarr;</a></p>
+  <!-- Was a link to the private ParamantOS repository, so it 404'd for every reader.
+       This one hid behind the docs.html copy in the first sweep: the gate reports one
+       source per dead URL, so a second page carrying the same link only surfaces once
+       the first is fixed. Fix by URL, then run the gate again. -->
+  <p style="margin-top:12px"><a href="mailto:privacy@paramant.app?subject=ParamantOS+image" rel="noopener">Ask us about ParamantOS &rarr;</a></p>
 
   <h2 id="customer-transparency">Customer transparency</h2>
   <p>Security is also about knowing what the vendor can and cannot do. The <a href="/trust">Trust &amp; Transparency page</a> documents, in plain terms, how license-check works, what Paramant can see of your relay (and what it never can), how to verify your deployment, and which remote actions are possible versus structurally impossible. Each claim there is tagged as live today or planned, with links to the public protocol specifications.</p>

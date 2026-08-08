@@ -340,53 +340,82 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
     </div>
   </div>
 
-  <div class="section-label">// DOWNLOADS — v0.2.0 ⚠ VEROUDERD</div>
+  <!-- Deze knoppen wezen naar github.com/Apolloccrypt/paramant-app/releases. Die repo
+       is privé, dus alle vijf gaven 404 voor iedere bezoeker die wij niet zijn. Ze
+       worden nu vanaf deze server geserveerd (/dl/), zodat de repo privé kan blijven.
+
+       De versies lopen uiteen en dat staat er nu bij: v0.2.1 heeft alleen een .deb en
+       een .apk, dus Windows, RPM en AppImage zijn nog v0.2.0. Eén versienummer boven
+       de hele lijst zou over drie van de vijf liegen.
+
+       Elke regel onder een knop is nagemeten op 2026-08-08, niet overgenomen:
+         .apk       v1 JAR-signature + APK Signing Block v2/v3, cert CN=Mick Beer
+         .exe       Authenticode, certificate table 1704 bytes
+         .deb       GEEN signature: geen _gpgorigin in het ar-archief. De kaart zei
+                    "GPG-gesigneerd door Mick Beer / GPG: 6EF8E5AC...29A49B97", en dat
+                    was niet waar te maken. Nu staat er de SHA256, die het wel is.
+         .rpm       GEEN signature: alleen SHA256HEADER in de signature-header
+         .AppImage  GEEN signature: .sha256_sig en .sig_key bestaan maar zijn nul
+                    (lege placeholders van appimagetool)
+       Volledige lijst: /dl/SHA256SUMS -->
+  <div class="section-label">// DOWNLOADS — .deb en .apk v0.2.1 · overige v0.2.0</div>
   <div class="dl-grid">
-    <a class="dl-card" href="https://github.com/Apolloccrypt/paramant-app/releases/download/v0.2.0/PARAMANT_0.2.0_amd64.deb">
+    <a class="dl-card" href="/dl/paramant_0.2.1_amd64.deb">
       <div class="dl-platform">[LNX]</div>
       <div class="dl-name">Linux</div>
-      <div class="dl-ext">.deb — Debian / Ubuntu / Pop!_OS</div>
-      <div class="dl-desc">Rust backend + Tauri 2 WebKit. ML-KEM-768 native AVX2. GPG-gesigneerd door Mick Beer.</div>
+      <div class="dl-ext">.deb — Debian / Ubuntu / Pop!_OS · v0.2.1</div>
+      <div class="dl-desc">Rust backend + Tauri 2 WebKit. ML-KEM-768 native AVX2. Niet gesigneerd: controleer de SHA256 hieronder.</div>
       <div class="dl-btn">[DL] .deb</div>
-      <div class="dl-meta">~3 MB</div>
-      <div class="dl-signed">GPG: 6EF8E5AC...29A49B97</div>
+      <div class="dl-meta">2,5 MB</div>
+      <div class="dl-signed">SHA256: 62360ad6...703e32bb</div>
     </a>
-    <a class="dl-card" href="https://github.com/Apolloccrypt/paramant-app/releases/download/v0.2.0/PARAMANT-0.2.0-1.x86_64.rpm">
+    <a class="dl-card" href="/dl/PARAMANT-0.2.0-1.x86_64.rpm">
       <div class="dl-platform">[LNX]</div>
       <div class="dl-name">Linux</div>
-      <div class="dl-ext">.rpm — Fedora / RHEL / openSUSE</div>
+      <div class="dl-ext">.rpm — Fedora / RHEL / openSUSE · v0.2.0</div>
       <div class="dl-desc">Identiek aan .deb. Zelfde Rust crypto core, zelfde relay. Gebouwd voor RPM-gebaseerde distros.</div>
       <div class="dl-btn">[DL] .rpm</div>
-      <div class="dl-meta">~3 MB</div>
-      <div class="dl-signed">// build: cargo tauri build</div>
+      <div class="dl-meta">2,4 MB</div>
+      <div class="dl-signed">SHA256: b103dadc...d7d541be</div>
     </a>
-    <a class="dl-card" href="https://github.com/Apolloccrypt/paramant-app/releases/download/v0.2.0/PARAMANT_0.2.0_amd64.AppImage">
+    <a class="dl-card" href="/dl/PARAMANT_0.2.0_amd64.AppImage">
       <div class="dl-platform">[LNX]</div>
       <div class="dl-name">Linux</div>
-      <div class="dl-ext">.AppImage — Universeel</div>
+      <div class="dl-ext">.AppImage — Universeel · v0.2.0</div>
       <div class="dl-desc">Portable binary — runs on any Linux distro without installation. No root required. chmod +x and run.</div>
       <div class="dl-btn">[DL] .AppImage</div>
-      <div class="dl-meta">~77 MB (all-in-one)</div>
-      <div class="dl-signed">// chmod +x paramant.AppImage</div>
+      <div class="dl-meta">80,7 MB (all-in-one)</div>
+      <div class="dl-signed">SHA256: 7e0962ac...ee9aa728</div>
     </a>
-    <a class="dl-card" href="https://github.com/Apolloccrypt/paramant-app/releases/download/v0.2.0/PARAMANT-0.2.0-windows-signed.exe">
+    <a class="dl-card" href="/dl/PARAMANT-0.2.0-windows-signed.exe">
       <div class="dl-platform">[WIN]</div>
       <div class="dl-name">Windows</div>
-      <div class="dl-ext">.exe — Windows 10/11 x64</div>
-      <div class="dl-desc">Cross-compiled via mingw-w64. Gesigneerd met osslsigncode (self-signed). SmartScreen: klik Meer info -> Toch uitvoeren.</div>
+      <div class="dl-ext">.exe — Windows 10/11 x64 · v0.2.0</div>
+      <div class="dl-desc">Cross-compiled via mingw-w64. Authenticode-gesigneerd (self-signed). SmartScreen: klik Meer info -> Toch uitvoeren.</div>
       <div class="dl-btn">[DL] .exe</div>
-      <div class="dl-meta">~20 MB</div>
-      <div class="dl-signed">// signed: osslsigncode</div>
+      <div class="dl-meta">5,8 MB</div>
+      <div class="dl-signed">// Authenticode, self-signed</div>
     </a>
-    <a class="dl-card" href="https://github.com/Apolloccrypt/paramant-app/releases/download/v0.2.0/PARAMANT-0.2.0-android-signed.apk">
+    <a class="dl-card" href="/dl/PARAMANT-0.2.1-android.apk">
       <div class="dl-platform">[APK]</div>
       <div class="dl-name">Android</div>
-      <div class="dl-ext">.apk — Android 8.0+ (ARM64)</div>
+      <div class="dl-ext">.apk — Android 8.0+ (ARM64) · v0.2.1</div>
       <div class="dl-desc">Tauri Mobile. Rust gecompileerd naar ARM64 + x86_64. APK signing v2+v3 scheme. Sideload: Instellingen -> Onbekende bronnen.</div>
       <div class="dl-btn">[DL] .apk</div>
-      <div class="dl-meta">~22 MB</div>
-      <div class="dl-signed">// v2+v3 signed, 1 signer</div>
+      <div class="dl-meta">22,5 MB</div>
+      <div class="dl-signed">// v2+v3, cert AF:73:EF:52...8C:9E:92:4F</div>
     </a>
+  </div>
+
+  <div style="background:var(--bone-2);border:1px solid var(--ink-hair);padding:16px;margin-bottom:24px;font-size:11px;line-height:1.8;color:var(--ink-dim)">
+    <div style="color:var(--ink);font-size:10px;letter-spacing:.08em;margin-bottom:8px">// VERIFIEREN</div>
+    Alleen de .apk en de .exe dragen een signature. De .deb, .rpm en .AppImage niet, dus
+    daar is de SHA256 het enige dat je hebt. Controleer hem:<br>
+    <code style="color:var(--ink)">curl -sO https://paramant.app/dl/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS --ignore-missing</code><br>
+    Het APK-certificaat is self-signed, vingerafdruk
+    <code style="color:var(--ink)">AF:73:EF:52:1A:FB:CC:16:10:71:6E:3B:A4:BD:77:98:29:6B:77:04:C6:6E:CC:0C:3D:14:FA:0D:8C:9E:92:4F</code>
+    (<code style="color:var(--ink)">apksigner verify --print-certs</code>).
+    <a href="/dl/SHA256SUMS" style="color:var(--ink)">Alle checksums &rarr;</a>
   </div>
 
   <div class="section-label">// CHANGELOG — WAT IS NIEUW IN WEB APP (nog niet in native)</div>
