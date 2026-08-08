@@ -473,12 +473,26 @@ section p+p{margin-top:14px}
     <div class="aside">
       <div class="label">NSA CNSA 2.0 — September 2022</div>
       <p>
-        <strong>"Organizations should avoid using public-key cryptography based on RSA
-        or elliptic curve for all sensitive data with a secrecy requirement extending
-        beyond approximately five years."</strong><br><br>
+        <!-- This block used to quote the NSA as writing: "Organizations should avoid
+             using public-key cryptography based on RSA or elliptic curve for all
+             sensitive data with a secrecy requirement extending beyond approximately
+             five years." That sentence is not in CNSA 2.0. On 2026-08-08 both the
+             advisory and the FAQ were pulled and searched: the word "secrecy" does
+             not occur in either, and no source for the sentence could be found. A
+             quote we cannot point at is worse than no quote, so it is replaced by
+             what the advisory does say, word for word, checked against the document.
+
+             The advisory PDF is gone from media.defense.gov (404; a 403 to curl and
+             to Chromium made it look alive, which is why this was checked with more
+             than one client). NSA's own resources page now links only the FAQ, so
+             the link goes there and the archived advisory is noted here:
+             http://web.archive.org/web/20241215203633/https://media.defense.gov/2022/Sep/07/2003071834/-1/-1/0/CSA_CNSA_2.0_ALGORITHMS_.PDF -->
+        <strong>"Note that this will effectively deprecate the use of RSA,
+        Diffie-Hellman (DH), and elliptic curve cryptography (ECDH and ECDSA)
+        when mandated."</strong><br><br>
         CISA, NCSC-UK, and the BSI issue the same guidance: begin migration now.
         Waiting for Q-Day means the archive is already complete.
-        <a href="https://media.defense.gov/2022/Sep/07/2003071834/-1/-1/0/CSA_CNSA_2.0_ALGORITHMS_.PDF" target="_blank" rel="noopener">NSA CNSA 2.0 (PDF) &rarr;</a>
+        <a href="https://www.nsa.gov/Cybersecurity/Post-Quantum-Cybersecurity-Resources/" target="_blank" rel="noopener">NSA post-quantum resources &rarr;</a>
       </p>
     </div>
   </section>

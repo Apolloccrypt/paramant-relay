@@ -97,12 +97,36 @@ test('every external link answers', { skip: !process.env.CHECK_EXTERNAL_LINKS &&
   // 403 without a browser is how several big hosts answer any bot, so it says
   // nothing about the link. A 404 says the thing is gone, which is what we are
   // hunting: a download button that hands the visitor an error page.
-  const dood = [];
-  await Promise.all(extern.map(async (url) => {
-    const status = await fetch(url, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(20000) })
+  //
+  // A 404 alone is still not enough. On 2026-08-08 media.defense.gov answered
+  // 404 to this test and 403 to both curl and Chromium, which looked like a
+  // blocked client rather than a missing file. It was not: the host's root
+  // answers 200, the FAQ next to it downloads fine, and the factsheet really
+  // was withdrawn. The 403 was the misleading half.
+  //
+  // So each 404 is weighed against that host's own root. Root reachable means
+  // the page is genuinely gone. Root turning us away too means we are being
+  // filtered and cannot tell, and the run says so out loud instead of failing
+  // on nothing. Never conclude "dead" from one client's word.
+  const status = (url) =>
+    fetch(url, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(20000) })
       .then((r) => r.status).catch((e) => `unreachable (${e.name})`);
-    if (status === 404 || status === 410) dood.push(`${status}  ${url}   (from ${bron.get(url)})`);
+
+  const dood = [];
+  const onmeetbaar = [];
+  await Promise.all(extern.map(async (url) => {
+    const s = await status(url);
+    if (s !== 404 && s !== 410) return;
+    const root = await status(new URL(url).origin + '/');
+    if (typeof root === 'number' && root < 400) dood.push(`${s}  ${url}   (from ${bron.get(url)})`);
+    else onmeetbaar.push(`${s}  ${url}   (host root answers ${root})`);
   }));
+
+  if (onmeetbaar.length) {
+    console.log(`\n  Not measurable, the host turns us away on its own root too:\n  ` +
+      onmeetbaar.sort().join('\n  ') +
+      `\n  Open these by hand before treating them as broken.\n`);
+  }
 
   assert.deepEqual(dood.sort(), [],
     `\n  These external destinations are gone:\n  ` + dood.sort().join('\n  ') +
