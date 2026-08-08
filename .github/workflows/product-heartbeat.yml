@@ -47,6 +47,13 @@ jobs:
       - name: Heartbeat against frontend/
         run: node --test tests/product-heartbeat.test.mjs
 
+      # Internal destinations only: resolved against frontend/ on disk, no
+      # network, about a second. It runs before nothing and after nothing, it
+      # just has to run: a typo like /login instead of /auth/login is invisible
+      # to every other gate we have.
+      - name: Where every internal link leads
+        run: node --test tests/links.test.mjs
+
   live:
     name: heartbeat — production
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -86,6 +93,20 @@ jobs:
         env:
           PARAMANT_RELAY_URL: https://relay.paramant.app
           PARAMANT_API_KEY: ${{ secrets.PARAMANT_CANARY_KEY }}
+
+      # External destinations: someone else's uptime, so hourly and never in a
+      # pull request. A third party can also delete a page without telling us,
+      # which is exactly what a scheduled check is for. always(), because a
+      # failing page must not hide a dead download button.
+      #
+      # This is expected to be RED until the /download question is settled: five
+      # installers and three ParamantOS links point at private repositories, so
+      # every visitor gets a 404. That is a real breakage and the alarm should
+      # say so rather than be silenced first.
+      - name: Where every external link leads
+        if: always()
+        shell: bash
+        run: CHECK_EXTERNAL_LINKS=1 node --test tests/links.test.mjs 2>&1 | tee -a /tmp/heartbeat.log
 
       # An hourly job that turns red in a tab nobody opens is not an alarm. A
       # red run opens an issue with the failing output; a green run closes it
