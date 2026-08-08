@@ -197,7 +197,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
         <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
@@ -280,7 +279,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
       <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
   </div>
@@ -521,26 +519,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <hr class="divider">
-
-  <h2>ParamantOS</h2>
-  <p>The official installer image for self-hosted relay deployments. Hardened NixOS with the relay pre-installed.</p>
-  <table class="table" style="margin-top:16px">
-    <thead><tr><th>Component</th><th>Configuration</th></tr></thead>
-    <tbody>
-      <tr><td>SSH KEX</td><td>mlkem768x25519-sha256 + curve25519 (ML-KEM FIPS 203)</td></tr>
-      <tr><td>SSH host key</td><td>Ed25519 only: no RSA, no ECDSA</td></tr>
-      <tr><td>SSH auth</td><td>Public key only: no passwords, no GSSAPI, no forwarding</td></tr>
-      <tr><td>Kernel</td><td>unprivileged_bpf_disabled=1, kptr_restrict=2, bpf_jit_harden=2</td></tr>
-      <tr><td>Firewall</td><td>Ports 22 + 3000–3004 only</td></tr>
-      <tr><td>Service isolation</td><td>Dedicated system user, systemd NoNewPrivileges, ProtectSystem=strict</td></tr>
-      <tr><td>CVEs mitigated</td><td>CVE-2023-51767, CVE-2025-26465, CVE-2025-26466, CVE-2025-32728</td></tr>
-    </tbody>
-  </table>
-  <!-- Was a link to the private ParamantOS repository, so it 404'd for every reader.
-       This one hid behind the docs.html copy in the first sweep: the gate reports one
-       source per dead URL, so a second page carrying the same link only surfaces once
-       the first is fixed. Fix by URL, then run the gate again. -->
-  <p style="margin-top:12px"><a href="mailto:privacy@paramant.app?subject=ParamantOS+image" rel="noopener">Ask us about ParamantOS &rarr;</a></p>
 
   <h2 id="customer-transparency">Customer transparency</h2>
   <p>Security is also about knowing what the vendor can and cannot do. The <a href="/trust">Trust &amp; Transparency page</a> documents, in plain terms, how license-check works, what Paramant can see of your relay (and what it never can), how to verify your deployment, and which remote actions are possible versus structurally impossible. Each claim there is tagged as live today or planned, with links to the public protocol specifications.</p>

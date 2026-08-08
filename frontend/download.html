@@ -160,7 +160,6 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
         <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
         <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
         <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
         <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
       </ul>
     </li>
@@ -243,7 +242,6 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
       <a href="/install-pi.sh">install-pi.sh</a>
       <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
       <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
       <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
     </div>
   </div>
@@ -339,17 +337,19 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
     <div class="cmp-col" style="border-left:1px solid var(--ink-hair)">
       <!-- This column listed five things native does better and nothing it does
            worse, so it read as "native is the safe choice". It is not: the build
-           predates the traffic-analysis work. Two rows added for what it costs,
-           and the signing row corrected. Measured 2026-08-08: the .apk carries a
-           v1 + v2/v3 signature, the .exe is Authenticode-signed, and the .deb has
-           no _gpgorigin at all, so "GPG signed" was not true for it. -->
-      <div class="cmp-title native">NATIVE — March 2026 build</div>
+           predates the traffic-analysis work. Rows added for what it costs, and the
+           signing row corrected. Measured 2026-08-08: the .exe is Authenticode-signed
+           and the .deb has no _gpgorigin at all, so "GPG signed" was not true for it.
+           Desktop only now: the Android APK is gone, because there the app runs in
+           the Android System WebView and the "own process, no browser" argument does
+           not apply. -->
+      <div class="cmp-title native">NATIVE DESKTOP — March 2026 build</div>
       <div class="cmp-row"><span class="cmp-ok">OK</span>Rust drop() wist sleutels uit RAM</div>
       <div class="cmp-row"><span class="cmp-ok">OK</span>Geen browser — geen extensies</div>
       <div class="cmp-row"><span class="cmp-ok">OK</span>ML-KEM-768 + AES-256-GCM identiek</div>
       <div class="cmp-row"><span class="cmp-no">NO</span>Geen padding, geen jitter — verkeersanalyse mogelijk</div>
       <div class="cmp-row"><span class="cmp-no">NO</span>Mist 21 beschermingen die de web app heeft</div>
-      <div class="cmp-row"><span class="cmp-warn">!</span>.apk en .exe gesigneerd, .deb en .rpm niet</div>
+      <div class="cmp-row"><span class="cmp-warn">!</span>Alleen .exe gesigneerd, .deb en .rpm niet</div>
     </div>
   </div>
 
@@ -357,12 +357,11 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
        is privé, dus alle vijf gaven 404 voor iedere bezoeker die wij niet zijn. Ze
        worden nu vanaf deze server geserveerd (/dl/), zodat de repo privé kan blijven.
 
-       De versies lopen uiteen en dat staat er nu bij: v0.2.1 heeft alleen een .deb en
-       een .apk, dus Windows, RPM en AppImage zijn nog v0.2.0. Eén versienummer boven
-       de hele lijst zou over drie van de vijf liegen.
+       De versies lopen uiteen en dat staat er nu bij: v0.2.1 leverde alleen een .deb,
+       dus Windows en RPM en AppImage zijn nog v0.2.0. Eén versienummer boven de hele
+       lijst zou over drie van de vier liegen.
 
        Elke regel onder een knop is nagemeten op 2026-08-08, niet overgenomen:
-         .apk       v1 JAR-signature + APK Signing Block v2/v3, cert CN=Mick Beer
          .exe       Authenticode, certificate table 1704 bytes
          .deb       GEEN signature: geen _gpgorigin in het ar-archief. De kaart zei
                     "GPG-gesigneerd door Mick Beer / GPG: 6EF8E5AC...29A49B97", en dat
@@ -370,12 +369,13 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
          .rpm       GEEN signature: alleen SHA256HEADER in de signature-header
          .AppImage  GEEN signature: .sha256_sig en .sig_key bestaan maar zijn nul
                     (lege placeholders van appimagetool)
-       Volledige lijst: /dl/SHA256SUMS -->
-  <!-- Deze kop zei "v0.2.0 ⚠ VEROUDERD". Bij het uitsplitsen van de versies per
+       Volledige lijst: /dl/SHA256SUMS
+
+       Deze kop zei "v0.2.0 ⚠ VEROUDERD". Bij het uitsplitsen van de versies per
        platform is dat woord verdwenen, waardoor de enige waarschuwing nog boven de
        vergelijking stond. Terug, en met de reden erbij: de versienummers zijn het
        punt niet, de ontbrekende beschermingen zijn het. -->
-  <div class="section-label">// DOWNLOADS — ⚠ VEROUDERDE BUILD · .deb en .apk v0.2.1 · overige v0.2.0</div>
+  <div class="section-label">// DOWNLOADS DESKTOP — ⚠ VEROUDERDE BUILD · .deb v0.2.1 · overige v0.2.0</div>
   <div class="dl-grid">
     <a class="dl-card" href="/dl/paramant_0.2.1_amd64.deb">
       <div class="dl-platform">[LNX]</div>
@@ -413,25 +413,34 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
       <div class="dl-meta">5,8 MB</div>
       <div class="dl-signed">// Authenticode, self-signed</div>
     </a>
-    <a class="dl-card" href="/dl/PARAMANT-0.2.1-android.apk">
-      <div class="dl-platform">[APK]</div>
-      <div class="dl-name">Android</div>
-      <div class="dl-ext">.apk — Android 8.0+ (ARM64) · v0.2.1</div>
-      <div class="dl-desc">Tauri Mobile. Rust gecompileerd naar ARM64 + x86_64. APK signing v2+v3 scheme. Sideload: Instellingen -> Onbekende bronnen.</div>
-      <div class="dl-btn">[DL] .apk</div>
-      <div class="dl-meta">22,5 MB</div>
-      <div class="dl-signed">// v2+v3, cert AF:73:EF:52...8C:9E:92:4F</div>
+    <!-- De Android-knop wees naar de APK. Die is eraf, en niet omdat hij stuk was:
+         op Android draait de Tauri-app in de Android System WebView, net als de
+         browser, dus daar valt het argument "eigen proces, geen browser" weg. Wat
+         blijft is een build van maart die 21 beschermingen mist tegenover een
+         installeerbare web-app die ze alle heeft. Er is ook niemand die er iets aan
+         verliest: de knop gaf 404 zolang hij bestond, dus via deze site heeft nooit
+         iemand een APK gekregen.
+
+         Op desktop staat de afweging anders. Daar is het een eigen proces zonder
+         browser-extensies, en Rust drop() wist de sleutels uit RAM. Die drie knoppen
+         blijven dus staan. -->
+    <a class="dl-card" href="/" style="border:1px solid var(--cobalt)">
+      <div class="dl-platform">[PWA]</div>
+      <div class="dl-name">Android &amp; iOS</div>
+      <div class="dl-ext">geen installer — vanaf de site</div>
+      <div class="dl-desc">Open paramant.app op je telefoon en kies "Toevoegen aan beginscherm". Je krijgt een eigen app-venster zonder browserbalk, met alle beschermingen van de web app. Op mobiel is dit de actuele versie, niet een oudere build.</div>
+      <div class="dl-btn">Naar paramant.app &rarr;</div>
+      <div class="dl-meta">altijd actueel</div>
+      <div class="dl-signed">// via HTTPS, geen sideload nodig</div>
     </a>
   </div>
 
   <div style="background:var(--bone-2);border:1px solid var(--ink-hair);padding:16px;margin-bottom:24px;font-size:11px;line-height:1.8;color:var(--ink-dim)">
     <div style="color:var(--ink);font-size:10px;letter-spacing:.08em;margin-bottom:8px">// VERIFIEREN</div>
-    Alleen de .apk en de .exe dragen een signature. De .deb, .rpm en .AppImage niet, dus
-    daar is de SHA256 het enige dat je hebt. Controleer hem:<br>
-    <code style="color:var(--ink)">curl -sO https://paramant.app/dl/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS --ignore-missing</code><br>
-    Het APK-certificaat is self-signed, vingerafdruk
-    <code style="color:var(--ink)">AF:73:EF:52:1A:FB:CC:16:10:71:6E:3B:A4:BD:77:98:29:6B:77:04:C6:6E:CC:0C:3D:14:FA:0D:8C:9E:92:4F</code>
-    (<code style="color:var(--ink)">apksigner verify --print-certs</code>).
+    Van de drie installers draagt alleen de .exe een signature (Authenticode,
+    self-signed). De .deb en de .rpm niet, dus daar is de SHA256 het enige dat je
+    hebt. Controleer hem:<br>
+    <code style="color:var(--ink)">curl -sO https://paramant.app/dl/SHA256SUMS &amp;&amp; sha256sum -c SHA256SUMS --ignore-missing</code>
     <a href="/dl/SHA256SUMS" style="color:var(--ink)">Alle checksums &rarr;</a>
   </div>
 
@@ -485,8 +494,8 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
       <div class="install-code">chmod +x paramant_0.2.0_amd64.AppImage<br>./paramant_0.2.0_amd64.AppImage</div>
     </div>
     <div class="install-card">
-      <div class="install-title">[APK] Android</div>
-      <div class="install-code">Instellingen -> Beveiliging -><br>Onbekende bronnen -> APK installeren</div>
+      <div class="install-title">[PWA] Android &amp; iOS</div>
+      <div class="install-code">paramant.app openen -><br>menu -> Toevoegen aan beginscherm</div>
     </div>
   </div>
 
