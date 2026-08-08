@@ -89,11 +89,17 @@
         var msg = String((err && err.message) || '');
         /* No session: send them to sign-in and straight back here. An account
          * is what makes the payment attributable, so it is a precondition, not
-         * an obstacle to route around. */
+         * an obstacle to route around.
+         *
+         * The route is /auth/login (frontend/auth/login.html). It was written
+         * as /login here, which is a 404, so from the day this file shipped
+         * every signed-out visitor who clicked a price button landed on the
+         * error page. The rest of the site already linked /auth/login; this
+         * one line was the odd one out. */
         if (msg.indexOf('key_http_401') === 0 || msg.indexOf('key_http_403') === 0 ||
             msg === 'key_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
-          window.location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
+          window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
           return;
         }
         showError(btn, 'Could not start checkout. Nothing has been charged. ' +
