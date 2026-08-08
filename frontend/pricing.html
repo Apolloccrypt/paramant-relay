@@ -374,12 +374,17 @@
           <li>Email notifications via Resend</li>
           <li>No IP rate limit</li>
         </ul>
-<!-- Mollie payment links (Fase A, one-off, amounts incl. 21% btw):
-     ParaSend Pro   monthly 18.15 zvsE7pxE5kLaYxC8j4rDH | yearly 181.50 drRnrb7hky6bjkvea5ipk
-     ParaSign Pro   monthly 59.29 tY9CRhMfcJSi4s9nU3s6D | yearly 603.79 iYKTBMtf9WeWZMc3HSTWj
-     ParaSign Bus.  monthly 361.79 L9iVQXjtxwjrF9M8qdGYm | yearly 3617.90 Npj56fkDJ8npWprUYnXBN -->
-        <a href="https://payment-links.mollie.com/payment/zvsE7pxE5kLaYxC8j4rDH" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get ParaSend Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;18,15/mo incl.</span></a>
-        <div style="text-align:center"><a href="https://payment-links.mollie.com/payment/drRnrb7hky6bjkvea5ipk" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;181,50/yr incl. &rarr;</a></div>
+<!-- Prices live in relay/lib/billing-catalog.js, server side, and the button
+     only carries product/plan/interval. pricing-billing.js turns a click into
+     POST /v2/billing/checkout, which creates the Mollie payment WITH the
+     metadata the webhook needs to grant the tier.
+
+     The href is the no-JS fallback and points at sign-in, not at a payment.
+     It used to hold six static Mollie payment links; all six returned 404 on
+     2026-08-08, and even alive they carried no metadata, which is how the
+     first paying customer got nothing on 2026-07-21. -->
+        <a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get ParaSend Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;18,15/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;181,50/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -442,8 +447,8 @@
           <li>Unlimited transfers - API access</li>
           <li>Annual: EUR 499 (two months free)</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/tY9CRhMfcJSi4s9nU3s6D" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Pro &rarr; <span style="font-weight:400;opacity:.85">EUR 59,29/mo incl.</span></a>
-        <div style="text-align:center"><a href="https://payment-links.mollie.com/payment/iYKTBMtf9WeWZMc3HSTWj" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 603,79/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Pro &rarr; <span style="font-weight:400;opacity:.85">EUR 59,29/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 603,79/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -457,8 +462,8 @@
           <li>Exportable audit log with CT tree head (CSV or JSON)</li>
           <li>Annual: EUR 2,990 (two months free)</li>
         </ul>
-        <a href="https://payment-links.mollie.com/payment/L9iVQXjtxwjrF9M8qdGYm" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">EUR 361,79/mo incl.</span></a>
-        <div style="text-align:center"><a href="https://payment-links.mollie.com/payment/Npj56fkDJ8npWprUYnXBN" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 3.617,90/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">EUR 361,79/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 3.617,90/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">

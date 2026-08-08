@@ -151,8 +151,14 @@ let origin = BASE;
 if (!BASE) {
   server = http.createServer((req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-    const file = path.join(ROOT, p);
-    if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
+    const base = path.join(ROOT, p);
+    if (!base.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
+    // Production serves /auth/login from auth/login.html. Without the same
+    // extension-less resolution here, a link that works locally can still 404
+    // for the visitor, and the reverse. Try what nginx tries, in that order.
+    const file = [base, base + '.html', path.join(base, 'index.html')]
+      .find((f) => f.startsWith(ROOT) && fs.existsSync(f) && fs.statSync(f).isFile());
+    if (!file) { res.writeHead(404); return res.end(); }
     fs.readFile(file, (e, b) => {
       if (e) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
@@ -241,6 +247,49 @@ for (const page of PAGES) {
     await ctx.close();
   });
 }
+
+// The paid funnel is the one page where "it loaded fine" is worth nothing. On
+// 2026-08-08 /pricing.html passed every rule above while both ways out of it
+// were dead: the six static hrefs were Mollie payment links that all returned
+// 404, and pricing-billing.js sent signed-out visitors to /login, which does
+// not exist either (the page is /auth/login). Anyone who wanted to pay hit an
+// error page, and the suite stayed green because nothing on /pricing itself
+// was broken. So follow the buttons out of the page, not just into it.
+test('/pricing.html — every way out of the paid funnel exists', async () => {
+  const ctx = await browser.newContext();
+  const tab = await ctx.newPage();
+  await tab.goto(origin + '/pricing.html', { waitUntil: 'load', timeout: 45000 });
+
+  // Route 1: the href, which is what a visitor without JS follows.
+  const hrefs = await tab.$$eval('a[data-billing-product]', (els) =>
+    els.map((e) => e.getAttribute('href')).filter(Boolean));
+  assert.ok(hrefs.length >= 1, 'no price buttons found on /pricing.html at all');
+
+  // Route 2: where the script sends a signed-out visitor. Read it from the
+  // source rather than clicking: the click needs a real 401 from the relay,
+  // which a local run cannot produce, and this must hold in both modes.
+  const src = await (await fetch(origin + '/js/pricing-billing.js')).text();
+  const jump = [...src.matchAll(/location\.href\s*=\s*['"]([^'"]+)['"]/g)]
+    .map((m) => m[1].replace(/['"]?\s*\+.*$/, ''))     // strip the concatenated next= tail
+    .filter((u) => u.startsWith('/'));
+  assert.ok(jump.length >= 1, 'pricing-billing.js no longer redirects anywhere; has the flow changed?');
+
+  const dead = [];
+  for (const target of [...new Set([...hrefs, ...jump])]) {
+    const url = target.startsWith('http') ? target : origin + target;
+    // Same-origin targets resolve like any page; an external one (a payment
+    // provider) has to answer for itself. Either way, 4xx means the visitor
+    // is looking at an error page instead of paying.
+    const status = await fetch(url, { redirect: 'follow' })
+      .then((r) => r.status).catch((e) => `unreachable (${e.message})`);
+    if (typeof status !== 'number' || status >= 400) dead.push(`${target} -> ${status}`);
+  }
+  assert.deepEqual(dead, [],
+    `\n  A price button leads nowhere:\n  ` + dead.join('\n  ') +
+    `\n  Every route out of /pricing must reach a real page, with or without JS.\n`);
+
+  await ctx.close();
+});
 
 // Coverage, stated out loud. A page with neither a progress check nor a written
 // reason is a page nobody decided about, and that silence is what let /ontvang
