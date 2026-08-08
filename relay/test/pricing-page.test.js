@@ -2,7 +2,7 @@
 // The pricing page shows the four ParaSign tiers (Free / Pro / Business /
 // Enterprise) with the agreed copy, keeps all six paid checkout links wired
 // for the API-first billing flow (data-billing-* attributes resolvable in the
-// server catalog, static Mollie link as fallback), states that checkout
+// server catalog, no-JS href pointing at sign-in), states that checkout
 // charges incl. 21% btw, shows the incl-btw amount up-front on every paid card,
 // keeps one primary monthly CTA per tier with the yearly option demoted to a
 // secondary link, and no longer claims a 5 MB file limit. It also checks the
@@ -29,12 +29,26 @@ const VARIANTS = [
   { product: 'parasign', plan: 'business', interval: 'yearly',  excl: 2990 },
 ];
 
-// One annotated checkout button per variant, static Mollie link as fallback.
-const btnRe = /<a\s+href="(https:\/\/payment-links\.mollie\.com\/payment\/[A-Za-z0-9]+)"\s+data-billing-product="([a-z]+)"\s+data-billing-plan="([a-z]+)"\s+data-billing-interval="([a-z]+)"/g;
+// One annotated checkout button per variant. The href is the no-JS fallback and
+// must NOT be a static Mollie payment link: those carry no metadata, so the
+// webhook cannot attribute the payment and the buyer gets nothing, which is what
+// happened to the first paying customer on 2026-07-21. All six were 404 by
+// 2026-08-08 as well. The fallback is sign-in, because an account is what makes
+// a payment attributable. This regex used to require the Mollie URL, so it kept
+// the bug in place instead of the rule.
+const btnRe = /<a\s+href="([^"]+)"\s+data-billing-product="([a-z]+)"\s+data-billing-plan="([a-z]+)"\s+data-billing-interval="([a-z]+)"/g;
 const buttons = [];
 for (let m; (m = btnRe.exec(html)); ) buttons.push({ href: m[1], product: m[2], plan: m[3], interval: m[4] });
 assert.strictEqual(buttons.length, 6, 'expected 6 annotated checkout buttons, got ' + buttons.length);
-ok('6 checkout buttons with data-billing-* and a static Mollie fallback href');
+ok('6 checkout buttons with data-billing-*');
+
+for (const b of buttons) {
+  assert(!/payment-links\.mollie\.com/.test(b.href),
+    'checkout button falls back to a static Mollie link (no metadata, unattributable): ' + b.href);
+  assert(b.href.startsWith('/auth/login'),
+    'no-JS fallback must be sign-in, got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
+}
+ok('no-JS fallback on every button is sign-in, never a metadata-less payment link');
 
 for (const v of VARIANTS) {
   const btn = buttons.find(b => b.product === v.product && b.plan === v.plan && b.interval === v.interval);
