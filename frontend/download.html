@@ -53,6 +53,7 @@ h1{font-size:26px;font-weight:800}
 .cmp-row:last-child{border-bottom:none}
 .cmp-ok{color:var(--ink);flex-shrink:0}
 .cmp-warn{color:#f59e0b;flex-shrink:0}
+.cmp-no{color:#ef4444;flex-shrink:0}
 .dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-bottom:40px}
 .dl-card{background:var(--bone-2);padding:20px;text-decoration:none;display:block;transition:background .15s}
 .dl-card:hover{background:var(--ink-ghost);text-decoration:none}
@@ -311,7 +312,12 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
   <!-- Verouderd notice -->
   <div style="background:#111;border:1px solid var(--ink-hair);padding:16px 20px;margin-bottom:24px;font-size:12px;line-height:1.8">
     <div style="color:var(--ink);font-weight:700;letter-spacing:.06em;margin-bottom:6px">⚠ NATIVE APP OUTDATED — WEB APP RECOMMENDED</div>
-    <div style="color:var(--ink-dim)">The native app was built on <strong style="color:var(--cobalt)">v0.2.0</strong>. The web app has received significant protocol and security updates since then that are not yet in the native build. Use <a href="/" style="color:var(--cobalt)">paramant.app</a> for the most up-to-date version. Native app v0.2.1 follows once the Rust implementation is updated.</div>
+    <!-- "significant updates" was too vague to act on: a reader who wants privacy
+         picked native, because the comparison below only lists what native does
+         better. It is 21 named protections, and every one of them is a reason not
+         to install this build. Counted from the changelog further down this page.
+         Last commit on paramant-app: 2026-03-28. -->
+    <div style="color:var(--ink-dim)">The native app was last built in <strong style="color:var(--cobalt)">March 2026</strong> and is missing <strong style="color:var(--cobalt)">21 protections</strong> the web app has: 512-byte packet padding, timing jitter, per-peer ratchets for group chat, disposable mode, stealth mode, safety-number verification, hourly flush, screenshot detection and more. They are listed in the changelog below. Padding and jitter are traffic-analysis defences, so this is not a matter of missing convenience features. Use <a href="/" style="color:var(--cobalt)">paramant.app</a> until the native app is rebuilt.</div>
   </div>
 
   <div class="page-header">
@@ -331,12 +337,19 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
       <div class="cmp-row"><span class="cmp-warn">!</span>Browser-extensies kunnen DOM lezen</div>
     </div>
     <div class="cmp-col" style="border-left:1px solid var(--ink-hair)">
-      <div class="cmp-title native">NATIVE — v0.2.0</div>
+      <!-- This column listed five things native does better and nothing it does
+           worse, so it read as "native is the safe choice". It is not: the build
+           predates the traffic-analysis work. Two rows added for what it costs,
+           and the signing row corrected. Measured 2026-08-08: the .apk carries a
+           v1 + v2/v3 signature, the .exe is Authenticode-signed, and the .deb has
+           no _gpgorigin at all, so "GPG signed" was not true for it. -->
+      <div class="cmp-title native">NATIVE — March 2026 build</div>
       <div class="cmp-row"><span class="cmp-ok">OK</span>Rust drop() wist sleutels uit RAM</div>
       <div class="cmp-row"><span class="cmp-ok">OK</span>Geen browser — geen extensies</div>
       <div class="cmp-row"><span class="cmp-ok">OK</span>ML-KEM-768 + AES-256-GCM identiek</div>
-      <div class="cmp-row"><span class="cmp-ok">OK</span>Relay URL via Rust command</div>
-      <div class="cmp-row"><span class="cmp-ok">OK</span>GPG/APK v2+v3 gesigneerd</div>
+      <div class="cmp-row"><span class="cmp-no">NO</span>Geen padding, geen jitter — verkeersanalyse mogelijk</div>
+      <div class="cmp-row"><span class="cmp-no">NO</span>Mist 21 beschermingen die de web app heeft</div>
+      <div class="cmp-row"><span class="cmp-warn">!</span>.apk en .exe gesigneerd, .deb en .rpm niet</div>
     </div>
   </div>
 
@@ -358,7 +371,11 @@ nav.p-nav{position:sticky;top:0;z-index:1000;background:var(--bone);border-botto
          .AppImage  GEEN signature: .sha256_sig en .sig_key bestaan maar zijn nul
                     (lege placeholders van appimagetool)
        Volledige lijst: /dl/SHA256SUMS -->
-  <div class="section-label">// DOWNLOADS — .deb en .apk v0.2.1 · overige v0.2.0</div>
+  <!-- Deze kop zei "v0.2.0 ⚠ VEROUDERD". Bij het uitsplitsen van de versies per
+       platform is dat woord verdwenen, waardoor de enige waarschuwing nog boven de
+       vergelijking stond. Terug, en met de reden erbij: de versienummers zijn het
+       punt niet, de ontbrekende beschermingen zijn het. -->
+  <div class="section-label">// DOWNLOADS — ⚠ VEROUDERDE BUILD · .deb en .apk v0.2.1 · overige v0.2.0</div>
   <div class="dl-grid">
     <a class="dl-card" href="/dl/paramant_0.2.1_amd64.deb">
       <div class="dl-platform">[LNX]</div>
