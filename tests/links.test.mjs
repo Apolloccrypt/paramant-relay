@@ -42,7 +42,16 @@ const SERVER_ROUTES = [
   /^\/v2\//,
   /^\/\.well-known\//,
   /^\/admin\//,      // the admin container, behind its own gate
+  /^\/dl\//,         // installers: in the docroot, not in the repo. See DOCROOT_ROUTES.
 ];
+
+// An exception on SERVER_ROUTES is a hole unless something else covers it, and
+// /dl/ is the case that would hurt: five installer buttons that were 404 for
+// every visitor is exactly what this file exists to catch. The files live in the
+// docroot and not in git (like dist/), so disk cannot answer for them and
+// production has to. Collected here, checked against the live site in the
+// hourly run below.
+const DOCROOT_ROUTES = /^\/dl\//;
 
 function htmlFiles(dir) {
   const uit = [];
@@ -87,6 +96,28 @@ test('every internal link resolves to a page that exists', () => {
     `\n  These destinations do not exist. A visitor following them gets the 404 page:\n  ` +
     [...new Set(dood)].sort().join('\n  ') +
     `\n\n  Add the page, fix the path, or add the route to SERVER_ROUTES if the relay serves it.\n`);
+});
+
+const BASE = process.env.PARAMANT_BASE_URL || 'https://paramant.app';
+
+test('every file served from the docroot is really there', { skip: !process.env.CHECK_EXTERNAL_LINKS && 'set CHECK_EXTERNAL_LINKS=1 (runs hourly against production, not in pull requests)' }, async () => {
+  const paden = [...new Set(alle.map(({ d }) => d).filter((d) => DOCROOT_ROUTES.test(d)))];
+  assert(paden.length, 'no /dl/ links found at all, which means the download buttons vanished');
+
+  // Range request: proves the file is there and readable without pulling 80 MB
+  // of AppImage through CI. 206 or 200 both mean served.
+  const dood = [];
+  await Promise.all(paden.map(async (p) => {
+    const r = await fetch(BASE + p, { headers: { Range: 'bytes=0-1023' }, signal: AbortSignal.timeout(30000) })
+      .catch((e) => ({ status: `unreachable (${e.name})` }));
+    if (r.status !== 200 && r.status !== 206) dood.push(`${r.status}  ${p}`);
+  }));
+
+  assert.deepEqual(dood.sort(), [],
+    `\n  These files are offered on the site but not in the docroot on ${BASE}:\n  ` +
+    dood.sort().join('\n  ') +
+    `\n\n  They are not in git, so a deploy does not carry them. Copy them to\n` +
+    `  /home/paramant/app/dl/ or take the button off the page.\n`);
 });
 
 test('every external link answers', { skip: !process.env.CHECK_EXTERNAL_LINKS && 'set CHECK_EXTERNAL_LINKS=1 (runs hourly against production, not in pull requests)' }, async () => {
