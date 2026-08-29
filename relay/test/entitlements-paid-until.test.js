@@ -13,9 +13,13 @@ const assert = require('assert');
 const ent = require('../lib/entitlements');
 
 let passed = 0;
+const pending = [];
 function test(name, fn) {
-  try { fn(); passed++; console.log(`ok   ${name}`); }
-  catch (e) { console.error(`FAIL ${name}\n     ${e.message}`); process.exitCode = 1; }
+  const run = async () => {
+    try { await fn(); passed++; console.log(`ok   ${name}`); }
+    catch (e) { console.error(`FAIL ${name}\n     ${e.message}`); process.exitCode = 1; }
+  };
+  pending.push(run);
 }
 
 const T0 = Date.parse('2026-09-01T00:00:00Z');
@@ -102,4 +106,81 @@ test('the other product is never moved by a period on this one', () => {
   assert.strictEqual(ent.effectiveProductTier(rec, 'parasign', MONTH).tier, 'business');
 });
 
-console.log(`\n${passed} passed`);
+(async () => {
+  for (const run of pending) await run();
+  console.log(`\n${passed} passed`);
+})();
+
+// ── The webhook half: a payment must buy a bounded period ────────────────────
+const billing = require('../lib/billing');
+
+function payment(over) {
+  return Object.assign({
+    id: 'tr_demo', status: 'paid', amount: { value: '18.15', currency: 'EUR' },
+    metadata: { accountId: 'acct_demo', product: 'parasend', plan: 'pro', interval: 'monthly' },
+  }, over || {});
+}
+
+test('a paid webhook grants a tier AND an end date', async () => {
+  let got = null;
+  const out = await billing.processPayment(payment(), {
+    now: new Date('2026-09-15T10:00:00Z'),
+    setProductPlan: (a, p, t, until) => { got = { a, p, t, until }; return { ok: true }; },
+  });
+  assert.strictEqual(out.result, 'granted');
+  assert.strictEqual(got.t, 'pro');
+  assert.strictEqual(got.until.toISOString(), '2026-10-15T10:00:00.000Z');
+});
+
+// 29 February exists only in a leap year, so the start date here must be a real
+// one: 2024. Renewing lands on 28 February 2025, the last day of that month,
+// never 1 March.
+test('yearly buys twelve months and clamps a leap day to the month end', async () => {
+  let got = null;
+  await billing.processPayment(payment({
+    amount: { value: '181.50', currency: 'EUR' },
+    metadata: { accountId: 'acct_demo', product: 'parasend', plan: 'pro', interval: 'yearly' },
+  }), {
+    now: new Date('2024-02-29T00:00:00Z'),
+    setProductPlan: (a, p, t, until) => { got = until; return { ok: true }; },
+  });
+  assert.strictEqual(got.toISOString().slice(0, 10), '2025-02-28');
+});
+
+test('renewing early extends from the end of the period, not from today', async () => {
+  let got = null;
+  await billing.processPayment(payment(), {
+    now: new Date('2026-09-10T00:00:00Z'),
+    currentPaidUntil: async () => '2026-09-15T00:00:00.000Z',
+    setProductPlan: (a, p, t, until) => { got = until; return { ok: true }; },
+  });
+  assert.strictEqual(got.toISOString().slice(0, 10), '2026-10-15');
+});
+
+test('paying after a lapse starts from now, so a gap is not covered backwards', async () => {
+  let got = null;
+  await billing.processPayment(payment(), {
+    now: new Date('2026-11-01T00:00:00Z'),
+    currentPaidUntil: async () => '2026-09-15T00:00:00.000Z',
+    setProductPlan: (a, p, t, until) => { got = until; return { ok: true }; },
+  });
+  assert.strictEqual(got.toISOString().slice(0, 10), '2026-12-01');
+});
+
+test('an interval with no period is refused, never granted open-ended', async () => {
+  let called = false;
+  const out = await billing.processPayment(payment({
+    metadata: { accountId: 'acct_demo', product: 'parasend', plan: 'pro', interval: 'weekly' },
+  }), { setProductPlan: () => { called = true; return { ok: true }; } });
+  assert.strictEqual(out.result, 'refused');
+  assert.strictEqual(called, false);
+});
+
+test('a chargeback clears the period along with the tier', async () => {
+  let got = 'untouched';
+  await billing.processPayment(payment({ status: 'chargeback' }), {
+    setProductPlan: (a, p, t, until) => { got = { t, until }; return { ok: true }; },
+  });
+  assert.strictEqual(got.t, 'community');
+  assert.strictEqual(got.until, null);
+});

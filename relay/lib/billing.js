@@ -15,6 +15,36 @@
 
 const catalog = require('./billing-catalog');
 
+// How far a paid interval carries the entitlement. Calendar months and years,
+// not 30 or 365 days: a customer who pays on the 31st should renew on a date
+// they recognise, and the yearly plan must not drift a day per leap year.
+// Clamped to the last day of the target month, so 31 January plus one month is
+// 28 February and never 3 March.
+function periodEnd(from, interval) {
+  const start = from instanceof Date ? new Date(from.getTime()) : new Date(from);
+  if (Number.isNaN(start.getTime())) return null;
+  const months = interval === 'yearly' ? 12 : interval === 'monthly' ? 1 : 0;
+  if (!months) return null;
+  const day = start.getUTCDate();
+  const end = new Date(Date.UTC(
+    start.getUTCFullYear(), start.getUTCMonth() + months, 1,
+    start.getUTCHours(), start.getUTCMinutes(), start.getUTCSeconds(), start.getUTCMilliseconds(),
+  ));
+  const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate();
+  end.setUTCDate(Math.min(day, lastDay));
+  return end;
+}
+
+// A renewal extends from where the paid period currently ends, not from the day
+// the money happened to land. Paying three days early must add a month, not
+// throw three days away; a payment after a lapse starts from now, so a gap is
+// never retroactively covered.
+function extendFrom(currentPaidUntil, now) {
+  const cur = currentPaidUntil ? new Date(currentPaidUntil) : null;
+  if (!cur || Number.isNaN(cur.getTime())) return now;
+  return cur.getTime() > now.getTime() ? cur : now;
+}
+
 // deps: {
 //   setProductPlan(accountId, product, tier) -> { ok, ... }  (sync or async)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
@@ -57,22 +87,41 @@ async function processPayment(payment, deps) {
         reason: `amount_mismatch paid=${paid}/${cur} expected=${order.amount}/${order.currency}`,
       };
     }
+    // The period this payment bought. Without it the grant never ends: Mollie is
+    // asked for a one-off payment, so no second collection follows, and the
+    // entitlement used to stay on the paid tier forever. An interval we cannot
+    // turn into a date is refused rather than granted open-endedly.
+    const now = d.now instanceof Date ? d.now : new Date();
+    const paidUntil = periodEnd(extendFrom(
+      typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, product) : null,
+      now,
+    ), interval);
+    if (!paidUntil) {
+      return { result: 'refused', level: 'error', account: accountId, product, reason: `no_period_for_interval:${interval}` };
+    }
+
     // Grant ONLY this product's tier. setProductPlan never touches the other
     // product (rule: product A must not move product B).
     let set;
-    try { set = await d.setProductPlan(accountId, product, order.tier); }
+    try { set = await d.setProductPlan(accountId, product, order.tier, paidUntil); }
     catch (e) { set = { ok: false, reason: e.message }; }
     if (!set || !set.ok) {
       return { result: 'refused', level: 'error', account: accountId, product, reason: `grant_failed:${set && set.reason}` };
     }
     if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted'); } catch { /* best effort */ } }
-    return { result: 'granted', level: 'info', account: accountId, product, tier: order.tier, reason: `${product}->${order.tier}` };
+    return {
+      result: 'granted', level: 'info', account: accountId, product, tier: order.tier,
+      paidUntil: paidUntil.toISOString(),
+      reason: `${product}->${order.tier} until ${paidUntil.toISOString().slice(0, 10)}`,
+    };
   }
 
   if (status === 'chargeback' || status === 'charged_back') {
     // Money reclaimed. Revoke: drop this product to its floor tier.
     const floor = catalog.floorTier(product);
-    try { await d.setProductPlan(accountId, product, floor); } catch { /* logged by caller via reason */ }
+    // null clears the period along with the tier: money reclaimed leaves no
+    // paid time on record.
+    try { await d.setProductPlan(accountId, product, floor, null); } catch { /* logged by caller via reason */ }
     if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'revoked'); } catch { /* best effort */ } }
     return { result: 'revoked', level: 'warn', account: accountId, product, tier: floor, reason: 'chargeback' };
   }
@@ -107,4 +156,4 @@ function classifyFetchError(err) {
   return { retry: true, level: 'warn', reason: status ? `mollie_${status}` : (msg || 'fetch_error') };
 }
 
-module.exports = { processPayment, classifyFetchError };
+module.exports = { processPayment, classifyFetchError, periodEnd, extendFrom };

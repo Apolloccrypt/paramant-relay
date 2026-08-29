@@ -1676,7 +1676,10 @@ function grantParasignOnPaidPlan(accountId) {
 // fan-out + users.json persistence. Idempotent (a repeat call with the same tier
 // changes nothing -> changed:0). For parasign it also flips the `parasign` access
 // flag on when the tier is paid (non-free). NEVER touches the other product.
-function setProductPlan(accountId, product, tier) {
+// paidUntil travels with the tier: a Date (or ISO string) sets the period this
+// grant is paid for, null clears it, and undefined leaves whatever is on record
+// alone. That last case keeps every admin grant behaving exactly as before.
+function setProductPlan(accountId, product, tier, paidUntil) {
   if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
   const norm = product === 'parasign'
     ? entitlements.normaliseParasignTier(tier)
@@ -1689,7 +1692,7 @@ function setProductPlan(accountId, product, tier) {
     if (!mv) continue;
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
-    if (entitlements.applyProductTier(mv, product, norm).changed) changed++;
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil).changed) changed++;
   }
   // Mirror onto the accounts summary too. Readers that only hold an account_id
   // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
@@ -1697,7 +1700,7 @@ function setProductPlan(accountId, product, tier) {
   // outvote a paid grant on any future read path either.
   const _acct = accounts.get(accountId);
   if (_acct) {
-    entitlements.applyProductTier(_acct, product, norm);
+    entitlements.applyProductTier(_acct, product, norm, paidUntil);
     _acct.plan_updated = new Date().toISOString();
   }
   _mutateUsersJson(ud => {
@@ -5144,6 +5147,12 @@ const server = http.createServer(async (req, res) => {
     const _idemKey = (id) => `paramant:billing:done:${id}`;
     const outcome = await billing.processPayment(payment, {
       setProductPlan,
+      // Lets a renewal extend from where the paid period ends instead of from
+      // the day the money landed, so paying early never costs the buyer days.
+      currentPaidUntil: async (accountId, product) => {
+        const rec = accounts.get(accountId);
+        return (rec && rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null;
+      },
       isProcessed: async (id) => { if (!_rok()) return false; try { return !!(await redisClient.get(_idemKey(id))); } catch { return false; } },
       markProcessed: async (id, val) => { if (!_rok()) return; try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ } },
     });
