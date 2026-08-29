@@ -87,6 +87,59 @@ const PRODUCT_PLAN_FIELD = Object.freeze({
   parasign: 'plan_parasign',
 });
 
+// The date a paid tier stops being paid for, per product. A tier without one is
+// a grant that never ends: before this field, a single 15 euro payment set
+// plan_parasend to 'pro' and nothing ever took it back, because Mollie is asked
+// for a one-off payment and there is no second collection. Both halves are
+// needed. The subscription makes the money come in again; this field makes the
+// entitlement stop when it does not. Without it, cancelling an subscription
+// leaves the buyer on the paid tier forever.
+//
+// Absent means "no paid period on record", which is the correct reading for a
+// free account and for every account that predates billing. It is NEVER read as
+// expired, so a missing field can not silently downgrade anyone.
+const PRODUCT_PAID_UNTIL_FIELD = Object.freeze({
+  parasend: 'paid_until_parasend',
+  parasign: 'paid_until_parasign',
+});
+
+// The tier a product falls back to when a paid period runs out. Mirrors
+// billing-catalog.floorTier; kept here too so the entitlement layer can answer
+// without importing the billing layer (the dependency runs the other way).
+function floorTierOf(product) {
+  return product === 'parasign' ? 'free' : 'community';
+}
+
+// Parse a stored paid-until value. Anything unparseable is treated as absent
+// rather than as expired, on the same no-silent-downgrade rule as the migration
+// helpers below: a corrupt date must not cost a paying customer their tier.
+function parsePaidUntil(value) {
+  if (!value) return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : t;
+}
+
+// The tier an account ACTUALLY has right now, which is the stored tier unless
+// its paid period has passed. Read paths should use this instead of reading
+// PRODUCT_PLAN_FIELD directly, so an expired subscription stops granting even
+// if no webhook, cron or admin ever came along to write the downgrade.
+// Returns { tier, expired, paidUntil }.
+function effectiveProductTier(rec, product, now) {
+  const field = PRODUCT_PLAN_FIELD[product];
+  if (!rec || !field) return { tier: floorTierOf(product), expired: false, paidUntil: null };
+  const stored = product === 'parasign'
+    ? normaliseParasignTier(rec[field])
+    : normaliseParasendTier(rec[field]);
+  const floor = floorTierOf(product);
+  const paidUntil = parsePaidUntil(rec[PRODUCT_PAID_UNTIL_FIELD[product]]);
+  // A floor tier can not expire, and no recorded period means no expiry to
+  // enforce (free accounts, and every account from before billing existed).
+  if (stored === floor || paidUntil === null) return { tier: stored, expired: false, paidUntil };
+  const at = typeof now === 'number' ? now : Date.now();
+  if (at >= paidUntil) return { tier: floor, expired: true, paidUntil };
+  return { tier: stored, expired: false, paidUntil };
+}
+
 // ── Admin per-product grant primitives ───────────────────────────────────────
 // These back the fine-grained admin path (POST /v2/admin/keys/set-product-plan)
 // so exactly ONE product's tier moves, with the unified `plan` and the other
@@ -113,14 +166,26 @@ function validateProductPlan(product, tier) {
 // normalised (idempotent), so passing an already-normalised value is safe.
 // Returns { field, tier, changed, parasignGranted }; `changed` reflects the
 // plan-field move only (an already-set access flag is not a plan change).
-function applyProductTier(rec, product, tier) {
+function applyProductTier(rec, product, tier, paidUntil) {
   const field = PRODUCT_PLAN_FIELD[product];
   const norm = product === 'parasign' ? normaliseParasignTier(tier) : normaliseParasendTier(tier);
   let changed = false;
   if (rec[field] !== norm) { rec[field] = norm; changed = true; }
   let parasignGranted = false;
   if (product === 'parasign' && norm !== 'free' && rec.parasign !== true) { rec.parasign = true; parasignGranted = true; }
-  return { field, tier: norm, changed, parasignGranted };
+  // The paid period travels with the tier it paid for. Landing on the floor
+  // clears it, so a revoked or lapsed account carries no stale date; passing
+  // undefined leaves whatever is there alone, which keeps every existing caller
+  // (admin grants, migrations) behaving exactly as before.
+  const untilField = PRODUCT_PAID_UNTIL_FIELD[product];
+  if (norm === floorTierOf(product)) {
+    if (rec[untilField] !== undefined) { delete rec[untilField]; changed = true; }
+  } else if (paidUntil !== undefined) {
+    const iso = paidUntil === null ? null : new Date(paidUntil).toISOString();
+    if (iso === null) { if (rec[untilField] !== undefined) { delete rec[untilField]; changed = true; } }
+    else if (rec[untilField] !== iso) { rec[untilField] = iso; changed = true; }
+  }
+  return { field, tier: norm, changed, parasignGranted, paidUntil: rec[untilField] || null };
 }
 
 // ── Migration: legacy single `plan` (+ parasign flag) -> per-product plan ─────
@@ -314,8 +379,10 @@ module.exports = {
   normaliseParasendTier,
   normaliseParasignTier,
   PRODUCT_PLAN_FIELD,
+  PRODUCT_PAID_UNTIL_FIELD,
   validateProductPlan,
   applyProductTier,
+  effectiveProductTier,
   getEntitlements,
   mergeAccountRecord,
   transfersQuota,
