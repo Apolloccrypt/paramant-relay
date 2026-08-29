@@ -330,7 +330,16 @@ function initRequester() {
     const r = await verifyAnswer(bundle);
     const out = $('req-verify-out');
     out.className = 'pa-result ' + (r.ok ? 'ok' : 'err');
-    const tierLabel = { presence: 'presence-only (a live person, identity not checked)', substantial: 'substantial (MRZ check-digit consistency, document authenticity not checked)', high: 'high (passport chip)' }[bundle.tier || 'presence'] || esc(bundle.tier || '');
+    // 'substantial' is the pre-rename spelling of the same rung; both resolve to
+    // one label so an older credential can never read as a stronger check than
+    // the one that was actually done. An unknown tier gets no flattering wording.
+    const TIER_LABELS = {
+      presence: 'presence-only (a live person, identity not checked)',
+      'mrz-unverified': 'MRZ form only (check digits add up; the document itself was never seen or authenticated)',
+      substantial: 'MRZ form only (check digits add up; the document itself was never seen or authenticated)',
+      high: 'high (passport chip, passively authenticated)',
+    };
+    const tierLabel = TIER_LABELS[bundle.tier || 'presence'] || esc(bundle.tier || '');
     out.innerHTML = r.ok
       ? '<b>&#10003; ' + esc(r.question) + ' ' + esc(String(r.answer).toUpperCase()) + '</b><br>issuer: ' + esc(r.registry) + '<br>assurance: ' + esc(tierLabel)
       : '<b>&#10007; rejected</b><br>' + r.errors.map(esc).join('<br>') + '<br>issuer: ' + esc(r.registry);

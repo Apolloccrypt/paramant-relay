@@ -71,7 +71,10 @@ async function issue() {
     if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || ('issuance failed (' + resp.status + ')')); }
     const { credential } = await resp.json();
     localStorage.setItem('paraid.credential.v1', JSON.stringify(credential));
-    localStorage.setItem('paraid.identity.v1', JSON.stringify({ verified: true, method: 'document', tier: 'substantial' }));
+    // The rung this flow actually reaches: the MRZ form checked out, nothing else
+    // did. It used to write 'substantial', which claimed an eIDAS level no part
+    // of this flow establishes.
+    localStorage.setItem('paraid.identity.v1', JSON.stringify({ verified: true, method: 'document', tier: 'mrz-unverified' }));
     if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
     $('doc-status').innerHTML = '<b>Done.</b> Your wallet now holds a credential recording age_over_18 = ' + esc(credential.fields.age_over_18) + ' and nationality = ' + esc(credential.fields.nationality) + ' as derived from the entered MRZ data. This is not a document-authenticity result.';
     $('doc-done').hidden = false;
