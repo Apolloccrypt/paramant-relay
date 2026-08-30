@@ -285,4 +285,61 @@ function accountHasParasignEntitlement(memberRecords, plan) {
   return PARASIGN_ENTITLED_PLANS.has(plan);
 }
 
-module.exports = { VALID_SCOPES, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };
+// ── Erasure: what a deletion request must actually remove ────────────────────
+//
+// Revoking a key stops it working. It does not remove the person behind it, and
+// for a while that was the whole of "delete account": POST /admin/delete-account
+// flipped every key to inactive, cleared Redis, and left the email address
+// sitting in users.json on all five sectors. Audit finding 5 of 2026-07-21.
+// Article 17 GDPR is about erasure, and an inactive record that still names
+// someone is not erased.
+//
+// The fields below are the ones that identify a person. Everything else on a key
+// record describes what was bought and used, and that has to survive: a payment
+// must stay traceable for the tax years it belongs to. So this erases identity,
+// never financial fact, and it marks the record instead of removing it, because
+// removing the row would take the billing history with it.
+const PERSONAL_DATA_FIELDS = Object.freeze([
+  'email', 'label', 'dsa_pub', 'trial_metadata', 'name', 'company', 'phone',
+]);
+
+// Erase in place, on the parsed users.json that _mutateUsersJson hands its
+// callback. Touches both places an account lives: the accounts summary and every
+// api-key record belonging to it (see mergeAccountRecord in entitlements.js for
+// why there are two).
+//
+// Idempotent on purpose. A deletion that runs twice, or that is retried after a
+// sector was briefly unreachable, must not fail the second time; it should find
+// nothing left to do and say so.
+function erasePersonalData(data, accountOrKey) {
+  const out = { accounts: 0, keys: 0, fields: 0 };
+  if (!data || !accountOrKey) return out;
+  const wipe = (rec) => {
+    let n = 0;
+    for (const f of PERSONAL_DATA_FIELDS) {
+      if (rec[f] !== undefined && rec[f] !== null) { delete rec[f]; n++; }
+    }
+    if (n) { rec.erased_at = rec.erased_at || new Date().toISOString(); }
+    return n;
+  };
+  const matches = (rec) => rec && (rec.key === accountOrKey || rec.account_id === accountOrKey);
+
+  for (const rec of (data.api_keys || [])) {
+    if (!matches(rec)) continue;
+    const n = wipe(rec);
+    if (n) { out.keys++; out.fields += n; }
+    // A key whose owner is gone must not keep working, even if the revoke call
+    // that normally precedes this never landed.
+    rec.active = false;
+  }
+  for (const rec of (data.accounts || [])) {
+    if (!matches(rec)) continue;
+    const n = wipe(rec);
+    if (n) { out.accounts++; out.fields += n; }
+  }
+  return out;
+}
+
+module.exports = {
+  PERSONAL_DATA_FIELDS,
+  erasePersonalData, VALID_SCOPES, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };
