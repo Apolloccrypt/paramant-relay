@@ -38,7 +38,7 @@ const quota         = require('./lib/quota');
 const keysTable     = require('./lib/keys-table');
 const paraidRegistry = require('./lib/paraid-registry');
 
-const VERSION    = '3.0.0';
+const VERSION    = '3.1.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
