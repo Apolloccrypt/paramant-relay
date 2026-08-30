@@ -5,7 +5,9 @@
 //   2. the Business+ audit-export returns the completed envelope's full .psign,
 //      and a Pro key is still refused 403 even with the envelope deps present
 //   3. backfillAccountIndex() rebuilds the index from an un-indexed env:* key
-// Needs redis (REDIS_URL / 127.0.0.1:6396) + @paramant/core; skips otherwise.
+// Needs the ML-DSA-65 engine (@paramant/core) and a redis at REDIS_URL /
+// 127.0.0.1:6396. A missing one is a FAILURE unless the runner declared it
+// absent via RELAY_TEST_SKIP; see test/_requires.js.
 //   docker run -d --rm -p 6396:6379 --name auditexp-redis redis:alpine
 
 const assert = require('assert');
@@ -14,28 +16,12 @@ const envelopeMod = require('../envelope');
 const openApi = require('../lib/parasign-open-api');
 const ax = require('../lib/parasign-audit-export');
 const parasign = require('../parasign');
+const { requireEngine, requireRedis, summary } = require('./_requires');
 
 let passed = 0;
 const ok = (n) => { passed++; console.log('  ok -', n); };
 const J = JSON.stringify;
 
-function loadEngine() {
-  try {
-    require('../crypto/bootstrap').bootstrap();
-    const registry = require('../crypto/registry');
-    const eng = registry.getSig(0x0002);
-    if (eng && typeof eng.generateKeyPair === 'function') return eng;
-  } catch (_) {}
-  return null;
-}
-async function tryRedis() {
-  const url = process.env.REDIS_URL || 'redis://127.0.0.1:6396';
-  let createClient;
-  try { ({ createClient } = require('redis')); } catch { return null; }
-  const rc = createClient({ url, socket: { connectTimeout: 800, reconnectStrategy: false } });
-  rc.on('error', () => {});
-  try { await rc.connect(); await rc.ping(); return rc; } catch { try { await rc.disconnect(); } catch {} return null; }
-}
 function fakeRes() {
   return {
     statusCode: null, headers: null, _body: '',
@@ -54,13 +40,11 @@ async function completeOpenEnvelope(store, eng, out, docHash) {
 }
 
 async function main() {
-  const eng = loadEngine();
-  const rc = await tryRedis();
+  const eng = requireEngine();
+  const rc = await requireRedis('redis://127.0.0.1:6396');
   if (!eng || !rc) {
-    console.log('  skip - need redis (127.0.0.1:6396) + ML-DSA-65 engine');
-    console.log(`\nparasign-envelope-index: ${passed} checks passed`);
-    if (rc) try { await rc.disconnect(); } catch {}
-    return;
+    if (rc) try { await rc.disconnect(); } catch (_) {}
+    return summary('parasign-envelope-index', passed);
   }
   const registry = require('../crypto/registry');
   const store = new envelopeMod.EnvelopeStore(rc, {
@@ -173,7 +157,7 @@ async function main() {
     try { await rc.quit(); } catch {}
   }
 
-  console.log(`\nparasign-envelope-index: ${passed} checks passed`);
+  summary('parasign-envelope-index', passed);
   if (passed < 7) process.exit(1);
 }
 

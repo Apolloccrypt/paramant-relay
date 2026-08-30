@@ -1,28 +1,21 @@
 'use strict';
 // ParaSign durable side-store (lib/parasign-store.js). Proves the encryption
-// invariants and both backends. The redis-backed checks (durability + TTL) run
-// only when a throwaway redis is reachable (REDIS_URL, default 127.0.0.1:6399);
-// otherwise they skip so the default suite stays green without a container.
+// invariants and both backends. The redis-backed checks (durability + TTL) need
+// a throwaway redis (REDIS_URL, default 127.0.0.1:6399); without one the suite
+// FAILS unless the runner declared redis absent. The encryption checks above
+// them do not touch redis and run either way. See test/_requires.js.
 //   docker run -d --rm -p 6399:6379 --name parasign-test-redis redis:alpine
 //   REDIS_URL=redis://127.0.0.1:6399 node --test test/parasign-store.test.js
 
 const assert = require('assert');
 const crypto = require('crypto');
 const { createParaSignStore, normalizeKey, seal, unseal } = require('../lib/parasign-store');
+const { requireRedis, summary } = require('./_requires');
 
 const KEY = crypto.randomBytes(32);
 let passed = 0;
 const ok = (n) => { passed++; console.log('  ok -', n); };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-async function tryRedis() {
-  const url = process.env.REDIS_URL || 'redis://127.0.0.1:6399';
-  let createClient;
-  try { ({ createClient } = require('redis')); } catch { return null; }
-  const rc = createClient({ url, socket: { connectTimeout: 800, reconnectStrategy: false } });
-  rc.on('error', () => {});
-  try { await rc.connect(); await rc.ping(); return rc; } catch { try { await rc.disconnect(); } catch {} return null; }
-}
 
 async function main() {
   // 1. seal/unseal round-trip + AAD binding
@@ -64,9 +57,9 @@ async function main() {
   }
 
   // 4. redis backend: DURABILITY (survives a fresh store instance) + TTL
-  const rc = await tryRedis();
+  const rc = await requireRedis('redis://127.0.0.1:6399');
   if (!rc) {
-    console.log('  skip - redis backend checks (no reachable redis at REDIS_URL/127.0.0.1:6399)');
+    // requireRedis already said so, by name. Nothing to add.
   } else {
     try {
       const id = 'durable_' + crypto.randomBytes(6).toString('hex');
@@ -103,5 +96,5 @@ async function main() {
 }
 
 main()
-  .then(() => console.log(`\nparasign-store: ${passed} checks passed`))
+  .then(() => summary('parasign-store', passed))
   .catch((e) => { console.error('\nFAILED:', e && e.stack || e); process.exit(1); });

@@ -7,25 +7,19 @@
 //  C) the sandbox/test nature is baked INTO the notary-signed .psign evidence
 //     (mode:'test' + sandbox:true, inside the signed payload); a live receipt
 //     carries NO such marker.
-// Needs the ML-DSA-65 engine (@paramant/core); skips if it cannot load.
+// Needs the ML-DSA-65 engine (@paramant/core). If it cannot load this suite
+// FAILS: it is the only guard on the live/sandbox split, so a green tick over
+// zero checks would be a lie. See test/_requires.js.
 
 const assert = require('assert');
 const crypto = require('crypto');
+const { requireEngine, summary } = require('./_requires');
 const openApi = require('../lib/parasign-open-api');
 const parasign = require('../parasign');
 
 const SHA3 = (b) => crypto.createHash('sha3-256').update(b).digest('hex');
 let passed = 0;
 const ok = (n) => { passed++; console.log('  ok -', n); };
-
-function loadEngine() {
-  try {
-    require('../crypto/bootstrap').bootstrap();
-    const eng = require('../crypto/registry').getSig(0x0002);
-    if (eng && typeof eng.generateKeyPair === 'function') return eng;
-  } catch (_) {}
-  return null;
-}
 
 function makeRes() {
   return { code: 0, headers: null, body: null,
@@ -130,7 +124,16 @@ async function testTestSandbox(eng) {
 // the emitted .psign. Verifies the marker lives INSIDE the notary-signed body.
 async function receiptFor(eng, mode) {
   const relayKp = eng.generateKeyPair();
-  const relayIdentity = { sk: relayKp.secretKey, pk_hash: SHA3(Buffer.from(relayKp.publicKey)) };
+  // pk is NOT optional: buildEnvelopePsign puts the raw notary key in the
+  // receipt (notary.relay_public_key = Buffer.from(relayIdentity.pk)), so a
+  // fixture without it made Buffer.from(undefined) throw, getReceipt mapped
+  // that to 500 notary_sign_failed, and the marker checks below never ran.
+  // Nobody noticed, because the whole suite was skipping before it got here.
+  const relayIdentity = {
+    sk: relayKp.secretKey,
+    pk: relayKp.publicKey,
+    pk_hash: SHA3(Buffer.from(relayKp.publicKey)),
+  };
   const token = 'psk_' + mode + '_owner123';
   const id = 'env_' + crypto.randomBytes(6).toString('hex');
   const env = {
@@ -178,13 +181,13 @@ async function testReceiptMarker(eng) {
 }
 
 async function main() {
-  const eng = loadEngine();
-  if (!eng) { console.log('  skip - ML-DSA-65 engine unavailable'); return; }
+  const eng = requireEngine();
+  if (!eng) return;
   await testLiveGuard(eng);
   await testTestSandbox(eng);
   await testReceiptMarker(eng);
 }
 
 main()
-  .then(() => console.log(`\nparasign-sandbox-live-guard: ${passed} checks passed`))
+  .then(() => summary('parasign-sandbox-live-guard', passed))
   .catch((e) => { console.error('\nFAILED:', e && e.stack || e); process.exit(1); });
