@@ -13,6 +13,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const catalog = require('../lib/billing-catalog');
+const entitlements = require('../lib/entitlements');
 
 const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'pricing.html'), 'utf8');
 
@@ -256,3 +257,83 @@ assert(VISIBLE.includes('Forever &middot; no card required'), 'Free card must ke
 ok('one starting-for-free promise: forever-free tier, no trial clock');
 
 console.log('pricing-page: ' + passed + ' checks passed');
+
+// ── Every amount belongs to the card it stands in ────────────────────────────
+//
+// The catalog sweep above asks two questions: is every amount on the page a
+// catalog amount, and does every catalog amount appear somewhere. Both are true
+// of a page where two cards have swapped prices, so a ParaSend Pro button
+// reading EUR 59.29/mo passes: that is ParaSign Pro's real price, just on the
+// wrong card. Same for a swapped yearly link, and same for a discount figure
+// that is genuine for another plan.
+//
+// That is not a hypothetical. A wrong number next to the right plan is exactly
+// the class of bug this page had, so the check has to bind an amount to the card
+// it is printed in, not to the page as a whole.
+const cards = html.split(/<div class="tier-card/).slice(1);
+assert(cards.length >= 5, 'expected at least 5 tier cards, found ' + cards.length);
+
+const cardMoney = /&euro;([\d,]+\.?\d*)/g;
+  // Only a percentage presented as a discount, so an SLA figure ("99.9%") in a
+  // paid card is not read as a price claim. The page writes discounts as
+  // "16.7% off"; anything else is left alone.
+  const cardPct = /(\d+\.\d)%\s*off/g;
+let bound = 0;
+
+for (const raw of cards) {
+  // Strip HTML comments first: the WHY-notes above quote the old wrong figures
+  // on purpose, and a test that reads them would fail on its own documentation.
+  const card = raw.replace(/<!--[\s\S]*?-->/g, '');
+  const btn = /data-billing-product="([a-z]+)"\s+data-billing-plan="([a-z]+)"/.exec(card);
+  if (!btn) continue;                       // free card: nothing is charged there
+  const [, product, plan] = btn;
+
+  // Every price this card is allowed to print: its own, in both intervals, each
+  // excl and incl btw. Anything else in this card is a number from another plan.
+  const allowed = new Set();
+  for (const interval of ['monthly', 'yearly']) {
+    const order = catalog.resolveOrder({ product, plan, interval });
+    assert(!order.error, product + '/' + plan + '/' + interval + ': ' + order.error);
+    const incl = Number(order.amount);
+    const excl = Math.round((incl / 1.21) * 100) / 100;
+    allowed.add(incl.toFixed(2));
+    allowed.add(excl.toFixed(2));
+    allowed.add(String(Math.round(excl)));  // "15" as well as "15.00"
+    allowed.add(Math.round(excl).toLocaleString('en-US'));
+  }
+
+  // The per-signature overage rate is a real amount on this card and it does not
+  // come from the subscription catalog; it hangs off the tier itself. Read it
+  // from there rather than allowing any stray number through, so a wrong overage
+  // rate is still caught.
+  const ent = entitlements.getEntitlements(
+    product === 'parasign' ? { plan_parasign: plan } : { plan_parasend: plan },
+  )[product];
+  const rate = ent && ent.overage && ent.overage.rate_eur;
+  if (rate != null) {
+    allowed.add(Number(rate).toFixed(2));
+    allowed.add(String(Number(rate)));
+  }
+
+  for (let m; (m = cardMoney.exec(card)); ) {
+    const raw = m[1].replace(/,/g, '');
+    const norm = new Set([raw, Number(raw).toFixed(2), String(Number(raw))]);
+    const ok_ = [...norm].some((n) => allowed.has(n));
+    assert(ok_, product + '/' + plan + ' card shows &euro;' + m[1] +
+      ', which belongs to another plan (allowed here: ' + [...allowed].sort().join(', ') + ')');
+    bound++;
+  }
+  cardMoney.lastIndex = 0;
+
+  // The yearly discount printed on this card must be this plan's own discount.
+  const mo = Number(catalog.resolveOrder({ product, plan, interval: 'monthly' }).amount);
+  const yr = Number(catalog.resolveOrder({ product, plan, interval: 'yearly' }).amount);
+  const own = Math.round((1 - yr / (mo * 12)) * 1000) / 10;
+  for (let m; (m = cardPct.exec(card)); ) {
+    assert.strictEqual(Number(m[1]), own,
+      product + '/' + plan + ' card claims a ' + m[1] + '% yearly discount; its own is ' + own + '%');
+  }
+  cardPct.lastIndex = 0;
+}
+assert(bound >= 8, 'expected to bind at least 8 amounts to a card, bound ' + bound);
+ok('every amount and discount sits on the card of the plan it belongs to (' + bound + ' amounts bound)');
