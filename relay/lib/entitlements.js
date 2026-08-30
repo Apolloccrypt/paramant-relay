@@ -291,11 +291,21 @@ const PARASIGN = Object.freeze(Object.fromEntries(
 // Missing per-product plan falls back to derivation from the legacy plan, so an
 // account never accidentally lands on the floor tier just because migration has
 // not run yet.
-function getEntitlements(account) {
+function getEntitlements(account, now) {
   const acct = (account && typeof account === 'object') ? account : { plan: account };
   const legacyPlan = acct.plan;
-  const psTier = normaliseParasendTier(acct.plan_parasend || derivePlanParasend(legacyPlan));
-  const pgTier = normaliseParasignTier(acct.plan_parasign || derivePlanParasign(legacyPlan, acct.parasign));
+  const psStored = normaliseParasendTier(acct.plan_parasend || derivePlanParasend(legacyPlan));
+  const pgStored = normaliseParasignTier(acct.plan_parasign || derivePlanParasign(legacyPlan, acct.parasign));
+  // The paid period decides here, at the one place every gate reads. Writing the
+  // date on the record is not enough on its own: without this the tier field
+  // still grants after the period is over, and an expired subscription keeps
+  // working until somebody happens to write a downgrade.
+  //
+  // A record with no period is never expired, so the legacy paths above and
+  // every account from before billing keep exactly the tier they had. Only a
+  // tier that was paid for, with a date that has passed, falls to its floor.
+  const psTier = effectiveProductTier({ plan_parasend: psStored, [PRODUCT_PAID_UNTIL_FIELD.parasend]: acct[PRODUCT_PAID_UNTIL_FIELD.parasend] }, 'parasend', now).tier;
+  const pgTier = effectiveProductTier({ plan_parasign: pgStored, [PRODUCT_PAID_UNTIL_FIELD.parasign]: acct[PRODUCT_PAID_UNTIL_FIELD.parasign] }, 'parasign', now).tier;
   return {
     parasend: PARASEND[psTier],
     parasign: PARASIGN[pgTier],

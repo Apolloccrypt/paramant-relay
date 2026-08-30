@@ -184,3 +184,38 @@ test('a chargeback clears the period along with the tier', async () => {
   assert.strictEqual(got.t, 'community');
   assert.strictEqual(got.until, null);
 });
+
+// ── The gate: getEntitlements must honour the period ─────────────────────────
+// Writing the date on the record is not enough. Every quota and limit in the
+// product comes out of getEntitlements, so if that function ignores the period,
+// an expired subscription keeps working until somebody writes a downgrade.
+
+test('an expired paid tier grants free-tier quotas at the gate', () => {
+  const at = Date.parse('2026-10-01T00:00:00Z');
+  const live = ent.getEntitlements({ plan_parasend: 'pro', paid_until_parasend: '2026-11-01T00:00:00.000Z' }, at);
+  const dead = ent.getEntitlements({ plan_parasend: 'pro', paid_until_parasend: '2026-09-01T00:00:00.000Z' }, at);
+  assert.strictEqual(live.parasend.tier, 'pro');
+  assert.strictEqual(dead.parasend.tier, 'community');
+  assert.ok(dead.parasend.quotas.transfers_month < live.parasend.quotas.transfers_month);
+});
+
+test('an account from before billing keeps its tier at the gate', () => {
+  const at = Date.parse('2026-10-01T00:00:00Z');
+  assert.strictEqual(ent.getEntitlements({ plan_parasend: 'pro' }, at).parasend.tier, 'pro');
+  assert.strictEqual(ent.getEntitlements({ plan: 'pro' }, at).parasend.tier, 'pro');
+});
+
+test('expiry on one product leaves the other alone at the gate', () => {
+  const at = Date.parse('2026-10-01T00:00:00Z');
+  const e = ent.getEntitlements({
+    plan_parasend: 'pro', paid_until_parasend: '2026-09-01T00:00:00.000Z',
+    plan_parasign: 'business', paid_until_parasign: '2026-11-01T00:00:00.000Z',
+  }, at);
+  assert.strictEqual(e.parasend.tier, 'community');
+  assert.strictEqual(e.parasign.tier, 'business');
+});
+
+test('the gate without a clock still answers, using now', () => {
+  const e = ent.getEntitlements({ plan_parasign: 'pro' });
+  assert.strictEqual(e.parasign.tier, 'pro');
+});
