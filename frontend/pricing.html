@@ -333,6 +333,26 @@
   </div>
 </section>
 
+<!-- One basis for every listed price on this page: excl. btw. The rest of the
+     site quotes the same numbers that way (frontend/js/quota-upgrade.js), so
+     switching this page to incl. btw would only move the contradiction.
+
+     The amount actually taken off the card is incl. 21% btw and lives in
+     relay/lib/billing-catalog.js. It is always printed as "charged ... incl.
+     21% btw" beside the listed price, never on its own. Until 2026-08-30 the
+     monthly prices were listed excl. btw and the Business yearly price incl.
+     btw; read side by side that looks like paying yearly costs more.
+
+     Yearly discount is stated as a percentage, not as "two months free". Two
+     months free is 16.7%, which holds for ParaSend Pro and ParaSign Business
+     but not for ParaSign Pro (15.1%: 59.29 x 12 = 711.48 against 603.79).
+
+     Number format is English throughout (dot decimal, comma thousands) and the
+     currency is always &euro;, never the string "EUR". The page mixed all four
+     variants, including EUR 3.617,90 and &euro;3,617.90 for the same amount.
+
+     relay/test/pricing-page.test.js recomputes every amount here from the
+     catalog, so a price edited on this page alone turns the suite red. -->
 <!-- TIER CARDS: PARASEND -->
 <section style="padding:0 0 var(--space-9)">
   <div class="container">
@@ -360,7 +380,7 @@
       <div class="tier-card featured">
         <div class="tier-name">Pro</div>
         <div class="tier-price">&euro;15<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">&euro;18,15/mo incl. 21%</span><br>&euro;15/mo or &euro;150/yr excl.</div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;18.15/mo incl. 21% btw</span><br>Annual &euro;150 excl. &middot; 16.7% off</div>
         <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
         <ul class="tier-features">
           <li>Everything in Free</li>
@@ -381,8 +401,8 @@
      It used to hold six static Mollie payment links; all six returned 404 on
      2026-08-08, and even alive they carried no metadata, which is how the
      first paying customer got nothing on 2026-07-21. -->
-        <a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get ParaSend Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;18,15/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;181,50/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get ParaSend Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;18.15/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;181.50/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -424,7 +444,7 @@
 
       <div class="tier-card">
         <div class="tier-name">Free</div>
-        <div class="tier-price">EUR 0</div>
+        <div class="tier-price">&euro;0</div>
         <div class="tier-price-note">Forever</div>
         <ul class="tier-features">
           <li>2 signatures per month</li>
@@ -437,31 +457,31 @@
 
       <div class="tier-card featured">
         <div class="tier-name">Pro</div>
-        <div class="tier-price">EUR 49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">EUR 59,29/mo incl. 21%</span></div>
+        <div class="tier-price">&euro;49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;59.29/mo incl. 21% btw</span></div>
         <ul class="tier-features">
-          <li>100 signatures per month, then EUR 0.40 each, up to 1,000</li>
+          <li>100 signatures per month, then &euro;0.40 each, up to 1,000</li>
           <li>Past 1,000 a month, Business is cheaper anyway</li>
           <li>Unlimited transfers - API access</li>
-          <li>Annual: EUR 499 (two months free)</li>
+          <li>Annual: &euro;499 excl. &middot; 15.1% off</li>
         </ul>
-        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Pro &rarr; <span style="font-weight:400;opacity:.85">EUR 59,29/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 603,79/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;59.29/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;603.79/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
         <div class="tier-name">Business</div>
-        <div class="tier-price">EUR 299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">EUR 361,79/mo incl. 21%</span></div>
+        <div class="tier-price">&euro;299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;361.79/mo incl. 21% btw</span></div>
         <ul class="tier-features">
           <li>1,000 signatures per month</li>
           <li>Named support, response within one business day</li>
           <li>We help you answer your customers' security questionnaires</li>
           <li>Exportable audit log with CT tree head (CSV or JSON)</li>
-          <li>Annual: EUR 2,990 (two months free)</li>
+          <li>Annual: &euro;2,990 excl. &middot; 16.7% off</li>
         </ul>
-        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">EUR 361,79/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; EUR 3.617,90/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">&euro;361.79/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;3,617.90/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -517,13 +537,17 @@
   </div>
 </section>
 
-<!-- TRIAL CTA -->
+<!-- This block promised "30 days, no credit card, full relay access" until
+     2026-08-30, on a page whose Free cards say "Forever, no card required" and
+     whose FAQ says there is no separate trial. Three promises, one of them
+     invented. The free tier is the trial; there is no 30-day clock. -->
+<!-- FREE-TIER CTA -->
 <section style="padding:var(--space-4) 0 var(--space-9)">
   <div class="container-md">
     <div class="trial-cta">
       <div>
         <p style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-2)">Not sure which plan fits?</p>
-        <p style="font-size:var(--text-sm);color:var(--ink)">Create a free account. 30 days, no credit card, full relay access.</p>
+        <p style="font-size:var(--text-sm);color:var(--ink)">Start on the free tier. No card, no time limit; upgrade when you outgrow the limits.</p>
       </div>
       <a href="/signup" class="btn btn-primary">Create account →</a>
     </div>
@@ -552,7 +576,7 @@
 
     <div class="faq-item">
       <p class="faq-q">How does ParaSign pricing work?</p>
-      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Free covers 2 signatures a month; Pro (&euro;49/mo or &euro;499/yr) includes 100 a month, then &euro;0.40 each, with API access; Business (&euro;299/mo) includes 1,000 a month with named support and an exportable audit log. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. Signatures are advanced (AES), not qualified (QES). QES is coming via an EU QTSP partner.</div>
+      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Free covers 2 signatures a month; Pro (&euro;49/mo or &euro;499/yr, excl. btw) includes 100 a month, then &euro;0.40 each, with API access; Business (&euro;299/mo or &euro;2,990/yr, excl. btw) includes 1,000 a month with named support and an exportable audit log. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. Signatures are advanced (AES), not qualified (QES). QES is coming via an EU QTSP partner.</div>
     </div>
 
     <div class="faq-item">
