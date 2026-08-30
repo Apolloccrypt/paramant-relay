@@ -5052,6 +5052,40 @@ const server = http.createServer(async (req, res) => {
     }));
   }
 
+  // ── POST /v2/admin/keys/erase ─────────────────────────────────────────────
+  // Revoke stops a key working; this removes the person. Article 17 GDPR asks for
+  // erasure, and until now "delete account" left the email address in users.json
+  // on every sector while only Redis was cleared. Audit finding 5 of 2026-07-21.
+  //
+  // Takes an account_id or a key and erases the identifying fields from both
+  // places the account lives, keeping what a payment must stay traceable by.
+  // Idempotent: a retry after a sector was briefly unreachable finds nothing left
+  // and reports zero, which is a success and not an error.
+  if (path === '/v2/admin/keys/erase' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const target = d.account_id || d.key;
+      if (!target) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
+      let result = { accounts: 0, keys: 0, fields: 0 };
+      await _mutateUsersJson(ud => {
+        result = keysTable.erasePersonalData(ud, target);
+        ud.updated = new Date().toISOString();
+      });
+      // Drop the in-memory copies too, otherwise the erased address stays
+      // readable until the next restart.
+      for (const [k, v] of apiKeys) {
+        if (k === target || (v && v.account_id === target)) {
+          for (const f of keysTable.PERSONAL_DATA_FIELDS) delete v[f];
+          v.active = false;
+        }
+      }
+      const acct = accounts.get(target);
+      if (acct) { for (const f of keysTable.PERSONAL_DATA_FIELDS) delete acct[f]; }
+      log('info', 'account_erased', { target: String(target).slice(0, 16), ...result });
+      res.writeHead(200); return res.end(J({ ok: true, erased: result }));
+    } catch (e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     try {

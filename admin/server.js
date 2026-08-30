@@ -2587,6 +2587,14 @@ api.delete("/user/account", authUser, async (req, res) => {
     await relayFetch(s, "/v2/admin/keys/revoke", "POST", { key: user_id }, false, ADMIN_TOKEN);
   });
 
+  // Revoking stops the key; it does not remove the person. This route sits
+  // behind the "Deactivate account" button, so a visitor who presses it is
+  // asking to be gone, and until now their email address stayed in users.json on
+  // every sector. Article 17 GDPR, and audit finding 5 of 2026-07-21.
+  await eachSector(Object.keys(SECTORS), async s => {
+    await relayFetch(s, "/v2/admin/keys/erase", "POST", { key: user_id }, false, ADMIN_TOKEN);
+  });
+
   await callRelay("/v2/user/delete-totp", { user_id });
 
   for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
@@ -3284,6 +3292,12 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
   try {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
+    // Erase the person, not just the key. Redis was already cleared below, but
+    // users.json on every sector kept the email address. Audit finding 5 of
+    // 2026-07-21. Errors are swallowed like the revoke above: a sector that is
+    // briefly unreachable must not leave the deletion half done and unretryable,
+    // and the call is idempotent so a retry is free.
+    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/erase', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
     await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
     for await (const rkey of scanKeys(redis(), { MATCH: `paramant:user:session:*`, COUNT: 100 })) {
       const raw = await redis().get(rkey).catch(() => null);
