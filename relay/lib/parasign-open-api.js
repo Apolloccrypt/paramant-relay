@@ -198,6 +198,35 @@ async function emitEvent(deps, id, event, extra) {
   }
 }
 
+// ── /v1 Bearer authentication ─────────────────────────────────────────────────
+// The single definition of "is this caller a known /v1 client": Authorization:
+// Bearer psk_live_/psk_test_ resolving to an active key-table record. Split out
+// of route() (behaviour there is unchanged) because it used to live ONLY inside
+// this router, and relay.js has /v1 handlers of its own that run BEFORE the
+// router and therefore never reached it. That is how POST /v1/paraid/
+// issue-document shipped with nothing but an IP rate-limit in front of a live
+// credential signer. Those handlers now call this.
+// AUTHENTICATION only. The parasign scope check stays in route(), because it is
+// AUTHORIZATION for one product: ParaID is not in billing-catalog PRODUCTS and
+// has no scope of its own, so demanding "parasign" there would gate one product
+// behind another's entitlement.
+// Returns { ok: true, token, mode, rec } or { ok: false, code, error, message }.
+function authenticateBearer(authHeader, apiKeys) {
+  const m = /^Bearer\s+(.+)$/i.exec((authHeader || '').trim());
+  const token = m ? m[1].trim() : '';
+  const isPsk = /^psk_(live|test)_/.test(token);
+  if (!token || !isPsk) {
+    return { ok: false, code: 401, error: 'unauthorized',
+      message: 'Missing or malformed API key. Send Authorization: Bearer psk_live_... / Geen of ongeldige API-sleutel; stuur Authorization: Bearer psk_live_...' };
+  }
+  const rec = apiKeys && apiKeys.get(token);
+  if (!rec || rec.active === false) {
+    return { ok: false, code: 401, error: 'unauthorized',
+      message: 'API key not recognised or revoked. / API-sleutel onbekend of ingetrokken.' };
+  }
+  return { ok: true, token, mode: token.startsWith('psk_test_') ? 'test' : 'live', rec };
+}
+
 // ── main router ───────────────────────────────────────────────────────────────
 // deps: { req, res, method, path, query, clientIp, authHeader, publicOrigin,
 //         apiKeys, envStore, envCreateRateOk, safeHttpsRequest, canonicalJSON,
@@ -205,22 +234,10 @@ async function emitEvent(deps, id, event, extra) {
 async function route(deps) {
   const { res, method, path, query, apiKeys, envStore, J } = deps;
 
-  // 1) AUTH - Bearer psk_live_/psk_test_ + parasign scope.
-  const m = /^Bearer\s+(.+)$/i.exec((deps.authHeader || '').trim());
-  const token = m ? m[1].trim() : '';
-  const isPsk = /^psk_(live|test)_/.test(token);
-  if (!token || !isPsk) {
-    return errRes(res, 401,
-      'unauthorized',
-      'Missing or malformed API key. Send Authorization: Bearer psk_live_... / Geen of ongeldige API-sleutel; stuur Authorization: Bearer psk_live_...',
-      J);
-  }
-  const mode = token.startsWith('psk_test_') ? 'test' : 'live';
-  const rec = apiKeys.get(token);
-  if (!rec || rec.active === false) {
-    return errRes(res, 401, 'unauthorized',
-      'API key not recognised or revoked. / API-sleutel onbekend of ingetrokken.', J);
-  }
+  // 1) AUTH - Bearer psk_live_/psk_test_ (authenticateBearer) + parasign scope.
+  const auth = authenticateBearer(deps.authHeader, apiKeys);
+  if (!auth.ok) return errRes(res, auth.code, auth.error, auth.message, J);
+  const { token, mode, rec } = auth;
   if (!hasParaSignScope(rec)) {
     return errRes(res, 403, 'forbidden_scope',
       'This key lacks the "parasign" scope. Enable ParaSign for this key/account. / Deze sleutel mist de scope "parasign". Activeer ParaSign voor deze sleutel/dit account.', J);
@@ -723,6 +740,7 @@ async function voidEnvelope(deps, id, token, rec) {
 
 module.exports = {
   route, emitEvent, hasParaSignScope, externalStatus,
+  authenticateBearer,           // shared with the relay's own /v1 handlers
   grantParaSignScope, setParaSignEnabled,
   authorizeReceipt, hexEqual,   // exposed for tests
   sandboxAutoSign,              // exposed for tests

@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- noindex: ParaID was pulled from the shop window on 2026-07-19 (fb3cdd3) and is not a
+     product in relay/lib/billing-catalog.js, so it cannot be bought. A bulk SEO commit
+     (e0e82a1, 2026-07-25) then re-published all 59 routes into sitemap.xml and put this
+     page back in front of Google six days after that decision. The sitemap entries are
+     gone again; this tag is what makes the already-indexed copies drop out. The page
+     itself stays reachable on purpose: it is labelled beta and states it is not an
+     eIDAS-qualified scheme. Removing it is a product call, not an SEO one. -->
+<meta name="robots" content="noindex, nofollow">
 <title>ParaID wallet · Paramant</title>
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="Your ParaID wallet: hold a credential and prove claims like 18+? without revealing the data. Beta.">
