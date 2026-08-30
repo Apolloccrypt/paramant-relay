@@ -75,6 +75,57 @@
     box.textContent = text;
   }
 
+  /* The choice a visitor made before we sent them away to sign in.
+   *
+   * Clicking a price button while signed out used to end here: we redirected to
+   * /auth/login?next=/pricing, and after signing in the visitor landed back on a
+   * page full of buttons with no memory of which one they had pressed. They had
+   * to find it again and click a second time. Every new customer had to want it
+   * twice, and the moment they were most willing to pay was the moment we threw
+   * their choice away.
+   *
+   * sessionStorage, not a query parameter: the plan is not a secret but it is
+   * also nobody's business in a URL that gets shared, logged and pasted. It dies
+   * with the tab, which is exactly the lifetime of a purchase decision. */
+  var INTENT = 'paramant.checkout.intent.v1';
+
+  function rememberIntent(btn) {
+    try {
+      sessionStorage.setItem(INTENT, JSON.stringify({
+        product: btn.getAttribute('data-billing-product'),
+        plan: btn.getAttribute('data-billing-plan'),
+        interval: btn.getAttribute('data-billing-interval'),
+        at: new Date().toISOString()
+      }));
+    } catch (e) { /* private mode: the visitor just clicks again, no worse than before */ }
+  }
+
+  function takeIntent() {
+    var raw = null;
+    try { raw = sessionStorage.getItem(INTENT); sessionStorage.removeItem(INTENT); }
+    catch (e) { return null; }
+    if (!raw) return null;
+    try {
+      var i = JSON.parse(raw);
+      if (!i || !i.product || !i.plan || !i.interval) return null;
+      return i;
+    } catch (e) { return null; }
+  }
+
+  /* Find the button that matches a remembered choice, so resuming presses the
+   * real button: same request, same error handling, same visible state. A
+   * separate resume path would be a second way to buy, and the second way is
+   * always the one that rots. */
+  function buttonFor(i) {
+    for (var n = 0; n < buttons.length; n++) {
+      var b = buttons[n];
+      if (b.getAttribute('data-billing-product') === i.product &&
+          b.getAttribute('data-billing-plan') === i.plan &&
+          b.getAttribute('data-billing-interval') === i.interval) return b;
+    }
+    return null;
+  }
+
   Array.prototype.forEach.call(buttons, function (btn) {
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
@@ -99,6 +150,7 @@
         if (msg.indexOf('key_http_401') === 0 || msg.indexOf('key_http_403') === 0 ||
             msg === 'key_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
+          rememberIntent(btn);
           window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
           return;
         }
@@ -107,4 +159,21 @@
       });
     });
   });
+
+  /* Back from signing in with a choice still pending: press it for them. Only
+   * once, because takeIntent clears the store as it reads. A failure here shows
+   * the same inline error as a normal click, so a visitor is never left on a
+   * page that silently did nothing. */
+  var pending = takeIntent();
+  if (pending) {
+    var target = buttonFor(pending);
+    if (target) {
+      var note = document.createElement('div');
+      note.setAttribute('role', 'status');
+      note.style.cssText = 'margin-top:.6rem;font-size:.85rem;color:#334155';
+      note.textContent = 'Picking up where you left off.';
+      if (target.parentNode) target.parentNode.insertBefore(note, target.nextSibling);
+      target.click();
+    }
+  }
 })();
