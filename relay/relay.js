@@ -2202,7 +2202,26 @@ const server = http.createServer(async (req, res) => {
   // Substantial tier: issue from a passport MRZ. The relay re-validates the MRZ
   // check digits and derives age_over_18 + nationality itself; only those two
   // attributes are sealed, never name/birthdate/document number.
+  //
+  // AUTHENTICATED. This route signs an identity claim with the registered Demo
+  // Authority key on nothing but MRZ text the caller typed, and it shipped with
+  // only a per-IP rate-limit in front of it: anyone on the internet could mint a
+  // signed "age_over_18 / nationality" credential from made-up digits. An
+  // unauthenticated signer of identity claims is a liability, so it now sits
+  // behind the same Bearer psk_ authentication as every other /v1 route
+  // (parasign-open-api authenticateBearer). It is deliberately NOT behind the
+  // parasign SCOPE: ParaID is not a product in billing-catalog PRODUCTS and has
+  // no scope of its own, and gating it on another product's entitlement would
+  // be a pricing decision, not a security one.
+  // Known consequence: the /paraid-document page's issue button now gets a 401.
+  // The page stays up (it is labelled beta and says it is not an eIDAS scheme),
+  // but issuance is no longer something a visitor can trigger.
   if (path === '/v1/paraid/issue-document' && req.method === 'POST') {
+    const _paraidAuth = parasignOpenApi.authenticateBearer(req.headers['authorization'] || '', apiKeys);
+    if (!_paraidAuth.ok) {
+      res.writeHead(_paraidAuth.code, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: _paraidAuth.error, message: _paraidAuth.message }));
+    }
     if (!paraidIssuer || !paraidIssuer.issueSubstantial) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'issuer not configured' })); }
     if (!envCreateRateOk('paraid:' + clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'issuance quota exceeded, try later' })); }
     let body;

@@ -182,21 +182,6 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://paramant.app/paraid</loc>
-    <lastmod>2026-07-21</lastmod>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://paramant.app/paraid-app</loc>
-    <lastmod>2026-07-21</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://paramant.app/paraid-document</loc>
-    <lastmod>2026-07-21</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
     <loc>https://paramant.app/pararules</loc>
     <lastmod>2026-07-21</lastmod>
     <priority>0.6</priority>
