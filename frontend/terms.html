@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Service Level Agreement — PARAMANT</title>
+<title>Terms of Service · PARAMANT</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
-<meta property="og:title" content="Service Level Agreement · PARAMANT">
-<meta property="og:description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
-<meta property="og:url" content="https://paramant.app/sla">
+<meta name="description" content="PARAMANT Terms of Service: who you contract with, what the plans include, payment and cancellation, acceptable use, liability, and the right of withdrawal.">
+<meta property="og:title" content="Terms of Service · PARAMANT">
+<meta property="og:description" content="PARAMANT Terms of Service: who you contract with, what the plans include, payment and cancellation, acceptable use, liability, and the right of withdrawal.">
+<meta property="og:url" content="https://paramant.app/terms">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Service Level Agreement · PARAMANT">
-<meta name="twitter:description" content="PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans.">
-<link rel="canonical" href="https://paramant.app/sla">
+<meta name="twitter:title" content="Terms of Service · PARAMANT">
+<meta name="twitter:description" content="PARAMANT Terms of Service: who you contract with, what the plans include, payment and cancellation, acceptable use, liability, and the right of withdrawal.">
+<link rel="canonical" href="https://paramant.app/terms">
 
 <link rel="stylesheet" href="/design-system.css?v=22">
 <link rel="stylesheet" href="/nav.css?v=19">
@@ -127,9 +127,9 @@ a:hover{opacity:.8}
   "@graph": [
     {
       "@type": "WebPage",
-      "@id": "https://paramant.app/sla#webpage",
-      "url": "https://paramant.app/sla",
-      "name": "Service Level Agreement — PARAMANT",
+      "@id": "https://paramant.app/terms#webpage",
+      "url": "https://paramant.app/terms",
+      "name": "Terms of Service · PARAMANT",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -137,7 +137,7 @@ a:hover{opacity:.8}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "PARAMANT SLA: uptime commitments, credits policy, and support tiers for community, professional, and enterprise plans."
+      "description": "PARAMANT Terms of Service: who you contract with, what the plans include, payment and cancellation, acceptable use, liability, and the right of withdrawal."
     }
   ]
 }
@@ -309,135 +309,106 @@ a:hover{opacity:.8}
 </div>
 
 <div class="wrap">
-  <div class="eyebrow">Legal &mdash; effective 1 January 2025</div>
-  <h1>Service Level Agreement</h1>
-  <p class="sub">Uptime commitments, downtime credits, and support response times for all PARAMANT relay plans.</p>
+  <div class="eyebrow">Legal &mdash; version 1, effective 25 August 2026</div>
+  <h1>Terms of Service</h1>
+  <p class="sub">The agreement between you and Paramantis Solutions B.V. for the use of PARAMANT. Written to be read, not to be skipped. Where these terms are silent, Dutch law fills the gap.</p>
 
   <div class="toc">
-    <a href="#uptime">1. Uptime commitments</a>
-    <a href="#credits">2. Downtime credits</a>
-    <a href="#support">3. Support tiers</a>
-    <a href="#exclusions">4. Exclusions</a>
-    <a href="#measurement">5. Measurement methodology</a>
-    <a href="#changes">6. SLA changes</a>
-    <a href="#contact">7. Contact</a>
+    <a href="#parties">1. Who you are contracting with</a>
+    <a href="#scope">2. What the service is</a>
+    <a href="#account">3. Your account</a>
+    <a href="#plans">4. Plans, price and payment</a>
+    <a href="#withdrawal">5. Cancellation and right of withdrawal</a>
+    <a href="#use">6. Acceptable use</a>
+    <a href="#content">7. Your content, and what we cannot do with it</a>
+    <a href="#availability">8. Availability and support</a>
+    <a href="#liability">9. Liability</a>
+    <a href="#suspension">10. Suspension and termination</a>
+    <a href="#ip">11. Intellectual property</a>
+    <a href="#changes">12. Changes to these terms</a>
+    <a href="#law">13. Law, disputes and complaints</a>
+    <a href="#contact">14. Contact</a>
   </div>
 
-  <!-- 1. Uptime -->
-  <h2 id="uptime">1. Uptime commitments</h2>
-  <p>Monthly uptime percentage is calculated as: <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">(total minutes &minus; downtime minutes) / total minutes &times; 100</code></p>
+  <h2 id="parties">1. Who you are contracting with</h2>
+  <p>PARAMANT is operated by <strong>Paramantis Solutions B.V.</strong>, established in Harderwijk, the Netherlands, registered with the Dutch Chamber of Commerce under KvK 42115132. In these terms "we", "us" and "PARAMANT" mean that company. "You" means the person or organisation using the service.</p>
+  <p>These terms apply to every use of paramant.app, the relay, the dashboard, ParaSend, ParaSign, ParaShare and the API. They apply from the moment you create an account or use the service without one.</p>
+  <div class="note-box">These terms cover the <strong>hosted service</strong> at paramant.app. The <strong>software</strong> is licensed separately under the <a href="/license">Business Source License 1.1</a>, which permits free non-commercial, personal and research use, including self-hosting. Running your own relay is governed by that licence, not by this document.</div>
 
-  <div class="sla-grid">
-    <div class="sla-cell head">
-      <div class="tier">Community</div>
-      <div class="uptime">99.5%</div>
-      <div class="uptime-sub">~3.6 h/month max downtime</div>
-    </div>
-    <div class="sla-cell head">
-      <div class="tier">Enterprise</div>
-      <div class="uptime">99.95%</div>
-      <div class="uptime-sub">~22 min/month max downtime</div>
-    </div>
-  </div>
+  <h2 id="scope">2. What the service is</h2>
+  <p>PARAMANT relays encrypted data. Files and documents are encrypted in your own browser before they reach us, and the relay never holds the plaintext or the key. Transfer payloads live in RAM only and are destroyed on first read or when their time to live expires, whichever comes first. The current time to live is one hour on Free, twenty-four hours on Pro and seven days on Enterprise.</p>
+  <p>Two consequences follow from that design, and you should understand both before you rely on the service.</p>
+  <p><strong>PARAMANT is not storage and not a backup.</strong> Anything you send is meant to disappear. Keep your own copy of anything you care about. We cannot recover a transfer once it has burned or expired, because there is nothing left to recover.</p>
+  <p><strong>We cannot read your data, and therefore we cannot restore it.</strong> If you lose your key or your link, the content is unrecoverable. That is not a support limitation we could lift with more effort; it is the property that makes the service worth using.</p>
 
-  <p>Uptime is measured per calendar month across the primary relay endpoint assigned to your plan. All five sector relays (health, legal, finance, IoT, relay) are covered.</p>
+  <h2 id="account">3. Your account</h2>
+  <p>An account requires a working e-mail address. You are responsible for keeping your credentials and your second factor secure, and for everything that happens under your account. Tell us promptly at <a href="mailto:info@paramant.app">info@paramant.app</a> if you think your account has been compromised.</p>
+  <p>One account is for one person or one organisation. Do not share credentials, and do not create accounts to work around the limits of a plan.</p>
+  <p>You must be at least 16 years old to create an account. PARAMANT is not directed at children.</p>
 
-  <!-- 2. Credits -->
-  <h2 id="credits">2. Downtime credits</h2>
-  <p>If PARAMANT fails to meet the monthly uptime commitment, you may request a service credit. Credits are applied to the next billing cycle and are the sole remedy for downtime.</p>
+  <h2 id="plans">4. Plans, price and payment</h2>
+  <p>The Free tier is free, has no card requirement, and stays free. Paid plans buy higher limits: longer link expiry, more reads per link, more registered devices, API access and a dedicated relay. They do not unlock the encryption, which is the same on every tier.</p>
+  <p>Prices are shown on the <a href="/pricing">pricing page</a> excluding Dutch VAT (btw). Checkout charges the amount including 21% VAT. The price that applies is the one shown at the moment you subscribe.</p>
+  <div class="note-box"><strong>State of play, honestly:</strong> automated billing is not yet live. Paid plans are currently arranged by hand, by e-mail. When online checkout goes live it will run through Mollie, a Dutch payment provider; card details are entered on Mollie's own pages and PARAMANT never sees or stores them.</div>
+  <p>Subscriptions run for the term you choose, monthly or yearly, and renew automatically for the same term unless you cancel before the renewal date. We may change prices for a future term; we will tell you at least thirty days before a change takes effect, and you may cancel before the new term begins.</p>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Monthly uptime</th>
-        <th>Community credit</th>
-        <th>Enterprise credit</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>99.5% &ndash; 99.9%</td>
-        <td>&mdash;</td>
-        <td>5%</td>
-      </tr>
-      <tr>
-        <td>99.0% &ndash; 99.5%</td>
-        <td>&mdash;</td>
-        <td>15%</td>
-      </tr>
-      <tr>
-        <td>95.0% &ndash; 99.0%</td>
-        <td>&mdash;</td>
-        <td>30%</td>
-      </tr>
-      <tr>
-        <td>Below 95.0%</td>
-        <td>&mdash;</td>
-        <td>50%</td>
-      </tr>
-    </tbody>
-  </table>
+  <h2 id="withdrawal">5. Cancellation and right of withdrawal</h2>
+  <p>You can cancel a paid plan at any time. Cancellation takes effect at the end of the paid term. Your plan keeps working until then, after which the account falls back to Free. We do not refund a term that has already started, except where the law requires it or where we have failed to deliver.</p>
+  <p><strong>Consumers.</strong> If you are a consumer in the EU, you have a statutory right to withdraw from a distance contract within fourteen days, without giving a reason. If you ask us to start the service immediately and acknowledge that you thereby lose that right once the service has been fully performed, the right lapses accordingly. If you withdraw within the period and we have already begun, you pay a proportionate amount for what you used. To withdraw, send a plain e-mail to <a href="mailto:info@paramant.app">info@paramant.app</a>; no form and no reason are required.</p>
+  <p><strong>Business customers.</strong> The right of withdrawal above does not apply to contracts entered into in the course of a business or profession.</p>
+  <p>Deleting your account deletes your account data. Transfers already in flight are destroyed with it.</p>
 
-  <div class="note-box"><strong>How to claim:</strong> Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with subject "SLA credit request" within 30 days of the end of the affected calendar month. Include your API key label and a description of the outage. Credits are not automatically issued.</div>
-
-  <!-- 3. Support -->
-  <h2 id="support">3. Support tiers</h2>
-  <p>Initial response times are best-effort targets during business hours (09:00–17:00 CET, Mon–Fri).</p>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Tier</th>
-        <th>Channel</th>
-        <th>Initial response</th>
-        <th>Scope</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="badge badge-comm">Community</span></td>
-        <td>GitHub Issues</td>
-        <td>Best effort</td>
-        <td>Bug reports, documentation questions</td>
-      </tr>
-      <tr>
-        <td><span class="badge badge-ent">Enterprise</span></td>
-        <td>Email + dedicated channel</td>
-        <td>4 business hours</td>
-        <td>Priority escalation, compliance docs, DPO contact, custom contracts</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- 4. Exclusions -->
-  <h2 id="exclusions">4. Exclusions</h2>
-  <p>The following are not counted as downtime for SLA purposes:</p>
-  <ul style="color:var(--ink-dim);padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
-    <li>Scheduled maintenance windows, announced at least 48 hours in advance via <a href="https://github.com/Apolloccrypt/paramant-relay/releases">GitHub Releases</a></li>
-    <li>Downtime caused by client-side network failures, DNS misconfiguration, or TLS certificate errors on the client</li>
-    <li>Force majeure events (natural disasters, acts of war, upstream provider outages outside our control)</li>
-    <li>Downtime caused by your own configuration errors, abuse, or violation of the BUSL-1.1 license terms</li>
-    <li>Degraded performance that does not result in complete unavailability of the relay API endpoints</li>
-    <li>Community plan: no credit entitlement regardless of downtime duration</li>
+  <h2 id="use">6. Acceptable use</h2>
+  <p>The service is end-to-end encrypted, which means we cannot see what you send. That makes this section a matter of your responsibility rather than our filtering. You may not use PARAMANT:</p>
+  <ul style="color:var(--ink-dim);margin:0 0 16px 20px;line-height:1.8">
+    <li>for anything unlawful under Dutch or EU law, including distributing material depicting the sexual abuse of children, or content that incites terrorism;</li>
+    <li>to infringe someone else's intellectual property or breach a duty of confidentiality you owe;</li>
+    <li>to attack, overload, probe or circumvent the limits of the relay or anyone else's systems;</li>
+    <li>to send malware, or to run a command-and-control or phishing operation;</li>
+    <li>to resell the hosted service as your own, or to evade plan limits by automation or multiple accounts.</li>
   </ul>
+  <p>You are responsible for having the right to send what you send, and for complying with any rules that bind you, such as professional confidentiality, export control or sector regulation.</p>
+  <p>Where a court or a competent authority orders us to act, we comply with what Dutch and EU law require of us. In practice there is very little we can hand over: we hold ciphertext and account data, never plaintext and never keys. We will not weaken the encryption, and we will not build a way in. If we are legally free to tell you that we received an order, we will.</p>
 
-  <!-- 5. Measurement -->
-  <h2 id="measurement">5. Measurement methodology</h2>
-  <p>PARAMANT measures availability using automated HTTP health checks against <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on each relay sector endpoint, from multiple EU locations, every 60 seconds. An endpoint is considered unavailable when three consecutive checks fail with a non-2xx response or a TCP timeout.</p>
-  <p>Historical uptime data is published in the Certificate Transparency log and available at <a href="/ct-log">/ct-log</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
+  <h2 id="content">7. Your content, and what we cannot do with it</h2>
+  <p>What you send stays yours. You grant us only the narrow, temporary permission needed to relay it: to receive an encrypted blob, hold it in memory, and hand it to the recipient. Nothing more.</p>
+  <p>We do not read, scan, mine, profile, sell or train on your content. That is not only a promise; the architecture removes the possibility. What we do process to run your account is set out in the <a href="/privacy">Privacy Policy</a>, and business customers can sign a <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a> under Article 28 GDPR.</p>
 
-  <!-- 6. Changes -->
-  <h2 id="changes">6. SLA changes</h2>
-  <p>PARAMANT may update this SLA with 30 days' written notice. Continued use of the service after the effective date constitutes acceptance of the revised SLA. Material reductions to uptime commitments entitle existing paying customers to terminate their subscription and receive a pro-rated refund for the remaining term.</p>
+  <h2 id="availability">8. Availability and support</h2>
+  <p>We aim to keep the service up, but the Free tier comes with no uptime guarantee. Committed uptime, downtime credits and support response times for paid tiers are set out in the <a href="/sla">Service Level Agreement</a>, which forms part of these terms for the plans it covers.</p>
+  <p>We may perform maintenance and may change or discontinue features. If we discontinue something you pay for, we will give reasonable notice and refund the unused part of your term.</p>
 
-  <!-- 7. Contact -->
-  <h2 id="contact">7. Contact</h2>
-  <p>For SLA credits, support escalations, or enterprise contract inquiries:</p>
-  <p><a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
-  PARAMANT &mdash; Hetzner DE (NBG1)<br>
-  EU/DE jurisdiction &middot; GDPR Art. 28 compliant &middot; No US CLOUD Act exposure</p>
+  <h2 id="liability">9. Liability</h2>
+  <p>The service is provided as it is. To the extent Dutch law permits, our total liability towards a business customer under these terms is limited, per event and per calendar year, to the amount you paid us in the twelve months before the event, and for the Free tier to nil. We are not liable for indirect or consequential loss, lost profit, lost data or missed savings.</p>
+  <p>These limits do not apply to damage caused by our intent or deliberate recklessness, to death or personal injury, or where mandatory law forbids the limitation. If you are a consumer, your statutory rights are unaffected by anything in this section.</p>
+  <p>We are specifically not liable for data you lose because a transfer burned, expired, or because you lost the key. That behaviour is the service working as described.</p>
 
-  <div class="note-box" style="margin-top:40px"><strong>Self-hosting:</strong> This SLA applies exclusively to the managed PARAMANT relay service at <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 5px">*.paramant.app</code>. Self-hosted deployments are governed by the BUSL-1.1 license and carry no uptime warranty. See <a href="https://github.com/Apolloccrypt/paramant-relay#self-hosting" target="_blank" rel="noopener">self-hosting documentation on GitHub</a> for HA configuration guidance.</div>
+  <h2 id="suspension">10. Suspension and termination</h2>
+  <p>We may suspend or terminate an account that breaches these terms, that endangers the platform or other users, or where the law requires it. Except in urgent cases we will warn you first and give you a chance to put it right. Where we suspend without warning, we will explain afterwards why.</p>
+  <p>You may terminate at any time by cancelling your plan and deleting your account.</p>
+
+  <h2 id="ip">11. Intellectual property</h2>
+  <p>The PARAMANT name, logo, site content and documentation belong to Paramantis Solutions B.V. The relay, dashboard and protocol are licensed under the <a href="/license">Business Source License 1.1</a>, which grants free non-commercial, personal and research use and converts to the MIT licence on 1 January 2030. Commercial production use of the software requires a commercial licence. Nothing in these terms transfers ownership of the software to you, and nothing in the licence gives you rights over the hosted service beyond these terms.</p>
+
+  <h2 id="changes">12. Changes to these terms</h2>
+  <p>We may change these terms. Every version carries a number and an effective date at the top of this page. For material changes affecting paid plans we will notify account holders by e-mail at least thirty days in advance, and you may cancel before the change takes effect. Continuing to use the service after that date means you accept the new version.</p>
+
+  <h2 id="law">13. Law, disputes and complaints</h2>
+  <p>Dutch law applies. Disputes go to the competent court in the district where Paramantis Solutions B.V. is established, unless mandatory law gives you the right to another forum. If you are a consumer, you keep the right to bring a case before the court of your own place of residence.</p>
+  <p>Bring a complaint to us first at <a href="mailto:info@paramant.app">info@paramant.app</a>. We answer within fourteen days, and if we need longer we say so and say when. Consumers in the EU may also use the European ODR platform.</p>
+  <p>If a provision of these terms turns out to be invalid, the rest stays in force and the invalid part is read as the closest valid alternative.</p>
+
+  <h2 id="contact">14. Contact</h2>
+  <table>
+    <tr><td>Company</td><td>Paramantis Solutions B.V.</td></tr>
+    <tr><td>Registered office</td><td>Harderwijk, the Netherlands</td></tr>
+    <tr><td>KvK</td><td>42115132</td></tr>
+    <tr><td>General and billing</td><td><a href="mailto:info@paramant.app">info@paramant.app</a></td></tr>
+    <tr><td>Privacy and data requests</td><td><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></td></tr>
+  </table>
+  <p>Related documents: <a href="/privacy">Privacy Policy</a> &middot; <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a> &middot; <a href="/sla">Service Level Agreement</a> &middot; <a href="/license">License</a> &middot; <a href="/security">Security</a>.</p>
 </div>
 
 <footer>

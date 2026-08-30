@@ -82,6 +82,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://paramant.app/terms</loc>
+    <lastmod>2026-07-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://paramant.app/government</loc>
     <lastmod>2026-07-21</lastmod>
     <priority>0.6</priority>

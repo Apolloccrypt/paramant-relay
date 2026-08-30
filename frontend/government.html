@@ -334,6 +334,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
       <a href="/quantum-urgency">Quantum urgency</a>
       <a href="/crypto-agility">Crypto agility</a>
       <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
     </div>
   </div>
 
@@ -576,6 +577,12 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
       <div class="step">
         <div class="step-num">4</div>
         <div class="step-body">
+          <!-- The live site carries a stray "Terms of Service" link inside the
+               sentence below, between the DPA link and "(GDPR Art. 28)", so the
+               page reads "sign the Data Processing Agreement Terms of Service
+               (GDPR Art. 28)". It was added by a blind edit that treated every
+               DPA link as a nav item. Deploying this file repairs that; the nav
+               and footer links to /terms are kept, that one is not. -->
           <h4>Data Processing Agreement (managed relay only)</h4>
           <p>If using the Paramant-managed relay, sign the <a href="/dpa">Data Processing Agreement</a>
           (GDPR Art. 28). When self-hosting, no DPA is required &mdash; you control all infrastructure.</p>
@@ -620,6 +627,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:28px}
         <div class="footer-links">
           <a href="/privacy">Privacy Policy</a>
           <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
           <a href="/license">License</a>
           <a href="/compliance/nis2">Compliance overview</a>
