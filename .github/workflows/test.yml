@@ -86,6 +86,27 @@ jobs:
         working-directory: relay
         run: node --test $(find crypto -name '*.test.js')
 
+      # The ParaSign suites that need the ML-DSA-65 engine. They used to run in
+      # the unit job below, which installs nothing, so @paramant/core was never
+      # there: each one caught the load error, printed "skip - ...", and returned.
+      # A file that exits 0 is a PASS to `node --test`, so the job reported
+      # "ok 24" while four suites asserted nothing at all. The worst of them was
+      # parasign-sandbox-live-guard, the only guard on "a psk_live_ key must
+      # never reach the sandbox auto-signer". They run here instead, against the
+      # engine this job builds, and test/_requires.js now fails them outright if
+      # it is missing. This job has no redis service, so that one precondition is
+      # declared by name rather than silently swallowed.
+      - name: Relay ParaSign engine suites
+        working-directory: relay
+        env:
+          RELAY_TEST_SKIP: redis
+        run: >-
+          node --test
+          test/parasign-sandbox.test.js
+          test/parasign-sandbox-live-guard.test.js
+          test/parasign-open-api-e2e.test.js
+          test/parasign-envelope-index.test.js
+
       # inbound-hash-verify spawns a real relay.js, so it needs the installed
       # dependencies and belongs here, not in the no-install unit job. It sat in
       # that job from 2026-07-20 and failed every single run with "relay did not
@@ -108,10 +129,21 @@ jobs:
       # binding, webauthn helpers. No @paramant/core build and no Redis, so the
       # relay/test suite that previously had zero CI coverage now gates here.
       # inbound-hash-verify is excluded: it spawns a real relay.js and needs the
-      # installed dependencies, so it runs in the crypto job above.
+      # installed dependencies, so it runs in the crypto job above. The four
+      # parasign-* suites are excluded for the same reason: they need the
+      # ML-DSA-65 engine, which this job deliberately does not build. They used
+      # to run here and silently skip, which is what made "ok 24" mean nothing.
       - name: Relay unit suite
         working-directory: relay
-        run: node --test $(ls test/*.test.js | grep -v inbound-hash-verify)
+        env:
+          # This job installs nothing on purpose, so the redis client is absent
+          # and parasign-store / parasign-signs-quota cannot reach a server.
+          # Declaring it here is what keeps them amber instead of red; anything
+          # NOT named here is now a hard failure (see relay/test/_requires.js).
+          RELAY_TEST_SKIP: redis
+        run: >-
+          node --test $(ls test/*.test.js | grep -vE
+          'inbound-hash-verify|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index')
 
       # Root integration suites (tests/*.mjs): dependency-injected, node builtins
       # only (no @paramant/core, no Redis, no npm install). The browser suites are

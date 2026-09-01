@@ -10,25 +10,18 @@
 //   * a NEW signature increments the counter by exactly 1,
 //   * an idempotent ('idem') retry does NOT double-count,
 //   * once the counter reaches the plan cap the next sign is refused with 402.
-// Skips when no redis is reachable (REDIS_URL, default 127.0.0.1:6399).
+// Needs a redis (REDIS_URL, default 127.0.0.1:6399). Without one this suite
+// FAILS unless the runner declared redis absent; see test/_requires.js.
 //   docker run -d --rm -p 6399:6379 --name parasign-test-redis redis:alpine
 
 const assert = require('assert');
 const crypto = require('crypto');
 const quota = require('../lib/quota');
 const tiers = require('../lib/tiers');
+const { requireRedis, summary } = require('./_requires');
 
 let passed = 0;
 const ok = (n) => { passed++; console.log('  ok -', n); };
-
-async function tryRedis() {
-  const url = process.env.REDIS_URL || 'redis://127.0.0.1:6399';
-  let createClient;
-  try { ({ createClient } = require('redis')); } catch { return null; }
-  const rc = createClient({ url, socket: { connectTimeout: 800, reconnectStrategy: false } });
-  rc.on('error', () => {});
-  try { await rc.connect(); await rc.ping(); return rc; } catch { try { await rc.disconnect(); } catch {} return null; }
-}
 
 // Mirror of the fixed /v2/envelopes/:id/sign metering. storeCode is what
 // EnvelopeStore.sign() would return ('new' | 'idem' | 'bad_signature').
@@ -50,8 +43,8 @@ async function routeSign(rc, accountId, plan, storeCode) {
 async function usage(rc, acct) { return (await quota.readUsage(rc, acct)).signs_this_month; }
 
 async function main() {
-  const rc = await tryRedis();
-  if (!rc) { console.log('  skip - no reachable redis'); return; }
+  const rc = await requireRedis('redis://127.0.0.1:6399');
+  if (!rc) return;
   try {
     const acct = 'acct_' + crypto.randomBytes(6).toString('hex');
     await rc.del(quota.signsKey ? quota.signsKey(acct) : `paramant:quota:signs:${acct}:${quota.ymKey()}`);
@@ -98,5 +91,5 @@ async function main() {
 }
 
 main()
-  .then(() => console.log(`\nparasign-signs-quota: ${passed} checks passed`))
+  .then(() => summary('parasign-signs-quota', passed))
   .catch((e) => { console.error('\nFAILED:', e && e.stack || e); process.exit(1); });

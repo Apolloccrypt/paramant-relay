@@ -4,30 +4,19 @@
 // that produces CRYPTOGRAPHICALLY VALID per-slot signatures (the fake envStore
 // here verifies each one with the real engine under the correct recipe), and
 // that signer.completed + envelope.completed webhooks fire (HMAC-SHA256 signed).
-// Needs the ML-DSA-65 engine (@paramant/core); skips if it cannot load.
+// Needs the ML-DSA-65 engine (@paramant/core). If it cannot load this suite
+// FAILS rather than skipping quietly. See test/_requires.js.
 
 const assert = require('assert');
 const crypto = require('crypto');
 const openApi = require('../lib/parasign-open-api');
+const { requireEngine, summary } = require('./_requires');
 const { signMessageBytes, partyEmailHash } = require('../envelope');
 
 let passed = 0;
 const ok = (n) => { passed++; console.log('  ok -', n); };
 
-function loadEngine() {
-  try {
-    require('../crypto/bootstrap').bootstrap();
-    const registry = require('../crypto/registry');
-    const eng = registry.getSig(0x0002);
-    if (eng && typeof eng.generateKeyPair === 'function') return eng;
-  } catch (_) {}
-  return null;
-}
-
-async function run(bindingMode, recipe) {
-  const eng = loadEngine();
-  if (!eng) return { skipped: true };
-
+async function run(eng, bindingMode, recipe) {
   const N = 2;
   const docHash = crypto.createHash('sha3-256').update('doc' + bindingMode).digest('hex');
   const id = 'env_' + crypto.randomBytes(8).toString('hex');
@@ -98,15 +87,14 @@ async function run(bindingMode, recipe) {
 }
 
 async function main() {
-  const a = await run('open', 4);
-  if (a.skipped) { console.log('  skip - ML-DSA-65 engine unavailable'); }
-  else {
-    ok('sandbox auto-signs an OPEN test envelope with valid v4 signatures + completion webhooks');
-    await run('email', 2);
-    ok('sandbox auto-signs an EMAIL-bound test envelope with valid v2 signatures + trusted-internal proof');
-  }
+  const eng = requireEngine();
+  if (!eng) return;
+  await run(eng, 'open', 4);
+  ok('sandbox auto-signs an OPEN test envelope with valid v4 signatures + completion webhooks');
+  await run(eng, 'email', 2);
+  ok('sandbox auto-signs an EMAIL-bound test envelope with valid v2 signatures + trusted-internal proof');
 }
 
 main()
-  .then(() => console.log(`\nparasign-sandbox: ${passed} checks passed`))
+  .then(() => summary('parasign-sandbox', passed))
   .catch((e) => { console.error('\nFAILED:', e && e.stack || e); process.exit(1); });

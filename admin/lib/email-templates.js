@@ -397,6 +397,12 @@ https://paramant.app`;
 }
 
 // ── 6. ACCOUNT DELETION ───────────────────────────────────────────────────────
+// This mail used to say that account records were retained and that erasure was
+// a separate request to privacy@. That was true while deletion only revoked the
+// key and cleared Redis, leaving the email address in users.json on every sector
+// (audit finding 5 of 2026-07-21). Deletion now erases the personal data itself,
+// so the old wording understated what happened, and a mail that undersells an
+// erasure is as untrue as one that oversells it.
 function accountDeletionEmail({ email, deletedAt, reason }) {
   const preheader = 'Your Paramant account has been deactivated.';
   const dateStr = formatTS(typeof deletedAt === 'number' ? deletedAt : Date.parse(deletedAt));
@@ -405,14 +411,15 @@ function accountDeletionEmail({ email, deletedAt, reason }) {
 
 Your Paramant account (${email}) was deactivated on ${dateStr}.
 
-Its API key can no longer be used. Active sessions and the TOTP setup were removed. Some account records are retained.
+Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.
 
 What this means:
 - API key no longer works
 - Active sessions terminated
-- Account record and audit entries retained
+- Personal data removed from our systems
+- Billing records kept for as long as tax law requires
 
-For a separate personal-data erasure request, contact privacy@paramant.app.
+If you have a question about what was kept and why, contact privacy@paramant.app.
 
 Reason: ${reason || 'not specified'}
 
@@ -425,14 +432,15 @@ https://paramant.app`;
   const html = htmlShell(preheader, `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deactivated</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deactivated on <strong>${dateStr}</strong>.</p>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Its API key can no longer be used. Active sessions and the TOTP setup were removed. Some account records are retained.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.</p>
     <h2 style="margin:24px 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">What this means</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>API key no longer works</li>
       <li>Active sessions terminated</li>
-      <li>Account record and audit entries retained</li>
+      <li>Personal data removed from our systems</li>
+      <li>Billing records kept for as long as tax law requires</li>
     </ul>
-    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">For a separate personal-data erasure request, contact <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">If you have a question about what was kept and why, contact <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
     <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:12px 16px;margin:0 0 24px 0;">
       <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason ? escHtml(reason) : 'not specified'}</p>
     </div>

@@ -38,7 +38,7 @@ const quota         = require('./lib/quota');
 const keysTable     = require('./lib/keys-table');
 const paraidRegistry = require('./lib/paraid-registry');
 
-const VERSION    = '3.0.0';
+const VERSION    = '3.1.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 
@@ -1676,7 +1676,10 @@ function grantParasignOnPaidPlan(accountId) {
 // fan-out + users.json persistence. Idempotent (a repeat call with the same tier
 // changes nothing -> changed:0). For parasign it also flips the `parasign` access
 // flag on when the tier is paid (non-free). NEVER touches the other product.
-function setProductPlan(accountId, product, tier) {
+// paidUntil travels with the tier: a Date (or ISO string) sets the period this
+// grant is paid for, null clears it, and undefined leaves whatever is on record
+// alone. That last case keeps every admin grant behaving exactly as before.
+function setProductPlan(accountId, product, tier, paidUntil) {
   if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
   const norm = product === 'parasign'
     ? entitlements.normaliseParasignTier(tier)
@@ -1689,7 +1692,7 @@ function setProductPlan(accountId, product, tier) {
     if (!mv) continue;
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
-    if (entitlements.applyProductTier(mv, product, norm).changed) changed++;
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil).changed) changed++;
   }
   // Mirror onto the accounts summary too. Readers that only hold an account_id
   // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
@@ -1697,7 +1700,7 @@ function setProductPlan(accountId, product, tier) {
   // outvote a paid grant on any future read path either.
   const _acct = accounts.get(accountId);
   if (_acct) {
-    entitlements.applyProductTier(_acct, product, norm);
+    entitlements.applyProductTier(_acct, product, norm, paidUntil);
     _acct.plan_updated = new Date().toISOString();
   }
   _mutateUsersJson(ud => {
@@ -2199,7 +2202,26 @@ const server = http.createServer(async (req, res) => {
   // Substantial tier: issue from a passport MRZ. The relay re-validates the MRZ
   // check digits and derives age_over_18 + nationality itself; only those two
   // attributes are sealed, never name/birthdate/document number.
+  //
+  // AUTHENTICATED. This route signs an identity claim with the registered Demo
+  // Authority key on nothing but MRZ text the caller typed, and it shipped with
+  // only a per-IP rate-limit in front of it: anyone on the internet could mint a
+  // signed "age_over_18 / nationality" credential from made-up digits. An
+  // unauthenticated signer of identity claims is a liability, so it now sits
+  // behind the same Bearer psk_ authentication as every other /v1 route
+  // (parasign-open-api authenticateBearer). It is deliberately NOT behind the
+  // parasign SCOPE: ParaID is not a product in billing-catalog PRODUCTS and has
+  // no scope of its own, and gating it on another product's entitlement would
+  // be a pricing decision, not a security one.
+  // Known consequence: the /paraid-document page's issue button now gets a 401.
+  // The page stays up (it is labelled beta and says it is not an eIDAS scheme),
+  // but issuance is no longer something a visitor can trigger.
   if (path === '/v1/paraid/issue-document' && req.method === 'POST') {
+    const _paraidAuth = parasignOpenApi.authenticateBearer(req.headers['authorization'] || '', apiKeys);
+    if (!_paraidAuth.ok) {
+      res.writeHead(_paraidAuth.code, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: _paraidAuth.error, message: _paraidAuth.message }));
+    }
     if (!paraidIssuer || !paraidIssuer.issueSubstantial) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'issuer not configured' })); }
     if (!envCreateRateOk('paraid:' + clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'issuance quota exceeded, try later' })); }
     let body;
@@ -5052,6 +5074,40 @@ const server = http.createServer(async (req, res) => {
     }));
   }
 
+  // ── POST /v2/admin/keys/erase ─────────────────────────────────────────────
+  // Revoke stops a key working; this removes the person. Article 17 GDPR asks for
+  // erasure, and until now "delete account" left the email address in users.json
+  // on every sector while only Redis was cleared. Audit finding 5 of 2026-07-21.
+  //
+  // Takes an account_id or a key and erases the identifying fields from both
+  // places the account lives, keeping what a payment must stay traceable by.
+  // Idempotent: a retry after a sector was briefly unreachable finds nothing left
+  // and reports zero, which is a success and not an error.
+  if (path === '/v2/admin/keys/erase' && req.method === 'POST') {
+    try {
+      const d = JSON.parse((await readBody(req, 1024)).toString());
+      const target = d.account_id || d.key;
+      if (!target) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
+      let result = { accounts: 0, keys: 0, fields: 0 };
+      await _mutateUsersJson(ud => {
+        result = keysTable.erasePersonalData(ud, target);
+        ud.updated = new Date().toISOString();
+      });
+      // Drop the in-memory copies too, otherwise the erased address stays
+      // readable until the next restart.
+      for (const [k, v] of apiKeys) {
+        if (k === target || (v && v.account_id === target)) {
+          for (const f of keysTable.PERSONAL_DATA_FIELDS) delete v[f];
+          v.active = false;
+        }
+      }
+      const acct = accounts.get(target);
+      if (acct) { for (const f of keysTable.PERSONAL_DATA_FIELDS) delete acct[f]; }
+      log('info', 'account_erased', { target: String(target).slice(0, 16), ...result });
+      res.writeHead(200); return res.end(J({ ok: true, erased: result }));
+    } catch (e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
   if (path === '/v2/admin/keys/revoke' && req.method === 'POST') {
     try {
@@ -5144,6 +5200,12 @@ const server = http.createServer(async (req, res) => {
     const _idemKey = (id) => `paramant:billing:done:${id}`;
     const outcome = await billing.processPayment(payment, {
       setProductPlan,
+      // Lets a renewal extend from where the paid period ends instead of from
+      // the day the money landed, so paying early never costs the buyer days.
+      currentPaidUntil: async (accountId, product) => {
+        const rec = accounts.get(accountId);
+        return (rec && rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null;
+      },
       isProcessed: async (id) => { if (!_rok()) return false; try { return !!(await redisClient.get(_idemKey(id))); } catch { return false; } },
       markProcessed: async (id, val) => { if (!_rok()) return; try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ } },
     });

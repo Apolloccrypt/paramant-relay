@@ -127,8 +127,31 @@ function wireSetupPasskey() {
       a.click();
     });
     const finishBtn = document.getElementById('passkey-finish-btn');
-    if (finishBtn) finishBtn.addEventListener('click', () => { window.location = '/dashboard'; });
+    // Where the visitor was heading before they were asked to register. Someone
+    // who clicked a price button and got sent here wants to land back on the
+    // price page with their choice intact, not on a dashboard that has no idea
+    // they wanted to buy anything. The login path below already reads `next`
+    // this way; this button was hardcoded to /dashboard and threw it away, so
+    // every new customer lost their purchase halfway through signing up.
+    if (finishBtn) finishBtn.addEventListener('click', () => { window.location = safeNext(); });
   }
+}
+
+// Where to send the visitor after they are signed in or registered.
+//
+// Reads `next` (or the older `return`) from the query string and falls back to
+// the dashboard. Only a local path is accepted: it must start with exactly one
+// slash, so an attacker cannot hand out /auth/login?next=//evil.example and turn
+// our sign-in into an open redirect. Anything else silently becomes /dashboard.
+//
+// This lives in one place because it was previously written out twice: once
+// correctly on the login path, and once as a hardcoded /dashboard on the
+// registration finish button. Two copies of the same rule is how one of them
+// ends up wrong.
+function safeNext() {
+  const q = new URLSearchParams(window.location.search);
+  const want = q.get('next') || q.get('return') || '/dashboard';
+  return /^\/(?![\/\\])/.test(want) ? want : '/dashboard';
 }
 
 // ── Login: /auth/login (email-first passkey sign-in) ─────────────────────────
@@ -144,9 +167,7 @@ function wireLoginPasskey() {
     return;
   }
 
-  const _rp = new URLSearchParams(window.location.search), _rv = _rp.get('next') || _rp.get('return') || '/dashboard';
-  // Local paths only (leading single slash) — never an off-site open redirect.
-  const returnUrl = /^\/(?![\/\\])/.test(_rv) ? _rv : '/dashboard';
+  const returnUrl = safeNext();
 
   btn.addEventListener('click', async () => {
     const email = (emailEl && emailEl.value || '').trim();

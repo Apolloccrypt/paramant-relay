@@ -29,7 +29,30 @@ function merkleRoot(leaves) {
 // that a live human was present. No name, age or nationality: those come only
 // from a document read, which is a separate, higher tier. We never fabricate.
 const FIELDS_PRESENCE = ['presence_verified', 'holder_binding'];
-const FIELDS_SUBSTANTIAL = ['age_over_18', 'nationality', 'holder_binding'];
+const FIELDS_MRZ = ['age_over_18', 'nationality', 'holder_binding'];
+
+// The assurance label on a credential says what the issuer actually checked, and
+// nothing more. This one used to read 'substantial', which is the eIDAS word for
+// a legally defined level of identity assurance. A caller supplies two lines of
+// text; the issuer recomputes the ICAO check digits and signs the result. Check
+// digits are a typo guard, not a signature: anyone can write an MRZ that passes
+// them, because the algorithm is public and the input is the caller's own. So
+// the document is never seen, its authenticity is never tested, and no person is
+// tied to it. Claiming eIDAS substantial on that is a claim the evidence does
+// not carry, and a verifier filtering on the word gets a wrong answer.
+//
+// 'mrz-unverified' says the true thing: an MRZ whose form checks out, from a
+// document nobody authenticated. The real substantial rung needs the passport
+// chip (eMRTD SOD, passive authentication), and that is what TIER_CHIP is
+// reserved for. Nothing issues it yet, and nothing pretends to.
+const TIER_PRESENCE = 'presence';
+const TIER_MRZ = 'mrz-unverified';
+const TIER_CHIP = 'high';
+
+// Older credentials in the wild carry 'substantial' from before this rename.
+// They mean exactly what mrz-unverified means; a verifier must read them as the
+// same rung, never as the eIDAS level the word suggests.
+const LEGACY_TIER_ALIASES = Object.freeze({ substantial: TIER_MRZ });
 
 // Server-side MRZ re-validation, so the issuer never signs an attribute the
 // document does not actually check out to. Same ICAO 9303 TD3 logic as the
@@ -57,6 +80,25 @@ function ageOver18(dobYYMMDD, now) {
   return age >= 18;
 }
 
+// Read a credential's assurance rung, mapping the pre-rename word onto the rung
+// it always meant. Verifiers must go through this instead of comparing tier
+// strings, so one old credential cannot read as a level it never had.
+export function assuranceOf(credential) {
+  const t = (credential && credential.tier) || TIER_PRESENCE;
+  return LEGACY_TIER_ALIASES[t] || t;
+}
+
+// Ascending order of what the issuer actually verified. Anything unknown sorts
+// below presence rather than above it: an unrecognised label is never a reason
+// to trust a credential more.
+export const ASSURANCE_RANK = Object.freeze([TIER_PRESENCE, TIER_MRZ, TIER_CHIP]);
+export function assuranceAtLeast(credential, required) {
+  const have = ASSURANCE_RANK.indexOf(assuranceOf(credential));
+  const need = ASSURANCE_RANK.indexOf(required);
+  if (have < 0 || need < 0) return false;
+  return have >= need;
+}
+
 export function createIssuer({ keyFile }) {
   const raw = JSON.parse(readFileSync(keyFile, 'utf8'));
   const secretKey = new Uint8Array(Buffer.from(raw.secretKey, 'base64'));
@@ -80,7 +122,7 @@ export function createIssuer({ keyFile }) {
       ok: true,
       credential: {
         v: 1,
-        tier: 'presence',
+        tier: TIER_PRESENCE,
         fieldOrder: order,
         issuerDid: did,
         issuerPublicKey: b64(publicKey),
@@ -97,13 +139,13 @@ export function createIssuer({ keyFile }) {
   // check digits and derives the attributes itself, so it never signs a claim
   // the document does not check out to. Only age_over_18 and nationality are
   // sealed: never the name, birthdate or document number.
-  function issueSubstantial({ holderBindingB64url, mrzLine1, mrzLine2, now }) {
+  function issueFromMrz({ holderBindingB64url, mrzLine1, mrzLine2, now }) {
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(holderBindingB64url || '')) {
       return { ok: false, error: 'holder_binding must be a b64url sha3-256 hash' };
     }
     const v = validateTD3(mrzLine1, mrzLine2);
     if (!v) return { ok: false, error: 'MRZ failed validation (format or check digits)' };
-    const order = FIELDS_SUBSTANTIAL;
+    const order = FIELDS_MRZ;
     const fields = {
       age_over_18: ageOver18(v.dob, now instanceof Date ? now : new Date()) ? 'yes' : 'no',
       nationality: v.nationality,
@@ -116,7 +158,11 @@ export function createIssuer({ keyFile }) {
     return {
       ok: true,
       credential: {
-        v: 1, tier: 'substantial', fieldOrder: order,
+        v: 1, tier: TIER_MRZ, fieldOrder: order,
+        // Spelled out on the credential itself, so a verifier that never reads
+        // our docs still cannot mistake this for a checked document.
+        checked: 'mrz_check_digits',
+        not_checked: ['document_authenticity', 'chip_signature', 'holder_identity', 'liveness'],
         issuerDid: did, issuerPublicKey: b64(publicKey),
         fields, salts: Object.fromEntries(Object.entries(salts).map(([k, s]) => [k, b64url(s)])),
         root: hex(root), rootSig: b64(rootSig),
@@ -124,5 +170,12 @@ export function createIssuer({ keyFile }) {
     };
   }
 
-  return { did, issue, issueSubstantial, publicKeyB64: b64(publicKey) };
+  // issueSubstantial is kept as an alias so every existing caller keeps working
+  // while the name moves to what the function actually does. The credential it
+  // returns now carries the honest tier either way, so the alias cannot be used
+  // to get the old claim back.
+  return {
+    did, issue, issueFromMrz, issueSubstantial: issueFromMrz,
+    publicKeyB64: b64(publicKey),
+  };
 }

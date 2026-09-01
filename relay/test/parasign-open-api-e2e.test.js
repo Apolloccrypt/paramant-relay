@@ -4,7 +4,9 @@
 // in one flow: durable-store persistence (Point 1), the sandbox auto-signer
 // (Point 4), the server-side stamp-worker (Point 2), the full .psign receipt,
 // and webhook_url validation at create (Point 6).
-// Needs redis (REDIS_URL / 127.0.0.1:6399) + @paramant/core; skips otherwise.
+// Needs the ML-DSA-65 engine (@paramant/core) and a redis at REDIS_URL /
+// 127.0.0.1:6399. A missing one is a FAILURE unless the runner declared it
+// absent via RELAY_TEST_SKIP; see test/_requires.js.
 //   docker run -d --rm -p 6399:6379 --name parasign-test-redis redis:alpine
 
 const assert = require('assert');
@@ -15,27 +17,11 @@ const parasignStamp = require('../lib/parasign-stamp');
 const envelopeMod = require('../envelope');
 const parasign = require('../parasign');
 const { isSsrfSafeUrl } = require('../lib/ssrf-guard');
+const { requireEngine, requireRedis, summary } = require('./_requires');
 
 let passed = 0;
 const ok = (n) => { passed++; console.log('  ok -', n); };
 
-function loadEngine() {
-  try {
-    require('../crypto/bootstrap').bootstrap();
-    const registry = require('../crypto/registry');
-    const eng = registry.getSig(0x0002);
-    if (eng && typeof eng.generateKeyPair === 'function') return eng;
-  } catch (_) {}
-  return null;
-}
-async function tryRedis() {
-  const url = process.env.REDIS_URL || 'redis://127.0.0.1:6399';
-  let createClient;
-  try { ({ createClient } = require('redis')); } catch { return null; }
-  const rc = createClient({ url, socket: { connectTimeout: 800, reconnectStrategy: false } });
-  rc.on('error', () => {});
-  try { await rc.connect(); await rc.ping(); return rc; } catch { try { await rc.disconnect(); } catch {} return null; }
-}
 async function makePdfB64() {
   const { PDFDocument, StandardFonts, rgb } = parasignStamp.loadPdfLib();
   const doc = await PDFDocument.create();
@@ -56,9 +42,12 @@ function mockRes() {
 }
 
 async function main() {
-  const eng = loadEngine();
-  const rc = await tryRedis();
-  if (!eng || !rc) { console.log('  skip - need redis + ML-DSA-65 engine'); console.log(`\nparasign-open-api-e2e: ${passed} checks passed`); if (rc) try { await rc.disconnect(); } catch {} return; }
+  const eng = requireEngine();
+  const rc = await requireRedis('redis://127.0.0.1:6399');
+  if (!eng || !rc) {
+    if (rc) try { await rc.disconnect(); } catch (_) {}
+    return;   // the .then below prints the summary line
+  }
 
   const registry = require('../crypto/registry');
   try {
@@ -155,5 +144,5 @@ async function main() {
 }
 
 main()
-  .then(() => console.log(`\nparasign-open-api-e2e: ${passed} checks passed`))
+  .then(() => summary('parasign-open-api-e2e', passed))
   .catch((e) => { console.error('\nFAILED:', e && e.stack || e); process.exit(1); });
