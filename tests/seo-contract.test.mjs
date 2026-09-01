@@ -216,8 +216,13 @@ test('the sitemap has a plausible lastmod on every url', () => {
 // carries Disallow: /auth/. The crawler was invited to a page, redirected into a
 // directory it may not read, and the only title it could see was "302 Found".
 // /sign and /parashare were the only two of 59 sitemap URLs that did not answer
-// 200. The same cycle traps a person: 17 unique non-bot IPs asked for /sign in a
-// day, against 4 for /pricing, and not one of them continued past the login form.
+// 200.
+//
+// This gate is about the crawler, not about visitors. An earlier version of this
+// comment cited 17 visitors on /sign against 4 on /pricing; that count did not
+// survive checking, because 31 of the 36 non-bot IPs that reached /sign fetched
+// no CSS, JS, font or favicon, which is a scanner and not a reader. The config
+// cycle is measured from nginx and robots.txt, so it holds regardless.
 //
 // This reads the deployed nginx config in deploy/, not the running server, so it
 // gates the commit rather than the machine. Production is a separate copy: see
