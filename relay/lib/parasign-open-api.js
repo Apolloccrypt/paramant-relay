@@ -202,14 +202,15 @@ async function emitEvent(deps, id, event, extra) {
 // The single definition of "is this caller a known /v1 client": Authorization:
 // Bearer psk_live_/psk_test_ resolving to an active key-table record. Split out
 // of route() (behaviour there is unchanged) because it used to live ONLY inside
-// this router, and relay.js has /v1 handlers of its own that run BEFORE the
-// router and therefore never reached it. That is how POST /v1/paraid/
-// issue-document shipped with nothing but an IP rate-limit in front of a live
-// credential signer. Those handlers now call this.
-// AUTHENTICATION only. The parasign scope check stays in route(), because it is
-// AUTHORIZATION for one product: ParaID is not in billing-catalog PRODUCTS and
-// has no scope of its own, so demanding "parasign" there would gate one product
-// behind another's entitlement.
+// this router, while relay.js has /v1 handlers of its own that run BEFORE the
+// router and therefore never reached it. A route could sit on /v1, look gated,
+// and not be. That shape once shipped a live credential signer with nothing but
+// an IP rate-limit in front of it; the route is gone, the shape is not, so the
+// check stays out here where a handler can reach it before the router runs.
+// AUTHENTICATION only. The parasign scope check stays in route(), because that
+// is AUTHORIZATION for one product, and gating a non-ParaSign route on a
+// ParaSign entitlement would be a pricing decision dressed up as a security
+// one.
 // Returns { ok: true, token, mode, rec } or { ok: false, code, error, message }.
 function authenticateBearer(authHeader, apiKeys) {
   const m = /^Bearer\s+(.+)$/i.exec((authHeader || '').trim());

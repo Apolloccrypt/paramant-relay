@@ -36,7 +36,6 @@ const tiers         = require('./lib/tiers');
 const entitlements  = require('./lib/entitlements'); // product+tier separation (ParaSend vs ParaSign)
 const quota         = require('./lib/quota');
 const keysTable     = require('./lib/keys-table');
-const paraidRegistry = require('./lib/paraid-registry');
 
 const VERSION    = '3.1.0';
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
@@ -2097,20 +2096,6 @@ function setHeaders(res, req) {
   res.setHeader('X-Hybrid-Mode',                'available');
 }
 
-// ── ParaID issuer registry (fase 2): file-backed, elke mutatie CT-verankerd ──
-const PARAID_REGISTRY_FILE = process.env.PARAID_REGISTRY_FILE || '/data/paraid-issuers.json';
-const paraidIssuers = paraidRegistry.createRegistry({ file: PARAID_REGISTRY_FILE });
-try { log('info', 'paraid_registry_loaded', { issuers: paraidIssuers.load() }); }
-catch (e) { log('warn', 'paraid_registry_load_error', { err: e.message }); }
-
-// ── ParaID demo issuer: signs demo credentials so logged-in users have a real,
-// registry-anchored credential to use. ESM (noble) loaded via dynamic import so
-// signatures match the browser verifier. Absent key file -> issuance disabled.
-const PARAID_ISSUER_KEY_FILE = process.env.PARAID_ISSUER_KEY_FILE || '/data/paraid-demo-authority.sk.json';
-let paraidIssuer = null;
-import('./lib/paraid-issuer.mjs')
-  .then((m) => { paraidIssuer = m.createIssuer({ keyFile: PARAID_ISSUER_KEY_FILE }); log('info', 'paraid_issuer_loaded', { did: paraidIssuer.did }); })
-  .catch((e) => { log('warn', 'paraid_issuer_unavailable', { err: e.message }); });
 
 // ── Code-transparency manifest: in-memory + /data, CT-verankerd bij publish ──
 const CODE_MANIFEST_FILE = process.env.CODE_MANIFEST_FILE || '/data/code-manifest.json';
@@ -2118,7 +2103,11 @@ let codeManifest = null;
 try { codeManifest = JSON.parse(require('fs').readFileSync(CODE_MANIFEST_FILE, 'utf8')); }
 catch (e) { if (e.code !== 'ENOENT') log('warn', 'code_manifest_load_error', { err: e.message }); }
 
-function ctAppendParaidIssuer(eventType, did, payload) {
+// Append one event to the CT log and produce a fresh STH. Named for ParaID
+// when it was written, but the code-transparency manifest anchors through
+// this same function, so it outlives the product it was named after. `did`
+// is any opaque subject identifier, not necessarily a DID.
+function ctAppendEvent(eventType, did, payload) {
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
     .update(eventType).update('|').update(did).update('|')
@@ -2223,59 +2212,6 @@ const server = http.createServer(async (req, res) => {
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
 
-  // ── ParaID issuer registry: publiek leesbaar, vóór de /v1-Bearer-gate ───────
-  // Verifiers must be able to check issuer registrations without an API key.
-  if (path === '/v1/paraid/issuers' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
-    return res.end(J({ issuers: paraidIssuers.list() }));
-  }
-  // Issue a demo credential bound to a holder key. Rate-limited per IP. The
-  // wallet page is session-gated client-side; issuance itself only ever mints
-  // clearly-labelled demo credentials from the Paramant Demo Authority.
-  if (path === '/v1/paraid/issue-demo' && req.method === 'POST') {
-    if (!paraidIssuer) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'demo issuer not configured' })); }
-    if (!envCreateRateOk('paraid:' + clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'issuance quota exceeded, try later' })); }
-    let body;
-    try { body = JSON.parse((await readBody(req, 8192)).toString()); }
-    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
-    const out = paraidIssuer.issue({ holderBindingB64url: String(body.holder_binding || ''), subject: body.subject || {} });
-    if (!out.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(out)); }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J(out));
-  }
-  // Substantial tier: issue from a passport MRZ. The relay re-validates the MRZ
-  // check digits and derives age_over_18 + nationality itself; only those two
-  // attributes are sealed, never name/birthdate/document number.
-  //
-  // AUTHENTICATED. This route signs an identity claim with the registered Demo
-  // Authority key on nothing but MRZ text the caller typed, and it shipped with
-  // only a per-IP rate-limit in front of it: anyone on the internet could mint a
-  // signed "age_over_18 / nationality" credential from made-up digits. An
-  // unauthenticated signer of identity claims is a liability, so it now sits
-  // behind the same Bearer psk_ authentication as every other /v1 route
-  // (parasign-open-api authenticateBearer). It is deliberately NOT behind the
-  // parasign SCOPE: ParaID is not a product in billing-catalog PRODUCTS and has
-  // no scope of its own, and gating it on another product's entitlement would
-  // be a pricing decision, not a security one.
-  // Known consequence: the /paraid-document page's issue button now gets a 401.
-  // The page stays up (it is labelled beta and says it is not an eIDAS scheme),
-  // but issuance is no longer something a visitor can trigger.
-  if (path === '/v1/paraid/issue-document' && req.method === 'POST') {
-    const _paraidAuth = parasignOpenApi.authenticateBearer(req.headers['authorization'] || '', apiKeys);
-    if (!_paraidAuth.ok) {
-      res.writeHead(_paraidAuth.code, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: _paraidAuth.error, message: _paraidAuth.message }));
-    }
-    if (!paraidIssuer || !paraidIssuer.issueSubstantial) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'issuer not configured' })); }
-    if (!envCreateRateOk('paraid:' + clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' }); return res.end(J({ error: 'issuance quota exceeded, try later' })); }
-    let body;
-    try { body = JSON.parse((await readBody(req, 8192)).toString()); }
-    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
-    const out = paraidIssuer.issueSubstantial({ holderBindingB64url: String(body.holder_binding || ''), mrzLine1: String(body.mrz_line1 || ''), mrzLine2: String(body.mrz_line2 || ''), now: new Date() });
-    if (!out.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(out)); }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J(out));
-  }
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
   // Independent monitors fetch this and compare it against the live assets.
@@ -3502,26 +3438,6 @@ const server = http.createServer(async (req, res) => {
     return res.end(renderPrometheus());
   }
 
-  // ── ParaID issuer registry: admin writes ───────────────────────────────────
-  // The public read lives BEFORE the /v1 Bearer-gate higher up. Admin writes:
-  // the public apex 404s /v2/admin at nginx; these are reached from the admin
-  // surface or the host itself. Every mutation is CT-anchored.
-  if (path === '/v2/admin/paraid/issuers' && req.method === 'POST') {
-    const adminTok = (req.headers['x-admin-token'] || '').trim();
-    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
-      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
-    }
-    let body;
-    try { body = JSON.parse((await readBody(req, 16384)).toString()); }
-    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
-    const r = paraidIssuers.add({ label: body.label, publicKeyB64: body.public_key });
-    if (!r.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(r)); }
-    const pkHash = crypto.createHash('sha3-256').update(Buffer.from(r.issuer.public_key, 'base64')).digest('hex');
-    const ct = ctAppendParaidIssuer('paraid_issuer_added', r.issuer.did, { label: r.issuer.label, pk_hash: pkHash });
-    log('info', 'paraid_issuer_added', { did: r.issuer.did, label: r.issuer.label });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, issuer: r.issuer, ct_index: ct.index }));
-  }
   // Publish a new code-transparency manifest (deploy-time step, CT-anchored).
   if (path === '/v2/admin/code-manifest' && req.method === 'POST') {
     const adminTok = (req.headers['x-admin-token'] || '').trim();
@@ -3534,7 +3450,7 @@ const server = http.createServer(async (req, res) => {
     if (!body || !body.files || !body.manifest_hash || typeof body.files !== 'object') {
       res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'manifest needs files + manifest_hash' }));
     }
-    const ct = ctAppendParaidIssuer('code_manifest_published', body.manifest_hash, {
+    const ct = ctAppendEvent('code_manifest_published', body.manifest_hash, {
       git_commit: body.git_commit || '', file_count: Object.keys(body.files).length,
     });
     codeManifest = { ...body, published: new Date().toISOString(), ct_index: ct.index };
@@ -3543,38 +3459,6 @@ const server = http.createServer(async (req, res) => {
     log('info', 'code_manifest_published', { hash: body.manifest_hash.slice(0, 16), files: Object.keys(body.files).length });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, manifest_hash: body.manifest_hash, ct_index: ct.index }));
-  }
-  // Revoke ONE credential of a registered issuer (status-list entry). The id is
-  // the hex SHA3-256 of the signed Merkle root: opaque, no personal data.
-  if (path === '/v2/admin/paraid/credentials/revoke' && req.method === 'POST') {
-    const adminTok = (req.headers['x-admin-token'] || '').trim();
-    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
-      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
-    }
-    let body;
-    try { body = JSON.parse((await readBody(req, 4096)).toString()); }
-    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
-    const r = paraidIssuers.revokeCredential(String(body.issuer_did || ''), String(body.credential || '').toLowerCase());
-    if (!r.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(r)); }
-    const ct = ctAppendParaidIssuer('paraid_credential_revoked', r.issuer.did, { credential: r.credential });
-    log('info', 'paraid_credential_revoked', { did: r.issuer.did, credential: r.credential.slice(0, 16) });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, issuer_did: r.issuer.did, credential: r.credential, ct_index: ct.index }));
-  }
-  if (path === '/v2/admin/paraid/issuers/revoke' && req.method === 'POST') {
-    const adminTok = (req.headers['x-admin-token'] || '').trim();
-    if (!process.env.ADMIN_TOKEN || !adminTok || !safeEqual(adminTok, process.env.ADMIN_TOKEN)) {
-      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' }));
-    }
-    let body;
-    try { body = JSON.parse((await readBody(req, 4096)).toString()); }
-    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invalid json' })); }
-    const r = paraidIssuers.revoke(String(body.did || ''));
-    if (!r.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J(r)); }
-    const ct = ctAppendParaidIssuer('paraid_issuer_revoked', r.issuer.did, { label: r.issuer.label });
-    log('info', 'paraid_issuer_revoked', { did: r.issuer.did });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, issuer: r.issuer, ct_index: ct.index }));
   }
 
   // ── GET /ct, /ct/ — public CT log web UI (no auth) ─────────────────────────

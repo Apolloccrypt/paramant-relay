@@ -29,14 +29,6 @@ const PRIVATE = new Set([
   'developer', 'get', 'ontvang', 'request-key', 'setup',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
-  // ParaID is not for sale: it is absent from PRODUCTS in billing-catalog.js and
-  // was pulled from the navigation on 2026-07-19 (fb3cdd3), which kept the pages
-  // as unlinked routes for the alpha. A later SEO commit then republished all 59
-  // routes in bulk, so the three ParaID pages ended up back in the sitemap on
-  // 2026-07-25, six days after the decision to take them out, with priority 0.9.
-  // They are held to the noindex contract instead: still reachable for anyone
-  // holding the link, not offered to a search engine as something we sell.
-  'paraid', 'paraid-app', 'paraid-document',
 ]);
 
 // Meta-refresh stubs. They point their canonical at the real page and are held

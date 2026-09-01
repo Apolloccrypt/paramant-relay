@@ -8,7 +8,6 @@
 #   - ct-log.json            per relay: the append-only CT log
 #   - sth-log.jsonl          per relay: the Merkle Signed-Tree-Head log
 #   - peer-sths/             per relay: cross-signed peer STHs
-#   - paraid-*.json          per relay: ParaID issuer registry + demo authority key
 #   - code-manifest.json     per relay: code-transparency manifest
 #   - trial-keys.jsonl       per relay
 #   - users.json             per relay: accounts (also covered by the old backup)

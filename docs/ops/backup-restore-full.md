@@ -15,8 +15,6 @@ those volumes:
 | File / dir (per relay `/data`)     | What it is                              | Lose it =                          |
 |------------------------------------|-----------------------------------------|------------------------------------|
 | `relay-identity.json` (0600)       | Relay signing/identity private key      | Relay identity gone, cannot re-sign |
-| `paraid-demo-authority.sk.json` (0400) | ParaID demo authority private key   | ParaID issuance broken             |
-| `paraid-issuers.json`              | ParaID issuer registry                  | Issuer trust set lost              |
 | `ct-log.json`                      | Append-only CT log                      | Transparency history gone          |
 | `sth-log.jsonl`                    | Merkle Signed-Tree-Head log             | Merkle continuity broken           |
 | `peer-sths/`                       | Cross-signed peer STHs                  | Peer gossip state lost             |
@@ -132,7 +130,6 @@ staging container quarterly.
 ## Verification status (this branch)
 
 - Dry-run on the NUC against dummy relay dirs + a throwaway redis with a real
-  AOF/RDB: manifest hashed all 20 expected files (relay-identity, paraid keys,
   ct-log, sth-log, peer-sths, users, redis dump.rdb + appendonlydir).
 - Full round-trip with `age`: encrypt -> decrypt -> extract -> all manifest
   hashes matched -> `--inspect` touched nothing.
