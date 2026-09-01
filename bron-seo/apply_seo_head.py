@@ -31,16 +31,14 @@ PRIVATE = {
     "404", "account", "admin", "all-systems-go", "claim", "co-sign", "dashboard",
     "developer", "get", "ontvang", "request-key", "setup",
     "auth/backup", "auth/login", "auth/request-reset", "auth/reset-confirm",
-    "auth/setup", "billing/checkout", "signup/verified",
-}
+    "auth/setup", "billing/checkout", "signup/verified"}
 
 # Pages that describe an actual piece of software a visitor can use. These earn
 # SoftwareApplication; the rest stay WebPage. Claiming SoftwareApplication on a
 # policy page is the kind of over-tagging that gets structured data ignored.
 SOFTWARE = {
-    "index", "parashare", "sign", "verify", "vault", "download", "paraid",
-    "paraid-app", "paraid-document", "liveness", "co-sign",
-}
+    "index", "parashare", "sign", "verify", "vault", "download",
+    "co-sign"}
 
 
 def pages():
@@ -109,8 +107,7 @@ ORG = {
     "description": "Post-quantum encrypted file transfer and document signing, "
                    "built and hosted in the Netherlands.",
     "areaServed": "EU",
-    "knowsLanguage": ["nl", "en"],
-}
+    "knowsLanguage": ["nl", "en"]}
 
 
 def graph_for(slug, title, desc):
@@ -129,8 +126,7 @@ def graph_for(slug, title, desc):
         "name": clean(title),
         "isPartOf": {"@id": f"{ORIGIN}/#website"},
         "publisher": {"@id": f"{ORIGIN}/#organization"},
-        "inLanguage": "nl" if slug == "banken" else "en",
-    }
+        "inLanguage": "nl" if slug == "banken" else "en"}
     if desc:
         page["description"] = desc
     nodes = [page]
@@ -154,8 +150,7 @@ def graph_for(slug, title, desc):
             "applicationCategory": "SecurityApplication",
             "operatingSystem": "Web browser",
             "url": url,
-            "publisher": {"@id": f"{ORIGIN}/#organization"},
-        })
+            "publisher": {"@id": f"{ORIGIN}/#organization"}})
 
     if slug == "index":
         nodes.append(ORG)
@@ -165,8 +160,7 @@ def graph_for(slug, title, desc):
             "url": ORIGIN + "/",
             "name": "Paramant",
             "publisher": {"@id": f"{ORIGIN}/#organization"},
-            "inLanguage": "en",
-        })
+            "inLanguage": "en"})
 
     return {"@context": "https://schema.org", "@graph": nodes}
 

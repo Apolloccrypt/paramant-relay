@@ -13,9 +13,6 @@ is()  { [ "$2" = "$3" ] && ok "$1" "$3" || bad "$1" "$3" "verwacht $2"; }
 has() { if echo "$3" | grep -qi "$2"; then ok "$1" "ja"; else bad "$1" "nee" "moest '$2' bevatten"; fi; }
 hasnt(){ if echo "$3" | grep -qi "$2"; then bad "$1" "ja" "mocht '$2' NIET bevatten"; else ok "$1" "weg"; fi; }
 
-echo "== de kritieke auditbevinding van 21-07: ParaID tekende zonder auth =="
-is "issue-document zonder header" 401 "$(code -X POST $API/v1/paraid/issue-document -H 'Content-Type: application/json' -d '{"holder_binding":"aaaaaaaaaaaaaaaaaaaaaaaaaa","mrz_line1":"x","mrz_line2":"y"}')"
-is "issue-document met verzonnen bearer" 401 "$(code -X POST $API/v1/paraid/issue-document -H 'Authorization: Bearer psk_verzonnen' -d '{}')"
 
 echo "== AVG: het wis-endpoint bestaat en is dicht =="
 is "keys/erase zonder admin-token" 401 "$(code -X POST $API/v2/admin/keys/erase -H 'Content-Type: application/json' -d '{"key":"pgp_x"}')"
@@ -37,13 +34,8 @@ has "registratie respecteert next" "safeNext" "$K"
 # elementen, en die hoort daar te blijven.
 has "registratieknop gebruikt safeNext" "finishBtn.addEventListener..click.* => . window.location = safeNext" "$K"
 
-echo "== ParaID uit de etalage, pagina blijft bestaan =="
 S=$(curl -s -m 8 "$WEB/sitemap.xml")
-hasnt "sitemap zonder paraid" "paraid" "$S"
 has "sitemap kent de terms-pagina" "/terms" "$S"
-is "paraid-pagina blijft bereikbaar" 200 "$(code $WEB/paraid.html)"
-has "en draagt noindex" "noindex" "$(curl -s -m 8 $WEB/paraid.html)"
-has "eerlijk assurance-label" "never seen or authenticated" "$(curl -s -m 8 $WEB/js/paraid-app.js)"
 
 echo "== de teruggehaalde Terms of Service =="
 is "terms-pagina bereikbaar" 200 "$(code $WEB/terms.html)"

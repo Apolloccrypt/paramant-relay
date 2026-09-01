@@ -106,11 +106,6 @@ const PAGES = [
     what: 'signature verification',
     progressNote: 'verification needs a .psign file dropped in. Covered by tests/parasign-multi-verify.test.mjs.',
   },
-  {
-    url: '/paraid.html',
-    what: 'ParaID',
-    progressNote: 'the wallet demo issues its credential on a button press; the session nonce placeholder ("-") is filled then, by design (js/paraid.js:106).',
-  },
 ];
 
 // Only our own static assets. A 401 on /api/* without a session is correct
