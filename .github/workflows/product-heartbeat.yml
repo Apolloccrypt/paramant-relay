@@ -94,6 +94,22 @@ jobs:
           PARAMANT_RELAY_URL: https://relay.paramant.app
           PARAMANT_API_KEY: ${{ secrets.PARAMANT_CANARY_KEY }}
 
+      # ParaSign canary: does the flagship still sign. The transfer canary
+      # covers ParaSend; nothing covered signing, and in the whole retained log
+      # window (22 Aug to 1 Sep 2026) not one human signed anything, so a broken
+      # ceremony would sit there until a customer found it. It runs a psk_test_
+      # key, so the sandbox signer drives it: no human, no mailbox, no real
+      # document, nothing about a customer read or stored. It verifies the
+      # notary signature itself rather than trusting a 200. always(), because a
+      # dead page must not hide a dead signer.
+      - name: ParaSign canary against the live relay
+        if: always()
+        shell: bash
+        run: node --test tests/parasign-canary.test.mjs 2>&1 | tee -a /tmp/heartbeat.log
+        env:
+          PARAMANT_RELAY_URL: https://relay.paramant.app
+          PARASIGN_CANARY_KEY: ${{ secrets.PARASIGN_CANARY_KEY }}
+
       # External destinations: someone else's uptime, so hourly and never in a
       # pull request. A third party can also delete a page without telling us,
       # which is exactly what a scheduled check is for. always(), because a
