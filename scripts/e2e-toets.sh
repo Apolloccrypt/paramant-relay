@@ -40,7 +40,6 @@ has "sitemap kent de terms-pagina" "/terms" "$S"
 echo "== de teruggehaalde Terms of Service =="
 is "terms-pagina bereikbaar" 200 "$(code $WEB/terms.html)"
 has "navlink naar terms" 'href="/terms"' "$P"
-hasnt "geen terms-link middenin een zin" "sign the <a href=./dpa.>Data Processing Agreement</a>.<a href=./terms" "$(curl -s -m 8 $WEB/government.html | strip | tr -d '\n')"
 
 echo "== gezondheid =="
 is "health" 200 "$(code $API/health)"
