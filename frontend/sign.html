@@ -476,6 +476,37 @@
     <li data-step="sign">Sign</li>
   </ol>
 
+  <!-- No session: say what this needs BEFORE a document is picked.
+       The page used to be behind an nginx auth_request, so a visitor never got
+       here at all; he got /auth/login and, measurably, stopped. Serving the page
+       and then failing at the last step with "please sign in" would only move
+       the dead end to a worse place: after he has already chosen a file. So the
+       honest version states the requirement up front, next to what the product
+       actually does. Hidden by default and revealed by sign-flow.js only when
+       /api/user/check answers 401, so a signed-in user never sees it. -->
+  <section class="ds-step ds-anon" id="step-anon" hidden>
+    <h2>Signing a document needs an account</h2>
+    <p class="ds-sub">
+      Not because the document goes anywhere. It does not: the file and your private key
+      stay in this browser, and the relay only ever sees a hash. The account exists because
+      a Paramant signature is made with a key that belongs to a passkey on your device, and
+      that key has to be enrolled somewhere before it can sign.
+    </p>
+    <p class="ds-sub">
+      <strong>What you can do without one:</strong> open a signing request someone sent you
+      and sign it with the link from that email, and
+      <a href="/verify">verify any signed document</a> against the public log. Neither needs
+      an account.
+    </p>
+    <p class="ds-anon-actions">
+      <a class="ds-btn primary" href="/signup?next=/sign">Create an account</a>
+      <a class="ds-btn" href="/auth/login?next=/sign">Sign in</a>
+    </p>
+    <p class="ds-sub ds-anon-foot">
+      Free accounts sign 2 documents a month. <a href="/pricing">See what the paid tiers add</a>.
+    </p>
+  </section>
+
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
     <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">Choose a workflow. You can change it before sending.</p></div><span class="ds-mode-safe">Private key stays on your device</span></div>
@@ -736,6 +767,20 @@
 
   <!-- Done -->
   <section class="ds-step" id="step-done" hidden>
+    <!-- What the proof says, and what it does not. An open-mode envelope has no
+         invited email and no verified signer: recipe version 4 binds the
+         SIGNER'S PUBLIC KEY into the signed message, so the proof commits to
+         "key K signed slot i of document D" and to nothing about who holds K.
+         Saying more than that would be the same overclaim the ParaID assurance
+         rung was renamed for (substantial -> mrz-unverified). Shown by
+         sign-flow.js only for binding_mode 'open'. -->
+    <p class="ds-proof-scope" id="ds-proof-scope" hidden>
+      <strong>Signer not verified.</strong> This document was signed in open mode, so no
+      email invitation tied a person to a slot. The proof shows that a specific key signed
+      this exact document, and that the key is the one recorded in the envelope. It does not
+      show who holds that key. For a signature bound to an invited email address, use
+      <em>Request signatures</em> instead.
+    </p>
     <div class="ds-success" id="ds-success-banner" hidden></div>
     <h2>Your signed document</h2>
     <p class="ds-sub">Here is what your signature looks like on the document. Scroll the preview to inspect the stamp. The downloads below are self-contained: anyone with your public key can verify them offline, with or without the Paramant relay.</p>
