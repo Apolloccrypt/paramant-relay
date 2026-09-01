@@ -23,6 +23,40 @@ const RELAY = (process.env.PARAMANT_RELAY_URL || 'https://relay.paramant.app').r
 const API_KEY = process.env.PARAMANT_API_KEY || '';
 const TTL_MS = 600000;
 
+// How slow production may get before "it still works" stops being the whole
+// answer. A relay that returns the right bytes in four seconds is not healthy,
+// and the canary was blind to that: it asserted status codes and hashes and
+// never looked at the clock.
+//
+// The number is chosen from measurement, not taste. Median round-trip from the
+// Netherlands on 2026-09-01 was 85 to 124 ms across /health, / and /v2/pubkey,
+// with a worst single sample of 205 ms. A GitHub runner sits further away, so
+// add roughly 150 ms of transit: expect something near 250 ms there. The
+// threshold is an order of magnitude above that, which is wide enough that
+// normal jitter, a cold cache or a slow runner never cries wolf, and tight
+// enough that a relay taking multiple seconds per request cannot pass.
+//
+// Override with CANARY_SLOW_MS when measuring from somewhere far away, or lower
+// it deliberately to tighten the promise once there is a baseline to defend.
+const SLOW_MS = Number(process.env.CANARY_SLOW_MS || 2500);
+
+// Every timing is printed, pass or fail. A threshold that only speaks when it
+// trips gives no series to look at, and the first thing anyone asks after an
+// incident is "was it already creeping up?".
+async function timed(label, fn) {
+  const t0 = performance.now();
+  const out = await fn();
+  const ms = Math.round(performance.now() - t0);
+  console.log(`    ${label}: ${ms} ms`);
+  assert.ok(
+    ms <= SLOW_MS,
+    `${label} took ${ms} ms, over the ${SLOW_MS} ms threshold. The request succeeded, ` +
+    'so this is not an outage; it is the relay getting slow enough that a user notices. ' +
+    'Check the relay process, redis and disk before raising CANARY_SLOW_MS.',
+  );
+  return out;
+}
+
 const sha256hex = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 
 // A distinct payload per run, so two canaries can never collide on one hash and
@@ -32,6 +66,10 @@ function payload(label) {
 }
 
 async function upload(route, body, headers = {}) {
+  return timed(`POST ${route}`, () => _upload(route, body, headers));
+}
+
+async function _upload(route, body, headers = {}) {
   const r = await fetch(`${RELAY}${route}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -54,13 +92,13 @@ test('anonymous transfer: upload, download, burn', async () => {
   assert.equal(up.json?.hash, hash, 'relay stored the blob under a different hash');
   assert.ok(up.json?.download_token, 'no download token, so the recipient has no way to fetch it');
 
-  const dl = await fetch(`${RELAY}/v2/dl/${up.json.download_token}/get`, { signal: AbortSignal.timeout(30000) });
+  const dl = await timed('GET /v2/dl/:token/get', () => fetch(`${RELAY}/v2/dl/${up.json.download_token}/get`, { signal: AbortSignal.timeout(30000) }));
   assert.equal(dl.status, 200, `download failed: HTTP ${dl.status}`);
   const got = Buffer.from(await dl.arrayBuffer());
   assert.equal(sha256hex(got), hash, 'the bytes that came back are not the bytes that went in');
 
   // Burn-on-read is a promise on the front page, not an implementation detail.
-  const again = await fetch(`${RELAY}/v2/dl/${up.json.download_token}/get`, { signal: AbortSignal.timeout(30000) });
+  const again = await timed('GET /v2/dl/:token/get (burned)', () => fetch(`${RELAY}/v2/dl/${up.json.download_token}/get`, { signal: AbortSignal.timeout(30000) }));
   assert.equal(again.status, 410, `the blob survived its read: HTTP ${again.status}, burn-on-read is broken`);
 });
 
@@ -83,10 +121,10 @@ test('keyed transfer: upload, download, burn', { skip: API_KEY ? false : 'PARAMA
   assert.equal(up.status, 200, `keyed upload rejected: HTTP ${up.status} ${up.text.slice(0, 200)}`);
   assert.equal(up.json?.ok, true, 'relay did not accept the keyed upload');
 
-  const dl = await fetch(`${RELAY}/v2/outbound/${hash}`, {
+  const dl = await timed('GET /v2/outbound/:hash', () => fetch(`${RELAY}/v2/outbound/${hash}`, {
     headers: { 'X-Api-Key': API_KEY },
     signal: AbortSignal.timeout(30000),
-  });
+  }));
   assert.equal(dl.status, 200, `keyed download failed: HTTP ${dl.status}`);
   const got = Buffer.from(await dl.arrayBuffer());
   assert.equal(sha256hex(got), hash, 'the bytes that came back are not the bytes that went in');
