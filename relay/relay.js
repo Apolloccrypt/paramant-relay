@@ -174,7 +174,7 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
@@ -182,7 +182,7 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
-               '/v2/capabilities','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   full:       null,
 };
@@ -2500,8 +2500,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   // GET /v2/health/deep -- aggregated readiness check for the post-setup page.
-  // Public read (no auth) so the setup wizard and /all-systems-go can show it.
+  // In full mode this is a public read (no auth) so the setup wizard and
+  // /all-systems-go can show it. In ghost_pipe and iot the same payload is an
+  // information leak (version, key count, free disk, cert age), so there it
+  // sits behind the X-Internal-Auth header that already gates the user
+  // endpoints: monitoring on the host can read it, the open internet cannot.
+  // With no INTERNAL_AUTH_TOKEN configured the route stays closed (the gate
+  // treats missing config as closed), which is the pre-existing behaviour of
+  // every internal endpoint.
   if (req.method === 'GET' && path === '/v2/health/deep') {
+    if (RELAY_MODE !== 'full' && !_internalOk()) return _internalReject();
     const checks = [];
     const add = (name, status, detail) => checks.push({ name, status, detail });
 
