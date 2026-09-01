@@ -180,6 +180,10 @@ select:focus{border-color:var(--cobalt)}
 }
 </style>
 <meta name="description" content="Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download.">
+<meta name="robots" content="noindex, nofollow">
+<!-- Gated by nginx (auth_request /api/user/check), so a crawler can only
+     ever see the 302 to /auth/login, a path robots.txt disallows. Saying
+     noindex here is the honest version of what the server already does. -->
 <meta property="og:title" content="Encrypted file transfer · Paramant">
 <meta property="og:description" content="Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download. No account needed to receive.">
 <meta property="og:url" content="https://paramant.app/parashare">

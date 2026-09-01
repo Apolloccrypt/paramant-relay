@@ -27,6 +27,14 @@ const ORIGIN = 'https://paramant.app';
 const PRIVATE = new Set([
   '404', 'account', 'admin', 'all-systems-go', 'claim', 'co-sign', 'dashboard',
   'developer', 'get', 'ontvang', 'request-key', 'setup',
+  // /parashare sits behind the same nginx auth_request that /sign used to, so
+  // by the rule at the top of this list it belongs here: gated pages are held
+  // to the noindex contract, not the discoverability one. It was in the sitemap
+  // with priority 0.9 while answering 302 to a robots-disallowed login, which
+  // indexes nothing and wastes crawl budget on every pass. This does not open or
+  // close ParaShare; the page and its gate are untouched. It stops the sitemap
+  // from claiming a door is open that is not.
+  'parashare',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
   // ParaID is not for sale: it is absent from PRODUCTS in billing-catalog.js and
@@ -200,4 +208,56 @@ test('the sitemap has a plausible lastmod on every url', () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(mod)) problems.push(`${loc}: lastmod "${mod}" is not YYYY-MM-DD`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// A page cannot be indexed if the server sends the crawler somewhere robots.txt
+// forbids. Measured on 1 September 2026, before this gate existed: sitemap.xml
+// listed /sign, nginx answered 302 to /auth/login?next=/sign, and robots.txt
+// carries Disallow: /auth/. The crawler was invited to a page, redirected into a
+// directory it may not read, and the only title it could see was "302 Found".
+// /sign and /parashare were the only two of 59 sitemap URLs that did not answer
+// 200.
+//
+// This gate is about the crawler, not about visitors. An earlier version of this
+// comment cited 17 visitors on /sign against 4 on /pricing; that count did not
+// survive checking, because 31 of the 36 non-bot IPs that reached /sign fetched
+// no CSS, JS, font or favicon, which is a scanner and not a reader. The config
+// cycle is measured from nginx and robots.txt, so it holds regardless.
+//
+// This reads the deployed nginx config in deploy/, not the running server, so it
+// gates the commit rather than the machine. Production is a separate copy: see
+// scripts/check-prod-drift.sh.
+test('no page in the sitemap is gated behind a login redirect', () => {
+  const conf = fs.readFileSync(path.join(ROOT, 'deploy', 'nginx-paramant-live.conf'), 'utf8');
+  const sitemap = fs.readFileSync(SITEMAP, 'utf8');
+  const listed = new Set(
+    [...sitemap.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)]
+      .map((m) => m[1].replace(ORIGIN, '').replace(/\/$/, '') || '/'),
+  );
+
+  // Every location block that answers with the login redirect.
+  const gated = [...conf.matchAll(/location\s*=?\s*(\/[A-Za-z0-9_\-/.]*)\s*\{[^}]*error_page\s+401\s*=\s*@login_redirect/g)]
+    .map((m) => m[1].replace(/\/$/, '') || '/');
+
+  const both = gated.filter((route) => listed.has(route));
+  assert.deepStrictEqual(
+    both, [],
+    `these URLs are in sitemap.xml AND redirect to a robots-disallowed login: ${both.join(', ')}. ` +
+    'Either serve the page or take it out of the sitemap; inviting a crawler to a 302 indexes nothing.',
+  );
+});
+
+// The other half of the same cycle: whatever the login redirect points at must
+// stay out of the sitemap, or the next person to add a URL recreates the loop
+// from the other side.
+test('robots.txt disallows the login path the redirect points at', () => {
+  const robots = fs.readFileSync(path.join(FRONTEND, 'robots.txt'), 'utf8');
+  const conf = fs.readFileSync(path.join(ROOT, 'deploy', 'nginx-paramant-live.conf'), 'utf8');
+  const target = /@login_redirect\s*\{[^}]*?(\/auth\/[A-Za-z0-9_\-/.]*)/.exec(conf);
+  if (!target) return;   // no login redirect configured at all
+  const dir = target[1].replace(/[^/]*$/, '');
+  assert.ok(
+    new RegExp(`Disallow:\\s*${dir}`).test(robots),
+    `${dir} is where the login redirect sends a crawler, so robots.txt must disallow it`,
+  );
 });

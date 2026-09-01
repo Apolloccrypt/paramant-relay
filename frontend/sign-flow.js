@@ -2859,6 +2859,12 @@ function renderTotpSha1Note(afterEl) {
 function showDone() {
   setActive('step-done');
   const r = state.result;
+  // Say what the proof covers before the reader draws his own conclusion from
+  // a green checkmark. Only ever from what the server actually reported: the
+  // signing mode picked in the UI is not proof of the binding mode the relay
+  // recorded, and a label that guesses is worse than no label at all. An absent
+  // field therefore shows nothing rather than a claim in either direction.
+  showProofScope((r && r.binding_mode) || (state.envelope && state.envelope.binding_mode) || null);
   renderSignQuotaNotice(r && r.quota);
   if (state.signingMode === 'invite') { showDoneInvite(r); return; }
 
@@ -3273,6 +3279,50 @@ function init() {
   } else {
     setActive('step-mode');
   }
+  showSessionRequirement();
+}
+
+// The page is now served to everyone (nginx no longer gates /sign), so a
+// visitor without a session can reach it. Signing still needs an account,
+// because a Paramant signature is made with a key bound to a passkey on the
+// device and that key has to be enrolled first.
+//
+// Where the message goes matters more than what it says. Failing at the last
+// step with "please sign in" would move the dead end to a worse place: after
+// the visitor has chosen a file, placed a stamp and pressed Sign. So the
+// requirement is stated up front, next to what the product does.
+//
+// Someone arriving on an invitation link is NOT stopped: that path carries its
+// own invite token and does not need a session, so the notice stays hidden
+// whenever the URL names an envelope. A network failure also leaves it hidden,
+// because guessing "not signed in" from a failed fetch would show the notice to
+// exactly the paying customer whose connection blipped.
+async function showSessionRequirement() {
+  const el = $('step-anon');
+  if (!el) return;
+  const q = new URLSearchParams(location.search);
+  if (q.get('envelope') || q.get('e') || q.get('invite') || q.get('token') || location.hash.length > 1) return;
+  let unauthenticated = false;
+  try {
+    const r = await fetch('/api/user/check', { credentials: 'same-origin', cache: 'no-store' });
+    unauthenticated = (r.status === 401 || r.status === 403);
+  } catch { return; }
+  if (!unauthenticated) return;
+  el.hidden = false;
+  // The mode picker stays visible underneath: a visitor should still see what
+  // the three workflows are before deciding whether the account is worth it.
+}
+
+// What the finished proof does and does not say. An open-mode envelope has no
+// invited email, so recipe version 4 binds the signer's public key into the
+// signed message instead: the proof commits to "key K signed slot i of document
+// D" and to nothing about who holds K. Claiming a verified signer there would
+// be the same overclaim that renamed the ParaID rung from 'substantial' to
+// 'mrz-unverified'. Called wherever the done step is revealed.
+function showProofScope(bindingMode) {
+  const el = $('ds-proof-scope');
+  if (!el) return;
+  el.hidden = (bindingMode !== 'open');
 }
 
 // Edit toolbar (step-place, PDF mode): text, date, highlight, note, pen,
