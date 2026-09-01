@@ -95,6 +95,7 @@ const parasignOpenApi = require('./lib/parasign-open-api'); // ParaSign Open Dev
 const billingCatalog  = require('./lib/billing-catalog');   // server-side price + entitlement map
 const mollie          = require('./lib/mollie');            // Mollie Payments API client
 const billing         = require('./lib/billing');           // Mollie webhook decision state machine
+const billingRecurring = require('./lib/billing-recurring'); // subscription + mandate layer
 const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
 const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
@@ -1703,10 +1704,15 @@ function setProductPlan(accountId, product, tier, paidUntil) {
     entitlements.applyProductTier(_acct, product, norm, paidUntil);
     _acct.plan_updated = new Date().toISOString();
   }
+  // paidUntil is passed on to the DISK write as well. Without it the period
+  // lived only in memory: applyProductTier leaves the field alone when it is
+  // undefined, so users.json kept a bare tier and a relay restart handed every
+  // paying account an unbounded grant again. That is the bug this branch is
+  // for, surviving the very restart it was supposed to end.
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
       if ((entry.account_id || entry.key) === accountId) {
-        entitlements.applyProductTier(entry, product, norm);
+        entitlements.applyProductTier(entry, product, norm, paidUntil);
         entry.plan_updated = new Date().toISOString();
       }
     }
@@ -1714,6 +1720,44 @@ function setProductPlan(accountId, product, tier, paidUntil) {
   }).then(() => log('info', 'billing_entitlement_set', { account: String(accountId).slice(0, 12), product, tier: norm, keys: members.size, changed, persisted: true }))
     .catch(we => log('warn', 'billing_entitlement_persist_failed', { err: we.message }));
   return { ok: true, product, tier: norm, keys: members.size, changed };
+}
+
+// ── Mollie pointers (customer + per-product subscription) ────────────────────
+// Where the recurring layer keeps its two ids. They live on the same records as
+// the entitlement fields, and on the same serialized users.json queue, so a
+// restart does not lose the link between an account and what it is subscribed
+// to. Written per ACCOUNT (every member key gets the same pointer), because a
+// customer belongs to the buyer, not to one of his keys.
+function _setMolliePointer(accountId, field, value) {
+  if (!accountId || !field) return { ok: false, reason: 'bad_args' };
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) {
+    const mv = apiKeys.get(m);
+    if (!mv) continue;
+    if (value === null || value === undefined) delete mv[field];
+    else mv[field] = value;
+  }
+  const acct = accounts.get(accountId);
+  if (acct) { if (value === null || value === undefined) delete acct[field]; else acct[field] = value; }
+  _mutateUsersJson(ud => {
+    for (const entry of (ud.api_keys || [])) {
+      if ((entry.account_id || entry.key) === accountId) {
+        if (value === null || value === undefined) delete entry[field];
+        else entry[field] = value;
+      }
+    }
+    ud.updated = new Date().toISOString();
+  }).catch(we => log('warn', 'billing_pointer_persist_failed', { field, err: we.message }));
+  return { ok: true };
+}
+
+// The record the recurring layer reads its pointers from. Same resolution as
+// the entitlement path: the per-key record carries the fields, the accounts
+// summary is only a mirror.
+function _billingRecordOf(accountId) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv) return mv; }
+  return accounts.get(accountId) || null;
 }
 
 // Per-key persistence for the ParaSign entitlement toggle. Injected into
@@ -5094,13 +5138,45 @@ const server = http.createServer(async (req, res) => {
     const mode = mollie.billingMode();
     const origin = process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app';
     try {
-      const payment = await mollie.createPayment(mode, {
+      // A Mollie customer, and a payment marked as the FIRST of a series. Both
+      // are required before Mollie will create a mandate, and without a mandate
+      // there is no authority to collect a second time: the payment succeeds,
+      // the tier is granted, and the money never comes in again. That is what
+      // made every sale a one-off.
+      //
+      // The customer is reused when the account already has one and Mollie still
+      // knows it. A stale or foreign id must not break a checkout, so a failed
+      // lookup falls through to creating a new one rather than erroring out: the
+      // buyer's payment matters more than tidiness in our own records.
+      let customerId = null;
+      try {
+        const _rec = _billingRecordOf(accountId);
+        const stored = _rec && _rec[billingRecurring.CUSTOMER_FIELD];
+        if (stored) {
+          try { const c = await mollie.getCustomer(mode, stored); if (c && c.id) customerId = c.id; }
+          catch { customerId = null; }
+        }
+        if (!customerId) {
+          const created = await mollie.createCustomer(mode, {
+            name: (_rec && _rec.label) || undefined,
+            email: (_rec && _rec.email) || undefined,
+            metadata: { accountId },
+          });
+          if (created && created.id) { customerId = created.id; _setMolliePointer(accountId, billingRecurring.CUSTOMER_FIELD, created.id); }
+        }
+      } catch (ce) {
+        // No customer means no mandate means no renewal. The sale still goes
+        // through as a one-off rather than failing in the buyer's face, but this
+        // is an alert: money will come in once and never again.
+        log('error', 'billing_customer_failed', { account: String(accountId).slice(0, 12), err: ce.message, status: ce.status });
+      }
+      const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: order.amount },
         description: `Paramant ${order.product} ${order.plan} (${order.interval})`,
         redirectUrl: `${origin}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
         metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval },
-      });
+      }, customerId ? { customerId, sequenceType: 'first' } : {}));
       const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
       log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -5156,6 +5232,27 @@ const server = http.createServer(async (req, res) => {
       isProcessed: async (id) => { if (!_rok()) return false; try { return !!(await redisClient.get(_idemKey(id))); } catch { return false; } },
       markProcessed: async (id, val) => { if (!_rok()) return; try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ } },
     });
+    // The collecting half. A grant only says what this payment bought; without
+    // a subscription nothing asks for the next period. Deliberately AFTER the
+    // grant and never able to undo it: a buyer who paid keeps what he paid for
+    // even if Mollie refuses the subscription, and the error level is the
+    // signal that this account will not renew by itself.
+    if (outcome.result === 'granted') {
+      const sub = await billingRecurring.ensureSubscription(payment, outcome, {
+        mode,
+        webhookUrl: `${process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app'}/v2/billing/webhook`,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveSubscription: (aid, product, id) => _setMolliePointer(aid, billingRecurring.subscriptionFieldOf(product), id),
+        mollie,
+      });
+      if (sub.result !== 'skipped') {
+        log(sub.level || 'info', 'billing_subscription', {
+          payment_id: paymentId, account: String(outcome.account).slice(0, 12),
+          product: outcome.product, result: sub.result, reason: sub.reason,
+          subscription_id: sub.subscriptionId, start_date: sub.startDate,
+        });
+      }
+    }
     // Monitoring: log every webhook with payment-id, status and outcome. The
     // 'error' level marks the alert cases (paid but no entitlement: amount
     // mismatch, missing metadata, or a grant that failed).
@@ -5165,6 +5262,44 @@ const server = http.createServer(async (req, res) => {
       product: outcome.product, reason: outcome.reason,
     });
     res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true }));
+  }
+
+  // ── POST /v2/billing/cancel — stop the next collection (authenticated) ──────
+  // Selling a subscription without a way to end it is not allowed in the EU, and
+  // it is the first thing a buyer looks for before he buys. Cancelling stops the
+  // NEXT collection only: paid_until is untouched, so the period already paid
+  // for runs to its end and the tier goes with it. Anything else would be taking
+  // back time that was bought.
+  if (path === '/v2/billing/cancel' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    let body;
+    try { body = JSON.parse((await readBody(req, 1024)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    const product = body && body.product;
+    if (!billingRecurring.subscriptionFieldOf(product)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_product' }));
+    }
+    const mode = mollie.billingMode();
+    const out = await billingRecurring.cancelForProduct(accountId, product, {
+      mode,
+      getAccount: (aid) => _billingRecordOf(aid),
+      saveSubscription: (aid, p, id) => _setMolliePointer(aid, billingRecurring.subscriptionFieldOf(p), id),
+      mollie,
+    });
+    log(out.level || 'info', 'billing_cancel', {
+      account: String(accountId).slice(0, 12), product, result: out.result, reason: out.reason, mode,
+    });
+    if (out.result === 'failed' || out.result === 'refused') {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'cancel_failed', reason: out.reason }));
+    }
+    // What the buyer needs to see: nothing more will be collected, and until
+    // when he still has what he paid for.
+    const _rec = _billingRecordOf(accountId);
+    const until = (_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, cancelled: out.result === 'cancelled', product, access_until: until }));
   }
 
   // ── POST /v2/admin/keys/update-plan ─────────────────────────────────────────
