@@ -115,7 +115,10 @@ jobs:
       # main, and a suite nobody trusts is a suite nobody reads.
       - name: Relay integration suite (needs deps)
         working-directory: relay
-        run: node --test test/inbound-hash-verify.test.js
+        # deep-health-gate boots relay.js three times (two modes and a
+        # missing-token case), so like inbound-hash-verify it needs the
+        # installed dependencies and lives here, not in the no-install job.
+        run: node --test test/inbound-hash-verify.test.js test/deep-health-gate.test.js
 
   relay-unit-tests:
     name: relay - unit suite (no native deps)
@@ -150,7 +153,7 @@ jobs:
         run: |
           set -o pipefail
           node --test $(ls test/*.test.js | grep -vE \
-            'inbound-hash-verify|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index') \
+            'inbound-hash-verify|deep-health-gate|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
           # summary() in test/_requires.js.
