@@ -14,7 +14,7 @@
 # live relay images; revert until paramant-core's oqs crate supports the newer
 # liboqs. NOTE: CI's crypto suite does not build via this musl Dockerfile, so it
 # stayed green through the bump — this base must be verified by an actual image build.
-FROM rust:1.95-alpine@sha256:606fd313a0f49743ee2a7bd49a0914bab7deedb12791f3a846a34a4711db7ed2 AS paramant-core-binding
+FROM rust:1.98-alpine@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS paramant-core-binding
 
 RUN apk add --no-cache musl-dev gcc g++ make cmake ninja clang clang-dev llvm-dev perl nasm git bash
 ENV LIBCLANG_PATH=/usr/lib
