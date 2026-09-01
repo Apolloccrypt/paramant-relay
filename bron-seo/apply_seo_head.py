@@ -126,7 +126,7 @@ def graph_for(slug, title, desc):
         "name": clean(title),
         "isPartOf": {"@id": f"{ORIGIN}/#website"},
         "publisher": {"@id": f"{ORIGIN}/#organization"},
-        "inLanguage": "nl" if slug == "banken" else "en"}
+        "inLanguage": "en"}
     if desc:
         page["description"] = desc
     nodes = [page]
