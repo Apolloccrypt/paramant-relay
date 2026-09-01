@@ -156,10 +156,15 @@ jobs:
       # Gates the ParaSign open-API conformance suite + key-issuance + pdf-ops that
       # previously ran in no workflow at all.
       - name: Root integration suites (no browser)
-        # transfer-canary is excluded too: it talks to the live relay, so it
-        # measures production, not this commit. It runs hourly in the
-        # product-heartbeat workflow.
-        run: node --test $(grep -L "from 'playwright'" tests/*.mjs | grep -v transfer-canary)
+        # The canaries are excluded: they talk to the LIVE relay, so they measure
+        # production and not this commit, and they run hourly in the
+        # product-heartbeat workflow instead. parasign-canary additionally
+        # imports @noble/post-quantum to verify the notary signature, and this
+        # job installs nothing on purpose, so leaving it in fails the whole step
+        # on a missing package before a single assertion runs.
+        run: >-
+          node --test $(grep -L "from 'playwright'" tests/*.mjs
+          | grep -vE 'transfer-canary|parasign-canary')
 
   admin-unit-tests:
     name: admin - unit suite

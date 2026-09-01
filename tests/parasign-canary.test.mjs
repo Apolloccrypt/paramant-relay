@@ -29,7 +29,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
+
+// Loaded dynamically, and the failure is deliberately loud. A static import
+// throws ERR_MODULE_NOT_FOUND before a single line of this file runs, and
+// "Cannot find package" in an hourly heartbeat reads as "production is broken"
+// when it means "this job did not npm ci". The canary still FAILS without it,
+// because a run that cannot verify a signature proves nothing and must not pass
+// quietly, but it fails saying which job owes it an install.
+let ml_dsa65;
+try {
+  ({ ml_dsa65 } = await import('@noble/post-quantum/ml-dsa.js'));
+} catch (e) {
+  throw new Error(
+    '@noble/post-quantum is not installed, so the notary signature cannot be verified.\n' +
+    '  This canary runs in .github/workflows/product-heartbeat.yml, which does `npm ci` first.\n' +
+    '  It is deliberately excluded from the no-install job in test.yml.\n' +
+    `  Original: ${e.message}`);
+}
 
 const RELAY = (process.env.PARAMANT_RELAY_URL || 'https://relay.paramant.app').replace(/\/$/, '');
 const KEY = process.env.PARASIGN_CANARY_KEY || '';
