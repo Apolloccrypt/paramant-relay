@@ -358,7 +358,10 @@ test('the four plan ids map to the tiers and quotas the pricing rests on', async
   const expected = {
     acct_community: { parasend: 'community', parasign: 'free', transfers: 10, signs: 2 },
     acct_pro: { parasend: 'pro', parasign: 'pro', transfers: 500, signs: 100 },
-    acct_business: { parasend: 'enterprise', parasign: 'business', transfers: 1_000_000, signs: 1000 },
+    // business keeps its own ParaSend row: it is a ParaSign tier name, so the
+    // account never bought ParaSend, and it is neither raised to enterprise nor
+    // cut to pro (entitlements.PARASEND_LADDER).
+    acct_business: { parasend: 'business', parasign: 'business', transfers: 2000, signs: 1000 },
     acct_enterprise: { parasend: 'enterprise', parasign: 'enterprise', transfers: 1_000_000, signs: 1_000_000 },
   };
   for (const [account, want] of Object.entries(expected)) {
@@ -413,6 +416,80 @@ test('the admin usage view reports the same per-tier limits it enforces', async 
   assert.strictEqual(r.json.limits.signs_month, 100);
   assert.strictEqual(r.json.limits.devices, 50);
   assert.strictEqual(r.json.redis_available, false, 'this relay runs without redis, and the view says so');
+  srv.stop();
+  did();
+});
+
+test('the usage view reports the tier that is ENFORCED, not the plan billing left behind', async () => {
+  // The Mollie webhook upgrades through setProductPlan -> applyProductTier,
+  // which writes plan_parasend and deliberately never the unified `plan`. This
+  // view read `plan`, so it would tell an operator "community, 10 transfers,
+  // 5 devices" about an account the relay is holding to the Pro 500 and 50 -
+  // and, before the read paths moved onto the product axis, the relay really
+  // was holding that paying account to the community numbers.
+  const srv = await withUsers('usage-axis', [
+    // The shape the webhook writes: paid on ParaSend, unified plan untouched.
+    { key: 'pgp_v_hook', plan: 'community', plan_parasend: 'pro', active: true, account_id: 'acct_v_hook', email: 'vh@example.test' },
+    // The shape POST /v2/admin/keys/update-plan writes: unified plan set, both
+    // product plans derived from it.
+    { key: 'pgp_v_admin', plan: 'pro', plan_parasend: 'pro', plan_parasign: 'pro', active: true, account_id: 'acct_v_admin', email: 'va@example.test' },
+    // No plan at all, the shape every key minted before the field has.
+    { key: 'pgp_v_none', active: true, account_id: 'acct_v_none', email: 'vn@example.test' },
+  ]);
+
+  const hook = await srv.get('/v2/admin/usage/acct_v_hook', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.strictEqual(hook.status, 200, hook.text);
+  assert.strictEqual(hook.json.plan, 'community', 'the unified plan is what billing left behind');
+  assert.strictEqual(hook.json.parasend_tier, 'pro', 'and the ParaSend tier is the one that was paid for');
+  assert.strictEqual(hook.json.limits.transfers_month, 500, 'the operator reads the limit the gate enforces');
+  assert.strictEqual(hook.json.limits.devices, 50);
+
+  // Both shapes mean ParaSend Pro, so no ParaSend dimension may disagree. They
+  // differ on ParaSign on purpose: update-plan derives plan_parasign from the
+  // unified plan, a ParaSend purchase does not.
+  const admin = await srv.get('/v2/admin/usage/acct_v_admin', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.strictEqual(admin.json.parasend_tier, hook.json.parasend_tier);
+  for (const dim of ['transfers_month', 'file_mb', 'devices']) {
+    assert.strictEqual(admin.json.limits[dim], hook.json.limits[dim],
+      `the admin shape and the webhook shape must buy the same ${dim}`);
+  }
+
+  const none = await srv.get('/v2/admin/usage/acct_v_none', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.strictEqual(none.json.parasend_tier, 'community', 'a missing plan is not evidence of a paid one');
+  assert.strictEqual(none.json.limits.transfers_month, 10);
+  assert.strictEqual(none.json.limits.devices, 5);
+  srv.stop();
+  did();
+});
+
+test('the usage view reports the file ceiling the upload gate really applies', async () => {
+  // POST /v2/inbound takes the LOWER of the operator's MAX_BLOB and the tier's
+  // file_mb, so an uncapped tier row is still held to MAX_BLOB. Reporting the
+  // bare tier value put -1 on an enterprise account while the gate was
+  // enforcing 5 MB, and file_mb is the one number an operator would act on.
+  const srv = await withUsers('usage-file-mb', [
+    { key: 'pgp_f_ent', plan: 'enterprise', active: true, account_id: 'acct_f_ent', email: 'fe@example.test' },
+    { key: 'pgp_f_com', plan: 'community', active: true, account_id: 'acct_f_com', email: 'fc@example.test' },
+  ]);
+  const ent = await srv.get('/v2/admin/usage/acct_f_ent', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.strictEqual(ent.status, 200, ent.text);
+  assert.strictEqual(ent.json.parasend_tier, 'enterprise');
+  assert.strictEqual(ent.json.limits.file_mb, 5,
+    'the enterprise row says uncapped, the relay enforces MAX_BLOB, and the view must say what is enforced');
+  assert.notStrictEqual(ent.json.limits.file_mb, -1, 'never report uncapped for a ceiling that is capped');
+  // devices really is uncapped on enterprise, and that still reports as -1, so
+  // the fix is about the file ceiling and not about flattening every -1.
+  assert.strictEqual(ent.json.limits.devices, -1);
+
+  const com = await srv.get('/v2/admin/usage/acct_f_com', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.strictEqual(com.json.limits.file_mb, 5, 'a capped tier reads its own value, unchanged');
+
+  // The list view is the same view over every account and must not disagree.
+  const list = await srv.get('/v2/admin/usage', { headers: { 'X-Admin-Token': ADMIN } });
+  assert.strictEqual(list.status, 200, list.text);
+  for (const row of list.json.accounts) {
+    assert.strictEqual(row.limits.file_mb, 5, `${row.account_id} in the list view`);
+  }
   srv.stop();
   did();
 });
