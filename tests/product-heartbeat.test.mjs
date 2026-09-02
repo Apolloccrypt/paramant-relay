@@ -49,7 +49,7 @@ const PAGES = [
     // on production from 2026-07-02 until 2026-07-26.
     heartbeat: () => typeof window._cryptoBridge?.encryptBlob === 'function',
     because: 'window._cryptoBridge.encryptBlob is missing, so the send aborts with "WASM crypto module not loaded"',
-    progressNote: 'encryption only starts once a signed-in user picks a file. The real path is covered end to end by tests/transfer-canary.test.mjs, which pushes a file through the live relay every hour.',
+    progressNote: 'encryption only starts once a signed-in user picks a file. The real path is covered end to end by scripts/heartbeat/parasend.mjs, which pushes a file through the live relay every hour and keeps the hashes as evidence.',
   },
   {
     url: '/ontvang.html',
@@ -228,7 +228,7 @@ for (const page of PAGES) {
       `\n  ${page.url} is still asking the user to wait after it finished loading:\n  ` +
       stuck.join('\n  ') + `\n  Whatever should have replaced this text never ran.\n`);
 
-    // The relay is a separate host with its own gate (tests/transfer-canary),
+    // The relay is a separate host with its own gate (scripts/heartbeat/parasend.mjs),
     // and the test token is deliberately one no relay will accept, so a refused
     // socket to it says nothing about the frontend. Filtering this is only safe
     // BECAUSE the progress check above already proved the page did its work.

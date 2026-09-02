@@ -335,13 +335,21 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
 
 // 8 ── The SLA. Pricing quotes the figure the SLA page commits to, and the
 // measurement paragraph describes the checks that exist and nothing more.
-// What exists (read on 2 September 2026): the hourly product-heartbeat
-// workflow loads paramant.app in a browser and pushes a transfer and a
-// signature through relay.paramant.app; nothing in that workflow calls
-// GET /health, and the four sector relays are not in it. The only thing that
-// polls /health on all five relays is /status, from the visitor's browser.
-// There is no 60-second multi-location probe and the CT log holds no uptime
-// data.
+// What exists (read on 2 September 2026, after the heartbeat rebuild): the
+// hourly heartbeat workflow loads paramant.app in a browser and pushes a real
+// transfer and a real signature through relay.paramant.app, keeping an evidence
+// file per step. Before the rebuild the transfer and signature clauses were
+// aspirational: both canaries skipped for want of a secret and reported green.
+//
+// The run also calls GET /health and the deep readiness check on the main
+// relay, and reaches all six hosts to confirm one retired route stays refused,
+// and the page mentions neither. That is under-promising, which is safe, and it
+// is a deliberate follow-up: the paragraph gets rewritten once the monitor has
+// actually run, which needs two secrets that do not exist yet.
+//
+// The only thing that polls /health on all five relays is /status, from the
+// visitor's browser. There is still no 60-second multi-location probe and the
+// CT log still holds no uptime data.
 test('the SLA figures are consistent across pages and the measurement described exists', () => {
   const sla = page('sla');
   const ent = /<div class="tier">Enterprise<\/div>\s*<div class="uptime">([\d.]+%)<\/div>/.exec(sla)[1];
@@ -354,23 +362,93 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.doesNotMatch(text, /every 60 seconds|multiple EU locations|three consecutive checks/, 'sla: describes a probe that does not exist');
   assert.doesNotMatch(text, /uptime data is published in the Certificate Transparency log/i, 'sla: the CT log holds key and transfer commitments, not uptime');
 
-  // The hourly workflow: which suites it runs, against what, and that none of
-  // them is a health check.
-  const wf = read('.github/workflows/product-heartbeat.yml');
-  assert.match(wf, /cron:\s*'\d+ \* \* \* \*'/, 'product-heartbeat must run hourly for the SLA text to hold');
-  const live = wf.slice(wf.indexOf('\n  live:'));
-  assert.match(live, /PARAMANT_BASE_URL:\s*https:\/\/paramant\.app/, 'the live job must target paramant.app');
-  assert.match(live, /PARAMANT_RELAY_URL:\s*https:\/\/relay\.paramant\.app/, 'the live job must target the main relay');
-  const suites = ['tests/product-heartbeat.test.mjs', 'tests/transfer-canary.test.mjs', 'tests/parasign-canary.test.mjs'];
-  for (const f of suites) {
-    assert.ok(live.includes(`node --test ${f}`), `the live job must run ${f}`);
-    const src = stripJsComments(read(f));
-    assert.doesNotMatch(src, /\/health\b/, `${f} now calls /health; the SLA measurement text must say so`);
+  // The hourly workflow: what it runs, against what, and whether it is switched
+  // on. It moved out of product-heartbeat.yml on 2026-09-02, which is now only
+  // the pull-request gate, so the page may no longer name that file.
+  const wf = read('.github/workflows/heartbeat.yml');
+  assert.match(wf, /cron:\s*'\d+ \* \* \* \*'/, 'the heartbeat must be scheduled hourly');
+  assert.match(wf, /PARAMANT_BASE_URL:\s*https:\/\/paramant\.app/, 'the hourly job must target paramant.app');
+  assert.match(wf, /PARAMANT_RELAY_URL:\s*https:\/\/relay\.paramant\.app/, 'the hourly job must target the main relay');
+  // The measurement paragraph with the markup taken out, so a regex is matching
+  // sentences rather than code tags.
+  const measure = text.replace(/<[^>]+>/g, '');
+  assert.match(measure, /heartbeat workflow/,
+    'the page must name the workflow that actually holds the schedule');
+  assert.doesNotMatch(measure, /product-heartbeat workflow/,
+    'product-heartbeat.yml has no schedule any more; naming it on /sla is a false claim');
+
+  // Whether it is running at all. The job is gated on a repository variable
+  // until its two canary secrets exist, so until that gate goes the page must
+  // say the check is switched off, and afterwards it must stop saying so. Both
+  // directions are pinned, which is what forces the follow-up rewrite to happen
+  // rather than being remembered.
+  const gated = /vars\.HEARTBEAT_ENABLED\s*==\s*'true'/.test(wf);
+  if (gated) {
+    assert.match(measure, /runs hourly once enabled/,
+      'the hourly job is gated off, so the page must not claim it is running');
+    assert.match(measure, /switched off until its credentials are in place/,
+      'the page must say why it is not running');
+    assert.doesNotMatch(measure, /workflow[^.]*runs hourly and exercises/,
+      'the page describes a monitor that is switched off as though it were running');
+  } else {
+    assert.doesNotMatch(measure, /runs hourly once enabled|switched off until/,
+      'the gate is gone, so the page must stop saying the check is switched off');
   }
-  assert.doesNotMatch(live.replace(/(^|\s)#.*$/gm, '$1'), /\/health\b/, 'the workflow now calls /health; the SLA measurement text must say so');
+
+  // Each clause of the sentence, pinned to the code that makes it true. These
+  // used to point at tests/transfer-canary.test.mjs and
+  // tests/parasign-canary.test.mjs, which is how the page came to promise an
+  // hourly signature check that had never signed anything: both suites skipped
+  // for want of a secret and reported green, and this test only ever checked
+  // that the workflow named them.
+  assert.ok(wf.includes('node --test tests/product-heartbeat.test.mjs'),
+    'the page promises a page load in a real browser');
+  assert.match(wf, /node scripts\/heartbeat\/run\.mjs/, 'the page promises a transfer and a signature');
+
+  const parasend = stripJsComments(read('scripts/heartbeat/parasend.mjs'));
+  assert.match(parasend, /v2\/anon-inbound/, 'the page promises a transfer sent');
+  assert.match(parasend, /v2\/dl\//, 'the page promises that transfer read back');
+
+  const parasign = stripJsComments(read('scripts/heartbeat/parasign.mjs'));
+  assert.match(parasign, /\/sign`/, 'the page promises a document signed');
+  assert.match(parasign, /mldsa\.verify/, 'the page promises that signature verified');
+  // And verified for real, not by trusting a 200. The negative check is what
+  // separates the two, so it is pinned by name.
+  assert.match(parasign, /bad_signature/,
+    'the run must still prove the relay refuses a signature that does not verify');
+
+  // "A run that fails opens an issue in the repository." That sentence is a
+  // promise about behaviour, so it is pinned to the step that keeps it rather
+  // than to the workflow merely existing.
+  assert.match(measure, /A run that fails opens an issue in the repository/);
+  const issueStep = wf.slice(wf.indexOf('if: failure()'));
+  assert.ok(wf.includes('if: failure()'), 'the workflow must have a step that runs only on failure');
+  assert.match(issueStep, /issues\.create/, 'that step must actually open an issue');
+  assert.match(wf, /issues:\s*write/, 'and the job must be allowed to');
+
+  // The four sector relays, pinned to what surface.mjs actually does. The
+  // earlier version of this block exempted the sector hosts as long as no
+  // PRODUCT step named them, which let the sentence on /sla stay while the
+  // heartbeat POSTed to all four and went red if one did not answer. There is
+  // no exemption now: the code must reach them, and the page must say both
+  // halves of why.
+  const surface = stripJsComments(read('scripts/heartbeat/surface.mjs'));
   for (const sector of ['health', 'legal', 'finance', 'iot']) {
-    assert.doesNotMatch(live, new RegExp(`${sector}\\.paramant\\.app`), `the workflow now covers ${sector}.paramant.app; the SLA measurement text must say so`);
+    assert.ok(surface.includes(`${sector}.paramant.app`),
+      `the run no longer reaches ${sector}.paramant.app; the SLA measurement text must say so`);
   }
+  assert.match(surface, /paraid\/issue-/,
+    'the sector relays are reached for the ParaID deny check; if that changed, so must the page');
+  assert.match(measure, /The four sector relays \(health, legal, finance, IoT\) are reached only to confirm that a retired route stays refused there, so their uptime is not measured/,
+    'the page must say both what the run does at those hosts and what it does not measure');
+
+  // A step that records no evidence must fail. It is the mechanism that makes
+  // the hourly green tick mean anything at all, so it is pinned here too: the
+  // previous version of this paragraph was true of a workflow whose ParaSign
+  // step passed in 0.68 seconds without sending a packet.
+  assert.match(stripJsComments(read('scripts/heartbeat/lib.mjs')), /produced no proofs/,
+    'a heartbeat step that observes nothing must not report success');
+  assert.ok(wf.includes('upload-artifact'), 'the evidence must be kept with the run');
 
   // /status: the one place that polls GET /health, on every sector, from the
   // browser.
@@ -380,16 +458,21 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.match(status, /fetch\(s\.url \+ '\/health'/, 'status.inline1.js must fetch GET /health per sector');
   assert.match(page('status'), /status\.inline1\.js/, '/status must load that script');
 
-  // The paragraph may only describe those two things.
-  const plain = text.replace(/<[^>]+>/g, '');
-  assert.doesNotMatch(plain, /automated HTTP health checks|runs hourly[^.]*GET \/health|GET \/health[^.]*hourly/i,
-    'sla: the hourly workflow does not call GET /health');
-  assert.match(plain, /product-heartbeat workflow in the open-source repository runs hourly/);
+  // The paragraph may only describe those two things, and it may not
+  // over-promise. Under-promising is safe and is currently the case: the
+  // rebuilt hourly run also calls GET /health and reaches all six hosts for a
+  // deny check, and the page does not mention either. That gap is a follow-up
+  // to be made once the monitor has actually run; a page that describes a
+  // monitor which has never executed is the failure mode this whole file is
+  // here to prevent.
+  const plain = measure;
+  assert.doesNotMatch(plain, /automated HTTP health checks/i,
+    'sla: /status is a reading taken in one visitor browser, not a health-check monitor');
+  assert.match(plain, /heartbeat workflow/);
   assert.match(plain, /main relay \(relay\.paramant\.app\)/);
-  assert.match(plain, /a transfer sent and read back, a document signed and verified/);
-  assert.match(plain, /The four sector relays \(health, legal, finance, IoT\) are not part of that hourly run/);
+  assert.match(plain, /a transfer sent and read back, a document signed and its signature verified/);
   assert.match(plain, new RegExp(`fetches GET /health on all ${word(sectors)} relays from your own browser`));
-  assert.match(plain, /measured from your (own )?browser/);
+  assert.match(visible(sla), /measured from your (own )?browser/);
 });
 
 // 9 ── IP logging. The deploy configuration in the repository switches nginx

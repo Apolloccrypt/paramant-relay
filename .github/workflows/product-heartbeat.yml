@@ -2,12 +2,11 @@ name: product-heartbeat
 
 # Does the site still DO anything, in a real browser (tests/product-heartbeat.test.mjs).
 #
-# Runs twice, on purpose:
-#   build   on every frontend change, against the checkout. Catches a break
-#           before it is merged.
-#   live    hourly and on demand, against https://paramant.app. Catches a break
-#           that only exists on production: a half-finished deploy, an nginx
-#           rule, a file in the docroot that no longer matches the commit.
+# This is the pull-request gate: it runs against the checkout, before a break is
+# merged. The hourly half that ran against https://paramant.app moved to
+# heartbeat.yml on 2026-09-02, together with the two product canaries, so there
+# is one hourly alarm with one evidence artifact instead of a job whose green
+# tick meant different things in different steps.
 #
 # The July 2026 breaks (relative import 404, module loaded as classic script,
 # CSP-blocked signup) were all invisible to the Node suites and loud in a
@@ -23,8 +22,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  schedule:
-    - cron: '17 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -53,119 +50,3 @@ jobs:
       # to every other gate we have.
       - name: Where every internal link leads
         run: node --test tests/links.test.mjs
-
-  live:
-    name: heartbeat — production
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install deps (browsers installed separately)
-        run: npm ci
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Heartbeat against paramant.app
-        id: beat
-        # shell: bash sets pipefail. Without it the pipe into tee would hand the
-        # step tee's exit code and every failure would be reported as green.
-        shell: bash
-        run: node --test tests/product-heartbeat.test.mjs 2>&1 | tee /tmp/heartbeat.log
-        env:
-          PARAMANT_BASE_URL: https://paramant.app
-
-      # The heartbeat proves the pages initialise; the canary proves the product
-      # works: a real blob through the real relay, back byte for byte, then gone.
-      # It covers what a browser cannot see, the relay process, nginx, the rate
-      # limits, the CT append. always() so a dead page never hides a dead relay.
-      - name: Transfer canary against the live relay
-        if: always()
-        shell: bash
-        run: node --test tests/transfer-canary.test.mjs 2>&1 | tee -a /tmp/heartbeat.log
-        env:
-          PARAMANT_RELAY_URL: https://relay.paramant.app
-          PARAMANT_API_KEY: ${{ secrets.PARAMANT_CANARY_KEY }}
-
-      # ParaSign canary: does the flagship still sign. The transfer canary
-      # covers ParaSend; nothing covered signing, and in the whole retained log
-      # window (22 Aug to 1 Sep 2026) not one human signed anything, so a broken
-      # ceremony would sit there until a customer found it. It runs a psk_test_
-      # key, so the sandbox signer drives it: no human, no mailbox, no real
-      # document, nothing about a customer read or stored. It verifies the
-      # notary signature itself rather than trusting a 200. always(), because a
-      # dead page must not hide a dead signer.
-      - name: ParaSign canary against the live relay
-        if: always()
-        shell: bash
-        run: node --test tests/parasign-canary.test.mjs 2>&1 | tee -a /tmp/heartbeat.log
-        env:
-          PARAMANT_RELAY_URL: https://relay.paramant.app
-          PARASIGN_CANARY_KEY: ${{ secrets.PARASIGN_CANARY_KEY }}
-
-      # External destinations: someone else's uptime, so hourly and never in a
-      # pull request. A third party can also delete a page without telling us,
-      # which is exactly what a scheduled check is for. always(), because a
-      # failing page must not hide a dead download button.
-      #
-      # This is expected to be RED until the /download question is settled: five
-      # installers and three ParamantOS links point at private repositories, so
-      # every visitor gets a 404. That is a real breakage and the alarm should
-      # say so rather than be silenced first.
-      - name: Where every external link leads
-        if: always()
-        shell: bash
-        run: CHECK_EXTERNAL_LINKS=1 node --test tests/links.test.mjs 2>&1 | tee -a /tmp/heartbeat.log
-
-      # An hourly job that turns red in a tab nobody opens is not an alarm. A
-      # red run opens an issue with the failing output; a green run closes it
-      # again, so the issue list tracks the site instead of collecting noise.
-      - name: Open an issue when production is down
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const log = fs.readFileSync('/tmp/heartbeat.log', 'utf8').split('\n')
-              .filter(l => /^(✖|not ok|  AssertionError|ℹ fail)/.test(l)).slice(0, 40).join('\n');
-            const title = 'Production heartbeat is failing';
-            const open = await github.rest.issues.listForRepo({
-              ...context.repo, state: 'open', labels: 'heartbeat',
-            });
-            const body = [
-              `The hourly heartbeat against https://paramant.app failed.`,
-              ``,
-              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              ``,
-              '```',
-              log || 'see the run log',
-              '```',
-            ].join('\n');
-            if (open.data.length) {
-              await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body });
-            } else {
-              await github.rest.issues.create({ ...context.repo, title, body, labels: ['heartbeat'] });
-            }
-
-      - name: Close the issue when production is healthy again
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const open = await github.rest.issues.listForRepo({
-              ...context.repo, state: 'open', labels: 'heartbeat',
-            });
-            for (const issue of open.data) {
-              await github.rest.issues.createComment({
-                ...context.repo, issue_number: issue.number,
-                body: `Heartbeat green again as of run ${context.runId}. Closing.`,
-              });
-              await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed' });
-            }

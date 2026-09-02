@@ -174,7 +174,7 @@ coupling exists either way, so make it loud.
 | Absolute paths in entry points | `frontend-loading-contract.test.mjs` | ~200 ms | Root integration suites |
 | One cache-buster per file | `frontend-loading-contract.test.mjs` | ~200 ms | Root integration suites |
 | Modules loaded as modules | `frontend-module-scripts.test.mjs` | ~100 ms | Root integration suites |
-| The page actually works | `product-heartbeat.test.mjs` | ~20 s, Chromium | product-heartbeat, hourly against production |
+| The page actually works | `product-heartbeat.test.mjs` | ~20 s, Chromium | product-heartbeat (pull requests), heartbeat (hourly against production) |
 
 The hourly production run is what turns these from "green at merge" into "still
 true right now". `PARAMANT_BASE_URL=https://paramant.app node --test
