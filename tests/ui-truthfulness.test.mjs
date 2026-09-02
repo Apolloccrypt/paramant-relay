@@ -203,6 +203,51 @@ for (const [label, html] of [
     `${label} must not call the Community plan Free`);
 }
 
+// Nothing on the site may use Free as the NAME of our free plan. It is called
+// Community, and the review found it surviving in seven places the first sweep
+// missed: a feature list ("Everything in Free"), an FAQ answer ("Free covers 2
+// signatures a month"), an API reference table ("Free (pgp_)", "Free/community
+// -> 403"), the signing page ("Free accounts sign 2 documents a month") and the
+// terms twice ("one hour on Free", "falls back to Free"). Each of those reads
+// as a plan a visitor can go look for, and none of them exist under that name.
+//
+// Matched on shapes that can only be a plan name, so "Free to start", "Free on
+// the Community plan" and BUSL's "Free to use" are untouched. Two pages are
+// exempt and say why.
+const TIER_NAME_SHAPES = [
+  /Everything in Free\b/,
+  /\bFree covers\b/,
+  /\bFree accounts?\b/,
+  /\bFree \(pgp_\)/,
+  /\bFree\/community\b/,
+  /\bfalls back to Free\b/,
+  /\bon Free,/,
+  /tier named <strong>Free<\/strong>/,
+  /\bthe Free tier\b/,
+  /<div class="tier-name">Free<\/div>/,
+];
+// vs.html describes COMPETITORS' pricing (WeTransfer has a tier it calls Free);
+// paramant-ot-brief.html prices its own tier, named Evaluation, at "Free".
+const TIER_NAME_EXEMPT = new Set(['vs', 'docs/paramant-ot-brief']);
+const frontendPages = (dir = 'frontend', prefix = '') =>
+  fs.readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true }).flatMap((e) => {
+    if (e.isDirectory()) return ['node_modules', 'vendor'].includes(e.name) ? [] : frontendPages(`${dir}/${e.name}`, `${prefix}${e.name}/`);
+    return e.isFile() && e.name.endsWith('.html') ? [`${prefix}${e.name.slice(0, -5)}`] : [];
+  });
+
+const tierNameHits = [];
+for (const slug of frontendPages()) {
+  if (TIER_NAME_EXEMPT.has(slug)) continue;
+  // Comments explain the rename and quote the very wording they forbid.
+  const visible = read(`frontend/${slug}.html`).replace(/<!--[\s\S]*?-->/g, ' ');
+  for (const rx of TIER_NAME_SHAPES) {
+    const m = rx.exec(visible);
+    if (m) tierNameHits.push(`${slug}: "${m[0]}"`);
+  }
+}
+assert.deepEqual(tierNameHits, [],
+  `these use Free as the name of a plan; it is called Community:\n  ${tierNameHits.join('\n  ')}\n`);
+
 // The ParaRules grid on the homepage shows a SELECTION. It used to print the
 // numbers 01, 03, 04 and 06, which reads as two rules gone missing rather than
 // as four chosen. Either the numbers go or they run consecutively.
