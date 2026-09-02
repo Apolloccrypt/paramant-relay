@@ -812,6 +812,48 @@ test('no page promises an account lockout, and the login limits are the enforced
   for (const phrase of [`${perIp} attempts from one IP address`, `${perEmail} for one email address`, `${winMin} minutes`]) {
     if (!help.includes(phrase)) problems.push(`help/session-issues: must state "${phrase}"`);
   }
+
+  // "No lockout" is not the same as "nobody can lock you out". The email
+  // counter is keyed on the ADDRESS alone, it is incremented before the code is
+  // checked, and a successful login never clears it, so someone else's attempts
+  // on your address spend your budget and hold you at 429 for the rest of the
+  // window. The first version of this row said the opposite in a subordinate
+  // clause and nothing pinned it, which is the whole failure mode this file
+  // exists for. Read the three properties out of the handler and require the
+  // page to carry the caveat exactly while they hold.
+  const handler = srv.slice(srv.indexOf('api.post("/user/login"'));
+  const body = handler.slice(0, handler.indexOf('\napi.'));
+  const emailKeyed = /const emailKey = `paramant:user:ratelimit:email:\$\{email\.toLowerCase\(\)\}`/.test(body);
+  // indexOf returns -1 for "not found", and -1 sorts before every real offset,
+  // so a counter that was deleted outright would read as "counted first". Both
+  // offsets are required to exist before they are compared.
+  const incrAt = body.indexOf('redis().incr(emailKey)');
+  const authAt = body.indexOf('findUserByEmail');
+  assert.ok(emailKeyed, 'the per-email login counter must still be keyed on the address');
+  assert.ok(incrAt > 0, 'the login handler must still count attempts per address');
+  assert.ok(authAt > 0, 'the login handler must still look the account up');
+  const beforeAuth = incrAt < authAt;
+  const neverCleared = !new RegExp(`del\\(\\s*emailKey`).test(body);
+  const shared = emailKeyed && beforeAuth && neverCleared;
+
+  const CAVEAT = 'attempts someone else makes on your address count against you too';
+  if (shared) {
+    if (!help.includes(CAVEAT)) {
+      problems.push(`help/session-issues: the ${perEmail}-per-address counter is spent by anyone who knows the address, and the page must say so`);
+    }
+    // And no page may deny it, in any of the shapes that denial takes.
+    const DENIES = [/nobody can lock you out/i, /no ?one can lock you out/i,
+                    /cannot be locked out by/i, /only your own attempts count/i];
+    for (const slug of publicPages()) {
+      const text = visible(page(slug));
+      for (const re of DENIES) {
+        const m = re.exec(text);
+        if (m) problems.push(`${slug}: "${m[0]}" is not true while the counter is keyed on the address alone`);
+      }
+    }
+  } else if (help.includes(CAVEAT)) {
+    problems.push('help/session-issues: the per-address counter is no longer shared, so drop the caveat');
+  }
   // /dpa quotes the same limiter in its access-control row.
   const dpa = visible(page('dpa'));
   const perMin = /per-IP rate limiting \((\d+) attempts?\/min\)/.exec(dpa);
@@ -823,10 +865,13 @@ test('no page promises an account lockout, and the login limits are the enforced
 });
 
 // 16 ── The session cookie. /security described it as SameSite=Strict. It is
-// Lax, and deliberately so: ADR R018 in admin/server.js explains that a Strict
-// cookie is not sent on the top-level navigation from an emailed invite, which
-// is the one flow ParaSign is built around. Describing a security control as
-// stricter than it is, is the wrong direction to be wrong in.
+// Lax, and deliberately so: the comment above setUserCookie in admin/server.js
+// explains that a Strict cookie is not sent on the top-level navigation from an
+// emailed invite, which is the one flow ParaSign is built around. (That comment
+// cites ADR R018 for the decision, but docs/adrs/R018-parasign-invite-webauthn.md
+// says nothing about SameSite, so the comment is the source, not the ADR.)
+// Describing a security control as stricter than it is, is the wrong direction
+// to be wrong in.
 test('the session cookie described on /security is the cookie admin/server.js sets', () => {
   const srv = read('admin/server.js');
   const set = /paramant_user_session=\$\{token\};([^`]*)`/.exec(srv);
@@ -948,6 +993,16 @@ test('the Argon2id row says what relay.js uses Argon2id for', () => {
 // follows to an order of magnitude. The site was contradicting its own report.
 test('the 5 MB padding claim matches audit finding 5 and what ParaShare sends', () => {
   const audit = read('docs/security-audit-2026-04.md');
+  // /security and /trust link a reader to /docs/security-audit-2026-04.md, which
+  // is the copy under frontend/. This row is bounded by a finding in the repo
+  // copy, so the two have to be the same bytes: a drift between them would mean
+  // the test reads one report and the visitor reads another.
+  assert.equal(read('frontend/docs/security-audit-2026-04.md'), audit,
+    'frontend/docs/security-audit-2026-04.md must be byte-identical to docs/security-audit-2026-04.md');
+  for (const slug of ['security', 'trust']) {
+    assert.match(page(slug), /href="\/docs\/security-audit-2026-04\.md"/,
+      `${slug}: must still link the published report this row is bounded by`);
+  }
   const row = /\|\s*5\s*\|\s*\*\*Metadata size leakage\*\*[^|]*\|\s*(\S+)\s*\|([^|]*)\|/.exec(audit);
   assert.ok(row, 'audit finding 5 (metadata size leakage) must still be in the report');
   assert.match(row[2], /Accepted tradeoff/, 'finding 5 is the accepted trade-off this claim is bounded by');
@@ -1013,15 +1068,44 @@ test('the hourly ceiling a paid plan buys is outbound_per_hour, and no page sell
 // analytics snippet or one tracking pixel added to a shared header would leave
 // the sentences standing. This walks every public page and fails on any
 // subresource, of any kind, that is not served from paramant.app.
-test('no public page loads anything from a third party, which is what /parasend promises', () => {
+//
+// A tag scan alone is not enough. Audit finding 17 was a font stylesheet on
+// drop.html, and the two ways a page reaches off-origin without a tag are a
+// bare `@import "https://..."` (no url(), so a url() scan misses it) and a
+// runtime call in an inline script. Both are checked here, along with the
+// worker and socket constructors that fetch code or open a connection.
+//
+// The page set is the public list plus /ontvang and /parashare. Those two are
+// in PRIVATE because they are one-shot flows with no place in the sitemap, but
+// a recipient reaches them by opening a share link, without an account and
+// without a login: a third-party request there is as public as one anywhere,
+// and drop.html was exactly that kind of page.
+test('no page a visitor can open loads anything from a third party, which is what /parasend promises', () => {
   const TAGS = 'script|link|img|iframe|source|video|audio|embed|object|track|image';
   const ATTR = /\b(?:src|href|srcset|poster|data)\s*=\s*"([^"]*)"/gi;
+  const ABS = String.raw`(?:https?:)?\/\/`;
+  // Off-origin without a tag: a bare @import, and anything an inline script
+  // fetches, opens or loads at runtime.
+  const RUNTIME = [
+    [new RegExp(String.raw`@import\s+(?:url\(\s*)?['"]?(${ABS}[^'")\s;]+)`, 'gi'), 'a stylesheet @import of'],
+    [new RegExp(String.raw`\bfetch\(\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'an inline fetch() of'],
+    [new RegExp(String.raw`\.open\(\s*['"][A-Z]+['"]\s*,\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'an XMLHttpRequest to'],
+    [new RegExp(String.raw`new\s+(?:WebSocket|EventSource|Worker|SharedWorker)\(\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'a connection or worker from'],
+    [new RegExp(String.raw`importScripts\(\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'an importScripts() of'],
+    [new RegExp(String.raw`url\(\s*['"]?(${ABS}[^)'"]+)`, 'gi'), 'a stylesheet rule loading'],
+  ];
   const ours = (url) => {
     const host = /^(?:https?:)?\/\/([^/?#]+)/.exec(url);
     return !host || host[1] === 'paramant.app' || host[1].endsWith('.paramant.app');
   };
+  // Reachable without an account: every public page, plus the two share-link
+  // landing pages that PRIVATE excludes from the sitemap but not from a visitor.
+  const reachable = [...new Set([...publicPages(), 'ontvang', 'parashare'])].sort();
+  assert.ok(reachable.includes('ontvang') && reachable.includes('parashare'),
+    'the two share-link landing pages must be in the scan');
+
   const problems = [];
-  for (const slug of publicPages()) {
+  for (const slug of reachable) {
     const html = page(slug).replace(/<!--[\s\S]*?-->/g, '');
     for (const tag of html.matchAll(new RegExp(`<(?:${TAGS})\\b[^>]*>`, 'gi'))) {
       for (const a of tag[0].matchAll(ATTR)) {
@@ -1029,8 +1113,10 @@ test('no public page loads anything from a third party, which is what /parasend 
         if (/^(?:https?:)?\/\//.test(url) && !ours(url)) problems.push(`${slug}: loads ${url}`);
       }
     }
-    for (const u of html.matchAll(/url\(\s*['"]?((?:https?:)?\/\/[^)'"]+)/gi)) {
-      if (!ours(u[1])) problems.push(`${slug}: a stylesheet rule loads ${u[1]}`);
+    for (const [re, what] of RUNTIME) {
+      for (const m of html.matchAll(re)) {
+        if (!ours(m[1])) problems.push(`${slug}: ${what} ${m[1]}`);
+      }
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
