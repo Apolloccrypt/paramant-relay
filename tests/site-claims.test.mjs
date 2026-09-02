@@ -21,6 +21,77 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const page = (slug) => read(`frontend/${slug}.html`);
 
+// Comments out, strings intact. The obvious /\/\/.*$/gm cuts a line at the
+// first "//", which inside 'https://relay.paramant.app/health' deletes the
+// very call test 8 asserts is absent: a real health check written as a full
+// URL would strip away and the assertion would pass on nothing. So walk the
+// source instead. String, template and regex literals are copied through
+// untouched; line and block comments are dropped. Node builtins only, so no
+// parser dependency.
+const REGEX_AFTER_CHAR = /[([{,;:=!&|?+\-*%~^<>]$/;
+const REGEX_AFTER_WORD = /\b(return|typeof|instanceof|in|of|new|delete|void|do|else|case|yield|await)$/;
+function endOfQuoted(src, start) {
+  const quote = src[start];
+  let i = start + 1;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === quote) return i + 1;
+    if (quote === '`' && c === '$' && src[i + 1] === '{') { i = endOfHole(src, i + 2); continue; }
+    if (quote !== '`' && c === '\n') return i; // unterminated: do not run away
+    i += 1;
+  }
+  return i;
+}
+function endOfHole(src, start) { // start sits just after the "${"
+  let depth = 1;
+  let i = start;
+  while (i < src.length && depth > 0) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === '`') { i = endOfQuoted(src, i); continue; }
+    if (c === '{') depth += 1;
+    else if (c === '}') depth -= 1;
+    i += 1;
+  }
+  return i;
+}
+function endOfRegex(src, start) {
+  let i = start + 1;
+  let inClass = false;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '\n') return start + 1; // not a regex after all: emit the slash
+    if (inClass) { if (c === ']') inClass = false; }
+    else if (c === '[') inClass = true;
+    else if (c === '/') { i += 1; while (i < src.length && /[a-z]/i.test(src[i])) i += 1; return i; }
+    i += 1;
+  }
+  return i;
+}
+function stripJsComments(src) {
+  let out = '';
+  let tail = ''; // the last few emitted characters, for the regex heuristic
+  let i = 0;
+  const emit = (s) => { out += s; tail = (tail + s).slice(-16); };
+  while (i < src.length) {
+    const two = src.slice(i, i + 2);
+    if (two === '//') { while (i < src.length && src[i] !== '\n') i += 1; continue; }
+    if (two === '/*') { const end = src.indexOf('*/', i + 2); i = end === -1 ? src.length : end + 2; emit(' '); continue; }
+    const c = src[i];
+    if (c === '"' || c === "'" || c === '`') { const j = endOfQuoted(src, i); emit(src.slice(i, j)); i = j; continue; }
+    if (c === '/') {
+      const before = tail.replace(/\s+$/, '');
+      if (before === '' || REGEX_AFTER_CHAR.test(before) || REGEX_AFTER_WORD.test(before)) {
+        const j = endOfRegex(src, i); emit(src.slice(i, j)); i = j; continue;
+      }
+    }
+    emit(c);
+    i += 1;
+  }
+  return out;
+}
+
 // What a visitor reads: no comments, no scripts, no styles. Comments routinely
 // quote the very phrasing a test forbids.
 function visible(html) {
@@ -54,7 +125,7 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1);
 // 1 ── The parameter sets. Site says ML-KEM-768 (FIPS 203) and ML-DSA-65
 // (FIPS 204). The core registers exactly those two unconditionally.
 test('the post-quantum parameter sets on the site are the ones the core registers', () => {
-  const boot = read('relay/crypto/bootstrap.js').replace(/\/\/.*$/gm, '');
+  const boot = stripJsComments(read('relay/crypto/bootstrap.js'));
   // Everything registered before the extended-mode branch is what every relay
   // loads regardless of CRYPTO_MODE.
   const gate = boot.search(/if\s*\(\s*resolved\s*===\s*['"]extended['"]\s*\)/);
@@ -91,7 +162,7 @@ test('the post-quantum parameter sets on the site are the ones the core register
 // signatures, and only in CRYPTO_MODE=extended; the default (.env.example)
 // is core, which loads the two above. Both pages now say so.
 test('the algorithm counts on the site are what bootstrap.js registers, and the mode caveat is stated', () => {
-  const boot = read('relay/crypto/bootstrap.js').replace(/\/\/.*$/gm, '');
+  const boot = stripJsComments(read('relay/crypto/bootstrap.js'));
   const kems = (boot.match(/registerKEM\(/g) || []).length;
   const sigs = (boot.match(/registerSig\(/g) || []).length;
   assert.ok(kems > 0 && sigs > 0);
@@ -286,10 +357,10 @@ test('the SLA figures are consistent across pages and the measurement described 
   const suites = ['tests/product-heartbeat.test.mjs', 'tests/transfer-canary.test.mjs', 'tests/parasign-canary.test.mjs'];
   for (const f of suites) {
     assert.ok(live.includes(`node --test ${f}`), `the live job must run ${f}`);
-    const src = read(f).replace(/\/\/.*$/gm, '');
+    const src = stripJsComments(read(f));
     assert.doesNotMatch(src, /\/health\b/, `${f} now calls /health; the SLA measurement text must say so`);
   }
-  assert.doesNotMatch(live.replace(/#.*$/gm, ''), /\/health\b/, 'the workflow now calls /health; the SLA measurement text must say so');
+  assert.doesNotMatch(live.replace(/(^|\s)#.*$/gm, '$1'), /\/health\b/, 'the workflow now calls /health; the SLA measurement text must say so');
   for (const sector of ['health', 'legal', 'finance', 'iot']) {
     assert.doesNotMatch(live, new RegExp(`${sector}\\.paramant\\.app`), `the workflow now covers ${sector}.paramant.app; the SLA measurement text must say so`);
   }
