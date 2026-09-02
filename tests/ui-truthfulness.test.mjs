@@ -75,6 +75,124 @@ assert.match(signJs, /function showSessionRequirement/,
   'sign-flow.js must have the session-requirement control');
 
 
+// ── The auth and account screens ─────────────────────────────────────────────
+// docs/brand/messaging.md section 8: an auth screen exists to get the right
+// person back into their account with the least text possible. One sentence
+// saying what the screen does and what happens next, one action, and no promise.
+// These assertions pin the sentence each screen now opens with, so a rewrite
+// that quietly drops the explanation fails here instead of in production.
+const authFirstSentence = {
+  'frontend/auth/login.html': /No password to type: sign in with your passkey/i,
+  'frontend/auth/setup.html': /Pick one now and add the other later/i,
+  'frontend/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
+  'frontend/auth/request-reset.html': /if it matches an account, we send a link/i,
+  'frontend/auth/reset-confirm.html': /You get two emails, one after the other/i,
+  'frontend/signup/verified.html': /Paramant has no passwords/i,
+};
+for (const [file, rx] of Object.entries(authFirstSentence)) {
+  assert.match(read(file), rx, `${file} must open by saying what this screen does`);
+}
+
+// An auth screen that sells is an auth screen that lost someone's password
+// reset. No prices, no tier names, no founder block on these six.
+const authVisible = Object.keys(authFirstSentence)
+  .map((file) => read(file).replace(/<!--[\s\S]*?-->/g, ''))
+  .join('\n');
+assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|Community tier|Mick Beer/i,
+  'auth screens must not carry pricing, tier names or the founder block');
+
+// A ParaSign signature is a Simple Electronic Signature (/about pins that
+// wording). The setup flow used to end on "Add your legally-binding signature
+// to a PDF", which promises a legal effect the product does not deliver and
+// which tests/ui-truthfulness already forbids on /sign. Same rule, same surface.
+assert.doesNotMatch(authVisible,
+  /legally.binding|identity verified|verified signer|signer verified/i,
+  'the auth screens must not claim a legal effect or a verified identity');
+
+console.log('ui-truthfulness: the auth screens say what they do and sell nothing');
+
+
+// ── What the review of the auth screens caught, pinned so it cannot come back ─
+// Scope note: /account and /download are deliberately absent here. The account
+// screen is being rewritten in the dashboard PR and /download is not an auth
+// screen; both were taken back out of this branch.
+// 1. /auth/request-reset and /auth/reset-confirm used <main class="page-main">,
+//    a class no stylesheet in frontend/ defines, so at 390px the heading and the
+//    primary button sat flush against both screen edges. They now use the same
+//    container as /auth/login and /auth/backup.
+const styled = ['frontend/design-system.css', 'frontend/nav.css']
+  .map(read).join('\n');
+for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-confirm.html']) {
+  const main = read(file).match(/<main class="([^"]+)"/);
+  assert.ok(main, `${file} must have a <main> with a class`);
+  for (const cls of main[1].split(/\s+/)) {
+    assert.ok(styled.includes(`.${cls}`),
+      `${file}: <main class="${cls}"> has no rule in any stylesheet, so the page has no side margin`);
+  }
+}
+
+// 2. The reset confirmation token is written with { EX: 3600 } (admin/server.js).
+//    The page claimed 15 minutes and justified it as a safety property, which
+//    made a wrong number sound deliberate.
+const resetConfirm = read('frontend/auth/reset-confirm.html');
+assert.match(resetConfirm, /Confirmation links last 60 minutes/i,
+  'reset-confirm must state the TTL the code actually sets (EX: 3600)');
+assert.doesNotMatch(resetConfirm, /arrives within a minute|within a minute/i,
+  'no delivery-time promise: the reset mail is sent fire-and-forget');
+
+// 3. Clicking through from a mail to "confirm" and then being told a second mail
+//    follows reads as phishing unless the page says why it is split in two.
+assert.match(resetConfirm, /someone who briefly had your mailbox open/i,
+  'reset-confirm must say why the reset takes two emails');
+
+// 4. The sign-in rate limit is per IP (5/900s) AND per email address (10/900s),
+//    admin/server.js. The email counter is account-wide, so "this device" points
+//    the reader at the wrong cause.
+const loginJs = read('frontend/js/auth-login.js');
+assert.doesNotMatch(loginJs, /attempts from this device/i,
+  'the 429 text must not blame the device: the limit is also per account');
+assert.match(loginJs, /counted per account and per internet connection/i,
+  'the 429 text must name both counters, because either one can be the cause');
+
+// 5. Every one of these screens must name the party behind the product and the
+//    country it sits in. The stamped legal-strip carries the documents, not the
+//    company, and apply-nav.py owns that strip.
+for (const file of Object.keys(authFirstSentence)) {
+  assert.match(read(file), /Paramantis Solutions B\.V\./,
+    `${file} must name the company behind the product`);
+  assert.match(read(file), /Harderwijk,\s+the Netherlands/,
+    `${file} must name the country the company sits in`);
+}
+
+// 6. /signup/verified made a lawyer choose between seven authenticator apps and
+//    told them a SHA-256 app is "stronger" without saying what that means.
+const verified = read('frontend/signup/verified.html');
+assert.doesNotMatch(verified, /SHA-256 app is stronger|Raivo|Aegis|2FAS|Ente Auth/i,
+  'verified must not ask the reader to rank authenticator apps; link the help page');
+assert.match(verified, /help\/authenticator-apps/,
+  'verified must link the help page that does compare the apps');
+assert.doesNotMatch(verified, /class="next-num"/,
+  'no step badge numbered 2 on a page that has no step 1');
+// Same rule as reset-confirm: the setup mail is dispatched fire-and-forget and
+// nothing in the code knows what the receiving provider will do with it.
+assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute/i,
+  'no delivery-time promise on verified either: the rule holds on every screen');
+
+
+// 7. .lede carries no top margin and h1 carries no bottom margin, so on
+//    /auth/setup, /auth/backup and /auth/request-reset the heading and the lead
+//    paragraph touched at 390px (measured 0px, against 8px on login and 16px on
+//    verified). The .mt-3 utility (16px) restores the gap without changing .lede
+//    for the eleven other pages that use it.
+for (const file of ['frontend/auth/setup.html', 'frontend/auth/backup.html',
+                    'frontend/auth/request-reset.html']) {
+  const html = read(file);
+  const afterH1 = html.slice(html.indexOf('</h1>'));
+  assert.match(afterH1.slice(0, 200), /<p class="lede mt-3">/,
+    `${file}: the lead paragraph under the h1 needs a top margin or the two touch at 390px`);
+}
+
+console.log('ui-truthfulness: the review findings on PR #337 stay fixed');
 // ── The homepage now that it sells instead of describes ──────────────────────
 // It states two things a page can be wrong about at real cost: what a signature
 // is worth, and what it costs. Both are pinned here, because the homepage is
