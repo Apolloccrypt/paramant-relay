@@ -50,6 +50,43 @@ EXPECT_VERSION="3.1.0"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
 HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app iot.paramant.app relay.paramant.app"
 
+# The CI gate on main (runbook: "Before you start", point 1).
+#
+# One verdict per required workflow, not "the last 5 runs on main". That older
+# gate mixed workflows in one window and read a red run of ANY of them as a
+# stop: on 2026-09-02 --preflight-only stopped on a red `heartbeat` run, which
+# is the hourly alarm saying its two canary secrets are absent. That is a
+# statement about the alarm, not about whether main deploys.
+#
+# The list below is every workflow in .github/workflows that runs on a push to
+# main WITHOUT a paths: filter. tests/deploy-3.1-dryrun.test.sh derives the same
+# list from the workflow files and fails when the two disagree, so a new
+# push-gated workflow cannot quietly stay outside the gate.
+#
+# Deliberately NOT in the list:
+#   heartbeat.yml       does not run on push at all (schedule + workflow_dispatch)
+#                       and is gated on vars.HEARTBEAT_ENABLED. It is red on
+#                       purpose while the two canary secrets are missing, by its
+#                       own design: "there is no skip, a missing secret fails and
+#                       names the secret". Gating a deploy on it would mean no
+#                       deploy can happen until the alarm has its secrets.
+#   docker-publish.yml  path-gated on relay/**, so a main commit that touches
+#                       only the frontend produces no run at all, and a hard
+#                       "must be success" would block every such deploy. This
+#                       runbook also does not deploy that published image:
+#                       phase 4 recreates from the server's own checkout.
+#   build-image.yml     path-gated on relay/** for the same reason. It is a
+#                       toolchain-drift gate for pull requests, not a
+#                       main-is-deployable gate.
+REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat.yml}"
+
+# A required workflow still in_progress or queued on the sha we would deploy is
+# neither a pass nor a failure: it is an answer that has not arrived. The old
+# gate only looked for the literal string "failure", so two in_progress runs on
+# 2026-09-02 counted as "not failing" and the gate waved them through. Wait for
+# them instead, then judge what they became.
+CI_WAIT_SECONDS="${PARAMANT_CI_WAIT_SECONDS:-900}"   # 15 minutes
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -104,6 +141,56 @@ run_gated() {
   GATED_OUT="$("$@" 2>&1)" || rc=$?
   printf '%s\n' "$GATED_OUT" | sed 's/^/  | /'
   return $rc
+}
+
+# ci_running_ids: the run ids of <workflow> on main that have not finished on
+# <sha>. queued counts as running: it has not even started, so it certainly has
+# no conclusion.
+ci_running_ids() {   # workflow file, sha
+  local st
+  for st in in_progress queued; do
+    gh run list --workflow "$1" --branch main --status "$st" -L 20 \
+      --json databaseId,headSha \
+      --jq ".[] | select(.headSha == \"$2\") | .databaseId" 2>/dev/null || true
+  done
+}
+
+# ci_gate_workflow: the verdict for one required workflow. Returns 0 only when
+# nothing of it is still in flight on the sha we would deploy AND its last
+# completed run on main concluded success. Everything else, including a
+# workflow that has never completed a run on main, returns non-zero.
+ci_gate_workflow() {   # workflow file, sha
+  local wf="$1" sha="$2" id ids concl
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '\n  $ gh run list --workflow %s --branch main --status in_progress -L 20 --json databaseId,headSha\n' "$wf"
+    printf '  [dry-run] not executed; a run of %s still in flight on the main sha is waited on with gh run watch, up to %ss, and judged afterwards\n' \
+      "$wf" "$CI_WAIT_SECONDS"
+  else
+    ids="$(ci_running_ids "$wf" "$sha" | tr '\n' ' ')"
+    for id in $ids; do
+      printf '  %-22s run %s is still in flight on %s; waiting up to %ss\n' \
+        "$wf" "$id" "$(printf '%s' "$sha" | cut -c1-7)" "$CI_WAIT_SECONDS"
+      timeout "$CI_WAIT_SECONDS" gh run watch "$id" >/dev/null 2>&1 || true
+    done
+    if [ -n "${ids// /}" ]; then
+      ids="$(ci_running_ids "$wf" "$sha" | tr '\n' ' ')"
+      if [ -n "${ids// /}" ]; then
+        printf '  %-22s STILL RUNNING after %ss (run %s)\n' "$wf" "$CI_WAIT_SECONDS" "$ids"
+        return 1
+      fi
+    fi
+  fi
+
+  run_gated gh run list --workflow "$wf" --branch main --status completed -L 1 \
+    --json conclusion,headSha,displayTitle,url || true
+  [ "$DRY_RUN" -eq 1 ] && return 0
+
+  concl="$(gh run list --workflow "$wf" --branch main --status completed -L 1 \
+           --json conclusion --jq '.[0].conclusion // "NONE"' 2>/dev/null || echo UNKNOWN)"
+  [ -n "$concl" ] || concl=UNKNOWN
+  printf '  %-22s last completed run on main: %s\n' "$wf" "$concl"
+  [ "$concl" = "success" ]
 }
 
 # q_args: shell-quote each argument into one string.
@@ -314,20 +401,30 @@ fi
 phase_0() {
   phase 0 "Before you start (read-only)" "Before you start, points 1 to 4"
 
-  step "0a. CI on main"
-  run_gated gh run list --branch main -L 5 || warn "gh run list did not succeed; check CI on main by hand"
+  step "0a. CI on main, one verdict per required workflow"
+  printf '  required: %s\n' "$REQUIRED_WORKFLOWS"
+  printf '  excluded: heartbeat.yml (schedule only, red by design while its canary secrets are absent),\n'
+  printf '            docker-publish.yml and build-image.yml (path-gated on relay/**, so they need not have run)\n'
+
+  local main_sha wf ci_bad=0 ci_n=0
+  if [ "$DRY_RUN" -eq 1 ]; then
+    main_sha="<main sha>"
+  else
+    main_sha="$(gh api "repos/{owner}/{repo}/commits/main" --jq .sha 2>/dev/null || echo unknown)"
+    printf '  main sha: %s\n' "$(printf '%s' "$main_sha" | cut -c1-7)"
+    [ "$main_sha" = "unknown" ] && warn "could not read the main sha from gh; in-flight runs cannot be matched to it"
+  fi
+
+  for wf in $REQUIRED_WORKFLOWS; do
+    ci_n=$((ci_n + 1))
+    ci_gate_workflow "$wf" "$main_sha" || ci_bad=$((ci_bad + 1))
+  done
+
   if [ "$DRY_RUN" -eq 0 ]; then
-    local concl
-    concl="$(gh run list --branch main -L 5 --json conclusion --jq '.[].conclusion' 2>/dev/null || echo UNKNOWN)"
-    printf '  conclusions: %s\n' "$(printf '%s' "$concl" | tr '\n' ' ')"
-    if printf '%s\n' "$concl" | grep -qx 'failure'; then
-      die "CI on main has a failing run in the last 5; the runbook wants main green"
+    if [ "$ci_bad" -gt 0 ]; then
+      die "$ci_bad of $ci_n required workflows on main did not conclude success (or is still running); the runbook wants main green"
     fi
-    if printf '%s\n' "$concl" | grep -qx 'UNKNOWN'; then
-      warn "could not read CI conclusions from gh; check main by hand before continuing"
-    else
-      ok "CI on main: no failing run in the last 5"
-    fi
+    ok "CI on main: all $ci_n required workflows concluded success ($REQUIRED_WORKFLOWS)"
   fi
 
   step "0b. static sanity on the commit that will be deployed ($DEPLOY_REF)"
