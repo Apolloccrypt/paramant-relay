@@ -227,6 +227,29 @@ check_has "$SCRIPT" 'PARAMANT_SMOKE_API_KEY is not set'  "phase 6 says plainly w
 check_has "$FULL"   'needs PARAMANT_SMOKE_API_KEY'      "the dry run names the key the full proof needs"
 
 echo ""
+echo "6ab. The compose file really passes the receipt variables through"
+# There is no env_file in docker-compose.yml: .env only substitutes ${VAR}
+# inside the compose file, so a variable without a line in x-relay-env never
+# reaches a container no matter what .env says.
+COMPOSE="$ROOT/docker-compose.yml"
+check_lacks "$COMPOSE" '^[[:space:]]*env_file' \
+  "docker-compose.yml still has no env_file, so x-relay-env is the only route in"
+for v in PARAMANT_INLINE_RECEIPT_HEADER PARAMANT_RECEIPT_PER_ACCOUNT_MAX \
+         PARAMANT_RECEIPT_UNCAPPED_MAX PARAMANT_RECEIPT_TOTAL_MAX; do
+  check_has "$COMPOSE" "^  $v: " "x-relay-env declares $v"
+done
+check_has "$FULL" 'compose inline flag on'  "phase 4 proves the flag renders BEFORE the recreate"
+check_has "$FULL" 'docker compose config'   "that proof uses docker compose config, not a guess"
+
+echo ""
+echo "6ac. The round-2 guards"
+check_has "$SCRIPT" 'BLOCK_AWK'                          "the buffer guard counts inside each /v2/outbound block"
+check_has "$FULL"   'after outbound blocks with buffer'  "phase 5 reports blocks, not file-wide grep hits"
+check_has "$SCRIPT" 'REFUSED'                            "phase 5b refuses a deletion that resolves outside the docroot"
+check_has "$FULL"   'after refused outside docroot'      "phase 5b reports how many deletions it refused"
+check_has "$SCRIPT" 'NOT PROVEN'                         "phase 6h says NOT PROVEN when the header block is under 16 KB"
+
+echo ""
 echo "6b. Rollback restores in an order that cannot half-fail"
 check_has "$RB" 'missing backups = 0'    "rollback refuses to start when a backup it needs is absent"
 check_has "$RB" 'restore \.env first'    "rollback restores .env before recreating the containers"
@@ -289,6 +312,16 @@ TAINT="$(grep -E '(\.env|openssl rand)' "$SCRIPT" \
          | grep -vE 'grep -c|grep -qc|wc -l' \
          | grep -oE '(^|[[:space:]])[A-Za-z_][A-Za-z_0-9]*=' \
          | tr -d ' =' | sort -u)"
+# Let the taint inherit over one assignment, so `s3cr="$tok"` is tainted too.
+# One hop only: a full dataflow analysis is not what a shell test should be,
+# and two hops have never appeared in this script. If that changes, this is
+# the line to extend, and the limit is written down here on purpose.
+for _v in $TAINT; do
+  _heirs="$(grep -oE "(^|[[:space:]])[A-Za-z_][A-Za-z_0-9]*=\"?\\\$\{?$_v\}?\"?[[:space:]]*\$" "$SCRIPT" \
+            | grep -oE '[A-Za-z_][A-Za-z_0-9]*=' | tr -d ' =' || true)"
+  [ -n "$_heirs" ] && TAINT="$TAINT $_heirs"
+done
+TAINT="$(printf '%s\n' $TAINT | sort -u)"
 if [ -z "$TAINT" ]; then
   fail "the taint scan found no variable reading .env; the scan is not looking at anything"
 else

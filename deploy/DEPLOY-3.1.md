@@ -48,10 +48,28 @@ What main brings that touches the deploy, with the PR that did it:
 - **#323** seventeen norms and sector pages removed (nginx: the `/compliance/*` locations go).
 - this PR: the recurring layer needs an explicit `BILLING_MODE`.
 
-`docker-compose.yml` is byte-identical between `41501bb` and main
-(`git diff 41501bb origin/main -- docker-compose.yml` is empty). Every
-environment variable this runbook mentions already has its line in the
-`x-relay-env` block; nothing has to be added to the compose file, only to `.env`.
+`docker-compose.yml` is **no longer** byte-identical between `41501bb` and
+main, and that matters for this deploy. Two changes:
+
+- #340 rewrote the version header comment.
+- This PR adds `PARAMANT_INLINE_RECEIPT_HEADER` and the three
+  `PARAMANT_RECEIPT_*` variables from #342 to the `x-relay-env` block.
+
+That second one is not cosmetic. There is **no `env_file`** in
+`docker-compose.yml`: `.env` only fills in `${VAR}` references inside the
+compose file itself, so a variable without its own line in `x-relay-env`
+never reaches a container, however carefully it is written into `.env`. The
+four receipt variables had no line, so setting the inline-receipt opt-in in
+`.env` alone would have done nothing at all.
+
+Nothing has to be done by hand for this: step 3 pulls the new compose file
+with the rest of main, and the step 4 recreate is what makes the containers
+read it. `deploy/deploy-3.1.sh` proves it before recreating anything, with
+`docker compose config` on the server: the flag has to render as
+`PARAMANT_INLINE_RECEIPT_HEADER: "1"` on all five relays, or the deploy stops
+there rather than at the smoke test with 3.1.0 already live.
+
+Every other environment variable this runbook mentions already had its line.
 
 ## The brake, and why the deploy is now allowed
 

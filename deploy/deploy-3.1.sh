@@ -671,6 +671,23 @@ EOF
 phase_4() {
   phase 4 "Recreate, the canary relay first (server, WRITE)" "Step 4"
 
+  step "4pre. the rendered compose really carries the receipt flag"
+  note 'there is no env_file in docker-compose.yml: .env only substitutes'
+  note '${VAR} into it, so a variable without a line in x-relay-env never'
+  note 'reaches a container. This proves the flag lands BEFORE the recreate,'
+  note 'instead of learning it from a failed smoke test at the very end.'
+  remote "compose config" "$COMPOSE_DIR" <<'EOF'
+set -euo pipefail
+cd "$1"
+rendered="$(docker compose config 2>/dev/null)"
+echo "compose inline flag on = $(printf '%s\n' "$rendered" | grep -c 'PARAMANT_INLINE_RECEIPT_HEADER: "1"' || true)"
+echo "compose inline flag declared = $(printf '%s\n' "$rendered" | grep -c 'PARAMANT_INLINE_RECEIPT_HEADER:' || true)"
+printf '%s\n' "$rendered" | grep -nE 'PARAMANT_(RECEIPT_|INLINE_RECEIPT)' | head -8 | sed 's/^/  cfg /' || true
+EOF
+  # Five relays share x-relay-env; the anchor itself renders once more.
+  expect_min "compose inline flag on" 5 \
+    "the rendered compose sets PARAMANT_INLINE_RECEIPT_HEADER=1 on all five relays"
+
   step "4a. relay-iot alone, then read its two boot lines"
   remote "recreate relay-iot" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
@@ -826,6 +843,7 @@ echo "before deleted-in-git count = $(printf '%s\n' "$DEL" | grep -c . || true)"
 removed=0
 kept=0
 absent=0
+outside=0
 for f in $DEL; do
   rel="${f#frontend/}"
   # Never step outside the docroot, and never touch what the drift guard
@@ -844,21 +862,34 @@ for f in $DEL; do
     kept=$((kept + 1))
     continue
   fi
-  if [ -f "$DOCROOT/$rel" ]; then
-    rm -f "$DOCROOT/$rel"
-    echo "  removed $rel"
-    removed=$((removed + 1))
-  else
+  if [ ! -f "$DOCROOT/$rel" ]; then
     absent=$((absent + 1))
+    continue
   fi
+  # A symlinked subdirectory inside the docroot would let this rm land outside
+  # it. Resolve the path and refuse anything that is not really under DOCROOT.
+  real="$(readlink -f "$DOCROOT/$rel")"
+  realroot="$(readlink -f "$DOCROOT")"
+  case "$real" in
+    "$realroot"/*) : ;;
+    *) echo "  REFUSED $rel resolves to $real, outside $realroot"
+       outside=$((outside + 1))
+       continue ;;
+  esac
+  rm -f "$real"
+  echo "  removed $rel"
+  removed=$((removed + 1))
 done
 echo "after removed = $removed"
 echo "after kept on ignore list = $kept"
 echo "after already absent = $absent"
+echo "after refused outside docroot = $outside"
 echo "after docroot files = $(find "$DOCROOT" -type f | wc -l)"
 EOF
   expect_min "before deleted-in-git count" 1 \
     "git names at least one frontend file deleted since the deployed commit"
+  expect_count "after refused outside docroot" 0 \
+    "no deletion resolved to a path outside the docroot"
   if [ "$DRY_RUN" -eq 0 ]; then
     local rm_n ab_n
     rm_n="$(remote_field 'after removed')"
@@ -893,12 +924,50 @@ PARAID_RE='paraid/issue'
 OUT_RE='^[[:space:]]*location[[:space:]]*~[[:space:]]*\^/v2/outbound[[:space:]]*\{'
 BUF_RE='proxy_buffer_size 32k'
 
+# Two-pass insert: learn which /v2/outbound blocks already carry the buffer,
+# then insert only into the ones that do not.
+BUF_AWK='
+FNR==NR {
+  if ($0 ~ /^[[:space:]]*location[[:space:]]*~[[:space:]]*\^\/v2\/outbound[[:space:]]*\{/) { b++; inb=1; depth=1; next }
+  if (inb) {
+    if ($0 ~ /proxy_buffer_size 32k/) has[b]=1
+    depth += gsub(/\{/,"{") - gsub(/\}/,"}")
+    if (depth <= 0) inb=0
+  }
+  next
+}
+{
+  print
+  if ($0 ~ /^[[:space:]]*location[[:space:]]*~[[:space:]]*\^\/v2\/outbound[[:space:]]*\{/) {
+    j++
+    if (!has[j]) {
+      print "        proxy_buffer_size 32k;"
+      print "        proxy_buffers 8 32k;"
+      print "        proxy_busy_buffers_size 64k;"
+    }
+  }
+}'
+
+# Count /v2/outbound blocks, and how many of them carry the buffer INSIDE the
+# block. Counting matches per file cannot tell those apart.
+BLOCK_AWK='
+/^[[:space:]]*location[[:space:]]*~[[:space:]]*\^\/v2\/outbound[[:space:]]*\{/ { total++; inb=1; has=0; depth=1; next }
+inb {
+  if ($0 ~ /proxy_buffer_size 32k/) has=1
+  depth += gsub(/\{/,"{") - gsub(/\}/,"}")
+  if (depth <= 0) { if (has) withbuf++; inb=0 }
+}
+END { printf "%d %d\n", total+0, withbuf+0 }'
+
+count_blocks() { awk "$BLOCK_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
+
 echo "before sign gated = $(count "$SIGN_RE")"
 echo "before compliance = $(count "$COMP_RE")"
 echo "before dicom try_files = $(count "$DICOM_RE")"
 echo "before paraid deny = $(count "$PARAID_RE")"
-echo "before outbound locations = $(count "$OUT_RE")"
-echo "before outbound buffers = $(count "$BUF_RE")"
+read -r _obt _obw <<< "$(count_blocks)"
+echo "before outbound locations = $_obt"
+echo "before outbound blocks with buffer = $_obw"
 
 # Each edit must have something to do. A zero here means the server conf is not
 # the shape the runbook describes, and guessing further would be editing blind.
@@ -931,18 +1000,16 @@ for f in $TARGETS; do
   # 4. #342: raise the proxy buffers on /v2/outbound. Nginx has to hold the
   #    whole upstream header block in ONE buffer, and the default 4k/8k is far
   #    under the ~19 KB the deprecated inline X-Paramant-Receipt costs, which
-  #    is a 502 on every download. Inserted once, right after the location
-  #    opens; running this twice must not stack a second copy.
-  if ! grep -qF "proxy_buffer_size 32k" "$f"; then
-    awk '{ print }
-         /^[[:space:]]*location[[:space:]]*~[[:space:]]*\^\/v2\/outbound[[:space:]]*\{/ {
-           print "        proxy_buffer_size 32k;"
-           print "        proxy_buffers 8 32k;"
-           print "        proxy_busy_buffers_size 64k;"
-         }' "$f" > "/tmp/nginx-buf.$$"
-    cat "/tmp/nginx-buf.$$" > "$f"
-    rm -f "/tmp/nginx-buf.$$"
-  fi
+  #    is a 502 on every download.
+  #
+  #    The guard is per BLOCK, not per file. A file-wide grep passes as soon as
+  #    proxy_buffer_size appears anywhere, so a conf that already sets it on
+  #    /v2/inbound would leave the outbound block bare and every download would
+  #    502. Pass one reads which outbound blocks already have it, pass two
+  #    inserts only into the ones that do not, which also makes it idempotent.
+  awk "$BUF_AWK" "$f" "$f" > "/tmp/nginx-buf.$$"
+  cat "/tmp/nginx-buf.$$" > "$f"
+  rm -f "/tmp/nginx-buf.$$"
   if ! cmp -s "$f" "/tmp/nginx-pre-3.1-$(basename "$f").$TS"; then
     echo "edited $(basename "$f")"
     edited=$((edited + 1))
@@ -954,8 +1021,9 @@ echo "after compliance = $(count "$COMP_RE")"
 echo "after dicom try_files = $(count "$DICOM_RE")"
 echo "after dicom 404 = $(count 'location = /dicom[[:space:]]*\{[[:space:]]*return 404')"
 echo "after paraid deny = $(count "$PARAID_RE")"
-echo "after outbound locations = $(count "$OUT_RE")"
-echo "after outbound buffers = $(count "$BUF_RE")"
+read -r _oat _oaw <<< "$(count_blocks)"
+echo "after outbound locations = $_oat"
+echo "after outbound blocks with buffer = $_oaw"
 
 restore() {
   for b in "$NGBK"/*.pre-3.1-"$TS"; do
@@ -997,10 +1065,11 @@ EOF
   if [ "$DRY_RUN" -eq 0 ]; then
     local ol bf
     ol="$(remote_field 'after outbound locations')"
-    bf="$(remote_field 'after outbound buffers')"
+    bf="$(remote_field 'after outbound blocks with buffer')"
+    [ -n "$ol" ] && [ -n "$bf" ] || die "could not read the /v2/outbound block counts from the server"
     [ "$bf" = "$ol" ] \
-      || die "proxy_buffer_size is on $bf of $ol /v2/outbound locations; the inline receipt header would 502 on the rest"
-    ok "every /v2/outbound location carries proxy_buffer_size 32k ($bf of $ol)"
+      || die "proxy_buffer_size sits inside $bf of $ol /v2/outbound blocks; the inline receipt header would 502 on the rest"
+    ok "every /v2/outbound block carries proxy_buffer_size 32k ($bf of $ol blocks)"
   fi
   if [ "$DRY_RUN" -eq 0 ]; then
     local pb pa
@@ -1198,12 +1267,14 @@ EOF
       done
       grep -qi '^x-paramant-receipt-deprecated:' "$hdr" \
         && warn "the deprecation header is present alongside the inline one; the relay thinks the opt-in is off"
-      if [ "$size" -gt 16000 ]; then
-        ok "a real download returned 200 with a ${size}-byte header block, so nginx carried the fat inline receipt"
-      else
-        warn "the header block was only ${size} bytes; the inline receipt may not have been attached, so the >16 KB path is unproven"
-      fi
       ok "the download carries both the inline receipt and the id/hash/url reference"
+      if [ "$size" -gt 16000 ]; then
+        ok "a real download returned 200 with a ${size}-byte header block, so nginx carried the fat inline receipt through the raised buffers"
+      else
+        # No ok line here on purpose: the summary must not read as if the
+        # oversized-header path was proven when it was not.
+        warn "NOT PROVEN: the header block was only ${size} bytes, under the 16 KB that makes this test meaningful. The download worked, but the oversized-header path through nginx is untested."
+      fi
       rm -f "$tmp" "$hdr" "$body"
     else
       warn "PARAMANT_SMOKE_API_KEY is not set: NOT proven that a real download returns the inline receipt through nginx without a 502. Only the config was checked. Set the variable to a ParaSend key to run the full test."
