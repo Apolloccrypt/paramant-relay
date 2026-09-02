@@ -612,13 +612,13 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   <div class="arch-inner">
     <div class="section-num">07</div>
     <h2 class="section-title">Verified transfer</h2>
-    <p class="section-desc">Every Paramant transfer is account-bound and end-to-end encrypted in the browser. ParaShare adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
+    <p class="section-desc">Every Paramant transfer is account-bound and end-to-end encrypted in the browser. The ParaSend web app adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
 
     <table class="modes-table">
       <thead>
         <tr>
           <th>Property</th>
-          <th><span class="mode-badge mode-badge--lime">Verified<br>ParaShare</span></th>
+          <th><span class="mode-badge mode-badge--lime">Verified<br>web app</span></th>
         </tr>
       </thead>
       <tbody>
@@ -660,7 +660,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   <div class="arch-inner">
     <div class="section-num">08</div>
     <h2 class="section-title">Components</h2>
-    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the WebApp tools (ParaShare). Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the ParaSend web app. Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
 
     <table class="modes-table">
       <thead>
@@ -687,7 +687,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
           <td>Real post-quantum (@noble/post-quantum). Produces v1 blobs.</td>
         </tr>
         <tr>
-          <td><strong>ParaShare (webapp)</strong></td>
+          <td><strong>ParaSend web app</strong></td>
           <td>Verified, authenticated transfers from the browser.</td>
           <td>Hybrid ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, client-side. Pre-v1 blob layout. Migration to v1 in progress.</td>
         </tr>

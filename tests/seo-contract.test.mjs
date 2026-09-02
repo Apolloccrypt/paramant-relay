@@ -399,6 +399,11 @@ test('every public page names the company and the founder in its Organization no
 //              release is v0.2.1 of 28 March 2026 and none has followed.
 //   trust      frontend/trust.html tags every claim live or planned.
 //   signup     the ParaSign Community card on frontend/pricing.html.
+//   rules      frontend/rules.html carries the nine rules and their verify
+//              links. It was /pararules until the two-product-names round;
+//              pinned here because the retired brand is exactly what creeps
+//              back into a title, and the old URL keeps a 301 that only pays
+//              off while the new page is the one that is indexed.
 //
 // The title is pinned as well as the description. A title is the one sentence
 // that gets shared, and the gate above only pins the copies to each other: all
@@ -435,6 +440,10 @@ const PINNED = {
   signup: {
     title: 'Create a free Paramant account',
     desc: 'Create a Paramant account. ParaSign Community gives 2 signatures a month, unlimited receiving and full post-quantum crypto, forever. No card required.',
+  },
+  rules: {
+    title: 'Our rules · What Paramant stands for',
+    desc: 'The rules Paramant holds itself to: zero third-party requests, EU sovereignty, post-quantum by default, you own your keys, honest by design.',
   },
 };
 
