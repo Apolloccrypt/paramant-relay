@@ -113,9 +113,9 @@ console.log('ui-truthfulness: the auth screens say what they do and sell nothing
 
 
 // ── What the review of the auth screens caught, pinned so it cannot come back ─
-// Scope note: /account and /download are deliberately absent here. The account
-// screen is being rewritten in the dashboard PR and /download is not an auth
-// screen; both were taken back out of this branch.
+// Scope note: /account was deliberately absent here while the dashboard PR
+// rewrote it; the section further down now covers it. /download was absent for
+// the same reason and has its own section at the foot of this file.
 // 1. /auth/request-reset and /auth/reset-confirm used <main class="page-main">,
 //    a class no stylesheet in frontend/ defines, so at 390px the heading and the
 //    primary button sat flush against both screen edges. They now use the same
@@ -1308,3 +1308,202 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 
   console.log('ui-truthfulness: the trust pages answer who, what and what next above the fold');
 }
+// ── /download: the desktop app, and what the artifacts actually are ─────────
+//
+// Two reviewers rejected the previous version of this page on 2026-09-02. It
+// opened with "THE DESKTOP APP IS OUT OF DATE. USE THE WEB APP." and then ran
+// a full product page with four download buttons underneath it, so the page
+// argued with itself. It also made a signing claim the artifacts do not
+// support, and it counted "21 protections" the web app has over the native
+// build, a number no test in this repo could check.
+//
+// The page now carries one message: the desktop app is not maintained, use the
+// browser. The installers stay, collapsed, as an archive with the measurement
+// beside them. These assertions pin the parts a future edit could quietly
+// soften: the status, the file list, and the signing truth.
+//
+// Every number below was measured on 2026-09-02 against the files
+// https://paramant.app/dl/ serves, which are byte-identical to the release
+// artifacts of Apolloccrypt/paramant-app (verified by sha256). The repo is
+// private, so the artifacts are the source, not the release notes.
+
+// Wrapped in a named IIFE, the convention #359 settled for this file. It is a
+// flat script, so every const in it is a top-level binding and two sections
+// arriving from parallel branches collide with "has already been declared".
+(function pinDownloadPage() {
+  const downloadHtml = read('frontend/download.html');
+  const downloadVisible = downloadHtml.replace(/<!--[\s\S]*?-->/g, '');
+
+  // 1. The status sentence. The last release is v0.2.1 of 28 March 2026 and none
+  //    has followed it; the repository has no build pipeline that would produce
+  //    one. If the app is ever picked up again this assertion is the thing that
+  //    fails first, which is the point.
+  assert.match(downloadVisible, /The Paramant desktop app is no longer maintained/,
+    'download.html must open by saying the desktop app is not maintained');
+  assert.match(downloadVisible, /v0\.2\.1/,
+    'download.html must name the last release, v0.2.1');
+  assert.match(downloadVisible, /28 March 2026/,
+    'download.html must date the last release');
+
+  // The old contradiction, in both directions: the page may not recommend the
+  // desktop app, and may not sell it as current.
+  assert.doesNotMatch(downloadVisible, /\b(?:latest|current|newest)\s+(?:version|build|release)\s+of\s+the\s+desktop\b/i,
+    'download.html must not present the archived build as current');
+  assert.doesNotMatch(downloadVisible, /\bdownload the (?:desktop |native )?app\b/i,
+    'download.html must not invite a download as its call to action');
+
+  // 2. The archive equals what was actually published. Filename, version and
+  //    sha256 together: a version bump on the page without a new artifact, or a
+  //    fifth installer that no release ever shipped, both fail here.
+  const publishedInstallers = {
+    'paramant_0.2.1_amd64.deb': {
+      version: 'v0.2.1',
+      sha256: '62360ad6959be6a9b333de65de67a24b4534f754043c3d88b85908d4703e32bb',
+    },
+    'PARAMANT-0.2.0-1.x86_64.rpm': {
+      version: 'v0.2.0',
+      sha256: 'b103dadcd081e886ead442e9128843d5a894b3ec05547b8a2a1ec208d7d541be',
+    },
+    'PARAMANT_0.2.0_amd64.AppImage': {
+      version: 'v0.2.0',
+      sha256: '7e0962ace68feb6722a6ddcd60102513c8588c9ac4b3406f91b24721ee9aa728',
+    },
+    'PARAMANT-0.2.0-windows-signed.exe': {
+      version: 'v0.2.0',
+      sha256: 'fff0d10c1e0904c5b52cf7c15c1b0fce90e9ab9e48e54d6aab9747e73333f1bc',
+    },
+  };
+  for (const [file, want] of Object.entries(publishedInstallers)) {
+    assert.ok(downloadVisible.includes(`/dl/${file}`),
+      `download.html must link the archived installer /dl/${file}`);
+    assert.ok(downloadVisible.includes(want.sha256),
+      `download.html must carry the measured sha256 of ${file}`);
+  }
+  // No sixth link creeping in, and no Android installer: v0.2.1 shipped an .apk,
+  // but on Android the app runs in the system webview, so the "own process, no
+  // browser" argument that justifies the desktop archive does not apply there.
+  const linkedInstallers = [...downloadVisible.matchAll(/\/dl\/([A-Za-z0-9._-]+)/g)]
+    .map((m) => m[1])
+    .filter((name) => name !== 'SHA256SUMS');
+  assert.deepEqual(
+    [...new Set(linkedInstallers)].sort(),
+    Object.keys(publishedInstallers).sort(),
+    'download.html links installers that are not in the pinned release list, or is missing one');
+  // The .apk may be named as a fact (v0.2.1 shipped one), never offered as a
+  // link: on Android the app runs in the system webview, so the "own process,
+  // no browser" argument that justifies the desktop archive does not apply.
+  assert.doesNotMatch(downloadVisible, /href="[^"]*\.apk"/i,
+    'download.html must not link the Android build; the web app is current there');
+
+  // 3. The signing truth, measured on the artifacts themselves:
+  //      .deb 0.2.1  no _gpgbuilder and no _gpgorigin. Not signed.
+  //      .rpm        rpm -qpi reports "Signature : (none)". Not signed.
+  //      .AppImage   .sha256_sig and .sig_key exist but are all zeroes.
+  //      .exe        Authenticode present, certificate table 1704 bytes, but
+  //                  subject and issuer are both CN=Mick Beer, O=PARAMANT, C=NL.
+  //
+  //    A first pass of this page got the .deb wrong and a reviewer caught it.
+  //    It checked only for _gpgorigin, the member debsigs writes, and concluded
+  //    the v0.2.0 release notes had overclaimed. They had not. dpkg-sig writes
+  //    _gpgbuilder instead, and the v0.2.0 package carries one: a clearsigned
+  //    manifest, signer 6EF8E5ACC444949E5A2EAA65CCE2378929A49B97, exactly the
+  //    GOODSIG the notes name. The signature disappeared in v0.2.1, which is
+  //    the package this page serves. So it is a build regression, not a false
+  //    claim, and the yardstick has to name both members or the next reader
+  //    repeats the mistake.
+  assert.ok(downloadVisible.includes('_gpgbuilder') && downloadVisible.includes('_gpgorigin'),
+    'download.html must name both _gpgbuilder (dpkg-sig) and _gpgorigin (debsigs); '
+    + 'checking for only one is how the first version of this page got it wrong');
+
+  // A signature may be claimed for v0.2.0, never for the v0.2.1 package on
+  // offer. Every sentence that asserts one has to say which release it is about.
+  const signingClaims = downloadVisible
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .split(/(?<=\.)\s+/)
+    .filter((line) => /\bGPG[- ]?signed\b|\bGOODSIG\b|\bpackage was signed\b/i.test(line));
+  assert.ok(signingClaims.length > 0,
+    'download.html must still explain that the Debian package used to be signed');
+  for (const line of signingClaims) {
+    assert.match(line, /v0\.2\.0/,
+      `a signing claim on download.html must name the release it holds for: "${line.trim()}"`);
+  }
+  // The contrast itself, which is the whole point of the paragraph: one release
+  // carried the signature, the next did not. Softening either half turns a
+  // reported regression back into a vague "not signed" and loses the reason.
+  assert.match(downloadVisible, /v0\.2\.0 package was signed/i,
+    'download.html must say the v0.2.0 package was signed, because it was');
+  assert.match(downloadVisible, /v0\.2\.1 package[\s\S]{0,120}?has no such member/i,
+    'download.html must say the v0.2.1 package it serves lost that signature');
+  assert.match(downloadVisible, /paramant_0\.2\.1_amd64\.deb[\s\S]{0,400}?Not signed/,
+    'the archive entry for the served .deb must say it is not signed');
+  assert.match(downloadVisible, /self-signed/i,
+    'download.html must say the one signed installer is self-signed');
+  assert.doesNotMatch(downloadVisible, /\bsigned and verified\b|\bverified publisher\b|\btrusted publisher\b/i,
+    'download.html must not imply a signature a stranger can verify against a trust anchor');
+
+  // 4. No jargon in the first screenful. The rule is docs/brand/messaging.md
+  //    section 6: "Cryptography names, standard numbers and RAM-only appear
+  //    below the fold, as the reason the top half is true. Never in an H1." And:
+  //    at 390px the first screen carries an H1, a sub of at most two sentences,
+  //    and two buttons. Nothing enforced that before this page; this is the gate.
+  //
+  //    "First screenful" is the lead block, from <main> to the end of the
+  //    <header class="dl-lead">. That is what a 390px viewport shows, confirmed
+  //    by a screenshot at 390x844 in the PR that added this. The class is
+  //    page-prefixed on purpose: .hero and .lede already exist in
+  //    design-system.css and silently overrode the mobile spacing.
+  const heroStart = downloadVisible.indexOf('<main');
+  const heroEnd = downloadVisible.indexOf('</header>', heroStart);
+  assert.ok(heroStart !== -1 && heroEnd !== -1,
+    'download.html must open <main> with a <header class="dl-lead"> block');
+  const heroText = downloadVisible
+    .slice(heroStart, heroEnd)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const JARGON = [
+    // cryptography and standard numbers
+    /ML-KEM/i, /ML-DSA/i, /SPHINCS/i, /\bAES-\d/i, /\bECDH\b/i, /\bHKDF\b/i,
+    /\bSHA-?256\b/i, /\bFIPS\b/i, /\bGPG\b/i, /Authenticode/i, /\bratchet/i,
+    /\bnonce/i, /\bentropy\b/i, /\bjitter\b/i, /\bpadding\b/i, /post-quantum/i,
+    // build and packaging vocabulary
+    /\bTauri\b/i, /\bRust\b/i, /\bWebKit\b/i, /AppImage/i, /\.deb\b/i, /\.rpm\b/i,
+    /\.exe\b/i, /\bbinary\b/i, /\bAVX2\b/i, /\bRAM\b/i, /\brelay\b/i,
+    // header names and other internals a buyer never asked about
+    /x-forwarded-for/i, /IndexedDB/i, /getDisplayMedia/i, /\bWS\b/, /\bDOM\b/,
+    // the marketing words messaging.md bans outright
+    /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade/i,
+    /trusted by|world-class|effortless|next-generation|unlock|empower/i,
+  ];
+  const heroJargon = JARGON.filter((re) => re.test(heroText)).map((re) => String(re));
+  assert.deepEqual(heroJargon, [],
+    `the first screenful of download.html must say what it is, not how it is built.\n  ` +
+    `found: ${heroJargon.join(', ')}\n  in: "${heroText}"\n`);
+
+  // The sub is two sentences and stays near 160 characters, so the hero still
+  // fits a 390px screen above the fold.
+  const lede = (downloadVisible.slice(heroStart, heroEnd).match(/<p class="dl-sub">([\s\S]*?)<\/p>/) || [])[1] || '';
+  const ledeText = lede.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  assert.ok(ledeText.length > 0 && ledeText.length <= 200,
+    `download.html lede must stay short enough for one mobile screen, is ${ledeText.length} chars`);
+  assert.ok((ledeText.match(/\./g) || []).length <= 2,
+    `download.html lede must be at most two sentences: "${ledeText}"`);
+
+  // 5. The page is a whole document. The version this replaced was truncated
+  //    mid-word ("geen installatie verei") with no </main>, </body> or </html>,
+  //    which is why apply-nav.py could not stamp nav.js or nav-auth.js on it and
+  //    the hamburger on /download did nothing. Nothing else in the suite reads
+  //    HTML for well-formedness, so it is checked here.
+  for (const tag of ['</main>', '</body>', '</html>']) {
+    assert.ok(downloadHtml.includes(tag),
+      `download.html must be a complete document: ${tag} is missing`);
+  }
+  for (const src of ['/nav.js', '/js/nav-auth.js']) {
+    assert.ok(downloadHtml.includes(`src="${src}`),
+      `download.html must load ${src}; without a </body> the nav generator skips it`);
+  }
+})();
+
+console.log('ui-truthfulness: /download says the desktop app is unmaintained, and the archive matches the artifacts');

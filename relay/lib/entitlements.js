@@ -15,7 +15,8 @@
 //                     legacy `plan` + `parasign` flag WITHOUT downgrading.
 //
 // Products and their tier ladders (Mick's brief):
-//   parasend: community | pro | enterprise
+//   parasend: community | pro | enterprise, plus a legacy `business` row that is
+//             resolved but never sold (PARASEND_LADDER)
 //   parasign: free | pro | business | enterprise
 //
 // Hard rule -- no unbounded metered tier. Monthly METERED quotas
@@ -31,8 +32,24 @@ const tiers = require('./tiers');
 
 const PRODUCTS = Object.freeze(['parasend', 'parasign']);
 
+// The tiers a purchase or an admin may GRANT on each product. /pricing sells
+// ParaSend as these three; validateProductPlan is held to them.
 const PARASEND_TIERS = Object.freeze(['community', 'pro', 'enterprise']);
 const PARASIGN_TIERS = Object.freeze(['free', 'pro', 'business', 'enterprise']);
+
+// The full ParaSend ladder, INCLUDING the legacy `business` row. `business` is
+// a ParaSign tier name that a legacy unified `plan` can carry, so an account
+// holding it never bought ParaSend and it may not be GRANTED as a ParaSend
+// tier. It still has to RESOLVE, and to the numbers it has always had:
+//   mapping it up to enterprise is a silent UPGRADE (uncapped devices, uncapped
+//     downloads per hour, 100 views per link, a 365 day device-pubkey TTL, the
+//     10000-receipt retention) for an account that never bought the product;
+//   mapping it down to pro is a silent DOWNGRADE (2000 transfers a month to
+//     500, 100 devices to 50, a 7 day link to 24 hours, 25 views to 10).
+// So it keeps its own row, reading the same tiers.js line it always did, ranked
+// between pro and enterprise. Nothing changes for a business account, which is
+// the point: this ladder RESOLVES a stored value, it does not sell one.
+const PARASEND_LADDER = Object.freeze(['community', 'pro', 'business', 'enterprise']);
 
 // Finite ceiling for enterprise metered monthly quotas. Legacy enterprise was
 // UNLIMITED (Infinity) for transfers_month/signs_month; a real business never
@@ -47,6 +64,7 @@ const ENTERPRISE_MONTHLY_CEILING = 1_000_000;
 const PARASEND_TIER_TO_TIERS = Object.freeze({
   community: 'community',
   pro: 'pro',
+  business: 'business', // legacy row, not a tier the pricing page sells
   enterprise: 'enterprise',
 });
 const PARASIGN_TIER_TO_TIERS = Object.freeze({
@@ -75,7 +93,7 @@ function _meteredFinite(v) {
 // Clamp an arbitrary string to a valid tier for the product, defaulting to the
 // product's floor so an unknown/typo value never grants more than the base tier.
 function normaliseParasendTier(t) {
-  return PARASEND_TIERS.includes(t) ? t : 'community';
+  return PARASEND_LADDER.includes(t) ? t : 'community';
 }
 function normaliseParasignTier(t) {
   return PARASIGN_TIERS.includes(t) ? t : 'free';
@@ -195,17 +213,19 @@ function applyProductTier(rec, product, tier, paidUntil) {
 // derivePlanParasend:
 //   community/free/dev -> community   (10 transfers, as today)
 //   pro                -> pro         (500, as today)
-//   business           -> enterprise  (business today = 2000 transfers; parasend
-//                                       has no business tier, so we go UP to
-//                                       enterprise rather than down to pro. This
-//                                       over-grants the transfer ceiling for the
-//                                       few business accounts, which is the safe
-//                                       side of "no silent downgrade".)
+//   business           -> business    (its own row, see PARASEND_LADDER. It used
+//                                       to map UP to enterprise, which handed an
+//                                       account that never bought ParaSend the
+//                                       enterprise resource ceilings. It now
+//                                       keeps exactly the numbers it has always
+//                                       had: 2000 transfers, 100 devices, a 7
+//                                       day link, 25 views, 2000 downloads an
+//                                       hour. Neither an upgrade nor a cut.)
 //   enterprise/licensed -> enterprise
 function derivePlanParasend(plan) {
   const p = tiers.normalisePlan(plan); // community | pro | business | enterprise
   if (p === 'pro') return 'pro';
-  if (p === 'business') return 'enterprise';
+  if (p === 'business') return 'business';
   if (p === 'enterprise') return 'enterprise';
   return 'community';
 }
@@ -242,6 +262,10 @@ function _parasendEntitlement(tier) {
       devices: tiers.tierLimitNum(row, 'devices'),
       view_ttl_ms: tiers.tierLimitNum(row, 'view_ttl_ms'),
       max_views: tiers.tierLimitNum(row, 'max_views'),
+      // The per-hour download ceiling was the one ParaSend dimension missing
+      // here, so relay.js had to read the legacy `plan` for it while every
+      // other ceiling came off this object. Mirrors tiers.js like the rest.
+      outbound_per_hour: tiers.tierLimitNum(row, 'outbound_per_hour'),
     }),
     features: Object.freeze({
       transfers: true,
@@ -274,7 +298,7 @@ function _parasignEntitlement(tier) {
 
 // Precompute the full matrix so getEntitlements is a pure lookup.
 const PARASEND = Object.freeze(Object.fromEntries(
-  PARASEND_TIERS.map((t) => [t, _parasendEntitlement(t)]),
+  PARASEND_LADDER.map((t) => [t, _parasendEntitlement(t)]),
 ));
 const PARASIGN = Object.freeze(Object.fromEntries(
   PARASIGN_TIERS.map((t) => [t, _parasignEntitlement(t)]),
@@ -326,7 +350,9 @@ function getEntitlements(account, now) {
 //              so the paid history is not thrown away
 //   paidUntil  null means unbounded
 function _grantOf(rec, product, at) {
-  const ladder = product === 'parasign' ? PARASIGN_TIERS : PARASEND_TIERS;
+  // The RESOLVING ladder, so a stored legacy `business` ranks where it belongs
+  // instead of falling off the list and tying with community.
+  const ladder = product === 'parasign' ? PARASIGN_TIERS : PARASEND_LADDER;
   const norm = product === 'parasign' ? normaliseParasignTier : normaliseParasendTier;
   return {
     rank: ladder.indexOf(effectiveProductTier(rec, product, at).tier),
@@ -427,6 +453,7 @@ function migrateUsersData(data) {
 module.exports = {
   PRODUCTS,
   PARASEND_TIERS,
+  PARASEND_LADDER,
   PARASIGN_TIERS,
   ENTERPRISE_MONTHLY_CEILING,
   derivePlanParasend,

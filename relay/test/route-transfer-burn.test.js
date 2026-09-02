@@ -608,3 +608,228 @@ test('a caller may delete its own blob before anyone reads it, and only its own'
   assert.strictEqual((await download(PRO, b.hash)).status, 404, 'the aborted blob is really gone');
   did();
 });
+
+// ── 6. every ParaSend ceiling rides the PRODUCT axis, not the unified plan ────
+//
+// THE FAULT THIS SECTION PINS. Billing moves a customer with setProductPlan ->
+// entitlements.applyProductTier, which writes plan_parasend (or plan_parasign)
+// and never the unified `plan`. Four ceilings still resolved off `plan`:
+//   relay.js  view_ttl_ms and max_views on POST /v2/inbound
+//   relay.js  the device cap on POST /v2/pubkey
+//   relay.js  transfers_month, the only one already on the product axis
+// So the moment self-serve billing goes live, a ParaSend Pro customer keeps a
+// 1 hour link, 1 read and 5 devices while /pricing sells 24 hours, 10 reads and
+// 50 devices. It is invisible today only because billing still runs through the
+// admin route, which sets `plan` as well.
+//
+// Everything this section needs lives inside this function. Two parallel merges
+// broke main by each adding their own file-scope binding, so a new block earns
+// no new top-level name here.
+(function productAxisSection() {
+
+  // THE SHAPE THE MOLLIE WEBHOOK WRITES. setProductPlan -> applyProductTier moves
+  // plan_parasend only and deliberately leaves the unified `plan` alone, so a
+  // ParaSend Pro buyer's record still reads plan: 'community'. Every ceiling that
+  // resolved off `plan` was blind to this record.
+  const WEBHOOK = 'pgp_webhook_shape_key_for_the_transfer_suite';
+  // The shape POST /v2/admin/keys/update-plan writes: the unified plan set AND
+  // the per-product plans derived from it. It means the same thing as WEBHOOK and
+  // must be answered identically.
+  const ADMIN_SHAPE = 'pgp_admin_shape_key_for_the_transfer_suite';
+  // A key with no plan. The suite's shared relay already sits at the community
+  // edition's fixed 5-key ceiling (relay.js COMMUNITY_KEY_LIMIT), where key 6
+  // answers 402 to everything, so this section boots its own relay.
+  const AXIS_NOPLAN = 'pgp_no_plan_key_for_the_axis_section';
+
+  // One relay for the section, booted on first use and killed by the suite's
+  // after() hook along with everything else.
+  let axis = null;
+  async function axisSrv() {
+    if (!axis) {
+      axis = await boot({
+        tag: 'transfer-axis',
+        users: { api_keys: [
+          { key: WEBHOOK, plan: 'community', plan_parasend: 'pro', active: true, email: 'hook@example.test', account_id: 'acct_hook' },
+          { key: ADMIN_SHAPE, plan: 'pro', plan_parasend: 'pro', plan_parasign: 'pro', active: true, email: 'adm@example.test', account_id: 'acct_admin_shape' },
+          { key: AXIS_NOPLAN, active: true, email: 'axisnoplan@example.test', account_id: 'acct_axis_noplan' },
+        ] },
+      });
+    }
+    return axis;
+  }
+  const axisUpload = (a, key, b, extra = {}) => a.post('/v2/inbound', {
+    headers: { 'X-Api-Key': key },
+    body: { hash: b.hash, payload: b.payload.toString('base64'), ...extra },
+  });
+  const axisDownload = (a, key, hash) => a.get(`/v2/outbound/${hash}`, { headers: { 'X-Api-Key': key } });
+
+  test('a ParaSend Pro tier bought through the webhook is honoured, though `plan` still reads community', async () => {
+    const a = await axisSrv();
+    const week = 7 * 86_400_000;
+    const t = await axisUpload(a, WEBHOOK, blob('hook-ttl'), { ttl_ms: week });
+    assert.strictEqual(t.status, 200, t.text);
+    assert.strictEqual(t.json.ttl_ms, 86_400_000,
+      'the Pro day the customer paid for, not the community hour his unified plan still says');
+
+    const v = blob('hook-views');
+    assert.strictEqual((await axisUpload(a, WEBHOOK, v, { max_views: 10 })).status, 200);
+    for (let i = 1; i <= 10; i++) {
+      const r = await axisDownload(a, WEBHOOK, v.hash);
+      assert.strictEqual(r.status, 200, `read ${i} of the ten a Pro tier buys`);
+      assert.strictEqual(r.headers['x-paramant-burned'], i === 10 ? 'true' : 'false');
+    }
+    assert.strictEqual((await axisDownload(a, WEBHOOK, v.hash)).status, 404, 'and the eleventh is past the Pro ceiling');
+    did();
+  });
+
+  test('the device cap follows the ParaSend tier, and a plan-less key gets the community five', async () => {
+    // lib/tiers.js: community.devices = 5, pro.devices = 50. The read here used to
+    // be `keyData.plan || 'pro'`, so it missed the webhook record AND handed a key
+    // with no plan at all the Pro cap: the mirror image of the default fixed on
+    // the inbound ceilings.
+    const a = await axisSrv();
+    const dev = (key, n) => {
+      const id = `${key}-device-${n}`;
+      return a.post('/v2/pubkey', {
+        headers: { 'X-Api-Key': key },
+        body: { device_id: id, ecdh_pub: Buffer.from(id.padEnd(32, 'x')).toString('base64') },
+      });
+    };
+    for (let n = 1; n <= 5; n++) {
+      assert.strictEqual((await dev(AXIS_NOPLAN, n)).status, 200, `plan-less device ${n} of the community five`);
+    }
+    const sixth = await dev(AXIS_NOPLAN, 6);
+    assert.strictEqual(sixth.status, 429, 'a missing plan must not quietly buy the Pro cap of fifty devices');
+    assert.strictEqual(sixth.json.limit, 5);
+    assert.strictEqual(sixth.json.plan, 'community', 'and the 429 names the tier that decided');
+
+    for (let n = 1; n <= 6; n++) {
+      assert.strictEqual((await dev(WEBHOOK, n)).status, 200,
+        `device ${n} on a webhook-written Pro tier, which the community five would have refused at 6`);
+    }
+    did();
+  });
+
+  test('the device cap governs adding a device, never re-registering one it already holds', async () => {
+    // The cap check used to run BEFORE the already-registered check, so an
+    // account over its cap got 429 on every re-registration of a device it
+    // already had. That is the normal path, not an edge: a community device
+    // pubkey lives 7 days and the expiry sweep runs hourly, so a device comes
+    // back to this route routinely. An account over its cap would have been
+    // locked out one device at a time, and being over the cap is a real state:
+    // the counter matched nothing until this branch, so an account could hold
+    // any number, and a tier change can put an account over it at any time.
+    const KEY = 'pgp_over_cap_key_for_the_axis_section';
+    const over = await boot({
+      tag: 'transfer-axis-cap',
+      env: { ADMIN_TOKEN: 'admin-token-for-the-axis-section', INTERNAL_AUTH_TOKEN: 'internal-token-for-the-axis-section' },
+      users: { api_keys: [
+        // Starts uncapped, so the eight devices below can be registered at all.
+        { key: KEY, plan: 'community', plan_parasend: 'enterprise', active: true, email: 'cap@example.test', account_id: 'acct_over_cap' },
+      ] },
+    });
+    const reg = (n) => {
+      const id = `over-cap-device-${n}`;
+      return over.post('/v2/pubkey', {
+        headers: { 'X-Api-Key': KEY },
+        body: { device_id: id, ecdh_pub: Buffer.from(id.padEnd(32, 'x')).toString('base64') },
+      });
+    };
+    for (let n = 1; n <= 8; n++) assert.strictEqual((await reg(n)).status, 200, `device ${n} while uncapped`);
+
+    // Now move the account down to Community, whose cap is 5. It holds 8.
+    const moved = await over.post('/v2/admin/keys/set-product-plan', {
+      headers: { 'X-Admin-Token': 'admin-token-for-the-axis-section', 'X-Internal-Auth': 'internal-token-for-the-axis-section' },
+      body: { key: KEY, product: 'parasend', tier: 'community' },
+    });
+    assert.strictEqual(moved.status, 200, moved.text);
+
+    // Every device it already holds still answers on its own merits. The live
+    // entry answers 409 (first registration wins, the guard further down the
+    // route); what matters is that it is the device answer and not the quota
+    // answer. An entry whose TTL has passed but which the hourly sweep has not
+    // reached yet takes the same skip and is renewed with a 200.
+    for (let n = 1; n <= 8; n++) {
+      const again = await reg(n);
+      assert.notStrictEqual(again.status, 429,
+        `re-registering held device ${n} must not be refused for the cap the account is already over`);
+      assert.strictEqual(again.status, 409, `held device ${n} answers on device identity, not on quota`);
+    }
+
+    // A device it does NOT hold is a new one, and the cap applies to it.
+    const ninth = await reg(9);
+    assert.strictEqual(ninth.status, 429, 'a ninth device is an addition, and an account 3 over its cap gets none');
+    assert.strictEqual(ninth.json.limit, 5);
+    assert.strictEqual(ninth.json.plan, 'community');
+    over.stop();
+    did();
+  });
+
+  test('the admin route\'s record shape and the webhook\'s answer identically', async () => {
+    // update-plan sets `plan` and derives the per-product plans; the webhook sets
+    // plan_parasend alone. Both mean ParaSend Pro, so no ceiling may disagree.
+    const a = await axisSrv();
+    const week = 7 * 86_400_000;
+    const hook = await axisUpload(a, WEBHOOK, blob('shape-hook-ttl'), { ttl_ms: week });
+    const admin = await axisUpload(a, ADMIN_SHAPE, blob('shape-admin-ttl'), { ttl_ms: week });
+    assert.strictEqual(hook.json.ttl_ms, admin.json.ttl_ms, 'the two shapes must buy the same link lifetime');
+    assert.strictEqual(hook.json.ttl_ms, 86_400_000);
+
+    const hv = blob('shape-hook-views');
+    const av = blob('shape-admin-views');
+    assert.strictEqual((await axisUpload(a, WEBHOOK, hv, { max_views: 10 })).status, 200);
+    assert.strictEqual((await axisUpload(a, ADMIN_SHAPE, av, { max_views: 10 })).status, 200);
+    const h1 = await axisDownload(a, WEBHOOK, hv.hash);
+    const a1 = await axisDownload(a, ADMIN_SHAPE, av.hash);
+    assert.strictEqual(h1.headers['x-paramant-burned'], a1.headers['x-paramant-burned'],
+      'the two shapes must buy the same read count');
+    assert.strictEqual(h1.headers['x-paramant-burned'], 'false',
+      'ten reads on both, so neither burns on the first');
+    did();
+  });
+
+  test('with redis counting, the monthly transfer quota is the one the ParaSend tier bought', async () => {
+    // transfers_month is the one ceiling that was already on the product axis, so
+    // this pins the axis end to end: the same record shape, the same tier, four
+    // ceilings, one source. The gate fails open without redis (lib/quota.js), so
+    // this is the one test in the section that needs a real counter.
+    const rc = await requireRedis(DEFAULT_REDIS);
+    if (!rc) return;
+    try {
+      // Fresh account ids per run: the counter is a calendar-month key in redis
+      // and a rerun would otherwise start where the previous one stopped.
+      const tag = crypto.randomBytes(6).toString('hex');
+      const HOOK = 'pgp_quota_hook_shape';
+      const COM = 'pgp_quota_community';
+      const srv2 = await boot({
+        tag: 'transfer-quota-axis',
+        env: { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS },
+        users: { api_keys: [
+          { key: HOOK, plan: 'community', plan_parasend: 'pro', active: true, email: 'qh@example.test', account_id: `acct_q_hook_${tag}` },
+          { key: COM, plan: 'community', active: true, email: 'qc@example.test', account_id: `acct_q_com_${tag}` },
+        ] },
+      });
+      const send = (key) => {
+        const b = blob('quota');
+        return srv2.post('/v2/inbound', { headers: { 'X-Api-Key': key }, body: { hash: b.hash, payload: b.payload.toString('base64') } });
+      };
+      // community.transfers_month = 10.
+      for (let i = 1; i <= 10; i++) assert.strictEqual((await send(COM)).status, 200, `community transfer ${i}`);
+      const over = await send(COM);
+      assert.strictEqual(over.status, 402, 'the eleventh community transfer is over the monthly cap');
+      assert.strictEqual(over.json.limit, 10);
+      assert.strictEqual(over.json.plan, 'community', 'the 402 names the tier that decided, not the unified plan');
+
+      // The webhook-shaped record has the same unified plan and must not stop at 10.
+      for (let i = 1; i <= 11; i++) {
+        assert.strictEqual((await send(HOOK)).status, 200,
+          `transfer ${i} on a webhook-written ParaSend Pro tier (500 a month, not the community 10)`);
+      }
+      srv2.stop();
+      did();
+    } finally {
+      try { await rc.quit(); } catch (_) { /* already gone */ }
+    }
+  });
+
+})();

@@ -131,13 +131,31 @@ test('specific migration cases match the brief', () => {
   assert.strictEqual(comm.parasend.quotas.transfers_month, 10);
   assert.strictEqual(comm.parasign.quotas.signs_month, 2);
 
-  // business: parasign stays business (1000); parasend goes UP to enterprise
-  // (never below its current 2000 transfers).
+  // business: parasign stays business (1000); parasend keeps its OWN row.
+  //
+  // `business` is a ParaSign tier name, so an account whose unified plan says
+  // business never bought ParaSend. It used to map UP to enterprise on a
+  // no-downgrade reading, which handed that account the whole enterprise row:
+  // uncapped devices, uncapped downloads per hour, 100 views per link, a 365
+  // day device-pubkey TTL and the 10000-receipt retention. Mapping it DOWN to
+  // pro would have been the opposite error, cutting 2000 transfers to 500 and
+  // a 7 day link to 24 hours. It resolves to its own tiers.js row instead, so
+  // it is neither raised nor cut, and it stays ungrantable by an admin.
   const biz = ent.getEntitlements(ent.migrateUserEntry({ plan: 'business' }));
   assert.strictEqual(biz.parasign.tier, 'business');
   assert.strictEqual(biz.parasign.quotas.signs_month, 1000);
-  assert.strictEqual(biz.parasend.tier, 'enterprise');
-  assert.ok(biz.parasend.quotas.transfers_month >= 2000);
+  assert.strictEqual(biz.parasend.tier, 'business');
+  assert.notStrictEqual(biz.parasend.tier, 'enterprise',
+    'a ParaSign Business plan must never grant the ParaSend enterprise row');
+  // Exactly the legacy numbers, dimension for dimension, and nothing on the row
+  // is uncapped: that is what separates it from enterprise.
+  assert.strictEqual(biz.parasend.quotas.transfers_month, 2000);
+  assert.deepStrictEqual(biz.parasend.limits, {
+    file_mb: 5, devices: 100, view_ttl_ms: 604_800_000, max_views: 25, outbound_per_hour: 2000,
+  });
+  // And it is not a tier anyone can be sold or granted.
+  assert.strictEqual(ent.PARASEND_TIERS.includes('business'), false);
+  assert.deepStrictEqual(ent.validateProductPlan('parasend', 'business'), { ok: false, error: 'invalid_tier' });
 });
 
 test('migration is idempotent and additive (keeps plan + parasign)', () => {

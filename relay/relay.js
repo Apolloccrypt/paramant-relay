@@ -1332,6 +1332,41 @@ function entitlementRecordOf(accountId) {
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   return entitlements.mergeAccountRecord(acct, [...members].map(m => apiKeys.get(m)));
 }
+
+// EVERY ParaSend ceiling a request is held to, off the product axis and nowhere
+// else. Reading `keyData.plan` for a limit is the fault this function exists to
+// end: the Mollie webhook upgrades an account through setProductPlan ->
+// entitlements.applyProductTier, which writes plan_parasend and deliberately
+// never touches the unified `plan`. A gate reading `plan` therefore cannot see
+// a paid ParaSend upgrade at all, so a Pro buyer would keep the community hour,
+// the single read and the 5-device cap while /pricing sells him 24 hours, 10
+// reads and 50 devices. Only the manual admin route sets `plan` as well, which
+// is why nothing was visible before self-serve billing.
+//
+// A record with no tier on file resolves to community, the strictest ParaSend
+// tier. A missing plan is not evidence of a paid one; the previous `|| 'pro'`
+// defaults on the device cap and the pubkey TTL were the mirror image of that
+// rule and handed an unplanned key the Pro ceiling.
+function parasendLimitsOf(rec) {
+  return entitlements.getEntitlements(rec || null).parasend;
+}
+
+// An entitlement number as the admin views report it. The entitlement layer
+// says Infinity for an uncapped structural limit; the admin JSON has always
+// said -1 (tiers.UNLIMITED), and JSON.stringify turns Infinity into null, which
+// an operator reads as "no data" rather than "no cap".
+function _reportLimit(v) {
+  return v === Infinity ? tiers.UNLIMITED : v;
+}
+
+// The file ceiling an upload is really held to, in MB. POST /v2/inbound takes
+// the LOWER of the operator's MAX_BLOB and the tier's file_mb, so a tier whose
+// row says "uncapped" is still held to MAX_BLOB and the views must say so.
+// Reporting the bare tier value put -1 on an enterprise row while the gate was
+// enforcing 5 MB, and that is the one number an operator would act on.
+function _effectiveFileMb(ent) {
+  return Math.min(MAX_BLOB / 1048576, ent.parasend.limits.file_mb);
+}
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
 
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
@@ -1621,11 +1656,14 @@ let inFlightInbound = 0;
 // and 'business' were not in it, so a Business account, which pays for the
 // highest volume of all, was rate limited at the free 50 per hour. tiers.js
 // normalises the plan name (free/dev -> community, licensed -> enterprise), so
-// every plan the pricing page sells now resolves to its own ceiling.
+// every plan the pricing page sells now resolves to its own ceiling. It takes
+// the KEY RECORD, not a plan string: outbound_per_hour is a ParaSend ceiling
+// and resolves on the product axis with the other five, so a webhook upgrade
+// (plan_parasend only) raises it.
 const OUTBOUND_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour sliding window
 const outboundRateMap = new Map(); // apiKey → { count, resetAt }
-function outboundRateOk(apiKey, plan) {
-  const max = tiers.tierLimitNum(plan, 'outbound_per_hour');
+function outboundRateOk(apiKey, rec) {
+  const max = parasendLimitsOf(rec).limits.outbound_per_hour;
   if (max === Infinity) return true;
   const now = Date.now();
   let c = outboundRateMap.get(apiKey);
@@ -1692,9 +1730,11 @@ const RECEIPT_UNCAPPED_TIER_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECE
 // A fixed override, for tests that need to drive the eviction rule without
 // making thousands of downloads. Unset in production, where the tier decides.
 const RECEIPT_PER_ACCOUNT_OVERRIDE = parseInt(process.env.PARAMANT_RECEIPT_PER_ACCOUNT_MAX || '0', 10) || 0;
-function receiptCapFor(plan) {
+// The retention cap rides on outbound_per_hour, so it is a ParaSend ceiling too
+// and takes the key record rather than a plan string.
+function receiptCapFor(rec) {
   if (RECEIPT_PER_ACCOUNT_OVERRIDE > 0) return RECEIPT_PER_ACCOUNT_OVERRIDE;
-  const rate = tiers.tierLimitNum(plan, 'outbound_per_hour');
+  const rate = parasendLimitsOf(rec).limits.outbound_per_hour;
   const cap = Number.isFinite(rate) ? rate * 2 : RECEIPT_UNCAPPED_TIER_MAX;
   return Math.max(1, Math.min(cap, RECEIPT_UNCAPPED_TIER_MAX));
 }
@@ -1718,10 +1758,10 @@ function _dropOldestOf(owner) {
   _dropReceipt(oldest.value);
   return true;
 }
-async function storeDeliveryReceipt(json, hash, apiKey, owner, plan) {
+async function storeDeliveryReceipt(json, hash, apiKey, owner, rec) {
   const id = crypto.randomBytes(16).toString('hex');
   const bucket = owner || apiKey || '_anonymous';
-  const cap = receiptCapFor(plan);
+  const cap = receiptCapFor(rec);
   if (redisClient && redisClient.isReady) {
     try {
       const ak = RECEIPT_AK(bucket);
@@ -2063,7 +2103,19 @@ function loadTrialKeys() {
 // devices count + view TTL + max views + monthly quotas + file size).
 // _pubkeyMax now reads device caps from TIER_LIMITS via tiers.tierLimitNum so
 // there is one source of truth for the per-tier device count.
-const _pubkeyTtl = { free: 7 * 86_400_000, pro: 30 * 86_400_000, enterprise: 365 * 86_400_000 };
+// Keyed on the ParaSend tier the callers resolve, plus `free`, which is what an
+// anonymous keyless DID registration passes. It used to hold three rows and a
+// `?? free` fallback, so `community` and `business` were not in it and reached
+// the free row by accident, the same kind of hole tiers.js closed for the other
+// dimensions. Every name a caller can produce now has its own row, so a value
+// is never the result of a miss.
+const _pubkeyTtl = {
+  free:        7 * 86_400_000,
+  community:   7 * 86_400_000,
+  pro:        30 * 86_400_000,
+  business:   30 * 86_400_000, // legacy plan name; never below pro
+  enterprise: 365 * 86_400_000,
+};
 const _pubkeyMax = new Proxy({}, {
   get(_t, plan) { return tiers.tierLimitNum(plan, 'devices'); },
 });
@@ -4204,11 +4256,35 @@ const server = http.createServer(async (req, res) => {
       }
       // Non-invite: require valid API key
       if (!keyData?.active) { res.writeHead(401); return res.end(J({ error: 'Invalid API key' })); }
-      const plan = keyData.plan || 'pro';
-      // Per-plan total device limit
-      const maxDevices = _pubkeyMax[plan] ?? _pubkeyMax.free;
-      if (maxDevices !== Infinity) {
-        const keyPrefix = `:${apiKey}`;
+      // Device cap on the PRODUCT axis (parasendLimitsOf), not on the unified
+      // `plan`. This read was `keyData.plan || 'pro'`: it could not see a
+      // webhook-written plan_parasend, and its default handed a key with no
+      // plan at all the Pro cap of 50 devices - the mirror image of the fault
+      // closed on the inbound ceilings. The strictest tier is the right
+      // default; _pubkeyMax stays as the tiers.js lookup for other callers.
+      const _psend = parasendLimitsOf(keyData);
+      const plan = _psend.tier;
+      const maxDevices = _psend.limits.devices;
+      // The cap governs how many devices an account may HAVE, so it applies to a
+      // registration that would ADD one. A device this account already holds is
+      // re-registered, not added: the map entry is replaced and the count does
+      // not grow. Checking the cap first turned every re-registration by an
+      // account over its cap into a 429, and re-registration is the normal path
+      // (a community device pubkey lives 7 days and the expiry sweep runs
+      // hourly), so an account over its cap could never refresh a device it
+      // already had and would lose them one by one. Being over the cap is a real
+      // state: every account that registered while the counter matched nothing
+      // (see below), and any account moved to a lower tier afterwards.
+      const _pkSlot = `${d.device_id}:${acctOf(apiKey)}`;
+      const _alreadyHeld = pubkeys.has(_pkSlot);
+      if (maxDevices !== Infinity && !_alreadyHeld) {
+        // Count what is actually STORED. Every write and every lookup on this
+        // map is keyed `<device_id>:<account_id>` (acctOf), but this counter
+        // matched on `:<api_key>`, which equals the account id only for a key
+        // that has none. So for every real account the tally stayed 0 and the
+        // cap never fired, whatever the tier said. Counting the same suffix
+        // the route writes makes the ceiling above enforceable.
+        const keyPrefix = `:${acctOf(apiKey)}`;
         let deviceCount = 0;
         for (const k of pubkeys.keys()) { if (k.endsWith(keyPrefix)) deviceCount++; }
         if (deviceCount >= maxDevices) {
@@ -4218,13 +4294,13 @@ const server = http.createServer(async (req, res) => {
       const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
-      const existingPubkey = pubkeys.get(`${d.device_id}:${acctOf(apiKey)}`);
+      const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
         res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' }));
       }
       const fp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
       const regAt = new Date().toISOString();
-      pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, {
+      pubkeys.set(_pkSlot, {
         ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '',
         dsa_pub:  d.dsa_pub  || '',
         fingerprint: fp, ct_index: ctEntry.index,
@@ -4547,7 +4623,13 @@ const server = http.createServer(async (req, res) => {
       // never held. The honest client sends hash = sha256(payload bytes), so this
       // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
       if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
-      const planMaxSize = MAX_BLOB;
+      // The blob ceiling: the operator's MAX_BLOB is the hard roof (it bounds
+      // relay memory and must stay the last word), and the tier may only be
+      // stricter. Every ParaSend row in tiers.js is 5 MB today and enterprise
+      // is uncapped, so the number is unchanged; what changes is that file_mb
+      // now sits on the product axis with the other five ceilings.
+      const _psend = parasendLimitsOf(keyData);
+      const planMaxSize = Math.min(MAX_BLOB, _psend.limits.file_mb * 1048576);
       if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
 
       try { peekInboundBlob(blob); }
@@ -4567,17 +4649,18 @@ const server = http.createServer(async (req, res) => {
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      // Per-tier ceilings -- single source of truth in lib/tiers.js. ONE default
-      // for both, and it is the strictest one. The two used to disagree a line
-      // apart: the TTL fell back to 'community' and max_views to 'pro', so a key
-      // with no plan was held to the community link lifetime and handed the Pro
-      // read count at the same time. A missing plan is not evidence of a paid
-      // one, so both fall to community.
-      const _plan = keyData?.plan || 'community';
-      const _maxTtl = tiers.tierLimitNum(_plan, 'view_ttl_ms');
+      // Per-tier ceilings, off the SAME ParaSend entitlement as the size gate
+      // above and the quota gate below. ONE default for both, and it is the
+      // strictest one. The two used to disagree a line apart: the TTL fell back
+      // to 'community' and max_views to 'pro', so a key with no plan was held
+      // to the community link lifetime and handed the Pro read count at the
+      // same time. That default was fixed; the SOURCE was not, and reading the
+      // unified `plan` here meant a ParaSend Pro buyer still got 1 hour and 1
+      // read, because the webhook only ever writes plan_parasend.
+      const _maxTtl = _psend.limits.view_ttl_ms;
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
       // Access policies: max_views (default 1 = burn-on-read) + Argon2id password.
-      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(_plan, 'max_views') || 1));
+      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, _psend.limits.max_views || 1));
       let pw_hash = null;
       if (password) {
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
@@ -4594,12 +4677,15 @@ const server = http.createServer(async (req, res) => {
         // ParaSend entitlement: transfers_month for this account's plan_parasend
         // (falls back to the legacy plan when not yet migrated). Independent of
         // the ParaSign signs quota below.
-        const _tLimit = entitlements.getEntitlements(keyData).parasend.quotas.transfers_month;
+        const _tLimit = _psend.quotas.transfers_month;
         const _tGate  = await quota.gateTransfer(redisClient, keyData.account_id, _dedupKey, _tLimit, log);
         if (!_tGate.allowed) {
-          log('info', 'quota_transfer_declined', { account: String(keyData.account_id).slice(0, 12), plan: keyData.plan || 'community', limit: _tLimit });
+          // Report the tier that DECIDED, not the unified plan. A ParaSend Pro
+          // buyer whose `plan` still reads community would otherwise be told
+          // he is on community while being held to the Pro ceiling.
+          log('info', 'quota_transfer_declined', { account: String(keyData.account_id).slice(0, 12), plan: _psend.tier, limit: _tLimit });
           res.writeHead(402, { 'Content-Type': 'application/json' });
-          return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: keyData.plan || 'community', limit: _tLimit }));
+          return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: _psend.tier, limit: _tLimit }));
         }
       }
 
@@ -4689,7 +4775,7 @@ const server = http.createServer(async (req, res) => {
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found. Expired, burned, or never stored.' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     // Per-key outbound rate limit (finding #12)
-    if (!outboundRateOk(apiKey, keyData?.plan)) {
+    if (!outboundRateOk(apiKey, keyData)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Outbound rate limit exceeded. Retry after the hourly window resets.' }));
     }
@@ -4785,9 +4871,9 @@ const server = http.createServer(async (req, res) => {
     if (receiptHeader) {
       const receiptHash = crypto.createHash('sha3-256').update(receiptHeader).digest('hex');
       const _receiptKey = entry.apiKey || apiKey || null;
-      const _receiptPlan = (_receiptKey && apiKeys.get(_receiptKey)?.plan) || keyData?.plan || 'community';
+      const _receiptRec = (_receiptKey && apiKeys.get(_receiptKey)) || keyData || null;
       const receiptId = await storeDeliveryReceipt(receiptJson, receiptHash, _receiptKey,
-        _receiptKey ? acctOf(_receiptKey) : null, _receiptPlan);
+        _receiptKey ? acctOf(_receiptKey) : null, _receiptRec);
       outHeaders['X-Paramant-Receipt-Id'] = receiptId;
       outHeaders['X-Paramant-Receipt-Hash'] = 'sha3-256:' + receiptHash;
       outHeaders['X-Paramant-Receipt-Url'] = `/v2/transfers/${receiptId}/receipt`;
@@ -4988,9 +5074,12 @@ const server = http.createServer(async (req, res) => {
       const _didIsNew = !didRegistry.has(did); // overwrite of same did must not double-count
       didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc, ts: new Date().toISOString() });
       if (_didIsNew && ownerKey) didKeyCounts.set(ownerKey, (didKeyCounts.get(ownerKey) || 0) + 1);
-      // Pubkey TTL follows the authenticated plan; an ANONYMOUS (keyless inv_)
-      // registration gets the free-tier TTL, never the pro default.
-      const _didPlan = keyData ? (keyData.plan || 'pro') : 'free';
+      // Pubkey TTL follows the authenticated ParaSend tier; an ANONYMOUS
+      // (keyless inv_) registration gets the free-tier TTL, never the pro
+      // default. Same fix as POST /v2/pubkey: the tier comes off the product
+      // axis, and a key with no plan on file lands on community (7 days) rather
+      // than being handed the pro 30 by the `|| 'pro'` default.
+      const _didPlan = keyData ? parasendLimitsOf(keyData).tier : 'free';
       pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
@@ -5197,19 +5286,26 @@ const server = http.createServer(async (req, res) => {
       const accountId = v.account_id || k;
       const usage = await quota.readUsage(redisClient, accountId, month);
       const plan = v.plan || 'community';
+      // The limits an operator reads here are the limits the relay enforces, so
+      // they come off the same product axis the gates read and NOT off the
+      // unified `plan`, which a webhook upgrade never moves. Both product tiers
+      // ride along, because `plan` alone no longer explains the numbers.
+      const ent = entitlements.getEntitlements(v);
       out.push({
         account_id: accountId,
         api_key_prefix: k.slice(0, 12),
         plan,
+        parasend_tier: ent.parasend.tier,
+        parasign_tier: ent.parasign.tier,
         label: v.label || '',
         email: v.email || null,
         active: !!v.active,
         usage,
         limits: {
-          transfers_month: tiers.tierLimit(plan, 'transfers_month'),
-          signs_month:     tiers.tierLimit(plan, 'signs_month'),
-          file_mb:         tiers.tierLimit(plan, 'file_mb'),
-          devices:         tiers.tierLimit(plan, 'devices'),
+          transfers_month: _reportLimit(ent.parasend.quotas.transfers_month),
+          signs_month:     _reportLimit(ent.parasign.quotas.signs_month),
+          file_mb:         _effectiveFileMb(ent),
+          devices:         _reportLimit(ent.parasend.limits.devices),
         },
       });
     }
@@ -5221,6 +5317,8 @@ const server = http.createServer(async (req, res) => {
     const accountId = decodeURIComponent(usageMatch[1]);
     const entry = [...apiKeys.entries()].find(([k, v]) => (v.account_id || k) === accountId || k === accountId);
     const plan = entry ? (entry[1].plan || 'community') : 'community';
+    // Same product axis as the list above and as the gates themselves.
+    const ent = entitlements.getEntitlements(entry ? entry[1] : null);
     const month = quota.ymKey();
     const usage = await quota.readUsage(redisClient, accountId, month);
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -5232,11 +5330,13 @@ const server = http.createServer(async (req, res) => {
       month,
       redis_available: !!(redisClient && redisClient.isReady),
       usage,
+      parasend_tier: ent.parasend.tier,
+      parasign_tier: ent.parasign.tier,
       limits: {
-        transfers_month: tiers.tierLimit(plan, 'transfers_month'),
-        signs_month:     tiers.tierLimit(plan, 'signs_month'),
-        file_mb:         tiers.tierLimit(plan, 'file_mb'),
-        devices:         tiers.tierLimit(plan, 'devices'),
+        transfers_month: _reportLimit(ent.parasend.quotas.transfers_month),
+        signs_month:     _reportLimit(ent.parasign.quotas.signs_month),
+        file_mb:         _effectiveFileMb(ent),
+        devices:         _reportLimit(ent.parasend.limits.devices),
       },
     }));
   }
@@ -5737,7 +5837,13 @@ const server = http.createServer(async (req, res) => {
     const successRate = total > 0 ? Math.round((acked / total) * 1000) / 1000 : 1;
     return res.end(J({
       ok:              true,
-      plan:            kd.plan || 'pro',
+      // Display only, no limit hangs off it. The unified plan stays the value
+      // of this long-standing field so nothing reading it breaks, but the
+      // default was the generous one (a key with no plan on file reported
+      // itself as pro), and the tier the stats beside it are actually measured
+      // against now travels alongside.
+      plan:            kd.plan || 'community',
+      parasend_tier:   parasendLimitsOf(kd).tier,
       blobs_in_flight: pending,
       stats: {
         inbound:       stats.inbound,
@@ -5811,12 +5917,16 @@ const server = http.createServer(async (req, res) => {
       if (keyData && keyData.account_id) {
         // ParaSign entitlement: signs_month for this account's plan_parasign
         // (independent of the ParaSend transfers quota). Separate counter key.
-        const _sLimit = entitlements.getEntitlements(keyData).parasign.quotas.signs_month;
+        const _psign  = entitlements.getEntitlements(keyData).parasign;
+        const _sLimit = _psign.quotas.signs_month;
         const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
         if (!_sGate.allowed) {
-          log('info', 'quota_sign_declined', { account: String(keyData.account_id).slice(0, 12), plan: keyData.plan || 'community', limit: _sLimit });
+          // The tier that DECIDED, as on the transfer gate: the unified plan
+          // does not move on a ParaSign purchase either, so reporting it here
+          // tells a paying customer he is on a tier he is not being held to.
+          log('info', 'quota_sign_declined', { account: String(keyData.account_id).slice(0, 12), plan: _psign.tier, limit: _sLimit });
           res.writeHead(402, { 'Content-Type': 'application/json' });
-          return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: keyData.plan || 'community', limit: _sLimit }));
+          return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: _psign.tier, limit: _sLimit }));
         }
       }
 
