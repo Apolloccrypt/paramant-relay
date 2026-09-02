@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Stubbed curl for the posture dry run. Answers from POSTURE_STUB_MODE, never
+# from the network. See tests/security-posture-dryrun.sh.
+set -u
+mode=${POSTURE_STUB_MODE:-green}
+url=""; want_headers=0; want_code=0; post=0
+for a in "$@"; do
+  case "$a" in
+    -D) want_headers=1 ;;
+    *%{http_code}*) want_code=1 ;;
+    POST) post=1 ;;
+    https://*) url=$a ;;
+  esac
+done
+[ "$want_headers" -eq 1 ] || case " $* " in *" -D "*) want_headers=1 ;; esac
+
+emit_headers() {
+  if [ "$mode" = missing ]; then return 0; fi
+  echo "HTTP/2 200 "
+  if [ "$mode" = green ]; then
+    echo "strict-transport-security: max-age=63072000; includeSubDomains; preload"
+    echo "content-security-policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; frame-ancestors 'none'"
+    echo "x-frame-options: DENY"
+    echo "referrer-policy: no-referrer"
+    echo "permissions-policy: geolocation=(), microphone=(), camera=(self)"
+    echo "x-content-type-options: nosniff"
+  else
+    # Every required header wrong in its own way, one way per header.
+    echo "strict-transport-security: max-age=63072000; includeSubDomains"
+    echo "strict-transport-security: max-age=63072000; includeSubDomains"
+    echo "content-security-policy: default-src 'self'; script-src 'self' 'unsafe-eval'; frame-ancestors 'none'"
+    echo "referrer-policy: unsafe-url"
+    echo "permissions-policy: interest-cohort=()"
+    echo "x-content-type-options: sniff"
+  fi
+}
+
+case "$url" in
+  *api.osv.dev/v1/querybatch)
+    case "$mode" in
+      green) echo '{"results":[{}]}' ;;
+      red)   echo '{"results":[{"vulns":[{"id":"STUB-0001"}]}]}' ;;
+      *)     echo 'not json' ;;
+    esac
+    exit 0 ;;
+  *api.osv.dev/v1/vulns/*)
+    case "$mode" in
+      red) echo '{"id":"STUB-0001","database_specific":{"severity":"CRITICAL"}}' ;;
+      *)   echo 'not json' ;;
+    esac
+    exit 0 ;;
+  *robots.txt)
+    [ "$mode" = missing ] && exit 0
+    echo "User-agent: *"
+    echo "Allow: /"
+    echo "Disallow: /auth/"
+    if [ "$mode" = green ]; then
+      echo ""
+      echo "Sitemap: https://paramant.app/sitemap.xml"
+    fi
+    exit 0 ;;
+  *sitemap.xml)
+    [ "$mode" = missing ] && exit 0
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    if [ "$mode" = green ]; then
+      echo '  <url><loc>https://paramant.app/pricing</loc></url>'
+    else
+      echo '  <url><loc>https://paramant.app/auth/login</loc></url>'
+    fi
+    echo '</urlset>'
+    exit 0 ;;
+esac
+
+if [ "$want_code" -eq 1 ]; then
+  if [ "$post" -eq 1 ]; then
+    # The ParaID issuing route. 404 is the only acceptable answer.
+    case "$mode" in
+      green) printf '404' ;;
+      red)   printf '200' ;;
+      *)     printf '' ;;
+    esac
+  else
+    # A sitemap url. Green answers 200; red answers a redirect to a login.
+    case "$mode" in
+      green) printf '200' ;;
+      red)   printf '302' ;;
+      *)     printf '' ;;
+    esac
+  fi
+  exit 0
+fi
+
+[ "$want_headers" -eq 1 ] && emit_headers
+exit 0

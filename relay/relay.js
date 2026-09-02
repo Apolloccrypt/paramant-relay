@@ -2356,7 +2356,19 @@ function setHeaders(res, req) {
   res.setHeader('Content-Security-Policy',      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
   res.setHeader('Strict-Transport-Security',    'max-age=63072000; includeSubDomains; preload');
   res.setHeader('Referrer-Policy',              'no-referrer');
-  res.setHeader('Permissions-Policy',           'interest-cohort=()');
+  // A relay answers json to script, never inside a frame. frame-ancestors in
+  // the CSP above already says so to a current browser; this is the same
+  // sentence for the ones that only read the older header. Measured on
+  // 2026-09-03: all five sector relays sent no X-Frame-Options at all, while
+  // paramant.app itself did.
+  res.setHeader('X-Frame-Options',              'DENY');
+  // interest-cohort was never a registered Permissions-Policy feature. FLoC was
+  // withdrawn in 2022 and the name was never added to the feature registry, so
+  // a policy consisting only of it parses to an empty policy: the header is
+  // present, looks like hardening in a scan that only checks presence, and
+  // governs nothing. These are registered features, and denying them costs a
+  // json api nothing.
+  res.setHeader('Permissions-Policy',           'geolocation=(), microphone=(), camera=(), payment=(), usb=()');
   // X-Paramant-Version intentionally omitted — version disclosure via response header removed (security hardening v2.3.3)
   res.setHeader('X-Paramant-Sector',            SECTOR);
   res.setHeader('X-Crypto-Version',             'ML-KEM-768+AES-256-GCM');

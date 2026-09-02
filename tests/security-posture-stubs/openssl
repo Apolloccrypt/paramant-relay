@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Stubbed openssl for the posture dry run. See tests/security-posture-dryrun.sh.
+set -u
+mode=${POSTURE_STUB_MODE:-green}
+sub=${1:-}
+shift || true
+
+if [ "$sub" = s_client ]; then
+  [ "$mode" = missing ] && exit 0
+  proto=""
+  for a in "$@"; do
+    case "$a" in -tls1|-tls1_1|-tls1_2|-tls1_3) proto=${a#-} ;; esac
+  done
+  case "$mode:$proto" in
+    # Green: the deprecated protocols refuse, the modern ones complete.
+    green:tls1|green:tls1_1) exit 0 ;;
+    # Red: the deprecated protocols complete, the modern ones refuse.
+    red:tls1_2|red:tls1_3) exit 0 ;;
+  esac
+  printf -- '-----BEGIN CERTIFICATE-----\nstub\n-----END CERTIFICATE-----\n'
+  exit 0
+fi
+
+if [ "$sub" = x509 ]; then
+  body=$(cat)
+  # No flags: the pem-capture pass. Hand the certificate straight back.
+  if [ $# -eq 0 ]; then printf '%s\n' "$body"; exit 0; fi
+  [ -n "$body" ] || exit 1
+  case " $* " in
+    *" -enddate "*)
+      if [ "$mode" = green ]; then
+        printf 'notAfter=%s\n' "$(date -u -d '+90 days' '+%b %-d %H:%M:%S %Y GMT')"
+      else
+        printf 'notAfter=%s\n' "$(date -u -d '+3 days' '+%b %-d %H:%M:%S %Y GMT')"
+      fi
+      ;;
+    *" subjectAltName "*)
+      if [ "$mode" = green ]; then
+        echo "X509v3 Subject Alternative Name: "
+        echo "    DNS:paramant.app, DNS:relay.paramant.app, DNS:health.paramant.app, DNS:legal.paramant.app, DNS:finance.paramant.app, DNS:iot.paramant.app"
+      else
+        echo "X509v3 Subject Alternative Name: "
+        echo "    DNS:example.invalid"
+      fi
+      ;;
+    *" -issuer "*) echo "issuer=C=US, O=Stub CA, CN=STUB" ;;
+  esac
+  exit 0
+fi
+exit 0

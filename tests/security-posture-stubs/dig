@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Stubbed dig for the posture dry run. See tests/security-posture-dryrun.sh.
+set -u
+mode=${POSTURE_STUB_MODE:-green}
+[ "$mode" = missing ] && exit 0
+type=""; name=""; dnssec=0
+for a in "$@"; do
+  case "$a" in
+    +dnssec) dnssec=1 ;;
+    +short) ;;
+    TXT|CAA|DS|A|NS) type=$a ;;
+    +*) ;;
+    -*) ;;
+    *) name=$a ;;
+  esac
+done
+
+# The unsigned-zone probe: `dig +dnssec <name> A`, read for the ad flag.
+if [ "$dnssec" -eq 1 ] && [ "$type" = A ]; then
+  if [ "$mode" = green ]; then
+    echo ";; flags: qr rd ra ad; QUERY: 1, ANSWER: 1"
+  else
+    echo ";; flags: qr rd ra; QUERY: 1, ANSWER: 1"
+  fi
+  exit 0
+fi
+
+case "$type:$name" in
+  TXT:_dmarc.*)
+    if [ "$mode" = green ]; then echo '"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"'
+    else echo '"v=DMARC1; p=none"'; fi ;;
+  TXT:*._domainkey.*)
+    [ "$mode" = green ] && echo '"v=DKIM1; k=rsa; p=STUBKEY"' ;;
+  TXT:*)
+    if [ "$mode" = green ]; then echo '"v=spf1 include:_spf.example.com ~all"'
+    else echo '"v=spf1 include:_spf.example.com +all"'; fi ;;
+  CAA:*)
+    [ "$mode" = green ] && echo '0 issue "letsencrypt.org"' ;;
+  DS:*)
+    [ "$mode" = green ] && echo '12345 13 2 abcdef' ;;
+esac
+exit 0
