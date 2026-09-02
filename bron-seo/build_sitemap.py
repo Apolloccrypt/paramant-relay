@@ -33,7 +33,7 @@ PRIVATE = {
 # Crawl priority. Not a ranking factor, but it tells a crawler where to spend
 # its budget on a 60-page site: the product and the money pages first.
 PRIORITY = [
-    (0.9, {"index", "pricing", "sign", "verify", "vault", "download"}),
+    (0.9, {"index", "pricing", "parasign", "sign", "verify", "vault", "download"}),
     (0.8, {"security", "trust", "architecture", "docs", "vs", "about"}),
 ]
 DEFAULT_PRIORITY = 0.6

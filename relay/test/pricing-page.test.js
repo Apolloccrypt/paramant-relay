@@ -144,6 +144,27 @@ assert(!/data-billing-interval="yearly"\s+class="btn/.test(html), 'no yearly var
 ok('one primary monthly CTA per tier, yearly demoted to a secondary link');
 
 // The dead stub checkout page no longer serves the "no charge" lie; it redirects.
+// /parasign is the product page and quotes the ParaSign prices a second time.
+// relay/test/pricing-page.test.js is the only thing that ties a listed price to
+// the catalog, so the product page is held to the same numbers here: an edit
+// to one page without the other turns this suite red instead of leaving two
+// prices on the site.
+const parasignHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasign.html'), 'utf8');
+for (const v of VARIANTS.filter(x => x.product === 'parasign')) {
+  const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
+  assert(!order.error, 'catalog rejects ' + v.plan + '/' + v.interval + ': ' + order.error);
+  const excl = '&euro;' + v.excl.toLocaleString('en-US');
+  assert(parasignHtml.includes(excl), 'parasign.html no longer shows ' + excl + ' for ' + v.plan + '/' + v.interval);
+  const incl = '&euro;' + Number(order.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  assert(parasignHtml.includes(incl), 'parasign.html no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.plan + '/' + v.interval);
+  ok('parasign.html ' + v.plan + ' ' + v.interval + ': shows ' + excl + ' excl and ' + incl + ' incl');
+}
+for (const s of ['2 signatures per month', '100 signatures per month, then &euro;0.40 each, up to 1,000', '1,000 signatures per month']) {
+  assert(parasignHtml.includes(s), 'parasign.html lost the quota line: ' + s);
+}
+assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
+ok('parasign.html carries the same quota lines and the btw convention');
+
 const checkoutHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'billing', 'checkout.html'), 'utf8');
 assert(!/no charge/i.test(checkoutHtml), 'checkout.html must not claim "no charge"');
 assert(!/activates immediately/i.test(checkoutHtml), 'checkout.html must not claim "activates immediately"');

@@ -37,7 +37,7 @@ PRIVATE = {
 # SoftwareApplication; the rest stay WebPage. Claiming SoftwareApplication on a
 # policy page is the kind of over-tagging that gets structured data ignored.
 SOFTWARE = {
-    "index", "parashare", "sign", "verify", "vault", "download",
+    "index", "parashare", "parasign", "sign", "verify", "vault", "download",
     "co-sign"}
 
 
