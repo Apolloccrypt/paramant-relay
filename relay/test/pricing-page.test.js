@@ -80,7 +80,7 @@ const PARASIGN_COPY = [
   '&euro;49<',
   '100 signatures a month, then &euro;0.40 each, up to 1,000',
   'Past 1,000 a month, Business is cheaper anyway',
-  'Unlimited transfers - API access',
+  tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers a month - API access',
   'Annual: &euro;499 excl. &middot; 15.1% off',
   // BUSINESS - EUR 299/month
   '&euro;299<',

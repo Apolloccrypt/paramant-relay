@@ -687,7 +687,7 @@ assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*AP
 assert.doesNotMatch(developerHtml, /your IT can check/i,
   'developer.html talks to the developer on the screen, not to their buyer');
 // Both plan lines are only true while /pricing sells API access on ParaSign Pro.
-assert.match(pricing, /Unlimited transfers - API access/,
+assert.match(pricing, /transfers a month - API access/,
   'pricing.html must still list API access on the ParaSign Pro tier');
 
 // Answer 1: signing without an account. Quoted from /sign, which is pinned above.
@@ -1507,3 +1507,71 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 })();
 
 console.log('ui-truthfulness: /download says the desktop app is unmaintained, and the archive matches the artifacts');
+
+
+// ── "Unlimited transfers", banned across the whole site ──────────────────────
+//
+// relay/lib/tiers.js gives every metered tier a finite transfers_month (10 on
+// Community, 500 on Pro, 2,000 on Business) and relay/lib/entitlements.js holds
+// even enterprise to ENTERPRISE_MONTHLY_CEILING rather than Infinity, so no
+// page and no script may promise transfers without a ceiling. relay/relay.js
+// refuses the transfer over the cap with a 402 monthly_transfer_quota_reached
+// naming that ceiling: a visitor who read "unlimited" meets the number anyway,
+// at the worst possible moment.
+//
+// relay/test/pricing-page.test.js already forbade the phrase, but only on
+// /parasign and /parasend, and only in .html. It sat on three files that check
+// could not see: /pricing itself (the ParaSign Pro card), frontend/js/
+// quota-upgrade.js (the 402 upgrade card, which is the very screen the relay
+// shows when the cap bites) and frontend/js/dashboard.js (the summary a paying
+// customer reads). So the ban is scoped to the whole frontend here, scripts and
+// served markdown included, which is what "site-wide" has to mean for a claim
+// that travels in a template string.
+//
+// Receiving IS uncapped, and stays sayable: nothing in tiers.js or in any
+// entitlement quota meters it (#359 pins that negatively in pricing-page.test).
+// Licence capacity is uncapped too (max_keys 'unlimited' really is Infinity in
+// relay.js), as is enterprise devices/outbound_per_hour in tiers.js. So this
+// bans the word beside "transfers", not the word.
+(function noUnlimitedTransfers() {
+  const TEXT_EXT = ['.html', '.js', '.mjs', '.md'];
+  const SKIP_DIR = ['node_modules', 'vendor', 'assets'];
+  const walk = (dir) => fs.readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true })
+    .flatMap((e) => {
+      if (e.isDirectory()) return SKIP_DIR.includes(e.name) ? [] : walk(`${dir}/${e.name}`);
+      return TEXT_EXT.some((x) => e.name.endsWith(x)) ? [`${dir}/${e.name}`] : [];
+    });
+  const files = walk('frontend');
+  assert.ok(files.length > 20, `the frontend walk found only ${files.length} text files; the ban would be vacuous`);
+
+  // Comments are stripped: a comment that explains a removed overclaim quotes
+  // the wording it exists to forbid, which is exactly how it stays forbidden.
+  const strip = (s) => s
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+
+  const hits = [];
+  for (const file of files) {
+    const m = /unlimited(?:\s|&nbsp;|<[^>]+>)+(?:\w+(?:\s|&nbsp;)+)?transfers/i.exec(strip(read(file)));
+    if (m) hits.push(`${file}: "${m[0].replace(/\s+/g, ' ')}"`);
+  }
+  assert.deepEqual(hits, [],
+    'no frontend page or script may promise transfers without a ceiling; tiers.js caps every tier ' +
+    'and relay.js answers 402 monthly_transfer_quota_reached with that cap:\n  ' + hits.join('\n  '));
+
+  // The positive half: /pricing, /parasign and the 402 card all quote the SAME
+  // ParaSend Pro ceiling, so correcting one page can never leave another behind.
+  const proTransfers = 500; // relay/lib/tiers.js pro.transfers_month, pinned to the module in relay/test/
+  for (const [file, rx] of [
+    ['frontend/pricing.html', new RegExp(`<li>${proTransfers} ParaSend transfers a month - API access</li>`)],
+    ['frontend/parasign.html', new RegExp(`<li>${proTransfers} ParaSend transfers a month</li>`)],
+    ['frontend/js/quota-upgrade.js', new RegExp(`${proTransfers}`)],
+    ['frontend/js/dashboard.js', new RegExp(`${proTransfers} ParaSend transfers a month`)],
+  ]) {
+    assert.match(read(file), rx,
+      `${file} must state the ParaSend Pro transfers ceiling where it used to say "unlimited"`);
+  }
+})();
+
+console.log('ui-truthfulness: no page or script promises transfers without a ceiling');

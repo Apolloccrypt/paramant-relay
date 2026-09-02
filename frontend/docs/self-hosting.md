@@ -181,11 +181,21 @@ python3 scripts/paramant-admin.py sync
 These are **end-user plans** — they control what a `pgp_` API key holder can do.
 Set when you create a key with `--plan`.
 
-| Plan | Uploads/day | Max file size | TTL | Views/blob | Priority |
-|------|-------------|---------------|-----|------------|----------|
-| `free` | 10 | 5 MB | 1 hour | 1 | Low |
-| `pro` | Unlimited | 500 MB | 24 hours | 10 | High |
-| `enterprise` | Unlimited | Unlimited | 7 days | 100 | Highest |
+| Plan | Transfers/month | Max file size | TTL | Views/blob | Downloads/hour |
+|------|-----------------|---------------|-----|------------|----------------|
+| `free` | 10 | 5 MB | 1 hour | 1 | 50 |
+| `pro` | 500 | 5 MB | 24 hours | 10 | 500 |
+| `enterprise` | 1,000,000 | 5 MB | 7 days | 100 | unlimited |
+
+Every figure comes from `relay/lib/tiers.js`, the single source the relay reads.
+The table used to say `pro` and `enterprise` had unlimited uploads and a 500 MB
+file: transfers are metered per calendar month (`transfers_month`, HTTP 402
+`monthly_transfer_quota_reached`), never per day, and `file_mb` is bounded by
+the operator's `MAX_BLOB` (5 MB on the hosted relay), which is always the last
+word. No metered tier is unbounded: `relay/lib/entitlements.js` holds even
+`enterprise` to a finite monthly ceiling. `Priority` named no field at all and
+is replaced by `outbound_per_hour`, the per-key hourly download window the relay
+does enforce with a 429.
 
 > **Get a free `pgp_` key:** [paramant.app/request-key](https://paramant.app/request-key) — form takes 30 seconds, key arrives by email. No account or credit card needed.
 

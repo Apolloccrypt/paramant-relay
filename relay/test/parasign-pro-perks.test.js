@@ -2,7 +2,7 @@
 // ParaSign Pro perk delivery. The pricing page (frontend/pricing.html, ParaSign
 // Pro card) promises, per perk:
 //   1. "100 signatures a month, then EUR 0.40 each, up to 1,000"
-//   2. "Unlimited transfers - API access"
+//   2. "500 ParaSend transfers a month - API access"
 //
 // These prove, per perk, what a per-product grant of parasign=pro (the exact
 // effect of setProductPlan(account,'parasign','pro') and of a Mollie ParaSign
@@ -88,21 +88,27 @@ test('parasign=pro leaves the unified plan and ParaSend entitlement untouched', 
   assert.strictEqual(sendAfter.quotas.transfers_month, 10, 'ParaSend transfers cap unchanged');
 });
 
-// ── FINDING (regression-locked): "Unlimited transfers" is NOT delivered ───────
-// The page's ParaSign Pro card lists "Unlimited transfers", but transfers are a
-// ParaSEND capacity (plan_parasend), which a ParaSign grant deliberately does
-// not touch. A ParaSign-Pro customer keeps their EXISTING ParaSend tier (10/mo
-// for a free account). Moreover NO ParaSend tier is truly unlimited: even
-// enterprise is capped at ENTERPRISE_MONTHLY_CEILING, not Infinity. This test
-// pins that fact so a future "unlimited transfers" claim cannot slip in silently
-// via a ParaSign grant. Mick decides: bundle a ParaSend entitlement into
-// ParaSign Pro, or drop the line from the page.
-test('FINDING: a parasign=pro grant does NOT grant unlimited transfers (page overclaim)', () => {
+// ── FINDING (regression-locked): the transfers line is NOT delivered ─────────
+// The page's ParaSign Pro card lists a ParaSend transfers allowance, but
+// transfers are a ParaSEND capacity (plan_parasend), which a ParaSign grant
+// deliberately does not touch. A ParaSign-Pro customer keeps their EXISTING
+// ParaSend tier (10/mo for a free account), so the card promises 500 that the
+// grant does not hand over.
+//
+// The card no longer says "Unlimited transfers". That half was strictly false
+// for everyone, because NO ParaSend tier is unbounded: even enterprise is
+// capped at ENTERPRISE_MONTHLY_CEILING, not Infinity, and /pricing, /parasign,
+// the dashboard and the 402 upgrade card now all quote the real 500 (see
+// tests/ui-truthfulness.test.mjs, which bans the old wording site-wide). What
+// this test still pins is the DELIVERY gap underneath the wording: a
+// parasign=pro grant moves no ParaSend ceiling at all. Mick decides: bundle a
+// ParaSend Pro entitlement into ParaSign Pro, or drop the line from the cards.
+test('FINDING: a parasign=pro grant does NOT move the ParaSend transfers ceiling (page overclaim)', () => {
   const acct = freeAccount();
   ent.applyProductTier(acct, 'parasign', 'pro');
   const transfers = ent.getEntitlements(acct).parasend.quotas.transfers_month;
-  assert.strictEqual(transfers, 10, 'ParaSign Pro grant leaves transfers at the free ParaSend cap, NOT unlimited');
-  // And the highest ParaSend tier is finite, so "unlimited" is not a real tier.
+  assert.strictEqual(transfers, 10, 'ParaSign Pro grant leaves transfers at the free ParaSend cap, NOT at the 500 the card names');
+  // And the highest ParaSend tier is finite, so no card may drop the ceiling.
   assert.strictEqual(ent.PARASEND.enterprise.quotas.transfers_month, ent.ENTERPRISE_MONTHLY_CEILING);
-  assert.notStrictEqual(ent.PARASEND.enterprise.quotas.transfers_month, Infinity, 'no ParaSend tier is truly unlimited');
+  assert.notStrictEqual(ent.PARASEND.enterprise.quotas.transfers_month, Infinity, 'no ParaSend tier is unbounded');
 });
