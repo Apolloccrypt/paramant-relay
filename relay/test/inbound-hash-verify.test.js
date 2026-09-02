@@ -8,24 +8,23 @@
 // client (frontend/js/parashare.page.js and extensions/shared/paramant-core.js)
 // sends hash = sha256(exact payload bytes), so a correct upload is unaffected.
 //
-// Boots relay.js on a random port (keyless anon path + one pro API key via
+// Boots relay.js on a free port from the OS (keyless anon path + one pro key via
 // USERS_JSON), then posts a matching and a mismatching hash to each route.
 // Run: node relay/test/inbound-hash-verify.test.js
 
 const { test, before, after } = require('node:test');
 const assert = require('assert');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { bootHealthyRelay, killSpawnedRelays } = require('./_boot-relay');
 
-const RELAY_DIR = path.join(__dirname, '..');
-const PORT = 34000 + (process.pid % 5000);
-const BASE = `http://127.0.0.1:${PORT}`;
 const API_KEY = 'pgp_hashverify_test';
 
-let child;
+// Filled in by before(): the port comes from the OS, not from this process's
+// pid, so a sibling suite in the same `node --test` run cannot pick it too.
+let BASE = null;
 let usersFile;
 
 // A blob that does NOT start with the "PQHB" v1 magic, so peekInboundBlob()
@@ -52,31 +51,18 @@ async function post(route, body, headers) {
 before(async () => {
   usersFile = path.join(os.tmpdir(), `hashverify-users-${process.pid}.json`);
   fs.writeFileSync(usersFile, '{}');
-  child = spawn('node', ['relay.js'], {
-    cwd: RELAY_DIR,
-    env: {
-      ...process.env,
-      PORT: String(PORT),
-      USERS_FILE: usersFile,
-      RELAY_MODE: 'full',
-      USERS_JSON: JSON.stringify({
-        api_keys: [{ key: API_KEY, active: true, plan: 'pro', label: 'hashverify', email: 't@t' }],
-      }),
-      RELAY_REDIS_URL: '',
-      NATS_URL: '',
-    },
-    stdio: ['ignore', 'ignore', 'ignore'],
+  const relay = await bootHealthyRelay({
+    USERS_FILE: usersFile,
+    RELAY_MODE: 'full',
+    USERS_JSON: JSON.stringify({
+      api_keys: [{ key: API_KEY, active: true, plan: 'pro', label: 'hashverify', email: 't@t' }],
+    }),
   });
-  const deadline = Date.now() + 15000;
-  for (;;) {
-    try { const r = await fetch(BASE + '/health'); if (r.ok) break; } catch (_) { /* not up yet */ }
-    if (Date.now() > deadline) throw new Error('relay did not become healthy in time');
-    await new Promise((r) => setTimeout(r, 250));
-  }
+  BASE = relay.base;
 });
 
 after(() => {
-  if (child) child.kill('SIGKILL');
+  killSpawnedRelays();
   try { fs.unlinkSync(usersFile); } catch (_) { /* best effort */ }
 });
 
