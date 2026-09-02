@@ -688,6 +688,10 @@ function visible0(html) {
     .trim();
 }
 const visible = (file) => visible0(read(file));
+// The plan limits are read from the code that enforces them, not from another
+// page. tiers.js is the single source; relay.js turns its rows into a 402 and a
+// 413. Comparing two pages only proves they agree, and both were wrong together.
+const { default: tiers } = await import('../relay/lib/tiers.js');
 const parasign = visible('frontend/parasign.html');
 const parasend = visible('frontend/parasend.html');
 const aboutVisible = visible('frontend/about.html');
@@ -698,12 +702,26 @@ const signVisibleText = visible('frontend/sign.html');
 // Proof 1. The EU claim is about the data path, not the whole chain, and the
 // Resend exception travels with it. A page may shorten the long form on
 // /pararules to this one; it may never drop the second half.
-const EU_CLAIM = 'No US provider in the data path.';
+const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
 const EU_EXCEPTION = 'Email goes out via Resend';
 const homeVisible = visible('frontend/index.html');
 for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['parasend', parasend]]) {
   assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
+}
+// And it may not be offered against a source that does not carry it. The
+// Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
+// jurisdiction, the CLOUD Act row, retention, IP logging and analytics. Bunny is
+// not in it, and DNS is not a row. A page that names Bunny and then sends the
+// reader to that table has offered a checkpoint that fails when checked.
+const securityJurisdiction = (read('frontend/security.html')
+  .match(/<h2>Jurisdiction[\s\S]*?<\/table>/) || [''])[0];
+assert.ok(securityJurisdiction, 'security.html must keep its Jurisdiction and privacy table');
+assert.ok(!/Bunny/i.test(securityJurisdiction),
+  'the /security jurisdiction table now names Bunny; the product pages may point at it again');
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+  assert.doesNotMatch(text, /Bunny DNS[^.]*\.[^.]*\.[^.]*\.[^.]*jurisdiction table is on the/,
+    `${name}.html sends the reader to the /security jurisdiction table for a claim that table does not carry`);
 }
 // The broader claim is the one section 9 of the guide holds open. It may stay
 // on /security, where the table qualifies it, and nowhere near a product hero.
@@ -770,13 +788,23 @@ assert.ok(visible0(parasignHero).includes(SES),
   'the SES scope note must sit in the first screen of /parasign, not below the tiers');
 assert.ok(visible0(parasignHero).includes('legal, finance and healthcare practices in the EU'),
   '/parasign must name who it is for in the first screen');
-assert.ok(visible0(parasignHero).includes('2 signatures a month'),
-  'the free promise in the /parasign hero must carry its real number');
+assert.ok(visible0(parasignHero).includes(`${tiers.tierLimit('community', 'signs_month')} signatures a month`),
+  'the free promise in the /parasign hero must carry the number tiers.js enforces');
 const parasendHero = read('frontend/parasend.html').split('<section class="ps-band"')[0];
-for (const fact of ['links that last an hour', 'gone after one read', '10 uploads an hour']) {
+const communityHeroFacts = [
+  `${tiers.tierLimit('community', 'transfers_month')} transfers a month`,
+  `${tiers.tierLimit('community', 'file_mb')} MB a file`,
+  `links that last an hour`,
+  `gone after one read`,
+];
+for (const fact of communityHeroFacts) {
   assert.ok(visible0(parasendHero).includes(fact),
-    `the free promise in the /parasend hero must carry its real limit: ${fact}`);
+    `the free promise in the /parasend hero must carry the limit tiers.js enforces: ${fact}`);
 }
+assert.ok(tiers.tierLimit('community', 'view_ttl_ms') === 3_600_000 && tiers.tierLimit('community', 'max_views') === 1,
+  'the one-hour, one-read wording in the /parasend hero no longer matches tiers.js');
+assert.doesNotMatch(visible0(parasendHero), /uploads (per|an) hour/i,
+  'the /parasend hero states the deprecated anon-endpoint rate as if it were a plan limit');
 assert.ok(visible0(parasendHero).includes('For offices that email client documents'),
   '/parasend must name who it is for in the first screen');
 
@@ -790,6 +818,31 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
   assert.doesNotMatch(text, /identity verified|verified signer|signer verified|legally binding/i,
     `${name}.html must not claim a verified identity or legal effect it cannot deliver`);
 }
+
+// ── A claim may not be contradicted by the page it cites ─────────────────────
+//
+// /parasend promised "ML-DSA-65 signed receipts" for ParaShare and linked to the
+// algorithm register in the same sentence. That register lists ParaShare
+// (webapp) with SIG n/a on the pre-v1 hybrid wire, migrating to v1; ML-DSA-65 is
+// the SDK rows. The register is the source, so it is read here and the page is
+// held to what it says.
+const registerRow = (label) => {
+  const rows = read('frontend/crypto-agility.html').match(/<tr>[\s\S]*?<\/tr>/g) || [];
+  const row = rows.find((r) => r.includes(label));
+  return row ? [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').trim()) : null;
+};
+const shareRow = registerRow('ParaShare (webapp)');
+assert.ok(shareRow && shareRow.length >= 4, 'crypto-agility.html no longer registers ParaShare (webapp)');
+const [, shareKem, shareSig, shareWire] = shareRow;
+assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the register changed; /parasend quotes it');
+if (shareSig === 'n/a') {
+  assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts/,
+    'the register gives ParaShare no signature, so /parasend may not sell it ML-DSA-65 signed receipts');
+  assert.ok(parasend.includes(`the webapp on the ${shareWire} wire`),
+    '/parasend must state the wire format the register gives the webapp, not a better one');
+}
+assert.doesNotMatch(parasend, /proof that the file came from you/,
+  '/parasend may not promise sender proof on a path the register gives no signature');
 
 // Tone, section 6 of the guide. We have no testimonials, no customer logos and
 // no user counts, so no page may imply them, and the marketing vocabulary the

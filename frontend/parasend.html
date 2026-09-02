@@ -190,7 +190,7 @@
       <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
     </div>
-    <p class="ps-sub">Free on the Community plan, forever, no card: links that last an hour, gone after one read, 10 uploads an hour. Organisations pay for volume, never for security.</p>
+    <p class="ps-sub">Free on the Community plan, forever, no card: 10 transfers a month, 5 MB a file, links that last an hour and are gone after one read. Organisations pay for volume, never for security.</p>
     <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file once, and the copy is wiped. Keep your own copy, because a file that has been read cannot be fetched again.</p>
   </div>
 </section>
@@ -228,8 +228,8 @@
         <p>The recipient opens the link, gets the file, and that is the whole flow. No account, nothing to install.</p>
       </div>
       <div class="check-card">
-        <div class="k">A receipt the other side can check</div>
-        <p>The person you send to gets proof that the file came from you and was not changed on the way. ParaShare is the send screen you use; ParaSend is the product it belongs to.</p>
+        <div class="k">It opens on their device, or nowhere</div>
+        <p>The file is locked to a key registered on the recipient's device, so it opens there and nowhere else, and a file altered on the way does not open at all. ParaShare is the send screen you use; ParaSend is the product it belongs to.</p>
       </div>
       <div class="check-card">
         <div class="k">Lock a file for yourself</div>
@@ -283,9 +283,10 @@
         <div class="tier-note">Forever &middot; no card required</div>
         <ul>
           <li>Encrypted in your browser, key never sent</li>
+          <li>10 transfers per month</li>
+          <li>5 MB per file, on every plan</li>
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
-          <li>10 uploads per hour per IP</li>
           <li>Up to 5 registered devices for ParaShare, the ParaSend send screen</li>
         </ul>
       </div>
@@ -299,12 +300,13 @@
         <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;18.15/mo incl. 21% btw</span><br>Annual &euro;150 excl. &middot; 16.7% off</div>
         <ul>
           <li>Everything in Community</li>
+          <li>500 transfers per month</li>
           <li>24 hour link expiry</li>
           <li>Up to 10 reads per link</li>
           <li>Up to 50 registered devices</li>
           <li>Send history and link management</li>
           <li>Webhooks on upload and download</li>
-          <li>No IP rate limit</li>
+          <li>Email notifications via Resend</li>
         </ul>
       </div>
       <div class="tier-card">
@@ -336,11 +338,11 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds fixed-size ciphertext, never the plaintext and never the key, and it holds it in RAM until the read burns it. The architecture is on the <a href="/security">security page</a>.</p>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until the read burns it. A ParaShare transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">The receipt, in full</div>
-        <p>Verified transfers via ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts. The algorithm register is on the <a href="/crypto-agility">crypto agility page</a>.</p>
+        <div class="k">The wire format, in full</div>
+        <p>ParaShare uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/crypto-agility">crypto agility page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">You own your keys</div>
@@ -348,7 +350,7 @@
       </div>
       <div class="check-card">
         <div class="k">EU soil, EU law</div>
-        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out. The jurisdiction table is on the <a href="/security">security page</a>.</p>
+        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out. The subprocessors are listed there, and ParaRule 5 states the same claim in full on <a href="/pararules">ParaRules</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">No third-party requests</div>

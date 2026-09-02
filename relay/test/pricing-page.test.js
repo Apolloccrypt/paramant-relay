@@ -437,16 +437,83 @@ for (const page of PRODUCT_PAGES) {
 }
 ok('both product pages carry the btw convention and the catalog amounts');
 
-// The quota lines are what a buyer picks a tier on, so they are pinned to the
-// words /pricing uses. A free tier that quietly loses "2 signatures per month"
-// is the same defect as a price that drifts.
+// ── The free number, pinned to the code that enforces it ─────────────────────
+//
+// /parasend said "10 uploads per hour per IP". That figure is real, but it is
+// ANON_RATE_PER_HOUR on POST /v2/anon-inbound (relay.js), an endpoint deprecated
+// on 2026-05-28 that answers with Deprecation and Sunset headers and retires on
+// 2026-12-31. It is not what a Community ACCOUNT gets. The account limits live
+// in relay/lib/tiers.js and are enforced in relay.js: transfers_month with a 402
+// (monthly_transfer_quota_reached), file_mb with a 413 (Max 5MB), view_ttl_ms
+// and max_views on the link itself.
+//
+// So the page is pinned to tiers.js rather than to the wording on /pricing.
+// Pinning one page to another only proves the two agree; it cannot catch both
+// being wrong together, which is exactly what happened here: /pricing and
+// index.html carry the same upload figure and are corrected in their own PRs.
+const tiers = require('../lib/tiers');
+const hours = (ms) => ms / 3_600_000;
+
+const COMMUNITY_LINES = [
+  [tiers.tierLimit('community', 'transfers_month') + ' transfers per month', 'transfers_month'],
+  [tiers.tierLimit('community', 'file_mb') + ' MB per file', 'file_mb'],
+  [hours(tiers.tierLimit('community', 'view_ttl_ms')) + ' hour link expiry', 'view_ttl_ms'],
+  [tiers.tierLimit('community', 'devices') + ' registered devices', 'devices'],
+];
+for (const [line, dim] of COMMUNITY_LINES) {
+  assert(productHtml.parasend.includes(line),
+    'parasend.html no longer states the Community ' + dim + ' that tiers.js enforces: "' + line + '"');
+}
+assert(tiers.tierLimit('community', 'max_views') === 1 && /Burn on first read/.test(productHtml.parasend),
+  'tiers.js gives Community one view, so parasend.html must say the link burns on first read');
+
+const PRO_LINES = [
+  [tiers.tierLimit('pro', 'transfers_month') + ' transfers per month', 'transfers_month'],
+  [hours(tiers.tierLimit('pro', 'view_ttl_ms')) + ' hour link expiry', 'view_ttl_ms'],
+  ['Up to ' + tiers.tierLimit('pro', 'max_views') + ' reads per link', 'max_views'],
+  ['Up to ' + tiers.tierLimit('pro', 'devices') + ' registered devices', 'devices'],
+];
+for (const [line, dim] of PRO_LINES) {
+  assert(productHtml.parasend.includes(line),
+    'parasend.html no longer states the ParaSend Pro ' + dim + ' that tiers.js enforces: "' + line + '"');
+}
+// The anon endpoint's figure may not come back on either product page under any
+// wording. It describes a keyless path that is being retired, not a plan.
+for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
+  assert(!/uploads per hour|uploads an hour/i.test(pageHtml),
+    name + ' states an uploads-per-hour figure; that is ANON_RATE_PER_HOUR on the deprecated /v2/anon-inbound, not a plan limit');
+}
+// No metered tier is unbounded: relay/lib/entitlements.js gives even enterprise
+// a finite ceiling. A page may not promise unlimited transfers to anyone.
+for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
+  assert(!/Unlimited transfers/i.test(pageHtml),
+    name + ' promises unlimited transfers, which entitlements.js forbids for every metered tier');
+}
+// A ParaSign plan derives its ParaSend tier (entitlements.js derivePlanParasend),
+// so where /parasign quotes a transfer number it must be that tier's number.
+assert(productHtml.parasign.includes(tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers per month'),
+  'parasign.html must quote the ParaSend transfer ceiling a ParaSign Pro account actually derives');
+ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
+   tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
+   tiers.tierLimit('community', 'file_mb') + ' MB)');
+
+// A feature bullet quoted from /pricing has to stay a quote. This one names a
+// subprocessor, so dropping "via Resend" would quietly remove a disclosure the
+// EU claim depends on being made in the same breath.
+for (const line of ['Email notifications via Resend']) {
+  assert(html.includes(line), '/pricing lost the feature line: ' + line);
+  assert(productHtml.parasend.includes(line), 'parasend.html lost the feature line /pricing carries: ' + line);
+}
+ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
+
+// The signature quota lines stay pinned to the words /pricing uses: those three
+// are billing copy (the overage rate and the hard cap), not a tiers.js row.
 for (const line of ['2 signatures per month', '100 signatures per month, then &euro;0.40 each, up to 1,000', '1,000 signatures per month']) {
   assert(productHtml.parasign.includes(line), 'parasign.html lost the quota line: ' + line);
 }
-for (const line of ['1 hour link expiry', 'Burn on first read', '24 hour link expiry', 'Up to 10 reads per link']) {
-  assert(productHtml.parasend.includes(line), 'parasend.html lost the limit line: ' + line);
-}
-ok('both product pages carry the same quota and limit lines as /pricing');
+assert(tiers.tierLimit('community', 'signs_month') === 2,
+  'tiers.js no longer gives the free plan 2 signatures a month, so the pages that say so are stale');
+ok('parasign.html carries the signature quota lines, and tiers.js still backs the free one');
 
 // ── The service promises in a tier bullet are pinned too ─────────────────────
 //
