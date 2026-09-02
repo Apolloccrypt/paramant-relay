@@ -98,6 +98,30 @@ test('every internal link resolves to a page that exists', () => {
     `\n\n  Add the page, fix the path, or add the route to SERVER_ROUTES if the relay serves it.\n`);
 });
 
+// A page nothing links to is a page nobody reaches. /parasend shipped exactly
+// like that: the product page existed and was in the sitemap, and not one link
+// on the whole site pointed at it. /parasign had one, from /sign. The check
+// above proves a link leads somewhere; this proves a page is arrived at, which
+// is the other half of the same question.
+test('the two product pages are reachable, and from the homepage', () => {
+  const home = new Set(destinations(path.join(ROOT, 'index.html')).map((d) => d.split('?')[0].split('#')[0]));
+  const overal = new Map();
+  for (const { d, f } of alle) {
+    const clean = d.split('?')[0].split('#')[0];
+    if (!overal.has(clean)) overal.set(clean, new Set());
+    overal.get(clean).add(path.relative(ROOT, f));
+  }
+  for (const route of ['/parasign', '/parasend']) {
+    const bronnen = [...(overal.get(route) || [])].filter((f) => f !== route.slice(1) + '.html');
+    assert.ok(bronnen.length,
+      `Nothing on the site links to ${route}. The page exists and is in the sitemap, so it is` +
+      ` indexed and unreachable at the same time.`);
+    assert.ok(home.has(route),
+      `The homepage does not link to ${route}. It is where a visitor starts, and both products` +
+      ` are introduced there, so both product pages are reached from there.`);
+  }
+});
+
 const BASE = process.env.PARAMANT_BASE_URL || 'https://paramant.app';
 
 test('every file served from the docroot is really there', { skip: !process.env.CHECK_EXTERNAL_LINKS && 'set CHECK_EXTERNAL_LINKS=1 (runs hourly against production, not in pull requests)' }, async () => {

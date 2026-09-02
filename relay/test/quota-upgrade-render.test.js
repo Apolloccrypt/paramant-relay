@@ -42,9 +42,9 @@ ok('isQuota402 accepts the three quota errors and nothing else');
 const free = q.html({ error: 'monthly_sign_quota_reached', plan: 'free', limit: 2, used: 2, reset_date: '2026-08-01' });
 for (const s of [
   "You've used both signatures this month.",
-  'Community gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
+  'Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
   'Pro - EUR 49/month',
-  '100 signatures per month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.',
+  '100 signatures a month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.',
   'Upgrade to Pro',
   'Maybe later',
   'Your limit resets on 2026-08-01.',
@@ -88,7 +88,7 @@ ok('free second signature renders the inline notice verbatim');
 
 const over = q.signNotice({ used: 101, included: 100, overage_count: 1, overage_rate_eur: 0.4, hard_cap: 1000, reset_date: '2026-08-01' });
 for (const s of [
-  "You've passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 per month.",
+  "You've passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 a month.",
   'Signing more than 600 a month? Business (EUR 299) works out cheaper.',
   'Compare plans',
 ]) {

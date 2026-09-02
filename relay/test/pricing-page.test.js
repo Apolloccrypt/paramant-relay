@@ -72,19 +72,19 @@ for (const v of VARIANTS) {
 const PARASIGN_COPY = [
   // FREE - EUR 0
   '>&euro;0<',
-  '2 signatures per month',
-  'Unlimited receiving',
+  '2 signatures a month',
+  'No limit on receiving',
   'Full post-quantum crypto - Public verification log',
   'No card required',
   // PRO - EUR 49/month
   '&euro;49<',
-  '100 signatures per month, then &euro;0.40 each, up to 1,000',
+  '100 signatures a month, then &euro;0.40 each, up to 1,000',
   'Past 1,000 a month, Business is cheaper anyway',
   'Unlimited transfers - API access',
   'Annual: &euro;499 excl. &middot; 15.1% off',
   // BUSINESS - EUR 299/month
   '&euro;299<',
-  '1,000 signatures per month',
+  '1,000 signatures a month',
   'Named support, response within one business day',
   "We help you answer your customers' security questionnaires",
   'Exportable audit log with CT tree head (CSV or JSON)',
@@ -148,13 +148,31 @@ const htmlVisible = html.replace(/<!--[\s\S]*?-->/g, '');
 const communityTransfers = tiers.tierLimit('community', 'transfers_month');
 const communityFileMb = tiers.tierLimit('community', 'file_mb');
 const proTransfers = tiers.tierLimit('pro', 'transfers_month');
-assert(new RegExp(`<li>${communityTransfers} transfers per month</li>`).test(html),
+
+// Two different failures, kept apart on purpose.
+//
+// The site used to say "10 transfers a month" on / and /docs and "10 transfers
+// per month" on /pricing, /parasend and /parasign: one limit, two spellings,
+// and a reader who compares two pages cannot tell whether that is one number or
+// two. The site's form is now "a month" everywhere.
+//
+// So the NUMBER checks accept either spelling. If tiers.js moves from 10 to 20
+// they go red on the number, whatever the wording is that day. The WORDING is
+// pinned once, further down (MONTHLY_FORM), so a page that drifts back to "per
+// month" fails on wording and not on a limit that is still perfectly correct.
+// Declared as functions, not consts: two parallel PRs each adding a top-level
+// `const` under one name is exactly what stopped this file parsing on main, and
+// a function declaration tolerates being declared twice where a const throws.
+function aMonth(n, noun) { return new RegExp(`${n} ${noun} (?:a|per) month`); }
+function statesLine(pageHtml, line) { return line instanceof RegExp ? line.test(pageHtml) : pageHtml.includes(line); }
+
+assert(new RegExp(`<li>${communityTransfers} transfers (?:a|per) month</li>`).test(html),
   `the Community card must name the transfers_month limit from tiers.js (${communityTransfers})`);
 assert(new RegExp(`<li>${communityFileMb} MB per file</li>`).test(html),
   `the Community card must name the file_mb limit from tiers.js (${communityFileMb} MB)`);
-assert(new RegExp(`${communityTransfers} transfers per month, ${communityFileMb} MB per file`).test(html),
+assert(new RegExp(`${communityTransfers} transfers (?:a|per) month, ${communityFileMb} MB per file`).test(html),
   'the lead must carry the same two Community limits as the card');
-assert(new RegExp(`<li>${proTransfers} transfers per month</li>`).test(html),
+assert(new RegExp(`<li>${proTransfers} transfers (?:a|per) month</li>`).test(html),
   `the ParaSend Pro card must name its transfers_month limit from tiers.js (${proTransfers})`);
 assert(!/uploads per hour/i.test(htmlVisible),
   'the page must not sell the anonymous per-IP rate of a deprecated endpoint as an account limit');
@@ -212,7 +230,7 @@ function showsAmountOnCard(pageHtml, amount, interval) {
 // to one page without the other turns this suite red instead of leaving two
 // prices on the site.
 const parasignHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasign.html'), 'utf8');
-for (const s of ['2 signatures per month', '100 signatures per month, then &euro;0.40 each, up to 1,000', '1,000 signatures per month']) {
+for (const s of ['2 signatures a month', '100 signatures a month, then &euro;0.40 each, up to 1,000', '1,000 signatures a month']) {
   assert(parasignHtml.includes(s), 'parasign.html lost the quota line: ' + s);
 }
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
@@ -495,30 +513,34 @@ ok('both product pages carry the btw convention and the catalog amounts');
 // Pinning one page to another only proves the two agree; it cannot catch both
 // being wrong together, which is exactly what happened here: /pricing and
 // index.html carry the same upload figure and are corrected in their own PRs.
-const tiers = require('../lib/tiers');
 const hours = (ms) => ms / 3_600_000;
 
+// The transfer lines are matched on the number and accept either spelling of
+// the period, so tiers.js drift fails here and wording drift fails in the
+// MONTHLY_FORM block instead. Same split as the /pricing checks above.
 const COMMUNITY_LINES = [
-  [tiers.tierLimit('community', 'transfers_month') + ' transfers per month', 'transfers_month'],
+  [aMonth(tiers.tierLimit('community', 'transfers_month'), 'transfers'), 'transfers_month'],
   [tiers.tierLimit('community', 'file_mb') + ' MB per file', 'file_mb'],
   [hours(tiers.tierLimit('community', 'view_ttl_ms')) + ' hour link expiry', 'view_ttl_ms'],
+  ['Up to ' + tiers.tierLimit('community', 'outbound_per_hour') + ' retrievals an hour', 'outbound_per_hour'],
   [tiers.tierLimit('community', 'devices') + ' registered devices', 'devices'],
 ];
 for (const [line, dim] of COMMUNITY_LINES) {
-  assert(productHtml.parasend.includes(line),
+  assert(statesLine(productHtml.parasend, line),
     'parasend.html no longer states the Community ' + dim + ' that tiers.js enforces: "' + line + '"');
 }
 assert(tiers.tierLimit('community', 'max_views') === 1 && /Burn on first read/.test(productHtml.parasend),
   'tiers.js gives Community one view, so parasend.html must say the link burns on first read');
 
 const PRO_LINES = [
-  [tiers.tierLimit('pro', 'transfers_month') + ' transfers per month', 'transfers_month'],
+  [aMonth(tiers.tierLimit('pro', 'transfers_month'), 'transfers'), 'transfers_month'],
   [hours(tiers.tierLimit('pro', 'view_ttl_ms')) + ' hour link expiry', 'view_ttl_ms'],
   ['Up to ' + tiers.tierLimit('pro', 'max_views') + ' reads per link', 'max_views'],
+  ['Up to ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' retrievals an hour', 'outbound_per_hour'],
   ['Up to ' + tiers.tierLimit('pro', 'devices') + ' registered devices', 'devices'],
 ];
 for (const [line, dim] of PRO_LINES) {
-  assert(productHtml.parasend.includes(line),
+  assert(statesLine(productHtml.parasend, line),
     'parasend.html no longer states the ParaSend Pro ' + dim + ' that tiers.js enforces: "' + line + '"');
 }
 // The anon endpoint's figure may not come back on either product page under any
@@ -533,9 +555,69 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
   assert(!/Unlimited transfers/i.test(pageHtml),
     name + ' promises unlimited transfers, which entitlements.js forbids for every metered tier');
 }
+// ── The hourly ceiling the relay enforces and no page stated ─────────────────
+//
+// outbound_per_hour has been enforced since the rate-limit finding (relay.js,
+// outboundRateOk, applied on GET /v2/outbound/:hash) and appeared on no page at
+// all: a Community account that scripts its own downloads hit a 429 it had
+// never been told about. It is now on /parasend per tier and on the /parasign
+// Pro card, and it is pinned here like every other tiers.js number.
+//
+// What the page may NOT do is call it a send limit or a recipient limit. It
+// counts the account's own retrievals through GET /v2/outbound with its own key;
+// the browser recipient path is GET /v2/dl/:token/get, which has no rate limit,
+// so a recipient opening a link never spends the sender's hour.
+//
+// In its own scope, like every block added below it: nothing this PR introduces
+// reaches the top level, so a parallel PR cannot collide with it.
+(function hourlyCeiling() {
+  assert(tiers.isUnlimited(tiers.tierLimit('enterprise', 'outbound_per_hour')),
+    'tiers.js now caps enterprise outbound_per_hour, so parasend.html may not say there is no hourly cap');
+  assert(/No hourly cap on API retrievals/.test(productHtml.parasend),
+    'parasend.html must state the Enterprise hourly position tiers.js gives it (unlimited)');
+  for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
+    assert(!/(sends|uploads) an hour/i.test(pageHtml),
+      name + ' calls the hourly figure a send rate; outbound_per_hour counts retrievals through GET /v2/outbound, not sends');
+  }
+  assert(new RegExp('Up to ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' ParaSend retrievals an hour').test(productHtml.parasign),
+    'parasign.html must quote the hourly retrieval ceiling a ParaSign Pro account derives (' +
+    tiers.tierLimit('pro', 'outbound_per_hour') + ')');
+  ok('the hourly retrieval ceiling on /parasend and /parasign comes from tiers.js (' +
+     tiers.tierLimit('community', 'outbound_per_hour') + '/' + tiers.tierLimit('pro', 'outbound_per_hour') + ' an hour)');
+})();
+
+// ── "No limit on receiving", pinned negatively ───────────────────────────────
+//
+// Every other limit on these pages points at a field. This one points at the
+// absence of one: /parasign, /pricing and the homepage say receiving is not
+// metered, and that is only true as long as no receiving dimension exists to
+// meter it with. Nothing in tiers.js or in the entitlement quotas may name one,
+// and the day something does, this fails and the pages have to state the real
+// ceiling instead of a promise the code stopped keeping.
+(function receivingIsNotMetered() {
+  const receivingDim = (obj) => Object.keys(obj).find((k) => /receiv|inbound/i.test(k));
+  for (const [tier, row] of Object.entries(tiers.TIER_LIMITS)) {
+    const dim = receivingDim(row);
+    assert(!dim, 'tiers.js gives ' + tier + ' a receiving dimension (' + dim + '), so "No limit on receiving" is no longer true');
+  }
+  const account = { key: 'k_demo', account_id: 'acct_demo', plan: 'community' };
+  for (const [product, block] of Object.entries(entitlements.getEntitlements(account))) {
+    if (!block || !block.quotas) continue;
+    const dim = receivingDim(block.quotas);
+    assert(!dim, 'entitlements.js meters receiving for ' + product + ' (' + dim + '), so "No limit on receiving" is no longer true');
+  }
+  for (const [name, pageHtml] of [['pricing.html', html], ['parasign.html', productHtml.parasign]]) {
+    assert(pageHtml.includes('No limit on receiving'),
+      name + ' dropped the receiving line; it is the one claim on these pages backed by a field that does not exist');
+  }
+  assert(/Receiving is not metered\./.test(productHtml.parasign),
+    '/parasign must say what "no limit on receiving" rests on, and that signing what you receive is still counted');
+  ok('"No limit on receiving" holds: no receiving dimension in tiers.js or in the entitlement quotas');
+})();
+
 // A ParaSign plan derives its ParaSend tier (entitlements.js derivePlanParasend),
 // so where /parasign quotes a transfer number it must be that tier's number.
-assert(productHtml.parasign.includes(tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers per month'),
+assert(aMonth(tiers.tierLimit('pro', 'transfers_month'), 'ParaSend transfers').test(productHtml.parasign),
   'parasign.html must quote the ParaSend transfer ceiling a ParaSign Pro account actually derives');
 ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
    tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
@@ -552,7 +634,7 @@ ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
 
 // The signature quota lines stay pinned to the words /pricing uses: those three
 // are billing copy (the overage rate and the hard cap), not a tiers.js row.
-for (const line of ['2 signatures per month', '100 signatures per month, then &euro;0.40 each, up to 1,000', '1,000 signatures per month']) {
+for (const line of ['2 signatures a month', '100 signatures a month, then &euro;0.40 each, up to 1,000', '1,000 signatures a month']) {
   assert(productHtml.parasign.includes(line), 'parasign.html lost the quota line: ' + line);
 }
 assert(tiers.tierLimit('community', 'signs_month') === 2,
@@ -587,5 +669,30 @@ ok('the SLA figure on /pricing and /parasend is the one /sla publishes (' + SLA_
 assert(productHtml.parasend.includes('IEC 62443 / NIS2 / NEN 7510 documentation as input for your own compliance process, not third-party certification'),
   'parasend.html must qualify the compliance bullet where the bullet stands');
 ok('the compliance bullet on /parasend carries its own limit');
+
+// ── One spelling for the monthly period ──────────────────────────────────────
+//
+// The same Community limit shipped as "10 transfers a month" on / and /docs and
+// as "10 transfers per month" on /pricing, /parasend and /parasign. Both are
+// true, which is what makes it a problem: a buyer comparing two pages has to
+// work out whether that is one allowance or two, and every page that repeats a
+// limit multiplies the chance of a real drift hiding inside a wording drift.
+//
+// The site's form is "a month". The number checks above accept both spellings
+// on purpose, so a tiers.js change fails on the number; this is the only place
+// the wording is pinned, so a page that reverts fails here and says so plainly.
+(function oneMonthlyForm() {
+  const MONTHLY_FORM = /([\d,]+) (signatures|transfers|ParaSend transfers) per month/;
+  const PAGES = ['pricing.html', 'parasend.html', 'parasign.html', 'index.html', 'signup.html', 'help/index.html'];
+  for (const rel of PAGES) {
+    const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
+    const stray = MONTHLY_FORM.exec(pageHtml);
+    assert(!stray, rel + ' says "' + (stray ? stray[0] : '') + '"; the site says "' +
+      (stray ? stray[1] + ' ' + stray[2] : 'N noun') + ' a month" and one limit gets one spelling');
+    assert(/(signatures|transfers) a month/.test(pageHtml),
+      rel + ' no longer states a monthly allowance at all, so this gate is guarding nothing');
+  }
+  ok('every page that repeats a monthly limit uses one spelling ("a month")');
+})();
 
 console.log('pricing-page: ' + passed + ' checks passed');

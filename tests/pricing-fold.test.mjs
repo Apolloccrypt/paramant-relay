@@ -116,7 +116,7 @@ test('the first screen at 390px carries the amount, the audience, the founder an
     ['h1', '^Pricing$'],
     ['what', 'Sign documents and send files that vanish after one read'],
     ['amount', '€0 a month, forever'],
-    ['limit', '2 signatures per month, 10 transfers per month, 5 MB per file'],
+    ['limit', '2 signatures a month, 10 transfers a month, 5 MB per file'],
     // Both paid amounts, because they buy different products and a buyer who
     // only sees €15 has been told the price of the other one.
     ['sending', '€15 a month'],
@@ -178,7 +178,7 @@ test('pricing and signup use one term for what a free account gives', async () =
   const [pricingText, signupText] = [await text(pricing), await text(signup)];
   await pricing.close();
   await signup.close();
-  const TERM = '2 signatures per month';
+  const TERM = '2 signatures a month';
   assert.ok(pricingText.includes(TERM), `/pricing must say "${TERM}"`);
   assert.ok(signupText.includes(TERM), `/signup must use the same words as /pricing: "${TERM}"`);
   for (const [label, body] of [['pricing', pricingText], ['signup', signupText]]) {

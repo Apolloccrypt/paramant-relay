@@ -87,7 +87,7 @@
 .prod-lines { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
 .prod-lines li { display: block; background: none; border: 0; padding: 0 0 0 18px; position: relative; font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 6px; }
 .prod-lines li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 2px; background: var(--lime); }
-.prod-cta { margin-top: auto; }
+.prod-cta { margin-top: auto; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 @media (max-width: 760px) { .prod-grid { grid-template-columns: 1fr; } }
 
 /* ── Three steps ── */
@@ -312,7 +312,7 @@
         <li>They sign with the link from that email. Signing an invitation needs no account.</li>
         <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
       </ul>
-      <div class="prod-cta"><a class="btn btn-lime" href="/sign">Sign a document</a></div>
+      <div class="prod-cta"><a class="btn btn-lime" href="/parasign">What ParaSign is</a><a class="btn home-act-ghost" href="/sign">Sign a document</a></div>
     </li>
     <li>
       <span class="prod-name">ParaSend</span>
@@ -322,7 +322,7 @@
         <li>The relay only ever holds the encrypted blob in RAM, never on a disk.</li>
         <li>It is burned on the first read, so there is nothing left to leak later.</li>
       </ul>
-      <div class="prod-cta"><a class="btn home-act-ghost" href="/parashare">Send a file</a></div>
+      <div class="prod-cta"><a class="btn btn-lime" href="/parasend">What ParaSend is</a><a class="btn home-act-ghost" href="/parashare">Send a file</a></div>
     </li>
   </ul>
 </section>
@@ -363,9 +363,9 @@
       <h3>ParaSign</h3>
       <p class="price-sub">Getting documents signed.</p>
       <ul class="tiers">
-        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 2 signatures per month, unlimited receiving</span></li>
-        <li><span class="tier-price">&euro;49</span><span class="tier-what"><b>Pro</b> &middot; 100 signatures per month, then &euro;0.40 each up to 1,000</span></li>
-        <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures per month, named support, exportable audit log</span></li>
+        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 2 signatures a month, no limit on receiving</span></li>
+        <li><span class="tier-price">&euro;49</span><span class="tier-what"><b>Pro</b> &middot; 100 signatures a month, then &euro;0.40 each up to 1,000</span></li>
+        <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures a month, named support, exportable audit log</span></li>
         <li><span class="tier-price">Talk</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, SLA with service credits, self-hosting licence</span></li>
       </ul>
       <p class="price-foot">&euro;59.29 and &euro;361.79 per month incl. 21% btw &middot; yearly is cheaper</p>
