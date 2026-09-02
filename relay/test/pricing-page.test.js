@@ -164,20 +164,19 @@ for (const s of ['2 signatures per month', '100 signatures per month, then &euro
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
 ok('parasign.html carries the same quota lines and the btw convention');
 
-// The free plan is called Community on /parasign, because that is what it is:
-// a give-back, not a trial. /pricing lists the same plan under the name Free
-// (PR #328 introduces the Community wording on the homepage the same way). Two
-// names for one plan is fine only while the page says so; a visitor who goes
-// looking for "Community" on the pricing page and finds four tiers, none of
-// them called that, has been sent on a walk. So: if /parasign says Community,
-// it must also name the tier /pricing sells, and /pricing must still sell it.
-if (/\bCommunity\b/.test(parasignHtml)) {
-  assert(/tier named <strong>Free<\/strong>/.test(parasignHtml),
-    'parasign.html calls the free plan Community, so it must also name the /pricing tier it maps to');
-  assert(/>\s*Free\s*</.test(html),
-    '/pricing must actually carry a tier named Free for that bridge to be true');
-  ok('parasign.html bridges Community to the tier /pricing calls Free');
-}
+// The free plan is called Community, full stop: on /parasign, on /pricing, on
+// the homepage and on the dashboard badge. It used to need a bridge sentence
+// ("this plan is the tier named Free") because /pricing disagreed with every
+// other page; PR #328 renamed the tier instead, so the bridge is gone and the
+// gate checks the thing that actually has to hold. A visitor who reads
+// "Community" and goes looking for it on the pricing page must find it there.
+assert(/<div class="tier-name">Community<\/div>/.test(html),
+  '/pricing must carry a tier named Community');
+assert(!/<div class="tier-name">Free<\/div>/.test(html),
+  '/pricing must not name a tier Free any more; the plan is called Community');
+assert(!/tier named <strong>Free<\/strong>|tier is called Free/.test(parasignHtml),
+  'parasign.html must not explain Community away as Free; one name, one page');
+ok('Community is the one name for the free plan on /pricing and /parasign');
 
 // Every tier name the product page prints must be a tier /pricing sells, so the
 // two pages cannot drift into different product line-ups.

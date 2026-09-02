@@ -194,7 +194,11 @@ assert.ok(/<div class="tier-name">Community<\/div>/.test(pricing),
   '/pricing must name its free tiers Community');
 assert.doesNotMatch(pricing, /<div class="tier-name">Free<\/div>/,
   '/pricing must not have a tier named Free any more');
-for (const [label, html] of [['index.html', home], ['dashboard.html', read('frontend/dashboard.html')]]) {
+for (const [label, html] of [
+  ['index.html', home],
+  ['dashboard.html', read('frontend/dashboard.html')],
+  ['parasign.html', read('frontend/parasign.html')],
+]) {
   assert.doesNotMatch(html, /tier named <strong>Free<\/strong>|tier is called Free|the free plan\b/i,
     `${label} must not call the Community plan Free`);
 }
