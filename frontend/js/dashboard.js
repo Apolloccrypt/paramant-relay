@@ -88,9 +88,11 @@
     txt('plan',         planName);
     txt('plan-strong',  planName);
 
-    // A free plan gets one visible way up. A paid plan does not need selling to.
-    var upgrade = root.querySelector('[data-dh="upgrade-link"]');
-    if (upgrade) upgrade.hidden = !FREE_PLANS[planId];
+    // A free plan gets one visible way up, and it is told what it is on: the
+    // Community plan is a gift, not a trial, and the business plans are what
+    // pays for it. A paying customer never sees the band.
+    var community = root.querySelector('#dh-community');
+    if (community) community.hidden = !FREE_PLANS[planId];
     txt('created',      fmtDate(data.created_at));
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));

@@ -38,8 +38,14 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-hero h1 small { display: block; font-size: 14px; font-weight: 400; color: var(--ink-dim); margin-top: var(--space-1); letter-spacing: 0; }
 .dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 4px 10px; border: 1px solid var(--ink-hair); border-radius: 999px; background: var(--bone); }
 .dh-hero .dh-plan strong { color: var(--ink); font-weight: 600; }
-.dh-hero .dh-plan-up { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 1px; }
-.dh-hero .dh-plan-up:hover { color: var(--navy); }
+.dh-community { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); background: #0a1626; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); border-radius: 10px; padding: var(--space-5); margin-bottom: var(--space-6); }
+.dh-community > div { flex: 1 1 340px; }
+.dh-community-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #B2FF3F; }
+.dh-community-lede { margin: 0 0 var(--space-3); font-size: 15px; line-height: 1.6; color: #F8FAFC; }
+.dh-community-lede a { color: #B2FF3F; text-decoration: none; border-bottom: 1px solid rgba(178,255,63,.5); }
+.dh-community-adds { margin: 0; font-size: 13px; line-height: 1.6; color: rgba(248,250,252,.72); }
+.dh-community-cta { flex: 0 0 auto; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #0a1626; background: #B2FF3F; text-decoration: none; padding: 10px 16px; border-radius: 4px; }
+.dh-community-cta:hover { background: #F8FAFC; }
 .dh-start-kicker { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .75; }
 
 /* Onboarding hint (ParaPear, dismissible once) */
@@ -295,8 +301,21 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
         <h1 id="dh-h1">Important documents, under control.</h1>
         <p class="dh-mission">ParaSign gets a document signed. ParaSend sends a file that burns on read. Both run on servers in Germany.</p>
       </div>
-      <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span><a class="dh-plan-up" href="/pricing" data-dh="upgrade-link" hidden>Upgrade</a></span>
+      <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
     </header>
+
+    <!-- The one thing a free account should be told, in the words the homepage
+         uses: this is the Community plan, it is a gift and not a trial, and the
+         business plans are what pays for it. Shown by dashboard.js only while
+         the account is on a free plan, so a paying customer is never sold to. -->
+    <aside class="dh-community" id="dh-community" aria-label="Your plan" hidden>
+      <div>
+        <p class="dh-community-kicker">Community &middot; &euro;0</p>
+        <p class="dh-community-lede">You are on the free plan, and it stays free. It is Paramant's contribution back: signing and sending that does not route through an American cloud. On <a href="/pricing">the pricing page</a> this tier is called Free.</p>
+        <p class="dh-community-adds">The business plans add volume (100 or 1,000 signatures a month instead of 2), longer link expiry, send history and webhooks, named support, an exportable audit log, and on Enterprise a dedicated relay with a signed DPA.</p>
+      </div>
+      <a class="dh-community-cta" href="/pricing">See the business plans &rarr;</a>
+    </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
          usage_purpose: null. Answering or skipping posts to

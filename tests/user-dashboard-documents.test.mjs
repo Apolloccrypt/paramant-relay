@@ -57,9 +57,17 @@ await page.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
 await page.locator('#dh-root:not([hidden])').waitFor();
 await page.waitForFunction(() => document.querySelectorAll('.dh-document').length === 2);
 const mainText = await page.locator('main').innerText();
-ok('mission is the first dashboard promise', /Important documents, under control/.test(mainText) && /Send, sign and prove important documents/.test(mainText), mainText.slice(0, 220));
+// The mission line used to read "Send, sign and prove important documents.
+// Private by design." It now names the two products we actually sell, in the
+// same words the homepage uses, because a customer who has just signed up
+// should be able to map what is on screen onto what he read before signing up.
+ok('mission is the first dashboard promise', /Important documents, under control/.test(mainText) && /ParaSign gets a document signed/.test(mainText) && /ParaSend sends a file that burns on read/.test(mainText), mainText.slice(0, 220));
 ok('dashboard leads with three plain-language actions', await page.locator('.dh-start-card').count() === 3, await page.locator('.dh-start').innerText());
-ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/sign?mode=alone', await page.locator('.dh-start').innerText());
+// The order changed on purpose: the two PRODUCTS lead, so ParaSend is second
+// and signing alone is third. On a 390px screen the old order put both
+// ParaSign modes above the fold and pushed ParaSend out of sight, which made
+// the dashboard disagree with a homepage that sells two things.
+ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/parashare' && await page.locator('.dh-start-card').nth(2).getAttribute('href') === '/sign?mode=alone', await page.locator('.dh-start').innerText());
 ok('open filter shows waiting and in-progress documents', await page.locator('.dh-document').count() === 2 && /Waiting for signatures/.test(await page.locator('#dh-documents').innerText()) && /In progress/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
 ok('relay document counts fill every filter', await page.locator('[data-doc-count="open"]').innerText() === '2' && await page.locator('[data-doc-count="completed"]').innerText() === '1' && await page.locator('[data-doc-count="cancelled"]').innerText() === '1' && await page.locator('[data-doc-count="all"]').innerText() === '4', await page.locator('.dh-filters').innerText());
 ok('normal dashboard no longer loads developer operations', overviewRequests === 0 && !/API keys|More tools|Operations/.test(mainText), overviewRequests);

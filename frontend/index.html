@@ -45,6 +45,29 @@
 .home-state[hidden] { display: none; }
 .hero-note { margin: var(--space-4) 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
 
+/* ── The split that comes before every other argument: a free Community plan
+   that is given away, and the business plans that pay for it. ── */
+.home-split-sec { border-top: 0; padding-top: var(--space-3); }
+.split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.split-card { display: flex; flex-direction: column; padding: var(--space-5); border: 1px solid var(--ink-hair); }
+.split-free { background: #0a1626; border-color: transparent; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
+.split-paid { background: #fff; border-top: 2px solid var(--cobalt); }
+.split-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.split-free .split-kicker { color: #B2FF3F; }
+.split-card h3 { font-size: 22px; line-height: 1.15; letter-spacing: -0.018em; color: var(--navy); margin: 0 0 var(--space-3); }
+.split-free h3 { color: #F8FAFC; }
+.split-card p { font-size: 14px; line-height: 1.6; color: var(--ink-dim); margin: 0 0 var(--space-3); }
+.split-free p { color: rgba(248,250,252,.78); }
+.split-card strong, .split-card b { color: var(--navy); font-weight: 600; }
+.split-free strong { color: #F8FAFC; }
+.split-person { border-top: 1px solid rgba(248,250,252,.18); padding-top: var(--space-3); }
+.split-org { font-family: var(--mono); font-size: 11px; line-height: 1.6; letter-spacing: .02em; }
+.split-adds { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.split-adds li { position: relative; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 10px; }
+.split-adds li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 2px; background: var(--cobalt); }
+.split-cta { margin-top: auto; }
+@media (max-width: 760px) { .split-grid { grid-template-columns: 1fr; } }
+
 /* ── Shared section furniture ── */
 .home-sec { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
 .sec-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
@@ -214,7 +237,7 @@
       <a class="btn btn-lime" href="/sign">Sign a document</a>
       <a class="btn home-act-ghost" href="/pricing">See pricing</a>
     </div>
-    <p class="hero-note">Free to start &middot; no card required &middot; the person you invite needs no account</p>
+    <p class="hero-note">Free on the Community plan &middot; business plans from &euro;15 a month &middot; the person you invite needs no account</p>
   </div>
   <div class="home-state" data-home="in" hidden>
     <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
@@ -223,6 +246,37 @@
       <a class="btn btn-lime" href="/dashboard">Open documents</a>
       <a class="btn home-act-ghost" href="/sign">Start signing</a>
       <a class="btn home-act-ghost" href="/parashare">Send securely</a>
+    </div>
+  </div>
+</section>
+
+<section class="home-sec home-split-sec" aria-labelledby="split-h">
+  <div class="sec-intro">
+    <p class="sec-eyebrow"><span></span>why there are two kinds of plan</p>
+    <h2 id="split-h">One half is a gift. The other half pays for it.</h2>
+    <p class="sec-lede">That split is the whole idea, so it goes first. Everything further down this page is either the free half or the paid half.</p>
+  </div>
+  <div class="split-grid">
+    <div class="split-card split-free">
+      <p class="split-kicker">Community &middot; &euro;0</p>
+      <h3>Free, because it is meant to be.</h3>
+      <p>Anyone can sign a document and send a file safely, with no card and no time limit. On the pricing page this is the tier named <strong>Free</strong>; Community is what we call it here.</p>
+      <p>It is not a trial and it is not a funnel. It is what Paramant gives back: signing and sending that does not route through an American cloud, available to whoever needs it.</p>
+      <p class="split-person">Paramant is built by <strong>Mick Beer</strong>, privacy and security researcher and founder of Paramantis Solutions B.V. The Community plan is his contribution back to the society the tools came from.</p>
+      <p class="split-org">Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</p>
+      <div class="split-cta"><a class="btn btn-lime" href="/sign">Sign a document</a></div>
+    </div>
+    <div class="split-card split-paid">
+      <p class="split-kicker">Business plans &middot; from &euro;15 a month</p>
+      <h3>Organisations that need more, buy it.</h3>
+      <p>Paid plans are what keeps the free half free. The tiers are exactly the ones on the pricing page: <strong>Pro</strong> and <strong>Enterprise</strong> for ParaSend, <strong>Pro</strong>, <strong>Business</strong> and <strong>Enterprise</strong> for ParaSign.</p>
+      <ul class="split-adds">
+        <li><b>Volume.</b> 100 or 1,000 signatures a month instead of 2, and links that live 24 hours or 7 days instead of 1.</li>
+        <li><b>Control.</b> Send history and link management, webhooks on upload and download, up to 50 registered devices, no IP rate limit.</li>
+        <li><b>Accountability.</b> Named support with a reply within one business day, an exportable audit log with CT tree head, help answering your customers' security questionnaires.</li>
+        <li><b>Your own relay.</b> Enterprise adds a dedicated or sector relay, a signed Data Processing Agreement, SLA 99.9% and a self-hosting licence.</li>
+      </ul>
+      <div class="split-cta"><a class="btn home-act-ghost" href="/pricing">See the business plans</a></div>
     </div>
   </div>
 </section>

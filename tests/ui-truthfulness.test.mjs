@@ -128,5 +128,31 @@ const hero = (dashboard.match(/<header class="dh-hero"[\s\S]*?<\/header>/) || ['
 assert.doesNotMatch(hero, /data-dh="email"/,
   'the dashboard hero must not repeat the email address the nav already shows');
 
+// 4. "Community" is the word Mick uses for the free plan and the ID the relay
+// stores. It is NOT a tier on /pricing, where the free tier is called Free.
+// The homepage may lead with Community, but only while it also says which
+// pricing-page tier that is, or the visitor lands on /pricing looking for a
+// plan name that is not there. Same failure the dashboard badge had.
+if (/\bCommunity\b/.test(home)) {
+  assert.match(home, /tier named <strong>Free<\/strong>|tier is called Free|called <strong>Free<\/strong>/,
+    'index.html calls the free plan Community, so it must also name the /pricing tier it maps to');
+  assert.ok(/>\s*Free\s*</.test(pricing),
+    '/pricing must actually carry a tier named Free for that bridge to be true');
+}
+
+// 5. The founder line is on the homepage now. It may say exactly what /about
+// already says and nothing more, because a biography is the easiest thing on a
+// sales page to embellish and the hardest for a reader to check.
+const about = read('frontend/about.html');
+for (const claim of ['Mick Beer', 'privacy and security researcher', 'Paramantis Solutions B.V.']) {
+  if (home.includes(claim)) {
+    assert.ok(about.includes(claim),
+      `index.html claims "${claim}" about the founder, but /about does not say it`);
+  }
+}
+assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
+  'if the homepage names the founder it must also name the accountable company registration');
+
 console.log('ui-truthfulness: the homepage does not overclaim signatures and quotes the real prices');
+console.log('ui-truthfulness: Community is bridged to the Free tier and the founder line matches /about');
 console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');
