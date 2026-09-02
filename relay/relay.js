@@ -1615,11 +1615,17 @@ let inFlightInbound = 0;
 // ── Per-key outbound rate limiting (finding #12) ──────────────────────────────
 // Limits how fast a key holder can burn blobs via /v2/outbound — reduces
 // ability to probe or burn other users' blobs via intercepted download tokens.
-const OUTBOUND_RATE = { free: 50, pro: 500, enterprise: Infinity };
+// The ceiling per tier lives in lib/tiers.js (outbound_per_hour) with every
+// other per-tier number. It used to be a local three-key table keyed on the raw
+// plan string, { free, pro, enterprise }, with a `?? free` fallback: 'community'
+// and 'business' were not in it, so a Business account, which pays for the
+// highest volume of all, was rate limited at the free 50 per hour. tiers.js
+// normalises the plan name (free/dev -> community, licensed -> enterprise), so
+// every plan the pricing page sells now resolves to its own ceiling.
 const OUTBOUND_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour sliding window
 const outboundRateMap = new Map(); // apiKey → { count, resetAt }
 function outboundRateOk(apiKey, plan) {
-  const max = OUTBOUND_RATE[plan] ?? OUTBOUND_RATE.free;
+  const max = tiers.tierLimitNum(plan, 'outbound_per_hour');
   if (max === Infinity) return true;
   const now = Date.now();
   let c = outboundRateMap.get(apiKey);
@@ -4399,14 +4405,17 @@ const server = http.createServer(async (req, res) => {
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      // Per-tier view TTL ceiling -- single source of truth in lib/tiers.js.
-      // Falls back to community ceiling when the plan is missing or unrecognised.
+      // Per-tier ceilings -- single source of truth in lib/tiers.js. ONE default
+      // for both, and it is the strictest one. The two used to disagree a line
+      // apart: the TTL fell back to 'community' and max_views to 'pro', so a key
+      // with no plan was held to the community link lifetime and handed the Pro
+      // read count at the same time. A missing plan is not evidence of a paid
+      // one, so both fall to community.
       const _plan = keyData?.plan || 'community';
       const _maxTtl = tiers.tierLimitNum(_plan, 'view_ttl_ms');
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
       // Access policies: max_views (default 1 = burn-on-read) + Argon2id password.
-      // Per-tier max_views ceiling also lives in lib/tiers.js now.
-      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(keyData?.plan || 'pro', 'max_views') || 1));
+      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(_plan, 'max_views') || 1));
       let pw_hash = null;
       if (password) {
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }

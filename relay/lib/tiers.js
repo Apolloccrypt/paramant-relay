@@ -13,6 +13,12 @@
 //     _planMaxTtl   dev=1h,  pro=24h, enterprise=7d
 //     _planMaxViews free=1,  pro=10,  enterprise=100
 //     MAX_BLOB      5 MB (global, today)
+//     OUTBOUND_RATE free=50/h, pro=500/h, enterprise=unlimited
+//
+//   Every one of those legacy tables was keyed on THREE plan names and fell
+//   back to the free row for anything else, so `business` silently got the free
+//   ceiling. That is why the numbers live here: this table has a row per tier
+//   the pricing page sells, and normalisePlan maps the aliases onto it.
 //   So this refactor is a refactor, not a behaviour change.
 //
 //   For dimensions Mick stated in the tier-foundation brief (transfers_month,
@@ -42,6 +48,7 @@ const TIER_LIMITS = Object.freeze({
     devices: 5,            // mirrors legacy _pubkeyMax.free
     view_ttl_ms: 3_600_000, // mirrors legacy _planMaxTtl.dev (1 h)
     max_views: 1,          // mirrors legacy _planMaxViews.free (burn-on-read)
+    outbound_per_hour: 50,  // mirrors legacy OUTBOUND_RATE.free
   }),
   pro: Object.freeze({
     transfers_month: 500,
@@ -50,6 +57,7 @@ const TIER_LIMITS = Object.freeze({
     devices: 50,           // mirrors legacy _pubkeyMax.pro; brief says 10 once policy bump
     view_ttl_ms: 86_400_000, // 24 h
     max_views: 10,
+    outbound_per_hour: 500,  // mirrors legacy OUTBOUND_RATE.pro
   }),
   business: Object.freeze({
     transfers_month: 2000,
@@ -58,6 +66,8 @@ const TIER_LIMITS = Object.freeze({
     devices: 100,
     view_ttl_ms: 604_800_000, // 7 d
     max_views: 25,
+    outbound_per_hour: 2000, // its transfers_month; never below pro, which is
+                             // what the old table did by leaving it out
   }),
   enterprise: Object.freeze({
     transfers_month: UNLIMITED,
@@ -66,6 +76,7 @@ const TIER_LIMITS = Object.freeze({
     devices: UNLIMITED,
     view_ttl_ms: 604_800_000, // 7 d  (legacy enterprise ceiling)
     max_views: 100,
+    outbound_per_hour: UNLIMITED, // mirrors legacy OUTBOUND_RATE.enterprise
   }),
 });
 

@@ -28,6 +28,12 @@ const { summary } = require('./_requires');
 const PRO = 'pgp_pro_key_for_the_transfer_suite';
 const COMMUNITY = 'pgp_community_key_for_the_transfer_suite';
 const OTHER = 'pgp_other_tenant_key_for_the_transfer_suite';
+// A key with NO plan field at all. Real users.json entries in this shape exist:
+// every key minted before the plan field did, plus anything an import wrote.
+const NOPLAN = 'pgp_no_plan_key_for_the_transfer_suite';
+// A Business account. It is the tier the pricing page sells for the highest
+// volume, and the one the old three-key outbound table left out entirely.
+const BUSINESS = 'pgp_business_key_for_the_transfer_suite';
 
 let srv;
 let checks = 0;
@@ -57,6 +63,8 @@ before(async () => {
         { key: PRO, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_pro' },
         { key: COMMUNITY, plan: 'community', active: true, email: 'com@example.test', account_id: 'acct_com' },
         { key: OTHER, plan: 'pro', active: true, email: 'other@example.test', account_id: 'acct_other' },
+        { key: NOPLAN, active: true, email: 'noplan@example.test', account_id: 'acct_noplan' },
+        { key: BUSINESS, plan: 'business', active: true, email: 'biz@example.test', account_id: 'acct_biz' },
       ],
     },
   });
@@ -218,6 +226,75 @@ test('the TTL is clamped to the tier ceiling: community 1 hour, pro 24 hours', a
   // A request below the ceiling is honoured as asked.
   const small = await upload(PRO, blob('ttl-small'), { ttl_ms: 30_000 });
   assert.strictEqual(small.json.ttl_ms, 30_000);
+  did();
+});
+
+test('a key with no plan is held to ONE ceiling, the strictest, on both dimensions', async () => {
+  // The two ceilings are taken one line apart and used to disagree about what a
+  // missing plan means: the TTL fell back to 'community' (1 hour) and max_views
+  // to 'pro' (10 reads). So an unplanned key got the community link lifetime and
+  // the Pro read count in the same upload. A missing plan is not evidence of a
+  // paid one, so both must land on community: 1 hour, 1 read.
+  const week = 7 * 86_400_000;
+  const t = await upload(NOPLAN, blob('noplan-ttl'), { ttl_ms: week });
+  assert.strictEqual(t.status, 200, t.text);
+  assert.strictEqual(t.json.ttl_ms, 3_600_000, 'the TTL ceiling for a missing plan is the community hour');
+
+  const v = blob('noplan-views');
+  assert.strictEqual((await upload(NOPLAN, v, { max_views: 10 })).status, 200);
+  const first = await download(NOPLAN, v.hash);
+  assert.strictEqual(first.status, 200);
+  assert.strictEqual(first.headers['x-paramant-burned'], 'true',
+    'and the views ceiling is the community one too: the first read is the last');
+  assert.strictEqual((await download(NOPLAN, v.hash)).status, 404,
+    'a missing plan must not quietly buy the pro ceiling of 10 reads');
+  did();
+});
+
+test('a Business key is not rate limited at the free 50 downloads per hour', async () => {
+  // relay.js:1607 used to hold its own three-key table, { free, pro,
+  // enterprise }, keyed on the raw plan string with a `?? free` fallback.
+  // 'business' was not a key in it, so a Business account, which pays for the
+  // highest volume of all, was capped at the free 50 per hour. The ceiling now
+  // comes from lib/tiers.js (outbound_per_hour), which has a row per tier and
+  // normalises the aliases, so the 51st download goes through.
+  const tiers = require('../lib/tiers');
+  const FREE_CEILING = tiers.tierLimitNum('community', 'outbound_per_hour');
+  assert.strictEqual(FREE_CEILING, 50, 'the free ceiling this test is measuring against');
+  assert.ok(tiers.tierLimitNum('business', 'outbound_per_hour') > FREE_CEILING,
+    'business must buy more outbound than community, not the same');
+
+  for (let i = 1; i <= FREE_CEILING + 1; i++) {
+    const b = blob(`biz-${i}`);
+    assert.strictEqual((await upload(BUSINESS, b)).status, 200, `upload ${i}`);
+    const r = await download(BUSINESS, b.hash);
+    assert.strictEqual(r.status, 200,
+      `download ${i} of ${FREE_CEILING + 1}: a Business key must not hit the free hourly ceiling`);
+  }
+  did();
+});
+
+test('every tier the pricing page sells has its own outbound ceiling, and they only go up', async () => {
+  // The regression this pins is a table with a hole in it. Any tier missing
+  // from lib/tiers.js falls back to the community row, which is how 'business'
+  // silently got the free rate for as long as the local table existed.
+  const tiers = require('../lib/tiers');
+  const ladder = ['community', 'pro', 'business', 'enterprise'];
+  assert.deepStrictEqual(Object.keys(tiers.TIER_LIMITS), ladder,
+    'the tier list this assertion walks must be the whole tier list');
+  let previous = 0;
+  for (const tier of ladder) {
+    const raw = tiers.tierLimit(tier, 'outbound_per_hour');
+    assert.notStrictEqual(raw, null, `${tier} has no outbound_per_hour, so it silently gets the community rate`);
+    const rate = tiers.tierLimitNum(tier, 'outbound_per_hour');
+    assert.ok(rate > previous, `${tier} must buy more outbound than the tier below it, got ${rate} after ${previous}`);
+    previous = rate;
+  }
+  // And the aliases the relay really sees on a key record resolve to a row.
+  for (const [alias, canonical] of [['free', 'community'], ['dev', 'community'], ['licensed', 'enterprise']]) {
+    assert.strictEqual(tiers.tierLimitNum(alias, 'outbound_per_hour'), tiers.tierLimitNum(canonical, 'outbound_per_hour'),
+      `the legacy plan name ${alias} must resolve to the ${canonical} ceiling`);
+  }
   did();
 });
 
