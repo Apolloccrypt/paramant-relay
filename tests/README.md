@@ -13,7 +13,7 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 | `tests/auth-smoke.sh` | `deploy.sh` step 4 | 21 live HTTP assertions against production |
 | `deploy.sh` | manual deploy | Chains: sanity → build → health wait → smoke |
 | `tests/version-consistency.test.mjs` | Root integration suites | One version in one place: root `package.json` versus the relay and admin packages, both lockfiles, both image labels, the `VERSION` read in `relay.js`, the CHANGELOG section and the deploy check. Four places once gave three answers; see [docs/RELEASE.md](../docs/RELEASE.md) |
-| `tests/env-documented.test.mjs` | Root integration suites | Every `process.env` name the relay or admin reads must be in [deploy/.env.example](../deploy/.env.example) with a purpose, a default and the file that reads it, and nothing may be documented there that no code reads. 40 of 57 were undocumented on 2026-09-02 |
+| `tests/env-documented.test.mjs` | Root integration suites | Every `process.env` name the relay or admin reads must be in [deploy/.env.example](../deploy/.env.example) with a purpose, a default and the file that reads it. Nothing may be documented there that no code reads, and every `read in:` pointer must name a file that exists and mentions the variable. 40 of 57 were undocumented on 2026-09-02 |
 
 ## Running manually
 

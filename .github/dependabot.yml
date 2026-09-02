@@ -21,7 +21,7 @@ updates:
       - "dependencies"
       - "admin"
 
-  # Docker – relay image base (node:22-alpine / rust builder).
+  # Docker: relay image base (node:24-alpine / rust builder).
   # Was "/fly-relay", a path that no longer exists in this repo, so the
   # docker updater silently watched nothing. Point it at the real Dockerfiles.
   - package-ecosystem: "docker"

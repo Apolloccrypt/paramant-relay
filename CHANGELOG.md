@@ -172,11 +172,13 @@ decision:
   `node:24-alpine3.24`, which also matches the Alpine of the
   `rust:1.98-alpine` builder stage that compiles the musl binding.
 - Every environment variable is written down. `deploy/.env.example` documents all
-  77 (72 read by the relay or the admin panel, 5 consumed by compose or the
-  installer), each with a purpose, required-or-optional, its default and the
-  file that reads it. It documented three; the code read 57 names, 40 of them
-  written down nowhere. `tests/env-documented.test.mjs` fails the build on the
-  next undocumented one, and on documentation for a variable nothing reads.
+  77: the 72 the relay or the admin panel reads, plus 5 that docker-compose, the
+  deploy scripts or the self-host installers consume. Each with a purpose,
+  required-or-optional, its default and the file that reads it. It documented
+  three; the code read 57 names, 40 of them written down nowhere.
+  `tests/env-documented.test.mjs` fails the build on the next undocumented one,
+  on documentation for a variable nothing reads, and on a `read in:` pointer
+  naming a file that does not exist or never mentions the variable.
 - A release process that exists on paper and in the repo: `docs/RELEASE.md`.
   `docs/PROJECT-STATUS.md`, which declared itself obsolete in its own second
   line, points at the CHANGELOG and that document instead.

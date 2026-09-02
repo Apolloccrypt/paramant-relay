@@ -169,16 +169,28 @@ document; until it is made, `deploy/DEPLOY-3.1.md` is what actually happens.
 scripts/post-deploy-verify.sh https://paramant.app http://127.0.0.1:3000
 ```
 
-It reads the expected version from `relay/package.json`, so a version mismatch
-between the tag and what `/health` answers is a failing check rather than
-something anyone has to notice.
+Be precise about what that proves. The script compares the version `/health`
+returns against the version in the `relay/package.json` **of the checkout you
+run it from**. It does not read the tag. Run from a checkout of `v3.1.0`, tag
+and `package.json` agree by construction (that is what
+`tests/version-consistency.test.mjs` guarantees), so the comparison cannot
+catch a tag-versus-package mismatch. What it does catch is the failure that
+actually happens: production still serving an older build after a deploy that
+looked like it worked. So run it from the tag you just deployed, and a
+disagreement means the deploy did not land, not that the tag is wrong.
+
+Nothing here compares the running image digest against the digest the tag
+published. That check needs production access and does not exist yet; it is in
+"What still is not automated" below.
 
 ### 9. Afterwards
 
-- Bump `RELAY_VERSION` in `install.sh` (and the copies in `frontend/`) to the
-  new tag, so a self-host install clones the release rather than an older one.
-  Do this *after* the tag exists; doing it before points the installer at a tag
-  nobody can clone.
+- Bump the `RELAY_VERSION` fallback pin in all three installers to the new tag,
+  so a self-host install clones the release rather than an older one:
+  `install.sh`, `frontend/install.sh` and `frontend/install-pi.sh`. All three
+  read `PARAMANT_VERSION` with their own default, and check 9 of
+  `tests/static-sanity.sh` holds them to that shape. Do this *after* the tag
+  exists; doing it before points the installer at a tag nobody can clone.
 - If anything in `deploy/.env.example` changed, say so in the CHANGELOG under a
   migration note. Self-hosters read that file, not the diff.
 

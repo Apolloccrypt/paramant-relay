@@ -28,10 +28,10 @@ const ENV_EXAMPLE = 'deploy/.env.example';
 // needs a reason, because "documented but dead" is its own kind of wrong.
 const NOT_READ_BY_NODE = {
   LOG_LEVEL: 'consumed by docker-compose.yml only; the relay logs at a fixed level',
-  HTTP_PORT: 'docker-compose.yml port mapping for the nginx container',
-  HTTPS_PORT: 'docker-compose.yml port mapping for the nginx container',
+  HTTP_PORT: 'read by deploy/preflight.sh and deploy/post-install.sh, both shell',
+  HTTPS_PORT: 'read by deploy/preflight.sh and deploy/post-install.sh, both shell',
   ADMIN_TOTP_SECRET: 'passed to the relays by docker-compose.yml, read by nothing (see the note in the file)',
-  PARAMANT_VERSION: 'install.sh only: which git tag the self-host installer clones',
+  PARAMANT_VERSION: 'which git tag the three self-host installers clone; all shell',
 };
 
 // ── what the code reads ──────────────────────────────────────────────────────
@@ -105,26 +105,73 @@ test('E3 every entry in NOT_READ_BY_NODE really is absent from the code', () => 
     'Drop them from NOT_READ_BY_NODE.');
 });
 
-test('E4 each documented variable carries a one-line explanation above it', () => {
-  // A bare NAME= is not documentation. Every assignment must be preceded by a
-  // comment block, and that block must say where the value is read.
+// Pairs each documented variable with the comment block directly above it.
+function documentedBlocks() {
   const lines = exampleText.split('\n');
-  const bad = [];
+  const out = [];
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^#?\s*([A-Z][A-Z0-9_]*)=/);
     if (!m) continue;
-    // Walk back over the comment block directly above this assignment.
     let j = i - 1;
     let block = '';
     while (j >= 0 && /^#/.test(lines[j]) && !/^#\s*[A-Z][A-Z0-9_]*=/.test(lines[j])) {
       block = lines[j] + '\n' + block;
       j--;
     }
-    if (!/\bread in:/.test(block)) bad.push(`line ${i + 1}: ${m[1]}`);
+    out.push({ name: m[1], line: i + 1, block });
   }
+  return out;
+}
+
+test('E4 each documented variable carries a one-line explanation above it', () => {
+  // A bare NAME= is not documentation. Every assignment must be preceded by a
+  // comment block, and that block must say where the value is read.
+  const bad = documentedBlocks()
+    .filter((b) => !/\bread in:/.test(b.block))
+    .map((b) => `line ${b.line}: ${b.name}`);
   assert.deepEqual(bad, [],
     `Each variable in ${ENV_EXAMPLE} needs a comment block above it ending in a ` +
     '"read in: <file>" line, so the reader can go look at what actually uses it.');
+});
+
+test('E6 every file named in a "read in:" line exists and mentions the variable', () => {
+  // Without this, "read in:" is a claim nobody checks, and a wrong pointer is
+  // worse than none: it sends the reader to the wrong file with confidence.
+  // Two of these lines were wrong on the first pass. HTTP_PORT and HTTPS_PORT
+  // were credited to docker-compose.yml, which does not read them and has no
+  // nginx service at all; they live in deploy/preflight.sh and
+  // deploy/post-install.sh. PARAMANT_VERSION named install.sh alone while
+  // frontend/install.sh and frontend/install-pi.sh read it too.
+  const bad = [];
+  for (const { name, line, block } of documentedBlocks()) {
+    const m = block.match(/^#\s*read in:\s*(.+)$/m);
+    if (!m) continue; // E4 reports a missing line; this test only checks the ones that exist.
+    const targets = m[1]
+      .replace(/\([^)]*\)/g, '')           // drop asides like "(and nothing else)"
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => /\.(js|mjs|sh|yml|yaml|json)$/.test(t));
+    if (targets.length === 0) {
+      bad.push(`line ${line}: ${name} names no file in its "read in:" line`);
+      continue;
+    }
+    for (const t of targets) {
+      let src;
+      try {
+        src = readFileSync(join(ROOT, t), 'utf8');
+      } catch {
+        bad.push(`line ${line}: ${name} points at ${t}, which does not exist`);
+        continue;
+      }
+      // Whole word: PORT must not be satisfied by HTTP_PORT.
+      if (!new RegExp(`\\b${name}\\b`).test(src)) {
+        bad.push(`line ${line}: ${name} points at ${t}, which never mentions it`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [],
+    `Wrong "read in:" pointers in ${ENV_EXAMPLE}. Each named file must exist ` +
+    'and contain the variable name. Run grep before writing the line down.');
 });
 
 test('E5 the count in the file header matches the number of variables documented', () => {
