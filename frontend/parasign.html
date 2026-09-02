@@ -78,8 +78,16 @@
    purpose: design-system.css is shared with pages this PR does not touch. */
 @media(max-width:640px){
   .ps-hero{padding-top:var(--space-6)}
-  #main-content .sec-head{grid-template-columns:1fr;row-gap:var(--space-2)}
+  /* The hero runs headline, lede, who, buttons, price line, SES note. The house
+     .sec-head parks 64px of margin under its rule and .ps-actions takes another
+     32px on top, which on a 390x844 phone pushed the sentence that says a
+     ParaSign signature is a Simple Electronic Signature to y=863, 19px past the
+     fold (tests/first-screen.test.mjs). Both gaps shrink here, on this page and
+     this width only. Not a word of the note changes: it is the sentence pinned
+     as SES in tests/ui-truthfulness.test.mjs and repeated at about.html:254. */
+  #main-content .sec-head{grid-template-columns:1fr;row-gap:var(--space-2);margin-bottom:var(--space-5)}
   #main-content .sec-head .num{font-size:var(--text-xl);line-height:1}
+  #main-content .ps-actions{margin-top:var(--space-5)}
 }
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
