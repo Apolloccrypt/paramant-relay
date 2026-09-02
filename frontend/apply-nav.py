@@ -49,6 +49,13 @@ NEW_FOOTER = '''\
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
         <div class="footer-col-label">Legal</div>
         <div class="footer-links">
           <a href="/privacy">Privacy Policy</a>
@@ -62,7 +69,15 @@ NEW_FOOTER = '''\
   </div>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=22">'
+# Pages with the shared nav but no footer (auth, account, download, signup)
+# still owe the visitor the three legal documents. One line, three links, no
+# second navigation.
+LEGAL_STRIP = '''\
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+</footer>'''
+
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=23">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=19">'
 NAV_JS    = '<script src="/nav.js?v=14" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=5" defer></script>'
@@ -88,6 +103,26 @@ KEEP_OWN_NAV = {
     'co-sign.html',
     'developer.html',
 }
+
+
+def inject_legal_strip(html):
+    """Give footerless pages one line with privacy, dpa and terms.
+
+    Pages that already carry a real <footer> keep it. The strip uses
+    <footer class="legal-strip">, which the plain <footer> replacement above
+    never matches, so stamping stays idempotent and edits here still
+    propagate on the next run."""
+    if 'class="legal-strip"' in html:
+        return re.sub(r'<footer class="legal-strip">.*?</footer>', LEGAL_STRIP,
+                      html, flags=re.DOTALL)
+    if re.search(r'<footer\b', html):
+        return html
+    body_close = html.rfind('</body>')
+    if body_close == -1:
+        # download.html has no </body> at all. The strip still belongs on the
+        # page, so append it rather than skip the page.
+        return html.rstrip() + '\n' + LEGAL_STRIP + '\n'
+    return html[:body_close] + LEGAL_STRIP + '\n' + html[body_close:]
 
 
 def inject_design_system(html):
@@ -190,6 +225,7 @@ def process(fpath):
     updated = re.sub(r'<nav class="nav">.*?</nav>', NEW_NAV, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated)
     updated = re.sub(r'<footer>.*?</footer>', NEW_FOOTER, updated, flags=re.DOTALL)
+    updated = inject_legal_strip(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
     updated = inject_nav_auth_js(updated)

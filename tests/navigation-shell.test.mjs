@@ -85,7 +85,52 @@ const scrolledMenuGeometry = await publicPage.evaluate(() => {
 ok('mobile menu stays attached when opened after scrolling', scrolledMenuGeometry.navTop === 0 && Math.abs(scrolledMenuGeometry.menuTop - scrolledMenuGeometry.navBottom) < 0.5 && scrolledMenuGeometry.bodyPosition === 'fixed' && scrolledMenuGeometry.bodyTop === '-450px', JSON.stringify(scrolledMenuGeometry));
 await publicPage.evaluate(() => document.querySelector('#nav-hamburger').click());
 ok('closing the mobile menu restores the page position', await publicPage.evaluate(() => window.scrollY === 450 && getComputedStyle(document.body).position !== 'fixed'), await publicPage.evaluate(() => JSON.stringify({ scrollY:window.scrollY, bodyPosition:getComputedStyle(document.body).position })));
+const phoneHelp = await publicPage.evaluate(() => {
+  const link = document.querySelector('nav.nav a[href="/help"]');
+  if (!link) return { found:false };
+  const box = link.getBoundingClientRect();
+  return { found:true, display:getComputedStyle(link).display, width:box.width, height:box.height };
+});
+ok('support is reachable on a phone', phoneHelp.found && phoneHelp.display !== 'none' && phoneHelp.width > 0 && phoneHelp.height > 0, JSON.stringify(phoneHelp));
 await publicPage.close();
+
+const tabletPage = await browser.newPage({ viewport:{ width:820, height:1180 } });
+await tabletPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await tabletPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+await tabletPage.waitForSelector('nav.nav a[href="/help"]');
+const tabletHelp = await tabletPage.evaluate(() => {
+  const link = document.querySelector('nav.nav a[href="/help"]');
+  const box = link.getBoundingClientRect();
+  return { display:getComputedStyle(link).display, width:box.width, height:box.height };
+});
+ok('support is reachable on a tablet', tabletHelp.display !== 'none' && tabletHelp.width > 0 && tabletHelp.height > 0, JSON.stringify(tabletHelp));
+await tabletPage.close();
+
+// Static contract, no browser needed. The mobile drawer mirrors the four nav
+// links and carries no Help entry, so every stamped page must keep the /help
+// link in the bar itself. Pages without a footer must still name the three
+// legal documents; apply-nav.py stamps a legal strip there.
+// Application shells keep their own narrower nav and reach Help through the
+// signed-in user menu; apply-nav.py names them and this test reads that list
+// rather than repeating it.
+const generatorSource = fs.readFileSync(path.join(ROOT, 'apply-nav.py'), 'utf8');
+const keepOwnNav = new Set(Array.from((generatorSource.match(/KEEP_OWN_NAV = \{([^}]*)\}/) || [null, ''])[1].matchAll(/'([^']+)'/g), (match) => match[1]));
+const stamped = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes:true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.name.endsWith('.html')) {
+      const html = fs.readFileSync(full, 'utf8');
+      const name = path.relative(ROOT, full).split(path.sep).join('/');
+      if (html.includes('<nav class="nav">') && html.includes('id="nav-auth"') && !keepOwnNav.has(name)) stamped.push([name, html]);
+    }
+  }
+})(ROOT);
+const withoutHelp = stamped.filter(([, html]) => !/<a href="\/help"/.test(html)).map(([name]) => name);
+ok('every stamped page links support', stamped.length > 0 && withoutHelp.length === 0, withoutHelp.join(', ') || `${stamped.length} pages`);
+const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${href}"`))).map(([name]) => name);
+ok('every stamped page names privacy, dpa and terms', withoutLegal.length === 0, withoutLegal.join(', ') || `${stamped.length} pages`);
 
 const homePage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await homePage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));

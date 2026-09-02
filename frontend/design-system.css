@@ -2517,7 +2517,7 @@ pre code { background: none; padding: 0; }
   .nav-auth { gap: 6px; }
   .nav-signin { font-size: 10px; padding: 8px 2px; letter-spacing: 0.08em; }
   .nav-cta { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; border-width: 1.5px; }
-  .nav-help { display: none; }
+  .nav-help { padding: 6px 7px; font-size: 9px; letter-spacing: 0.06em; }
   .nav-user-email { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
@@ -2525,6 +2525,7 @@ pre code { background: none; padding: 0; }
   .nav-auth { gap: 4px; }
   .nav-signin { font-size: 9px; padding: 6px 2px; }
   .nav-cta { padding: 6px 8px; font-size: 9px; }
+  .nav-help { padding: 5px 5px; font-size: 9px; border: none; }
 }
 /* === end nav auth === */
 
@@ -2901,8 +2902,12 @@ a.skip-link:focus-visible,
   outline: 2px solid var(--lime, #B2FF3F);
   outline-offset: 2px;
 }
+/* Support must stay reachable on every screen. Below 900px the link shrinks
+   instead of disappearing: the mobile drawer mirrors the desktop nav links and
+   deliberately carries no Help entry, so hiding this one used to leave phone
+   and tablet visitors with no route to /help at all. */
 @media (max-width: 900px) {
-  .nav-help { display: none; }
+  .nav-help { padding: 7px 9px; font-size: 10px; letter-spacing: 0.08em; }
 }
 
 /* § 05 product grid — light-theme column differentiation ───────────────── */
@@ -3057,3 +3062,27 @@ a.skip-link:focus-visible,
    changing how anything looks. */
 h2.paramant-h1 { font-size: var(--text-5xl); font-weight: 800; letter-spacing: -.035em; line-height: 0.94; }
 h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacing: -.02em; line-height: inherit; }
+
+/* ── Legal strip ────────────────────────────────────────────
+   Auth, account and download pages carry no site footer. They still owe the
+   visitor the three legal documents, so apply-nav.py stamps this one line
+   there instead of a second navigation. */
+.legal-strip {
+  border-top: 1px solid var(--ink-hair, #E2E8F0);
+  margin-top: var(--space-6, 48px);
+  padding: 16px 24px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim, #64748b);
+}
+.legal-strip a {
+  color: var(--ink-dim, #64748b);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding: 2px 0;
+}
+.legal-strip a:hover { color: var(--navy, #0B3A6A); border-bottom-color: var(--lime, #B2FF3F); }
+.legal-strip a:focus-visible { outline: 2px solid var(--lime, #B2FF3F); outline-offset: 2px; }
+.legal-strip .legal-sep { padding: 0 8px; opacity: 0.5; }

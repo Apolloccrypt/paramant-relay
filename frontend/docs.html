@@ -17,7 +17,7 @@
 <meta name="twitter:description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
 <link rel="canonical" href="https://paramant.app/docs">
 
-<link rel="stylesheet" href="/design-system.css?v=22">
+<link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
   <style>
@@ -638,6 +638,17 @@ id=tr_XXXX
       <p><strong style="color:#B2FF3F">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
     </div>
 
+    <div class="callout"><span class="callout-label">Where to start</span>
+      <p>The navigation no longer carries these; this is the one place that does.
+      One-line install: <a href="/install.sh">install.sh</a> for a server,
+      <a href="/install-pi.sh">install-pi.sh</a> for a Raspberry Pi.
+      Images: <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" rel="noopener">Docker Hub</a>.
+      Source and tags: <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>,
+      <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank" rel="noopener">Releases</a>.
+      Client libraries: <a href="https://pypi.org/project/paramant-sdk/" target="_blank" rel="noopener">SDK on PyPI</a>,
+      <a href="https://www.npmjs.com/package/paramant-sdk" target="_blank" rel="noopener">SDK on npm</a>.</p>
+    </div>
+
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">bash</span></div>
       <pre><span class="cm"># 1. Clone</span>
@@ -992,6 +1003,13 @@ python3 scripts/paramant-admin.py sync</pre>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
         <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
       </div>
       <div>
         <div class="footer-col-label">Legal</div>
