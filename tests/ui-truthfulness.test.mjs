@@ -660,3 +660,199 @@ assert.doesNotMatch(docsHtml, /\u2014|&mdash;|\u2013|&ndash;/,
   'docs.html must carry no em-dash or en-dash');
 
 console.log('ui-truthfulness: /docs and /help answer a buyer with sentences that ship elsewhere');
+
+// ── The messaging guide, pinned ──────────────────────────────────────────────
+// docs/brand/messaging.md (PR #331) settles what the commercial pages promise
+// and in what order. Section 10 of that guide is the rule this block enforces:
+// a sentence may only go on the site if it is already true on the site or in
+// the code, and there is a test that fails when it stops being true. Every
+// string below is quoted from a page that ships, and the guide names each of
+// them as work to pin. Where the guide flagged a claim as disputed (ParaRule
+// 04's "no US provider in the chain", section 9) the claim is NOT asserted
+// here and does not appear on the product pages; only the /security row it
+// rests on is.
+// A claim is what a visitor reads, not how the markup happens to be wrapped.
+// The same sentence sits on one line in parasign.html and across three lines
+// with a <strong> in the middle in pricing.html, so comparing raw HTML would
+// pin the formatting instead of the promise. Comments, style and script are
+// dropped for the same reason ui-truthfulness already drops them on sign.html:
+// a comment routinely quotes the very wording it exists to forbid.
+function visible0(html) {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<(style|script)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&middot;/g, '\u00b7').replace(/&euro;/g, '\u20ac')
+    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&rarr;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+const visible = (file) => visible0(read(file));
+// The plan limits are read from the code that enforces them, not from another
+// page. tiers.js is the single source; relay.js turns its rows into a 402 and a
+// 413. Comparing two pages only proves they agree, and both were wrong together.
+const { default: tiers } = await import('../relay/lib/tiers.js');
+const parasign = visible('frontend/parasign.html');
+const parasend = visible('frontend/parasend.html');
+const aboutVisible = visible('frontend/about.html');
+const pricingVisible = visible('frontend/pricing.html');
+const security = visible('frontend/security.html');
+const signVisibleText = visible('frontend/sign.html');
+
+// Proof 1. The EU claim is about the data path, not the whole chain, and the
+// Resend exception travels with it. A page may shorten the long form on
+// /pararules to this one; it may never drop the second half.
+const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
+const EU_EXCEPTION = 'Email goes out via Resend';
+const homeVisible = visible('frontend/index.html');
+for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['parasend', parasend]]) {
+  assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
+  assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
+}
+// And it may not be offered against a source that does not carry it. The
+// Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
+// jurisdiction, the CLOUD Act row, retention, IP logging and analytics. Bunny is
+// not in it, and DNS is not a row. A page that names Bunny and then sends the
+// reader to that table has offered a checkpoint that fails when checked.
+const securityJurisdiction = (read('frontend/security.html')
+  .match(/<h2>Jurisdiction[\s\S]*?<\/table>/) || [''])[0];
+assert.ok(securityJurisdiction, 'security.html must keep its Jurisdiction and privacy table');
+assert.ok(!/Bunny/i.test(securityJurisdiction),
+  'the /security jurisdiction table now names Bunny; the product pages may point at it again');
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+  assert.doesNotMatch(text, /Bunny DNS[^.]*\.[^.]*\.[^.]*\.[^.]*jurisdiction table is on the/,
+    `${name}.html sends the reader to the /security jurisdiction table for a claim that table does not carry`);
+}
+// The broader claim is the one section 9 of the guide holds open. It may stay
+// on /security, where the table qualifies it, and nowhere near a product hero.
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+  assert.doesNotMatch(text, /no US (company|provider) in the chain|no US company\b/i,
+    `${name}.html claims more than the data path, which /privacy does not support`);
+}
+assert.ok(security.includes('Not applicable: no US infrastructure, no US company'),
+  'security.html must keep the US CLOUD Act row that proof 1 is measured against');
+
+// Proof 2. The three /about sentences the signing claim rests on.
+for (const claim of [
+  'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.',
+  'Every signature is entered into a public, append-only log.',
+  'A signed document verifies without contacting us.',
+]) {
+  assert.ok(aboutVisible.includes(claim), `about.html lost the signing claim: ${claim}`);
+  assert.ok(parasign.includes(claim), `parasign.html lost the signing claim: ${claim}`);
+}
+
+// Proof 3. The sentence the whole free-versus-paid split rests on. If the
+// pricing model ever gates cryptography behind a tier, this is what fails first.
+const SPLIT = 'Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.';
+for (const [name, text] of [['pricing', pricingVisible], ['parasign', parasign], ['parasend', parasend]]) {
+  assert.ok(text.includes(SPLIT), `${name}.html lost the pay-for-volume sentence`);
+}
+// The other half of the split: the free plan is permanent, it is called
+// Community, and the reason it stays free is named in the same sentence.
+const FREE_FOREVER = 'not to unlock features, and that is what keeps the Community plan free';
+for (const [name, text] of [['pricing', pricingVisible], ['parasign', parasign], ['parasend', parasend]]) {
+  assert.ok(text.includes(FREE_FOREVER), `${name}.html lost the Community-plan promise`);
+}
+// /sign carries the same split in one line, next to the account requirement,
+// and it names the plan the way /pricing names it.
+assert.match(signVisibleText, /Community accounts sign 2 documents a month/,
+  'sign.html must keep the free-tier line, under the plan name /pricing uses');
+assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier is called Free/,
+  'sign.html must not call the Community plan Free; one name across the site');
+
+// The founder, with the exact title and nothing added to it. No award, no year
+// count, no prior employer, no certification: none of that is on the site.
+const FOUNDER = 'Mick Beer, privacy and security researcher';
+for (const [name, text] of [['about', aboutVisible], ['parasign', parasign], ['parasend', parasend]]) {
+  assert.ok(text.includes(FOUNDER), `${name}.html must name the founder with his exact title`);
+}
+
+// Sentence three of the founder paragraph. It was the one claim on these pages
+// with no source on main; #332 put it on /about, so it is now quoted rather
+// than composed, and it is pinned to both ends of the quote.
+const GIVE_BACK = 'The Community plan is his way of giving something back to society; the business plans pay for it.';
+assert.ok(aboutVisible.includes(GIVE_BACK), 'about.html lost the give-back sentence the product pages quote');
+assert.ok(parasend.includes(GIVE_BACK), 'parasend.html must quote the give-back sentence as /about states it');
+
+// The limits, stated in the same voice as the promises. Both already shipped
+// before the product pages existed and neither may be softened or moved into
+// small print.
+const SES = 'A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).';
+assert.ok(aboutVisible.includes(SES), 'about.html lost the SES scope note');
+assert.ok(parasign.includes(SES), 'parasign.html must carry the SES scope note, not a softer version');
+// Where it sits is part of the claim. The note has to land in the hero section,
+// before the first band of the page, or it is a footnote with a test on it.
+const parasignHero = read('frontend/parasign.html').split('<section class="ps-band"')[0];
+assert.ok(visible0(parasignHero).includes(SES),
+  'the SES scope note must sit in the first screen of /parasign, not below the tiers');
+assert.ok(visible0(parasignHero).includes('legal, finance and healthcare practices in the EU'),
+  '/parasign must name who it is for in the first screen');
+assert.ok(visible0(parasignHero).includes(`${tiers.tierLimit('community', 'signs_month')} signatures a month`),
+  'the free promise in the /parasign hero must carry the number tiers.js enforces');
+const parasendHero = read('frontend/parasend.html').split('<section class="ps-band"')[0];
+const communityHeroFacts = [
+  `${tiers.tierLimit('community', 'transfers_month')} transfers a month`,
+  `${tiers.tierLimit('community', 'file_mb')} MB a file`,
+  `links that last an hour`,
+  `gone after one read`,
+];
+for (const fact of communityHeroFacts) {
+  assert.ok(visible0(parasendHero).includes(fact),
+    `the free promise in the /parasend hero must carry the limit tiers.js enforces: ${fact}`);
+}
+assert.ok(tiers.tierLimit('community', 'view_ttl_ms') === 3_600_000 && tiers.tierLimit('community', 'max_views') === 1,
+  'the one-hour, one-read wording in the /parasend hero no longer matches tiers.js');
+assert.doesNotMatch(visible0(parasendHero), /uploads (per|an) hour/i,
+  'the /parasend hero states the deprecated anon-endpoint rate as if it were a plan limit');
+assert.ok(visible0(parasendHero).includes('For offices that email client documents'),
+  '/parasend must name who it is for in the first screen');
+
+const NO_CERT = 'Paramant does not hold third-party certification for these frameworks.';
+assert.ok(pricing.includes(NO_CERT), 'pricing.html lost the certification limit');
+assert.ok(parasend.includes(NO_CERT), 'parasend.html quotes the compliance documentation, so it must carry its limit');
+
+// A product page must not claim the identity or legal effect that /sign is
+// already forbidden from claiming. Same overclaim, wider surface.
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+  assert.doesNotMatch(text, /identity verified|verified signer|signer verified|legally binding/i,
+    `${name}.html must not claim a verified identity or legal effect it cannot deliver`);
+}
+
+// ── A claim may not be contradicted by the page it cites ─────────────────────
+//
+// /parasend promised "ML-DSA-65 signed receipts" for ParaShare and linked to the
+// algorithm register in the same sentence. That register lists ParaShare
+// (webapp) with SIG n/a on the pre-v1 hybrid wire, migrating to v1; ML-DSA-65 is
+// the SDK rows. The register is the source, so it is read here and the page is
+// held to what it says.
+const registerRow = (label) => {
+  const rows = read('frontend/crypto-agility.html').match(/<tr>[\s\S]*?<\/tr>/g) || [];
+  const row = rows.find((r) => r.includes(label));
+  return row ? [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').trim()) : null;
+};
+const shareRow = registerRow('ParaShare (webapp)');
+assert.ok(shareRow && shareRow.length >= 4, 'crypto-agility.html no longer registers ParaShare (webapp)');
+const [, shareKem, shareSig, shareWire] = shareRow;
+assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the register changed; /parasend quotes it');
+if (shareSig === 'n/a') {
+  assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts/,
+    'the register gives ParaShare no signature, so /parasend may not sell it ML-DSA-65 signed receipts');
+  assert.ok(parasend.includes(`the webapp on the ${shareWire} wire`),
+    '/parasend must state the wire format the register gives the webapp, not a better one');
+}
+assert.doesNotMatch(parasend, /proof that the file came from you/,
+  '/parasend may not promise sender proof on a path the register gives no signature');
+
+// Tone, section 6 of the guide. We have no testimonials, no customer logos and
+// no user counts, so no page may imply them, and the marketing vocabulary the
+// guide bans stays banned by test rather than by good intentions. One word
+// from that list is absent here on purpose: "unlock" appears in the /pricing
+// sentence these pages quote ("not to unlock features"), so banning it would
+// fail on shipped copy the guide itself pins.
+const BANNED = /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class|effortless|next-generation|empower|journey/i;
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+  assert.doesNotMatch(text, BANNED, `${name}.html uses vocabulary the messaging guide bans`);
+}
+
+console.log('ui-truthfulness: the messaging guide claims are pinned to the pages that make them true');

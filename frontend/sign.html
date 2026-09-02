@@ -38,6 +38,12 @@
 .ds-kicker{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
 .ds-title{font-size:clamp(34px,5vw,52px);font-weight:700;letter-spacing:-.04em;line-height:1.05;margin-bottom:14px;color:var(--navy)}
 .ds-lede{font-size:16px;color:var(--ink-dim);line-height:1.65;max-width:690px}
+.ds-facts{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0;max-width:690px}
+.ds-facts li{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-dim);border:1px solid var(--ink-hair);background:var(--bone);padding:6px 10px;line-height:1.5}
+.ds-facts li b{color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.ds-headlink{margin:14px 0 0;font-size:13px}
+.ds-headlink a{color:var(--cobalt)}
+.ds-anon-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0}
 .ds-stepper{list-style:none;display:flex;gap:8px;padding:0;margin:0 0 32px;border-bottom:1px solid var(--ink-hair);counter-reset:dsstep}
 .ds-stepper li{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding:14px 0;border-bottom:2px solid transparent;counter-increment:dsstep;text-align:center}
 .ds-stepper li::before{content:counter(dsstep);display:inline-block;width:20px;height:20px;border:1px solid var(--ink-hair);border-radius:50%;line-height:18px;font-size:10px;margin-right:6px;font-weight:700}
@@ -224,7 +230,7 @@
 .ds-textarea{min-height:84px;resize:vertical;line-height:1.5}
 .ds-invite-status{font-family:var(--mono);font-size:10px;margin-top:5px;color:var(--ink-dim)}
 .ds-invite-status.ok{color:#087443}.ds-invite-status.err{color:#b42318}
-@media(max-width:640px){.ds-recipient-row,.ds-party-link-row{grid-template-columns:1fr}}
+@media(max-width:640px){.ds-recipient-row,.ds-party-link-row{grid-template-columns:1fr}.ds-anon-actions .btn{flex:1 1 100%;text-align:center}}
 @media(max-width:640px){.ds-party-link-row .ds-pl-url{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-all}.ds-party-link-row .ds-pl-copy{width:100%;padding:12px 14px}.ds-recipient-row .ds-rm{padding:10px 12px}}
 @media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
@@ -366,6 +372,12 @@
     <p class="ds-kicker">ParaSign · secure document workflow</p>
     <h1 class="ds-title">Get an important document signed.</h1>
     <p class="ds-lede">Sign it yourself, work together or send it to others. Your document stays private and every completed signature comes with independently verifiable proof.</p>
+    <ul class="ds-facts">
+      <li><b>Free forever</b> &middot; 2 signatures a month, no card</li>
+      <li><b>Your signing key stays here</b> &middot; it is made on your device and never reaches our servers</li>
+      <li><b>EU jurisdiction</b> &middot; servers in Germany, under EU law</li>
+    </ul>
+    <p class="ds-headlink"><a href="/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
   </header>
 
   <ol class="ds-stepper" id="ds-stepper" aria-label="Sign progress" hidden>
@@ -398,9 +410,14 @@
       <a href="/verify">verify any signed document</a> against the public log. Neither needs
       an account.
     </p>
+    <!-- .ds-btn was never defined in any stylesheet, so the one CTA a
+         session-less visitor gets rendered as two lines of plain blue text.
+         These are the house button classes the rest of this page already
+         uses, and sign-flow.js selects neither class, so nothing behavioural
+         changes. -->
     <p class="ds-anon-actions">
-      <a class="ds-btn primary" href="/signup?next=/sign">Create an account</a>
-      <a class="ds-btn" href="/auth/login?next=/sign">Sign in</a>
+      <a class="btn btn-primary" href="/signup?next=/sign">Create an account</a>
+      <a class="btn btn-secondary" href="/auth/login?next=/sign">Sign in</a>
     </p>
     <p class="ds-sub ds-anon-foot">
       Community accounts sign 2 documents a month. <a href="/pricing">See what the paid tiers add</a>.
@@ -409,7 +426,7 @@
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
-    <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">Choose a workflow. You can change it before sending.</p></div><span class="ds-mode-safe">Private key stays on your device</span></div>
+    <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">Choose a workflow. You can change it before sending.</p></div><span class="ds-mode-safe">Your signing key stays on your device</span></div>
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>

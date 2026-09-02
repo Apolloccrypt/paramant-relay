@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ParaSend &middot; Encrypted file transfer by Paramant</title>
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Send a file that is scrambled on your device and gone once it has been downloaded. Never stored on disk, servers in Germany. Free for everyone, paid for volume.">
+<meta property="og:title" content="ParaSend &middot; Encrypted file transfer by Paramant">
+<meta property="og:description" content="Send a file that is scrambled on your device and gone once it has been downloaded. Never stored on disk, servers in Germany. Free for everyone, paid for volume.">
+<meta property="og:url" content="https://paramant.app/parasend">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ParaSend &middot; Encrypted file transfer by Paramant">
+<meta name="twitter:description" content="Send a file that is scrambled on your device and gone once it has been downloaded. Never stored on disk, servers in Germany. Free for everyone, paid for volume.">
+<link rel="canonical" href="https://paramant.app/parasend">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+
+<link rel="stylesheet" href="/design-system.css?v=23">
+<link rel="stylesheet" href="/nav.css?v=19">
+<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<style>
+.ps-hero{padding:var(--space-10) 0 var(--space-6)}
+.ps-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
+.ps-band h2{font-size:var(--text-2xl);letter-spacing:-.02em;margin-bottom:var(--space-2)}
+.mono-eyebrow{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)}
+.ps-lede{font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.ps-band p{font-size:var(--text-base);color:var(--ink);line-height:1.8;max-width:680px;margin-top:var(--space-4)}
+.ps-band p a,.ps-band li a{color:var(--cobalt)}
+.ps-band p strong{color:var(--navy)}
+.ps-actions{display:flex;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-6)}
+.ps-actions .btn{flex:1 1 auto;text-align:center}
+.ps-sub{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.ps-sub a{color:var(--cobalt)}
+.ps-who{font-size:var(--text-base);color:var(--navy);font-weight:700;line-height:1.7;max-width:680px;margin-top:var(--space-3)}
+.ps-note{font-size:var(--text-sm);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4);border-left:3px solid var(--lime);background:var(--bone);padding:var(--space-3) var(--space-4)}
+.ps-note a{color:var(--cobalt)}
+.split-label{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--navy);font-weight:700;margin-top:var(--space-6);display:block}
+.split-label .who{color:var(--ink-dim);font-weight:400;letter-spacing:.06em;text-transform:none}
+.check-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
+.check-card{background:var(--bone);padding:var(--space-5) var(--space-5)}
+.check-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
+.check-card p{margin-top:var(--space-2);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
+.check-card a{color:var(--cobalt)}
+.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-3)}
+.tier-grid.one{grid-template-columns:1fr;max-width:420px}
+.tier-card{background:var(--bone);padding:var(--space-5);display:flex;flex-direction:column}
+.tier-card.featured{background:var(--lime)}
+.tier-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt)}
+.tier-price{font-family:var(--mono);font-size:var(--text-2xl);font-weight:700;color:var(--navy);margin-top:var(--space-2)}
+.tier-price span{font-size:var(--text-sm);color:var(--ink-dim);font-weight:400}
+.tier-note{font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-1);line-height:1.5}
+.tier-note .incl{color:var(--navy);font-weight:700}
+.tier-card ul{list-style:none;margin:var(--space-4) 0 0;padding:0}
+.tier-card li{font-family:var(--mono);font-size:var(--text-xs);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid var(--ink-hair);line-height:1.5}
+.tier-card li:last-child{border-bottom:none}
+.tier-card li::before{content:'+ ';font-weight:700;color:var(--cobalt)}
+.ps-fine{font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);max-width:none}
+.ps-steps{list-style:none;counter-reset:step;margin-top:var(--space-5);padding:0;max-width:680px}
+.ps-steps li{counter-increment:step;position:relative;padding:var(--space-4) 0 var(--space-4) var(--space-8);border-top:1px solid var(--ink-hair);font-size:var(--text-base);color:var(--ink);line-height:1.7}
+.ps-steps li:last-child{border-bottom:1px solid var(--ink-hair)}
+.ps-steps li::before{content:counter(step,decimal-leading-zero);position:absolute;left:0;top:var(--space-4);font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;font-weight:700;color:var(--cobalt)}
+.ps-steps strong{color:var(--navy)}
+.scope-note{background:var(--bone);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);padding:var(--space-4) var(--space-5);margin-top:var(--space-5);max-width:680px}
+.scope-note p{margin-top:0}
+.scope-note p + p{margin-top:var(--space-4)}
+.person-card{border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone);padding:var(--space-6);margin-top:var(--space-5);max-width:680px}
+.person-card p{margin-top:0}
+.person-card p + p{margin-top:var(--space-4)}
+.dev-line{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.8;max-width:680px;margin-top:var(--space-4)}
+.dev-line a{color:var(--cobalt)}
+@media(max-width:860px){.tier-grid{grid-template-columns:1fr}}
+@media(max-width:640px){
+  .check-grid{grid-template-columns:1fr}
+  .ps-actions .btn{flex:1 1 100%}
+  /* The shared .sec-head is a three-column grid (number, heading, eyebrow). At
+     390px that leaves the h1 about half the screen and drops it below a very
+     large number, so the first thing a visitor reads is set in a column six
+     words wide. Stacked here, on this page only; the desktop layout and the
+     house style are untouched. */
+  .ps-hero{padding:var(--space-6) 0 var(--space-5)}
+  .ps-hero .sec-head{grid-template-columns:1fr;row-gap:var(--space-2);align-items:start;margin-bottom:var(--space-5);padding-bottom:var(--space-3)}
+  .ps-hero .sec-head .num{font-size:var(--text-lg);line-height:1}
+  .ps-hero .sec-head h1.paramant-h2{font-size:var(--text-2xl)}
+  .ps-lede{font-size:var(--text-base)}
+}
+/* Mobile is the design target and the house .sec-head is not, at this width:
+   it keeps the section number in its own grid column, which leaves the H1 about
+   160px to wrap in. On /parasign that cost six lines of headline and pushed the
+   buttons and the eIDAS note clean off the first screen. On a narrow screen the
+   number stacks above the headline instead of standing beside it. Page-local on
+   purpose: design-system.css is shared with pages this PR does not touch. */
+@media(max-width:640px){
+  .ps-hero{padding-top:var(--space-6)}
+  #main-content .sec-head{grid-template-columns:1fr;row-gap:var(--space-2)}
+  #main-content .sec-head .num{font-size:var(--text-xl);line-height:1}
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/parasend#webpage",
+      "url": "https://paramant.app/parasend",
+      "name": "ParaSend · Encrypted file transfer by Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Send a file that is scrambled on your device and gone once it has been downloaded. Never stored on disk, servers in Germany. Free for everyone, paid for volume."
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://paramant.app/parasend#software",
+      "name": "Paramant",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web browser",
+      "url": "https://paramant.app/parasend",
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<div class="meta-bar">
+  <span class="">build 3.0.0</span>
+  <span class="sep">·</span>
+  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
+  <span class="sep">·</span>
+  <span class="">eu/de · ram only</span>
+</div>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+
+
+
+<!-- HERO: what you can do here, who it is for, and one action. The buyer meets
+     a promise in plain words first; the algorithm names live in section 06. -->
+<section class="ps-hero" id="main-content" tabindex="-1">
+  <div class="container-md">
+    <div class="sec-head">
+      <span class="num">00</span>
+      <h1 class="paramant-h2">Send a file that burns after one read.</h1>
+      <span class="mono-eyebrow">ParaSend &middot; sending files without leaving a copy behind</span>
+    </div>
+    <p class="ps-lede">Your file is locked on your own device before it is sent, and it is gone the moment the person you sent it to has opened it. Servers in Germany, under EU law.</p>
+    <p class="ps-who">For offices that email client documents, contracts and personal data today, and would rather not leave them sitting in a mailbox.</p>
+    <div class="ps-actions">
+      <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
+      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+    </div>
+    <p class="ps-sub">Free on the Community plan, forever, no card: 10 transfers a month, 5 MB a file, links that last an hour and are gone after one read. Organisations pay for volume, never for security.</p>
+    <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file once, and the copy is wiped. Keep your own copy, because a file that has been read cannot be fetched again.</p>
+  </div>
+</section>
+
+<!-- THE SPLIT: the one thing that has to be clear before anything else. Two
+     paragraphs here, both lifted from /pricing; the tier tables sit further
+     down, after the page has said what the product actually does. -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">01 / Free for everyone</span>
+    <h2 style="margin-top:var(--space-2)">Free for everyone. Paid for organisations.</h2>
+    <p><strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. Businesses pay for the higher limits (longer links, more reads, more devices, a dedicated relay), not to unlock features, and that is what keeps the Community plan free.</p>
+    <p><strong>Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</strong></p>
+    <p class="ps-sub">The plans and what each one costs are <a href="#plans">further down this page</a>. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+  </div>
+</section>
+
+<!-- WHAT IT DOES -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">02 / What it does</span>
+    <h2 style="margin-top:var(--space-2)">Scrambled here, unreadable in transit, gone after one read</h2>
+    <p>ParaSend is the transfer half of Paramant. It runs on the same post-quantum core as ParaSign. Your file is encrypted before it leaves your device, so our servers hold nothing they could hand over or lose.</p>
+    <div class="check-grid">
+      <div class="check-card">
+        <div class="k">Locked before it leaves you</div>
+        <p>Your browser locks the file on your own device. Our servers only ever hold the locked version, never the file itself and never the key that opens it.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Gone after one read</div>
+        <p>Nothing is written to disk. The file sits in server memory and is wiped the moment it is downloaded, or when the link runs out, whichever comes first.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">No account for receivers</div>
+        <p>The recipient opens the link, gets the file, and that is the whole flow. No account, nothing to install.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">It opens on their device, or nowhere</div>
+        <p>The file is locked to a key registered on the recipient's device, so it opens there and nowhere else, and a file altered on the way does not open at all. ParaShare is the send screen you use; ParaSend is the product it belongs to.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Lock a file for yourself</div>
+        <p>No recipient, no account: <a href="/vault">lock a file</a> into a .prmnt container with a passphrase. The file and the passphrase never leave your browser.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Your own server, if you need one</div>
+        <p>A larger organisation can run its own instance, on our hardware or on its own, with its own limits. That is the Enterprise plan.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO BEGIN -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">03 / How to begin</span>
+    <h2 style="margin-top:var(--space-2)">Three steps to a file that disappears</h2>
+    <p>Sending needs a Paramant account. Receiving needs nothing at all.</p>
+    <ol class="ps-steps">
+      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The free tier sends with a 1 hour link that burns on first read, forever.</li>
+      <li><strong><a href="/parashare">Open ParaShare</a>, the send screen of ParaSend, and pick your file.</strong> It is scrambled in your browser before anything is uploaded, so what our servers receive is unreadable, and they keep it in memory only.</li>
+      <li><strong>Share the link.</strong> The recipient opens it once and the file is wiped. On the free tier the link expires after an hour whether it is opened or not.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- WHO IS BEHIND IT -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">04 / Who is behind it</span>
+    <h2 style="margin-top:var(--space-2)">Built by a named person, in Harderwijk</h2>
+    <div class="person-card">
+      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by <strong>Mick Beer, privacy and security researcher</strong>. That background shapes the choices: post-quantum signatures, a public transparency log, offline-verifiable documents, and source code you can inspect yourself.</p>
+      <p>The Community plan is his way of giving something back to society; the business plans pay for it. Paramantis Solutions B.V. is the contracting and responsible party; the founder is the origin of the work, not the service itself.</p>
+      <p><a href="/about">More about Paramant &rarr;</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- THE PLANS: the tier tables, after the product has been explained. -->
+<section class="ps-band" id="plans">
+  <div class="container-md">
+    <span class="mono-eyebrow">05 / The plans</span>
+    <h2 style="margin-top:var(--space-2)">What each plan gives you</h2>
+<span class="split-label">Free for everyone <span class="who">&middot; anyone with a browser</span></span>
+    <div class="tier-grid one">
+      <div class="tier-card featured">
+        <div class="tier-name">Community</div>
+        <div class="tier-price">&euro;0</div>
+        <div class="tier-note">Forever &middot; no card required</div>
+        <ul>
+          <li>Encrypted in your browser, key never sent</li>
+          <li>10 transfers per month</li>
+          <li>5 MB per file, on every plan</li>
+          <li>1 hour link expiry</li>
+          <li>Burn on first read</li>
+          <li>Up to 5 registered devices for ParaShare, the ParaSend send screen</li>
+        </ul>
+      </div>
+    </div>
+
+    <span class="split-label">For organisations <span class="who">&middot; the business plans</span></span>
+    <div class="tier-grid">
+      <div class="tier-card">
+        <div class="tier-name">Pro</div>
+        <div class="tier-price">&euro;15<span>/mo</span></div>
+        <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;18.15/mo incl. 21% btw</span><br>Annual &euro;150 excl. &middot; 16.7% off</div>
+        <ul>
+          <li>Everything in Community</li>
+          <li>500 transfers per month</li>
+          <li>24 hour link expiry</li>
+          <li>Up to 10 reads per link</li>
+          <li>Up to 50 registered devices</li>
+          <li>Send history and link management</li>
+          <li>Webhooks on upload and download</li>
+          <li>Email notifications via Resend</li>
+        </ul>
+      </div>
+      <div class="tier-card">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price">Custom</div>
+        <div class="tier-note">Per organisation</div>
+        <ul>
+          <li>Everything in Pro</li>
+          <li>7 day link expiry</li>
+          <li>Up to 100 reads per link</li>
+          <li>Dedicated relay on our infra or yours</li>
+          <li>IEC 62443 / NIS2 / NEN 7510 documentation as input for your own compliance process, not third-party certification</li>
+          <li>Signed Data Processing Agreement (GDPR Art. 28)</li>
+          <li>SLA 99.95%, priority incident response</li>
+        </ul>
+      </div>
+    </div>
+    <p class="ps-fine">Every tier stores transfers in RAM and every tier uses the same cryptography. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
+    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;18.15/mo or &euro;181.50/yr. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+  </div>
+</section>
+
+<!-- THE PROOF, AND THE LIMITS -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">06 / The proof</span>
+    <h2 style="margin-top:var(--space-2)">Every claim has a place to check it</h2>
+    <p>You should not have to trust us. You should be able to check. Each point below links to where you can.</p>
+    <div class="check-grid">
+      <div class="check-card">
+        <div class="k">We never had it</div>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until the read burns it. A ParaShare transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">The wire format, in full</div>
+        <p>ParaShare uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/crypto-agility">crypto agility page</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">You own your keys</div>
+        <p>Generated on your device, never sent. We see only the public half. Read the <a href="/pararules">ParaRules</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">EU soil, EU law</div>
+        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out. The subprocessors are listed there, and ParaRule 5 states the same claim in full on <a href="/pararules">ParaRules</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">No third-party requests</div>
+        <p>Your browser talks only to us. No fonts, CDNs, analytics or pixels. Open devtools and check.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Quantum-ready by default</div>
+        <p>FIPS 203/204 today, not &ldquo;soon&rdquo;. The algorithm register is on the <a href="/crypto-agility">crypto agility page</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Dedicated relays, on the same rules</div>
+        <p>Enterprise customers run a dedicated relay on our infrastructure or their own, with limits configured per tenant within its RAM budget. The tiers are on the <a href="/pricing">pricing page</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Source-available code</div>
+        <p>The relay is source-available. Read it on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> and run it yourself.</p>
+      </div>
+    </div>
+    <div class="scope-note">
+      <p><strong>What the compliance documentation is.</strong> Architecture documents, security controls mappings and technical reference materials aligned to IEC 62443, NIS2 and NEN 7510. This is documentation you can use as input for your own compliance process. Paramant does not hold third-party certification for these frameworks.</p>
+      <p><strong>What burn-on-read costs you.</strong> A file is wiped immediately on download or on expiry, and there is no disk storage, so a file that has been read cannot be fetched again. Keep your own copy.</p>
+    </div>
+    <div class="ps-actions">
+      <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
+      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- DEVELOPERS, LAST -->
+<section class="ps-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">07 / Developers</span>
+    <h2 style="margin-top:var(--space-2)">Send from your own code</h2>
+    <p class="dev-line">There is an open SDK in JavaScript and Python and a self-host installer. Read the <a href="/docs">documentation</a>, or run the relay yourself from <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/sla">SLA</a>
+          <a href="/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<script src="/nav.js?v=14" defer></script>
+<script src="/js/nav-auth.js?v=5" defer></script>
+</body>
+</html>

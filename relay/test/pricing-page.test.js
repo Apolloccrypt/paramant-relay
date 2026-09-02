@@ -143,21 +143,31 @@ assert.strictEqual(yearlyAlts, 3, 'expected 3 yearly options demoted to secondar
 assert(!/data-billing-interval="yearly"\s+class="btn/.test(html), 'no yearly variant may still be an equal btn');
 ok('one primary monthly CTA per tier, yearly demoted to a secondary link');
 
+// An amount ends where it says it ends. A bare includes('&euro;49') is satisfied
+// by the annual "&euro;499 excl." on the same card, so the two Pro monthly
+// prices, the ones a buyer clicks, were pinned by nothing at all. Verified by
+// sabotage: &euro;49 -> &euro;59 and &euro;15 -> &euro;19 both stayed green
+// before this, and both go red after it.
+function esc(v) { return v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function showsAmount(pageHtml, amount) {
+  return new RegExp(esc(amount) + '(?![\\d.,])').test(pageHtml);
+}
+// The excl-btw price has to sit on the card of the plan it belongs to. A page
+// may mention "from &euro;49 a month" in its opening line as well, and that
+// sentence must not be able to stand in for the tier itself.
+function showsAmountOnCard(pageHtml, amount, interval) {
+  const re = interval === 'monthly'
+    ? new RegExp('<div class="tier-price">' + esc(amount) + '(?![\\d.,])')
+    : new RegExp('Annual:?\\s*' + esc(amount) + '(?![\\d.,])');
+  return re.test(pageHtml);
+}
+
 // /parasign is the product page and quotes the ParaSign prices a second time.
 // relay/test/pricing-page.test.js is the only thing that ties a listed price to
 // the catalog, so the product page is held to the same numbers here: an edit
 // to one page without the other turns this suite red instead of leaving two
 // prices on the site.
 const parasignHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasign.html'), 'utf8');
-for (const v of VARIANTS.filter(x => x.product === 'parasign')) {
-  const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
-  assert(!order.error, 'catalog rejects ' + v.plan + '/' + v.interval + ': ' + order.error);
-  const excl = '&euro;' + v.excl.toLocaleString('en-US');
-  assert(parasignHtml.includes(excl), 'parasign.html no longer shows ' + excl + ' for ' + v.plan + '/' + v.interval);
-  const incl = '&euro;' + Number(order.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
-  assert(parasignHtml.includes(incl), 'parasign.html no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.plan + '/' + v.interval);
-  ok('parasign.html ' + v.plan + ' ' + v.interval + ': shows ' + excl + ' excl and ' + incl + ' incl');
-}
 for (const s of ['2 signatures per month', '100 signatures per month, then &euro;0.40 each, up to 1,000', '1,000 signatures per month']) {
   assert(parasignHtml.includes(s), 'parasign.html lost the quota line: ' + s);
 }
@@ -315,6 +325,7 @@ assert(VISIBLE.includes('There is no separate trial'), 'FAQ must keep saying the
 assert(VISIBLE.includes('Forever &middot; no card required'), 'Community card must keep the forever/no-card promise');
 ok('one starting-for-free promise: forever-free tier, no trial clock');
 
+
 // ── Every amount belongs to the card it stands in ────────────────────────────
 //
 // The catalog sweep above asks two questions: is every amount on the page a
@@ -394,5 +405,143 @@ for (const raw of cards) {
 }
 assert(bound >= 8, 'expected to bind at least 8 amounts to a card, bound ' + bound);
 ok('every amount and discount sits on the card of the plan it belongs to (' + bound + ' amounts bound)');
+
+// ── The product pages quote the same prices a second time ────────────────────
+//
+// /parasign and /parasend sell one product each and repeat its tiers. This file
+// is the only thing that ties a listed price to relay/lib/billing-catalog.js,
+// so both product pages are held to the same numbers here: an edit to one page
+// without the other turns this suite red instead of leaving two prices on the
+// site for the same plan. The pages carry no checkout button of their own; they
+// send the buyer to /pricing, which is where the data-billing-* buttons live.
+const PRODUCT_PAGES = [
+  { product: 'parasign', file: 'parasign.html' },
+  { product: 'parasend', file: 'parasend.html' },
+];
+const productHtml = {};
+for (const page of PRODUCT_PAGES) {
+  const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', page.file), 'utf8');
+  productHtml[page.product] = pageHtml;
+  for (const v of VARIANTS.filter(x => x.product === page.product)) {
+    const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
+    assert(!order.error, 'catalog rejects ' + v.plan + '/' + v.interval + ': ' + order.error);
+    const excl = '&euro;' + v.excl.toLocaleString('en-US');
+    assert(showsAmountOnCard(pageHtml, excl, v.interval),
+      page.file + ' no longer shows ' + excl + ' on the ' + v.plan + ' card for ' + v.interval);
+    const incl = '&euro;' + Number(order.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    assert(showsAmount(pageHtml, incl), page.file + ' no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.plan + '/' + v.interval);
+    ok(page.file + ' ' + v.plan + ' ' + v.interval + ': shows ' + excl + ' excl and ' + incl + ' incl');
+  }
+  assert(/excl\. btw/.test(pageHtml) && /incl\. 21% btw/.test(pageHtml),
+    page.file + ' must state excl. btw and the incl. 21% btw checkout amount');
+}
+ok('both product pages carry the btw convention and the catalog amounts');
+
+// ── The free number, pinned to the code that enforces it ─────────────────────
+//
+// /parasend said "10 uploads per hour per IP". That figure is real, but it is
+// ANON_RATE_PER_HOUR on POST /v2/anon-inbound (relay.js), an endpoint deprecated
+// on 2026-05-28 that answers with Deprecation and Sunset headers and retires on
+// 2026-12-31. It is not what a Community ACCOUNT gets. The account limits live
+// in relay/lib/tiers.js and are enforced in relay.js: transfers_month with a 402
+// (monthly_transfer_quota_reached), file_mb with a 413 (Max 5MB), view_ttl_ms
+// and max_views on the link itself.
+//
+// So the page is pinned to tiers.js rather than to the wording on /pricing.
+// Pinning one page to another only proves the two agree; it cannot catch both
+// being wrong together, which is exactly what happened here: /pricing and
+// index.html carry the same upload figure and are corrected in their own PRs.
+const tiers = require('../lib/tiers');
+const hours = (ms) => ms / 3_600_000;
+
+const COMMUNITY_LINES = [
+  [tiers.tierLimit('community', 'transfers_month') + ' transfers per month', 'transfers_month'],
+  [tiers.tierLimit('community', 'file_mb') + ' MB per file', 'file_mb'],
+  [hours(tiers.tierLimit('community', 'view_ttl_ms')) + ' hour link expiry', 'view_ttl_ms'],
+  [tiers.tierLimit('community', 'devices') + ' registered devices', 'devices'],
+];
+for (const [line, dim] of COMMUNITY_LINES) {
+  assert(productHtml.parasend.includes(line),
+    'parasend.html no longer states the Community ' + dim + ' that tiers.js enforces: "' + line + '"');
+}
+assert(tiers.tierLimit('community', 'max_views') === 1 && /Burn on first read/.test(productHtml.parasend),
+  'tiers.js gives Community one view, so parasend.html must say the link burns on first read');
+
+const PRO_LINES = [
+  [tiers.tierLimit('pro', 'transfers_month') + ' transfers per month', 'transfers_month'],
+  [hours(tiers.tierLimit('pro', 'view_ttl_ms')) + ' hour link expiry', 'view_ttl_ms'],
+  ['Up to ' + tiers.tierLimit('pro', 'max_views') + ' reads per link', 'max_views'],
+  ['Up to ' + tiers.tierLimit('pro', 'devices') + ' registered devices', 'devices'],
+];
+for (const [line, dim] of PRO_LINES) {
+  assert(productHtml.parasend.includes(line),
+    'parasend.html no longer states the ParaSend Pro ' + dim + ' that tiers.js enforces: "' + line + '"');
+}
+// The anon endpoint's figure may not come back on either product page under any
+// wording. It describes a keyless path that is being retired, not a plan.
+for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
+  assert(!/uploads per hour|uploads an hour/i.test(pageHtml),
+    name + ' states an uploads-per-hour figure; that is ANON_RATE_PER_HOUR on the deprecated /v2/anon-inbound, not a plan limit');
+}
+// No metered tier is unbounded: relay/lib/entitlements.js gives even enterprise
+// a finite ceiling. A page may not promise unlimited transfers to anyone.
+for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
+  assert(!/Unlimited transfers/i.test(pageHtml),
+    name + ' promises unlimited transfers, which entitlements.js forbids for every metered tier');
+}
+// A ParaSign plan derives its ParaSend tier (entitlements.js derivePlanParasend),
+// so where /parasign quotes a transfer number it must be that tier's number.
+assert(productHtml.parasign.includes(tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers per month'),
+  'parasign.html must quote the ParaSend transfer ceiling a ParaSign Pro account actually derives');
+ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
+   tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
+   tiers.tierLimit('community', 'file_mb') + ' MB)');
+
+// A feature bullet quoted from /pricing has to stay a quote. This one names a
+// subprocessor, so dropping "via Resend" would quietly remove a disclosure the
+// EU claim depends on being made in the same breath.
+for (const line of ['Email notifications via Resend']) {
+  assert(html.includes(line), '/pricing lost the feature line: ' + line);
+  assert(productHtml.parasend.includes(line), 'parasend.html lost the feature line /pricing carries: ' + line);
+}
+ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
+
+// The signature quota lines stay pinned to the words /pricing uses: those three
+// are billing copy (the overage rate and the hard cap), not a tiers.js row.
+for (const line of ['2 signatures per month', '100 signatures per month, then &euro;0.40 each, up to 1,000', '1,000 signatures per month']) {
+  assert(productHtml.parasign.includes(line), 'parasign.html lost the quota line: ' + line);
+}
+assert(tiers.tierLimit('community', 'signs_month') === 2,
+  'tiers.js no longer gives the free plan 2 signatures a month, so the pages that say so are stale');
+ok('parasign.html carries the signature quota lines, and tiers.js still backs the free one');
+
+// ── The service promises in a tier bullet are pinned too ─────────────────────
+//
+// The quota lines above were pinned, the service lines were not, and that is
+// exactly how "SLA 99.9%" reached parasend.html while /pricing and /sla both
+// published 99.95%. A number in a tier card is a promise whether it is priced
+// in euros or in uptime, so the uptime figure is now read from /sla, the page
+// that defines it, and every page that repeats it has to match.
+const slaHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'sla.html'), 'utf8');
+// /sla states two targets, one per tier, so read the Enterprise cell by name
+// rather than the first .uptime on the page: the Community figure (99.5%) is
+// a real number too and would silently become the thing under test.
+const slaTarget = /<div class="tier">Enterprise<\/div>\s*<div class="uptime">([\d.]+)%<\/div>/.exec(slaHtml);
+assert(slaTarget, 'sla.html no longer states an Enterprise uptime target');
+const SLA_TARGET = slaTarget[1];
+const SLA_LINE = 'SLA ' + SLA_TARGET + '%, priority incident response';
+const straySla = new RegExp('SLA (?!' + SLA_TARGET.replace('.', '\\.') + '%)\\d+\\.?\\d*%');
+for (const [name, pageHtml] of [['pricing.html', html], ['parasend.html', productHtml.parasend]]) {
+  assert(pageHtml.includes(SLA_LINE), name + ' must state "' + SLA_LINE + '", the target /sla publishes');
+  assert(!straySla.test(pageHtml), name + ' states an SLA figure that is not the one on /sla');
+}
+ok('the SLA figure on /pricing and /parasend is the one /sla publishes (' + SLA_TARGET + '%)');
+
+// A compliance framework named in a tier bullet carries its own limit in that
+// bullet. The nuance used to live thousands of pixels below the bullet, which
+// on a phone reads as a certification claim.
+assert(productHtml.parasend.includes('IEC 62443 / NIS2 / NEN 7510 documentation as input for your own compliance process, not third-party certification'),
+  'parasend.html must qualify the compliance bullet where the bullet stands');
+ok('the compliance bullet on /parasend carries its own limit');
 
 console.log('pricing-page: ' + passed + ' checks passed');
