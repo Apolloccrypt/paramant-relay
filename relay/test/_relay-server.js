@@ -53,7 +53,13 @@ function stopChild(child) {
 function killAll() {
   const all = [..._children].map(stopChild);
   _children.clear();
-  return Promise.all(all);
+  return Promise.all(all).then(() => {
+    for (const d of _dirs) {
+      if (!d.startsWith(os.tmpdir())) continue;
+      try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {}
+    }
+    _dirs.clear();
+  });
 }
 
 // A port the OS just told us is free. Racy in theory (someone could take it in
@@ -69,8 +75,14 @@ function freePort() {
   });
 }
 
+// Scratch dirs handed out by boot(), removed by killAll() so a test run leaves
+// nothing behind. Only ever paths this module made under the OS temp dir.
+const _dirs = new Set();
+
 function scratchDir(tag) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `relay-${tag}-`));
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), `relay-${tag}-`));
+  _dirs.add(d);
+  return d;
 }
 
 // Env that keeps a booted relay entirely inside its own scratch dir. Every
