@@ -407,7 +407,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <h3>Rate limiting and replay protection</h3>
-  <p>TOTP codes expire thirty seconds after issue. Each code is marked used the first time it is accepted, with an atomic single-use key in Redis. If Redis cannot be reached the check is skipped rather than failing the login, so replay protection is only as available as Redis is. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes.</p>
+  <p>TOTP codes expire thirty seconds after issue. Each code is marked used the first time it is accepted, with an atomic single-use key in Redis. If Redis cannot be reached the sign-in is refused rather than waved through, so a code is never accepted without being marked. Sign-ins are rate-limited to five per IP per fifteen minutes. An email address is never rate-limited into a lockout: failed sign-ins are counted per address and cleared by a successful one, and past ten inside fifteen minutes the next attempt has to carry a proof-of-work rather than being refused. Nobody can lock you out of your account by guessing at your address.</p>
 
   <h3>Compared to alternatives</h3>
   <p>Most encrypted file transfer services use password authentication with optional two-factor as an upgrade. Paramant reverses this. TOTP is required for human access from day one. The surface for credential theft is close to zero because there is nothing to phish, stuff, or reset.</p>

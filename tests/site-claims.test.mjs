@@ -256,9 +256,16 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
 });
 
 // 6 ── The authentication numbers on the security page. Session cookie
-// Max-Age, TOTP step, and the two login rate limits all live in code. The
-// sentence "after ten consecutive failures an account locks for thirty
-// minutes" had no code behind it (searched 2 September 2026) and is gone.
+// Max-Age, TOTP step, and the login limits all live in code. The sentence
+// "after ten consecutive failures an account locks for thirty minutes" had no
+// code behind it (searched 2 September 2026) and is gone.
+//
+// The per-email half is no longer a limit at all, and the page has to say so.
+// It used to be a counter on the address, incremented before authentication and
+// refusing at eleven, which meant a stranger could put the owner of an address
+// on 429 for fifteen minutes. It counts failures now, a success clears it, and
+// past the threshold the attempt costs a proof-of-work instead of being
+// refused. So the page may claim exactly one hard limit, the per-IP one.
 test('the authentication numbers on the security page are the ones the code enforces', () => {
   const srv = read('admin/server.js');
   const sec = visible(page('security'));
@@ -275,15 +282,27 @@ test('the authentication numbers on the security page are the ones the code enfo
   const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
   const perIp = Number(/b\.count >= (\d+)/.exec(fn)[1]);
   const winMin = Number(/(\d+) \* 60_000/.exec(fn)[1]);
-  // /api/user/login: per-IP and per-email counters in Redis with a TTL.
-  const login = srv.slice(srv.indexOf('paramant:user:ratelimit:ip:'));
-  const ttlSec = Number(/expire\(ipKey,\s*(\d+)\)/.exec(login)[1]);
-  const lim = /ipCount > (\d+) \|\| emailCount > (\d+)/.exec(login);
-  assert.equal(Number(lim[1]), perIp, 'both login paths must cap the same per-IP count');
-  assert.equal(ttlSec, winMin * 60, 'both login paths must use the same window');
-  const perEmail = Number(lim[2]);
-  assert.match(sec, new RegExp(`rate-limited to ${WORDS[perIp]} per IP per ${WORDS[winMin]} minutes and ${WORDS[perEmail]} per email per ${WORDS[winMin]} minutes`),
-    `security: login limits must read ${perIp}/IP and ${perEmail}/email per ${winMin} minutes`);
+  // /api/user/login: the limiter now lives in admin/lib/login-ratelimit.js.
+  const rl = read('admin/lib/login-ratelimit.js');
+  const ipLimit = Number(/const IP_LIMIT = (\d+);/.exec(rl)[1]);
+  const windowS = Number(/const WINDOW_S = (\d+);/.exec(rl)[1]);
+  const powAt = Number(/const EMAIL_FAIL_THRESHOLD = (\d+);/.exec(rl)[1]);
+  assert.equal(ipLimit, perIp, 'both login paths must cap the same per-IP count');
+  assert.equal(windowS, winMin * 60, 'both login paths must use the same window');
+
+  assert.match(sec, new RegExp(`rate-limited to ${WORDS[perIp]} per IP per ${WORDS[winMin]} minutes`),
+    `security: the per-IP login limit must read ${perIp} per ${winMin} minutes`);
+  assert.match(sec, new RegExp(`past ${WORDS[powAt]} inside ${WORDS[winMin]} minutes the next attempt has to carry a proof-of-work`),
+    `security: the per-email threshold must read ${powAt} and must be described as a cost, not a refusal`);
+
+  // The page must not sell the per-email counter as a limit again, and the
+  // handler must not implement one. A refusal keyed on an address is a lockout
+  // whatever it is called.
+  assert.doesNotMatch(sec, /per email per/i, 'security: there is no per-email refusal to advertise');
+  const handler = srv.slice(srv.indexOf('api.post("/user/login"'), srv.indexOf('api.post("/user/login-with-backup"'));
+  assert.doesNotMatch(handler, /paramant:user:ratelimit:email:|emailCount\s*>/,
+    'the login handler must not refuse on a per-email attempt counter');
+  assert.match(handler, /clearEmailFailures/, 'a successful sign-in must clear the failures counted on that address');
 
   assert.doesNotMatch(srv, /consecutive failures|lockout_minutes|LOCKOUT_MS/i, 'no login lockout is implemented; if one is added, put the sentence back with its numbers');
   assert.doesNotMatch(sec, /consecutive failures|account locks/i, 'security: must not promise an account lockout the code does not implement');

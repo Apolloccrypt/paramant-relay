@@ -172,12 +172,48 @@ test('match-only mode (no store) verifies without touching a replay store', asyn
   assert.strictEqual(r.algorithm, 'sha256');
 });
 
-test('a store error fails OPEN so a Redis blip never locks out first use', async () => {
+// The single-use guard used to be `.catch(() => 'OK')`: a Redis error reported
+// success and the code was accepted. On the endpoint that mints admin-panel
+// sessions that is a replay window handed out for free, and the availability it
+// bought was imaginary, because the session store is the same Redis. It fails
+// closed now, with an error a call site can turn into a 503 instead of a 401.
+test('a store error fails CLOSED and says so, rather than accepting the code', async () => {
   const secret = freshSecret();
-  const throwingStore = { async set() { throw new Error('redis down'); } };
   const code = totp.totpCode(secret, slotNow(), 'sha256');
-  const r = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10' }, throwingStore);
-  assert.strictEqual(r.valid, true, 'store error => .catch(=>OK) => valid');
+
+  const throwingStore = { async set() { throw new Error('redis down'); } };
+  const thrown = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10' }, throwingStore);
+  assert.strictEqual(thrown.valid, false, 'an unreachable replay store must not validate a code');
+  assert.strictEqual(thrown.error, totp.REPLAY_STORE_UNAVAILABLE, 'and it is reported as an outage, not a bad code');
+
+  // A store that throws synchronously never returns a promise to attach a
+  // handler to; it must not take the process down either.
+  const syncThrowingStore = { set() { throw new Error('redis down, synchronously'); } };
+  const sync = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10b' }, syncThrowingStore);
+  assert.strictEqual(sync.valid, false, 'a synchronous throw is an outage too');
+  assert.strictEqual(sync.error, totp.REPLAY_STORE_UNAVAILABLE);
+
+  // The outage answer must stay distinguishable from a refused replay, or the
+  // call sites cannot tell 503 from 401.
+  const store = fakeReplayStore();
+  const first = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10c' }, store);
+  const replay = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10c' }, store);
+  assert.strictEqual(first.valid, true, 'first use is accepted');
+  assert.strictEqual(replay.valid, false, 'the same code is refused the second time');
+  assert.strictEqual(replay.error, 'replay', 'a refused replay is not an outage');
+
+  // And a wrong code stays a plain no-match: no error field, so it can never be
+  // mistaken for a service problem.
+  const wrong = await totp.verifyTotpGeneric('000000', secret, { replayKey: 't10d' }, fakeReplayStore());
+  assert.strictEqual(wrong.valid, false);
+  assert.strictEqual(wrong.error, undefined, 'a wrong code carries no error code');
+});
+
+test('the fail-open catch is gone from the source, not just from the behaviour', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'totp.js'), 'utf8');
+  const guard = src.slice(src.indexOf('async function verifyTotpGeneric'));
+  assert.doesNotMatch(guard, /\.catch\(\(\)\s*=>\s*'OK'\)/, "the .catch(() => 'OK') fail-open must not come back");
+  assert.match(guard, /REPLAY_STORE_UNAVAILABLE/, 'a store failure is surfaced');
 });
 
 test('matchTotpSlot returns the exact matched counter slot and algorithm', () => {

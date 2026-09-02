@@ -87,27 +87,48 @@ function matchTotpSlot(token, secret, opts = {}) {
 }
 
 // Verify with an injected replay store (Redis-shaped: async set(key,val,{NX,EX})
-// returning 'OK' or null). Dual-verify by default (SHA-256 OR SHA-1). Behaviour-
-// identical to the former relay.js verifyTotpGeneric for the replay path: no store
-// or no replayKey => match-only; a per-slot NX key rejects reuse of a still-in-
-// window code; a store error fails OPEN (.catch => 'OK') so a Redis blip never
-// locks out a legitimate first use. On success returns { valid:true, algorithm },
-// where algorithm is 'sha256' or 'sha1' (the one that matched); on no match returns
-// { valid:false }.
+// returning 'OK' or null). Dual-verify by default (SHA-256 OR SHA-1). No store or
+// no replayKey => match-only; a per-slot NX key rejects reuse of a still-in-window
+// code. On success returns { valid:true, algorithm }, where algorithm is 'sha256'
+// or 'sha1' (the one that matched); on no match returns { valid:false }.
+//
+// FAIL-CLOSED ON A STORE ERROR (changed). This used to be
+// `.catch(() => 'OK')`: if Redis threw, the single-use check silently reported
+// success and the code was accepted. The comment above it called that a
+// deliberate choice for availability, and for a check that only prevented
+// double-spending a code it would be arguable. It is not arguable here. The NX
+// key is the only thing standing between an observed TOTP code and its replay
+// inside the same 30-second slot, on the endpoint that mints admin-panel
+// sessions. Trading that away buys availability for a login that, during a Redis
+// outage, cannot mint a session anyway: the session store IS Redis.
+//
+// So a store failure now yields { valid:false, error:'replay_store_unavailable' },
+// which call sites answer with 503 and a log line, distinct from the 401 a wrong
+// code gets. A refused replay yields { valid:false, error:'replay' }.
+const REPLAY_STORE_UNAVAILABLE = 'replay_store_unavailable';
+
 async function verifyTotpGeneric(token, secret, opts = {}, store = null) {
   const { window = 1, replayKey, algorithm, algorithms, now } = opts;
   const matched = matchTotpSlot(token, secret, { window, algorithm, algorithms, now: now ?? Date.now() });
   if (matched === null) return { valid: false };
   if (replayKey && store) {
     const slotKey = `${replayKey}:${matched.slot}`;
-    const ok = await store.set(slotKey, '1', { NX: true, EX: 90 }).catch(() => 'OK');
-    if (ok === null) return { valid: false };
+    let ok;
+    // try/catch as well as .catch: a store whose set() throws synchronously
+    // never returns a promise to attach a handler to.
+    try {
+      ok = await Promise.resolve(store.set(slotKey, '1', { NX: true, EX: 90 }));
+    } catch {
+      return { valid: false, error: REPLAY_STORE_UNAVAILABLE };
+    }
+    if (ok === null) return { valid: false, error: 'replay' };
   }
   return { valid: true, algorithm: matched.algorithm };
 }
 
 module.exports = {
   ALPHABET,
+  REPLAY_STORE_UNAVAILABLE,
   base32Encode,
   base32Decode,
   totpCode,
