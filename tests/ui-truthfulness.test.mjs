@@ -258,15 +258,42 @@ if (ruleNumbers.length) {
     `the homepage rules grid prints ${ruleNumbers.join(', ')}: show consecutive numbers or none at all`);
 }
 
-// 5. The founder line is on the homepage now. It may say exactly what /about
-// already says and nothing more, because a biography is the easiest thing on a
-// sales page to embellish and the hardest for a reader to check.
+// 5. The founder line. The earlier version of this check had the shape
+// "if (page says X) assert (/about says X)", which a rewrite walks straight
+// past: swapping "privacy and security researcher" for "award winning
+// cryptographer" deletes the very string the check looks for and it stays
+// green. Pinned in BOTH directions now.
 const about = read('frontend/about.html');
-for (const claim of ['Mick Beer', 'privacy and security researcher', 'Paramantis Solutions B.V.']) {
-  if (home.includes(claim)) {
-    assert.ok(about.includes(claim),
-      `index.html claims "${claim}" about the founder, but /about does not say it`);
-  }
+const flatten = (html) => html
+  .replace(/<!--[\s\S]*?-->/g, ' ')
+  .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ')
+  .replace(/\s+/g, ' ');
+const aboutText = flatten(about);
+
+// The sanctioned name and title, exactly as /about states them.
+const SANCTIONED_TITLE = 'privacy and security researcher';
+assert.ok(aboutText.includes(`Mick Beer, ${SANCTIONED_TITLE}`),
+  '/about is the source for the founder line and must carry the name and the title');
+
+// Direction one: a page that sells on the founder must carry that exact title,
+// so it cannot be quietly upgraded to something better-sounding.
+// Direction two: the qualifier that follows his name must use only words
+// /about itself uses, so no new credential can be smuggled in beside it.
+const ABOUT_WORDS = new Set(aboutText.toLowerCase().match(/[a-z]+/g) || []);
+for (const slug of ['index', 'pricing', 'parasign']) {
+  const text = flatten(read(`frontend/${slug}.html`));
+  if (!text.includes('Mick Beer')) continue;
+  assert.ok(text.includes(`Mick Beer , ${SANCTIONED_TITLE}`) || text.includes(`Mick Beer, ${SANCTIONED_TITLE}`),
+    `${slug}.html names the founder, so it must use the title /about gives him: "${SANCTIONED_TITLE}"`);
+  // Everything between his name and the end of the qualifying clause.
+  const after = text.slice(text.indexOf('Mick Beer') + 'Mick Beer'.length);
+  const clause = after.split(/(?:\.\s|,\s+and\s+the\b|\(see\b)/)[0];
+  const foreign = [...new Set((clause.toLowerCase().match(/[a-z]+/g) || []))]
+    .filter((w) => w.length > 2 && !ABOUT_WORDS.has(w));
+  assert.deepEqual(foreign, [],
+    `${slug}.html describes Mick Beer with words /about does not use: ${foreign.join(', ')}`);
 }
 assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
   'if the homepage names the founder it must also name the accountable company registration');

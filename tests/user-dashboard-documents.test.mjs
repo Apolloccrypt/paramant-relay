@@ -104,6 +104,64 @@ ok('document status is fetched once on load', documentRequests === 1, documentRe
 await page.setViewportSize({ width:1280, height:900 });
 ok('desktop uses a three-action row without overflow', await page.evaluate(() => getComputedStyle(document.querySelector('.dh-start')).gridTemplateColumns.split(' ').length === 3 && document.documentElement.scrollWidth - document.documentElement.clientWidth <= 1), await page.evaluate(() => getComputedStyle(document.querySelector('.dh-start')).gridTemplateColumns));
 
+// ── The plan badge and the Community band, driven end to end ────────────────
+// admin/test/user-plan-fields.test.js proves the FIELDS are on the wire. It is
+// a source-inspection test, so it cannot see whether the browser does anything
+// with them: paidProductTier() and the #dh-community toggle in dashboard.js
+// could both be deleted and every suite stayed green. This drives the real page
+// in Chromium with /api/user/me stubbed, one account state at a time.
+//
+// Why each case matters:
+//   community            the give-back band is the whole point of the page
+//   parasign pro, valid  a paying customer must never be told he is free
+//   parasign pro, lapsed the same rule effectiveProductTier() applies on the
+//                        server: above the floor is paid only while the period
+//                        runs, so an expired one falls back
+//   licensed             normalisePlan folds it to enterprise; before this it
+//                        rendered as a raw machine string
+const planPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+await planPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await planPage.route('**/api/user/documents**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"documents":[]}' }));
+await planPage.route('**/api/user/dashboard/overview', (route) => route.fulfill({ status:500, body:'' }));
+await planPage.route('**/api/user/account/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+
+const future = new Date(Date.now() + 30 * 86400000).toISOString();
+const past = new Date(Date.now() - 86400000).toISOString();
+let planState = {};
+await planPage.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({
+  email:'demo@example.com', label:'Demo', created_at:'2026-06-01T10:00:00.000Z',
+  backup_codes_remaining:8, session_expires_at:'2026-07-21T16:00:00.000Z', usage_purpose:'organisation',
+  plan_parasign:null, plan_parasend:null, paid_until_parasign:null, paid_until_parasend:null,
+  ...planState,
+}) }));
+
+async function planCase(state) {
+  planState = state;
+  await planPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+  await planPage.locator('#dh-root:not([hidden])').waitFor();
+  return {
+    // textContent, not innerText: the chip is uppercased in CSS, and what is
+    // under test is the word dashboard.js writes, not how it is painted.
+    badge: (await planPage.locator('[data-dh="plan-strong"]').textContent()).trim(),
+    band: await planPage.locator('#dh-community').isVisible(),
+  };
+}
+
+const freePlan = await planCase({ plan:'community' });
+ok('a Community account sees the give-back band', freePlan.badge === 'Community' && freePlan.band === true, JSON.stringify(freePlan));
+
+const paidPlan = await planCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future });
+ok('a paid ParaSign tier is never called free', paidPlan.badge === 'Pro' && paidPlan.band === false, JSON.stringify(paidPlan));
+
+const lapsedPlan = await planCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:past });
+ok('an expired paid period falls back to Community', lapsedPlan.badge === 'Community' && lapsedPlan.band === true, JSON.stringify(lapsedPlan));
+
+const sendPlan = await planCase({ plan:'community', plan_parasend:'pro', paid_until_parasend:future });
+ok('a paid ParaSend tier counts too', sendPlan.badge === 'Pro' && sendPlan.band === false, JSON.stringify(sendPlan));
+
+const licensedPlan = await planCase({ plan:'licensed' });
+ok('a licensed account reads as Enterprise, not as a machine string', licensedPlan.badge === 'Enterprise' && licensedPlan.band === false, JSON.stringify(licensedPlan));
+
 for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name}${check.detail ? ' :: ' + check.detail : ''}`);
 await browser.close();
 server.close();

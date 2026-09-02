@@ -433,7 +433,21 @@ test('any CLI tool count the site states is the size of the developer catalogue'
   const wrong = [];
   for (const slug of allPages()) {
     const html = read(`frontend/${slug}.html`);
-    for (const m of html.matchAll(/(\d+|[A-Za-z]+) encrypted CLI tools/g)) {
+    // Broadened: the old regex only matched "encrypted CLI tools", the exact
+    // phrasing of a claim this PR removed, so it matched nothing anywhere and
+    // guarded nothing. It now catches any count of CLI or command-line tools,
+    // however the sentence is worded.
+    //
+    // Zero matches is ALLOWED and is the state today. The invariant is "if a
+    // page states a count, the count is right", not "some page must state one":
+    // the "10 encrypted CLI tools" claim came off the homepage on purpose,
+    // because paramant-solutions is private and a visitor cannot obtain the
+    // tools (July 2026 claims audit). Requiring the sentence to exist would
+    // force an unobtainable claim back onto the site.
+    // A COUNT is a numeral or a number word. "SDKs and CLI tools" states no
+    // count and is not this test's business.
+    const COUNT = `\\d+|${WORDS.join('|')}`;
+    for (const m of html.matchAll(new RegExp(`(${COUNT})(?:\\s+\\w+)? (?:CLI|command-line) tools\\b`, 'gi'))) {
       const stated = m[1];
       const ok = stated === String(n) || stated.toLowerCase() === WORDS[n];
       if (!ok) wrong.push(`${slug}: "${m[0]}" but the catalogue holds ${n}`);
