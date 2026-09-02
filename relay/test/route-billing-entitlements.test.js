@@ -166,6 +166,68 @@ test('a key loaded from users.json keeps the paid period it was stored with', ()
   did();
 });
 
+test('a key minted while the subscription is LIVE does not outlive it', async () => {
+  // The third place the period could be dropped, and the only one a customer can
+  // trigger on demand: POST /v2/user/parasign-keys (relay.js:3259, self-serve
+  // through the admin server) and the admin mint (relay.js:5451) both run
+  // keys-table.buildParasignKeyRecord, which wrote plan_parasign onto the new
+  // key and its users.json entry but never paid_until_parasign. A key minted
+  // one day before the subscription ended therefore carried a paid tier with no
+  // end date, and "no recorded period" means "never expires". Mint on the last
+  // day, keep ParaSign Business forever, restart included.
+  //
+  // The period here is deliberately a few seconds out, so the test watches a
+  // real subscription end instead of asserting on a stored string.
+  const SOON = new Date(Date.now() + 3500).toISOString();
+  let srv = await withUsers('mint-carries-period', [{
+    key: 'pgp_minting', plan: 'community', active: true, parasign: true,
+    account_id: 'acct_minting', email: 'mint@example.test',
+    plan_parasign: 'business', paid_until_parasign: SOON,
+  }]);
+  const live = await entitlementsOf(srv, 'acct_minting');
+  assert.strictEqual(live.json.entitlements.parasign.tier, 'business',
+    'precondition: at mint time the account really is a paying Business account');
+
+  const minted = await srv.post('/v2/user/parasign-keys', { headers: BOTH, body: { user_id: 'acct_minting' } });
+  assert.strictEqual(minted.status, 201, minted.text);
+  assert.match(minted.json.key, /^psk_(live|test)_[0-9a-f]{64}$/);
+
+  // The users.json write is queued, not awaited by the handler.
+  await new Promise((r) => setTimeout(r, 300));
+  const onDisk = srv.readUsersFile().api_keys.find((k) => k.key === minted.json.key);
+  assert.ok(onDisk, 'the minted key reached users.json');
+  assert.strictEqual(onDisk.plan_parasign, 'business', 'the new key inherits the paid tier');
+  assert.strictEqual(onDisk.paid_until_parasign, SOON,
+    'and the period that bounds it, or the tier is a permanent copy of a temporary grant');
+
+  // Let the subscription actually end, then come back on a cold process so the
+  // answer is read from disk and not from anything still in memory.
+  while (Date.now() < Date.parse(SOON) + 250) await new Promise((r) => setTimeout(r, 100));
+  srv = await srv.restart();
+  const after = await entitlementsOf(srv, 'acct_minting');
+  assert.strictEqual(after.json.entitlements.parasign.tier, 'free',
+    'the minted key must not outlive the subscription that paid for it');
+  srv.stop();
+  did();
+});
+
+test('a key minted for an ALREADY lapsed account is a plain floor key, with no stale date', async () => {
+  let srv = await withUsers('mint-after-lapse', [{
+    key: 'pgp_lapsed_mint', plan: 'community', active: true, parasign: true,
+    account_id: 'acct_lapsed_mint', email: 'lapsed-mint@example.test',
+    plan_parasign: 'business', paid_until_parasign: PAST,
+  }]);
+  const minted = await srv.post('/v2/user/parasign-keys', { headers: BOTH, body: { user_id: 'acct_lapsed_mint' } });
+  assert.strictEqual(minted.status, 201, minted.text);
+  await new Promise((r) => setTimeout(r, 300));
+  const onDisk = srv.readUsersFile().api_keys.find((k) => k.key === minted.json.key);
+  assert.strictEqual(onDisk.plan_parasign, 'free', 'a lapsed account mints what it is entitled to now, not what it paid for once');
+  assert.ok(!('paid_until_parasign' in onDisk),
+    'and carries no date, because a floor tier has no period to be bounded by');
+  srv.stop();
+  did();
+});
+
 test('entitlements.js:137: a record with NO paid_until is never read as expired', async () => {
   // The dangerous reading of "no date on file" is "the period ended". That would
   // downgrade every account that predates the paid_until field, and every one

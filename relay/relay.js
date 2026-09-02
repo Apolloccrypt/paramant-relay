@@ -1651,24 +1651,64 @@ setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap)
 // signature, same verification through POST /v2/verify-receipt.
 //
 // Kept in RAM like everything else on this relay, and deliberately short-lived:
-// a client fetches its receipt in the same breath as the download. The cap
-// bounds the memory a burst of downloads can pin (a receipt is about 18 KB).
+// a client fetches its receipt in the same breath as the download.
+//
+// The budget is PER ACCOUNT, not one shared queue. A single global LRU is a
+// cross-tenant eviction channel: one account doing enough downloads pushes
+// another account's receipt out inside its own 15 minute window, and before
+// this route the receipt was guaranteed to be on the response itself. So an
+// account can only ever evict its OWN oldest receipt, and the global ceiling is
+// a backstop that takes from the LARGEST holder, which can never be the small
+// tenant it would be protecting.
+//
+// Memory. The stored form is the receipt JSON, not its base64url wrapper: the
+// wrapper is 4/3 the size and re-encoding it on the way out is deterministic,
+// so the hash stays stable and about 4.6 KB per receipt is not held. That puts
+// a receipt at roughly 14 KB, so the ceiling below is a worst case of about
+// 56 MB, reached only when 20 accounts each hold a full 200 at once. Both caps
+// are overridable so the eviction rule itself is testable without driving
+// thousands of downloads.
 const RECEIPT_TTL_MS = 15 * 60 * 1000;
-const RECEIPT_MAX = 1000;
-const deliveryReceipts = new Map(); // receipt_id -> { payload, hash, apiKey, expiresAt }
-function storeDeliveryReceipt(payload, hash, apiKey) {
+const RECEIPT_PER_ACCOUNT_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_PER_ACCOUNT_MAX || '200', 10) || 200);
+const RECEIPT_TOTAL_MAX = Math.max(RECEIPT_PER_ACCOUNT_MAX, parseInt(process.env.PARAMANT_RECEIPT_TOTAL_MAX || '4000', 10) || 4000);
+const deliveryReceipts = new Map(); // receipt_id -> { json, hash, apiKey, owner, expiresAt }
+const receiptsByOwner = new Map();  // owner (account_id) -> Set<receipt_id>, insertion ordered
+function _dropReceipt(id) {
+  const rec = deliveryReceipts.get(id);
+  if (!rec) return;
+  deliveryReceipts.delete(id);
+  const own = receiptsByOwner.get(rec.owner);
+  if (own) { own.delete(id); if (own.size === 0) receiptsByOwner.delete(rec.owner); }
+}
+function _dropOldestOf(owner) {
+  const own = receiptsByOwner.get(owner);
+  if (!own) return false;
+  const oldest = own.values().next();
+  if (oldest.done) return false;
+  _dropReceipt(oldest.value);
+  return true;
+}
+function storeDeliveryReceipt(json, hash, apiKey, owner) {
   const id = crypto.randomBytes(16).toString('hex');
-  // Oldest-first eviction: Map preserves insertion order and every entry has
-  // the same TTL, so the head is always the one closest to expiring.
-  while (deliveryReceipts.size >= RECEIPT_MAX) {
-    const oldest = deliveryReceipts.keys().next();
-    if (oldest.done) break;
-    deliveryReceipts.delete(oldest.value);
+  const bucket = owner || apiKey || '_anonymous';
+  // Sets preserve insertion order and every entry has the same TTL, so the head
+  // of a bucket is always that owner's entry closest to expiring.
+  while ((receiptsByOwner.get(bucket)?.size || 0) >= RECEIPT_PER_ACCOUNT_MAX) {
+    if (!_dropOldestOf(bucket)) break;
   }
-  deliveryReceipts.set(id, { payload, hash, apiKey: apiKey || null, expiresAt: Date.now() + RECEIPT_TTL_MS });
+  // Global backstop. Take from whoever holds the most, never from whoever
+  // happens to be oldest, so a burst cannot evict a quiet tenant.
+  while (deliveryReceipts.size >= RECEIPT_TOTAL_MAX) {
+    let biggest = null; let most = 0;
+    for (const [o, set] of receiptsByOwner) if (set.size > most) { most = set.size; biggest = o; }
+    if (biggest === null || !_dropOldestOf(biggest)) break;
+  }
+  deliveryReceipts.set(id, { json, hash, apiKey: apiKey || null, owner: bucket, expiresAt: Date.now() + RECEIPT_TTL_MS });
+  if (!receiptsByOwner.has(bucket)) receiptsByOwner.set(bucket, new Set());
+  receiptsByOwner.get(bucket).add(id);
   return id;
 }
-setInterval(() => { const now = Date.now(); for (const [id, r] of deliveryReceipts) if (now > r.expiresAt) deliveryReceipts.delete(id); }, 60_000).unref?.();
+setInterval(() => { const now = Date.now(); for (const [id, r] of deliveryReceipts) if (now > r.expiresAt) _dropReceipt(id); }, 60_000).unref?.();
 
 // Deprecation window for the fat header. Nothing in this repo reads it outside
 // its own tests, but an out-of-tree client might, so an operator can put it back
@@ -1864,13 +1904,23 @@ function mintParasignKey(accountId, opts = {}) {
   // permanent one. A record with no per-product tier at all is left undefined,
   // so buildParasignKeyRecord still derives from the legacy plan as before.
   const eff = entitlementRecordOf(accountId) || {};
-  const _effTier = (product) => (eff[entitlements.PRODUCT_PLAN_FIELD[product]] == null
-    ? undefined
-    : entitlements.effectiveProductTier(eff, product).tier);
+  // Tier AND period, together, or the new key is an unbounded copy of a bounded
+  // grant. An ALREADY expired grant is minted as the floor tier with no period
+  // at all (effectiveProductTier reports it as expired), so a lapsed account
+  // does not get a stale date on a fresh key either.
+  const _effGrant = (product) => {
+    if (eff[entitlements.PRODUCT_PLAN_FIELD[product]] == null) return {};
+    const g = entitlements.effectiveProductTier(eff, product);
+    return { tier: g.tier, paidUntil: g.expired ? null : eff[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]] };
+  };
+  const _pg = _effGrant('parasign');
+  const _ps = _effGrant('parasend');
   const built = keysTable.buildParasignKeyRecord({
     accountId, plan, email, label: opts.label, test: !!opts.test,
-    planParasign: opts.planParasign || _effTier('parasign'),
-    planParasend: opts.planParasend || _effTier('parasend'),
+    planParasign: opts.planParasign || _pg.tier,
+    planParasend: opts.planParasend || _ps.tier,
+    paidUntilParasign: _pg.paidUntil,
+    paidUntilParasend: _ps.paidUntil,
     randomHex: crypto.randomBytes(32).toString('hex'),
   });
   const { key, record, usersEntry } = built;
@@ -4617,6 +4667,7 @@ const server = http.createServer(async (req, res) => {
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
+    let receiptJson = null;
     const ctData = entry.ct_entry || null;
     if (ctData) {
       const inclusionProof = {
@@ -4646,7 +4697,8 @@ const server = http.createServer(async (req, res) => {
         } catch(e) { log('warn', 'receipt_sign_failed', { err: e.message }); }
       }
       const receipt = { ...receiptPayload, signature };
-      receiptHeader = Buffer.from(JSON.stringify(receipt)).toString('base64url');
+      receiptJson = JSON.stringify(receipt);
+      receiptHeader = Buffer.from(receiptJson).toString('base64url');
     }
 
     const outHeaders = {
@@ -4661,12 +4713,20 @@ const server = http.createServer(async (req, res) => {
     // that Node clients or a default nginx will accept (see the store above).
     if (receiptHeader) {
       const receiptHash = crypto.createHash('sha3-256').update(receiptHeader).digest('hex');
-      const receiptId = storeDeliveryReceipt(receiptHeader, receiptHash, entry.apiKey || apiKey || null);
+      const _receiptKey = entry.apiKey || apiKey || null;
+      const receiptId = storeDeliveryReceipt(receiptJson, receiptHash, _receiptKey, _receiptKey ? acctOf(_receiptKey) : null);
       outHeaders['X-Paramant-Receipt-Id'] = receiptId;
       outHeaders['X-Paramant-Receipt-Hash'] = 'sha3-256:' + receiptHash;
       outHeaders['X-Paramant-Receipt-Url'] = `/v2/transfers/${receiptId}/receipt`;
-      // DEPRECATED, off by default, removed after 2026-12-01.
+      // DEPRECATED, off by default, removed after 2026-12-01. When it is off,
+      // say so ON THE RESPONSE. A client that reads X-Paramant-Receipt and finds
+      // nothing there has no way to tell "this transfer had no receipt" from
+      // "the receipt moved", and the Python SDK's own handling of an absent
+      // header is a silent receipt=None (sdk-py/paramant_sdk.py:681). A silent
+      // downgrade of a delivery proof is the one failure mode this route must
+      // not have, so the removal announces itself and says where to go.
       if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+      else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
     }
     res.writeHead(200, outHeaders);
     if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
@@ -4691,7 +4751,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (rec.apiKey && rec.apiKey !== apiKey) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    return res.end(J({ ok: true, receipt: rec.payload, receipt_hash: 'sha3-256:' + rec.hash }));
+    return res.end(J({ ok: true, receipt: Buffer.from(rec.json).toString('base64url'), receipt_hash: 'sha3-256:' + rec.hash }));
   }
 
   // ── GET /v2/status/:hash ─────────────────────────────────────────────────────

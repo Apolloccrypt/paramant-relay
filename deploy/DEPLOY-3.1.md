@@ -75,6 +75,39 @@ layer on is a separate decision, taken when there is a Mollie test key to
 prove it against first. That is step 3 in the vault's order (deny, then
 test key plus mode, then deploy) collapsed to: deploy now, decide later.
 
+## A second brake: the delivery receipt moved out of the download header
+
+**Precondition, not a step: `Apolloccrypt/paramant-sdk` PR #5 must be released
+to PyPI before main reaches production.**
+
+Relay PR #342 takes the signed ParaSend delivery receipt out of the
+`X-Paramant-Receipt` response header. It had to go: 18551 bytes for that one
+header, over Node's 16 KB limit and over the default nginx proxy buffer, so a
+client using `fetch()` could not download at all. The receipt is now fetched
+from `GET /v2/transfers/:receipt_id/receipt`.
+
+The out-of-tree Python SDK reads that header (`sdk-py/paramant_sdk.py:681`) and
+turns an absent one into `receipt = None`, without an error. So a `3.2.0`
+client against a deployed main keeps working and silently stops getting proof
+of delivery. `paramant-sdk` 3.2.1 reads both shapes and fails loudly; that is
+the release this deploy waits for.
+
+Two ways out if the release is not ready and the deploy cannot wait:
+
+- Set `PARAMANT_INLINE_RECEIPT_HEADER=1` in the relay containers for this
+  deploy. The old header comes back alongside the new reference, so old clients
+  keep working. It then also needs `proxy_buffer_size` raised on the
+  `/v2/outbound` locations in nginx, or the download is a 502; the repo copy of
+  `deploy/nginx-paramant-public.conf` already carries that setting with a
+  comment, the production conf does not.
+- Or hold main. The default is off on purpose, because on a default nginx the
+  fat header is a 502 rather than a feature.
+
+Either way the flag is temporary: the old header is removed after
+**2026-12-01**. While it is off, every download carries
+`X-Paramant-Receipt-Deprecated` naming the new url, so a client that looks
+finds out.
+
 ## Before you start (laptop or NUC, read-only)
 
 1. CI on main is green: `gh run list --branch main -L 5`.

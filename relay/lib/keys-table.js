@@ -238,7 +238,7 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
 // keeps scope+parasign). A minted product key is never an account primary.
 //   randomHex: caller-supplied cryptographic hex (relay: crypto.randomBytes(32)).
 //   test:      psk_test_ (sandbox) vs psk_live_.
-function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt, planParasign, planParasend }) {
+function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt, planParasign, planParasend, paidUntilParasign, paidUntilParasend }) {
   if (!accountId) throw new Error('accountId required');
   if (!randomHex || typeof randomHex !== 'string') throw new Error('randomHex required');
   const key = (test ? 'psk_test_' : 'psk_live_') + randomHex;
@@ -273,6 +273,24 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
     plan_parasign: normParasign, plan_parasend: normParasend,
     account_id: accountId, is_primary: false, scope: 'parasign', parasign: true, product: 'parasign',
   };
+  // The paid PERIOD travels with the inherited tier, onto BOTH the live record
+  // and the users.json entry. Without it a key minted while the subscription was
+  // still running carried a paid tier and no end date, and "no recorded period"
+  // means "never expires" (entitlements.js:137). So the new key outlived the
+  // subscription that paid for it, and outlived a restart too, because that is
+  // the shape that reached disk. Both issuance paths run through here
+  // (POST /v2/user/parasign-keys, self-serve, and the admin mint), so this is
+  // the one place it has to be right.
+  // applyProductTier is the shared field rule: undefined leaves the field alone,
+  // and landing on a floor tier clears any period, so a lapsed grant is minted
+  // as a plain floor key with no stale date on it.
+  for (const [product, tier, until] of [
+    ['parasign', normParasign, paidUntilParasign],
+    ['parasend', normParasend, paidUntilParasend],
+  ]) {
+    entitlements.applyProductTier(rec, product, tier, until);
+    entitlements.applyProductTier(usersEntry, product, tier, until);
+  }
   return { key, record: rec, usersEntry };
 }
 

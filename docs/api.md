@@ -111,6 +111,13 @@ operator can put it back for the transition with
 `PARAMANT_INLINE_RECEIPT_HEADER=1`, and must then also raise
 `proxy_buffer_size` on any proxy in front of the relay.
 
+While the old header is off, every download also carries
+`X-Paramant-Receipt-Deprecated: removed 2026-12-01; GET /v2/transfers/<id>/receipt`.
+It exists because a client that reads `X-Paramant-Receipt` and finds nothing
+cannot tell "this transfer had no receipt" from "the receipt moved", and a
+delivery proof must never go missing quietly. The header is not sent when the
+opt-in is on, because then there is nothing to announce.
+
 ---
 
 ### GET /v2/transfers/:receipt_id/receipt (fetch a delivery receipt)

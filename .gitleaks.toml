@@ -1,0 +1,29 @@
+# gitleaks configuration for paramant-relay.
+#
+# WHY THIS FILE EXISTS. The published API docs show every authenticated call as
+# a runnable curl, and a curl needs a key-shaped string in it. gitleaks' own
+# `curl-auth-header` rule then fires on the placeholder, so the secrets job goes
+# red on a documentation change that contains no secret at all.
+#
+# Until now that was handled by adding the finding's fingerprint to
+# .gitleaksignore. A fingerprint is commit:file:rule:line, so it goes stale the
+# moment a line moves, and every new example needs a new entry: the ignore file
+# already carries 20-odd of them for exactly this rule. This allowlist is the
+# durable half. .gitleaksignore stays as it is, for the findings that really are
+# per-commit history (the revoked RESEND_API_KEY, test fixtures).
+#
+# The regex is deliberately narrow: the two literal placeholder strings, and
+# only where they follow the API key header. `pgp_` and `plk_` keys with any
+# other body are still caught, which is the whole point. There is a test for
+# that claim in the PR that introduced this file: swap the placeholder for a
+# random-looking key and gitleaks fires again.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documentation placeholders in the published curl examples. Not keys: literal strings, in docs/api.md, frontend/docs/api.md and README.md."
+regexTarget = "match"
+regexes = [
+  '''X-Api-Key:\s*pgp_your_key''',
+  '''X-Api-Key:\s*plk_your_key''',
+]

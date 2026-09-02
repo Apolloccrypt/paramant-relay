@@ -215,6 +215,13 @@ test('a download answers with less than 8 KB of response headers', async () => {
     `a download must fit a default proxy buffer, got ${bytes} bytes of headers`);
   assert.ok(!('x-paramant-receipt' in r.headers),
     'and the fat header is gone by default, not merely smaller');
+  // The removal is announced ON the response, because a client that reads the
+  // old header and finds nothing cannot tell "no receipt" from "it moved". The
+  // Python SDK turns an absent header into a silent receipt=None, which is a
+  // delivery proof quietly becoming nothing.
+  assert.strictEqual(r.headers['x-paramant-receipt-deprecated'],
+    `removed 2026-12-01; GET /v2/transfers/${r.headers['x-paramant-receipt-id']}/receipt`,
+    'a download says out loud that the old header is gone and where the receipt went');
   did();
 });
 
@@ -236,6 +243,58 @@ test('a receipt reference is single-tenant, and unknown or foreign ids give one 
   for (let i = 0; i < 2; i++) {
     assert.strictEqual((await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': PRO } })).status, 200);
   }
+  did();
+});
+
+test('a busy tenant cannot evict a quiet tenant\'s receipt', async () => {
+  // The receipt store started as ONE shared LRU. That is a cross-tenant
+  // eviction channel: enough downloads by B push A's receipt out inside A's own
+  // 15 minute window, and before this route existed the receipt was guaranteed
+  // to be on the response itself, so this would be a regression paid for by a
+  // stranger. The budget is per account now, and the global ceiling takes from
+  // the LARGEST holder, which can never be the tenant it would be protecting.
+  //
+  // The caps are driven down here so the RULE is measured rather than the
+  // numbers: with a shared queue of 8, B's ninth receipt evicts A's first.
+  const A = 'pgp_quiet_tenant_receipt_suite';
+  const B = 'pgp_busy_tenant_receipt_suite';
+  const srv2 = await boot({
+    tag: 'transfer-receipt-budget',
+    env: { PARAMANT_RECEIPT_PER_ACCOUNT_MAX: '4', PARAMANT_RECEIPT_TOTAL_MAX: '8' },
+    users: { api_keys: [
+      { key: A, plan: 'pro', active: true, email: 'quiet@example.test', account_id: 'acct_quiet' },
+      { key: B, plan: 'business', active: true, email: 'busy@example.test', account_id: 'acct_busy' },
+    ] },
+  });
+  const put = async (key) => {
+    const b = blob(`budget-${crypto.randomBytes(4).toString('hex')}`);
+    assert.strictEqual((await srv2.post('/v2/inbound', {
+      headers: { 'X-Api-Key': key }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+    })).status, 200);
+    const r = await srv2.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': key } });
+    assert.strictEqual(r.status, 200);
+    return r.headers['x-paramant-receipt-id'];
+  };
+
+  const quiet = await put(A);
+  assert.ok(quiet, 'the quiet tenant has exactly one receipt outstanding');
+  // Three times the whole store, all from one account.
+  const busy = [];
+  for (let i = 0; i < 24; i++) busy.push(await put(B));
+
+  const still = await srv2.get(`/v2/transfers/${quiet}/receipt`, { headers: { 'X-Api-Key': A } });
+  assert.strictEqual(still.status, 200,
+    'a stranger\'s download burst must not take the quiet tenant\'s receipt away');
+
+  // And the busy tenant is held to its OWN budget, so the burst is bounded.
+  const survivors = [];
+  for (const id of busy) {
+    const r = await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': B } });
+    if (r.status === 200) survivors.push(id);
+  }
+  assert.strictEqual(survivors.length, 4, 'the busy tenant keeps its own 4 newest and no more');
+  assert.deepStrictEqual(survivors, busy.slice(-4), 'and they are the newest, not an arbitrary four');
+  srv2.stop();
   did();
 });
 
@@ -261,6 +320,8 @@ test('the fat header comes back only when an operator asks for it, and it is dep
   assert.ok(Buffer.byteLength(r.headers['x-paramant-receipt']) > 16384,
     'and it is still the header that does not fit, which is why it is going away');
   assert.ok(r.headers['x-paramant-receipt-id'], 'the reference is served alongside it during the window');
+  assert.ok(!('x-paramant-receipt-deprecated' in r.headers),
+    'and while the opt-in is on there is nothing to announce: the old header is really there');
   legacy.stop();
   did();
 });
