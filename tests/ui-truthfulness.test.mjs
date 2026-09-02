@@ -113,11 +113,14 @@ assert.deepEqual(drifted, [],
   `these prices are on the homepage but not on /pricing: ${drifted.join(', ')}`);
 
 // ── The dashboard, which is the homepage for anyone who signed up ────────────
-// Mick's phone showed a badge reading "COMMUNITY PLAN" over a Start card, while
-// /pricing sells Free, Pro, Business and Enterprise and never once says
-// Community. The badge was the raw relay plan ID leaking into the interface, so
-// the one number a customer wants to check (which plan am I on, what does the
-// next one cost) could not be looked up on the page that sells it.
+// Mick's phone showed a badge reading "COMMUNITY PLAN" over a Start card, and
+// the word was the raw relay plan ID leaking through. The fix is not to hide
+// the word: Community is what relay/lib/tiers.js calls the free row, what /sla
+// calls the plan, what the account mail calls it, and it is the one thing
+// Paramant sells on. What was actually broken is that /pricing labels the same
+// tier Free, so a customer who read COMMUNITY on the dashboard could not find
+// it on the page that sells it. So the dashboard says Community AND names the
+// pricing tier, and every OTHER name it shows has to exist on /pricing.
 const dashboardJs = read('frontend/js/dashboard.js');
 const planMap = (dashboardJs.match(/var PLAN_NAMES = \{[\s\S]*?\};/) || [''])[0];
 const planEntries = [...planMap.matchAll(/^\s*([a-z_]+):\s*'([^']+)',?$/gm)].map((m) => [m[1], m[2]]);
@@ -175,6 +178,48 @@ const verifyCount = (guarantees.match(/class="rule-verify"/g) || []).length;
 assert.equal(verifyCount, ruleCount,
   `pararules.html has ${ruleCount} rules but ${verifyCount} verify links; the homepage promises one each`);
 assert.ok(ruleCount >= 9, `expected at least nine ParaRules, found ${ruleCount}`);
+
+// ── The same answer on the account page ──────────────────────────────────────
+// A customer who wants to know what he pays goes to /account, not /dashboard,
+// so account.inline1.js resolves plans too. It has to obey the same source of
+// truth: name every canonical row, fold every alias the same way. Two maps that
+// drift apart is how 'standard' reached a customer's screen in the first place.
+const accountJsPlans = read('frontend/js/account.inline1.js');
+const acctIds = [...((accountJsPlans.match(/var PLAN_NAMES = \{[\s\S]*?\};/) || [''])[0])
+  .matchAll(/^\s*([a-z_]+):\s*'([^']+)',?$/gm)].map((m) => m[1]);
+const acctUnnamed = canonicalPlans.filter((id) => !acctIds.includes(id));
+assert.deepEqual(acctUnnamed, [],
+  `relay/lib/tiers.js has these canonical plans but account.inline1.js has no display name: ${acctUnnamed.join(', ')}`);
+
+const acctAliasBlock = (accountJsPlans.match(/var PLAN_ALIASES = \{[^}]*\}/) || [''])[0];
+const acctWrongAlias = tierAliases.filter(([from, to]) => !new RegExp(`${from}:\\s*'${to}'`).test(acctAliasBlock));
+assert.deepEqual(acctWrongAlias.map(([f, t]) => `${f}->${t}`), [],
+  'account.inline1.js must fold the same plan aliases normalisePlan does');
+
+// ── Both signed-in surfaces, on the message itself ───────────────────────────
+const dashboardHtml = read('frontend/dashboard.html');
+const accountHtml = read('frontend/account.html');
+
+// A paying customer is not a lead. The band a paid plan sees says what was
+// bought and stops there; it may not carry a link to the pricing page.
+for (const [file, html] of [['dashboard.html', dashboardHtml], ['account.html', accountHtml]]) {
+  const paid = (html.match(/id="(dh-plan-paid|billing-paid)"[\s\S]*?<\/(aside|div)>/) || [''])[0];
+  assert.ok(paid, `${file} must carry the paid-plan band`);
+  assert.doesNotMatch(paid, /href="\/pricing"/,
+    `${file} must not sell a higher tier to someone who already pays`);
+}
+
+// The free band is the one upgrade path, so it gets exactly one link to
+// /pricing. Two was the old bridge sentence explaining that Community was
+// called Free over there; /pricing says Community now and the sentence is gone.
+for (const [file, html, id] of [['dashboard.html', dashboardHtml, 'dh-community'], ['account.html', accountHtml, 'billing-community']]) {
+  const band = (html.match(new RegExp(`id="${id}"[\\s\\S]*?<\\/(aside|div)>\\s*<\\/?(aside|div|p)`)) || [''])[0];
+  assert.ok(band, `${file} must carry the free-plan band`);
+  assert.equal((band.match(/href="\/pricing"/g) || []).length, 1,
+    `${file} must offer exactly one upgrade link in the free band`);
+  assert.doesNotMatch(band, /called Free|tier is called|Same name on/i,
+    `${file} must not still explain a Free/Community mismatch that no longer exists`);
+}
 
 // The signed-in address is in the nav. A second copy in the hero was the first
 // thing under the H1 on a phone, above both product actions.
@@ -282,9 +327,20 @@ assert.ok(aboutText.includes(`Mick Beer, ${SANCTIONED_TITLE}`),
 // Direction two: the qualifier that follows his name must use only words
 // /about itself uses, so no new credential can be smuggled in beside it.
 const ABOUT_WORDS = new Set(aboutText.toLowerCase().match(/[a-z]+/g) || []);
-for (const slug of ['index', 'pricing', 'parasign']) {
+// Pages that SELL on the founder. On these the line is required, not optional:
+// an if-includes gate lets the sentence be deleted and stays green, and the
+// give-back promise is the one thing the signed-in pages are there to make.
+const FOUNDER_REQUIRED = ['index', 'dashboard', 'account'];
+// Pages that MAY name him. If they do, the same rules apply.
+const FOUNDER_OPTIONAL = ['pricing', 'parasign'];
+for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
   const text = flatten(read(`frontend/${slug}.html`));
-  if (!text.includes('Mick Beer')) continue;
+  if (FOUNDER_REQUIRED.includes(slug)) {
+    assert.ok(text.includes('Mick Beer'),
+      `${slug}.html sells on the founder, so it must name him; the line may not quietly disappear`);
+  } else if (!text.includes('Mick Beer')) {
+    continue;
+  }
   assert.ok(text.includes(`Mick Beer , ${SANCTIONED_TITLE}`) || text.includes(`Mick Beer, ${SANCTIONED_TITLE}`),
     `${slug}.html names the founder, so it must use the title /about gives him: "${SANCTIONED_TITLE}"`);
   // Everything between his name and the end of the qualifying clause.
@@ -301,3 +357,4 @@ assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
 console.log('ui-truthfulness: the homepage does not overclaim signatures and quotes the real prices');
 console.log('ui-truthfulness: the free plan is Community everywhere and the founder line matches /about');
 console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');
+console.log('ui-truthfulness: the account page resolves plans from the same source and never upsells a customer');
