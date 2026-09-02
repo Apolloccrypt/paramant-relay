@@ -174,6 +174,13 @@ checked ParaSign against production, so it is also the first chance to find that
 ParaSign has been broken for the eleven days nobody signed anything. Do it
 watching the log, not on a schedule at three in the morning.
 
+`scripts/directie/signalen.py` reads this switch before anything else. While it
+is off, the directie report carries one orange `heartbeat` signal naming the
+variable and whichever canary secret is still missing, rather than three canary
+signals reporting nothing. Once it is on, that becomes three signals, one per
+proof step, read out of the run's evidence artifact. See
+[docs/directie.md](directie.md).
+
 One thing follows the switch: `/sla` currently says the check "runs hourly once
 enabled" and is "switched off until its credentials are in place". That stops
 being true the moment `HEARTBEAT_ENABLED` is set, and `site-claims.test.mjs`

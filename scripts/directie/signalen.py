@@ -21,11 +21,13 @@ Meer niet, met opzet: dit moet ook draaien op een kale machine.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import zipfile
 from datetime import datetime, timezone
 
 # Drempels. Bewust bovenaan en met een reden, zodat een discussie over "wanneer
@@ -37,10 +39,11 @@ PR_OUD_UREN = 72
 DEPENDABOT_OUD_UREN = 14 * 24
 # Gefaalde workflow-runs tellen we over dit venster.
 RUNS_VENSTER_UREN = 24
-# De kanarie-workflow draait per uur. Wordt de laatste uitslag ouder dan dit,
-# dan meet niemand meer mee.
-KANARIE_ORANJE_UREN = 6
-KANARIE_ROOD_UREN = 24
+# De heartbeat draait op :17, dus elk uur een uitslag. Is de laatste afgeronde
+# run ouder dan dit, dan is er minstens een ronde overgeslagen en meet niemand
+# meer mee. Twee uur, niet zes: een alarm dat een halve dag stil mag staan is
+# geen alarm.
+HEARTBEAT_ROOD_UREN = 2
 # Responstijd van de homepage.
 HOMEPAGE_ORANJE_S = 1.0
 HOMEPAGE_ROOD_S = 2.5
@@ -64,14 +67,27 @@ PARAID_HOSTS = [
     "iot.paramant.app",
 ]
 
-# De kanaries zoals ze in .github/workflows heten. Het script zoekt ze op naam
-# op, in de workflow-namen, de job-namen en de stapnamen, zodat het blijft
-# werken als een kanarie ooit een eigen workflow wordt.
-KANARIES = [
-    ("transfer-kanarie", re.compile(r"transfer[\s_-]*(canary|kanarie)", re.I)),
-    ("parasign-kanarie", re.compile(r"parasign[\s_-]*(canary|kanarie)", re.I)),
-    # Alleen de kanarie tegen productie, niet de heartbeat tegen de checkout.
-    ("heartbeat", re.compile(r"heartbeat\s+(against|tegen)\s+\S*paramant", re.I)),
+# Het uurlijkse alarm. Sinds PR #338 draait dat in .github/workflows/heartbeat.yml
+# en is product-heartbeat.yml alleen nog de gate op pull requests. De drie oude
+# kanariestappen bestaan daar niet meer, dus zoeken naar hun stapnamen leverde
+# drie keer oranje "geen uitslag" op terwijl er niets stuk was.
+HEARTBEAT_WORKFLOW = "heartbeat.yml"
+PR_GATE_WORKFLOW = "product-heartbeat.yml"
+# De job draait alleen bij een handmatige start of als deze repositoryvariabele
+# op true staat.
+HEARTBEAT_VARIABELE = "HEARTBEAT_ENABLED"
+# Zonder deze twee gaat de run rood met de naam van de sleutel, met opzet.
+HEARTBEAT_SLEUTELS = ("PARAMANT_CANARY_KEY", "PARASIGN_CANARY_KEY")
+# De titel die de workflow zelf aan zijn alarmissue geeft.
+HEARTBEAT_ISSUE_TITEL = "Heartbeat rood"
+# De stappen van scripts/heartbeat/run.mjs, gegroepeerd zoals de directie ze
+# kent. parasign zijn er in het script twee: een receipt over /v1 en de publieke
+# tekenceremonie over /v2. Hier is dat een signaal, want het product is pas heel
+# als ze allebei kloppen.
+HEARTBEAT_STAPPEN = [
+    ("surface", ("surface",)),
+    ("parasend", ("parasend",)),
+    ("parasign", ("parasign-receipt", "parasign-public-sign")),
 ]
 
 ROOD, ORANJE, GROEN = "rood", "oranje", "groen"
@@ -139,6 +155,23 @@ def gh_json(args: list[str]) -> tuple[object | None, str | None]:
         return json.loads(klaar.stdout), None
     except json.JSONDecodeError as exc:
         return None, f"gh gaf geen geldige JSON ({exc})"
+
+
+def gh_bytes(args: list[str]) -> tuple[bytes | None, str | None]:
+    """Draai gh en geef de ruwe uitvoer terug. Nodig voor het bewijsartefact van
+    de heartbeat: dat is een zipbestand, geen JSON."""
+    try:
+        klaar = subprocess.run(["gh", *args], capture_output=True, timeout=GH_TIMEOUT)
+    except FileNotFoundError:
+        return None, "gh is niet geinstalleerd"
+    except subprocess.TimeoutExpired:
+        return None, f"gh gaf geen antwoord binnen {GH_TIMEOUT}s"
+    if klaar.returncode != 0:
+        fout = (klaar.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+        return None, fout[-1] if fout else f"gh eindigde met code {klaar.returncode}"
+    if not klaar.stdout:
+        return None, "gh gaf een lege uitvoer"
+    return klaar.stdout, None
 
 
 def curl_meting(url: str, methode: str = "GET", body: str | None = None) -> dict:
@@ -376,84 +409,25 @@ def signaal_gefaalde_runs(repo: str) -> dict:
     )
 
 
-# -------------------------------------------------------------------- kanaries
+# ------------------------------------------------------------------- heartbeat
 
-def workflow_map(repo_wortel: str) -> str:
-    return os.path.join(repo_wortel, ".github", "workflows")
+def workflow_runs(repo: str, bestand: str, events: tuple, cache: dict,
+                  limiet: int = 25) -> list[dict]:
+    """De runs van een workflow, per event opgevraagd en op tijd gesorteerd.
 
-
-def lees_workflows(repo_wortel: str) -> list[dict]:
-    """Lees de workflowbestanden en haal er de namen uit die we nodig hebben:
-    de workflownaam, de jobnamen en de stapnamen. Geen YAML-bibliotheek in de
-    standaardbibliotheek, dus dit is een bewust simpele scanner op inspringing.
-    Hij hoeft maar een ding te kunnen: name-regels vinden."""
-    map_pad = workflow_map(repo_wortel)
-    if not os.path.isdir(map_pad):
-        return []
-    bestanden = []
-    for naam in sorted(os.listdir(map_pad)):
-        if not naam.endswith((".yml", ".yaml")):
-            continue
-        pad = os.path.join(map_pad, naam)
-        try:
-            with open(pad, "r", encoding="utf-8") as fh:
-                regels = fh.read().splitlines()
-        except OSError:
-            continue
-        workflow_naam, namen = None, []
-        for regel in regels:
-            treffer = re.match(r"^(\s*)(?:-\s+)?name:\s*(.+?)\s*$", regel)
-            if not treffer:
-                continue
-            inspringing, waarde = len(treffer.group(1)), treffer.group(2).strip()
-            waarde = waarde.strip("'\"")
-            if inspringing == 0 and workflow_naam is None:
-                workflow_naam = waarde
-            namen.append(waarde)
-        bestanden.append({
-            "bestand": naam,
-            "workflow": workflow_naam or naam,
-            "namen": namen,
-        })
-    return bestanden
-
-
-def jobs_van_run(repo: str, run_id: int, cache: dict) -> list[dict]:
-    if run_id in cache:
-        return cache[run_id]
-    data, fout = gh_json(["api", f"repos/{repo}/actions/runs/{run_id}/jobs?per_page=100"])
-    jobs = []
-    if fout is None and isinstance(data, dict):
-        jobs = data.get("jobs") or []
-    cache[run_id] = jobs
-    return jobs
-
-
-def kanarie_runs(repo: str, bestand: str, cache: dict, breed: bool = False) -> list[dict]:
-    """De runs waarin een kanarie een uitslag kan hebben gegeven.
-
-    De kanaries hangen in de live-job, en die draait alleen op schedule en op
-    workflow_dispatch. Een kale --limit 20 bestaat op een drukke dag bijna
-    helemaal uit pull_request-runs waarin de kanariestappen zijn overgeslagen,
-    en dan wordt een levende kanarie vals oranje gemeld. Daarom eerst die twee
-    eventlijsten. Het brede net (limiet 50, alle events) is de terugval voor
-    het geval een kanarie ooit ergens anders gaat draaien, en wordt alleen
-    getrokken als de eerste ronde niets oplevert."""
-    sleutel = (bestand, breed)
+    Per event, niet in een kale lijst: op een drukke dag bestaan de laatste
+    twintig runs van een workflow bijna helemaal uit pull_request-runs, en dan
+    verdwijnt de geplande run waar het hier om gaat achter de horizon."""
+    sleutel = (bestand, events, limiet)
     if sleutel in cache:
         return cache[sleutel]
-    velden = "databaseId,conclusion,status,createdAt,updatedAt,event,url"
-    vragen = (
-        [["--limit", "50"]] if breed else
-        [["--event", "schedule", "--limit", "25"],
-         ["--event", "workflow_dispatch", "--limit", "25"]]
-    )
+    velden = "databaseId,conclusion,status,createdAt,updatedAt,event,url,headBranch"
     gezien: set = set()
     runs: list[dict] = []
-    for extra in vragen:
+    for event in events:
         data, fout = gh_json([
             "run", "list", "--repo", repo, "--workflow", bestand,
-            *extra, "--json", velden,
+            "--event", event, "--limit", str(limiet), "--json", velden,
         ])
         if fout is not None:
             continue
@@ -468,97 +442,361 @@ def kanarie_runs(repo: str, bestand: str, cache: dict, breed: bool = False) -> l
     return runs
 
 
-def zoek_uitslag(repo: str, patroon, runs: list[dict], bestand: str, cache_jobs: dict) -> dict | None:
-    """De jongste afgeronde run waarin de stap echt een uitslag gaf. Een
-    overgeslagen stap telt niet: die zegt alleen dat de job niet aan de beurt
-    was, niet dat de kanarie leeft."""
+def laatste_afgeronde(runs: list[dict]) -> dict | None:
     for run in runs:
-        if (run.get("status") or "") != "completed":
-            continue
-        for job in jobs_van_run(repo, run.get("databaseId"), cache_jobs):
-            for stap in job.get("steps") or []:
-                if not patroon.search(stap.get("name") or ""):
-                    continue
-                conclusie = (stap.get("conclusion") or "").lower()
-                if conclusie in {"", "skipped"}:
-                    continue
-                return {
-                    "run_id": run.get("databaseId"),
-                    "url": run.get("url"),
-                    "event": run.get("event"),
-                    "job": job.get("name"),
-                    "stap": stap.get("name"),
-                    "conclusie": conclusie,
-                    "afgerond": stap.get("completed_at") or job.get("completed_at"),
-                    "workflow": bestand,
-                }
+        if (run.get("status") or "") == "completed":
+            return run
     return None
 
 
-def signalen_kanaries(repo: str, repo_wortel: str) -> list[dict]:
-    workflows = lees_workflows(repo_wortel)
-    cache_runs: dict = {}
-    cache_jobs: dict[int, list] = {}
-    uit: list[dict] = []
+def heartbeat_schakelaar(repo: str) -> tuple[bool | None, str | None, str | None]:
+    """Staat de uurlijkse run aan? Geeft (aan, waarde, fout).
 
-    for sleutel, patroon in KANARIES:
-        treffers = [wf for wf in workflows if any(patroon.search(n) for n in wf["namen"])]
-        if not treffers:
-            uit.append(signaal(
-                f"kanarie-{sleutel}", f"kanarie {sleutel}", ORANJE,
-                "geen workflow of stap met deze naam in .github/workflows",
-                f"Bevestig of {sleutel} bewust weg is, en haal hem anders uit dit script.",
-                bron=".github/workflows",
-            ))
-            continue
+    De job draagt `if: github.event_name == 'workflow_dispatch' || vars.
+    HEARTBEAT_ENABLED == 'true'`. Staat die variabele niet op true, dan doet de
+    geplande run niets en zegt een groene of afwezige uitslag niets over
+    productie. Dan is de vraag of het alarm aan hoort te staan, niet of het
+    groen is."""
+    data, fout = gh_json(["api", f"repos/{repo}/actions/variables/{HEARTBEAT_VARIABELE}"])
+    if fout is None and isinstance(data, dict) and data.get("value") is not None:
+        waarde = str(data["value"]).strip()
+        return waarde.lower() == "true", waarde, None
+    # Een 404 op deze route is geen meetfout maar een uitslag: de variabele
+    # bestaat niet, dus de schakelaar staat uit.
+    if fout and "404" in fout:
+        return False, None, None
+    # Terugval voor een token dat de losse route niet mag lezen maar de lijst
+    # wel. Levert die ook niets op, dan is het echt niet gemeten.
+    lijst, fout_lijst = gh_json(["variable", "list", "--repo", repo, "--json", "name,value"])
+    if fout_lijst is None and isinstance(lijst, list):
+        for variabele in lijst:
+            if (variabele.get("name") or "") == HEARTBEAT_VARIABELE:
+                waarde = str(variabele.get("value") or "").strip()
+                return waarde.lower() == "true", waarde, None
+        return False, None, None
+    return None, None, fout or fout_lijst
 
-        bestand = treffers[0]["bestand"]
-        gevonden = zoek_uitslag(
-            repo, patroon, kanarie_runs(repo, bestand, cache_runs), bestand, cache_jobs,
+
+def ontbrekende_sleutels(repo: str) -> list[str] | None:
+    """Welke van de twee verplichte kanarie-secrets ontbreken. None als de lijst
+    niet te lezen is met dit token. GitHub geeft alleen de namen terug, nooit de
+    waarden, dus dit is een veilige vraag."""
+    data, fout = gh_json(["api", f"repos/{repo}/actions/secrets?per_page=100"])
+    if fout is not None or not isinstance(data, dict):
+        return None
+    aanwezig = {(s.get("name") or "") for s in data.get("secrets") or []}
+    return [naam for naam in HEARTBEAT_SLEUTELS if naam not in aanwezig]
+
+
+def heartbeat_bewijs(repo: str, run_id: int) -> tuple[dict | None, str | None]:
+    """summary.json uit het bewijsartefact van een run.
+
+    Waarom het artefact en niet de stapstatus uit de jobs-API: de proefstap
+    draait met continue-on-error, zodat de browserhelft en de upload daarna nog
+    gebeuren, en GitHub meldt zo'n stap daarna als conclusion success. Run
+    33656533245 is daar het bewijs van: de stap "Proof run" staat op success
+    terwijl summary.json parasend en beide parasign-stappen rood noemt. Wie de
+    jobs-API gelooft, meldt een dode kanarie groen."""
+    data, fout = gh_json(["api", f"repos/{repo}/actions/runs/{run_id}/artifacts"])
+    if fout is not None:
+        return None, fout
+    artefacten = [
+        a for a in (data or {}).get("artifacts") or []
+        if str(a.get("name") or "").startswith("heartbeat-evidence")
+    ]
+    levend = [a for a in artefacten if not a.get("expired")]
+    if not levend:
+        return None, (
+            "het bewijsartefact is verlopen" if artefacten
+            else "deze run heeft geen bewijsartefact"
         )
-        if gevonden is None:
-            gevonden = zoek_uitslag(
-                repo, patroon,
-                kanarie_runs(repo, bestand, cache_runs, breed=True), bestand, cache_jobs,
+    rauw, fout = gh_bytes(["api", f"repos/{repo}/actions/artifacts/{levend[0].get('id')}/zip"])
+    if fout is not None:
+        return None, fout
+    try:
+        with zipfile.ZipFile(io.BytesIO(rauw)) as zip_bestand:
+            naam = next(
+                (n for n in zip_bestand.namelist() if n.rsplit("/", 1)[-1] == "summary.json"),
+                None,
             )
+            if naam is None:
+                return None, "het bewijsartefact bevat geen summary.json"
+            return json.loads(zip_bestand.read(naam).decode("utf-8")), None
+    except (zipfile.BadZipFile, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, f"het bewijsartefact is onleesbaar ({exc})"
 
-        if gevonden is None:
+
+def signalen_heartbeat(repo: str, cache_runs: dict) -> list[dict]:
+    """Het uurlijkse alarm: eerst de schakelaar, dan pas de uitslag."""
+    aan, waarde, fout = heartbeat_schakelaar(repo)
+
+    if fout is not None:
+        return [signaal(
+            "heartbeat", "uurlijkse heartbeat", ORANJE,
+            f"niet gemeten: {fout}",
+            "Controleer of gh is ingelogd op deze machine en de repositoryvariabelen mag lezen.",
+            workflow=HEARTBEAT_WORKFLOW, variabele=HEARTBEAT_VARIABELE,
+            bron="gh api actions/variables",
+        )]
+
+    if not aan:
+        # Een uitgeschakeld alarm is een stand van zaken, geen storing, en het
+        # is een signaal en niet drie: er valt niets te meten zolang de
+        # geplande run niets doet.
+        ontbreekt = ontbrekende_sleutels(repo)
+        stand = (
+            f"{HEARTBEAT_VARIABELE} niet gezet" if waarde is None
+            else f"{HEARTBEAT_VARIABELE} staat op {waarde}"
+        )
+        if ontbreekt is None:
+            sleutels = "kanarie-sleutels niet te lezen met dit token"
+            voorstel = (
+                "Zet de kanarie-sleutels, draai heartbeat.yml eenmaal met de hand en zet "
+                f"daarna {HEARTBEAT_VARIABELE} op true, in die volgorde."
+            )
+        elif ontbreekt:
+            sleutels = f"kanarie-sleutels ontbreken ({', '.join(ontbreekt)})"
+            voorstel = (
+                f"Zet {' en '.join(ontbreekt)}, draai heartbeat.yml eenmaal met de hand en "
+                f"zet daarna {HEARTBEAT_VARIABELE} op true, in die volgorde."
+            )
+        else:
+            sleutels = "kanarie-sleutels staan er wel"
+            voorstel = (
+                "Draai heartbeat.yml eenmaal met de hand, en zet daarna "
+                f"{HEARTBEAT_VARIABELE} op true zodra die run groen is."
+            )
+        return [signaal(
+            "heartbeat", "uurlijkse heartbeat", ORANJE,
+            f"heartbeat uitgeschakeld: {stand}, {sleutels}; volgorde in docs/heartbeat.md",
+            voorstel,
+            workflow=HEARTBEAT_WORKFLOW, variabele=HEARTBEAT_VARIABELE, waarde=waarde,
+            ontbrekende_sleutels=ontbreekt, documentatie="docs/heartbeat.md",
+            bron="gh api actions/variables + actions/secrets",
+        )]
+
+    runs = workflow_runs(repo, HEARTBEAT_WORKFLOW, ("schedule", "workflow_dispatch"), cache_runs)
+    run = laatste_afgeronde(runs)
+    if run is None:
+        return [signaal(
+            "heartbeat", "uurlijkse heartbeat", ROOD,
+            f"{HEARTBEAT_VARIABELE} staat aan, maar {HEARTBEAT_WORKFLOW} heeft geen afgeronde run",
+            "Start heartbeat.yml met de hand en zoek uit waarom de geplande run niet loopt.",
+            workflow=HEARTBEAT_WORKFLOW, variabele=HEARTBEAT_VARIABELE,
+            bron="gh run list --workflow heartbeat.yml",
+        )]
+
+    run_id = run.get("databaseId")
+    conclusie = (run.get("conclusion") or "").lower()
+    bewijs, fout_bewijs = heartbeat_bewijs(repo, run_id)
+    uitslagen = {}
+    if isinstance(bewijs, dict):
+        for stap in bewijs.get("steps") or []:
+            if stap.get("name"):
+                uitslagen[stap["name"]] = stap
+    dry_run = bool((bewijs or {}).get("dry_run"))
+    # Faalde de run terwijl elke proefstap groen is, dan zat de storing in de
+    # browserhelft of de linkcheck. Is er wel een rode proefstap, dan is de run
+    # daardoor gevallen en hoeft een groene stap daar niet ook nog voor te
+    # boeten: dat rode signaal staat er al.
+    alles_groen = bool(uitslagen) and all(s.get("ok") for s in uitslagen.values())
+    klaar = tijdstip((bewijs or {}).get("at")) or tijdstip(run.get("updatedAt"))
+    leeftijd = uren_geleden(klaar)
+
+    uit: list[dict] = []
+    for naam, deelstappen in HEARTBEAT_STAPPEN:
+        details = {
+            "workflow": HEARTBEAT_WORKFLOW,
+            "run_id": run_id,
+            "url": run.get("url"),
+            "event": run.get("event"),
+            "run_conclusie": conclusie,
+            "stappen": list(deelstappen),
+            "afgerond": None if klaar is None else klaar.isoformat().replace("+00:00", "Z"),
+            "leeftijd_uren": None if leeftijd is None else round(leeftijd, 2),
+            "bron": "gh api actions/artifacts/<id>/zip (summary.json)",
+        }
+        gevonden = [uitslagen[d] for d in deelstappen if d in uitslagen]
+
+        if not gevonden:
+            reden = fout_bewijs or "de stap staat niet in summary.json"
             uit.append(signaal(
-                f"kanarie-{sleutel}", f"kanarie {sleutel}", ORANJE,
-                f"staat in {bestand} maar gaf in geen van de recente runs een uitslag",
-                f"Start {bestand} handmatig met gh workflow run en kijk of {sleutel} weer meet.",
-                workflow=bestand, bron="gh api actions/runs/<id>/jobs",
+                f"heartbeat-{naam}", f"heartbeat {naam}",
+                ROOD if conclusie in KAPOT else ORANJE,
+                f"geen uitslag in run {run_id} ({reden}), de run zelf eindigde als "
+                f"{conclusie or 'onbekend'}",
+                f"Open run {run_id} en kijk waarom {naam} geen bewijs schreef; een stap "
+                "zonder bewijs telt hier niet als groen.",
+                **details,
             ))
             continue
 
-        leeftijd = uren_geleden(tijdstip(gevonden["afgerond"]))
-        conclusie = gevonden["conclusie"]
-        if conclusie in KAPOT:
-            ernst = ROOD
-            voorstel = f"Open de run van {sleutel} en repareer wat er kapot is voordat een klant het merkt."
-        elif leeftijd is not None and leeftijd > KANARIE_ROOD_UREN:
-            ernst = ROOD
-            voorstel = f"De kanarie {sleutel} meet al {duur(leeftijd)} niet meer, zet de geplande run weer aan."
-        elif leeftijd is not None and leeftijd > KANARIE_ORANJE_UREN:
-            ernst = ORANJE
-            voorstel = f"Controleer waarom {sleutel} niet per uur draait, de laatste uitslag is {duur(leeftijd)} oud."
-        elif conclusie == "success":
-            ernst = GROEN
-            voorstel = "Niets doen, de kanarie leeft."
-        else:
-            ernst = ORANJE
-            voorstel = f"Kijk waarom {sleutel} eindigde als {conclusie} in plaats van success."
+        kapot = [s for s in gevonden if not s.get("ok")]
+        bewijzen = sum(int(s.get("proofs") or 0) for s in gevonden)
+        details["proofs"] = bewijzen
+        details["deelstappen"] = [
+            {"naam": s.get("name"), "ok": bool(s.get("ok")),
+             "oorzaak": s.get("cause"), "proofs": s.get("proofs")}
+            for s in gevonden
+        ]
 
-        uit.append(signaal(
-            f"kanarie-{sleutel}", f"kanarie {sleutel}", ernst,
-            f"{conclusie}, {duur(leeftijd)} geleden (run {gevonden['run_id']}, {bestand})",
-            voorstel,
-            **gevonden,
-            leeftijd_uren=None if leeftijd is None else round(leeftijd, 2),
-            bron="gh api actions/runs/<id>/jobs",
-        ))
+        if kapot:
+            oorzaken = "; ".join(
+                f"{s.get('name')}: {s.get('cause') or 'zonder opgegeven oorzaak'}" for s in kapot
+            )
+            ernst = ROOD
+            meting = f"rood in run {run_id}, {duur(leeftijd)} geleden ({oorzaken})"
+            voorstel = (
+                f"Repareer {naam} voordat een klant het merkt: "
+                f"{kapot[0].get('cause') or 'zie de run'}."
+            )
+        elif dry_run:
+            ernst = ORANJE
+            meting = (
+                f"run {run_id} was een dry run: de bedrading klopt, maar er is niets "
+                "over productie bewezen"
+            )
+            voorstel = f"Draai heartbeat.yml zonder HEARTBEAT_DRY_RUN, anders meet {naam} niets."
+        elif leeftijd is not None and leeftijd > HEARTBEAT_ROOD_UREN:
+            ernst = ROOD
+            meting = (
+                f"groen, maar de laatste uitslag is {duur(leeftijd)} oud "
+                f"(drempel {HEARTBEAT_ROOD_UREN} uur, run {run_id})"
+            )
+            voorstel = (
+                "De uurlijkse run slaat over; kijk of de schedule van heartbeat.yml nog "
+                "loopt en of de repository niet inactief is verklaard."
+            )
+        elif conclusie in KAPOT and alles_groen:
+            ernst = ORANJE
+            meting = (
+                f"groen met {bewijzen} bewijzen, maar run {run_id} eindigde als {conclusie}: "
+                "er faalde iets buiten de drie proefstappen"
+            )
+            voorstel = (
+                f"Kijk in run {run_id} welke stap buiten de proefrun faalde, de browserhelft "
+                "of de externe links."
+            )
+        elif leeftijd is None:
+            ernst = ORANJE
+            meting = f"groen met {bewijzen} bewijzen in run {run_id}, maar zonder tijdstip"
+            voorstel = f"Controleer met de hand hoe oud de laatste uitslag van {naam} is."
+        else:
+            ernst = GROEN
+            meting = f"groen, {bewijzen} bewijzen, {duur(leeftijd)} geleden (run {run_id})"
+            voorstel = "Niets doen, de heartbeat bewijst dit stuk product."
+
+        uit.append(signaal(f"heartbeat-{naam}", f"heartbeat {naam}", ernst, meting, voorstel, **details))
 
     return uit
+
+
+def signaal_heartbeat_issue(repo: str) -> dict:
+    """Staat het alarmissue van de heartbeat open?
+
+    De workflow opent er een bij rood en sluit hem zelf zodra een run weer groen
+    is. Staat hij open, dan is productie rood geweest en heeft niemand het
+    afgemaakt, ook als de laatste run intussen niet meer draait."""
+    data, fout = gh_json([
+        "issue", "list", "--repo", repo, "--state", "open", "--limit", "100",
+        "--json", "number,title,url,createdAt,updatedAt",
+    ])
+    if fout is not None:
+        return signaal(
+            "heartbeat-issue", f"open issue {HEARTBEAT_ISSUE_TITEL}", ORANJE,
+            f"niet gemeten: {fout}",
+            "Controleer of gh is ingelogd op deze machine en draai het script opnieuw.",
+            bron="gh issue list",
+        )
+    treffers = [
+        i for i in (data or [])
+        if (i.get("title") or "").strip() == HEARTBEAT_ISSUE_TITEL
+    ]
+    if not treffers:
+        return signaal(
+            "heartbeat-issue", f"open issue {HEARTBEAT_ISSUE_TITEL}", GROEN,
+            f"geen open issue met de titel {HEARTBEAT_ISSUE_TITEL}",
+            "Niets doen, het alarm heeft niets openstaan.",
+            aantal=0, bron="gh issue list --json title",
+        )
+    eerste = treffers[0]
+    nummer = eerste.get("number")
+    leeftijd = uren_geleden(tijdstip(eerste.get("createdAt")))
+    return signaal(
+        "heartbeat-issue", f"open issue {HEARTBEAT_ISSUE_TITEL}", ROOD,
+        f"issue #{nummer} staat {duur(leeftijd)} open ({eerste.get('url')})",
+        f"Lees issue #{nummer}, repareer wat daar rood staat; de heartbeat sluit hem zelf "
+        "zodra een run weer groen is.",
+        nummer=nummer, url=eerste.get("url"), aantal=len(treffers),
+        leeftijd_uren=None if leeftijd is None else round(leeftijd, 2),
+        bron="gh issue list --json title",
+    )
+
+
+def signaal_pr_gate(repo: str, repo_wortel: str, cache_runs: dict) -> dict:
+    """product-heartbeat.yml, wat het sinds PR #338 nog is: de gate op pull
+    requests. Geen kanarie meer, dus geen uitspraak over productie."""
+    pad = os.path.join(repo_wortel, ".github", "workflows", PR_GATE_WORKFLOW)
+    try:
+        with open(pad, "r", encoding="utf-8") as fh:
+            inhoud = fh.read()
+    except OSError:
+        return signaal(
+            "pr-gate-heartbeat", "PR-gate product-heartbeat", ORANJE,
+            f"{PR_GATE_WORKFLOW} staat niet in .github/workflows",
+            "Bevestig of de browsergate bewust weg is; zonder die gate merkt niemand een "
+            "kapotte pagina voor de merge.",
+            workflow=PR_GATE_WORKFLOW, bron=".github/workflows",
+        )
+    if not re.search(r"^\s{2}pull_request:", inhoud, re.M):
+        return signaal(
+            "pr-gate-heartbeat", "PR-gate product-heartbeat", ORANJE,
+            f"{PR_GATE_WORKFLOW} heeft geen pull_request-trigger meer",
+            "Zet de pull_request-trigger terug, anders draait de browsergate niet voor een merge.",
+            workflow=PR_GATE_WORKFLOW, bron=".github/workflows",
+        )
+    if re.search(r"^\s{2}schedule:", inhoud, re.M):
+        return signaal(
+            "pr-gate-heartbeat", "PR-gate product-heartbeat", ORANJE,
+            f"{PR_GATE_WORKFLOW} heeft weer een schedule-trigger",
+            "Haal de schedule uit de PR-gate; het uurlijkse alarm hoort op een plek te "
+            "staan, in heartbeat.yml.",
+            workflow=PR_GATE_WORKFLOW, bron=".github/workflows",
+        )
+
+    runs = workflow_runs(repo, PR_GATE_WORKFLOW, ("pull_request", "push"), cache_runs, limiet=20)
+    run = laatste_afgeronde(runs)
+    if run is None:
+        return signaal(
+            "pr-gate-heartbeat", "PR-gate product-heartbeat", ORANJE,
+            "de gate staat er, maar heeft geen afgeronde run op push of pull_request",
+            "Kijk of de gate nog draait; een gate die niet loopt is geen gate.",
+            workflow=PR_GATE_WORKFLOW, bron="gh run list --workflow product-heartbeat.yml",
+        )
+    conclusie = (run.get("conclusion") or "").lower()
+    leeftijd = uren_geleden(tijdstip(run.get("updatedAt")))
+    if conclusie in KAPOT:
+        ernst = ORANJE
+        voorstel = (
+            f"Repareer de gate op {run.get('headBranch') or 'de branch'}; hij zegt niets over "
+            "productie, maar hij laat wel een kapotte pagina door."
+        )
+    elif conclusie == "success":
+        ernst = GROEN
+        voorstel = "Niets doen, de browsergate draait en is groen."
+    else:
+        ernst = ORANJE
+        voorstel = f"Kijk waarom de gate eindigde als {conclusie or 'onbekend'}."
+    return signaal(
+        "pr-gate-heartbeat", "PR-gate product-heartbeat", ernst,
+        f"{conclusie or 'onbekend'} op {run.get('headBranch') or 'onbekende branch'}, "
+        f"{duur(leeftijd)} geleden (run {run.get('databaseId')})",
+        voorstel,
+        workflow=PR_GATE_WORKFLOW, run_id=run.get("databaseId"), url=run.get("url"),
+        event=run.get("event"), conclusie=conclusie,
+        leeftijd_uren=None if leeftijd is None else round(leeftijd, 2),
+        bron="gh run list --workflow product-heartbeat.yml",
+    )
 
 
 # ------------------------------------------------------------------- productie
@@ -709,7 +947,10 @@ def main(argv: list[str]) -> int:
     signalen: list[dict] = []
     signalen += signalen_pull_requests(repo)
     signalen.append(signaal_gefaalde_runs(repo))
-    signalen += signalen_kanaries(repo, wortel)
+    cache_runs: dict = {}
+    signalen += signalen_heartbeat(repo, cache_runs)
+    signalen.append(signaal_heartbeat_issue(repo))
+    signalen.append(signaal_pr_gate(repo, wortel, cache_runs))
     signalen.append(signaal_health())
     signalen.append(signaal_homepage())
     signalen += signalen_paraid_deny()
