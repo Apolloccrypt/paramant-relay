@@ -250,9 +250,18 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Community must say ${free} hour link expiry`);
   assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Pro must say ${pro} hour link expiry`);
   assert.ok(pricing.includes(`${ent / 24} day link expiry`), `pricing: Enterprise must say ${ent / 24} day link expiry`);
+  // Business exists in tiers.js with the same ceiling as Enterprise, and the
+  // privacy policy used to skip it: a Business customer read the page and found
+  // no row that was theirs. Both sentences now name it, and this asserts the two
+  // tiers really do share the ceiling before it lets them share a sentence.
+  const bus = hours(ttl('business'));
+  assert.equal(bus, ent, 'business and enterprise no longer share a ceiling; split the sentence on /privacy and /terms');
   const priv = visible(page('privacy'));
-  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Pro, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
-  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
+  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Pro, ${ent / 24} days for Business and Enterprise`), 'privacy: retention line must match tiers.js');
+  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Business and Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
+  const WORD = { 1: 'one', 24: 'twenty-four', 7: 'seven' };
+  assert.ok(visible(page('terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Pro and ${WORD[ent / 24]} days on Business and Enterprise`),
+    'terms: the time-to-live sentence must match tiers.js');
 });
 
 // 6 ── The authentication numbers on the security page. Session cookie
@@ -1174,4 +1183,236 @@ test('no page a visitor can open loads anything from a third party, which is wha
   assert.match(visible(page('parasend')), /No third-party requests/, 'parasend: the promise must still be on the page');
   assert.match(visible(page('parasend')), /No fonts, CDNs, analytics or pixels/, 'parasend: name what is not loaded');
   assert.match(visible(page('pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
+});
+
+// 23 ── The BUSL conversion. LICENSE is the operative grant; /license quotes it
+// in a code block, repeats it in prose, and repeats it again in four head
+// copies, and /terms repeats it once more. All six said 1 January 2030 and MIT
+// while the file granted 2029-01-01 and Apache License 2.0: a reader deciding
+// whether to build on the code was told the wrong licence and the wrong year.
+// Verified by sabotage: with the old page text in place this block fails on the
+// licence-box line first and on each head copy after it.
+test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
+  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const lic = read('LICENSE');
+  const d = /^Change Date:\s*(\d{4})-(\d{2})-(\d{2})\s*$/m.exec(lic);
+  const n = /^Change License:\s*(\S.*?)\s*$/m.exec(lic);
+  assert.ok(d, 'LICENSE must state a Change Date as YYYY-MM-DD');
+  assert.ok(n, 'LICENSE must state a Change License');
+  const iso = `${d[1]}-${d[2]}-${d[3]}`;
+  const name = n[1];
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  const human = `${Number(d[3])} ${MONTHS[Number(d[2]) - 1]} ${d[1]}`;
+
+  // The copy that ships with a self-hosted relay must not grant something else.
+  assert.match(read('deploy/LICENSE'), new RegExp(`^Change Date:\\s*${iso}\\s*$`, 'm'),
+    'deploy/LICENSE states a different Change Date than LICENSE');
+  assert.match(read('deploy/LICENSE'), new RegExp(`^Change License:\\s*${esc(name)}\\s*$`, 'm'),
+    'deploy/LICENSE states a different Change License than LICENSE');
+
+  const licPage = page('license');
+  assert.match(licPage, new RegExp(`Change Date:\\s+${iso}`), 'license: the licence box must quote the Change Date in LICENSE');
+  assert.match(licPage, new RegExp(`Change License:\\s+${esc(name)}`), 'license: the licence box must quote the Change License in LICENSE');
+  assert.ok(visible(licPage).includes(`On ${human} the entire codebase will be released under the ${name}.`),
+    `license: the prose must say ${human} and ${name}`);
+  // The head copies: description, og, twitter and the JSON-LD all carry the
+  // sentence, and seo-contract only pins them to each other, so all four can be
+  // wrong together.
+  const heads = [...licPage.matchAll(/converts to the ([^"<]+?) on (\d{4}-\d{2}-\d{2})\./g)];
+  assert.ok(heads.length >= 4, `license: expected the conversion sentence in every head copy, found ${heads.length}`);
+  for (const h of heads) {
+    assert.equal(h[1], name, 'license: a head copy names a different licence than LICENSE');
+    assert.equal(h[2], iso, 'license: a head copy names a different date than LICENSE');
+  }
+  assert.ok(visible(page('terms')).includes(`converts to the ${name} on ${human}.`),
+    `terms: the licence sentence must say ${name} and ${human}`);
+
+  // No page may name a conversion the file does not grant.
+  const problems = [];
+  for (const slug of publicPages()) {
+    const text = page(slug);
+    for (const m of text.matchAll(/Change Date:\s*(\d{4}-\d{2}-\d{2})/g)) {
+      if (m[1] !== iso) problems.push(`${slug}: quotes Change Date ${m[1]}, LICENSE says ${iso}`);
+    }
+    for (const m of text.matchAll(/(?:converts to|released under) the ([A-Za-z0-9][A-Za-z0-9. ]*?(?:License|licence)(?: \d+(?:\.\d+)*)?)/g)) {
+      if (m[1] !== name) problems.push(`${slug}: names "${m[1]}" as the conversion licence, LICENSE says ${name}`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 24 ── "Burned on read" as a universal property. tiers.js gives Pro 10 reads
+// per link, Business 25 and Enterprise 100, and /pricing sells exactly that, so
+// the privacy policy claiming every chunk is destroyed after the first download
+// was describing the Community plan and calling it the service. Verified by
+// sabotage: raising community.max_views to 2 fails the first assertion, and
+// changing any of the three paid numbers fails the sentence.
+test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
+  const tiers = read('relay/lib/tiers.js');
+  const views = (t) => Number(/max_views:\s*(\d+)/.exec(tiers.slice(tiers.indexOf(`${t}:`)))[1]);
+  const comm = views('community');
+  assert.equal(comm, 1, 'community no longer burns on the first read; rewrite the burn-on-read paragraph on /privacy');
+  const priv = visible(page('privacy'));
+  assert.ok(priv.includes('On the Community plan it is permanently and irreversibly destroyed after the first download'),
+    'privacy: burn-on-read must be attributed to the plan that has it');
+  assert.ok(priv.includes(`up to ${views('pro')} on Pro, ${views('business')} on Business and ${views('enterprise')} on Enterprise`),
+    'privacy: the reads a paid link allows must be the max_views in tiers.js');
+  assert.doesNotMatch(priv, /relay server and is permanently and irreversibly destroyed after the first download/,
+    'privacy: must not state burn-on-read as a property of every plan');
+});
+
+// 25 ── The sub-processor lists. /dpa is signed by customers and named two
+// parties; the relay and the admin call a third at runtime. Every external host
+// the server code sends a request to has to be on both lists, because a
+// controller signing the DPA is authorising exactly that list.
+// Verified by sabotage: deleting the Mollie row from the /dpa table fails this
+// by vendor name. Renaming only the first cell does not, and should not: the
+// question is whether the party is named, not which cell names it.
+test('every third party the server code calls is named on /privacy and /dpa', () => {
+  const sources = [
+    'relay/relay.js', 'relay/envelope.js', 'relay/parasign.js',
+    ...fs.readdirSync(path.join(ROOT, 'relay/lib')).filter((f) => f.endsWith('.js')).map((f) => `relay/lib/${f}`),
+    'admin/server.js',
+    ...fs.readdirSync(path.join(ROOT, 'admin/lib')).filter((f) => f.endsWith('.js')).map((f) => `admin/lib/${f}`),
+  ];
+  const hosts = new Set();
+  for (const f of sources) {
+    const src = stripJsComments(read(f));
+    for (const m of src.matchAll(/https\.request\(\s*\{[^}]*?hostname:\s*['"`]([^'"`]+)/g)) hosts.add(m[1]);
+    for (const m of src.matchAll(/fetch\(\s*['"`]https:\/\/([^/'"`]+)/g)) hosts.add(m[1]);
+    for (const m of src.matchAll(/^const [A-Z_]*HOST\s*=\s*['"`]([^'"`]+)/gm)) hosts.add(m[1]);
+  }
+  const external = [...hosts].filter((h) => !/(^|\.)paramant\.app$/.test(h) && !/^(localhost|127\.|10\.|192\.168\.)/.test(h));
+  assert.ok(external.length >= 2, `only ${external.length} external hosts found; the scan stopped seeing the calls it exists for`);
+  // The vendor is the registrable name in the host: api.resend.com -> resend.
+  const vendors = [...new Set(external.map((h) => h.split('.').slice(-2)[0]))];
+  const priv = visible(page('privacy'));
+  const dpa = visible(page('dpa'));
+  const subs = priv.slice(priv.indexOf('<h2>Subprocessors</h2>'));
+  const table = dpa.slice(dpa.indexOf('id="subprocessors"'), dpa.indexOf('</table>', dpa.indexOf('id="subprocessors"')));
+  assert.ok(subs.length > 200 && table.length > 200, 'the sub-processor sections must still be findable on both pages');
+  const problems = [];
+  for (const v of vendors) {
+    const re = new RegExp(`\\b${v}\\b`, 'i');
+    if (!re.test(subs)) problems.push(`privacy: the code calls ${v}, and the sub-processor list does not name it`);
+    if (!re.test(table)) problems.push(`dpa: the code calls ${v}, and the sub-processor table does not name it`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 26 ── The two retentions the privacy policy left open. A signing envelope is
+// kept for a fixed term (envelope.js) and a delivery receipt for fifteen minutes
+// (relay.js); the page said "until its expiry" for the first and nothing at all
+// for the second. Verified by sabotage: DEFAULT_TTL_DAYS 30 -> 31 and
+// RECEIPT_TTL_MS 15 -> 20 minutes each turn this red.
+test('the signing and receipt retentions on /privacy are the ones the relay applies', () => {
+  const env = stripJsComments(read('relay/envelope.js'));
+  const def = Number(/DEFAULT_TTL_DAYS\s*=\s*(\d+)/.exec(env)[1]);
+  const max = Number(/MAX_TTL_DAYS\s*=\s*(\d+)/.exec(env)[1]);
+  assert.ok(def > 0 && max >= def, 'envelope.js must declare a default and a maximum retention');
+  const priv = visible(page('privacy'));
+  assert.ok(priv.includes(`${def} days unless the request asks for another term, and never longer than ${max} days`),
+    `privacy: the envelope retention must say ${def} days by default and ${max} days at most`);
+
+  const rly = stripJsComments(read('relay/relay.js'));
+  const m = /RECEIPT_TTL_MS\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)/.exec(rly);
+  assert.ok(m, 'relay.js must declare RECEIPT_TTL_MS as a literal product');
+  const minutes = (Number(m[1]) * Number(m[2]) * Number(m[3])) / 60000;
+  assert.ok(priv.includes(`Redis · ${minutes} minutes, then deleted`),
+    `privacy: the delivery-receipt row must say ${minutes} minutes`);
+});
+
+// 27 ── The CT log hash. ct-hash.js is SHA3-256 throughout and /dpa says so;
+// /privacy said SHA-256 in the same table row, which is a different algorithm
+// and the one the blob hash uses two rows above. Verified by sabotage: the row
+// with SHA-256 in it fails here.
+test('the CT-log hash named on /privacy and /dpa is the one ct-hash.js computes', () => {
+  const src = stripJsComments(read('relay/lib/ct-hash.js'));
+  const algos = [...new Set([...src.matchAll(/createHash\('([^']+)'\)/g)].map((m) => m[1]))];
+  assert.deepEqual(algos, ['sha3-256'], `ct-hash.js now hashes with ${algos.join(', ')}; rewrite the CT-log rows`);
+  const shown = 'SHA3-256';
+  assert.ok(visible(page('privacy')).includes(`/data/ct-log.json · ${shown} one-way hash only`),
+    `privacy: the CT-log row must name ${shown}`);
+  assert.ok(visible(page('dpa')).includes(`device IDs hashed ${shown} in CT log`),
+    `dpa: the data-minimisation row must name ${shown}`);
+});
+
+// 28 ── The browser-storage list. It named ps_free_uses "to enforce the 10/day
+// limit client-side" and pm_docs_key; neither string exists anywhere in the
+// repository, and the limit it described is 10 a month, not a day. Meanwhile the
+// key the site really does write, an API key, was not on the list at all.
+// Verified by sabotage: deleting any one <code> entry fails this by key name.
+test('the browser storage /privacy lists is the storage the frontend writes', () => {
+  const files = [];
+  (function walk(dir, prefix) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) { if (!['node_modules', 'vendor', 'pkg'].includes(e.name)) walk(path.join(dir, e.name), `${prefix}${e.name}/`); continue; }
+      if (/\.(js|mjs|html)$/.test(e.name)) files.push(`${prefix}${e.name}`);
+    }
+  })(path.join(ROOT, 'frontend'), '');
+  assert.ok(files.length > 20, `the frontend walk found only ${files.length} files; the check would be vacuous`);
+
+  const keys = new Set();
+  for (const f of files) {
+    const src = stripJsComments(read(`frontend/${f}`));
+    for (const m of src.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*['"`]([^'"`]+)/g)) keys.add(m[1]);
+    // A key held in a constant, and a key built by a helper: both are used here.
+    for (const m of src.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g)) {
+      const c = new RegExp(`(?:const|let|var)\\s+${m[1]}\\s*=\\s*['"\`]([^'"\`]+)`).exec(src);
+      if (c) keys.add(c[1]);
+    }
+    for (const m of src.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([A-Za-z_$][\w$]*)\(/g)) {
+      const fn = new RegExp(`function\\s+${m[1]}\\s*\\([^)]*\\)\\s*\\{\\s*return\\s+['"\`]([^'"\`]+)`).exec(src);
+      if (fn) keys.add(fn[1]);
+    }
+  }
+  assert.ok(keys.size >= 5, `only ${keys.size} storage keys resolved; the check would be vacuous`);
+
+  const priv = visible(page('privacy'));
+  const list = priv.slice(priv.indexOf('<h2>Local storage in your browser</h2>'), priv.indexOf('</ul>', priv.indexOf('<h2>Local storage in your browser</h2>')));
+  const named = [...list.matchAll(/<code>([^<]+)<\/code>/g)].map((m) => m[1].replace(/&hellip;$/, ''));
+  const problems = [];
+  for (const k of [...keys].sort()) {
+    if (!named.some((n) => k === n || k.startsWith(n))) problems.push(`privacy: the frontend writes "${k}" and the storage list does not name it`);
+  }
+  for (const n of named) {
+    if (![...keys].some((k) => k === n || k.startsWith(n))) problems.push(`privacy: the storage list names "${n}" and no frontend file writes it`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 29 ── The IP-logging row read as "we do not log requests", and for the hosted
+// service that is what the config does. The self-host configuration in the same
+// repository does the opposite: its log_format starts with $remote_addr. A
+// self-hoster reading /security had no way to know. Verified by sabotage:
+// dropping $remote_addr from the format fails the first assertion.
+test('the self-host access log /security describes is the one the self-host config writes', () => {
+  const conf = read('deploy/nginx-selfhost.conf').replace(/#.*$/gm, '');
+  const fmt = /log_format\s+(\S+)\s+'([^;]*)';/s.exec(conf);
+  assert.ok(fmt, 'deploy/nginx-selfhost.conf must define its access log format');
+  assert.match(fmt[2], /^\$remote_addr/, 'the self-host log format no longer starts with the client address; rewrite the IP-logging row on /security');
+  assert.match(conf, new RegExp(`access_log\\s+\\S+\\s+${fmt[1]};`), 'the self-host config must still use that format');
+  const sec = visible(page('security'));
+  assert.ok(sec.includes('<code>deploy/nginx-selfhost.conf</code> writes an access log whose first field is the client address'),
+    'security: the IP-logging row must state what a self-hosted relay logs');
+});
+
+// 30 ── One city. /dpa and /privacy are the documents a customer relies on and
+// both say Nuremberg; README said Frankfurt in the same table that claims EU
+// jurisdiction. Nothing in this repository can prove which datacentre runs the
+// service, but nothing in it may name two.
+test('the repository names one Hetzner location, the one the DPA names', () => {
+  const CITY = /Hetzner[^.<|\n]*?\b(Nuremberg|Frankfurt|Falkenstein|Helsinki|Ashburn|Hillsboro|Singapore)\b/g;
+  const dpaCities = [...new Set([...visible(page('dpa')).matchAll(CITY)].map((m) => m[1]))];
+  assert.deepEqual(dpaCities, ['Nuremberg'], `the DPA now names ${dpaCities.join(', ')}; this test follows the DPA, so update it deliberately`);
+  const files = ['README.md', 'ROADMAP.md', 'SECURITY.md',
+    ...publicPages().map((s) => `frontend/${s}.html`)];
+  const problems = [];
+  for (const f of files) {
+    for (const m of read(f).matchAll(CITY)) {
+      if (m[1] !== dpaCities[0]) problems.push(`${f}: names Hetzner ${m[1]}, the DPA says ${dpaCities[0]}`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
