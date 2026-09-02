@@ -294,8 +294,8 @@ a:hover{opacity:.8}
 
   <!-- 5. Measurement -->
   <h2 id="measurement">5. Measurement methodology</h2>
-  <p>PARAMANT measures availability using automated HTTP health checks against <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on each relay sector endpoint, from multiple EU locations, every 60 seconds. An endpoint is considered unavailable when three consecutive checks fail with a non-2xx response or a TCP timeout.</p>
-  <p>Historical uptime data is published in the Certificate Transparency log and available at <a href="/ct-log">/ct-log</a>. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
+  <p>PARAMANT does not yet run an automated uptime monitor against every relay. What runs today: the product-heartbeat workflow in the open-source repository runs hourly and exercises the site and the main relay (<code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">relay.paramant.app</code>) end to end: a page load in a real browser, a transfer sent and read back, a document signed and verified. A run that fails opens an issue in the repository. The four sector relays (health, legal, finance, IoT) are not part of that hourly run. The <a href="/status">/status</a> page fetches <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">GET /health</code> on all five relays from your own browser and keeps the result for 24 hours.</p>
+  <p>Historical uptime data is not yet published; the <a href="/status">/status</a> page shows the last 24 hours as measured from your browser. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
 
   <!-- 6. Changes -->
   <h2 id="changes">6. SLA changes</h2>

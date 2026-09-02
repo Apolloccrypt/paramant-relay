@@ -217,7 +217,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <hr class="divider">
 
   <h2>Cryptography</h2>
-  <p>All algorithms are from NIST post-quantum standards (FIPS 203, 204, 205, 206) or established symmetric primitives. Nothing custom. No proprietary key exchange. The relay loads 3 KEMs and 18 signatures; clients choose, the relay validates, and the live registry is at <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. See <a href="/crypto-agility">crypto agility</a> for the wire format and full algorithm table.</p>
+  <p>All algorithms are from NIST post-quantum standards (FIPS 203, 204, 205, 206) or established symmetric primitives. Nothing custom. No proprietary key exchange. The relay ships 3 KEMs and 17 signature schemes. The default core mode loads ML-KEM-768 and ML-DSA-65; extended mode loads all of them. Clients choose, the relay validates, and the live registry is at <a href="/v2/capabilities"><code>/v2/capabilities</code></a>. See <a href="/crypto-agility">crypto agility</a> for the wire format and full algorithm table.</p>
 
   <table class="table" style="margin-top:20px">
     <thead>
@@ -304,7 +304,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <h3>Rate limiting and replay protection</h3>
-  <p>TOTP codes expire thirty seconds after issue. Each code can be used exactly once across the system, enforced atomically in Redis. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes. After ten consecutive failures, an account locks for thirty minutes.</p>
+  <p>TOTP codes expire thirty seconds after issue. Each code can be used exactly once across the system, enforced atomically in Redis. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes.</p>
 
   <h3>Compared to alternatives</h3>
   <p>Most encrypted file transfer services use password authentication with optional two-factor as an upgrade. Paramant reverses this. TOTP is required for human access from day one. The surface for credential theft is close to zero because there is nothing to phish, stuff, or reset.</p>
@@ -356,7 +356,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
         <tr><td>US CLOUD Act</td><td>Not applicable: no US infrastructure, no US company</td></tr>
         <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
-        <tr><td>IP logging</td><td>Nginx access logs. Not linked to transfer content. Retention: 7 days.</td></tr>
+        <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
       </tbody>
     </table>
