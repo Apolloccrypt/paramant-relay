@@ -32,7 +32,7 @@ What main brings that touches the deploy, with the PR that did it:
 
 - **#314** release 3.1.0, ParaID auth, billing with an end date.
 - **#315** `paid_until` survives a restart, Mollie mandate and subscription layer.
-- **#316** ParaSign canary (`tests/parasign-canary.test.mjs`, needs a `psk_test_` key).
+- **#316** ParaSign canary. **Replaced by #338**: that suite never ran (its secret does not exist, and node:test counts a skip as a pass), so it lives on as `scripts/heartbeat/parasign.mjs`, which fails by name when the key is missing. Still needs a `psk_test_` key, now as `PARASIGN_CANARY_KEY`, plus `PARAMANT_CANARY_KEY`.
 - **#317** `/sign` served without login (nginx change in `deploy/nginx-paramant-live.conf`).
 - **#319** ParaID removed: 3339 lines, 26 files.
 - **#322** `/v2/health/deep` in `ghost_pipe` and `iot`, behind `INTERNAL_AUTH_TOKEN`.

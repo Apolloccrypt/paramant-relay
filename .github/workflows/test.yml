@@ -189,16 +189,28 @@ jobs:
       # sign-e2e workflow, which installs Chromium.
       # Gates the ParaSign open-API conformance suite + key-issuance + pdf-ops that
       # previously ran in no workflow at all.
+      # tests/heartbeat-lib.test.mjs needs @noble/post-quantum to pin the
+      # ML-DSA-65 argument order, so the root dependencies go in here. Browsers
+      # are not downloaded and the browser suites stay excluded by what they
+      # import, one line below; the install changes nothing about which suites
+      # run. Making that test skip when the package is absent was the obvious
+      # alternative and it is exactly the bug being fixed: the canary it
+      # replaces skipped for weeks and reported green.
+      - name: Install root deps (browsers not needed here)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
       - name: Root integration suites (no browser)
-        # The canaries are excluded: they talk to the LIVE relay, so they measure
-        # production and not this commit, and they run hourly in the
-        # product-heartbeat workflow instead. parasign-canary additionally
-        # imports @noble/post-quantum to verify the notary signature, and this
-        # job installs nothing on purpose, so leaving it in fails the whole step
-        # on a missing package before a single assertion runs.
-        run: >-
-          node --test $(grep -L "from 'playwright'" tests/*.mjs
-          | grep -vE 'transfer-canary|parasign-canary')
+        # The canaries used to be excluded here by name because they talk to the
+        # LIVE relay. They now live in scripts/heartbeat/ as plain scripts rather
+        # than node:test files, run hourly by the heartbeat workflow, and are no
+        # longer matched by tests/*.mjs at all, so the exclusion list is gone.
+        # That is deliberate: the old exclusion is exactly how a suite ends up
+        # running in no workflow, which is what let a skipping canary report
+        # green for as long as it did. What guards scripts/heartbeat/ itself is
+        # tests/heartbeat-lib.test.mjs, picked up by the same glob.
+        run: node --test $(grep -L "from 'playwright'" tests/*.mjs)
 
   admin-unit-tests:
     name: admin - unit suite

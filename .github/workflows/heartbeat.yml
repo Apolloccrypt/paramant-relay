@@ -1,0 +1,222 @@
+name: heartbeat
+
+# The hourly proof that the products still work. One alarm, not several.
+#
+# It replaces the live job that used to sit in product-heartbeat.yml. That job
+# reported green on 2026-09-02 (run 33624449015) while two of its four steps
+# proved nothing: node:test prints a skipped test as `ok N - name # SKIP reason`
+# and counts it in `# pass`, so a canary whose secret was missing reported
+# success. The ParaSign half finished its two real tests in 1.28 ms and 0.12 ms,
+# less than a TLS handshake, and the run was green.
+#
+# What changed, structurally:
+#   * the checks live in scripts/heartbeat/ as plain scripts, so they can be run
+#     by hand and read without a test runner's pass/skip semantics in the way
+#   * there is no skip. A missing secret fails and names the secret
+#   * every step writes an evidence file (ids, hashes, statuses, timings) that is
+#     uploaded as an artifact. A step that records nothing is failed
+#   * the one-line cause is emitted as a ::error:: annotation, which GitHub
+#     renders at the head of the run page, above the log
+#
+# product-heartbeat.yml keeps the browser suite as the pull-request gate; its
+# hourly half moved here so there is a single place that goes red.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+# Nothing beyond what the alarm needs: read the code, write the issue.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # An hourly job that overlaps itself doubles the canary data on production and
+  # makes the CT-log assertions race each other.
+  group: heartbeat
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    name: heartbeat - production
+    # The hourly run stays off until production is ready for it, and the switch
+    # is a repository variable rather than a commented-out cron.
+    #
+    # The reason is order of operations. This alarm fails loudly when a secret is
+    # missing, which is the whole point, but PARAMANT_CANARY_KEY and
+    # PARASIGN_CANARY_KEY do not exist yet and can only be created from the
+    # machine that holds them. Merged without a gate, it would go red at :17
+    # every hour and comment on the same issue twenty-four times a day, and an
+    # alarm that cries every hour for a known reason is one people learn to
+    # ignore. That is how a monitor dies.
+    #
+    # workflow_dispatch always runs, so the run can be tried by hand at any
+    # point, including before the variable is set, to see exactly which secret
+    # it still wants. See docs/heartbeat.md for the two commands.
+    if: github.event_name == 'workflow_dispatch' || vars.HEARTBEAT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # Generous next to a run that normally takes about two minutes, and still a
+    # ceiling: a relay that hangs must end as a red run, not as a job that sits
+    # there until the next hour starts.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps (browsers installed separately)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # The four proof steps, in one process so the summary line can name every
+      # failure at once. run.mjs runs all of them even after one fails: a dead
+      # page must never hide a dead signer.
+      - name: Proof run
+        id: proof
+        # continue-on-error, not `if: always()` on later steps: the run must be
+        # marked failed at the end, but the browser suite and the artifact upload
+        # still have to happen first.
+        continue-on-error: true
+        run: node scripts/heartbeat/run.mjs
+        env:
+          PARAMANT_RELAY_URL: https://relay.paramant.app
+          PARAMANT_BASE_URL: https://paramant.app
+          # Required. Absent, the run goes red naming the secret, which is the
+          # whole point of the rewrite.
+          PARAMANT_CANARY_KEY: ${{ secrets.PARAMANT_CANARY_KEY }}
+          PARASIGN_CANARY_KEY: ${{ secrets.PARASIGN_CANARY_KEY }}
+          # Optional, and the only optional input here. Without it the run still
+          # proves the deep-readiness gate is shut to the internet; with it, it
+          # also reads the eight component checks behind that gate.
+          PARAMANT_INTERNAL_AUTH_TOKEN: ${{ secrets.PARAMANT_INTERNAL_AUTH_TOKEN }}
+
+      # The browser half. It proves the pages initialise, which no HTTP check
+      # can see: the July 2026 breaks (a relative import 404, a module loaded as
+      # a classic script, a CSP-blocked signup) were all silent everywhere else.
+      - name: Pages initialise in a real browser
+        id: pages
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: node --test tests/product-heartbeat.test.mjs
+        env:
+          PARAMANT_BASE_URL: https://paramant.app
+
+      # Someone else's uptime, so hourly and never in a pull request.
+      - name: Where every external link leads
+        id: links
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: CHECK_EXTERNAL_LINKS=1 node --test tests/links.test.mjs
+
+      # The evidence, always. A red run's evidence is the more useful of the two.
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: heartbeat-evidence-${{ github.run_id }}
+          path: heartbeat-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+      # One line, at the top. GitHub renders annotations at the head of the run
+      # page, above the whole log, which is the only place in Actions that is
+      # genuinely the top. run.mjs already emits its own for the proof steps;
+      # this covers the two browser steps and settles the job's outcome.
+      - name: Say in one line what failed
+        if: always()
+        shell: bash
+        run: |
+          fail=""
+          [ "${{ steps.proof.outcome }}" = "failure" ] && fail="$fail proof-run"
+          [ "${{ steps.pages.outcome }}" = "failure" ] && fail="$fail pages-in-browser"
+          [ "${{ steps.links.outcome }}" = "failure" ] && fail="$fail external-links"
+          if [ -n "$fail" ]; then
+            line="Heartbeat rood bij:$fail"
+            if [ -f heartbeat-evidence/summary.json ]; then
+              line="$line -- $(node -e "process.stdout.write(require('./heartbeat-evidence/summary.json').line)")"
+            fi
+            echo "::error title=Heartbeat rood::$line"
+            echo "$line" > heartbeat-evidence/line.txt 2>/dev/null || true
+            exit 1
+          fi
+          echo "Heartbeat green: every step produced evidence."
+
+      # An hourly job that turns red in a tab nobody opens is not an alarm. One
+      # issue, reopened and commented rather than duplicated, closed again when
+      # the site is healthy, so the issue list tracks production instead of
+      # collecting noise.
+      #
+      # The lookup is deliberately over state:all. Searching only open issues
+      # says "reopened" and does the opposite: the previous episode's issue was
+      # closed by the green run that ended it, so the next red run finds nothing
+      # open and files a fresh one. A flapping relay would produce one issue per
+      # episode, which is the noise this is supposed to prevent.
+      - name: Open or update the issue when production is down
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const read = (p, d) => { try { return fs.readFileSync(p, 'utf8'); } catch { return d; } };
+            let summary = null;
+            try { summary = JSON.parse(read('heartbeat-evidence/summary.json', 'null')); } catch {}
+            const line = read('heartbeat-evidence/line.txt', '').trim() || 'see the run log';
+            const steps = summary
+              ? summary.steps.map(s => `- ${s.name}: ${s.ok ? `green (${s.proofs} proofs)` : `RED - ${s.cause}`}`).join('\n')
+              : '- the proof run wrote no summary, so it failed before it could report';
+            const title = 'Heartbeat rood';
+            const body = [
+              `**${line}**`,
+              '',
+              steps,
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              `Evidence: the heartbeat-evidence-${context.runId} artifact on that run carries the ids,`,
+              'hashes, statuses and timings of every request the run made.',
+              '',
+              `_${new Date().toISOString()}_`,
+            ].join('\n');
+            // Newest first, so a repository that has accumulated several over
+            // the years reopens the most recent rather than the first ever.
+            const all = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'all', labels: 'heartbeat',
+              sort: 'created', direction: 'desc', per_page: 100,
+            });
+            // Pull requests come back from this endpoint too, and the title has
+            // to match: the label alone would adopt an unrelated issue somebody
+            // labelled by hand.
+            const mine = all.data.filter(i => !i.pull_request && i.title === title);
+            if (!mine.length) {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['heartbeat'] });
+            } else {
+              const issue = mine.find(i => i.state === 'open') || mine[0];
+              if (issue.state !== 'open') {
+                await github.rest.issues.update({
+                  ...context.repo, issue_number: issue.number, state: 'open',
+                });
+              }
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number, body,
+              });
+            }
+
+      - name: Close the issue when production is healthy again
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'heartbeat',
+            });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: `Heartbeat green again as of run ${context.runId}, with evidence attached to that run. Closing.`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed' });
+            }
