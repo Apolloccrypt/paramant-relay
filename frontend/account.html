@@ -22,6 +22,22 @@
 <meta name="twitter:description" content="Your account — Paramant">
 <link rel="canonical" href="https://paramant.app/account">
 <style>
+/* Plan bands in the billing section: what this plan is, in one line. The
+   Community band is dark like the dashboard band so the same message reads as
+   the same message on both pages. */
+.acct-plan-band { border-radius: 10px; padding: 18px 20px; margin: 0 0 20px; }
+.acct-plan-band.free { background: #0a1626; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
+.acct-plan-band.paid { background: rgba(255,255,255,.76); border: 1px solid rgba(11,58,106,.09); }
+.acct-plan-kicker { margin: 0 0 8px; font-family: IBM Plex Mono, monospace; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+.acct-plan-band.free .acct-plan-kicker { color: #B2FF3F; }
+.acct-plan-band.paid .acct-plan-kicker { color: #1D4ED8; }
+.acct-plan-lede { margin: 0 0 10px; font-size: 15px; line-height: 1.6; }
+.acct-plan-band.free .acct-plan-lede { color: #F8FAFC; }
+.acct-plan-band.paid .acct-plan-lede { color: #0B3A6A; }
+.acct-plan-adds { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: rgba(248,250,252,.72); }
+.acct-plan-band.free a.acct-plan-cta { display: inline-block; font-family: IBM Plex Mono, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #0a1626; background: #B2FF3F; text-decoration: none; padding: 10px 16px; border-radius: 4px; }
+.acct-plan-band.free a.acct-plan-cta:hover { background: #F8FAFC; }
+.acct-plan-band.free .acct-plan-lede a { color: #B2FF3F; }
 .nav-help {
   display: inline-flex;
   align-items: center;
@@ -296,6 +312,21 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
   <div id="billing-loading" style="color:var(--ink-dim);font-size:var(--text-sm)">Loading billing status…</div>
 
   <div id="billing-content" class="hidden">
+    <!-- Shown by js/account.inline1.js only while the account pays for neither
+         product. Same message the dashboard leads with: Community is given, the
+         business plans pay for it, and one link is the whole upgrade path. -->
+    <div class="acct-plan-band free" id="billing-community" hidden>
+      <p class="acct-plan-kicker">Community &middot; &euro;0</p>
+      <p class="acct-plan-lede">You are on the Community plan and it stays free. It is Mick Beer, privacy and security researcher and founder of Paramantis Solutions B.V., giving something back to society; the business plans pay for it.</p>
+      <p class="acct-plan-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
+      <a class="acct-plan-cta" href="/pricing">See the business plans &rarr;</a>
+    </div>
+    <!-- Shown on a paid plan. No link to a higher tier: a customer who pays is
+         reading his own subscription, not an offer. -->
+    <div class="acct-plan-band paid" id="billing-paid" hidden>
+      <p class="acct-plan-kicker">Your subscription &middot; active</p>
+      <p class="acct-plan-lede">Thank you. Your subscription is what keeps the Community plan free for everyone else. Your plan, renewal date and invoices are below.</p>
+    </div>
     <div class="info-row">
       <div class="info-label">Current plan</div>
       <div class="info-value">
@@ -337,7 +368,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/account.inline1.js?v=1"></script>
+<script src="/js/account.inline1.js?v=2"></script>
 
 <script type="module" src="/js/account.inline2.js?v=2"></script>
 <script type="module" src="/js/passkey.js?v=3"></script>

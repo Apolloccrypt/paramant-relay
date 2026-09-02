@@ -12,6 +12,7 @@ const MIME = { '.js':'text/javascript','.css':'text/css','.html':'text/html','.s
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   if (pathname === '/dashboard') pathname = '/dashboard.html';
+  if (pathname === '/account') pathname = '/account.html';
   const file = path.join(ROOT, pathname);
   if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (error, body) => {
@@ -161,6 +162,85 @@ ok('a paid ParaSend tier counts too', sendPlan.badge === 'Pro' && sendPlan.band 
 
 const licensedPlan = await planCase({ plan:'licensed' });
 ok('a licensed account reads as Enterprise, not as a machine string', licensedPlan.badge === 'Enterprise' && licensedPlan.band === false, JSON.stringify(licensedPlan));
+
+// ── /account tells the same story, and gates the same way ────────────────────
+// This is the page a customer opens to find out what he pays, so the answer has
+// to match the dashboard's. It also carries two affordances the dashboard does
+// not: the Active badge and the Cancel button. Those used to be decided by
+// `current_plan !== 'community'`, one string, which got it wrong in BOTH
+// directions: a free ParaSign account sits on the tier called 'free', so it was
+// offered a cancel button for a subscription it does not have, and a self-serve
+// customer keeps the unified plan 'community' while only his product tier
+// moves, so the person actually paying never saw the badge.
+//
+// Tested through the rendered page rather than by reading the source for a
+// forbidden string, because the next wrong gate will not be spelled the same.
+const acctPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+let acctState = {};
+const acctBody = () => JSON.stringify({
+  email:'demo@example.com', api_key_masked:'pgp_****', label:'Demo',
+  created_at:'2026-06-01T10:00:00.000Z', backup_codes_remaining:8, sessions:[],
+  plan_parasign:null, plan_parasend:null, paid_until_parasign:null, paid_until_parasend:null,
+  ...acctState,
+});
+// Playwright tries handlers newest-first, so the catch-all is registered FIRST
+// and the specific stubs land on top of it. The other way round it answers {}
+// to everything and every case renders as a signed-out, planless page, which
+// makes three of the four assertions below pass for the wrong reason.
+await acctPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await acctPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await acctPage.route('**/api/user/billing/history', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"history":[]}' }));
+await acctPage.route('**/api/user/billing/status', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ current_plan: acctState.plan || 'community', ...JSON.parse(acctBody()) }) }));
+await acctPage.route('**/api/user/account', (route) => route.fulfill({ status:200, contentType:'application/json', body:acctBody() }));
+
+async function acctCase(state) {
+  acctState = state;
+  await acctPage.goto(ORIGIN + '/account', { waitUntil:'domcontentloaded' });
+  await acctPage.locator('#billing-content:not(.hidden)').waitFor();
+  return {
+    chip: (await acctPage.locator('#plan-chip').textContent()).trim(),
+    current: (await acctPage.locator('#billing-plan').textContent()).trim(),
+    active: await acctPage.locator('#billing-active-badge').isVisible(),
+    cancel: await acctPage.locator('#billing-cancel-btn').isVisible(),
+    giveBack: await acctPage.locator('#billing-community').isVisible(),
+    bought: await acctPage.locator('#billing-paid').isVisible(),
+  };
+}
+
+const acctFree = await acctCase({ plan:'community' });
+ok('a Community account is not offered a cancel button',
+  acctFree.chip === 'Community' && acctFree.current === 'Community' &&
+  acctFree.active === false && acctFree.cancel === false &&
+  acctFree.giveBack === true && acctFree.bought === false, JSON.stringify(acctFree));
+
+// ParaSign's floor tier is the word 'free', not 'community'
+// (relay/lib/entitlements.js PARASIGN_TIERS). The old gate read that as paid.
+const acctFloor = await acctCase({ plan:'community', plan_parasign:'free' });
+ok('the ParaSign floor tier is still free of charge',
+  acctFloor.current === 'Community' && acctFloor.cancel === false && acctFloor.giveBack === true, JSON.stringify(acctFloor));
+
+// ParaSend's floor is the word 'community', ParaSign's is 'free', and a tier
+// nobody recognises must not be luckier than either. paidProductTier() reads
+// the paid rungs rather than listing the floors, so all three come out unpaid.
+const acctSendFloor = await acctCase({ plan:'community', plan_parasend:'community' });
+ok('the ParaSend floor tier is free of charge as well',
+  acctSendFloor.current === 'Community' && acctSendFloor.cancel === false, JSON.stringify(acctSendFloor));
+
+const acctUnknown = await acctCase({ plan:'community', plan_parasign:'platinum', paid_until_parasign:future });
+ok('an unrecognised tier fails closed rather than unlocking a subscription',
+  acctUnknown.current === 'Community' && acctUnknown.active === false && acctUnknown.cancel === false, JSON.stringify(acctUnknown));
+
+const acctPaid = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future });
+ok('a self-serve customer gets the badge and the cancel button he pays for',
+  acctPaid.chip === 'Pro' && acctPaid.current === 'Pro' &&
+  acctPaid.active === true && acctPaid.cancel === true &&
+  acctPaid.giveBack === false && acctPaid.bought === true, JSON.stringify(acctPaid));
+
+const acctLapsed = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:past });
+ok('an expired paid period falls back to Community on /account too',
+  acctLapsed.chip === 'Community' && acctLapsed.current === 'Community' &&
+  acctLapsed.active === false && acctLapsed.cancel === false &&
+  acctLapsed.giveBack === true, JSON.stringify(acctLapsed));
 
 for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name}${check.detail ? ' :: ' + check.detail : ''}`);
 await browser.close();

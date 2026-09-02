@@ -84,8 +84,16 @@
 
   // Per-product ladders, lowest first, so the badge can show the highest tier a
   // customer actually pays for. Mirrors PARASEND_TIERS / PARASIGN_TIERS in
-  // relay/lib/entitlements.js; 'free' is the floor of both.
-  var PRODUCT_LADDER = ['free', 'pro', 'business', 'enterprise'];
+  // relay/lib/entitlements.js. The two products do NOT share a floor there:
+  // PARASEND_TIERS starts at 'community' and PARASIGN_TIERS at 'free', so both
+  // words have to count as unpaid.
+  // Only the rungs you can pay for. The two products do NOT share a floor in
+  // relay/lib/entitlements.js: PARASEND_TIERS starts at 'community' and
+  // PARASIGN_TIERS at 'free'. Rather than list both floor words and hope the
+  // list stays complete, this reads the other way round and fails closed: a
+  // tier counts as paid only when it is one of these three. A floor word, a
+  // renamed tier or a typo all come out unpaid, which is the safe direction.
+  var PRODUCT_LADDER = ['pro', 'business', 'enterprise'];
   var PRODUCT_NAMES = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
 
   // A product tier counts as paid only while its period still runs, which is
@@ -93,12 +101,28 @@
   // expires, and a missing paid_until means no period was ever recorded.
   function paidProductTier(tier, paidUntil) {
     var t = String(tier || 'free').toLowerCase();
-    if (PRODUCT_LADDER.indexOf(t) < 1) return null;
+    if (PRODUCT_LADDER.indexOf(t) < 0) return null;
     if (!paidUntil) return t;
     var ends = Date.parse(paidUntil);
     if (!isNaN(ends) && Date.now() >= ends) return null;
     return t;
   }
+
+  // What a paying customer already has, per product, quoted from /pricing. It
+  // is per product because a self-serve purchase moves one ladder only: someone
+  // who bought ParaSend Pro has no signature allowance to read about. Nothing
+  // here is an upsell. A customer who has paid should read what he bought.
+  var PRODUCT_INCLUDES = {
+    parasign: {
+      pro: 'ParaSign Pro: 100 signatures a month, then \u20ac0.40 each up to 1,000, unlimited transfers, and a connection you can plug into your own systems.',
+      business: 'ParaSign Business: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.',
+      enterprise: 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.'
+    },
+    parasend: {
+      pro: 'ParaSend Pro: links that stay open 24 hours, up to 10 reads each, up to 50 registered devices, a record of what you sent, and no rate limit.',
+      enterprise: 'ParaSend Enterprise: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.'
+    }
+  };
 
   function render(data) {
     var email = data.email || '';
@@ -128,6 +152,32 @@
     // pays for it. A paying customer never sees the band.
     var community = root.querySelector('#dh-community');
     if (community) community.hidden = !isFree;
+
+    // The other half of the same rule: a paying account reads what it bought.
+    // Per product, so a ParaSend customer is not told about signatures he has
+    // no allowance for, and with a plain sentence for an account whose unified
+    // plan was granted by hand rather than bought through a product ladder.
+    var paid = root.querySelector('#dh-plan-paid');
+    if (paid) {
+      var lines = [];
+      var bought = [
+        ['parasign', paidProductTier(data.plan_parasign, data.paid_until_parasign)],
+        ['parasend', paidProductTier(data.plan_parasend, data.paid_until_parasend)]
+      ];
+      for (var bi = 0; bi < bought.length; bi++) {
+        var copy = bought[bi][1] && PRODUCT_INCLUDES[bought[bi][0]][bought[bi][1]];
+        if (copy) lines.push(copy);
+      }
+      if (!lines.length && planId !== 'community') {
+        lines.push('Your account is on the ' + planName + ' plan, with the ' + planName +
+                   ' limits on both ParaSign and ParaSend.');
+      }
+      paid.hidden = isFree || !lines.length;
+      if (!paid.hidden) {
+        txt('paid-name', planName);
+        txt('paid-includes', lines.join(' '));
+      }
+    }
     txt('created',      fmtDate(data.created_at));
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));

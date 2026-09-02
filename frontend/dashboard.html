@@ -47,6 +47,25 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-community-cta { flex: 0 0 auto; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #0a1626; background: #B2FF3F; text-decoration: none; padding: 10px 16px; border-radius: 4px; }
 .dh-community-cta:hover { background: #F8FAFC; }
 .dh-start-kicker { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .75; }
+.dh-paid { border: 1px solid rgba(11,58,106,.09); border-radius: 10px; background: rgba(255,255,255,.76); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); }
+.dh-paid-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--cobalt); }
+.dh-paid-lede { margin: 0 0 var(--space-2); font: 15px/1.6 var(--sans); color: var(--ink); }
+.dh-paid-foot { margin: 0; font: 13px/1.6 var(--sans); color: var(--ink-dim); }
+.dh-paid-foot a { color: var(--cobalt); }
+
+/* Buyer questions -- the three things someone asks before he trusts this with
+   a contract, each answered in one line that links to the page that proves it. */
+.dh-ask { border: 1px solid rgba(11,58,106,.09); border-radius: 18px; background: rgba(255,255,255,.72); padding: var(--space-5); margin-bottom: var(--space-7); }
+.dh-ask h2 { margin: 0 0 var(--space-4); font: 600 18px/1.25 var(--sans); letter-spacing: -.01em; color: var(--ink); }
+.dh-ask-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-4); margin: 0 0 var(--space-4); }
+.dh-ask-item { margin: 0; }
+.dh-ask-item dt { margin: 0 0 4px; font: 600 15px/1.35 var(--sans); color: var(--ink); }
+.dh-ask-item dd { margin: 0; font: 14px/1.55 var(--sans); color: var(--ink-dim); }
+.dh-ask-item dd a { color: var(--cobalt); font-weight: 600; text-decoration: none; }
+.dh-ask-item dd a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.dh-ask-foot { margin: 0; padding-top: var(--space-3); border-top: 1px solid var(--ink-hair); font: 14px/1.55 var(--sans); color: var(--ink-dim); }
+.dh-ask-foot a { color: var(--cobalt); font-weight: 600; text-decoration: none; }
+.dh-ask-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Onboarding hint (ParaPear, dismissible once) */
 .dh-onb { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); border-radius: 16px; background: var(--bone); border: 1px solid var(--ink-hair); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.04); }
@@ -153,6 +172,16 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 @media (max-width: 760px) {
   .dh-start { grid-template-columns: 1fr; }
   .dh-start-card { min-height: 148px; }
+  /* Two flagship products first, at full size. The third card is the same
+     action in a smaller shape, so a phone reads Sign and Send before it reads
+     anything else. */
+  .dh-start-card:nth-child(-n+2) h2 { font-size: 22px; }
+  .dh-start-card:nth-child(n+3) { min-height: 0; padding: 16px 18px; border-radius: 14px; }
+  .dh-start-card:nth-child(n+3) .dh-start-icon { width: 30px; height: 30px; font-size: 16px; border-radius: 9px; }
+  .dh-start-card:nth-child(n+3) h2 { margin: 12px 0 4px; font-size: 16px; }
+  .dh-start-card:nth-child(n+3) p { font-size: 13px; }
+  .dh-start-card:nth-child(n+3) .dh-start-link { margin-top: 10px; }
+  .dh-ask { padding: var(--space-4); }
   .dh-document { grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 16px 18px; }
   .dh-document-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
   .dh-document-progress span { margin: 0; }
@@ -304,6 +333,30 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
     </header>
 
+    <section class="dh-start" aria-label="Start a document workflow">
+      <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Request signatures">
+        <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
+        <span class="dh-start-kicker">ParaSign</span>
+        <h2>Request signatures</h2>
+        <p>Send a secure document, invite the right people and follow every signature. They sign with the link from that email and need no account.</p>
+        <span class="dh-start-link">Start a request &rarr;</span>
+      </a>
+      <a class="dh-start-card" href="/parashare" aria-label="Send a file securely">
+        <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
+        <span class="dh-start-kicker">ParaSend</span>
+        <h2>Send a file that disappears</h2>
+        <p>The file is encrypted in your browser before it leaves. The recipient gets one link, and the file is gone the moment it has been read. No signature workflow attached.</p>
+        <span class="dh-start-link">Send a file &rarr;</span>
+      </a>
+      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Sign a document yourself">
+        <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
+        <span class="dh-start-kicker">ParaSign</span>
+        <h2>Sign it yourself</h2>
+        <p>Add your signature and download the result immediately.</p>
+        <span class="dh-start-link">Open signing &rarr;</span>
+      </a>
+    </section>
+
     <!-- The one thing a free account should be told, in the words the homepage
          uses: this is the Community plan, it is a gift and not a trial, and the
          business plans are what pays for it. Shown by dashboard.js only while
@@ -311,10 +364,19 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-community" id="dh-community" aria-label="Your plan" hidden>
       <div>
         <p class="dh-community-kicker">Community &middot; &euro;0</p>
-        <p class="dh-community-lede">You are on the Community plan, and it stays free. It is Paramant's contribution back: signing and sending that does not route through an American cloud. Same name on <a href="/pricing">the pricing page</a>.</p>
-        <p class="dh-community-adds">The business plans add volume (100 or 1,000 signatures a month instead of 2), longer link expiry, send history and webhooks, named support, an exportable audit log, and on Enterprise a dedicated relay with a signed DPA.</p>
+        <p class="dh-community-lede">You are on the Community plan and it stays free. It is Mick Beer, privacy and security researcher and founder of Paramantis Solutions B.V., giving something back to society; the business plans pay for it.</p>
+        <p class="dh-community-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
       </div>
       <a class="dh-community-cta" href="/pricing">See the business plans &rarr;</a>
+    </aside>
+
+    <!-- What a paying customer bought, in the words /pricing sells it in. Shown
+         by dashboard.js only on Pro, Business or Enterprise, and it carries no
+         link to a higher tier: someone who already pays is not a lead. -->
+    <aside class="dh-paid" id="dh-plan-paid" aria-label="Your plan" hidden>
+      <p class="dh-paid-kicker"><span data-dh="paid-name">--</span> plan &middot; active</p>
+      <p class="dh-paid-lede" data-dh="paid-includes">--</p>
+      <p class="dh-paid-foot">Your subscription and invoices are under <a href="/account#billing-section">Plan &amp; billing</a>.</p>
     </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
@@ -336,35 +398,11 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
       </div>
     </aside>
 
-    <section class="dh-start" aria-label="Start a document workflow">
-      <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Request signatures">
-        <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
-        <span class="dh-start-kicker">ParaSign</span>
-        <h2>Request signatures</h2>
-        <p>Send a secure document, invite the right people and follow every signature. They sign with the link from that email and need no account.</p>
-        <span class="dh-start-link">Start a request &rarr;</span>
-      </a>
-      <a class="dh-start-card" href="/parashare" aria-label="Send a file securely">
-        <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
-        <span class="dh-start-kicker">ParaSend</span>
-        <h2>Send a file that disappears</h2>
-        <p>Encrypted in your browser, held in RAM, burned on the first read. No signature workflow attached.</p>
-        <span class="dh-start-link">Send a file &rarr;</span>
-      </a>
-      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Sign a document yourself">
-        <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
-        <span class="dh-start-kicker">ParaSign</span>
-        <h2>Sign it yourself</h2>
-        <p>Add your signature and download the result immediately.</p>
-        <span class="dh-start-link">Open signing &rarr;</span>
-      </a>
-    </section>
-
     <section class="dh-workspace" aria-labelledby="dh-documents-title">
       <div class="dh-workspace-head">
         <div>
           <h2 id="dh-documents-title">Open documents</h2>
-          <p>Signing requests you created, with the status the relay actually reports.</p>
+          <p>Every signing request you started, and exactly how far each one is.</p>
         </div>
         <button class="dh-refresh" type="button" id="dh-documents-refresh">Refresh</button>
       </div>
@@ -389,6 +427,28 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
         <div class="dh-doc-dialog-body" id="dh-document-dialog-body"></div>
       </div>
     </div>
+
+    <!-- The three questions someone asks before he puts a real contract through
+         this. Each answer links to the page that carries the proof, so nothing
+         here is a claim this file has to be trusted on. -->
+    <section class="dh-ask" aria-labelledby="dh-ask-title">
+      <h2 id="dh-ask-title">Questions people ask before they trust this</h2>
+      <dl class="dh-ask-list">
+        <div class="dh-ask-item">
+          <dt>What does it cost?</dt>
+          <dd>Community is free forever, with no card. Paid plans start at &euro;15 a month excl. btw, which is ParaSend Pro. <a href="/pricing">See the plans</a></dd>
+        </div>
+        <div class="dh-ask-item">
+          <dt>Who can read what I send?</dt>
+          <dd>Files are encrypted in your browser, and the relay runs on Hetzner in Nuremberg, Germany. <a href="/security">Read how</a></dd>
+        </div>
+        <div class="dh-ask-item">
+          <dt>Can the other side check a signature?</dt>
+          <dd>Signed documents verify without an account. Older envelope formats need the relay. <a href="/verify">Try the verifier</a></dd>
+        </div>
+      </dl>
+      <p class="dh-ask-foot">Anything else is answered in the <a href="/help">help centre</a>.</p>
+    </section>
 
     <nav class="dh-quiet-links" aria-label="Other document actions">
       <a href="/verify">Verify a signed document</a>
@@ -471,6 +531,6 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/dashboard.js?v=5" defer></script>
+<script src="/js/dashboard.js?v=6" defer></script>
 </body>
 </html>

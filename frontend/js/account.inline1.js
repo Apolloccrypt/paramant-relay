@@ -1,5 +1,83 @@
 
 (function() {
+  // Plan resolution, the same shape js/dashboard.js uses, because a customer
+  // who wants to know what he pays comes here rather than to the dashboard and
+  // must not read a different answer. relay/lib/tiers.js is the declared single
+  // source of truth: TIER_LIMITS holds the canonical rows and normalisePlan
+  // folds every other ID onto one of them ('free' and 'dev' to community,
+  // 'licensed' to enterprise, anything unknown to community). That last rule is
+  // why 'standard', which the API returns for a record with no plan at all,
+  // resolves to Community instead of printing a machine string on the page.
+  // tests/ui-truthfulness.test.mjs reads the rows and aliases out of tiers.js
+  // and fails if this drifts from it.
+  var PLAN_ALIASES = { free: 'community', dev: 'community', licensed: 'enterprise' };
+  var PLAN_NAMES = {
+    community: 'Community',
+    pro:       'Pro',
+    business:  'Business',
+    enterprise:'Enterprise',
+  };
+
+  function normalisePlan(plan) {
+    var id = String(plan == null ? '' : plan).toLowerCase();
+    if (PLAN_ALIASES[id]) return PLAN_ALIASES[id];
+    return PLAN_NAMES[id] ? id : 'community';
+  }
+
+  // Per-product ladders, lowest first. Mirrors PARASEND_TIERS / PARASIGN_TIERS
+  // in relay/lib/entitlements.js, where the two products do NOT share a floor:
+  // PARASEND_TIERS starts at 'community' and PARASIGN_TIERS at 'free'. Both
+  // words therefore have to count as unpaid.
+  // Only the rungs you can pay for. The two products do NOT share a floor in
+  // relay/lib/entitlements.js: PARASEND_TIERS starts at 'community' and
+  // PARASIGN_TIERS at 'free'. Rather than list both floor words and hope the
+  // list stays complete, this reads the other way round and fails closed: a
+  // tier counts as paid only when it is one of these three. A floor word, a
+  // renamed tier or a typo all come out unpaid, which is the safe direction.
+  var PRODUCT_LADDER = ['pro', 'business', 'enterprise'];
+  var PRODUCT_NAMES = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+
+  // A product tier counts as paid only while its period still runs, the rule
+  // effectiveProductTier() applies server-side: the floor tier never expires,
+  // and a missing paid_until means no period was ever recorded.
+  function paidProductTier(tier, paidUntil) {
+    var t = String(tier || 'free').toLowerCase();
+    if (PRODUCT_LADDER.indexOf(t) < 0) return null;
+    if (!paidUntil) return t;
+    var ends = Date.parse(paidUntil);
+    if (!isNaN(ends) && Date.now() >= ends) return null;
+    return t;
+  }
+
+  // The highest tier this account actually pays for, across both products, or
+  // null when it pays for neither. A self-serve purchase moves one product
+  // ladder and leaves the unified plan on community, so testing the unified
+  // plan alone showed a paying customer the free band and the upgrade link.
+  function topPaidTier(data) {
+    var top = null;
+    var tiers = [
+      paidProductTier(data.plan_parasign, data.paid_until_parasign),
+      paidProductTier(data.plan_parasend, data.paid_until_parasend)
+    ];
+    for (var i = 0; i < tiers.length; i++) {
+      if (tiers[i] && (!top || PRODUCT_LADDER.indexOf(tiers[i]) > PRODUCT_LADDER.indexOf(top))) top = tiers[i];
+    }
+    return top;
+  }
+
+  // The name to put on screen: the unified plan, unless a product purchase
+  // outranks it while the unified plan is still the free row.
+  function planName(data, plan) {
+    var id = normalisePlan(plan);
+    var top = topPaidTier(data);
+    if (top && id === 'community') return PRODUCT_NAMES[top] || PLAN_NAMES[id];
+    return PLAN_NAMES[id];
+  }
+
+  function isFreeAccount(data, plan) {
+    return normalisePlan(plan) === 'community' && !topPaidTier(data);
+  }
+
   function show(id) {
     document.querySelectorAll('[id^="state-"]').forEach(function(el) {
       el.classList.add('hidden');
@@ -17,9 +95,9 @@
       const data = await res.json();
       document.getElementById('account-email').textContent = data.email;
       document.getElementById('api-key').textContent = data.api_key_masked;
-      document.getElementById('plan').textContent = data.plan;
+      document.getElementById('plan').textContent = planName(data, data.plan);
       var planChip = document.getElementById('plan-chip');
-      if (planChip) planChip.textContent = data.plan;
+      if (planChip) planChip.textContent = planName(data, data.plan);
       document.getElementById('label').textContent = data.label || '—';
       document.getElementById('created').textContent = data.created_at ? new Date(data.created_at).toLocaleDateString() : 'Unknown';
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
@@ -164,11 +242,26 @@
       document.getElementById('billing-content').classList.remove('hidden');
 
       const planEl = document.getElementById('billing-plan');
-      planEl.textContent = d.current_plan.charAt(0).toUpperCase() + d.current_plan.slice(1);
-      if (d.current_plan !== 'community') {
+      planEl.textContent = planName(d, d.current_plan);
+      // Paying is not one string. ParaSend's floor tier is 'community' and
+      // ParaSign's is 'free' (relay/lib/entitlements.js), the API answers
+      // 'standard' for a record with no plan at all, and a self-serve purchase
+      // moves only its own product ladder while the unified plan stays on
+      // community. Comparing against 'community' therefore both offered a free
+      // account a Cancel button for a subscription it does not have, and hid
+      // the badge from a customer who really was paying.
+      const free = isFreeAccount(d, d.current_plan);
+      if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
         document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
+      // One calm line about what this plan is. On Community it says whose gift
+      // it is and what the paid plans add, with a single way up. On a paid plan
+      // it says what was bought and stops there.
+      const band = document.getElementById('billing-community');
+      if (band) band.hidden = !free;
+      const bought = document.getElementById('billing-paid');
+      if (bought) bought.hidden = free;
       if (d.next_billing_date) {
         document.getElementById('billing-next-row').style.display = 'flex';
         document.getElementById('billing-next').textContent = new Date(d.next_billing_date).toLocaleDateString();
