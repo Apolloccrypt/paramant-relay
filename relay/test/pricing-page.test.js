@@ -143,7 +143,6 @@ assert.strictEqual(yearlyAlts, 3, 'expected 3 yearly options demoted to secondar
 assert(!/data-billing-interval="yearly"\s+class="btn/.test(html), 'no yearly variant may still be an equal btn');
 ok('one primary monthly CTA per tier, yearly demoted to a secondary link');
 
-// The dead stub checkout page no longer serves the "no charge" lie; it redirects.
 // /parasign is the product page and quotes the ParaSign prices a second time.
 // relay/test/pricing-page.test.js is the only thing that ties a listed price to
 // the catalog, so the product page is held to the same numbers here: an edit
@@ -165,6 +164,7 @@ for (const s of ['2 signatures per month', '100 signatures per month, then &euro
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
 ok('parasign.html carries the same quota lines and the btw convention');
 
+// The dead stub checkout page no longer serves the "no charge" lie; it redirects.
 const checkoutHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'billing', 'checkout.html'), 'utf8');
 assert(!/no charge/i.test(checkoutHtml), 'checkout.html must not claim "no charge"');
 assert(!/activates immediately/i.test(checkoutHtml), 'checkout.html must not claim "activates immediately"');
@@ -277,8 +277,6 @@ assert(VISIBLE.includes('There is no separate trial'), 'FAQ must keep saying the
 assert(VISIBLE.includes('Forever &middot; no card required'), 'Free card must keep the forever/no-card promise');
 ok('one starting-for-free promise: forever-free tier, no trial clock');
 
-console.log('pricing-page: ' + passed + ' checks passed');
-
 // ── Every amount belongs to the card it stands in ────────────────────────────
 //
 // The catalog sweep above asks two questions: is every amount on the page a
@@ -358,3 +356,5 @@ for (const raw of cards) {
 }
 assert(bound >= 8, 'expected to bind at least 8 amounts to a card, bound ' + bound);
 ok('every amount and discount sits on the card of the plan it belongs to (' + bound + ' amounts bound)');
+
+console.log('pricing-page: ' + passed + ' checks passed');
