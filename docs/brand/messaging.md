@@ -153,7 +153,7 @@ Fixed wording, from the rules grid on /, word for word:
 > Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email
 > goes out via Resend, as /privacy sets out.
 
-The long form, from ParaRule 5 on /pararules, word for word, and it is the
+The long form, from rule 5 on /rules, word for word, and it is the
 version to use wherever there is room for three sentences:
 
 > Hosted in Germany, owned top to bottom in the EU. No US CLOUD Act reach over
@@ -169,7 +169,7 @@ Resend sentence.
 Pinned by: nothing today. **To add** to `tests/ui-truthfulness.test.mjs`: assert
 that `frontend/index.html` still carries "No US provider in the data path" and,
 in the same rule, the Resend sentence with its link to /privacy; assert the same
-pairing in ParaRule 5 on `frontend/pararules.html`; and assert that no public
+pairing in rule 5 on `frontend/rules.html`; and assert that no public
 page carries "no US company in the chain", "no US provider in the chain" or
 "no US company" without the Resend exception beside it. See the open
 contradiction in section 9: /security still carries the unqualified row and has
@@ -269,14 +269,20 @@ sentence here. Dutch plainness in English words.
   We do not have them, so we do not imply them.
 - Numbers only where they already appear on the site: prices, 2 signatures a
   month, 7 day IP log retention, 99.9% SLA, 48 hour disclosure acknowledgement.
-- Claim plus checkpoint, the shape the ParaRules already use: say what it is and
-  say where it is checked.
+- Claim plus checkpoint, the shape the rules on /rules already use: say what it
+  is and say where it is checked.
 - Where something is unfinished, say so in the same voice, without a date. The
   Chromium and Outlook extensions currently take a server-side encryption path
   and are not zero-knowledge; "In development" means not live and no date.
-- Product names on commercial pages: ParaSign and ParaSend. ParaShare is the
-  name of the in-app sending tool and stays out of hero copy. ParaRules stays as
-  the name of the rules block only.
+- There are two product names, and only two: **ParaSend** and **ParaSign**.
+  Nothing else is presented as a product, on a commercial page or anywhere else.
+  ParaShare is not a product name. The URL /parashare stays, because extension
+  links that were minted years ago point at it and the sdk-js 3.x contract names
+  it in a `Link: rel="successor-version"` header, but in copy the page is "the
+  ParaSend web app" or "the sending tool". It never appears as an H1, a kicker
+  or a product card, and `tests/ui-truthfulness.test.mjs` fails when it does.
+  The rules page is "Our rules" on /rules. "ParaRules" is retired as a name and
+  the individual rules are "rule 5", not "ParaRule 5"; /pararules keeps a 301.
 - Cryptography names, standard numbers and RAM-only appear below the fold, as
   the reason the top half is true. Never in an H1.
 
@@ -366,7 +372,8 @@ it is worth a `/parasend` page in a later round, built to the /parasign pattern.
 Until then the buyer-facing surface for sending is the homepage product block
 and /pricing. Two pages exist today and keep their own jobs.
 
-**/parashare** (the sending tool, behind sign-in, noindex, and it stays that way)
+**/parashare** (the ParaSend web app, behind sign-in, noindex, and it stays that
+way; the URL keeps its name, the copy does not)
 
 - **Goal:** let a signed-in user send one encrypted file.
 - **H1:** unchanged.
@@ -480,13 +487,13 @@ its own PR and its own test.
    qualified (QES)." Both cannot be right. The /about wording is the one this
    guide pins, so the FAQ line is the one that has to move, in a separate round.
 2. **/security still says "no US company".** Settled on the homepage and on
-   /pararules, not yet on /security. Those two pages now say no US provider in
+   /rules, not yet on /security. Those two pages now say no US provider in
    the *data path* and name Resend in the same breath, per proof 1. The
    Jurisdiction and privacy table on /security still has the unqualified row
    "US CLOUD Act: Not applicable: no US infrastructure, no US company", which
    reads as no US party anywhere and is broader than /privacy allows. That row
    is the one that has to move, in its own PR with its own test, to the data
-   path wording. Until it does, proof 1 is quoted from / and /pararules only.
+   path wording. Until it does, proof 1 is quoted from / and /rules only.
    Cloudflare is no longer part of this: DNS moved to Bunny and the site is
    served straight from Hetzner, so the name is gone from the frontend and from
    the out-of-scope list, which now reads "Resend, Hetzner, Bunny, Mollie".

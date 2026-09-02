@@ -382,12 +382,28 @@ rsync -rc --no-times /opt/paramant-relay/frontend/ /home/paramant/app/
 nginx: main changes three things in `deploy/nginx-paramant-live.conf`
 (`/sign` no longer behind `auth_request`, the three `/compliance/*` locations
 gone, `/dicom` now `return 404`) and removes the `/compliance` lines from
-`deploy/nginx-paramant-public.conf`. The server files carry the 01-09 ParaID
-deny that the repo files do not, so **do not copy the repo files over them**.
-Apply the three changes by hand and keep the deny:
+`deploy/nginx-paramant-public.conf`. **Step 5c has a fourth edit since the two-product-names round**:
+the rules page moved from `/pararules` to `/rules`, so every server block that
+answers for the site gains
+
+```nginx
+location = /pararules { return 301 https://$host/rules; }
+```
+
+That one is an addition, not a rewrite, and it is permanent: `/pararules` is
+indexed, so the redirect is not a migration step that gets tidied away in a
+later round. It is in both repo confs already, and the script writes it into
+the server confs itself, anchored on the ParaID deny (`paramant-live.conf`
+carries no `server_name`, so the hostname is not usable as an anchor there).
+It is idempotent: a block that already has the line is left alone. If you are
+doing step 5c by hand instead of through the script, this is the line to add.
+
+The server files carry the 01-09 ParaID deny that the repo files do not, so
+**do not copy the repo files over them**. Apply the four changes by hand and
+keep the deny:
 
 ```bash
-nginx -T 2>/dev/null | grep -n 'paraid/issue\|location = /sign\|/compliance\|location = /dicom'
+nginx -T 2>/dev/null | grep -n 'paraid/issue\|location = /sign\|/compliance\|location = /dicom\|/pararules'
 # edit /etc/nginx/sites-enabled/paramant-public.conf and the live conf accordingly
 nginx -t && systemctl reload nginx
 ```
@@ -398,8 +414,11 @@ round, not in this one.
 
 ### Running step 5 twice
 
-All four nginx changes are idempotent, and the script reads each one as being
-in one of three states before it edits anything:
+All five nginx changes are idempotent, and the script reads the three rewrites
+as being in one of three states before it edits anything. The two additions,
+the `/v2/outbound` buffers and the `/pararules` 301, are counted per block
+instead: a block that lacks one is a pending edit, a block that has one is left
+untouched.
 
 | state | what the conf carries | what happens |
 |---|---|---|
@@ -432,11 +451,11 @@ already succeeded. The removal of the docroot files main deleted (step 5b)
 already worked this way: a file that is already gone is counted as *already
 absent*, not as a failure.
 
-What is asserted after the edits does not change, and that is where the weight
-sits: no `auth_request` on `/sign`, zero `/compliance` locations, `/dicom`
-answering `return 404`, the ParaID deny still present, `proxy_buffer_size 32k`
-inside **every** `location ~ ^/v2/outbound` block, and `nginx -t` clean before
-the reload. A run that changed nothing still tests and reloads nginx, so a hand
+What is asserted after the edits is where the weight sits: no `auth_request` on
+`/sign`, zero `/compliance` locations, `/dicom` answering `return 404`, the
+ParaID deny still present, `proxy_buffer_size 32k` inside **every**
+`location ~ ^/v2/outbound` block, the `/pararules` 301 inside **every** site
+block, and `nginx -t` clean before the reload. A run that changed nothing still tests and reloads nginx, so a hand
 edit made between deploys cannot hide behind "already applied".
 
 ## Step 6: smoke tests

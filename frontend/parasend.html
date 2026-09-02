@@ -258,7 +258,7 @@
       </div>
       <div class="check-card">
         <div class="k">It opens on their device, or nowhere</div>
-        <p>The file is locked to a key registered on the recipient's device, so it opens there and nowhere else, and a file altered on the way does not open at all. ParaShare is the send screen you use; ParaSend is the product it belongs to.</p>
+        <p>The file is locked to a key registered on the recipient's device, so it opens there and nowhere else, and a file altered on the way does not open at all. The send screen you use for this is the ParaSend web app.</p>
       </div>
       <div class="check-card">
         <div class="k">Lock a file for yourself</div>
@@ -280,7 +280,7 @@
     <p>Sending needs a Paramant account. Receiving needs nothing at all.</p>
     <ol class="ps-steps">
       <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The free tier sends with a 1 hour link that burns on first read, forever.</li>
-      <li><strong><a href="/parashare">Open ParaShare</a>, the send screen of ParaSend, and pick your file.</strong> It is scrambled in your browser before anything is uploaded, so what our servers receive is unreadable, and they keep it in memory only.</li>
+      <li><strong><a href="/parashare">Open the ParaSend web app</a> and pick your file.</strong> It is scrambled in your browser before anything is uploaded, so what our servers receive is unreadable, and they keep it in memory only.</li>
       <li><strong>Share the link.</strong> The recipient opens it once and the file is wiped. On the free tier the link expires after an hour whether it is opened or not.</li>
     </ol>
   </div>
@@ -317,7 +317,7 @@
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
           <li>Up to 50 retrievals an hour through the API</li>
-          <li>Up to 5 registered devices for ParaShare, the ParaSend send screen</li>
+          <li>Up to 5 registered devices for the ParaSend web app</li>
         </ul>
       </div>
     </div>
@@ -371,19 +371,19 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until the read burns it. A ParaShare transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until the read burns it. A web app transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">The wire format, in full</div>
-        <p>ParaShare uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/crypto-agility">crypto agility page</a>.</p>
+        <p>The ParaSend web app uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/crypto-agility">crypto agility page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">You own your keys</div>
-        <p>Generated on your device, never sent. We see only the public half. Read the <a href="/pararules">ParaRules</a>.</p>
+        <p>Generated on your device, never sent. We see only the public half. Read <a href="/rules">our rules</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">EU soil, EU law</div>
-        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out. The subprocessors are listed there, and ParaRule 5 states the same claim in full on <a href="/pararules">ParaRules</a>.</p>
+        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out. The subprocessors are listed there, and rule 5 states the same claim in full on <a href="/rules">our rules page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">No third-party requests</div>

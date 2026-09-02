@@ -350,16 +350,18 @@ const unsold = [...new Set(planNames)].filter((name) => !new RegExp(`>\\s*${name
 assert.deepEqual(unsold, [],
   `the dashboard shows these plan names, but /pricing does not sell them: ${unsold.join(', ')}`);
 
-// Every ParaRule must carry a way to check it, because the homepage says so:
-// "The ParaRules come with a verify link each". Measured before this gate:
+// Every rule must carry a way to check it, because the homepage says so:
+// "Our rules come with a verify link each". Measured before this gate:
 // nine rules, zero links, one mailto in the footer.
-const pararules = read('frontend/pararules.html');
-const guarantees = pararules.slice(pararules.indexOf('<h2>What we guarantee</h2>'), pararules.indexOf('<h2>How we build it</h2>'));
+// The page was /pararules until the two-product-names round; the nine rules and
+// their verify links moved across word for word, only the name went.
+const rulesPage = read('frontend/rules.html');
+const guarantees = rulesPage.slice(rulesPage.indexOf('<h2>What we guarantee</h2>'), rulesPage.indexOf('<h2>How we build it</h2>'));
 const ruleCount = (guarantees.match(/<h3>\d+\s*&middot;/g) || []).length;
 const verifyCount = (guarantees.match(/class="rule-verify"/g) || []).length;
 assert.equal(verifyCount, ruleCount,
-  `pararules.html has ${ruleCount} rules but ${verifyCount} verify links; the homepage promises one each`);
-assert.ok(ruleCount >= 9, `expected at least nine ParaRules, found ${ruleCount}`);
+  `rules.html has ${ruleCount} rules but ${verifyCount} verify links; the homepage promises one each`);
+assert.ok(ruleCount >= 9, `expected at least nine rules, found ${ruleCount}`);
 
 // ── The same answer on the account page ──────────────────────────────────────
 // A customer who wants to know what he pays goes to /account, not /dashboard,
@@ -480,7 +482,7 @@ for (const slug of frontendPages()) {
 assert.deepEqual(tierNameHits, [],
   `these use Free as the name of a plan; it is called Community:\n  ${tierNameHits.join('\n  ')}\n`);
 
-// The ParaRules grid on the homepage shows a SELECTION. It used to print the
+// The rules grid on the homepage shows a SELECTION. It used to print the
 // numbers 01, 03, 04 and 06, which reads as two rules gone missing rather than
 // as four chosen. Either the numbers go or they run consecutively.
 const ruleNumbers = [...home.matchAll(/<span class="r-n">(\d+)<\/span>/g)].map((m) => Number(m[1]));
@@ -824,8 +826,8 @@ console.log('ui-truthfulness: /docs and /help answer a buyer with sentences that
 // a sentence may only go on the site if it is already true on the site or in
 // the code, and there is a test that fails when it stops being true. Every
 // string below is quoted from a page that ships, and the guide names each of
-// them as work to pin. Where the guide flagged a claim as disputed (ParaRule
-// 04's "no US provider in the chain", section 9) the claim is NOT asserted
+// them as work to pin. Where the guide flagged a claim as disputed (rule 04's
+// "no US provider in the chain", section 9) the claim is NOT asserted
 // here and does not appear on the product pages; only the /security row it
 // rests on is.
 // A claim is what a visitor reads, not how the markup happens to be wrapped.
@@ -859,7 +861,7 @@ const signVisibleText = visible('frontend/sign.html');
 
 // Proof 1. The EU claim is about the data path, not the whole chain, and the
 // Resend exception travels with it. A page may shorten the long form on
-// /pararules to this one; it may never drop the second half.
+// /rules to this one; it may never drop the second half.
 const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
 const EU_EXCEPTION = 'Email goes out via Resend';
 const homeVisible = visible('frontend/index.html');
@@ -892,7 +894,7 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
 // table qualified the broader claim. Section 9.2 of the guide names that row
 // as the one that has to move to the data-path wording in its own PR with its
 // own test. This is that PR. What proof 1 is measured against on /security is
-// now the same sentence / and /pararules carry, with its Resend exception; the
+// now the same sentence / and /rules carry, with its Resend exception; the
 // window check that keeps the two together lives further down this file.
 assert.ok(!/no US company/i.test(security),
   'security.html must no longer claim "no US company", which is broader than /privacy supports');
@@ -1217,7 +1219,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // while ten screens lower the page says the Chromium and Outlook extensions
   // take a server-side encryption path. For an extension user the flat version
   // is untrue today, so the exception travels with the promise.
-  assert.match(securityHero, /That holds for the web app, ParaShare and the official SDKs\./,
+  assert.match(securityHero, /That holds for the ParaSend web app and the official SDKs\./,
     'security.html must scope the zero-knowledge promise in the hero');
   assert.match(securityHero, /The Chromium and Outlook extensions still encrypt on our server/,
     'security.html must name the extension exception in the same breath as the promise');
@@ -1666,3 +1668,132 @@ console.log('ui-truthfulness: no page or script promises transfers without a cei
 })();
 
 console.log('ui-truthfulness: no ParaSign surface sells a transfers ceiling the ParaSign grant does not deliver');
+
+
+// ── Two product names, and only two ──────────────────────────────────────────
+//
+// docs/brand/messaging.md section 6: there are two products, ParaSend and
+// ParaSign. ParaShare was never a product, only the label on the send screen,
+// and it read as a fifth brand on the perskit, the pricing page and five claims
+// on /security. The name is gone from copy. Two things it is NOT gone from, on
+// purpose, and neither is a name a buyer reads:
+//
+//   /parashare        the URL. Every link the Chromium and Thunderbird
+//                     extensions ever minted is baked against it
+//                     (extensions/shared/paramant-core.js), those links sit in
+//                     recipients' mailboxes, and relay.js answers the retired
+//                     /v2/anon-inbound with a Link: rel="successor-version"
+//                     header pointing at it, which is in the sdk-js 3.x
+//                     contract until the 31-12-2026 Sunset. The URL cannot move.
+//   the register row  <td>ParaShare (webapp)</td> on /crypto-agility is a
+//                     technical key: two other gates read the algorithms out of
+//                     that row by that label (this file, above, and
+//                     relay/test/pricing-page.test.js).
+//
+// Everywhere else the name may only appear as a glossed contract term in the
+// three legal documents, where dropping a defined term out of live conditions
+// is not a search and replace.
+(function twoProductNamesOnly() {
+  const dir = new URL('../frontend/', import.meta.url);
+  const pages = [];
+  const walk = (rel) => {
+    for (const entry of fs.readdirSync(new URL(rel, dir), { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== 'vendor') walk(`${rel}${entry.name}/`);
+      } else if (entry.name.endsWith('.html')) {
+        pages.push(`${rel}${entry.name}`);
+      }
+    }
+  };
+  walk('');
+  assert.ok(pages.length > 30, 'the page walk found almost nothing; this gate would read nothing');
+
+  // The legal term, glossed. A gloss on the first mention is what makes the
+  // term readable; a bare mention on a page that never defines it is not.
+  const LEGAL = new Set(['terms.html', 'privacy.html', 'dpa.html']);
+  const REGISTER = 'crypto-agility.html';
+  const GLOSS = 'ParaShare (the ParaSend web app)';
+
+  const strays = [];
+  for (const page of pages) {
+    const html = read('frontend/' + page);
+    if (!html.includes('ParaShare')) continue;
+    if (LEGAL.has(page)) {
+      assert.ok(html.includes(GLOSS),
+        `${page} uses ParaShare as a contract term without ever defining it; it must read "${GLOSS}" at least once`);
+      continue;
+    }
+    if (page === REGISTER) {
+      assert.ok(/<td>ParaShare \(webapp\)<\/td>/.test(html),
+        'crypto-agility.html may carry ParaShare only as the register row two other gates read by that label');
+      continue;
+    }
+    strays.push(page);
+  }
+  assert.deepEqual(strays, [], `these pages present ParaShare in copy again: ${strays.join(', ')}`);
+
+  // And nowhere, not even on the four pages above, in the three places a
+  // reader takes for a product name: the H1, the kicker over it, or the
+  // heading on a card. The eyebrow on /parashare said PARASHARE until this
+  // round, which is exactly the shape this looks for.
+  const shouty = [];
+  for (const page of pages) {
+    const html = read('frontend/' + page);
+    const spots = [
+      ...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi),
+      ...html.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi),
+      ...html.matchAll(/<span[^>]*class="[^"]*eyebrow[^"]*"[^>]*>([\s\S]*?)<\/span>/gi),
+      ...html.matchAll(/<p[^>]*class="[^"]*eyebrow[^"]*"[^>]*>([\s\S]*?)<\/p>/gi),
+    ];
+    for (const m of spots) {
+      if (/parashare|pararules/i.test(m[1])) shouty.push(`${page}: ${m[1].replace(/\s+/g, ' ').trim()}`);
+    }
+  }
+  assert.deepEqual(shouty, [],
+    `a heading, card or kicker presents a retired name as a product:\n  ${shouty.join('\n  ')}\n`);
+})();
+
+console.log('ui-truthfulness: ParaSend and ParaSign are the only two product names in copy');
+
+
+// ── The rules page is "Our rules" on /rules ──────────────────────────────────
+//
+// The nine rules and their verify links (#328) moved word for word; only the
+// name went. /pararules is in Google, so it keeps a permanent 301 in both
+// server confs the runbook edits, and nothing on the site may point at the old
+// path any more: a link that takes a redirect is a link that will rot the day
+// someone tidies the redirect away.
+(function rulesPageMoved() {
+  const rules = read('frontend/rules.html');
+  assert.match(rules, /<h1>Our rules<\/h1>/, 'frontend/rules.html must carry the H1 the page is named for');
+  assert.match(rules, /<link rel="canonical" href="https:\/\/paramant\.app\/rules">/,
+    'rules.html must point its canonical at the new URL, or the 301 sends the signal back and forth');
+  assert.ok(!/ParaRule/i.test(rules), 'rules.html carries the retired name again');
+
+  const sitemap = read('frontend/sitemap.xml');
+  assert.ok(sitemap.includes('<loc>https://paramant.app/rules</loc>'), '/rules is missing from the sitemap');
+  assert.ok(!sitemap.includes('/pararules'), 'the sitemap still lists the retired /pararules URL');
+
+  // No internal link may take the redirect.
+  const dir = new URL('../frontend/', import.meta.url);
+  const linkers = [];
+  const walk = (rel) => {
+    for (const entry of fs.readdirSync(new URL(rel, dir), { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== 'vendor') walk(`${rel}${entry.name}/`);
+      } else if (entry.name.endsWith('.html') || entry.name.endsWith('.js')) {
+        if (read('frontend/' + rel + entry.name).includes('/pararules')) linkers.push(rel + entry.name);
+      }
+    }
+  };
+  walk('');
+  assert.deepEqual(linkers, [], `these files still link to the retired /pararules: ${linkers.join(', ')}`);
+
+  // The 301 itself, in both confs deploy/deploy-3.1.sh phase 5c names.
+  for (const conf of ['deploy/nginx-paramant-public.conf', 'deploy/nginx-paramant-live.conf']) {
+    assert.match(read(conf), /location = \/pararules \{ return 301 https:\/\/\$host\/rules; \}/,
+      `${conf} has no 301 from /pararules to /rules; every indexed link to the old page would 404`);
+  }
+})();
+
+console.log('ui-truthfulness: the rules page is Our rules on /rules, with /pararules redirected');
