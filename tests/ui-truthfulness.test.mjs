@@ -154,6 +154,41 @@ assert.doesNotMatch(loginJs, /attempts from this device/i,
 assert.match(loginJs, /counted per account and per internet connection/i,
   'the 429 text must name both counters, because either one can be the cause');
 
+// 4b. POST /api/user/auth/request-totp-reset sends a CONFIRMATION mail whose
+//     token is { EX: 3600 } (admin/server.js:1890). The 14 day setup token is
+//     only written after /auth/reset-confirm succeeds (admin/server.js:1935),
+//     so the success message on request-reset may not promise a setup link that
+//     lasts 14 days: at that point no setup link exists yet. Both numbers have
+//     to appear, attached to the right mail.
+const requestResetJs = read('frontend/js/auth-request-reset.js');
+assert.match(requestResetJs, /a confirmation email is on its way/i,
+  'request-reset must say the first mail confirms the request, not that it carries the setup link');
+assert.match(requestResetJs, /valid for 60 minutes/i,
+  'the confirmation token is EX 3600, so the success message must say 60 minutes');
+assert.match(requestResetJs, /that one works for 14 days/i,
+  'the 14 days belong to the second mail, the one with the setup link');
+assert.doesNotMatch(requestResetJs, /a setup link is on its way/i,
+  'no setup link exists until the confirmation is opened');
+
+//     And the success message has to be visible when it fires: #success sat
+//     inside #reset-form, which auth-request-reset.js hides on success, so the
+//     confirmation was hidden with its parent and the screen went blank.
+const requestResetHtml = read('frontend/auth/request-reset.html');
+const resetFormBlock = requestResetHtml.slice(requestResetHtml.indexOf('<form id="reset-form"'),
+                                              requestResetHtml.indexOf('</form>'));
+assert.doesNotMatch(resetFormBlock, /id="success"/,
+  'the success message must sit outside #reset-form: the handler hides that form on success');
+assert.match(requestResetHtml, /id="success"/,
+  'request-reset still needs a success container, just not inside the form');
+
+//     The same endpoint answers 429 with retry_after 86400 (admin/server.js:1875)
+//     off a 5-per-address-per-24h and 10-per-connection-per-hour limit. A shared
+//     "try again" branch tells someone who is locked out for a day to retry now.
+assert.match(requestResetJs, /res\.status === 429/,
+  'request-reset must handle 429 separately: retrying does not help for up to a day');
+assert.match(requestResetJs, /up to 24 hours to clear/i,
+  'the 429 text must state the wait the server actually imposes (retry_after 86400)');
+
 // 5. Every one of these screens must name the party behind the product and the
 //    country it sits in. The stamped legal-strip carries the documents, not the
 //    company, and apply-nav.py owns that strip.

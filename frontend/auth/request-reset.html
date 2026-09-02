@@ -57,7 +57,8 @@
   <h1>Reset your <em>authenticator</em>.</h1>
   <p class="lede mt-3">
     Enter your account email and, if it matches an account, we send a link that
-    lets you link a new authenticator app.
+    confirms the request. A second mail then carries the link that links a new
+    authenticator app.
   </p>
 </section>
 
@@ -71,8 +72,11 @@
     </button>
 
     <div id="error" class="error"></div>
-    <div id="success" class="success" style="display:none"></div>
   </form>
+
+  <!-- Outside the form on purpose: the handler hides the form on success, and a
+       success message nested inside it would be hidden along with its parent. -->
+  <div id="success" class="success" style="display:none"></div>
 
   <p class="footer-text mt-4">
     Still have a backup code? <a href="/auth/backup">Use it instead</a><br>
