@@ -23,11 +23,19 @@ const { test, before, after } = require('node:test');
 const assert = require('assert');
 const crypto = require('crypto');
 const { boot, killAll } = require('./_relay-server');
-const { summary } = require('./_requires');
+const { requireRedis, summary } = require('./_requires');
+
+const DEFAULT_REDIS = 'redis://127.0.0.1:6399';
 
 const PRO = 'pgp_pro_key_for_the_transfer_suite';
 const COMMUNITY = 'pgp_community_key_for_the_transfer_suite';
 const OTHER = 'pgp_other_tenant_key_for_the_transfer_suite';
+// A key with NO plan field at all. Real users.json entries in this shape exist:
+// every key minted before the plan field did, plus anything an import wrote.
+const NOPLAN = 'pgp_no_plan_key_for_the_transfer_suite';
+// A Business account. It is the tier the pricing page sells for the highest
+// volume, and the one the old three-key outbound table left out entirely.
+const BUSINESS = 'pgp_business_key_for_the_transfer_suite';
 
 let srv;
 let checks = 0;
@@ -57,6 +65,8 @@ before(async () => {
         { key: PRO, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_pro' },
         { key: COMMUNITY, plan: 'community', active: true, email: 'com@example.test', account_id: 'acct_com' },
         { key: OTHER, plan: 'pro', active: true, email: 'other@example.test', account_id: 'acct_other' },
+        { key: NOPLAN, active: true, email: 'noplan@example.test', account_id: 'acct_noplan' },
+        { key: BUSINESS, plan: 'business', active: true, email: 'biz@example.test', account_id: 'acct_biz' },
       ],
     },
   });
@@ -151,13 +161,267 @@ test('the download carries a signed delivery receipt with a burn confirmation', 
   await upload(PRO, b);
   const r = await download(PRO, b.hash);
   assert.strictEqual(r.status, 200);
-  const raw = r.headers['x-paramant-receipt'];
-  assert.ok(raw, 'every delivery is receipted');
-  const receipt = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+  // The download hands over a REFERENCE now; the receipt itself is fetched.
+  const id = r.headers['x-paramant-receipt-id'];
+  assert.match(id || '', /^[0-9a-f]{32}$/, 'every delivery is receipted');
+  assert.strictEqual(r.headers['x-paramant-receipt-url'], `/v2/transfers/${id}/receipt`);
+
+  const fetched = await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': PRO } });
+  assert.strictEqual(fetched.status, 200, fetched.text);
+  // The hash in the header is over the exact bytes that come back, so the
+  // handover cannot be tampered with in between.
+  assert.strictEqual(fetched.json.receipt_hash, r.headers['x-paramant-receipt-hash']);
+  assert.strictEqual('sha3-256:' + crypto.createHash('sha3-256').update(fetched.json.receipt).digest('hex'),
+    r.headers['x-paramant-receipt-hash'], 'the advertised hash really is the hash of the receipt');
+
+  const receipt = JSON.parse(Buffer.from(fetched.json.receipt, 'base64url').toString('utf8'));
   assert.strictEqual(receipt.blob_hash, b.hash);
   assert.strictEqual(receipt.burn_confirmed, true);
   assert.ok(receipt.signature, 'the receipt is signed by the relay identity');
   assert.ok(receipt.inclusion_proof, 'and carries the CT inclusion proof for the blob');
+
+  // And it is still the thing /v2/verify-receipt was built to check.
+  const verified = await srv.post('/v2/verify-receipt', {
+    headers: { 'X-Api-Key': PRO }, body: { receipt: fetched.json.receipt },
+  });
+  assert.strictEqual(verified.status, 200, verified.text);
+  assert.strictEqual(verified.json.valid, true, 'the fetched receipt verifies as delivered');
+  did();
+});
+
+test('a download answers with less than 8 KB of response headers', async () => {
+  // PR #341, finding 2. X-Paramant-Receipt carried the whole signed receipt:
+  // 18551 bytes for that one header, 19560 for the block. Two hard consequences,
+  // neither of them theoretical:
+  //   Node's default maxHeaderSize is 16384, so fetch() and a default
+  //   http.request threw UND_ERR_HEADERS_OVERFLOW on every single download.
+  //   nginx's default proxy_buffer_size is 4k/8k and that one buffer must hold
+  //   the whole upstream header block, so a proxied download is a 502.
+  // 8 KB is the ceiling here because it is the larger of the two nginx defaults:
+  // stay under it and the smallest realistic proxy still passes the response.
+  const b = blob('header-size');
+  await upload(PRO, b);
+  const r = await download(PRO, b.hash);
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.headers['x-paramant-receipt-id'], 'measured on a download that really is receipted');
+
+  // Reconstruct the wire bytes of the header block: "Name: value\r\n" each,
+  // plus the closing CRLF. The status line is a few dozen bytes on top.
+  let bytes = 2;
+  for (const [name, value] of Object.entries(r.headers)) {
+    for (const v of Array.isArray(value) ? value : [value]) {
+      bytes += Buffer.byteLength(`${name}: ${v}\r\n`);
+    }
+  }
+  assert.ok(bytes < 8192,
+    `a download must fit a default proxy buffer, got ${bytes} bytes of headers`);
+  assert.ok(!('x-paramant-receipt' in r.headers),
+    'and the fat header is gone by default, not merely smaller');
+  // The removal is announced ON the response, because a client that reads the
+  // old header and finds nothing cannot tell "no receipt" from "it moved". The
+  // Python SDK turns an absent header into a silent receipt=None, which is a
+  // delivery proof quietly becoming nothing.
+  assert.strictEqual(r.headers['x-paramant-receipt-deprecated'],
+    `removed 2026-12-01; GET /v2/transfers/${r.headers['x-paramant-receipt-id']}/receipt`,
+    'a download says out loud that the old header is gone and where the receipt went');
+  did();
+});
+
+test('a receipt reference is single-tenant, and unknown or foreign ids give one 404', async () => {
+  const b = blob('receipt-auth');
+  await upload(PRO, b);
+  const id = (await download(PRO, b.hash)).headers['x-paramant-receipt-id'];
+
+  const foreign = await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': OTHER } });
+  const unknown = await srv.get(`/v2/transfers/${'0'.repeat(32)}/receipt`, { headers: { 'X-Api-Key': OTHER } });
+  assert.strictEqual(foreign.status, 404, 'another tenant may not read the receipt for a delivery it did not make');
+  assert.deepStrictEqual(foreign.json, unknown.json,
+    'and it answers exactly like an id that never existed, so it is no oracle');
+
+  const noKey = await srv.get(`/v2/transfers/${id}/receipt`);
+  assert.strictEqual(noKey.status, 401, 'the route sits behind the same auth gate as the download');
+
+  // The owner can still read it, and more than once: nothing was consumed.
+  for (let i = 0; i < 2; i++) {
+    assert.strictEqual((await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': PRO } })).status, 200);
+  }
+  did();
+});
+
+test('a busy tenant cannot evict a quiet tenant\'s receipt', async () => {
+  // The receipt store started as ONE shared LRU. That is a cross-tenant
+  // eviction channel: enough downloads by B push A's receipt out inside A's own
+  // 15 minute window, and before this route existed the receipt was guaranteed
+  // to be on the response itself, so this would be a regression paid for by a
+  // stranger. The budget is per account now, and the global ceiling takes from
+  // the LARGEST holder, which can never be the tenant it would be protecting.
+  //
+  // The caps are driven down here so the RULE is measured rather than the
+  // numbers: with a shared queue of 8, B's ninth receipt evicts A's first.
+  const A = 'pgp_quiet_tenant_receipt_suite';
+  const B = 'pgp_busy_tenant_receipt_suite';
+  const srv2 = await boot({
+    tag: 'transfer-receipt-budget',
+    env: { PARAMANT_RECEIPT_PER_ACCOUNT_MAX: '4', PARAMANT_RECEIPT_TOTAL_MAX: '8' },
+    users: { api_keys: [
+      { key: A, plan: 'pro', active: true, email: 'quiet@example.test', account_id: 'acct_quiet' },
+      { key: B, plan: 'business', active: true, email: 'busy@example.test', account_id: 'acct_busy' },
+    ] },
+  });
+  const put = async (key) => {
+    const b = blob(`budget-${crypto.randomBytes(4).toString('hex')}`);
+    assert.strictEqual((await srv2.post('/v2/inbound', {
+      headers: { 'X-Api-Key': key }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+    })).status, 200);
+    const r = await srv2.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': key } });
+    assert.strictEqual(r.status, 200);
+    return r.headers['x-paramant-receipt-id'];
+  };
+
+  const quiet = await put(A);
+  assert.ok(quiet, 'the quiet tenant has exactly one receipt outstanding');
+  // Three times the whole store, all from one account.
+  const busy = [];
+  for (let i = 0; i < 24; i++) busy.push(await put(B));
+
+  const still = await srv2.get(`/v2/transfers/${quiet}/receipt`, { headers: { 'X-Api-Key': A } });
+  assert.strictEqual(still.status, 200,
+    'a stranger\'s download burst must not take the quiet tenant\'s receipt away');
+
+  // And the busy tenant is held to its OWN budget, so the burst is bounded.
+  const survivors = [];
+  for (const id of busy) {
+    const r = await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': B } });
+    if (r.status === 200) survivors.push(id);
+  }
+  assert.strictEqual(survivors.length, 4, 'the busy tenant keeps its own 4 newest and no more');
+  assert.deepStrictEqual(survivors, busy.slice(-4), 'and they are the newest, not an arbitrary four');
+  srv2.stop();
+  did();
+});
+
+test('the global backstop takes from the biggest holder, never from the quiet one', async () => {
+  // The per-account cap bounds one tenant. The GLOBAL cap is what happens when
+  // the store is full anyway, and an oldest-first global eviction there would
+  // reintroduce exactly the cross-tenant channel the per-account cap closes:
+  // the quiet tenant's single receipt is, by definition, the oldest one.
+  const SMALL = 'pgp_small_holder_receipt_suite';
+  const HUGE = 'pgp_huge_holder_receipt_suite';
+  const srv2 = await boot({
+    tag: 'transfer-receipt-backstop',
+    // Per-account room for 6 each but only 5 slots in the whole store, so the
+    // two caps cannot both be satisfied and the GLOBAL backstop is the rule
+    // under test rather than the per-account one.
+    env: { PARAMANT_RECEIPT_PER_ACCOUNT_MAX: '6', PARAMANT_RECEIPT_TOTAL_MAX: '5' },
+    users: { api_keys: [
+      { key: SMALL, plan: 'pro', active: true, email: 'small@example.test', account_id: 'acct_small' },
+      { key: HUGE, plan: 'pro', active: true, email: 'huge@example.test', account_id: 'acct_huge' },
+    ] },
+  });
+  const put = async (key) => {
+    const b = blob(`backstop-${crypto.randomBytes(4).toString('hex')}`);
+    assert.strictEqual((await srv2.post('/v2/inbound', {
+      headers: { 'X-Api-Key': key }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+    })).status, 200);
+    const r = await srv2.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': key } });
+    assert.strictEqual(r.status, 200);
+    return r.headers['x-paramant-receipt-id'];
+  };
+  const alive = async (id, key) =>
+    (await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': key } })).status === 200;
+
+  // The quiet tenant goes FIRST, so under an oldest-first global rule it is the
+  // first thing evicted. That is the regression this test exists for.
+  const small = [await put(SMALL), await put(SMALL)];
+  const huge = [];
+  for (let i = 0; i < 6; i++) huge.push(await put(HUGE));
+
+  for (const id of small) {
+    assert.ok(await alive(id, SMALL),
+      'the store filled up and the small holder still has both of its receipts');
+  }
+  const hugeAlive = [];
+  for (const id of huge) if (await alive(id, HUGE)) hugeAlive.push(id);
+  assert.strictEqual(hugeAlive.length, 3,
+    'the biggest holder paid for the whole overflow: 5 slots, 2 of them the small holder\'s');
+  assert.deepStrictEqual(hugeAlive, huge.slice(-3), 'and it lost its oldest, not an arbitrary set');
+  srv2.stop();
+  did();
+});
+
+test('with redis, a receipt outlives the process that issued it', async () => {
+  // The store used to be a bare in-process Map, so every restart 404d every
+  // outstanding receipt. A deploy in the middle of somebody's 15 minute window
+  // silently cost them their proof of delivery, and restarting is a thing
+  // operators do on purpose. The envelope store already runs on redis; so does
+  // this now, with the Map kept only as the fallback for a relay without one.
+  const rc = await requireRedis(DEFAULT_REDIS);
+  if (!rc) return;
+  // The client is closed in a finally: an open redis connection keeps the test
+  // runner alive, so a FAILING assertion would hang the run instead of
+  // reporting, which is a worse outcome than the failure itself.
+  try {
+  const KEY = 'pgp_restart_receipt_suite';
+  const env = { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS };
+  // usersFile mode: restart() re-reads users.json from the same scratch dir, so
+  // the key has to be on disk and not only in USERS_JSON.
+  let srv2 = await boot({
+    tag: 'transfer-receipt-restart',
+    env,
+    usersFile: true,
+    users: { api_keys: [{ key: KEY, plan: 'pro', active: true, email: 'restart@example.test', account_id: 'acct_restart' }] },
+  });
+  const b = blob('restart-receipt');
+  assert.strictEqual((await srv2.post('/v2/inbound', {
+    headers: { 'X-Api-Key': KEY }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+  })).status, 200);
+  const dl = await srv2.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.strictEqual(dl.status, 200);
+  const id = dl.headers['x-paramant-receipt-id'];
+  const hash = dl.headers['x-paramant-receipt-hash'];
+  assert.ok(id, 'the download was receipted');
+
+  const before = await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': KEY } });
+  assert.strictEqual(before.status, 200, before.text);
+
+  srv2 = await srv2.restart();
+  const after = await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': KEY } });
+  assert.strictEqual(after.status, 200, 'a restart must not take an outstanding receipt away');
+  assert.deepStrictEqual(after.json, before.json, 'and it is the same receipt, byte for byte');
+  assert.strictEqual(after.json.receipt_hash, hash,
+    'still matching the hash the download promised, across the process boundary');
+  srv2.stop();
+  did();
+  } finally {
+    try { await rc.quit(); } catch (_) { /* already gone */ }
+  }
+});
+
+test('the fat header comes back only when an operator asks for it, and it is deprecated', async () => {
+  // The removal is not silent: an out-of-tree client that still reads
+  // X-Paramant-Receipt gets one release to move, behind an explicit opt-in.
+  const legacy = await boot({
+    tag: 'transfer-legacy-receipt',
+    env: { PARAMANT_INLINE_RECEIPT_HEADER: '1' },
+    users: { api_keys: [{ key: PRO, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_pro' }] },
+  });
+  const b = blob('legacy-header');
+  assert.strictEqual((await legacy.post('/v2/inbound', {
+    headers: { 'X-Api-Key': PRO }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+  })).status, 200);
+  // Reading it back needs room Node does not give by default. That IS the bug:
+  // a client cannot ask for this without knowing about it first.
+  const r = await legacy.get(`/v2/outbound/${b.hash}`, {
+    headers: { 'X-Api-Key': PRO }, maxHeaderSize: 96 * 1024,
+  });
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.headers['x-paramant-receipt'], 'the opt-in really puts the old header back');
+  assert.ok(Buffer.byteLength(r.headers['x-paramant-receipt']) > 16384,
+    'and it is still the header that does not fit, which is why it is going away');
+  assert.ok(r.headers['x-paramant-receipt-id'], 'the reference is served alongside it during the window');
+  assert.ok(!('x-paramant-receipt-deprecated' in r.headers),
+    'and while the opt-in is on there is nothing to announce: the old header is really there');
+  legacy.stop();
   did();
 });
 
@@ -218,6 +482,75 @@ test('the TTL is clamped to the tier ceiling: community 1 hour, pro 24 hours', a
   // A request below the ceiling is honoured as asked.
   const small = await upload(PRO, blob('ttl-small'), { ttl_ms: 30_000 });
   assert.strictEqual(small.json.ttl_ms, 30_000);
+  did();
+});
+
+test('a key with no plan is held to ONE ceiling, the strictest, on both dimensions', async () => {
+  // The two ceilings are taken one line apart and used to disagree about what a
+  // missing plan means: the TTL fell back to 'community' (1 hour) and max_views
+  // to 'pro' (10 reads). So an unplanned key got the community link lifetime and
+  // the Pro read count in the same upload. A missing plan is not evidence of a
+  // paid one, so both must land on community: 1 hour, 1 read.
+  const week = 7 * 86_400_000;
+  const t = await upload(NOPLAN, blob('noplan-ttl'), { ttl_ms: week });
+  assert.strictEqual(t.status, 200, t.text);
+  assert.strictEqual(t.json.ttl_ms, 3_600_000, 'the TTL ceiling for a missing plan is the community hour');
+
+  const v = blob('noplan-views');
+  assert.strictEqual((await upload(NOPLAN, v, { max_views: 10 })).status, 200);
+  const first = await download(NOPLAN, v.hash);
+  assert.strictEqual(first.status, 200);
+  assert.strictEqual(first.headers['x-paramant-burned'], 'true',
+    'and the views ceiling is the community one too: the first read is the last');
+  assert.strictEqual((await download(NOPLAN, v.hash)).status, 404,
+    'a missing plan must not quietly buy the pro ceiling of 10 reads');
+  did();
+});
+
+test('a Business key is not rate limited at the free 50 downloads per hour', async () => {
+  // relay.js:1607 used to hold its own three-key table, { free, pro,
+  // enterprise }, keyed on the raw plan string with a `?? free` fallback.
+  // 'business' was not a key in it, so a Business account, which pays for the
+  // highest volume of all, was capped at the free 50 per hour. The ceiling now
+  // comes from lib/tiers.js (outbound_per_hour), which has a row per tier and
+  // normalises the aliases, so the 51st download goes through.
+  const tiers = require('../lib/tiers');
+  const FREE_CEILING = tiers.tierLimitNum('community', 'outbound_per_hour');
+  assert.strictEqual(FREE_CEILING, 50, 'the free ceiling this test is measuring against');
+  assert.ok(tiers.tierLimitNum('business', 'outbound_per_hour') > FREE_CEILING,
+    'business must buy more outbound than community, not the same');
+
+  for (let i = 1; i <= FREE_CEILING + 1; i++) {
+    const b = blob(`biz-${i}`);
+    assert.strictEqual((await upload(BUSINESS, b)).status, 200, `upload ${i}`);
+    const r = await download(BUSINESS, b.hash);
+    assert.strictEqual(r.status, 200,
+      `download ${i} of ${FREE_CEILING + 1}: a Business key must not hit the free hourly ceiling`);
+  }
+  did();
+});
+
+test('every tier the pricing page sells has its own outbound ceiling, and they only go up', async () => {
+  // The regression this pins is a table with a hole in it. Any tier missing
+  // from lib/tiers.js falls back to the community row, which is how 'business'
+  // silently got the free rate for as long as the local table existed.
+  const tiers = require('../lib/tiers');
+  const ladder = ['community', 'pro', 'business', 'enterprise'];
+  assert.deepStrictEqual(Object.keys(tiers.TIER_LIMITS), ladder,
+    'the tier list this assertion walks must be the whole tier list');
+  let previous = 0;
+  for (const tier of ladder) {
+    const raw = tiers.tierLimit(tier, 'outbound_per_hour');
+    assert.notStrictEqual(raw, null, `${tier} has no outbound_per_hour, so it silently gets the community rate`);
+    const rate = tiers.tierLimitNum(tier, 'outbound_per_hour');
+    assert.ok(rate > previous, `${tier} must buy more outbound than the tier below it, got ${rate} after ${previous}`);
+    previous = rate;
+  }
+  // And the aliases the relay really sees on a key record resolve to a row.
+  for (const [alias, canonical] of [['free', 'community'], ['dev', 'community'], ['licensed', 'enterprise']]) {
+    assert.strictEqual(tiers.tierLimitNum(alias, 'outbound_per_hour'), tiers.tierLimitNum(canonical, 'outbound_per_hour'),
+      `the legacy plan name ${alias} must resolve to the ${canonical} ceiling`);
+  }
   did();
 });
 

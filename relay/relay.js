@@ -185,14 +185,14 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
-               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
+               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/v2/transfers',
                '/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   full:       null,
@@ -1615,11 +1615,17 @@ let inFlightInbound = 0;
 // ── Per-key outbound rate limiting (finding #12) ──────────────────────────────
 // Limits how fast a key holder can burn blobs via /v2/outbound — reduces
 // ability to probe or burn other users' blobs via intercepted download tokens.
-const OUTBOUND_RATE = { free: 50, pro: 500, enterprise: Infinity };
+// The ceiling per tier lives in lib/tiers.js (outbound_per_hour) with every
+// other per-tier number. It used to be a local three-key table keyed on the raw
+// plan string, { free, pro, enterprise }, with a `?? free` fallback: 'community'
+// and 'business' were not in it, so a Business account, which pays for the
+// highest volume of all, was rate limited at the free 50 per hour. tiers.js
+// normalises the plan name (free/dev -> community, licensed -> enterprise), so
+// every plan the pricing page sells now resolves to its own ceiling.
 const OUTBOUND_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour sliding window
 const outboundRateMap = new Map(); // apiKey → { count, resetAt }
 function outboundRateOk(apiKey, plan) {
-  const max = OUTBOUND_RATE[plan] ?? OUTBOUND_RATE.free;
+  const max = tiers.tierLimitNum(plan, 'outbound_per_hour');
   if (max === Infinity) return true;
   const now = Date.now();
   let c = outboundRateMap.get(apiKey);
@@ -1629,6 +1635,158 @@ function outboundRateOk(apiKey, plan) {
   return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
+
+// ── Delivery receipt store (PR #341, finding 2) ─────────────────────────
+// The signed delivery receipt used to ride out on the download itself, in the
+// X-Paramant-Receipt response header. It carries a full ML-DSA-65 signature and
+// an inclusion proof, so that header measured 18551 bytes and the response
+// header block 19560. Node's own default maxHeaderSize is 16384, so a client
+// using fetch() or a default http.request could not download a blob at all
+// (UND_ERR_HEADERS_OVERFLOW), and nginx's default proxy_buffer_size of 4k/8k
+// answers 502 on an upstream header block that size.
+//
+// So the receipt is handed over by REFERENCE instead: the download carries a
+// receipt id and the hash of the receipt bytes, and the bytes themselves are
+// fetched from GET /v2/transfers/:receipt_id/receipt. Same receipt, same
+// signature, same verification through POST /v2/verify-receipt.
+//
+// Kept in RAM like everything else on this relay, and deliberately short-lived:
+// a client fetches its receipt in the same breath as the download.
+//
+// The budget is PER ACCOUNT, not one shared queue. A single global LRU is a
+// cross-tenant eviction channel: one account doing enough downloads pushes
+// another account's receipt out inside its own 15 minute window, and before
+// this route the receipt was guaranteed to be on the response itself. So an
+// account can only ever evict its OWN oldest receipt, and the global ceiling is
+// a backstop that takes from the LARGEST holder, which can never be the small
+// tenant it would be protecting.
+//
+// Where it lives. REDIS when the relay has one, which is what the envelope
+// store already runs on, and the in-process Map only as the fallback for a
+// relay without redis. A Map alone means every restart 404s every outstanding
+// receipt: a deploy in the middle of somebody's download window silently costs
+// them their proof of delivery, and a restart is a thing operators do on
+// purpose. With redis the receipt survives the process that issued it.
+//
+// Memory. The stored form is the receipt JSON, not its base64url wrapper: the
+// wrapper is 4/3 the size and re-encoding it on the way out is deterministic,
+// so the hash stays stable and about 4.6 KB per receipt is not held. That puts
+// a receipt at roughly 14 KB.
+//
+// The per-account cap is DERIVED from the tier's own outbound ceiling: two
+// hours of downloading at the rate that tier pays for. A flat 200 was wrong for
+// exactly the tier that pays most, business at 2000 downloads an hour would
+// lose its oldest receipts after six minutes of steady use, inside the 15
+// minute window it was promised. Enterprise has no outbound ceiling to double,
+// so it takes an explicit one.
+//
+//   community  50/h  ->   100      pro   500/h  ->  1000
+//   business 2000/h  ->  4000      enterprise   -> RECEIPT_UNCAPPED_TIER_MAX
+//
+// The global backstop applies to the Map path only, where the memory is this
+// process's. With redis the bound is the TTL, the per-account cap, and redis'
+// own maxmemory policy.
+const RECEIPT_TTL_MS = 15 * 60 * 1000;
+const RECEIPT_TTL_S = Math.round(RECEIPT_TTL_MS / 1000);
+const RECEIPT_UNCAPPED_TIER_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_UNCAPPED_MAX || '10000', 10) || 10000);
+// A fixed override, for tests that need to drive the eviction rule without
+// making thousands of downloads. Unset in production, where the tier decides.
+const RECEIPT_PER_ACCOUNT_OVERRIDE = parseInt(process.env.PARAMANT_RECEIPT_PER_ACCOUNT_MAX || '0', 10) || 0;
+function receiptCapFor(plan) {
+  if (RECEIPT_PER_ACCOUNT_OVERRIDE > 0) return RECEIPT_PER_ACCOUNT_OVERRIDE;
+  const rate = tiers.tierLimitNum(plan, 'outbound_per_hour');
+  const cap = Number.isFinite(rate) ? rate * 2 : RECEIPT_UNCAPPED_TIER_MAX;
+  return Math.max(1, Math.min(cap, RECEIPT_UNCAPPED_TIER_MAX));
+}
+const RECEIPT_TOTAL_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_TOTAL_MAX || '4000', 10) || 4000);
+const RECEIPT_RK = (id) => `paramant:receipt:${id}`;
+const RECEIPT_AK = (owner) => `paramant:receipts:acct:${owner}`;
+const deliveryReceipts = new Map(); // receipt_id -> { json, hash, apiKey, owner, expiresAt }
+const receiptsByOwner = new Map();  // owner (account_id) -> Set<receipt_id>, insertion ordered
+function _dropReceipt(id) {
+  const rec = deliveryReceipts.get(id);
+  if (!rec) return;
+  deliveryReceipts.delete(id);
+  const own = receiptsByOwner.get(rec.owner);
+  if (own) { own.delete(id); if (own.size === 0) receiptsByOwner.delete(rec.owner); }
+}
+function _dropOldestOf(owner) {
+  const own = receiptsByOwner.get(owner);
+  if (!own) return false;
+  const oldest = own.values().next();
+  if (oldest.done) return false;
+  _dropReceipt(oldest.value);
+  return true;
+}
+async function storeDeliveryReceipt(json, hash, apiKey, owner, plan) {
+  const id = crypto.randomBytes(16).toString('hex');
+  const bucket = owner || apiKey || '_anonymous';
+  const cap = receiptCapFor(plan);
+  if (redisClient && redisClient.isReady) {
+    try {
+      const ak = RECEIPT_AK(bucket);
+      await redisClient.set(RECEIPT_RK(id), JSON.stringify({ json, hash, apiKey: apiKey || null }), { EX: RECEIPT_TTL_S });
+      await redisClient.zAdd(ak, { score: Date.now(), value: id });
+      await redisClient.expire(ak, RECEIPT_TTL_S);
+      // The cap is per account and enforced against that account's own index,
+      // so a busy tenant can only ever drop its own oldest.
+      const over = (await redisClient.zCard(ak)) - cap;
+      if (over > 0) {
+        const stale = await redisClient.zRange(ak, 0, over - 1);
+        if (stale.length) {
+          await redisClient.del(stale.map(RECEIPT_RK));
+          await redisClient.zRemRangeByRank(ak, 0, over - 1);
+        }
+      }
+      return id;
+    } catch (e) {
+      // Never fail a download over its receipt: fall through to the Map.
+      log('warn', 'receipt_store_redis_failed', { err: e.message });
+    }
+  }
+  // Sets preserve insertion order and every entry has the same TTL, so the head
+  // of a bucket is always that owner's entry closest to expiring.
+  while ((receiptsByOwner.get(bucket)?.size || 0) >= cap) {
+    if (!_dropOldestOf(bucket)) break;
+  }
+  // Global backstop. Take from whoever holds the most, never from whoever
+  // happens to be oldest, so a burst cannot evict a quiet tenant.
+  while (deliveryReceipts.size >= RECEIPT_TOTAL_MAX) {
+    let biggest = null; let most = 0;
+    for (const [o, set] of receiptsByOwner) if (set.size > most) { most = set.size; biggest = o; }
+    if (biggest === null || !_dropOldestOf(biggest)) break;
+  }
+  deliveryReceipts.set(id, { json, hash, apiKey: apiKey || null, owner: bucket, expiresAt: Date.now() + RECEIPT_TTL_MS });
+  if (!receiptsByOwner.has(bucket)) receiptsByOwner.set(bucket, new Set());
+  receiptsByOwner.get(bucket).add(id);
+  return id;
+}
+setInterval(() => { const now = Date.now(); for (const [id, r] of deliveryReceipts) if (now > r.expiresAt) _dropReceipt(id); }, 60_000).unref?.();
+
+// Read one back. Redis first, so a receipt issued by a process that has since
+// been restarted is still there; the Map is the fallback for a relay with no
+// redis. Returns { json, hash, apiKey } or null.
+async function fetchDeliveryReceipt(id) {
+  if (redisClient && redisClient.isReady) {
+    try {
+      const raw = await redisClient.get(RECEIPT_RK(id));
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      log('warn', 'receipt_fetch_redis_failed', { err: e.message });
+    }
+  }
+  const rec = deliveryReceipts.get(id);
+  if (!rec) return null;
+  if (Date.now() > rec.expiresAt) { _dropReceipt(id); return null; }
+  return rec;
+}
+
+// Deprecation window for the fat header. Nothing in this repo reads it outside
+// its own tests, but an out-of-tree client might, so an operator can put it back
+// for one release with PARAMANT_INLINE_RECEIPT_HEADER=1. It is off by default
+// because on a default nginx the fat header is a 502, not a feature. To be
+// removed after 2026-12-01; see docs/api.md.
+const INLINE_RECEIPT_HEADER = process.env.PARAMANT_INLINE_RECEIPT_HEADER === '1';
 
 // Serialized async write queue for users.json — prevents lost-update race.
 // _writeUsersJson: low-level write (caller must already hold the snapshot).
@@ -1812,11 +1970,28 @@ function mintParasignKey(accountId, opts = {}) {
   // The new key inherits the account's EFFECTIVE per-product tiers, resolved
   // over every key the account holds. Minting used to pass the legacy `plan`
   // only, which silently issued a free-tier ParaSign key to a paying account.
+  // EFFECTIVE, not the tier on file: the new key record carries no paid_until,
+  // so re-issuing a lapsed tier here would turn an expired subscription into a
+  // permanent one. A record with no per-product tier at all is left undefined,
+  // so buildParasignKeyRecord still derives from the legacy plan as before.
   const eff = entitlementRecordOf(accountId) || {};
+  // Tier AND period, together, or the new key is an unbounded copy of a bounded
+  // grant. An ALREADY expired grant is minted as the floor tier with no period
+  // at all (effectiveProductTier reports it as expired), so a lapsed account
+  // does not get a stale date on a fresh key either.
+  const _effGrant = (product) => {
+    if (eff[entitlements.PRODUCT_PLAN_FIELD[product]] == null) return {};
+    const g = entitlements.effectiveProductTier(eff, product);
+    return { tier: g.tier, paidUntil: g.expired ? null : eff[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]] };
+  };
+  const _pg = _effGrant('parasign');
+  const _ps = _effGrant('parasend');
   const built = keysTable.buildParasignKeyRecord({
     accountId, plan, email, label: opts.label, test: !!opts.test,
-    planParasign: opts.planParasign || eff.plan_parasign,
-    planParasend: opts.planParasend || eff.plan_parasend,
+    planParasign: opts.planParasign || _pg.tier,
+    planParasend: opts.planParasend || _ps.tier,
+    paidUntilParasign: _pg.paidUntil,
+    paidUntilParasend: _ps.paidUntil,
     randomHex: crypto.randomBytes(32).toString('hex'),
   });
   const { key, record, usersEntry } = built;
@@ -4392,14 +4567,17 @@ const server = http.createServer(async (req, res) => {
         sigResult = verifyDsaSignature(hash, dsa_signature, keyData.dsa_pub);
       }
 
-      // Per-tier view TTL ceiling -- single source of truth in lib/tiers.js.
-      // Falls back to community ceiling when the plan is missing or unrecognised.
+      // Per-tier ceilings -- single source of truth in lib/tiers.js. ONE default
+      // for both, and it is the strictest one. The two used to disagree a line
+      // apart: the TTL fell back to 'community' and max_views to 'pro', so a key
+      // with no plan was held to the community link lifetime and handed the Pro
+      // read count at the same time. A missing plan is not evidence of a paid
+      // one, so both fall to community.
       const _plan = keyData?.plan || 'community';
       const _maxTtl = tiers.tierLimitNum(_plan, 'view_ttl_ms');
       const ttl = Math.min(parseInt(ttl_ms || TTL_MS), _maxTtl);
       // Access policies: max_views (default 1 = burn-on-read) + Argon2id password.
-      // Per-tier max_views ceiling also lives in lib/tiers.js now.
-      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(keyData?.plan || 'pro', 'max_views') || 1));
+      const maxViews = Math.max(1, Math.min(parseInt(reqMaxViews || 1) || 1, tiers.tierLimitNum(_plan, 'max_views') || 1));
       let pw_hash = null;
       if (password) {
         if (!argon2Lib) { res.writeHead(501); return res.end(J({ error: 'Argon2id not available on this relay' })); }
@@ -4560,6 +4738,7 @@ const server = http.createServer(async (req, res) => {
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
+    let receiptJson = null;
     const ctData = entry.ct_entry || null;
     if (ctData) {
       const inclusionProof = {
@@ -4589,7 +4768,8 @@ const server = http.createServer(async (req, res) => {
         } catch(e) { log('warn', 'receipt_sign_failed', { err: e.message }); }
       }
       const receipt = { ...receiptPayload, signature };
-      receiptHeader = Buffer.from(JSON.stringify(receipt)).toString('base64url');
+      receiptJson = JSON.stringify(receipt);
+      receiptHeader = Buffer.from(receiptJson).toString('base64url');
     }
 
     const outHeaders = {
@@ -4598,10 +4778,50 @@ const server = http.createServer(async (req, res) => {
       'X-Paramant-Burned':  burned ? 'true' : 'false',
       'X-Paramant-Hash':    outm[1],
     };
-    if (receiptHeader) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+    // The receipt travels by reference, not by value: an id to fetch it with and
+    // the hash of the exact bytes that will come back, so the handover itself is
+    // verifiable. The payload is ~18 KB and does not fit in a response header
+    // that Node clients or a default nginx will accept (see the store above).
+    if (receiptHeader) {
+      const receiptHash = crypto.createHash('sha3-256').update(receiptHeader).digest('hex');
+      const _receiptKey = entry.apiKey || apiKey || null;
+      const _receiptPlan = (_receiptKey && apiKeys.get(_receiptKey)?.plan) || keyData?.plan || 'community';
+      const receiptId = await storeDeliveryReceipt(receiptJson, receiptHash, _receiptKey,
+        _receiptKey ? acctOf(_receiptKey) : null, _receiptPlan);
+      outHeaders['X-Paramant-Receipt-Id'] = receiptId;
+      outHeaders['X-Paramant-Receipt-Hash'] = 'sha3-256:' + receiptHash;
+      outHeaders['X-Paramant-Receipt-Url'] = `/v2/transfers/${receiptId}/receipt`;
+      // DEPRECATED, off by default, removed after 2026-12-01. When it is off,
+      // say so ON THE RESPONSE. A client that reads X-Paramant-Receipt and finds
+      // nothing there has no way to tell "this transfer had no receipt" from
+      // "the receipt moved", and the Python SDK's own handling of an absent
+      // header is a silent receipt=None (sdk-py/paramant_sdk.py:681). A silent
+      // downgrade of a delivery proof is the one failure mode this route must
+      // not have, so the removal announces itself and says where to go.
+      if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+      else outHeaders['X-Paramant-Receipt-Deprecated'] = `removed 2026-12-01; GET /v2/transfers/${receiptId}/receipt`;
+    }
     res.writeHead(200, outHeaders);
     if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
     return res.end(blob);
+  }
+
+  // ── GET /v2/transfers/:receipt_id/receipt ─ the delivery receipt, by reference ─
+  // Answers with the exact base64url payload GET /v2/outbound/:hash used to put
+  // in its X-Paramant-Receipt header, so a client that already decodes that
+  // string, or posts it to /v2/verify-receipt, needs no other change.
+  // The id is 16 random bytes handed only to the caller that did the download,
+  // and the receipt is additionally bound to that caller's API key. An unknown,
+  // expired, or foreign id answers with ONE 404, so the route can never be used
+  // to probe whether a transfer existed.
+  const rcptm = path.match(/^\/v2\/transfers\/([a-f0-9]{32})\/receipt$/);
+  if (rcptm && req.method === 'GET') {
+    const rec = await fetchDeliveryReceipt(rcptm[1]);
+    const gone = { error: 'Not found. Expired, or never issued.' };
+    if (!rec) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
+    if (rec.apiKey && rec.apiKey !== apiKey) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, receipt: Buffer.from(rec.json).toString('base64url'), receipt_hash: 'sha3-256:' + rec.hash }));
   }
 
   // ── GET /v2/status/:hash ─────────────────────────────────────────────────────
@@ -6106,7 +6326,8 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/verify-receipt — Verify a signed delivery receipt ───────────────
   // Verifies the ML-DSA-65 signature and re-walks the inclusion proof.
-  // Receipt must be base64url-encoded JSON (as returned in X-Paramant-Receipt header).
+  // Receipt must be base64url-encoded JSON, as returned by
+  // GET /v2/transfers/:receipt_id/receipt (before 2026-09, the X-Paramant-Receipt header).
   if (path === '/v2/verify-receipt' && req.method === 'POST') {
     try {
       const body = await readBody(req, 65536);

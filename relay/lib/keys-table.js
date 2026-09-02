@@ -72,7 +72,18 @@ function parseAccountFields(rawKey) {
   // users.json reload. null (not undefined) keeps the admin JSON shape stable.
   const usage_purpose = typeof rawKey.usage_purpose === 'string' ? rawKey.usage_purpose : null;
   const usage_purpose_at = rawKey.usage_purpose_at || null;
-  return { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign, usage_purpose, usage_purpose_at };
+  // The paid period belongs to the tier above and must be rehydrated with it.
+  // Without this the in-memory record carried a paid tier and no end date, and
+  // an end date that is not loaded is an entitlement that never expires: the
+  // relay wrote paid_until to users.json correctly and then dropped it on the
+  // way back in. Only set when present, so "no period on file" stays absent
+  // (never expired) rather than becoming an explicit null.
+  const out = { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign, usage_purpose, usage_purpose_at };
+  for (const product of entitlements.PRODUCTS) {
+    const f = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
+    if (rawKey[f] != null) out[f] = rawKey[f];
+  }
+  return out;
 }
 
 // Pick a kid not already present in `taken` (anything with a .has(kid) method:
@@ -95,13 +106,6 @@ function assignKid(taken, key, log) {
 // is_primary/scope (set via parseAccountFields at load). Assigns each value a
 // stable `kid`. First-writer fills the account record; an explicit primary key
 // always wins primary_api_key.
-// Highest of two tiers on a product ladder; unknown/absent values never win.
-function _higherTier(order, cur, next) {
-  if (!next || order.indexOf(next) < 0) return cur;
-  if (!cur || order.indexOf(cur) < 0) return next;
-  return order.indexOf(next) > order.indexOf(cur) ? next : cur;
-}
-
 function rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log) {
   accounts.clear();
   accountKeys.clear();
@@ -119,8 +123,11 @@ function rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log) {
     // free 2-signature wall. It also means the mirror setProductPlan writes
     // survives a restart and POST /v2/admin/keys/reload instead of being
     // silently dropped on the next rebuild.
-    acct.plan_parasign = _higherTier(entitlements.PARASIGN_TIERS, acct.plan_parasign, v.plan_parasign);
-    acct.plan_parasend = _higherTier(entitlements.PARASEND_TIERS, acct.plan_parasend, v.plan_parasend);
+    // Tier AND paid period together: a summary that took the highest tier but
+    // left the date behind handed every account-level read an unbounded grant,
+    // which is the same drop mergeAccountRecord used to make one layer up.
+    entitlements.mergeProductGrantInto(acct, v, 'parasign');
+    entitlements.mergeProductGrantInto(acct, v, 'parasend');
     if (v.parasign) acct.parasign = true;
     if (v.is_primary || !acct.primary_api_key) acct.primary_api_key = v.is_primary ? key : (acct.primary_api_key || key);
     if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
@@ -231,7 +238,7 @@ function designatePrimary(apiKeys, accounts, accountKeys, accountId, key) {
 // keeps scope+parasign). A minted product key is never an account primary.
 //   randomHex: caller-supplied cryptographic hex (relay: crypto.randomBytes(32)).
 //   test:      psk_test_ (sandbox) vs psk_live_.
-function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt, planParasign, planParasend }) {
+function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex, createdAt, planParasign, planParasend, paidUntilParasign, paidUntilParasend }) {
   if (!accountId) throw new Error('accountId required');
   if (!randomHex || typeof randomHex !== 'string') throw new Error('randomHex required');
   const key = (test ? 'psk_test_' : 'psk_live_') + randomHex;
@@ -266,6 +273,24 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
     plan_parasign: normParasign, plan_parasend: normParasend,
     account_id: accountId, is_primary: false, scope: 'parasign', parasign: true, product: 'parasign',
   };
+  // The paid PERIOD travels with the inherited tier, onto BOTH the live record
+  // and the users.json entry. Without it a key minted while the subscription was
+  // still running carried a paid tier and no end date, and "no recorded period"
+  // means "never expires" (entitlements.js:137). So the new key outlived the
+  // subscription that paid for it, and outlived a restart too, because that is
+  // the shape that reached disk. Both issuance paths run through here
+  // (POST /v2/user/parasign-keys, self-serve, and the admin mint), so this is
+  // the one place it has to be right.
+  // applyProductTier is the shared field rule: undefined leaves the field alone,
+  // and landing on a floor tier clears any period, so a lapsed grant is minted
+  // as a plain floor key with no stale date on it.
+  for (const [product, tier, until] of [
+    ['parasign', normParasign, paidUntilParasign],
+    ['parasend', normParasend, paidUntilParasend],
+  ]) {
+    entitlements.applyProductTier(rec, product, tier, until);
+    entitlements.applyProductTier(usersEntry, product, tier, until);
+  }
   return { key, record: rec, usersEntry };
 }
 

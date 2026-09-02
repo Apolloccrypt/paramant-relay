@@ -75,9 +75,71 @@ Response headers:
 |--------|-------|
 | `X-Paramant-Burned` | `true` if blob was destroyed |
 | `X-Paramant-Hash` | SHA-256 hex of the blob |
-| `X-Paramant-Receipt` | Base64url-encoded signed delivery receipt |
+| `X-Paramant-Receipt-Id` | 32 hex characters. Fetch the receipt with it |
+| `X-Paramant-Receipt-Hash` | `sha3-256:<hex>` over the receipt bytes you will get back |
+| `X-Paramant-Receipt-Url` | `/v2/transfers/<receipt_id>/receipt` |
 
-The `X-Paramant-Receipt` value is a base64url-encoded JSON object:
+The receipt is handed over by reference, not by value. It carries a full
+ML-DSA-65 signature and an inclusion proof, so the payload is around 18 KB:
+too large for a response header. Node's default `maxHeaderSize` is 16 KB and
+nginx's default `proxy_buffer_size` is 4k/8k, so a receipt in the header meant
+`UND_ERR_HEADERS_OVERFLOW` on the client and 502 at the proxy.
+
+**Deprecated:** `X-Paramant-Receipt`, which carried that payload inline. It is
+off by default from 2026-09 and will be removed after **2026-12-01**. An
+operator can put it back for the transition with
+`PARAMANT_INLINE_RECEIPT_HEADER=1`, and must then also raise
+`proxy_buffer_size` on any proxy in front of the relay.
+
+While the old header is off, every download also carries
+`X-Paramant-Receipt-Deprecated: removed 2026-12-01; GET /v2/transfers/<id>/receipt`.
+It exists because a client that reads `X-Paramant-Receipt` and finds nothing
+cannot tell "this transfer had no receipt" from "the receipt moved", and a
+delivery proof must never go missing quietly. The header is not sent when the
+opt-in is on, because then there is nothing to announce.
+
+---
+
+### GET /v2/transfers/:receipt_id/receipt (fetch a delivery receipt)
+
+Requires the same API key that made the download. An unknown, expired, or
+foreign id all answer with the same 404, so the route cannot be used to probe
+whether a transfer existed.
+
+**How long you have, exactly.** Fetch the receipt right after the download.
+Three things can take it away, and all three answer with the same 404:
+
+| | |
+|---|---|
+| **Time** | 15 minutes from the download. |
+| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your tier's hourly download ceiling: community 100, pro 1000, business 4000, enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
+| **A relay without redis** | A relay configured with `REDIS_URL` keeps receipts in redis, so they survive a restart of the relay process. A relay without one keeps them in memory, and then a restart or a deploy loses every outstanding receipt. |
+
+If none of that is acceptable for your use, the receipt can still be delivered
+inline on the download itself: ask the operator to run the relay with
+`PARAMANT_INLINE_RECEIPT_HEADER=1`, which restores the `X-Paramant-Receipt`
+header alongside the reference. That header is around 18 KB, so it needs
+`proxy_buffer_size` raised on any proxy in front of the relay, and it is
+removed after 2026-12-01.
+
+```bash
+curl https://relay.paramant.app/v2/transfers/$RECEIPT_ID/receipt \
+  -H "X-Api-Key: pgp_your_key"
+```
+
+```json
+{
+  "ok": true,
+  "receipt": "<base64url>",
+  "receipt_hash": "sha3-256:9c1f…"
+}
+```
+
+`receipt_hash` is identical to the `X-Paramant-Receipt-Hash` the download
+carried, over the exact `receipt` string returned here, so the handover is
+verifiable end to end.
+
+`receipt` decodes to:
 
 ```json
 {
@@ -103,7 +165,7 @@ Public. No API key required.
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
   -H "Content-Type: application/json" \
-  -d '{"receipt":"<base64url from X-Paramant-Receipt>"}'
+  -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 ```
 
 Success:

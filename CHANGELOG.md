@@ -9,8 +9,29 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet. New entries go here as they merge; `docs/RELEASE.md` says when and
-how they move into a version section.
+### Changed
+- **The ParaSend delivery receipt moved out of the response header.**
+  `GET /v2/outbound/:hash` used to answer with `X-Paramant-Receipt`, the whole
+  signed receipt inline: 18551 bytes for that header and 19560 for the block.
+  Node's default `maxHeaderSize` is 16384, so a client using `fetch()` could not
+  download at all (`UND_ERR_HEADERS_OVERFLOW`), and nginx's default
+  `proxy_buffer_size` of 4k/8k answers 502. The download now carries
+  `X-Paramant-Receipt-Id`, `X-Paramant-Receipt-Hash` and
+  `X-Paramant-Receipt-Url`, and the receipt itself comes from the new
+  `GET /v2/transfers/:receipt_id/receipt`, which returns the exact same
+  base64url payload. Receipts are held for 15 minutes, per account, and bound to
+  the API key that made the download.
+
+### Deprecated
+- **`X-Paramant-Receipt`.** Off by default from this release, removed after
+  **2026-12-01**. `PARAMANT_INLINE_RECEIPT_HEADER=1` puts it back for the
+  transition; a proxy in front of the relay then needs `proxy_buffer_size`
+  raised to match. While it is off, every download carries
+  `X-Paramant-Receipt-Deprecated` naming the new URL, so a client cannot
+  silently turn a missing header into a missing receipt. The Python SDK does
+  exactly that today (`sdk-py/paramant_sdk.py:681`), which is why the notice
+  exists; `Apolloccrypt/paramant-sdk` PR #5 teaches it both shapes and that
+  release must ship before this one reaches production.
 
 ---
 
