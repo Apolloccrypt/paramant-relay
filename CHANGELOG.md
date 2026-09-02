@@ -9,6 +9,202 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet. New entries go here as they merge; `docs/RELEASE.md` says when and
+how they move into a version section.
+
+---
+
+## [3.1.0] - unreleased
+
+277 commits since the `v3.0.0` tag (2026-06-24), of which 58 arrived through a
+numbered pull request and the rest were pushed to `main` directly. Compiled from
+`git log v3.0.0..origin/main` on 2026-09-02 and rebased onto `main` the same
+day, which brought six more PRs in; PR numbers are given where the commit
+carried one. Numbers written as "finding #n" are security findings or issues,
+not pull requests.
+
+Not yet tagged. Tagging and publishing are one step, described in
+`docs/RELEASE.md`; a tag that is not deployed is worse than no tag.
+
+### Security
+
+- Audit chain hardening: `chain_valid` is a real tamper check that binds every
+  field and recomputes rather than trusting a stored flag (finding #19), and the
+  SSRF guard now blocks NAT64 and 6to4 IPv4-in-IPv6 embeddings (finding #21).
+- AAD verification fails closed, PII is masked in logs, outbound mail is escaped
+  and per-user MFA attempts are throttled (#266).
+- Monthly tier caps are enforced on active use, not only at issue time, and
+  admin logs are masked (#267).
+- API keys are delivered through a one-time claim link instead of in plaintext
+  in an email (privacy finding H1, #268).
+- Audit PII retention is bounded and IP addresses are masked in persistent
+  records (privacy finding M2, #271).
+- Signing requires a fresh step-up token on `/attested`, and the signer public
+  key is pinned (#272).
+- `script-src 'unsafe-inline'` is gone from the admin panel (#273) and from the
+  public site (#274).
+- Batch of low-severity pentest findings #15, #17, #20, #22 and #23 (#206).
+- The public transparency log no longer leaks device identifiers (finding H-1,
+  #205).
+- Single-signer notary signatures are domain-separated (v2); v1 envelopes stay
+  verifiable (findings #3 and #4, #208).
+- The stub checkout that granted plans without a payment is disabled, and the
+  inbound content hash is verified against the payload on `/v2/inbound` and
+  `/v2/anon-inbound`.
+- DID auth runs against the owner's entitlements and quota, and a revoked
+  enrollment is refused.
+- The gitleaks allowlist was rebuilt from a verified full-history scan.
+- `/v2/health/deep` is reachable on production again, behind internal auth
+  rather than open (#322).
+
+### Added
+
+- ParaSign `/v1` signing API with authorization, quota and offline v3 verify
+  (#283), documented in the README (#285).
+- ParaSign PDF editor: HiDPI preview, placeable text and date fields,
+  annotations and page management (#286).
+- Recurring billing collects a second period, and `paid_until` survives a
+  restart (#315).
+- A canary for ParaSign, the product that had no alarm (#316), and a transfer
+  canary that runs a real file through the real relay hourly. The transfer
+  canary now also checks the clock (#320).
+- `/sign` is served to everyone, and says honestly what it needs (#317).
+- Visitors are counted by what a client did, not by what it called itself
+  (#318).
+- A signals script that says what is red without asking a model (#330).
+- Product heartbeat and docroot drift guard, running on every pull request, with
+  a red heartbeat made visible as a GitHub issue.
+- Document-focused user dashboard, a developer dashboard centred on the ParaSign
+  API, self-service ParaSign key minting, and encrypted document delivery with
+  signing invitations.
+- Per-product plan grants: one product's tier can be set without moving the
+  unified plan.
+- ParaSign sign tiers with Pro overage metering and a hard cap, plus per-tier
+  feature gates wired into the relay endpoints.
+- Per-account ParaSign envelope index, full per-envelope `.psign` audit export
+  and a CLI backfill for the index.
+- A one-time usage-purpose question on the dashboard, shown in the admin user
+  list.
+- `/about` and `/trust` pages, and a ParaSign product page at `/parasign`
+  (#325).
+- `docs/brand/messaging.md`: who we sell to, what we promise and how each
+  promise is proven (#331).
+
+### Changed
+
+- The recurring billing layer stays off until `BILLING_MODE` says otherwise
+  (#326).
+- Navigation says what we sell: seven items instead of forty (#324), and 17
+  standards and sector pages were pruned from paramant.app (#323).
+- The installers are served by us, and only the signatures we actually have are
+  claimed (#308); the native build's cost is stated alongside what it does well
+  (#309).
+- The relay is called source-available (BUSL-1.1) rather than open source.
+- The billing docs say Mollie, not Stripe, and document `/v2/billing/checkout`
+  and its webhook.
+- The homepage speaks to a buyer: Community as the gift, the business plans as
+  the product (#328).
+
+### Fixed
+
+- The hourly relay crash: a `setInterval` swept a `Map` that no longer existed.
+  This is the failure that the `no-undef` gate in `test.yml` now exists to
+  catch.
+- A comma-operator bug made the create-envelope gate swallow every POST.
+- Script readiness is sticky, so `/ontvang` stops hanging on keygen (#303), and
+  the heartbeat was extended to the pages that had no progress check (#304).
+- Dead destinations fixed, and every button's destination gated (#307).
+- The live device-hash feature survived the CSP refactor (#275); auth and
+  billing inline scripts were externalized and the real client IP restored
+  (#278).
+- The installer preserves the pinned release in the frontend scripts (#259), and
+  the admin compose volume paths resolve (#260).
+- A paid ParaSign upgrade is no longer invisible to the web sign gate; plan
+  changes fan out to every relay sector and are verified across all of them; a
+  new key plus a restart no longer drops a paid per-product grant.
+- Pricing buttons no longer fall back to an unattributable payment link.
+- TOTP dual-verifies SHA-256 and SHA-1, with a soft notice on SHA-1.
+- Stale entries are lazily pruned from the account envelope index.
+- Mobile navigation stays opaque and keeps its scroll position while open.
+
+### Removed
+
+- The Android APK and ParamantOS: nobody used either (#310).
+- ParaID (#319).
+
+### Build, CI and dependencies
+
+- The crypto binding builds on `rust:1.98-alpine` again, by adopting a
+  paramant-core that uses bindgen 0.72 (#329). This is the real fix for the
+  breakage that forced a re-pin to 1.95-alpine twice (#269, #284) and that
+  failed the drift gate on both #222 and #313.
+- `paramant-core-node` is built with `--locked`, so a transitive bump cannot
+  silently drift the crypto build (#270).
+- A drift gate that builds the real production Dockerfile on every pull request.
+  It is what caught #313 before merge.
+- `relay.js` finally has unit tests: the route suites boot a real `relay.js` and
+  exercise its critical paths (#341). Point 3 of the toekomstbestendigheid
+  report was that 6488 lines and 68 routes were loaded by no unit test at all;
+  this is the first bite out of it.
+- The heartbeat cannot be green without evidence (#338), and the site's ten
+  heaviest claims are pinned to the code that makes them true (#327). Both turn
+  a page that merely loads into a page that has to prove something.
+- Published relay images are signed with cosign and carry an SBOM and SLSA
+  provenance.
+- Suites that assert nothing are held to a named list instead of reporting green
+  over nothing (#321).
+- Browser suites are selected by what they import rather than by a hand-kept
+  list of names.
+- gitleaks runs on push and on pull request.
+- Action bumps: `sigstore/cosign-installer` 3.7.0 to 4.1.2 (#290),
+  `anchore/sbom-action` 0.17.9 to 0.24.2 (#291), `gitleaks/gitleaks-action`
+  2.3.9 to 3.0.0 (#292), `actions/checkout` 7.0.0 to 7.0.1 (#293),
+  `actions/upload-artifact` 4.6.0 to 7.0.1 (#294).
+- `redis` in the admin panel: 4.7.1 to 6.0.1 (#254), then 6.0.1 to 6.2.1 (#312).
+- #314 landed the 30 August fixes under the name "Release 3.1.0". No tag was cut
+  at the time; this section is that release.
+
+### Release hygiene
+
+Landed in this version rather than deferred, because none of it needs a product
+decision:
+
+- One version, one place. The root `package.json` is the version;
+  `relay/package.json`, `admin/package.json`, both lockfiles and both
+  `org.opencontainers.image.version` labels follow it, and `relay.js` reads its
+  own `package.json` at runtime instead of restating the number.
+  `tests/version-consistency.test.mjs` fails the build if any of them drift.
+  Before this, four places gave three answers: root 3.1.0, relay 3.0.0, admin
+  0.9.0-beta, image label 3.0.0, and `scripts/post-deploy-verify.sh` asserting
+  that `/health` returns 3.0.0 while the relay already answered 3.1.0. The admin
+  panel moves from `0.9.0-beta` to the project version.
+- One Node line. The image, CI and the devcontainer are on Node 24, the newest
+  LTS; `engines` is `>=22 <25`, which is exactly the two LTS lines still getting
+  security fixes. The images were on `node:25-alpine3.21` and CI on Node 20, and
+  both of those are end-of-life. The relay base moves to
+  `node:24-alpine3.24`, which also matches the Alpine of the
+  `rust:1.98-alpine` builder stage that compiles the musl binding.
+- Every environment variable is written down. `deploy/.env.example` documents all
+  77: the 72 the relay or the admin panel reads, plus 5 that docker-compose, the
+  deploy scripts or the self-host installers consume. Each with a purpose,
+  required-or-optional, its default and the file that reads it. It documented
+  three; the code read 57 names, 40 of them written down nowhere.
+  `tests/env-documented.test.mjs` fails the build on the next undocumented one,
+  on documentation for a variable nothing reads, and on a `read in:` pointer
+  naming a file that does not exist or never mentions the variable.
+- A release process that exists on paper and in the repo: `docs/RELEASE.md`.
+  `docs/PROJECT-STATUS.md`, which declared itself obsolete in its own second
+  line, points at the CHANGELOG and that document instead.
+
+### Also in 3.1.0: entries written before the `v3.0.0` tag
+
+The 3.0.0 section below is dated 2026-05-27. The `v3.0.0` tag was cut on
+2026-06-24, a month later. Everything written in between sat under
+`[Unreleased]` and never got a released section of its own, so as far as any tag
+is concerned it is part of 3.1.0. It is folded in here unchanged rather than
+rewritten, because rewriting it would be guessing at what it meant.
+
+
 ### Removed
 - **Thunderbird FileLink add-on retired.** `thunderbird-filelink/` removed from the
   repo and the add-on unpublished from addons.thunderbird.net (it was status

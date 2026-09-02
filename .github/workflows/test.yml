@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       # The sibling of `bash -n`, for JavaScript. bash -n and node --check both
       # parse; neither resolves names. An hourly setInterval swept a Map that no
       # longer existed and took production down 425 times before anyone looked.
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       # @paramant/core is the Rust NAPI binding in the sibling paramant-core
       # repo. Until it is published to npm it is a dev file-link, so build it
       # here (as paramant-core's own CI does) to gate the relay crypto suite's
@@ -163,7 +163,10 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6399
         run: |
           set -o pipefail
-          node --test test/route-*.test.js test/parasign-signs-quota.test.js 2>&1 | tee /tmp/relay-routes.log
+          # --test-reporter=tap: see the unit job below. This gate parses the
+          # same TAP diagnostic lines, and its expected set is empty too, so
+          # the spec reporter would leave it green over anything.
+          node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js 2>&1 | tee /tmp/relay-routes.log
           # The same gate as the unit job below: a suite that runs and asserts
           # NOTHING still reports green, and that is how four ParaSign suites
           # came to mean nothing for weeks. This job has redis AND the engine,
@@ -190,7 +193,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       # Pure-JS units: account-split schema (keys-table), static-serve, envelope
       # binding, webauthn helpers. No @paramant/core build and no Redis, so the
       # relay/test suite that previously had zero CI coverage now gates here.
@@ -220,7 +223,17 @@ jobs:
           RELAY_TEST_SKIP: redis
         run: |
           set -o pipefail
-          node --test $(ls test/*.test.js | grep -vE \
+          # --test-reporter=tap is not decoration; it is what keeps the gate
+          # below alive. That gate parses the diagnostic lines summary() in
+          # test/_requires.js prints, and TAP prefixes them with "# ". Node's
+          # DEFAULT reporter for a non-TTY changed from tap to spec between
+          # Node 20 and Node 24, and spec drops the prefix. With the expected
+          # set now empty, a missing prefix does not turn this red: the grep
+          # finds nothing, `silent` is empty, and the gate passes for the wrong
+          # reason. A dead gate that reports green is exactly the failure this
+          # job exists to prevent, so the reporter is pinned rather than
+          # inherited from whatever Node decides a default should be.
+          node --test --test-reporter=tap $(ls test/*.test.js | grep -vE \
             'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-signs-quota|route-') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
@@ -289,7 +302,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Admin unit suite
         working-directory: admin
         run: node --test test/*.test.js

@@ -8,8 +8,9 @@ Last updated: 2026-05-27T21:00:05+02:00 (auto-maintained by overseer session)
 ## Current production state
 
 - Live: 116.203.86.81 (Hetzner, Germany), 5 sector relays + admin (docker compose)
-- Build: v2.5.0 marketing. NOTE: relay.js emits VERSION='3.0.0' via /health while
-  commit 77bb8d3 reserves 3.0.0 for ParaSign GA -- see PROJECT-STATUS.md findings.
+- Build: the relay reports its version from package.json on /health. The
+  marketing-versus-code split noted here on 2026-05-27 was resolved in 3.1.0;
+  see CHANGELOG.md and docs/RELEASE.md.
 - Users: ~100 community + enterprise pilots
 - Soak: M5b production 7-day clean signal in progress (started 2026-05-27 18:10,
   day 1 of 7)
@@ -18,8 +19,9 @@ Last updated: 2026-05-27T21:00:05+02:00 (auto-maintained by overseer session)
 
 ## Active development (open PRs + in-flight sessions)
 
-The authoritative live list is in docs/PROJECT-STATUS.md (regenerated each run).
-At last snapshot:
+The authoritative live list is `gh pr list`; docs/PROJECT-STATUS.md was a
+snapshot that never regenerated and no longer holds one. At that snapshot
+(2026-05-27):
 
 - PR #41: R008 low-code routing scope + examples (sessie 5) -- MERGEABLE, docs-only
 - PR #40: R006 crypto-mode opt-in (sessie 1.5) -- MERGED into main

@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Install deps (browsers installed separately)
         run: npm ci
         env:

@@ -286,6 +286,10 @@ Additional fixes applied 2026-04-13:
 
 ## Dependency audit (2026-04-13)
 
+> Historical record, kept as measured on that date. The base image has moved
+> since: it is `node:24-alpine3.24`, pinned by digest, as of 3.1.0. `node:22`
+> and `node:25` are both past their support window; see CHANGELOG.md.
+
 - 0 npm vulnerabilities across all 4 packages
 - Base image: node:22-alpine (node:20 was EOL)
 - express 4.x → 5.x

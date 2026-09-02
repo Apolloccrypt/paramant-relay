@@ -1,5 +1,8 @@
 #!/bin/bash
-# Post-deploy smoke test suite for paramant 3.0.0.
+# Post-deploy smoke test suite for the paramant relay.
+# The version it expects is read from relay/package.json, not hardcoded: this
+# file asserted 3.0.0 while relay.js already reported 3.1.0, so the one check
+# that could have caught the version drift was itself part of it.
 # Run AFTER the deploy completes. Exits 0 if all critical checks pass.
 #
 # Usage:
@@ -74,11 +77,17 @@ http_code() {
   echo ""
 } > "$REPORT"
 
+EXPECT_VER=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' "$(dirname "$0")/../relay/package.json" | head -1)
+if [ -z "$EXPECT_VER" ]; then
+  echo "FATAL: could not read the version from relay/package.json" >&2
+  exit 2
+fi
+
 note "== CRITICAL: relay /health =="
 HEALTH_JSON=$($CURL "$SITE/health" 2>/dev/null)
 HEALTH_VER=$(printf '%s' "$HEALTH_JSON" | jq -r '.version // empty' 2>/dev/null)
 check "/health HTTP" "200" "$(http_code "$SITE/health")" yes
-check "/health version" "3.0.0" "$HEALTH_VER" yes
+check "/health version" "$EXPECT_VER" "$HEALTH_VER" yes
 
 note ""
 note "== CRITICAL: /v2/capabilities (R006 core = 1 KEM) =="

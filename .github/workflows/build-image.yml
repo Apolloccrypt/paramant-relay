@@ -2,15 +2,17 @@ name: Build prod image (drift gate)
 
 # Toolchain-drift gate. The prod relay image is built from relay/Dockerfile, a
 # musl/Alpine multi-stage build that compiles the paramant-core Rust NAPI
-# binding against a deliberately pinned base (rust:1.95-alpine). The unit and
-# crypto suites in test.yml do NOT go through this Dockerfile, so a base or
-# toolchain bump (e.g. the rust 1.96-alpine bump that broke the vendored oqs
-# crate) stayed green in CI and only failed when the image was built after
+# binding against a deliberately pinned base (rust:1.98-alpine since #329). The
+# unit and crypto suites in test.yml do NOT go through this Dockerfile, so a
+# base or toolchain bump (e.g. the rust 1.96-alpine bump that broke the vendored
+# oqs crate) stayed green in CI and only failed when the image was built after
 # merge. This job builds the exact prod Dockerfile on every PR, turning that
 # post-merge failure into a pre-merge gate.
 #
-# Do NOT bump the rust base here or in relay/Dockerfile to make this pass; the
-# 1.95-alpine pin is intentional. Fix the underlying crate/toolchain instead.
+# Do NOT bump a base here or in relay/Dockerfile to make this pass. The rust pin
+# is a paired decision with paramant-core's own musl job; fix the underlying
+# crate/toolchain instead. #222 and #313 both failed here for exactly that
+# reason, and #329 fixed the crate rather than the gate.
 
 on:
   pull_request:
