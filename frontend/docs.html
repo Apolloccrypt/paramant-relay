@@ -855,8 +855,8 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
     <p>The CT log persists cryptographic hashes (Merkle leaf hashes, tree hashes, device hashes) to disk: never payload content. Even a complete disk image of the relay server reveals no file contents.</p>
     <p>Two-step burn: first the blob is zeroed in-place, then the Map entry is deleted. This prevents a brief window where a partial read could occur.</p>
 
-    <h2 id="padding">5 MB fixed padding (ParaShare)</h2>
-    <p>ParaShare authenticated blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. The block size tells an observer nothing about the file, but a transfer larger than one block is sent as several blocks and its <code>total_chunks</code> travels in the clear, so the number of blocks is visible and the file size can be placed within an order of magnitude. That is finding 5 of the April 2026 audit, an accepted trade-off.</p>
+    <h2 id="padding">5 MB fixed padding (ParaSend web app)</h2>
+    <p>Authenticated blobs from the ParaSend web app are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. The block size tells an observer nothing about the file, but a transfer larger than one block is sent as several blocks and its <code>total_chunks</code> travels in the clear, so the number of blocks is visible and the file size can be placed within an order of magnitude. That is finding 5 of the April 2026 audit, an accepted trade-off.</p>
 
     <h2 id="ct-log">Certificate Transparency log</h2>
     <p>Every transfer hash and device registration is appended to a public Merkle tree. The root hash changes with every write and is publicly verifiable. Anyone can prove a transfer occurred without learning what was transferred.</p>
@@ -921,7 +921,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><th>What a compromised relay can do</th><th>What it cannot do</th></tr>
       <tr><td>Deny or delay service</td><td>Read file contents (no decryption key)</td></tr>
       <tr><td>Learn transfer timing and frequency</td><td>Substitute a registered ML-KEM public key (CT log prevents rollback)</td></tr>
-      <tr><td>Observe that a ParaShare blob arrived (all fixed 5 MB, content opaque)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
+      <tr><td>Observe that a web app blob arrived (all fixed 5 MB, content opaque)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
       <tr><td>Block a specific device hash</td><td>Decrypt any stored ciphertext</td></tr>
     </table>
     <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not sufficient: both must be broken simultaneously.</p>

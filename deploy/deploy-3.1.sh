@@ -1223,7 +1223,7 @@ EOF
     fi
   fi
 
-  step "5c. the three nginx changes, by hand, keeping the ParaID deny"
+  step "5c. the four nginx changes, by hand, keeping the ParaID deny"
   remote "nginx edits" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_CONFS" <<'EOF'
 set -euo pipefail
 TS="$1"; SITES="$2"; NGBK="$3"; CONFS="$4"
@@ -1255,8 +1255,49 @@ DICOM_RE='location = /dicom[[:space:]]*\{[[:space:]]*try_files /dicom\.html'
 SIGN_LOC_RE='location = /sign[[:space:]]*\{'
 DICOM404_RE='location = /dicom[[:space:]]*\{[[:space:]]*return 404'
 PARAID_RE='paraid/issue'
+RULES_RE='location = /pararules'
 OUT_RE='^[[:space:]]*location[[:space:]]*~[[:space:]]*\^/v2/outbound[[:space:]]*\{'
 BUF_RE='proxy_buffer_size 32k'
+
+# /pararules became /rules in the two-product-names round. The page is indexed,
+# so the old path keeps a permanent 301 rather than a migration step that gets
+# tidied away in a later round.
+#
+# The anchor is the ParaID deny. It is in every server block by the 01-09
+# server edit the runbook already relies on and FATALs on below, which makes it
+# the one line that marks a block as "a block that answers for this site" in
+# both confs: paramant-live.conf carries no server_name at all (it is the
+# backend paramant-public.conf proxies to), so keying on the hostname would
+# have put the redirect in one conf and not the other.
+#
+# Two passes, like the buffer edit below: pass one learns which blocks already
+# carry the redirect, pass two inserts only into the ones that do not. A
+# file-wide grep would stop at the first block and leave the rest bare.
+RULES_AWK='
+FNR==NR {
+  if ($0 ~ /^server[[:space:]]*\{/) b++
+  if ($0 ~ /location = \/pararules/) has[b]=1
+  if ($0 ~ /paraid\/issue/) deny[b]=1
+  next
+}
+{
+  print
+  if ($0 ~ /^server[[:space:]]*\{/) j++
+  if ($0 ~ /paraid\/issue/ && deny[j] && !has[j] && !ins[j]) {
+    print "    location = /pararules { return 301 https://$host/rules; }"
+    ins[j]=1
+  }
+}'
+
+# Count the server blocks that answer for the site (the ParaID deny marks them)
+# and how many of those already carry the redirect.
+RULES_COUNT_AWK='
+/^server[[:space:]]*\{/ { b++ }
+/paraid\/issue/ { deny[b]=1 }
+/location = \/pararules/ { has[b]=1 }
+END { for (i in deny) { t++; if (has[i]) w++ } printf "%d %d\n", t+0, w+0 }'
+
+count_rules() { awk "$RULES_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
 
 # Two-pass insert: learn which /v2/outbound blocks already carry the buffer,
 # then insert only into the ones that do not.
@@ -1331,6 +1372,9 @@ echo "before paraid deny = $(count "$PARAID_RE")"
 read -r _obt _obw <<< "$(count_blocks)"
 echo "before outbound locations = $_obt"
 echo "before outbound blocks with buffer = $_obw"
+read -r _rbt _rbw <<< "$(count_rules)"
+echo "before pararules blocks = $_rbt"
+echo "before pararules blocks with redirect = $_rbw"
 
 # Each edit is in one of three states, and only one of them is a stop:
 #
@@ -1383,8 +1427,10 @@ pending=0
 for st in "$SIGN_STATE" "$COMP_STATE" "$DICOM_STATE"; do
   [ "$st" = todo ] && pending=$((pending + 1))
 done
-# A /v2/outbound block without the buffer is a fourth thing still to do.
+# A /v2/outbound block without the buffer is a fourth thing still to do, and a
+# site block without the /pararules redirect a fifth.
 pending=$((pending + _obt - _obw))
+pending=$((pending + _rbt - _rbw))
 echo "before edits pending = $pending"
 if [ "$pending" -eq 0 ]; then
   echo "before everything already applied = yes"
@@ -1424,6 +1470,10 @@ for f in $TARGETS; do
   awk "$BUF_AWK" "$f" "$f" > "/tmp/nginx-buf.$$"
   cat "/tmp/nginx-buf.$$" > "$f"
   rm -f "/tmp/nginx-buf.$$"
+  # 5. the permanent 301 from /pararules to /rules, one per site block.
+  awk "$RULES_AWK" "$f" "$f" > "/tmp/nginx-rules.$$"
+  cat "/tmp/nginx-rules.$$" > "$f"
+  rm -f "/tmp/nginx-rules.$$"
   if ! cmp -s "$f" "/tmp/nginx-pre-3.1-$(basename "$f").$TS"; then
     echo "edited $(basename "$f")"
     edited=$((edited + 1))
@@ -1441,6 +1491,10 @@ echo "after paraid deny = $(count "$PARAID_RE")"
 read -r _oat _oaw <<< "$(count_blocks)"
 echo "after outbound locations = $_oat"
 echo "after outbound blocks with buffer = $_oaw"
+read -r _rat _raw <<< "$(count_rules)"
+echo "after pararules blocks = $_rat"
+echo "after pararules blocks with redirect = $_raw"
+echo "after pararules redirect lines = $(count "$RULES_RE")"
 
 restore() {
   for b in "$NGBK"/*.pre-3.1-"$TS"; do
@@ -1487,8 +1541,9 @@ EOF
   # How many files were rewritten depends on what was left to do, so the exact
   # count of 2 only holds on a run that found work in both confs. What always
   # holds is the END state, and that is asserted hard just below: no
-  # auth_request on /sign, no /compliance locations, /dicom answering 404, and
-  # a buffer inside every /v2/outbound block. Those four are the deploy.
+  # auth_request on /sign, no /compliance locations, /dicom answering 404, a
+  # buffer inside every /v2/outbound block, and the /pararules 301 inside every
+  # block that answers for the site. Those five are the deploy.
   if [ "$DRY_RUN" -eq 1 ]; then
     printf '  SKIP  assert (dry-run): both named confs were rewritten, unless every edit was already applied\n'
   else
@@ -1498,7 +1553,7 @@ EOF
     [ -n "$pend" ] && [ -n "$edited" ] \
       || die "could not read the nginx edit state from the server"
     if [ "$pend" = yes ]; then
-      ok "nginx: already applied. All three edits and the outbound buffers were in place before this run, so nothing was rewritten (edited files = $edited)"
+      ok "nginx: already applied. All three edits, the outbound buffers and the /pararules 301 were in place before this run, so nothing was rewritten (edited files = $edited)"
     else
       [ "$edited" -ge 1 ] \
         || die "$(remote_field 'before edits pending') nginx edit(s) were still pending but no conf was rewritten"
@@ -1510,6 +1565,7 @@ EOF
   expect_count "after dicom try_files" 0 "/dicom no longer serves the page"
   expect_min "after dicom 404" 1 "/dicom now returns 404"
   expect_min "before outbound locations" 1 "the /v2/outbound location the buffers go on exists"
+  expect_min "after pararules redirect lines" 1 "/pararules answers a 301 to /rules"
   expect 'reloaded nginx' "nginx reloaded"
   if [ "$DRY_RUN" -eq 0 ]; then
     local ol bf
@@ -1519,6 +1575,15 @@ EOF
     [ "$bf" = "$ol" ] \
       || die "proxy_buffer_size sits inside $bf of $ol /v2/outbound blocks; the inline receipt header would 502 on the rest"
     ok "every /v2/outbound block carries proxy_buffer_size 32k ($bf of $ol blocks)"
+  fi
+  if [ "$DRY_RUN" -eq 0 ]; then
+    local rt rw
+    rt="$(remote_field 'after pararules blocks')"
+    rw="$(remote_field 'after pararules blocks with redirect')"
+    [ -n "$rt" ] && [ -n "$rw" ] || die "could not read the /pararules redirect counts from the server"
+    [ "$rw" = "$rt" ] \
+      || die "the /pararules 301 sits in $rw of $rt site block(s); an indexed link to the old rules page would 404 on the rest"
+    ok "every site block redirects /pararules to /rules ($rw of $rt blocks)"
   fi
   if [ "$DRY_RUN" -eq 0 ]; then
     local pb pa

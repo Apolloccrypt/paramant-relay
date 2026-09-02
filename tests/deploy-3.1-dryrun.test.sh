@@ -455,6 +455,26 @@ if [ "$(field_5c "$OUT1" 'after outbound blocks with buffer')" \
 else
   fail "the buffer landed in $(field_5c "$OUT1" 'after outbound blocks with buffer') of $(field_5c "$OUT1" 'after outbound locations') blocks"
 fi
+# /pararules moved to /rules in the two-product-names round. The old path is
+# indexed, so the 301 has to be in every block that answers for the site, not
+# just the first one the edit happened to walk into.
+if [ "$(field_5c "$OUT1" 'before pararules blocks with redirect')" = "0" ]; then
+  pass "the fixture starts without the /pararules redirect, so the edit has work to do"
+else
+  fail "the fixture already carries the redirect; this run would prove nothing"
+fi
+if [ "$(field_5c "$OUT1" 'after pararules blocks with redirect')" \
+   = "$(field_5c "$OUT1" 'after pararules blocks')" ] \
+   && [ "$(field_5c "$OUT1" 'after pararules blocks')" = "2" ]; then
+  pass "every site block came out with the 301 from /pararules to /rules"
+else
+  fail "the 301 landed in $(field_5c "$OUT1" 'after pararules blocks with redirect') of $(field_5c "$OUT1" 'after pararules blocks') site blocks"
+fi
+if [ "$(field_5c "$OUT1" 'after pararules redirect lines')" = "2" ]; then
+  pass "the redirect was written once per conf, not twice"
+else
+  fail "5c wrote $(field_5c "$OUT1" 'after pararules redirect lines') redirect line(s), expected 2"
+fi
 
 echo ""
 echo "6g-2. Second run on the same confs: already applied, not FATAL"
@@ -472,6 +492,8 @@ else
 fi
 for want in "before sign state:done" "before compliance state:done" "before dicom state:done" \
             "before edits pending:0" "before everything already applied:yes" \
+            "before pararules blocks with redirect:2" \
+            "after pararules redirect lines:2" \
             "after edited files:0"; do
   f="${want%%:*}"; v="${want##*:}"
   if [ "$(field_5c "$OUT2" "$f")" = "$v" ]; then pass "second run reports $f = $v"; else
@@ -510,6 +532,10 @@ check_has "$SCRIPT" 'already applied' \
   "the script has an already-applied verdict instead of a FATAL"
 check_has "$FULL"   'before edits pending'  "the dry run shows the pending-edit count"
 check_has "$FULL"   'before sign state'     "the dry run shows the per-edit state read"
+check_has "$SCRIPT" 'location = /pararules { return 301 https://\$host/rules; }' \
+  "phase 5c writes the permanent 301 from /pararules to /rules"
+check_has "$SCRIPT" 'the four nginx changes' \
+  "the 5c step name counts the /pararules redirect as one of the edits"
 
 echo ""
 echo "6g-4. A multi-line auth_request on /sign is todo, never already applied"

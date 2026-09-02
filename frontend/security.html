@@ -233,7 +233,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <div class="page-hero-inner">
   <span class="eyebrow">EVIDENCE</span>
   <h1>Security</h1>
-  <p class="lede">Break into our own server and you still cannot read the documents on it: they are encrypted on your device before they leave it, and the key never reaches us. That holds for the web app, ParaShare and the official SDKs. The Chromium and Outlook extensions still encrypt on our server, which means we can read what you upload through them until that is changed; the detail is further down this page.</p>
+  <p class="lede">Break into our own server and you still cannot read the documents on it: they are encrypted on your device before they leave it, and the key never reaches us. That holds for the ParaSend web app and the official SDKs. The Chromium and Outlook extensions still encrypt on our server, which means we can read what you upload through them until that is changed; the detail is further down this page.</p>
   <p class="lede">This is the evidence under everything the rest of the site promises, and it covers every plan: the Community tier gets exactly the same protection as the paid ones.</p>
   <p class="hero-by">Paramant is a product of Paramantis Solutions B.V. in Harderwijk, the Netherlands, KvK 42115132, founded by Mick Beer, privacy and security researcher.</p>
   <div class="hero-cta">
@@ -289,7 +289,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
         <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU. Transactional email goes via Resend, a US provider, which never receives the document. See <a href="/privacy">privacy</a>.</td></tr>
-        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
+        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for the ParaSend web app), view count. Deleted on burn.</td></tr>
         <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
       </tbody>
@@ -306,7 +306,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
     <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where the zero-knowledge guarantee holds today</div>
-    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) and the WebApp tools (ParaShare), each of which encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
+    <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) and the ParaSend web app, each of which encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
   </div>
 
   <h3 id="audits">What was audited</h3>
@@ -338,7 +338,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </table>
 
   <h3>Hybrid key exchange</h3>
-  <p>ParaShare authenticated transfers use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
+  <p>Authenticated transfers from the ParaSend web app use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
 
 
   <h3>Pre-shared secret (PSS)</h3>
@@ -359,7 +359,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding</div>
-      <p style="margin:0">ParaShare authenticated uploads are padded to a fixed 5 MB block for DPI masking. A single block reveals no file size, type or content. A transfer that needs more than one block sends its chunk count in the clear, so the number of blocks is visible and the size can be placed within an order of magnitude (audit finding 5, accepted).</p>
+      <p style="margin:0">Authenticated uploads from the ParaSend web app are padded to a fixed 5 MB block for DPI masking. A single block reveals no file size, type or content. A transfer that needs more than one block sends its chunk count in the clear, so the number of blocks is visible and the size can be placed within an order of magnitude (audit finding 5, accepted).</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">ML-DSA-65 relay identity</div>
@@ -373,7 +373,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div><span class="check">&#10003;</span><span>Read file contents: relay holds only ciphertext, never keys</span></div>
       <div><span class="check">&#10003;</span><span>Substitute a registered public key (after TOFU or PSS is used)</span></div>
       <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
-      <div><span class="check">&#10003;</span><span>Read an exact ParaShare file size: every block is a fixed 5 MB, and only the block count is visible</span></div>
+      <div><span class="check">&#10003;</span><span>Read an exact file size: every web app block is a fixed 5 MB, and only the block count is visible</span></div>
       <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed immediately on download</span></div>
       <div><span class="check">&#10003;</span><span>Forge CT log entries: Merkle chain is append-only and tamper-evident</span></div>
       <div><span class="check">&#10003;</span><span>Break ML-KEM-768: NIST FIPS 203, post-quantum secure</span></div>

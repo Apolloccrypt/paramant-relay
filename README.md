@@ -42,7 +42,7 @@ curl -fsSL https://paramant.app/install-pi.sh | bash
 ```
 
 Or via the browser — no install:
-**[Try ParaShare →](https://paramant.app/parashare)** (no account, no key needed)
+**[Try the ParaSend web app →](https://paramant.app/parashare)** (no account, no key needed)
 
 **[Create a free account →](https://paramant.app/signup)** (TOTP, no password)
 
@@ -131,7 +131,7 @@ Full set: [`docs/adrs/`](docs/adrs/) (R001–R011).
 | Chromium browser extension | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 | Outlook Add-in | Source in repo — server-side encryption path during client-side PQ migration ([architecture §08](https://paramant.app/architecture#components)) |
 
-**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the WebApp tools (ParaShare), and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished — until that lands, treat extension uploads as relay-side, not zero-knowledge.
+**Zero-knowledge scope:** the relay-cannot-read guarantee applies to transfers from the official SDKs (`paramant-sdk` for Python and JavaScript), the ParaSend web app, and the anonymous `/send` flow. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side hybrid crypto is being finished. Until that lands, treat extension uploads as relay-side, not zero-knowledge.
 
 ---
 
@@ -556,7 +556,7 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Hybrid KEM (browser path) | ML-KEM-768 + ECDH P-256, combined via HKDF-SHA256 |
 | Symmetric | AES-256-GCM · NIST SP 800-38D |
 | Signatures (relay STH / receipts) | ML-DSA-65 · NIST FIPS 204 |
-| Signatures (client, SDK only) | ML-DSA-65 over `ctKem ‖ senderPub ‖ nonce ‖ ct ‖ aad` (Node/Python SDK; browser ParaShare path does not yet sign client-side) |
+| Signatures (client, SDK only) | ML-DSA-65 over `ctKem ‖ senderPub ‖ nonce ‖ ct ‖ aad` (Node/Python SDK; the browser web app path does not yet sign client-side) |
 | Key derivation | HKDF-SHA256 · RFC 5869 |
 | Password blobs | Argon2id · RFC 9106 |
 | Crypto runtime | Rust/WASM — browser-side encryption runs in native code |
