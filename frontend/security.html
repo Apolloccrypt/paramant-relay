@@ -356,7 +356,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
         <tr><td>US CLOUD Act</td><td>Not applicable: no US infrastructure, no US company</td></tr>
         <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
-        <tr><td>IP logging</td><td>Nginx access logs, for security and abuse prevention only. Not linked to transfer content. No separate retention period is promised; logs follow the server&rsquo;s log rotation.</td></tr>
+        <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
       </tbody>
     </table>

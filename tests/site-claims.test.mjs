@@ -256,9 +256,14 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
 });
 
 // 8 ── The SLA. Pricing quotes the figure the SLA page commits to, and the
-// measurement paragraph describes the check that exists: the hourly
-// product-heartbeat workflow. There is no 60-second multi-location probe
-// and the CT log holds no uptime data (checked 2 September 2026).
+// measurement paragraph describes the checks that exist and nothing more.
+// What exists (read on 2 September 2026): the hourly product-heartbeat
+// workflow loads paramant.app in a browser and pushes a transfer and a
+// signature through relay.paramant.app; nothing in that workflow calls
+// GET /health, and the four sector relays are not in it. The only thing that
+// polls /health on all five relays is /status, from the visitor's browser.
+// There is no 60-second multi-location probe and the CT log holds no uptime
+// data.
 test('the SLA figures are consistent across pages and the measurement described exists', () => {
   const sla = page('sla');
   const ent = /<div class="tier">Enterprise<\/div>\s*<div class="uptime">([\d.]+%)<\/div>/.exec(sla)[1];
@@ -270,17 +275,68 @@ test('the SLA figures are consistent across pages and the measurement described 
   const text = visible(sla);
   assert.doesNotMatch(text, /every 60 seconds|multiple EU locations|three consecutive checks/, 'sla: describes a probe that does not exist');
   assert.doesNotMatch(text, /uptime data is published in the Certificate Transparency log/i, 'sla: the CT log holds key and transfer commitments, not uptime');
+
+  // The hourly workflow: which suites it runs, against what, and that none of
+  // them is a health check.
   const wf = read('.github/workflows/product-heartbeat.yml');
   assert.match(wf, /cron:\s*'\d+ \* \* \* \*'/, 'product-heartbeat must run hourly for the SLA text to hold');
-  assert.match(text, /runs hourly from the product-heartbeat workflow/);
-  assert.match(text, /measured from your (own )?browser/);
+  const live = wf.slice(wf.indexOf('\n  live:'));
+  assert.match(live, /PARAMANT_BASE_URL:\s*https:\/\/paramant\.app/, 'the live job must target paramant.app');
+  assert.match(live, /PARAMANT_RELAY_URL:\s*https:\/\/relay\.paramant\.app/, 'the live job must target the main relay');
+  const suites = ['tests/product-heartbeat.test.mjs', 'tests/transfer-canary.test.mjs', 'tests/parasign-canary.test.mjs'];
+  for (const f of suites) {
+    assert.ok(live.includes(`node --test ${f}`), `the live job must run ${f}`);
+    const src = read(f).replace(/\/\/.*$/gm, '');
+    assert.doesNotMatch(src, /\/health\b/, `${f} now calls /health; the SLA measurement text must say so`);
+  }
+  assert.doesNotMatch(live.replace(/#.*$/gm, ''), /\/health\b/, 'the workflow now calls /health; the SLA measurement text must say so');
+  for (const sector of ['health', 'legal', 'finance', 'iot']) {
+    assert.doesNotMatch(live, new RegExp(`${sector}\\.paramant\\.app`), `the workflow now covers ${sector}.paramant.app; the SLA measurement text must say so`);
+  }
+
+  // /status: the one place that polls GET /health, on every sector, from the
+  // browser.
+  const status = read('frontend/js/status.inline1.js');
+  const sectors = (status.match(/^\s*\{ id: '[a-z]+',\s*label:/gm) || []).length;
+  assert.equal(sectors, 5, 'status.inline1.js must list the five relays');
+  assert.match(status, /fetch\(s\.url \+ '\/health'/, 'status.inline1.js must fetch GET /health per sector');
+  assert.match(page('status'), /status\.inline1\.js/, '/status must load that script');
+
+  // The paragraph may only describe those two things.
+  const plain = text.replace(/<[^>]+>/g, '');
+  assert.doesNotMatch(plain, /automated HTTP health checks|runs hourly[^.]*GET \/health|GET \/health[^.]*hourly/i,
+    'sla: the hourly workflow does not call GET /health');
+  assert.match(plain, /product-heartbeat workflow in the open-source repository runs hourly/);
+  assert.match(plain, /main relay \(relay\.paramant\.app\)/);
+  assert.match(plain, /a transfer sent and read back, a document signed and verified/);
+  assert.match(plain, /The four sector relays \(health, legal, finance, IoT\) are not part of that hourly run/);
+  assert.match(plain, new RegExp(`fetches GET /health on all ${word(sectors)} relays from your own browser`));
+  assert.match(plain, /measured from your (own )?browser/);
 });
 
-// 9 ── IP logging. The repository carries no log-rotation config, so the page
-// may not promise a retention period.
-test('the IP-logging row promises no retention the repository cannot show', () => {
+// 9 ── IP logging. The deploy configuration in the repository switches nginx
+// access logging off on every public server block, and there is no
+// log-rotation config, so the page may neither describe access logs as a
+// fact of life nor promise a retention period. Whether the server matches
+// deploy/nginx-paramant-live.conf is not something this repository can show
+// (see docs/site-claims.md).
+test('the IP-logging row says what the deploy configuration does and promises no retention', () => {
+  const conf = read('deploy/nginx-paramant-live.conf').replace(/#.*$/gm, '');
+  assert.doesNotMatch(conf, /access_log\s+(?!off;)/, 'nginx-paramant-live.conf now writes an access log; rewrite the IP-logging row on /security');
+  // Every block that serves the docroot or proxies to a relay or the admin.
+  // (The last block only fronts the Outlook add-in via an external host.)
+  const blocks = conf.split(/^server \{/m).slice(1)
+    .filter((b) => /root \/home\/paramant|proxy_pass http:\/\/127\.0\.0\.1:/.test(b));
+  assert.ok(blocks.length >= 6, 'nginx-paramant-live.conf must carry the site and relay server blocks');
+  for (const b of blocks) {
+    assert.match(b, /^\s*access_log off;/m, `the server block on ${/listen\s+([^;]+)/.exec(b)?.[1]} logs requests; rewrite the IP-logging row on /security`);
+  }
   const rotation = fs.readdirSync(path.join(ROOT, 'deploy')).filter((f) => /logrotate/i.test(f));
   const sec = visible(page('security'));
+  const row = /IP logging<\/td><td>(.*?)<\/td>/s.exec(page('security'))?.[1] || '';
+  assert.match(row, /access_log off<\/code> on every server block that serves the site and the relays in <code>deploy\/nginx-paramant-live\.conf/,
+    'security: the IP-logging row must cite the config that switches logging off');
+  assert.doesNotMatch(sec, /Nginx access logs, for|follow the server's log rotation/, 'security: must not describe access logs as existing');
   if (rotation.length === 0) {
     assert.doesNotMatch(sec, /Retention:\s*\d+ days/, 'security: no retention config in deploy/, so no retention number on the page');
     assert.match(sec, /No separate retention period is promised/);
