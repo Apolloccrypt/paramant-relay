@@ -51,8 +51,8 @@
   function freeSignHtml(data) {
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
       '<strong>You\'ve used both signatures this month.</strong>' +
-      '<span>Community gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
-      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures per month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.</span>' +
+      '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
+      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures a month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.</span>' +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">Upgrade to Pro</a>' +
         '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>Maybe later</button>' +
@@ -110,7 +110,7 @@
     var over = Number(quota.overage_count);
     if (included === 100 && isFinite(over) && over >= 1) {
       return '<div class="pa-sign-note" role="status">' +
-        '<span>You\'ve passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 per month.</span>' +
+        '<span>You\'ve passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 a month.</span>' +
         '<span>Signing more than 600 a month? Business (EUR 299) works out cheaper. <a href="/pricing">Compare plans</a></span>' +
         '</div>';
     }

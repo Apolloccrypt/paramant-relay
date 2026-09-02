@@ -312,10 +312,11 @@
         <div class="tier-note">Forever &middot; no card required</div>
         <ul>
           <li>Encrypted in your browser, key never sent</li>
-          <li>10 transfers per month</li>
+          <li>10 transfers a month</li>
           <li>5 MB per file, on every plan</li>
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
+          <li>Up to 50 retrievals an hour through the API</li>
           <li>Up to 5 registered devices for ParaShare, the ParaSend send screen</li>
         </ul>
       </div>
@@ -329,9 +330,10 @@
         <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;18.15/mo incl. 21% btw</span><br>Annual &euro;150 excl. &middot; 16.7% off</div>
         <ul>
           <li>Everything in Community</li>
-          <li>500 transfers per month</li>
+          <li>500 transfers a month</li>
           <li>24 hour link expiry</li>
           <li>Up to 10 reads per link</li>
+          <li>Up to 500 retrievals an hour through the API</li>
           <li>Up to 50 registered devices</li>
           <li>Send history and link management</li>
           <li>Webhooks on upload and download</li>
@@ -346,6 +348,7 @@
           <li>Everything in Pro</li>
           <li>7 day link expiry</li>
           <li>Up to 100 reads per link</li>
+          <li>No hourly cap on API retrievals</li>
           <li>Dedicated relay on our infra or yours</li>
           <li>IEC 62443 / NIS2 / NEN 7510 documentation as input for your own compliance process, not third-party certification</li>
           <li>Signed Data Processing Agreement (GDPR Art. 28)</li>
@@ -353,6 +356,7 @@
         </ul>
       </div>
     </div>
+    <p class="ps-fine">What the hourly figure counts: fetching a transfer back yourself with your own API key, the route the SDKs and scripts use. A recipient who opens the link you sent goes through the download token instead, and that path is not counted against your hour. Past the ceiling the relay answers 429 until the hour rolls over. The number is outbound_per_hour in relay/lib/tiers.js, the same table the transfer, file size and link limits above come from.</p>
     <p class="ps-fine">Every tier stores transfers in RAM and every tier uses the same cryptography. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
     <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;18.15/mo or &euro;181.50/yr. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
   </div>
