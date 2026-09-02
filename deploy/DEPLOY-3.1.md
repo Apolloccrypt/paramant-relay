@@ -86,8 +86,14 @@ test key plus mode, then deploy) collapsed to: deploy now, decide later.
 
 ## A second brake: the delivery receipt moved out of the download header
 
-**Precondition, not a step: `Apolloccrypt/paramant-sdk` PR #5 must be released
-to PyPI before main reaches production.**
+**This precondition is dropped, and the version in it was wrong. It used to
+read: `Apolloccrypt/paramant-sdk` PR #5 must be released to PyPI before main
+reaches production. The release in question is **3.3.0**, not 3.2.1, and it
+cannot reach PyPI: the project has no trusted publisher configured, which is a
+setting in PyPI and not something this repository can fix. Reported
+2026-09-02; not measured here. Waiting on it would hold the deploy for an
+unknown time, so the deploy is decoupled from it and takes the first of the
+two ways out below. `deploy/deploy-3.1.sh` does that automatically.**
 
 Relay PR #342 takes the signed ParaSend delivery receipt out of the
 `X-Paramant-Receipt` response header. It had to go: 18551 bytes for that one
@@ -98,8 +104,8 @@ from `GET /v2/transfers/:receipt_id/receipt`.
 The out-of-tree Python SDK reads that header (`sdk-py/paramant_sdk.py:681`) and
 turns an absent one into `receipt = None`, without an error. So a `3.2.0`
 client against a deployed main keeps working and silently stops getting proof
-of delivery. `paramant-sdk` 3.2.1 reads both shapes and fails loudly; that is
-the release this deploy waits for.
+of delivery. `paramant-sdk` 3.3.0 reads both shapes and fails loudly; that is
+the release this deploy no longer waits for.
 
 Two ways out if the release is not ready and the deploy cannot wait:
 
@@ -111,6 +117,12 @@ Two ways out if the release is not ready and the deploy cannot wait:
   comment, the production conf does not.
 - Or hold main. The default is off on purpose, because on a default nginx the
   fat header is a 502 rather than a feature.
+
+This deploy takes the first way out, so the follow-up is a real step and not a
+footnote: **once 3.3.0 is on PyPI, take `PARAMANT_INLINE_RECEIPT_HEADER` back
+out of `/opt/paramant-relay/.env` and recreate the relays.** That is one line
+and a `docker compose up -d --no-deps`, no deploy. The raised
+`proxy_buffer_size` may stay; #342 calls it a margin rather than a fix.
 
 Either way the flag is temporary: the old header is removed after
 **2026-12-01**. While it is off, every download carries
