@@ -19,7 +19,7 @@
     if (res.ok) {
       window.location = '/dashboard';
     } else {
-      errorDiv.textContent = 'Invalid email or backup code.';
+      errorDiv.textContent = 'That email and backup code do not match. Each code works once, so check you are not reusing one you already used.';
       errorDiv.classList.add('visible');
     }
   });

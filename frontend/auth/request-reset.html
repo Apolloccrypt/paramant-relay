@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reset authenticator — Paramant</title>
+<title>Reset authenticator · Paramant</title>
 <link rel="canonical" href="https://paramant.app/auth/request-reset">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -12,6 +12,14 @@
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
+<style>
+/* Same compact phone rhythm as /auth/backup: existing tokens only,
+   design-system.css untouched. */
+@media (max-width: 600px) {
+  .section-lg { padding-top: var(--space-5); padding-bottom: var(--space-3); }
+  .section { padding: var(--space-5) 0; border-top: none; }
+}
+</style>
 </head>
 <body>
 
@@ -42,11 +50,19 @@
   <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 
-<main class="page-main">
-<section class="form-section">
-  <h1 class="form-title">Reset authenticator</h1>
-  <p class="form-subtitle">Enter your account email. If we find a matching account, we will send you a link to set up a new authenticator.</p>
+<main class="container-sm">
 
+<section class="section-lg">
+  <div class="eyebrow"><span class="bar"></span>authenticator reset</div>
+  <h1>Reset your <em>authenticator</em>.</h1>
+  <p class="lede mt-3">
+    Enter your account email and, if it matches an account, we send a link that
+    confirms the request. A second mail then carries the link that links a new
+    authenticator app.
+  </p>
+</section>
+
+<section class="section">
   <form id="reset-form" class="form-card">
     <label for="email">Email address</label>
     <input type="email" id="email" name="email" required autocomplete="username" autofocus>
@@ -56,11 +72,20 @@
     </button>
 
     <div id="error" class="error"></div>
-    <div id="success" class="success" style="display:none"></div>
   </form>
 
+  <!-- Outside the form on purpose: the handler hides the form on success, and a
+       success message nested inside it would be hidden along with its parent. -->
+  <div id="success" class="success" style="display:none"></div>
+
   <p class="footer-text mt-4">
+    Still have a backup code? <a href="/auth/backup">Use it instead</a><br>
     Back to <a href="/auth/login">sign in</a>
+  </p>
+
+  <p class="small mt-4" style="color:var(--ink-dim)">
+    Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+    the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
   </p>
 </section>
 </main>
@@ -68,7 +93,7 @@
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/auth-request-reset.js?v=1"></script>
+<script src="/js/auth-request-reset.js?v=2"></script>
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>

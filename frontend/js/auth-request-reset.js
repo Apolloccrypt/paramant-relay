@@ -19,7 +19,7 @@
         submitBtn.textContent = 'Verifying…';
         proof = await ParamantCaptcha.getCaptchaProof();
       } catch (_) {
-        errorDiv.textContent = 'Verification failed. Please try again.';
+        errorDiv.textContent = 'The browser check did not finish. It runs on this device and takes a few seconds. Try again.';
         errorDiv.classList.add('visible');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Send reset link';
@@ -36,15 +36,23 @@
       if (res.ok) {
         form.style.display = 'none';
         successDiv.style.display = 'block';
-        successDiv.innerHTML = '<p>If an account exists for <strong>' + email + '</strong>, a setup link has been sent. Check your inbox (and spam folder).</p><p style="margin-top:8px">The link is valid for 14 days.</p>';
+        successDiv.innerHTML = '<p>If an account exists for <strong>' + email + '</strong>, a confirmation email is on its way. Look in your inbox, and in the spam folder. The sender is noreply@paramant.app.</p><p style="margin-top:8px">That first mail only confirms the request, and its link is valid for 60 minutes. Once you open it, we send the second mail with the link that links a new authenticator app; that one works for 14 days.</p><p style="margin-top:8px">We do not say whether the address is registered, so this message looks the same either way.</p>';
+      } else if (res.status === 429) {
+        // server.js returns retry_after 86400 here: 5 requests per address per
+        // 24 hours, 10 per connection per hour. Telling the reader to try again
+        // hides a wait that can run to a full day, so the button stays disabled
+        // and the message says how long the wait can be.
+        errorDiv.textContent = 'Too many reset requests. An address can ask five times a day and a connection ten times an hour, so this can take up to 24 hours to clear. If you are locked out and cannot wait, mail privacy@paramant.app.';
+        errorDiv.classList.add('visible');
+        submitBtn.textContent = 'Send reset link';
       } else {
-        errorDiv.textContent = 'Request failed. Try again or contact privacy@paramant.app.';
+        errorDiv.textContent = 'We could not send the mail. Nothing changed on your account. Try again, or mail privacy@paramant.app.';
         errorDiv.classList.add('visible');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Send reset link';
       }
     } catch (err) {
-      errorDiv.textContent = 'Network error.';
+      errorDiv.textContent = 'We could not reach Paramant. Check your connection and try again.';
       errorDiv.classList.add('visible');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Send reset link';

@@ -51,22 +51,22 @@
         if (body && body.totp_algorithm === 'sha1') { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
-        errorDiv.textContent = 'Invalid email or code.';
+        errorDiv.textContent = 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.';
         errorDiv.classList.add('visible');
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = 'No authenticator linked to this account. <a href="/auth/request-reset">Request a setup link</a> or <a href="/signup">create an account</a>.';
+        errorDiv.innerHTML = 'This account has no authenticator app linked to it yet. <a href="/auth/request-reset">Email me a setup link</a>, or <a href="/signup">create an account</a>.';
         errorDiv.classList.add('visible');
       } else if (res.status === 429) {
-        errorDiv.textContent = 'Too many attempts. Try again in 15 minutes.';
+        errorDiv.textContent = 'Too many sign-in attempts. Sign-in is paused for up to 15 minutes. Attempts are counted per account and per internet connection, so someone else on your network can set this off too.';
         errorDiv.classList.add('visible');
       } else {
-        errorDiv.textContent = 'Sign-in failed. Please try again.';
+        errorDiv.textContent = 'Sign-in did not go through. Nothing changed on your account. Try again in a moment.';
         errorDiv.classList.add('visible');
       }
     } catch (err) {
-      errorDiv.textContent = 'Network error.';
+      errorDiv.textContent = 'We could not reach Paramant. Check your connection and try again.';
       errorDiv.classList.add('visible');
     }
 
