@@ -114,7 +114,7 @@
   // here is an upsell. A customer who has paid should read what he bought.
   var PRODUCT_INCLUDES = {
     parasign: {
-      pro: 'ParaSign Pro: 100 signatures a month, then \u20ac0.40 each up to 1,000, 500 ParaSend transfers a month, and a connection you can plug into your own systems.',
+      pro: 'ParaSign Pro: 100 signatures a month, then \u20ac0.40 each up to 1,000, and a connection you can plug into your own systems.',
       business: 'ParaSign Business: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.',
       enterprise: 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.'
     },

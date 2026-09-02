@@ -61,8 +61,7 @@ for (const s of [
   "You've used both signatures this month.",
   'Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
   'Pro - EUR 49/month',
-  '100 signatures a month, then EUR 0.40 each, up to 1,000. ' +
-    tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers a month. API access.',
+  '100 signatures a month, then EUR 0.40 each, up to 1,000. API access.',
   'Upgrade to Pro',
   'Maybe later',
   'Your limit resets on 2026-08-01.',
@@ -105,8 +104,32 @@ ok('transfer 402 falls back to the existing notice');
 // that safe: it renders the real cards and compares each figure against the two
 // modules the relay gates on, so a tier edit that does not reach the frontend
 // turns red here instead of shipping a card that promises the old number.
-assert(free.includes(tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers a month.'),
-  'the ParaSign Pro pitch must quote the ParaSend Pro transfers_month tiers.js enforces');
+// The ParaSign Pro pitch names NO transfer figure, and that is the point of the
+// negative pin. It used to say "Unlimited transfers", which is false for every
+// tier. Replacing it with 500 would have been false too, for a sharper reason:
+// transfers are a ParaSEND capacity held on plan_parasend, and the grant behind
+// this card (applyProductTier(acct,'parasign','pro'), the Mollie ParaSign Pro
+// purchase) deliberately never touches that field. So a ParaSign Pro buyer
+// keeps whatever ParaSend tier he already had.
+//
+// relay/test/parasign-pro-perks.test.js is the source, and it is READ here
+// rather than restated, so the day a ParaSend entitlement IS bundled into
+// ParaSign Pro this pin lifts itself instead of holding a true line off the
+// card. Until then: no transfers number in a ParaSign pitch.
+const parasignProSend = (() => {
+  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+  ent.applyProductTier(acct, 'parasign', 'pro');
+  return ent.getEntitlements(acct).parasend.quotas.transfers_month;
+})();
+if (parasignProSend === ent.PARASEND.pro.quotas.transfers_month) {
+  assert(/transfers/i.test(free),
+    'a parasign=pro grant now DOES deliver the ParaSend Pro transfers ceiling, so the Pro pitch may state it');
+} else {
+  assert(!/transfers/i.test(free),
+    'the ParaSign Pro pitch names a transfers figure, but a parasign=pro grant leaves ParaSend at ' +
+    parasignProSend + ' a month (see relay/test/parasign-pro-perks.test.js). Bundle the entitlement or drop the line.');
+}
+ok('the ParaSign Pro pitch claims no transfers ceiling the grant does not deliver');
 
 // Per deciding tier: the header names THAT tier and the body its ceiling. The
 // 402 body carries both since #361 (relay.js reports _psend.tier and its

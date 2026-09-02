@@ -80,7 +80,7 @@ const PARASIGN_COPY = [
   '&euro;49<',
   '100 signatures a month, then &euro;0.40 each, up to 1,000',
   'Past 1,000 a month, Business is cheaper anyway',
-  tiers.tierLimit('pro', 'transfers_month') + ' ParaSend transfers a month - API access',
+  'API access',
   'Annual: &euro;499 excl. &middot; 15.1% off',
   // BUSINESS - EUR 299/month
   '&euro;299<',
@@ -615,10 +615,45 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
   ok('"No limit on receiving" holds: no receiving dimension in tiers.js or in the entitlement quotas');
 })();
 
-// A ParaSign plan derives its ParaSend tier (entitlements.js derivePlanParasend),
-// so where /parasign quotes a transfer number it must be that tier's number.
-assert(aMonth(tiers.tierLimit('pro', 'transfers_month'), 'ParaSend transfers').test(productHtml.parasign),
-  'parasign.html must quote the ParaSend transfer ceiling a ParaSign Pro account actually derives');
+// ── A ParaSign card states no transfer figure at all ────────────────────────
+//
+// This block used to assert the opposite: "a ParaSign plan derives its ParaSend
+// tier (entitlements.js derivePlanParasend), so where /parasign quotes a
+// transfer number it must be that tier's number". derivePlanParasend only fires
+// on a legacy UNIFIED `plan`. The path that sells ParaSign Pro is
+// applyProductTier(acct,'parasign','pro') -- the Mollie webhook and the admin
+// grant -- and it writes plan_parasign alone, deliberately leaving
+// plan_parasend where it was. So a ParaSign Pro buyer derives nothing: he keeps
+// the ParaSend tier he already had, 10 transfers a month for a free account.
+// relay/test/parasign-pro-perks.test.js pins exactly that.
+//
+// The page therefore may not quote 500, and it may not go back to promising no
+// cap either. It states neither, and this asks the entitlement layer whether
+// that is still the right answer instead of hardcoding it: bundle a ParaSend
+// entitlement into ParaSign Pro and the branch flips by itself.
+(function parasignCardsClaimNoTransfers() {
+  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+  entitlements.applyProductTier(acct, 'parasign', 'pro');
+  const delivered = entitlements.getEntitlements(acct).parasend.quotas.transfers_month;
+  const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
+  // The ParaSign half of /pricing, and the ParaSign product page's plan cards.
+  const parasignGrid = html.slice(html.indexOf('<!-- TIER CARDS: PARASIGN -->'), html.indexOf('<!-- TIER CARDS: PARASEND -->'));
+  assert(parasignGrid.length > 500, 'the ParaSign tier grid markers moved; this gate would read nothing');
+  const scopes = [['pricing.html ParaSign grid', parasignGrid], ['parasign.html', productHtml.parasign]];
+  if (delivered === entitlements.PARASEND.pro.quotas.transfers_month) {
+    for (const [name, scope] of scopes) {
+      assert(TRANSFER_FIGURE.test(scope),
+        name + ': a parasign=pro grant now delivers the ParaSend Pro ceiling, so the card may (and should) state it');
+    }
+  } else {
+    for (const [name, scope] of scopes) {
+      const m = TRANSFER_FIGURE.exec(scope);
+      assert(!m, name + ' quotes "' + (m ? m[0] : '') + '" on a ParaSign card, but a parasign=pro grant leaves ' +
+        'ParaSend at ' + delivered + ' a month (relay/test/parasign-pro-perks.test.js). Bundle the entitlement or drop the line.');
+    }
+  }
+  ok('the ParaSign cards claim no transfer ceiling the ParaSign grant does not deliver (grant gives ' + delivered + ')');
+})();
 ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
    tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
    tiers.tierLimit('community', 'file_mb') + ' MB)');

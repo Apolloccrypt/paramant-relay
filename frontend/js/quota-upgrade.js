@@ -30,10 +30,18 @@
   // from relay/lib/tiers.js (transfers_month, signs_month) with the enterprise
   // row taking the finite plafond relay/lib/entitlements.js applies to a
   // metered dimension (ENTERPRISE_MONTHLY_CEILING). NO tier is unbounded, which
-  // is why no card here may call a ceiling absent: the ParaSign Pro pitch below
-  // promised transfers without a cap while a Pro account is held to 500 a
-  // month, the same overclaim /pricing and /parasign were corrected for. The
-  // word itself is banned from this file by the render test.
+  // is why no card here may call a ceiling absent, and why the word itself is
+  // banned from this file by the render test.
+  //
+  // These are TRANSFER numbers and they belong to a TRANSFER card. The ParaSign
+  // Pro pitch below used to end by promising transfers with no cap, and the
+  // honest version of that sentence is no sentence: transfers are a ParaSend
+  // capacity on plan_parasend, and applyProductTier(acct,'parasign','pro')
+  // deliberately never touches it, so a ParaSign Pro buyer keeps the ParaSend
+  // tier he already had (10 a month for a free account). Naming 500 there would
+  // have been as untrue as naming none. relay/test/parasign-pro-perks.test.js
+  // is the source for that; relay/test/quota-upgrade-render.test.js pins the
+  // pitch negatively against it.
   //
   // Baked in because this is a plain browser script with no way to require the
   // relay module. relay/test/quota-upgrade-render.test.js renders every card
@@ -109,8 +117,7 @@
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
       '<strong>You\'ve used both signatures this month.</strong>' +
       '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
-      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures a month, then EUR 0.40 each, up to 1,000. ' +
-        CEILINGS.transfers_month.pro + ' ParaSend transfers a month. API access.</span>' +
+      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures a month, then EUR 0.40 each, up to 1,000. API access.</span>' +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">Upgrade to Pro</a>' +
         '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>Maybe later</button>' +

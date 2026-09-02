@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 
 function read(file) { return fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'); }
 
@@ -687,7 +688,7 @@ assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*AP
 assert.doesNotMatch(developerHtml, /your IT can check/i,
   'developer.html talks to the developer on the screen, not to their buyer');
 // Both plan lines are only true while /pricing sells API access on ParaSign Pro.
-assert.match(pricing, /transfers a month - API access/,
+assert.match(pricing, /<li>API access<\/li>/,
   'pricing.html must still list API access on the ParaSign Pro tier');
 
 // Answer 1: signing without an account. Quoted from /sign, which is pinned above.
@@ -1560,14 +1561,13 @@ console.log('ui-truthfulness: /download says the desktop app is unmaintained, an
     'no frontend page or script may promise transfers without a ceiling; tiers.js caps every tier ' +
     'and relay.js answers 402 monthly_transfer_quota_reached with that cap:\n  ' + hits.join('\n  '));
 
-  // The positive half: /pricing, /parasign and the 402 card all quote the SAME
-  // ParaSend Pro ceiling, so correcting one page can never leave another behind.
+  // Where the word DID name a real ceiling, the number replaced it. These are
+  // ParaSend contexts: the plan table a self-hoster reads and the OT brief's own
+  // Pro tier, both describing the ParaSend capacity the relay actually enforces.
   const proTransfers = 500; // relay/lib/tiers.js pro.transfers_month, pinned to the module in relay/test/
   for (const [file, rx] of [
-    ['frontend/pricing.html', new RegExp(`<li>${proTransfers} ParaSend transfers a month - API access</li>`)],
-    ['frontend/parasign.html', new RegExp(`<li>${proTransfers} ParaSend transfers a month</li>`)],
-    ['frontend/js/quota-upgrade.js', new RegExp(`${proTransfers}`)],
-    ['frontend/js/dashboard.js', new RegExp(`${proTransfers} ParaSend transfers a month`)],
+    ['frontend/docs/paramant-ot-brief.html', new RegExp(`<li>${proTransfers} transfers a month</li>`)],
+    ['frontend/docs/self-hosting.md', new RegExp(`\\| \`pro\` \\| ${proTransfers} \\|`)],
   ]) {
     assert.match(read(file), rx,
       `${file} must state the ParaSend Pro transfers ceiling where it used to say "unlimited"`);
@@ -1575,3 +1575,66 @@ console.log('ui-truthfulness: /download says the desktop app is unmaintained, an
 })();
 
 console.log('ui-truthfulness: no page or script promises transfers without a ceiling');
+
+
+// ── A ParaSign surface states no transfers figure at all ────────────────────
+//
+// The other half of the same correction, and the sharper one. "Unlimited
+// transfers" on the ParaSign Pro card was false for everyone, because no tier
+// is unbounded. Putting 500 there would have been false for a different reason:
+// transfers are a ParaSEND capacity, held on plan_parasend, and the grant that
+// sells ParaSign Pro (entitlements.applyProductTier(acct,'parasign','pro'), the
+// Mollie webhook and the admin path) writes plan_parasign alone and leaves
+// plan_parasend exactly where it was. A ParaSign Pro buyer on a free ParaSend
+// tier keeps 10 transfers a month. relay/test/parasign-pro-perks.test.js pins
+// that delivery gap; this pins the copy that must not outrun it.
+//
+// So: ParaSign Pro sells signatures and the API. It does not sell transfers,
+// and no ParaSign card, pitch or plan summary may print a transfers number
+// while the grant does not move one. The gate ASKS the entitlement layer rather
+// than restating its answer, so bundling a ParaSend entitlement into ParaSign
+// Pro flips this from "must not state" to "must state" on its own.
+(function parasignSurfacesClaimNoTransfers() {
+  // The relay is CommonJS; this file is ESM. createRequire loads the real
+  // module rather than a copy of its numbers, which is the whole point: the
+  // gate has to move when the entitlement layer does.
+  const { applyProductTier, getEntitlements, PARASEND } =
+    createRequire(import.meta.url)('../relay/lib/entitlements.js');
+  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+  applyProductTier(acct, 'parasign', 'pro');
+  const delivered = getEntitlements(acct).parasend.quotas.transfers_month;
+  const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
+
+  // Every surface that pitches ParaSign Pro, scoped to the ParaSign part of it.
+  const pricingHtml = read('frontend/pricing.html');
+  const between = (src, a, b) => src.slice(src.indexOf(a), b ? src.indexOf(b) : undefined);
+  const dashJs = read('frontend/js/dashboard.js');
+  const quotaJs = read('frontend/js/quota-upgrade.js');
+  const scopes = [
+    ['pricing.html ParaSign grid', between(pricingHtml, '<!-- TIER CARDS: PARASIGN -->', '<!-- TIER CARDS: PARASEND -->')],
+    ['parasign.html plan cards', between(read('frontend/parasign.html'), '<h3', '')],
+    ['dashboard.js PRODUCT_INCLUDES.parasign', between(dashJs, 'parasign: {', 'parasend: {')],
+    ['quota-upgrade.js freeSignHtml', between(quotaJs, 'function freeSignHtml', 'function hardCapHtml')],
+  ];
+  for (const [name, scope] of scopes) {
+    assert.ok(scope.length > 200, `${name}: the scope markers moved; this gate would read nothing`);
+  }
+
+  if (delivered === PARASEND.pro.quotas.transfers_month) {
+    for (const [name, scope] of scopes) {
+      assert.match(scope, TRANSFER_FIGURE,
+        `${name}: a parasign=pro grant now delivers the ParaSend Pro ceiling, so this surface may state it`);
+    }
+  } else {
+    const hits = scopes
+      .map(([name, scope]) => [name, TRANSFER_FIGURE.exec(scope)])
+      .filter(([, m]) => m)
+      .map(([name, m]) => `${name}: "${m[0]}"`);
+    assert.deepEqual(hits, [],
+      'a ParaSign surface prints a transfers figure, but entitlements.applyProductTier(acct, "parasign", "pro") ' +
+      `leaves ParaSend at ${delivered} a month (relay/test/parasign-pro-perks.test.js). ` +
+      'Bundle a ParaSend entitlement into ParaSign Pro, or keep the line off the card:\n  ' + hits.join('\n  '));
+  }
+})();
+
+console.log('ui-truthfulness: no ParaSign surface sells a transfers ceiling the ParaSign grant does not deliver');
