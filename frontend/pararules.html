@@ -177,34 +177,48 @@ footer a{color:var(--ink);text-decoration:none}
 
 <p>These are the rules. Not marketing copy. They are the constraints we hold ourselves to, in the product and in the code. If we ever break one, hold us to it.</p>
 
+<style>
+.rule-verify { margin-top: -6px; }
+.rule-verify a { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 2px; }
+.rule-verify a:hover { color: var(--cobalt); }
+</style>
 <h2>What we guarantee</h2>
 
 <h3>1 &middot; We never had it</h3>
 <p>Files are encrypted in your browser before they reach us. The relay holds only ciphertext, in RAM, and burns it on read. We can&rsquo;t read it, can&rsquo;t leak it, and can&rsquo;t be compelled to hand over what we never had.</p>
+<p class="rule-verify"><a href="/security">verify: the relay architecture &rarr;</a></p>
 
 <h3>2 &middot; Your browser talks only to us</h3>
 <p>No third-party requests. No Google fonts, no CDN, no analytics, no pixels, no embedded widgets. Open your network inspector on any page: every request goes to paramant.app and nowhere else.</p>
+<p class="rule-verify"><a href="/security">verify: the content-security policy we ship &rarr;</a></p>
 
 <h3>3 &middot; No surveillance</h3>
 <p>No tracking cookies, no fingerprinting, no ad tech. One functional session cookie after you sign in. That is the entire list.</p>
+<p class="rule-verify"><a href="/privacy">verify: the cookie and logging list &rarr;</a></p>
 
 <h3>4 &middot; You own your keys</h3>
 <p>Keys are generated on your device and never leave it. Your passkey&rsquo;s private key is yours alone. We only ever see the public half.</p>
+<p class="rule-verify"><a href="https://github.com/Apolloccrypt/paramant-relay">verify: the key generation in the source &rarr;</a></p>
 
 <h3>5 &middot; EU soil, EU law</h3>
 <p>Hosted in Germany, owned top to bottom in the EU. No US CLOUD Act reach over your data.</p>
+<p class="rule-verify"><a href="/security">verify: the jurisdiction table &rarr;</a></p>
 
 <h3>6 &middot; Quantum-ready by default</h3>
 <p>FIPS 203/204 (ML-KEM and ML-DSA) today, not &ldquo;soon&rdquo;. Harvest-now-decrypt-later is already happening; we encrypt for the decade, not the demo.</p>
+<p class="rule-verify"><a href="/crypto-agility">verify: the FIPS 203/204 parameters &rarr;</a></p>
 
 <h3>7 &middot; Honest by design</h3>
 <p>No dark patterns. When something fails, we tell you what failed and how to recover. Never a vague or misleading message to keep the UI looking tidy.</p>
+<p class="rule-verify"><a href="/changelog">verify: what we changed and admitted &rarr;</a></p>
 
 <h3>8 &middot; Verifiable, not trust-me</h3>
 <p>Open-core you can run yourself, a public Certificate Transparency log, and a relay that proves what it does. You don&rsquo;t have to trust us. You can check it.</p>
+<p class="rule-verify"><a href="/ct-log">verify: the public transparency log &rarr;</a></p>
 
 <h3>9 &middot; Only what&rsquo;s required</h3>
 <p>An email to hold your account. No phone number, no IP logging beyond transit. Minimalism as a security property: data we don&rsquo;t hold can&rsquo;t be breached, subpoenaed, or sold.</p>
+<p class="rule-verify"><a href="/.well-known/security.txt">verify: security.txt (RFC 9116) &rarr;</a></p>
 
 <h2>How we build it</h2>
 <p>The same rules bind how we ship. The promises above are only credible if the engineering behind them is disciplined.</p>

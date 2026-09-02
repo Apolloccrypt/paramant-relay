@@ -1,5 +1,5 @@
 'use strict';
-// The pricing page shows the four ParaSign tiers (Free / Pro / Business /
+// The pricing page shows the four ParaSign tiers (Community / Pro / Business /
 // Enterprise) with the agreed copy, keeps all six paid checkout links wired
 // for the API-first billing flow (data-billing-* attributes resolvable in the
 // server catalog, no-JS href pointing at sign-in), states that checkout
@@ -307,13 +307,13 @@ assert.strictEqual(shownPcts.length, pctByPlan.size,
 ok('yearly discount stated per plan and matches the catalog (' + expectedPcts.join(' / ') + '%)');
 
 // One promise about starting for free. The page carried "30 days, no credit
-// card, full relay access" next to Free cards saying "Forever, no card
+// card, full relay access" next to Community cards saying "Forever, no card
 // required" and a FAQ saying there is no separate trial.
 assert(!/30 days/i.test(VISIBLE), 'pricing page must not promise a 30-day trial next to a forever-free tier');
 assert(!/credit card/i.test(VISIBLE), 'pricing page must not carry the "no credit card" trial copy');
 assert(!/full relay access/i.test(VISIBLE), 'the free tier is not full relay access');
 assert(VISIBLE.includes('There is no separate trial'), 'FAQ must keep saying there is no separate trial');
-assert(VISIBLE.includes('Forever &middot; no card required'), 'Free card must keep the forever/no-card promise');
+assert(VISIBLE.includes('Forever &middot; no card required'), 'Community card must keep the forever/no-card promise');
 ok('one starting-for-free promise: forever-free tier, no trial clock');
 
 // ── Every amount belongs to the card it stands in ────────────────────────────

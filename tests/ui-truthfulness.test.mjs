@@ -101,9 +101,14 @@ for (const m of home.matchAll(/[^.<>]*\bno account\b[^.<>]*/gi)) {
 // pages quoting money is two places to be wrong; this makes the second one
 // follow the first instead of drifting away from it.
 const pricing = read('frontend/pricing.html');
+// Matched on the WHOLE amount, not on a substring: an earlier version tested
+// pricing.includes('&euro;15'), which stayed green on a pricing page that only
+// ever said &euro;150. The digits must be followed by something that is not
+// another digit or a decimal separator.
 const homePrices = [...new Set([...home.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
 assert.ok(homePrices.length >= 6, `expected the homepage to quote its tiers, found ${homePrices.length} prices`);
-const drifted = homePrices.filter((p) => !pricing.includes(`&euro;${p}`));
+const priceOnPricingPage = (amount) => new RegExp(`&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])`).test(pricing);
+const drifted = homePrices.filter((p) => !priceOnPricingPage(p));
 assert.deepEqual(drifted, [],
   `these prices are on the homepage but not on /pricing: ${drifted.join(', ')}`);
 
@@ -115,11 +120,61 @@ assert.deepEqual(drifted, [],
 // next one cost) could not be looked up on the page that sells it.
 const dashboardJs = read('frontend/js/dashboard.js');
 const planMap = (dashboardJs.match(/var PLAN_NAMES = \{[\s\S]*?\};/) || [''])[0];
-const planNames = [...planMap.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-assert.ok(planNames.length >= 4, `expected the plan-name map in dashboard.js, found ${planNames.length} entries`);
+const planEntries = [...planMap.matchAll(/^\s*([a-z_]+):\s*'([^']+)',?$/gm)].map((m) => [m[1], m[2]]);
+const planIds = planEntries.map(([id]) => id);
+const planNames = planEntries.map(([, name]) => name);
+
+// relay/lib/tiers.js is the declared single source of truth for plans, so the
+// gate reads ITS rows and ITS aliases rather than a second copy kept here.
+// TIER_LIMITS holds the canonical plans; normalisePlan folds every other ID
+// (free, dev, licensed) onto one of them. dashboard.js must name every
+// canonical plan and must fold every alias the same way, or an account holding
+// that ID renders a raw machine string in the badge, which is what 'licensed'
+// did before this gate existed.
+const tiersSrc = read('relay/lib/tiers.js');
+const tierBlock = (tiersSrc.match(/TIER_LIMITS\s*=\s*Object\.freeze\(\{[\s\S]*?\n\}\);/) || [''])[0];
+const canonicalPlans = [...tierBlock.matchAll(/^\s{2}([a-z]+):\s*Object\.freeze/gm)].map((m) => m[1]);
+assert.ok(canonicalPlans.length >= 4,
+  `expected the canonical plan rows in relay/lib/tiers.js, found ${canonicalPlans.length}`);
+
+const normBlock = (tiersSrc.match(/function normalisePlan\([\s\S]*?\n\}/) || [''])[0];
+// One line can declare several aliases at once
+// ("if (plan === 'free' || plan === 'dev') return 'community';"), so collect
+// every ID named in the condition, not just the first.
+const tierAliases = [];
+for (const line of normBlock.split('\n')) {
+  const to = /return\s+'([a-z]+)'/.exec(line);
+  if (!to) continue;
+  for (const m of line.matchAll(/plan === '([a-z]+)'/g)) {
+    if (m[1] !== to[1]) tierAliases.push([m[1], to[1]]);
+  }
+}
+assert.ok(tierAliases.length >= 3,
+  `expected normalisePlan to declare its aliases, found ${tierAliases.length}`);
+
+const unnamed = canonicalPlans.filter((id) => !planIds.includes(id));
+assert.deepEqual(unnamed, [],
+  `relay/lib/tiers.js has these canonical plans but dashboard.js has no display name: ${unnamed.join(', ')}`);
+
+const dashAliasBlock = (dashboardJs.match(/var PLAN_ALIASES = \{[^}]*\}/) || [''])[0];
+const wrongAlias = tierAliases.filter(([from, to]) => !new RegExp(`${from}:\\s*'${to}'`).test(dashAliasBlock));
+assert.deepEqual(wrongAlias.map(([f, t]) => `${f}->${t}`), [],
+  'dashboard.js must fold the same plan aliases normalisePlan does');
+
 const unsold = [...new Set(planNames)].filter((name) => !new RegExp(`>\\s*${name}\\s*<`).test(pricing));
 assert.deepEqual(unsold, [],
   `the dashboard shows these plan names, but /pricing does not sell them: ${unsold.join(', ')}`);
+
+// Every ParaRule must carry a way to check it, because the homepage says so:
+// "The ParaRules come with a verify link each". Measured before this gate:
+// nine rules, zero links, one mailto in the footer.
+const pararules = read('frontend/pararules.html');
+const guarantees = pararules.slice(pararules.indexOf('<h2>What we guarantee</h2>'), pararules.indexOf('<h2>How we build it</h2>'));
+const ruleCount = (guarantees.match(/<h3>\d+\s*&middot;/g) || []).length;
+const verifyCount = (guarantees.match(/class="rule-verify"/g) || []).length;
+assert.equal(verifyCount, ruleCount,
+  `pararules.html has ${ruleCount} rules but ${verifyCount} verify links; the homepage promises one each`);
+assert.ok(ruleCount >= 9, `expected at least nine ParaRules, found ${ruleCount}`);
 
 // The signed-in address is in the nav. A second copy in the hero was the first
 // thing under the H1 on a phone, above both product actions.
@@ -128,16 +183,30 @@ const hero = (dashboard.match(/<header class="dh-hero"[\s\S]*?<\/header>/) || ['
 assert.doesNotMatch(hero, /data-dh="email"/,
   'the dashboard hero must not repeat the email address the nav already shows');
 
-// 4. "Community" is the word Mick uses for the free plan and the ID the relay
-// stores. It is NOT a tier on /pricing, where the free tier is called Free.
-// The homepage may lead with Community, but only while it also says which
-// pricing-page tier that is, or the visitor lands on /pricing looking for a
-// plan name that is not there. Same failure the dashboard badge had.
-if (/\bCommunity\b/.test(home)) {
-  assert.match(home, /tier named <strong>Free<\/strong>|tier is called Free|called <strong>Free<\/strong>/,
-    'index.html calls the free plan Community, so it must also name the /pricing tier it maps to');
-  assert.ok(/>\s*Free\s*</.test(pricing),
-    '/pricing must actually carry a tier named Free for that bridge to be true');
+// 4. The free plan is called Community everywhere, because that is the selling
+// point and not an internal ID: admin/server.js has always named the plan
+// Community, and /pricing, the homepage and the dashboard badge now agree.
+// An earlier version of this file pinned the opposite (a bridge sentence
+// explaining that Community "is the tier named Free"); that bridge existed only
+// because the pricing page disagreed, and the fix was to rename the tier rather
+// than to keep explaining it away.
+assert.ok(/<div class="tier-name">Community<\/div>/.test(pricing),
+  '/pricing must name its free tiers Community');
+assert.doesNotMatch(pricing, /<div class="tier-name">Free<\/div>/,
+  '/pricing must not have a tier named Free any more');
+for (const [label, html] of [['index.html', home], ['dashboard.html', read('frontend/dashboard.html')]]) {
+  assert.doesNotMatch(html, /tier named <strong>Free<\/strong>|tier is called Free|the free plan\b/i,
+    `${label} must not call the Community plan Free`);
+}
+
+// The ParaRules grid on the homepage shows a SELECTION. It used to print the
+// numbers 01, 03, 04 and 06, which reads as two rules gone missing rather than
+// as four chosen. Either the numbers go or they run consecutively.
+const ruleNumbers = [...home.matchAll(/<span class="r-n">(\d+)<\/span>/g)].map((m) => Number(m[1]));
+if (ruleNumbers.length) {
+  const consecutive = ruleNumbers.every((n, i) => i === 0 || n === ruleNumbers[i - 1] + 1);
+  assert.ok(consecutive,
+    `the homepage rules grid prints ${ruleNumbers.join(', ')}: show consecutive numbers or none at all`);
 }
 
 // 5. The founder line is on the homepage now. It may say exactly what /about
@@ -154,5 +223,5 @@ assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
   'if the homepage names the founder it must also name the accountable company registration');
 
 console.log('ui-truthfulness: the homepage does not overclaim signatures and quotes the real prices');
-console.log('ui-truthfulness: Community is bridged to the Free tier and the founder line matches /about');
+console.log('ui-truthfulness: the free plan is Community everywhere and the founder line matches /about');
 console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');

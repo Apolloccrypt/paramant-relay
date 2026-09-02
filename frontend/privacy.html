@@ -181,7 +181,7 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>How Ghost Pipe &amp; ParaShare work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
 <p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
-<p>Free tier blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
+<p>Community plan blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
 
 <h2>How ParaSign document delivery works</h2>
 <p>When you request signatures, your browser encrypts the document with AES-256-GCM before upload. The signing relay stores the encrypted capsule with the envelope until its expiry. The relay does not receive document plaintext or the document key. The personal signing link contains the key in its URL fragment; browsers do not send that fragment to the relay.</p>
@@ -229,7 +229,7 @@ footer a{color:var(--ink);text-decoration:none}
 <ul>
 <li><strong>ECDH + ML-KEM key pairs</strong>: generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
 <li><strong>Nonce registry</strong>: replay-attack protection (SDK sessions)</li>
-<li><strong>Free tier usage counter</strong> (<code>ps_free_uses</code>): today's date and upload count, used to enforce the 10/day limit client-side</li>
+<li><strong>Community plan usage counter</strong> (<code>ps_free_uses</code>): today's date and upload count, used to enforce the 10/day limit client-side</li>
 <li><strong>Docs access key</strong> (<code>pm_docs_key</code>): stored if you authenticate to the Docs with a paid API key</li>
 <li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
 <li><strong>ParaSign signing vault</strong> (IndexedDB): if you sign documents, your post-quantum signing key (ML-DSA-65) is generated and kept in your browser&rsquo;s IndexedDB, encrypted either with your passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) or, if your passkey provider cannot do that, with a passphrase (PBKDF2 &rarr; AES-256-GCM). The private key never leaves your device; only its public half is registered to your account.</li>

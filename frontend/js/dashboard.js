@@ -61,29 +61,64 @@
     if (errMsg && detail) errMsg.textContent = detail;
   }
 
-  // The relay stores a plan ID ('community', 'pro', ...). /pricing sells tiers
-  // by NAME, and there is no tier called Community on it: the free ParaSign and
-  // ParaSend tiers are both called Free. A dashboard badge reading COMMUNITY
-  // PLAN sends the customer to a pricing page where that word does not appear,
-  // so the badge speaks the pricing page's language and the ID stays internal.
+  // Plan names, mirroring relay/lib/tiers.js, which is the declared single
+  // source of truth. TIER_LIMITS has exactly four rows and normalisePlan folds
+  // every other ID onto one of them: 'free' and 'dev' become community,
+  // 'licensed' becomes enterprise, anything unknown becomes community. So the
+  // badge has four names to say and never a raw machine string, which is what
+  // it printed for 'licensed' before. tests/ui-truthfulness.test.mjs reads the
+  // rows and the aliases OUT of tiers.js and fails if this drifts from it.
+  var PLAN_ALIASES = { free: 'community', dev: 'community', licensed: 'enterprise' };
   var PLAN_NAMES = {
-    community: 'Free',
-    free:      'Free',
-    standard:  'Free',
-    dev:       'Free',
+    community: 'Community',
     pro:       'Pro',
     business:  'Business',
     enterprise:'Enterprise',
   };
-  var FREE_PLANS = { community: 1, free: 1, standard: 1, dev: 1 };
+
+  function normalisePlan(plan) {
+    var id = String(plan == null ? '' : plan).toLowerCase();
+    if (PLAN_ALIASES[id]) return PLAN_ALIASES[id];
+    return PLAN_NAMES[id] ? id : 'community';
+  }
+
+  // Per-product ladders, lowest first, so the badge can show the highest tier a
+  // customer actually pays for. Mirrors PARASEND_TIERS / PARASIGN_TIERS in
+  // relay/lib/entitlements.js; 'free' is the floor of both.
+  var PRODUCT_LADDER = ['free', 'pro', 'business', 'enterprise'];
+  var PRODUCT_NAMES = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+
+  // A product tier counts as paid only while its period still runs, which is
+  // the rule effectiveProductTier() applies server-side: the floor tier never
+  // expires, and a missing paid_until means no period was ever recorded.
+  function paidProductTier(tier, paidUntil) {
+    var t = String(tier || 'free').toLowerCase();
+    if (PRODUCT_LADDER.indexOf(t) < 1) return null;
+    if (!paidUntil) return t;
+    var ends = Date.parse(paidUntil);
+    if (!isNaN(ends) && Date.now() >= ends) return null;
+    return t;
+  }
 
   function render(data) {
     var email = data.email || '';
-    var plan  = data.plan  || 'standard';
-    var planId = String(plan).toLowerCase();
-    var planName = PLAN_NAMES[planId] || plan;
+    var planId = normalisePlan(data.plan);
+    var planName = PLAN_NAMES[planId];
 
-    txt('email',        email);
+    // The unified plan is not the whole answer. A self-serve ParaSign or
+    // ParaSend purchase moves only that product's tier, so read those too and
+    // let the highest paid one speak for the account.
+    var paidTiers = [
+      paidProductTier(data.plan_parasign, data.paid_until_parasign),
+      paidProductTier(data.plan_parasend, data.paid_until_parasend),
+    ].filter(Boolean);
+    var topPaid = null;
+    for (var pi = 0; pi < paidTiers.length; pi++) {
+      if (!topPaid || PRODUCT_LADDER.indexOf(paidTiers[pi]) > PRODUCT_LADDER.indexOf(topPaid)) topPaid = paidTiers[pi];
+    }
+    var isFree = planId === 'community' && !topPaid;
+    if (topPaid && planId === 'community') planName = PRODUCT_NAMES[topPaid] || planName;
+
     txt('email-full',   email || '--');
     txt('plan',         planName);
     txt('plan-strong',  planName);
@@ -92,7 +127,7 @@
     // Community plan is a gift, not a trial, and the business plans are what
     // pays for it. A paying customer never sees the band.
     var community = root.querySelector('#dh-community');
-    if (community) community.hidden = !FREE_PLANS[planId];
+    if (community) community.hidden = !isFree;
     txt('created',      fmtDate(data.created_at));
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));

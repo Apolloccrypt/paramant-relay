@@ -118,8 +118,7 @@
 .pq-core span { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: #88a6cb; }
 .rules-grid { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
 .rules-grid li { background: #fff; padding: var(--space-4); }
-.rules-grid .r-n { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--navy); opacity: .5; }
-.rules-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 6px 0 4px; }
+.rules-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 0 0 4px; }
 .rules-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
 .r-verify { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .05em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 2px; }
 .r-verify:hover { color: var(--cobalt); }
@@ -170,7 +169,7 @@
       "@id": "https://paramant.app/#organization",
       "name": "Paramant",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU, built and hosted in the Netherlands and Germany.",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
       "areaServed": "EU",
       "knowsLanguage": [
         "nl",
@@ -232,7 +231,7 @@
 <section class="home-hero">
   <div class="home-state" data-home="out">
     <h1>Get documents signed and send files safely, from your browser.</h1>
-    <p class="lede">Paramant is for <strong>small professional firms</strong> that would rather not put client files on an American cloud: legal, accountancy and healthcare practices in the EU. Send a contract out for signature, or send a file that is gone the moment it has been read. Everything runs on servers in Germany.</p>
+    <p class="lede">Paramant is for <strong>small professional firms</strong> that would rather not put client files on an American cloud: legal, finance and healthcare practices in the EU. Send a contract out for signature, or send a file that is gone the moment it has been read. Everything runs on servers in Germany.</p>
     <div class="home-actions">
       <a class="btn btn-lime" href="/sign">Sign a document</a>
       <a class="btn home-act-ghost" href="/pricing">See pricing</a>
@@ -260,7 +259,7 @@
     <div class="split-card split-free">
       <p class="split-kicker">Community &middot; &euro;0</p>
       <h3>Free, because it is meant to be.</h3>
-      <p>Anyone can sign a document and send a file safely, with no card and no time limit. On the pricing page this is the tier named <strong>Free</strong>; Community is what we call it here.</p>
+      <p>Anyone can sign a document and send a file safely, with no card and no time limit. Community is the name on the pricing page too, and it is the name on your dashboard.</p>
       <p>It is not a trial and it is not a funnel. It is what Paramant gives back: signing and sending that does not route through an American cloud, available to whoever needs it.</p>
       <p class="split-person">Paramant is built by <strong>Mick Beer</strong>, privacy and security researcher and founder of Paramantis Solutions B.V. The Community plan is his contribution back to the society the tools came from.</p>
       <p class="split-org">Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</p>
@@ -274,7 +273,7 @@
         <li><b>Volume.</b> 100 or 1,000 signatures a month instead of 2, and links that live 24 hours or 7 days instead of 1.</li>
         <li><b>Control.</b> Send history and link management, webhooks on upload and download, up to 50 registered devices, no IP rate limit.</li>
         <li><b>Accountability.</b> Named support with a reply within one business day, an exportable audit log with CT tree head, help answering your customers' security questionnaires.</li>
-        <li><b>Your own relay.</b> Enterprise adds a dedicated or sector relay, a signed Data Processing Agreement, SLA 99.9% and a self-hosting licence.</li>
+        <li><b>Your own relay.</b> Enterprise adds a dedicated relay, with terms that differ per product: ParaSend Enterprise carries the signed Data Processing Agreement and SLA 99.95%, ParaSign Enterprise carries the sector relay (health, legal, finance), SLA with service credits and a self-hosting licence.</li>
       </ul>
       <div class="split-cta"><a class="btn home-act-ghost" href="/pricing">See the business plans</a></div>
     </div>
@@ -340,14 +339,14 @@
   <div class="sec-intro">
     <p class="sec-eyebrow"><span></span>what it costs</p>
     <h2 id="cost-h">Free to start. Then a flat price per month.</h2>
-    <p class="sec-lede">Prices are per month excluding btw. You can stay on the free tier as long as you like; there is no card and no time limit.</p>
+    <p class="sec-lede">Prices are per month excluding btw. You can stay on the Community plan as long as you like; there is no card and no time limit.</p>
   </div>
   <ul class="price-grid">
     <li>
       <h3>ParaSign</h3>
       <p class="price-sub">Getting documents signed.</p>
       <ul class="tiers">
-        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Free</b> &middot; 2 signatures per month, unlimited receiving</span></li>
+        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 2 signatures per month, unlimited receiving</span></li>
         <li><span class="tier-price">&euro;49</span><span class="tier-what"><b>Pro</b> &middot; 100 signatures per month, then &euro;0.40 each up to 1,000</span></li>
         <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures per month, named support, exportable audit log</span></li>
         <li><span class="tier-price">Talk</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, SLA with service credits, self-hosting licence</span></li>
@@ -358,9 +357,9 @@
       <h3>ParaSend</h3>
       <p class="price-sub">Sending files that burn on read.</p>
       <ul class="tiers">
-        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Free</b> &middot; 1 hour link expiry, burn on first read, 10 uploads per hour</span></li>
+        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 1 hour link expiry, burn on first read, 10 uploads per hour</span></li>
         <li><span class="tier-price">&euro;15</span><span class="tier-what"><b>Pro</b> &middot; 24 hour expiry, up to 10 reads per link, send history, webhooks</span></li>
-        <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, signed DPA, SLA 99.9%, per-tenant limits</span></li>
+        <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, signed DPA, SLA 99.95%, per-tenant limits</span></li>
       </ul>
       <p class="price-foot">&euro;18.15 per month incl. 21% btw &middot; yearly is cheaper</p>
     </li>
@@ -374,14 +373,14 @@
   <div class="sec-intro">
     <p class="sec-eyebrow"><span></span>why you can trust it</p>
     <h2 id="trust-h">Rules you can check. Every one has a proof.</h2>
-    <p class="sec-lede">Everyone has a privacy policy. The ParaRules come with a verify link each: a log, a header, a repo. Not a promise.</p>
+    <p class="sec-lede">Everyone has a privacy policy. The ParaRules come with a verify link each: a log, a header, a repo. Not a promise. Four of the nine are below.</p>
   </div>
   <p class="pq-core"><strong>paramant-core</strong><span>ML-KEM-768 encryption &middot; ML-DSA-65 signatures &middot; FIPS 203/204</span></p>
   <ol class="rules-grid">
-    <li><span class="r-n">01</span><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
-    <li><span class="r-n">03</span><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
-    <li><span class="r-n">04</span><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the chain.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
-    <li><span class="r-n">06</span><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, receipts anyone can check offline.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
+    <li><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
+    <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
+    <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the chain.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
+    <li><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, receipts anyone can check offline.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
   </ol>
   <div class="sec-more">
     <a class="sec-link" href="/pararules">Read all nine ParaRules <span aria-hidden="true">&rarr;</span></a>
