@@ -41,6 +41,24 @@ jobs:
       # parse; neither resolves names. An hourly setInterval swept a Map that no
       # longer existed and took production down 425 times before anyone looked.
       # Config: eslint.config.mjs, one rule, no style opinions.
+      # Runs BEFORE eslint, on purpose. A duplicate top-level declaration is a
+      # SyntaxError, and eslint reports it as a bare "Parsing error" in the tail
+      # of a run over the whole repo, with no hint of where it came from. This
+      # guard names the file, the line and the cause first, and emits a GitHub
+      # error annotation so the file shows up in the job summary. It also covers
+      # the half eslint never can: a duplicate top-level var/function is legal
+      # JavaScript, so it parses, lints clean, and silently replaces the earlier
+      # definition that the assertions above it were written against.
+      #
+      # Why it exists: on 2026-09-02 five pull requests each appended a block to
+      # the same flat test file within the hour. Each was green on its own; the
+      # merge of the last one put "Identifier 'tiers' has already been declared"
+      # and "'pricingVisible' has already been declared" on main and took two
+      # suites out entirely. This job is where that lands, so this is where it
+      # gets a name.
+      - name: Test-scope guard (suites parse, one declaration per name)
+        run: scripts/check-test-declarations.sh
+
       - name: no-undef over the hand-written server code
         run: npx --yes eslint@9 .
 
