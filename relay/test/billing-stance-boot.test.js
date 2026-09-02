@@ -6,7 +6,8 @@
 // three stances: BILLING_MODE empty with a live key (production on 2026-09-02),
 // BILLING_MODE=test, BILLING_MODE=live. Never the key: only its prefix.
 //
-// Boots relay.js with stdout captured, three times. Needs the installed relay
+// Boots relay.js with stdout captured, four times: the three stances plus an
+// explicit mode without its key, which must boot red. Needs the installed relay
 // dependencies (relay.js requires redis at load), so this runs in the crypto
 // job next to deep-health-gate, not in the no-install unit job.
 // Run: node relay/test/billing-stance-boot.test.js

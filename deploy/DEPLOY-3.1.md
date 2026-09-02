@@ -84,7 +84,17 @@ test key plus mode, then deploy) collapsed to: deploy now, decide later.
    cd relay && RELAY_TEST_SKIP=redis node --test $(ls test/*.test.js | grep -vE 'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index')
    node --test test/billing-stance-boot.test.js             # needs relay/node_modules
    ```
-   Expected on 2026-09-02: static sanity `PASS`, units 176 pass, boot suite 4 pass.
+   Expected on 2026-09-02: static sanity checks 1 to 9 `OK` and check 10
+   `FAIL`, units 176 pass, boot suite 4 pass.
+
+   **Check 10 is red on main and stays red for this deploy.** It runs
+   `scripts/check-commit-style.sh` on the last commit only, and the squash
+   commits of #322 and #323 (and of this PR) carry `Co-Authored-By` trailers
+   that the guard flags; #323 also has an em-dash in an added line. Measured
+   on `0fc8648`: exit 1, 36 `OK` lines, the one `FAIL` is check 10. So the
+   gate for this deploy is checks 1 to 9: every one of them `OK`, and the
+   only `FAIL` line the one under `10. Commit/GitHub style guard`. Any other
+   `FAIL` blocks. Do not rewrite main's history to make check 10 green.
 3. Frontend drift: `scripts/check-prod-drift.sh origin/main`. It lists what the
    docroot would receive. Anything marked as present on the server and absent
    in git that is not in its `IGNORE` list is a hand edit: find out before you
@@ -160,9 +170,15 @@ git status                                                   # clean, or stash a
 git fetch origin && git pull --ff-only origin main
 git rev-parse --short HEAD                                   # the commit you tested locally
 
-tests/static-sanity.sh                                       # step 1 of deploy.sh; a FAIL blocks
+tests/static-sanity.sh; echo "exit $?"                       # expect exit 1: checks 1 to 9 OK, only check 10 FAIL
 docker compose build                                         # relays and admin from source, containers untouched
 ```
+
+Read the sanity output the way "Before you start" step 2 says: checks 1 to 9
+are the gate, check 10 (the commit style guard on the last commit) is known
+red on main and does not block. Anything else red blocks. This is also why
+this runbook does not call `deploy.sh`: its step 1 runs the same script and
+exits on the same check 10, so it would stop before building anything.
 
 `.env` stays as it was, plus the `INTERNAL_AUTH_TOKEN` line from step 1 if it
 was missing. **`BILLING_MODE` stays empty.**
