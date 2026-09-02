@@ -14,7 +14,7 @@
 
 All data-plane endpoints require: `X-Api-Key: your_key`
 
-- `pgp_` prefix — end user key (10 uploads/day free, no account needed)
+- `pgp_` prefix, end user key. Community plan: 10 transfers a month, 5 MB per file.
 - `plk_` prefix — operator license key (unlimited, from `.env`)
 
 CT log and STH endpoints are **public** — no API key required.

@@ -538,3 +538,61 @@ test('any CLI tool count the site states is the size of the developer catalogue'
   }
   assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}\n`);
 });
+
+// 11 ── What the free Community plan actually gives you.
+//
+// The homepage, the docs FAQ and the API reference all sold Community as "10
+// uploads per hour". That number is ANON_RATE_PER_HOUR, the per-IP ceiling on
+// POST /v2/anon-inbound (relay.js), an endpoint deprecated 2026-05-28 with a
+// sunset of 31 December 2026. It was never the limit of a logged-in Community
+// account. The real caps live in relay/lib/tiers.js and are enforced in
+// relay.js: transfers_month via the 402 monthly_transfer_quota_reached gate,
+// file_mb via the 413 "Max 5MB" check. So the pages read the tier row.
+test('the Community plan limits on the site are the ones tiers.js declares', () => {
+  const tiers = read('relay/lib/tiers.js');
+  const block = tiers.slice(tiers.indexOf('community:'), tiers.indexOf('pro:'));
+  const num = (dim) => {
+    const m = new RegExp(`${dim}:\\s*([\\d_]+)`).exec(block);
+    assert.ok(m, `tiers.js community.${dim} must be a literal number`);
+    return Number(m[1].replace(/_/g, ''));
+  };
+  const transfers = num('transfers_month');
+  const mb = num('file_mb');
+
+  // The quota gate and the size check must still be the things that enforce
+  // them, or the pages would be pinned to a constant nobody reads.
+  const relay = read('relay/relay.js');
+  assert.match(relay, /monthly_transfer_quota_reached/, 'relay.js must enforce transfers_month');
+  assert.match(relay, /dimension:\s*'transfers_month'/, 'relay.js must decline on the transfers_month dimension');
+  assert.match(relay, /Max \$\{Math\.round\(planMaxSize\/1048576\)\}MB/, 'relay.js must enforce the per-file size cap');
+
+  const problems = [];
+  const says = (where, text, phrase) => { if (!text.includes(phrase)) problems.push(`${where}: must state "${phrase}"`); };
+  says('index', visible(page('index')), `${transfers} transfers a month`);
+  says('index', visible(page('index')), `${mb} MB per file`);
+  says('docs', visible(page('docs')), `${transfers} transfers a month`);
+  says('docs', visible(page('docs')), `${mb} MB per file`);
+  const apiMd = read('frontend/docs/api.md');
+  says('docs/api.md', apiMd, `${transfers} transfers a month`);
+  says('docs/api.md', apiMd, `${mb} MB per file`);
+
+  // And no page may go back to selling the retired anonymous rate as a plan
+  // limit. Per-MINUTE claims are out of scope here: those are nginx and API
+  // rate limits with their own source (nginx-selfhost.conf, the envelope
+  // create limiter), not the tier table.
+  //
+  // pricing, parasign and parasend carry the same stale sentence and are
+  // corrected in their own PRs (#336, #339). Drop them from this list once
+  // those land; the exclusion is the only reason this scan is not global.
+  const DEFERRED = new Set(['pricing', 'parasign', 'parasend']);
+  for (const slug of publicPages()) {
+    if (DEFERRED.has(slug)) continue;
+    for (const m of visible(page(slug)).matchAll(/\d+\s*uploads?\s*(?:\/|\s+(?:per|an|a)\s+)(?:hour|day)/gi)) {
+      problems.push(`${slug}: claims "${m[0]}", which is the retired /v2/anon-inbound rate, not a tier limit`);
+    }
+  }
+  for (const m of apiMd.matchAll(/\d+\s*uploads?\s*(?:\/|\s+(?:per|an|a)\s+)(?:hour|day)/gi)) {
+    problems.push(`docs/api.md: claims "${m[0]}", which is the retired /v2/anon-inbound rate, not a tier limit`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
