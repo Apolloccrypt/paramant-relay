@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 
 function read(file) { return fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'); }
 
@@ -687,7 +688,7 @@ assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*AP
 assert.doesNotMatch(developerHtml, /your IT can check/i,
   'developer.html talks to the developer on the screen, not to their buyer');
 // Both plan lines are only true while /pricing sells API access on ParaSign Pro.
-assert.match(pricing, /Unlimited transfers - API access/,
+assert.match(pricing, /<li>API access<\/li>/,
   'pricing.html must still list API access on the ParaSign Pro tier');
 
 // Answer 1: signing without an account. Quoted from /sign, which is pinned above.
@@ -1507,3 +1508,133 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 })();
 
 console.log('ui-truthfulness: /download says the desktop app is unmaintained, and the archive matches the artifacts');
+
+
+// ── "Unlimited transfers", banned across the whole site ──────────────────────
+//
+// relay/lib/tiers.js gives every metered tier a finite transfers_month (10 on
+// Community, 500 on Pro, 2,000 on Business) and relay/lib/entitlements.js holds
+// even enterprise to ENTERPRISE_MONTHLY_CEILING rather than Infinity, so no
+// page and no script may promise transfers without a ceiling. relay/relay.js
+// refuses the transfer over the cap with a 402 monthly_transfer_quota_reached
+// naming that ceiling: a visitor who read "unlimited" meets the number anyway,
+// at the worst possible moment.
+//
+// relay/test/pricing-page.test.js already forbade the phrase, but only on
+// /parasign and /parasend, and only in .html. It sat on three files that check
+// could not see: /pricing itself (the ParaSign Pro card), frontend/js/
+// quota-upgrade.js (the 402 upgrade card, which is the very screen the relay
+// shows when the cap bites) and frontend/js/dashboard.js (the summary a paying
+// customer reads). So the ban is scoped to the whole frontend here, scripts and
+// served markdown included, which is what "site-wide" has to mean for a claim
+// that travels in a template string.
+//
+// Receiving IS uncapped, and stays sayable: nothing in tiers.js or in any
+// entitlement quota meters it (#359 pins that negatively in pricing-page.test).
+// Licence capacity is uncapped too (max_keys 'unlimited' really is Infinity in
+// relay.js), as is enterprise devices/outbound_per_hour in tiers.js. So this
+// bans the word beside "transfers", not the word.
+(function noUnlimitedTransfers() {
+  const TEXT_EXT = ['.html', '.js', '.mjs', '.md'];
+  const SKIP_DIR = ['node_modules', 'vendor', 'assets'];
+  const walk = (dir) => fs.readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true })
+    .flatMap((e) => {
+      if (e.isDirectory()) return SKIP_DIR.includes(e.name) ? [] : walk(`${dir}/${e.name}`);
+      return TEXT_EXT.some((x) => e.name.endsWith(x)) ? [`${dir}/${e.name}`] : [];
+    });
+  const files = walk('frontend');
+  assert.ok(files.length > 20, `the frontend walk found only ${files.length} text files; the ban would be vacuous`);
+
+  // Comments are stripped: a comment that explains a removed overclaim quotes
+  // the wording it exists to forbid, which is exactly how it stays forbidden.
+  const strip = (s) => s
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+
+  const hits = [];
+  for (const file of files) {
+    const m = /unlimited(?:\s|&nbsp;|<[^>]+>)+(?:\w+(?:\s|&nbsp;)+)?transfers/i.exec(strip(read(file)));
+    if (m) hits.push(`${file}: "${m[0].replace(/\s+/g, ' ')}"`);
+  }
+  assert.deepEqual(hits, [],
+    'no frontend page or script may promise transfers without a ceiling; tiers.js caps every tier ' +
+    'and relay.js answers 402 monthly_transfer_quota_reached with that cap:\n  ' + hits.join('\n  '));
+
+  // Where the word DID name a real ceiling, the number replaced it. These are
+  // ParaSend contexts: the plan table a self-hoster reads and the OT brief's own
+  // Pro tier, both describing the ParaSend capacity the relay actually enforces.
+  const proTransfers = 500; // relay/lib/tiers.js pro.transfers_month, pinned to the module in relay/test/
+  for (const [file, rx] of [
+    ['frontend/docs/paramant-ot-brief.html', new RegExp(`<li>${proTransfers} transfers a month</li>`)],
+    ['frontend/docs/self-hosting.md', new RegExp(`\\| \`pro\` \\| ${proTransfers} \\|`)],
+  ]) {
+    assert.match(read(file), rx,
+      `${file} must state the ParaSend Pro transfers ceiling where it used to say "unlimited"`);
+  }
+})();
+
+console.log('ui-truthfulness: no page or script promises transfers without a ceiling');
+
+
+// ── A ParaSign surface states no transfers figure at all ────────────────────
+//
+// The other half of the same correction, and the sharper one. "Unlimited
+// transfers" on the ParaSign Pro card was false for everyone, because no tier
+// is unbounded. Putting 500 there would have been false for a different reason:
+// transfers are a ParaSEND capacity, held on plan_parasend, and the grant that
+// sells ParaSign Pro (entitlements.applyProductTier(acct,'parasign','pro'), the
+// Mollie webhook and the admin path) writes plan_parasign alone and leaves
+// plan_parasend exactly where it was. A ParaSign Pro buyer on a free ParaSend
+// tier keeps 10 transfers a month. relay/test/parasign-pro-perks.test.js pins
+// that delivery gap; this pins the copy that must not outrun it.
+//
+// So: ParaSign Pro sells signatures and the API. It does not sell transfers,
+// and no ParaSign card, pitch or plan summary may print a transfers number
+// while the grant does not move one. The gate ASKS the entitlement layer rather
+// than restating its answer, so bundling a ParaSend entitlement into ParaSign
+// Pro flips this from "must not state" to "must state" on its own.
+(function parasignSurfacesClaimNoTransfers() {
+  // The relay is CommonJS; this file is ESM. createRequire loads the real
+  // module rather than a copy of its numbers, which is the whole point: the
+  // gate has to move when the entitlement layer does.
+  const { applyProductTier, getEntitlements, PARASEND } =
+    createRequire(import.meta.url)('../relay/lib/entitlements.js');
+  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+  applyProductTier(acct, 'parasign', 'pro');
+  const delivered = getEntitlements(acct).parasend.quotas.transfers_month;
+  const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
+
+  // Every surface that pitches ParaSign Pro, scoped to the ParaSign part of it.
+  const pricingHtml = read('frontend/pricing.html');
+  const between = (src, a, b) => src.slice(src.indexOf(a), b ? src.indexOf(b) : undefined);
+  const dashJs = read('frontend/js/dashboard.js');
+  const quotaJs = read('frontend/js/quota-upgrade.js');
+  const scopes = [
+    ['pricing.html ParaSign grid', between(pricingHtml, '<!-- TIER CARDS: PARASIGN -->', '<!-- TIER CARDS: PARASEND -->')],
+    ['parasign.html plan cards', between(read('frontend/parasign.html'), '<h3', '')],
+    ['dashboard.js PRODUCT_INCLUDES.parasign', between(dashJs, 'parasign: {', 'parasend: {')],
+    ['quota-upgrade.js freeSignHtml', between(quotaJs, 'function freeSignHtml', 'function hardCapHtml')],
+  ];
+  for (const [name, scope] of scopes) {
+    assert.ok(scope.length > 200, `${name}: the scope markers moved; this gate would read nothing`);
+  }
+
+  if (delivered === PARASEND.pro.quotas.transfers_month) {
+    for (const [name, scope] of scopes) {
+      assert.match(scope, TRANSFER_FIGURE,
+        `${name}: a parasign=pro grant now delivers the ParaSend Pro ceiling, so this surface may state it`);
+    }
+  } else {
+    const hits = scopes
+      .map(([name, scope]) => [name, TRANSFER_FIGURE.exec(scope)])
+      .filter(([, m]) => m)
+      .map(([name, m]) => `${name}: "${m[0]}"`);
+    assert.deepEqual(hits, [],
+      'a ParaSign surface prints a transfers figure, but entitlements.applyProductTier(acct, "parasign", "pro") ' +
+      `leaves ParaSend at ${delivered} a month (relay/test/parasign-pro-perks.test.js). ` +
+      'Bundle a ParaSend entitlement into ParaSign Pro, or keep the line off the card:\n  ' + hits.join('\n  '));
+  }
+})();
+
+console.log('ui-truthfulness: no ParaSign surface sells a transfers ceiling the ParaSign grant does not deliver');

@@ -2740,7 +2740,7 @@ api.post("/drop/upload", async (req, res) => {
   if (ipCount > 20) {
     return res.status(429).json({
       error: "rate_limited",
-      message: "Daily limit reached. Create a free account for unlimited drops.",
+      message: "Daily limit reached. Create a free account for 10 transfers a month.",
     });
   }
   const rlKey = `paramant:drop:ratelimit:${email.toLowerCase()}`;
@@ -2749,7 +2749,7 @@ api.post("/drop/upload", async (req, res) => {
   if (count > 3) {
     return res.status(429).json({
       error: "rate_limited",
-      message: "Daily limit reached. Create a free account for unlimited drops.",
+      message: "Daily limit reached. Create a free account for 10 transfers a month.",
     });
   }
   const anonRes = await relayFetch("health", "/v2/anon-inbound", "POST", req.body, false, "");
