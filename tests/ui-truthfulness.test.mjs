@@ -358,3 +358,62 @@ console.log('ui-truthfulness: the homepage does not overclaim signatures and quo
 console.log('ui-truthfulness: the free plan is Community everywhere and the founder line matches /about');
 console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');
 console.log('ui-truthfulness: the account page resolves plans from the same source and never upsells a customer');
+
+// ── /docs and /help now answer a buyer, and quote pages instead of paraphrasing ─
+// The messaging guide (docs/brand/messaging.md, section 10) allows a sentence on
+// the site only when it already ships somewhere and a test fails when it stops
+// shipping. These three answers were copied onto /help from /sign, /pricing and
+// /security. A copy drifts silently: the source page can be reworded and the
+// copy keeps promising the old thing. So each assertion is a pair, the quote and
+// the page it was quoted from, and the pair fails together.
+const docsHtml = read('frontend/docs.html');
+const helpHtml = read('frontend/help/index.html');
+const securityHtml = read('frontend/security.html');
+const developerHtml = read('frontend/developer.html');
+
+// /docs is where an evaluating buyer sends their IT, and it must say so before
+// it starts talking about pip install. It absorbed traffic that belonged on
+// /pricing, so it also has to name the price boundary of the API once.
+assert.match(docsHtml, /Your IT can check everything here/,
+  'docs.html must open with the line that tells a buyer what this page is for');
+assert.match(docsHtml, /The ParaSign API is available from ParaSign Pro/,
+  'docs.html must state which plan the ParaSign API needs');
+assert.match(developerHtml, /API access is included from ParaSign Pro/,
+  'developer.html must state which plan the ParaSign API needs');
+// Both of those are only true while /pricing sells API access on ParaSign Pro.
+assert.match(pricing, /Unlimited transfers - API access/,
+  'pricing.html must still list API access on the ParaSign Pro tier');
+
+// Answer 1: signing without an account. Quoted from /sign, which is pinned above.
+assert.match(helpHtml, /Signing a document needs an account/i,
+  'help/index.html must answer whether an account is required');
+assert.match(helpHtml, /open a signing request someone sent you/i,
+  'help/index.html must say what an invited signer can do without an account');
+assert.match(signHtml, /Free accounts sign 2 documents a month/i,
+  'sign.html is the source of the free signing limit quoted on /help');
+assert.match(helpHtml, /free accounts sign 2 documents a month/i,
+  'help/index.html must answer what the free tier gives');
+
+// Answer 2: cost. The sentence the whole free-versus-paid split rests on. If the
+// pricing model ever gates cryptography behind a tier, this is what fails first.
+assert.match(pricing, /Pay for volume, never for security/,
+  'pricing.html must keep the sentence the free-versus-paid split rests on');
+assert.match(helpHtml, /Pay for volume, never for security/,
+  'help/index.html must quote the pricing promise, not paraphrase it');
+
+// Answer 3: where the data lives. Quoted from the Jurisdiction and privacy table
+// on /security, word for word, and never broadened past what that table says.
+assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
+  'security.html must keep the server location row');
+assert.match(securityHtml, /Not applicable: no US infrastructure, no US company/,
+  'security.html must keep the CLOUD Act row');
+assert.match(helpHtml, /Hetzner Nuremberg, Germany/,
+  'help/index.html must answer where the data lives');
+assert.match(helpHtml, /Not applicable: no US infrastructure, no US company/,
+  'help/index.html must quote the CLOUD Act row exactly');
+
+// No sales voice on a support page. Someone here has already signed up.
+assert.doesNotMatch(helpHtml, /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class/i,
+  'help/index.html must stay in support voice');
+
+console.log('ui-truthfulness: /docs and /help answer a buyer with sentences that ship elsewhere');

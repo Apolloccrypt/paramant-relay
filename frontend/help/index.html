@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Help · PARAMANT</title>
 <meta property="og:title" content="Help · PARAMANT">
-<meta property="og:description" content="Help and documentation for PARAMANT. API keys, TOTP, integrations, and troubleshooting.">
+<meta property="og:description" content="Answers about Paramant: signing without an account, what it costs, where your data lives, plus API keys, TOTP, integrations and troubleshooting.">
 <meta property="og:url" content="https://paramant.app/help">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/help">
-<meta name="description" content="Help and documentation for PARAMANT. API keys, TOTP, integrations, and troubleshooting.">
+<meta name="description" content="Answers about Paramant: signing without an account, what it costs, where your data lives, plus API keys, TOTP, integrations and troubleshooting.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -24,6 +24,14 @@ main{max-width:860px;margin:0 auto;padding:80px 48px 120px}
 h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:560px}
 h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:20px;margin-top:56px;color:var(--ink)}
+.buyer-qa{border:1px solid var(--ink-hair);border-left:3px solid #B2FF3F;padding:24px 24px 8px;margin:0 0 48px}
+.buyer-qa .buyer-qa-title{margin:0 0 18px;font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b}
+.buyer-qa-item{margin-bottom:20px}
+.buyer-qa-q{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.buyer-qa-a{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7;margin-bottom:6px}
+.buyer-qa-link{font-family:IBM Plex Mono,monospace;font-size:12px;color:var(--cobalt);text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px;text-underline-offset:3px}
+.buyer-qa-link:hover{color:var(--ink)}
+@media(max-width:640px){.buyer-qa{padding:20px 18px 4px;margin-bottom:36px}.buyer-qa-q{font-size:14px}}
 a{color:var(--ink);text-decoration:none}
 footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
 .footer-links{display:flex;gap:20px;flex-wrap:wrap}
@@ -117,7 +125,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Help and documentation for PARAMANT. API keys, TOTP, integrations, and troubleshooting."
+      "description": "Answers about Paramant: signing without an account, what it costs, where your data lives, plus API keys, TOTP, integrations and troubleshooting."
     },
     {
       "@type": "BreadcrumbList",
@@ -179,6 +187,28 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Help</h1>
   <p class="lead">Answers to the most common questions about Paramant: authentication, integrations, and troubleshooting.</p>
+
+  <section class="buyer-qa" aria-labelledby="buyer-qa-title">
+    <h2 id="buyer-qa-title" class="buyer-qa-title">Asked most often</h2>
+
+    <div class="buyer-qa-item">
+      <div class="buyer-qa-q">Can I sign without an account?</div>
+      <p class="buyer-qa-a">No. Signing a document needs an account. Without one you can still open a signing request someone sent you.</p>
+      <a class="buyer-qa-link" href="/sign">Go to signing &rarr;</a>
+    </div>
+
+    <div class="buyer-qa-item">
+      <div class="buyer-qa-q">What does it cost?</div>
+      <p class="buyer-qa-a">The Community tier is free forever, no card required, and free accounts sign 2 documents a month. Organisations pay for the higher limits. Pay for volume, never for security.</p>
+      <a class="buyer-qa-link" href="/pricing">See pricing &rarr;</a>
+    </div>
+
+    <div class="buyer-qa-item">
+      <div class="buyer-qa-q">Where does my data live?</div>
+      <p class="buyer-qa-a">Server location: Hetzner Nuremberg, Germany. Legal jurisdiction: EU / Germany (GDPR). US CLOUD Act: Not applicable: no US infrastructure, no US company.</p>
+      <a class="buyer-qa-link" href="/security">Read the security page &rarr;</a>
+    </div>
+  </section>
 
   <aside class="parapear-block" aria-label="A friendly note">
     <img class="parapear-img" src="/assets/parapear/parapear-help.png" alt="" aria-hidden="true" loading="lazy" decoding="async" width="120" height="120">

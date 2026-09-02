@@ -6,15 +6,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PARAMANT · Documentation</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
+<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
 <meta property="og:title" content="PARAMANT · Documentation">
-<meta property="og:description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
+<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PARAMANT · Documentation">
-<meta name="twitter:description" content="API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2.">
+<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
 <link rel="canonical" href="https://paramant.app/docs">
 
 <link rel="stylesheet" href="/design-system.css?v=23">
@@ -31,7 +31,7 @@ a{color:var(--ink);text-decoration:none}
 .sidebar a{display:block;font-size:12px;color:var(--ink-dim);padding:3px 8px 3px 10px;line-height:1.8;transition:color .12s,background .12s,border-left-color .12s;border-left:2px solid transparent}
 .sidebar a:hover{color:#0B3A6A;background:rgba(178,255,63,0.08);border-left-color:#B2FF3F}
 .sidebar a.active{color:#0B3A6A;font-weight:500;background:rgba(29,78,216,0.06);border-left-color:#1D4ED8}
-.content{flex:1;padding:52px 72px 80px;max-width:840px}
+.content{flex:1;min-width:0;padding:52px 72px 80px;max-width:840px}
 .content h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .subtitle{font-size:14px;color:var(--ink-dim);margin-bottom:52px;line-height:1.8}
 .content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#0B3A6A;margin:56px 0 18px;padding-top:56px;border-top:2px solid #B2FF3F}
@@ -72,7 +72,7 @@ tr:last-child td{border-bottom:none}
 .faq-q{font-size:13px;font-weight:500;color:var(--ink);margin-bottom:8px}
 .faq-a{font-size:13px;color:var(--ink-dim);line-height:1.8}
 .sector-badge{display:inline-block;font-size:10px;font-family:var(--mono);color:var(--ink);background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:2px 7px;margin-right:6px}
-@media(max-width:900px){.sidebar{display:none}.content{padding:32px 24px 60px}}
+@media(max-width:900px){.sidebar{display:none}.content{padding:32px 24px 60px}.content table{display:block;overflow-x:auto;max-width:100%}}
 
 /* docs-hero */
 .docs-hero{background:linear-gradient(180deg,#F8FAFC 0%,rgba(11,58,106,0.04) 100%);border-bottom:1px solid rgba(11,58,106,0.08);padding:36px 24px 28px;margin-bottom:0}
@@ -81,6 +81,11 @@ tr:last-child td{border-bottom:none}
 .docs-hero h1{font-size:32px;font-weight:700;color:#0B3A6A;margin:0 0 10px;line-height:1.15;letter-spacing:-.02em}
 .docs-hero .lede{font-size:13px;line-height:1.75;color:#475569;margin:0 0 14px;max-width:640px}
 .docs-hero-cta{display:inline-block;font-family:var(--mono);font-size:12px;color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px;padding:4px 0}
+.docs-hero .docs-buyer{font-size:13px;line-height:1.7;color:#0B3A6A;margin:0 0 12px;max-width:640px;padding-left:10px;border-left:2px solid #B2FF3F}
+.docs-hero .docs-buyer a{color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px}
+.docs-hero .lede a{color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px}
+.docs-hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:18px}
+.docs-hero-cta-primary{font-weight:700}
 .docs-hero-cta:hover{color:#0B3A6A}
 @media(max-width:900px){.docs-hero-inner{padding:0 24px}}
 </style>
@@ -162,7 +167,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "API reference, SDK guide, self-hosting, and compliance docs for PARAMANT Ghost Pipe v2."
+      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key."
     }
   ]
 }
@@ -207,8 +212,12 @@ tr:last-child td{border-bottom:none}
   <div class="docs-hero-inner">
     <span class="eyebrow">REFERENCE</span>
     <h1>Documentation</h1>
-    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key.</p>
-    <a href="/signup" class="docs-hero-cta">Create account →</a>
+    <p class="docs-buyer">Evaluating Paramant? Your IT can check everything here. Plans and prices are on <a href="/pricing">Pricing</a>.</p>
+    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from ParaSign Pro; see <a href="/pricing">pricing</a>.</p>
+    <div class="docs-hero-actions">
+      <a href="#quickstart" class="docs-hero-cta docs-hero-cta-primary">Quick start →</a>
+      <a href="/signup" class="docs-hero-cta">Create account</a>
+    </div>
   </div>
 </section>
 

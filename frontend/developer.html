@@ -19,6 +19,7 @@ body{background:linear-gradient(180deg,#f8faff 0,#f5f7fb 460px)}
 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#607896;margin:0 0 10px}
 h1{font-size:clamp(30px,5vw,48px);letter-spacing:-.035em;line-height:1.05;color:#0b3a6a;margin:0 0 12px}
 .lede{max-width:690px;color:#587391;font-size:15px;line-height:1.65;margin:0}
+.lede a{color:#1d4ed8;text-decoration:underline;text-underline-offset:2px}
 .account{display:flex;align-items:center;gap:9px;padding:9px 13px;background:#fff;border:1px solid #dfe7f2;border-radius:999px;font-family:var(--mono);font-size:11px;color:#587391;white-space:nowrap;box-shadow:0 5px 18px rgba(11,58,106,.05)}
 .status-dot{width:8px;height:8px;border-radius:50%;background:#a7b4c5}.status-dot.ok{background:#20a66a}.status-dot.err{background:#d94b4b}
 .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:20px;margin-top:20px}
@@ -68,7 +69,7 @@ pre{margin:0;padding:20px;background:#0d1d33;color:#d7e7f8;overflow:auto;font-fa
     <a href="/developer" aria-current="page">Developer settings</a>
   </nav>
   <header class="hero">
-    <div><p class="eyebrow">Settings · ParaSign API</p><h1>Build signing into your product.</h1><p class="lede">Create secure signing requests, follow every signer and retrieve an offline-verifiable proof. Everything needed to connect and operate the ParaSign API is here.</p></div>
+    <div><p class="eyebrow">Settings · ParaSign API</p><h1>Build signing into your product.</h1><p class="lede">Create signing requests, follow every signer and retrieve an offline-verifiable proof. Every endpoint is in the <a href="/docs#v1-envelopes">API reference</a>, so your IT can check everything before you connect anything. API access is included from ParaSign Pro; see <a href="/pricing">pricing</a>.</p></div>
     <div class="account"><span class="status-dot" id="api-status-dot"></span><span data-dv="email">Loading account</span><span>·</span><strong data-dv="plan">--</strong></div>
   </header>
 
@@ -113,6 +114,7 @@ curl -X POST https://paramant.app/v1/envelopes \
       <section class="card" aria-labelledby="links-title">
         <div class="card-head"><div><h2 id="links-title">Build and operate</h2><p class="card-sub">The complete surface for the live API.</p></div></div>
         <div class="links">
+          <a class="link" href="/docs#quickstart">Quick start <span>&rarr;</span></a>
           <a class="link" href="/docs#v1-envelopes">API reference <span>&rarr;</span></a>
           <a class="link" href="/docs#v1-envelopes">Webhooks and signatures <span>&rarr;</span></a>
           <a class="link" href="/verify">Verify a .psign receipt <span>&rarr;</span></a>
