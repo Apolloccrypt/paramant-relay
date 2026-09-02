@@ -183,7 +183,10 @@ check_has   "$FULL" '^DEPLOY FINISHED'          "full run reaches the end marker
 echo ""
 echo "5c. --preflight-only writes nothing"
 check_has   "$PRE" 'read-only'                          "preflight announces itself as read-only"
-check_has   "$PRE" 'Nothing was written'                "preflight ends by saying nothing was written"
+check_has   "$PRE" 'no file was written, no container touched' \
+  "preflight ends by saying what it did not write"
+check_has   "$PRE" 'git fetch in phase 1a'   "preflight names the one thing it does run: git fetch"
+check_has   "$PRE" 'does not move HEAD'      "preflight says what that fetch does not do"
 check_lacks "$PRE" 'WRITE'                              "no phase header in preflight is marked WRITE"
 check_has   "$PRE"  'bash -s --.* report'               "the token step is invoked in report mode"
 check_lacks "$PRE"  'bash -s --.* write'                "no step in preflight is invoked in write mode"
@@ -507,6 +510,144 @@ check_has "$SCRIPT" 'already applied' \
   "the script has an already-applied verdict instead of a FATAL"
 check_has "$FULL"   'before edits pending'  "the dry run shows the pending-edit count"
 check_has "$FULL"   'before sign state'     "the dry run shows the per-edit state read"
+
+echo ""
+echo "6g-4. A multi-line auth_request on /sign is todo, never already applied"
+# SIGN_RE only matches the one-line spelling the repo conf uses. A hand edit
+# between two deploys that puts the gate back across several lines leaves that
+# count at zero, and a line-based state read would call it done and report
+# "already applied" while /sign sits behind the login again. The state is read
+# per BLOCK for exactly this.
+cat > "$NG/available/paramant-public.conf" <<'CONF'
+server {
+    server_name paramant.app;
+    location = /sign {
+        auth_request /api/user/check;
+        error_page 401 = @login_redirect;
+        try_files /sign.html =404;
+    }
+    location = /dicom { return 404; }
+    location = /v1/paraid/issue-document { deny all; }
+    location ~ ^/v2/outbound {
+        proxy_buffer_size 32k;
+        proxy_buffers 8 32k;
+        proxy_busy_buffers_size 64k;
+        proxy_pass http://relay;
+    }
+}
+CONF
+cp "$NG/available/paramant-public.conf" "$NG/available/paramant-live.conf"
+OUT4="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0003 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" 2>&1)"; RC4=$?
+
+if [ "$(field_5c "$OUT4" 'before sign gated')" = "0" ]; then
+  pass "the one-line pattern really does miss a multi-line auth_request (the trap)"
+else
+  fail "the fixture does not reproduce the trap: before sign gated = $(field_5c "$OUT4" 'before sign gated')"
+fi
+if [ "$(field_5c "$OUT4" 'before sign blocks with auth_request')" = "2" ]; then
+  pass "the block read finds the auth_request the line read missed"
+else
+  fail "the block read found $(field_5c "$OUT4" 'before sign blocks with auth_request') of 2 gated /sign blocks"
+fi
+if [ "$(field_5c "$OUT4" 'before sign state')" = "todo" ]; then
+  pass "a multi-line auth_request reads as todo, not as done"
+else
+  fail "a multi-line auth_request reads as '$(field_5c "$OUT4" 'before sign state')', expected todo"
+fi
+if [ "$(field_5c "$OUT4" 'before everything already applied')" = "no" ]; then
+  pass "the run does NOT report already applied while /sign is gated"
+else
+  fail "the run reported already applied with /sign still behind auth_request"
+fi
+if [ "$RC4" -ne 0 ] && printf '%s\n' "$OUT4" | grep -q 'still carry an auth_request'; then
+  pass "the edit could not remove it, so 5c stops and says so instead of shipping it"
+else
+  fail "5c exited $RC4 with /sign still gated"
+  printf '%s\n' "$OUT4" | sed 's/^/        /' | head -20
+fi
+
+echo ""
+echo "6h. A deploy AFTER a rollback still prunes the pages the rollback restored"
+# Phase 8 restores the docroot from the pre-3.1 tar, which puts every pruned
+# page back, and leaves the checkout, and so the marker, on main. Diffing
+# marker..HEAD then names nothing deleted, 5b prunes nothing, and phase 6e dies
+# on /compliance/nis2 answering 200 with everything else already live. 5b takes
+# the OLDER of the deployed commit and the runbook floor for this reason.
+RB5B="$WORK/rb5b"
+mkdir -p "$RB5B/repo" "$RB5B/docroot"
+sed -n '/^  remote "prune deleted frontend files"/,/^EOF$/p' "$SCRIPT" | sed '1d;$d' > "$RB5B/5b.sh"
+if [ -s "$RB5B/5b.sh" ]; then
+  pass "the 5b remote block could be extracted from the script"
+else
+  fail "could not extract the 5b remote block from the script"
+fi
+(
+  cd "$RB5B/repo"
+  git init -q . && git config user.email t@example.com && git config user.name t
+  mkdir -p frontend/compliance
+  for f in nis2 iec62443 nen7510; do echo "page $f" > "frontend/compliance/$f.html"; done
+  echo index > frontend/index.html
+  git add -A && git commit -qm floor
+  git rev-parse HEAD > "$RB5B/floor"
+  git rm -q frontend/compliance/nis2.html frontend/compliance/iec62443.html frontend/compliance/nen7510.html
+  git commit -qm "remove the compliance pages"
+  git rev-parse HEAD > "$RB5B/head"
+) >/dev/null 2>&1
+FLOOR="$(cat "$RB5B/floor")"
+HEADC="$(cat "$RB5B/head")"
+
+# The docroot as phase 8 leaves it: the deleted pages are back.
+mkdir -p "$RB5B/docroot/compliance"
+for f in nis2 iec62443 nen7510; do echo "page $f" > "$RB5B/docroot/compliance/$f.html"; done
+echo index > "$RB5B/docroot/index.html"
+
+# The marker is on main, because the rollback did not move the checkout.
+OUT5="$(bash "$RB5B/5b.sh" "$RB5B/repo" "$RB5B/docroot" "$HEADC" "dist" "$FLOOR" 2>&1)"; RC5=$?
+if [ "$RC5" -eq 0 ]; then pass "5b exits 0 in the deploy-after-rollback situation"; else
+  fail "5b exits $RC5 in the deploy-after-rollback situation"
+  printf '%s\n' "$OUT5" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT5" | grep -q "took the floor"; then
+  pass "5b takes the older floor as its base, not the commit the marker names"
+else
+  fail "5b kept the marker commit as its base, so it prunes nothing after a rollback"
+  printf '%s\n' "$OUT5" | sed 's/^/        /' | head -20
+fi
+if [ "$(field_5c "$OUT5" 'before prune base')" = "$FLOOR" ]; then
+  pass "the base it actually diffs against is the floor"
+else
+  fail "the prune base is '$(field_5c "$OUT5" 'before prune base')', expected the floor"
+fi
+if [ "$(field_5c "$OUT5" 'before deleted-in-git count')" = "3" ]; then
+  pass "git names the three restored pages as deleted, where marker..HEAD named none"
+else
+  fail "the delete list has $(field_5c "$OUT5" 'before deleted-in-git count') entries, expected 3"
+fi
+if [ "$(field_5c "$OUT5" 'after removed')" = "3" ]; then
+  pass "all three pages the rollback restored are pruned again"
+else
+  fail "5b removed $(field_5c "$OUT5" 'after removed') of 3 restored pages"
+fi
+if [ ! -f "$RB5B/docroot/compliance/nis2.html" ] && [ -f "$RB5B/docroot/index.html" ]; then
+  pass "the docroot lost the pruned page and kept the one main still ships"
+else
+  fail "the docroot is wrong after the prune"
+fi
+
+# The healthy second deploy: nothing was restored, so everything is already
+# gone. That is an OK answer and must not be a failure.
+OUT6="$(bash "$RB5B/5b.sh" "$RB5B/repo" "$RB5B/docroot" "$HEADC" "dist" "$FLOOR" 2>&1)"; RC6=$?
+if [ "$RC6" -eq 0 ] && [ "$(field_5c "$OUT6" 'after already absent')" = "3" ] \
+   && [ "$(field_5c "$OUT6" 'after removed')" = "0" ]; then
+  pass "running 5b again prunes nothing and reports all three as already absent"
+else
+  fail "the second 5b run exits $RC6, removed=$(field_5c "$OUT6" 'after removed') absent=$(field_5c "$OUT6" 'after already absent')"
+fi
+
+check_has "$SCRIPT" 'merge-base --is-ancestor "\$FLOOR" "\$BASE"' \
+  "the older-of-the-two choice is git's answer, not a guess"
+check_has "$FULL"   'before prune base'   "the dry run shows which base 5b will diff against"
 
 echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"

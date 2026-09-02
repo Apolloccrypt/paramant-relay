@@ -407,6 +407,25 @@ in one of three states before it edits anything:
 | `done` | the old shape is gone and the wanted shape is there (`location = /sign` without `auth_request`, no `/compliance` locations, `location = /dicom { return 404; }`) | reported as **already applied**, no error |
 | `unknown` | neither shape | `FATAL`, because this is not the conf the runbook describes and editing it further would be editing blind |
 
+The `/sign` state is read per **block**, not per line. The sed edit removes the
+one-line spelling the repo conf uses, and a grep for that line is blind to a
+hand edit that put the gate back across several lines:
+
+```nginx
+location = /sign {
+    auth_request /api/user/check;
+    error_page 401 = @login_redirect;
+    try_files /sign.html =404;
+}
+```
+
+A line-based read calls that `done` and reports **already applied** while
+`/sign` is behind the login again. An awk walk over the `location = /sign`
+block, brace depth and all, sees the `auth_request` wherever it sits, so this
+reads as `todo`. The one-line sed still cannot remove it, and that is the
+point: the phase then stops with a `FATAL` that names the multi-line spelling
+and asks for a hand edit, instead of shipping a gated `/sign` as a success.
+
 Only `unknown` stops the deploy. The older script read "nothing to do" as
 `FATAL` outright, which meant the second deploy died on an edit that had simply
 already succeeded. The removal of the docroot files main deleted (step 5b)
@@ -569,6 +588,42 @@ docker compose up -d --no-deps --force-recreate relay-main
 `deploy.sh` itself prints `git revert HEAD && ./deploy.sh <container>` as its
 rollback. That rebuilds from source and is slower; the tagged images are the
 fast path.
+
+### Deploying again after a rollback
+
+A rollback leaves the server in a state that reads like a finished deploy but
+is not one, and step 5b is where that bites.
+
+The tar restore puts the **whole** pre-3.1 docroot back, including all 26 pages
+main deleted. The checkout is untouched, so it stays on main, and so does the
+deployed-head marker. A step 5b that diffed `marker..HEAD` would find that main
+deleted nothing since the commit the marker names, prune nothing, and leave the
+26 pages served. Step 6e then dies on `/compliance/nis2` answering `200`, with
+the containers, `.env` and nginx already live. That is the worst place to find
+out.
+
+So 5b never diffs against the marker alone. It takes the **older** of the
+deployed commit and `41501bb`, which in practice means it diffs `41501bb..HEAD`
+on every run. The server decides which is older, with
+`git merge-base --is-ancestor`, because only the server has both commits. The
+choice is printed as `before base choice` and the answer as `before prune base`.
+
+Pruning something that is already gone costs nothing, so the normal answer on a
+healthy second deploy is:
+
+```
+after removed = 0
+after already absent = 26
+```
+
+and after a rollback it is `after removed = 26` instead. Both are fine. What is
+not fine is a delete list of zero on a docroot that still serves the pages, and
+that is the case the floor removes.
+
+The same applies if you move the checkout back by hand during a rollback: put
+that commit in the marker, or run the next deploy with
+`PARAMANT_EXPECTED_HEAD`. The prune base is unaffected either way, because the
+floor is older than both.
 
 ## What this runbook does not do
 

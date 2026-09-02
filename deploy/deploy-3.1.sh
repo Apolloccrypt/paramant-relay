@@ -1085,7 +1085,22 @@ EOF
 phase_5() {
   phase 5 "Frontend and nginx (server, WRITE)" "Step 5"
 
+  # The base 5b diffs against, to learn which frontend files main deleted.
+  #
+  # The obvious base is the commit that was deployed. It is wrong after a
+  # rollback. Phase 8 restores the docroot from the pre-3.1 tar, which puts all
+  # 26 pruned pages BACK, and it leaves the checkout, and therefore the marker,
+  # on main. The next deploy then diffs marker..HEAD, finds nothing deleted,
+  # prunes nothing, and phase 6e dies on /compliance/nis2 answering 200 with
+  # everything else already live. That is the worst place to find out.
+  #
+  # So the base is the OLDER of the deployed commit and the runbook's own
+  # starting commit, which in practice means 41501bb on every run. The server
+  # decides which is older, because only the server has both commits. Pruning
+  # something that is already gone costs nothing: "pruned 0 of 26, 26 were
+  # already gone" is the normal answer on a healthy second deploy.
   local base="${PREV_HEAD:-$EXPECT_PROD_COMMIT}"
+  local base_floor="$EXPECT_PROD_COMMIT"
 
   step "5a. rsync the docroot, never with --delete"
   remote "rsync docroot" "$COMPOSE_DIR" "$DOCROOT" <<'EOF'
@@ -1109,10 +1124,31 @@ EOF
   step "5b. prune the frontend files main deleted (rsync without --delete leaves them)"
   note "a page removed from git keeps being served by try_files until the file"
   note "goes; the list comes from git, never from a wildcard on the server"
-  remote "prune deleted frontend files" "$COMPOSE_DIR" "$DOCROOT" "$base" "$DOCROOT_IGNORE" <<'EOF'
+  note "the base is the older of the deployed commit and $base_floor, so a deploy"
+  note "after a rollback still prunes the pages the restored docroot brought back"
+  remote "prune deleted frontend files" "$COMPOSE_DIR" "$DOCROOT" "$base" "$DOCROOT_IGNORE" "$base_floor" <<'EOF'
 set -euo pipefail
 cd "$1"
-DOCROOT="$2"; BASE="$3"; IGNORE="$4"
+DOCROOT="$2"; BASE="$3"; IGNORE="$4"; FLOOR="$5"
+
+echo "before base candidate = $BASE"
+echo "before base floor = $FLOOR"
+# Older wins. "Older" here is git's own answer: FLOOR is older than BASE exactly
+# when FLOOR is an ancestor of it. A rollback leaves BASE on main and the
+# docroot back at the pre-3.1 tar, and only the floor still names every page
+# that has to go.
+if ! git rev-parse --verify --quiet "$FLOOR^{commit}" >/dev/null; then
+  echo "before base choice = kept $BASE, the floor $FLOOR does not resolve in this checkout"
+elif [ -z "$BASE" ]; then
+  echo "before base choice = took the floor $FLOOR, no deployed commit was measured"
+  BASE="$FLOOR"
+elif git merge-base --is-ancestor "$FLOOR" "$BASE" 2>/dev/null; then
+  echo "before base choice = took the floor $FLOOR, it is older than $BASE"
+  BASE="$FLOOR"
+else
+  echo "before base choice = kept $BASE, the floor $FLOOR is not an ancestor of it"
+fi
+echo "before prune base = $BASE"
 
 DEL="$(git diff --diff-filter=D --name-only "$BASE"..HEAD -- frontend/ || true)"
 echo "before deleted-in-git count = $(printf '%s\n' "$DEL" | grep -c . || true)"
@@ -1179,7 +1215,7 @@ EOF
     if [ "$del_n" -eq 0 ]; then
       ok "git names no frontend file deleted since the deployed commit, so there is nothing to prune"
     else
-      ok "pruned $rm_n of $del_n stale docroot file(s), $ab_n were already gone"
+      ok "pruned $rm_n of $del_n stale docroot file(s) against base $(remote_field 'before prune base'), $ab_n were already gone"
     fi
   fi
 
@@ -1242,6 +1278,32 @@ FNR==NR {
   }
 }'
 
+# Count /sign blocks, and how many of them carry an auth_request ANYWHERE
+# inside the block, whatever the line layout is.
+#
+# SIGN_RE only sees the one-line spelling the repo conf uses. A hand edit
+# between two deploys that put the gate back across several lines,
+#
+#     location = /sign {
+#         auth_request /api/user/check;
+#         ...
+#     }
+#
+# leaves SIGN_RE at zero, which the state read below would call "done" and
+# report as already applied while /sign is in fact behind the login again.
+# Reading the block instead of the line closes that. The header line is NOT
+# skipped, because the one-line spelling opens and closes on it.
+SIGN_AWK='
+/^[[:space:]]*location[[:space:]]*=[[:space:]]*\/sign[[:space:]]*\{/ { total++; inb=1; has=0; depth=0 }
+inb {
+  if ($0 ~ /auth_request/) has=1
+  depth += gsub(/\{/,"{") - gsub(/\}/,"}")
+  if (depth <= 0) { if (has) withauth++; inb=0 }
+}
+END { printf "%d %d\n", total+0, withauth+0 }'
+
+count_sign() { awk "$SIGN_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
+
 # Count /v2/outbound blocks, and how many of them carry the buffer INSIDE the
 # block. Counting matches per file cannot tell those apart.
 BLOCK_AWK='
@@ -1256,6 +1318,9 @@ END { printf "%d %d\n", total+0, withbuf+0 }'
 count_blocks() { awk "$BLOCK_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
 
 echo "before sign gated = $(count "$SIGN_RE")"
+read -r _sbt _sbw <<< "$(count_sign)"
+echo "before sign blocks = $_sbt"
+echo "before sign blocks with auth_request = $_sbw"
 echo "before compliance = $(count "$COMP_RE")"
 echo "before dicom try_files = $(count "$DICOM_RE")"
 echo "before paraid deny = $(count "$PARAID_RE")"
@@ -1286,14 +1351,16 @@ state() {   # old-count, wanted-count, has-wanted-shape(yes|no)
   fi
 }
 
-_b_sign="$(count "$SIGN_RE")";     _b_signloc="$(count "$SIGN_LOC_RE")"
+# /sign is judged on the BLOCK counts, so a multi-line auth_request reads as
+# todo and never as done. The other two edits are single lines by construction:
+# a /compliance location and the /dicom try_files both live on one line.
 _b_comp="$(count "$COMP_RE")"
 _b_dicom="$(count "$DICOM_RE")";   _b_dicom404="$(count "$DICOM404_RE")"
 
-SIGN_STATE="$(state "$_b_sign" "$_b_signloc" yes)"
+SIGN_STATE="$(state "$_sbw" "$_sbt" yes)"
 COMP_STATE="$(state "$_b_comp" 0 no)"
 DICOM_STATE="$(state "$_b_dicom" "$_b_dicom404" yes)"
-echo "before sign location = $_b_signloc"
+echo "before sign location = $_sbt"
 echo "before dicom 404 = $_b_dicom404"
 echo "before sign state = $SIGN_STATE"
 echo "before compliance state = $COMP_STATE"
@@ -1360,6 +1427,9 @@ for f in $TARGETS; do
 done
 echo "after edited files = $edited"
 echo "after sign gated = $(count "$SIGN_RE")"
+read -r _sat _saw <<< "$(count_sign)"
+echo "after sign blocks = $_sat"
+echo "after sign blocks with auth_request = $_saw"
 echo "after compliance = $(count "$COMP_RE")"
 echo "after dicom try_files = $(count "$DICOM_RE")"
 echo "after dicom 404 = $(count 'location = /dicom[[:space:]]*\{[[:space:]]*return 404')"
@@ -1378,6 +1448,18 @@ restore() {
 
 if [ "$(count "$PARAID_RE")" -eq 0 ]; then
   echo "FATAL the ParaID deny disappeared; restoring"
+  restore
+  exit 1
+fi
+
+# The sed above only removes the one-line spelling of the gate. If a block
+# still carries an auth_request, the edit did not take, and saying "OK" here
+# would ship /sign behind the login. Restore and say what to do by hand.
+if [ "$_saw" -gt 0 ]; then
+  echo "FATAL $_saw of $_sat 'location = /sign' block(s) still carry an auth_request after the edit."
+  echo "FATAL the runbook removes the ONE-LINE spelling; this conf spreads the gate over several lines,"
+  echo "FATAL so someone edited it by hand between deploys. Take the auth_request and the error_page 401"
+  echo "FATAL line out of the /sign block yourself, then run this phase again. Restoring the backed up confs."
   restore
   exit 1
 fi
@@ -1664,7 +1746,7 @@ phase_7() {
 
   step "7a. record the deployed commit, so the next run's phase 1a has a gate"
   note "without this marker the next run falls back to $EXPECT_PROD_COMMIT and stops:"
-  note "that is exactly the poort that made this script single-use"
+  note "that is exactly the gate that made this script single-use"
   remote "record deployed head" "$COMPOSE_DIR" "$BACKUP_DIR" "$DEPLOYED_HEAD_FILE" <<'EOF'
 set -euo pipefail
 cd "$1"
@@ -1951,7 +2033,11 @@ phase_1
 if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
   echo
   hr
-  echo "PREFLIGHT ONLY: phases 0 and 1 done, read-only. Nothing was written."
+  echo "PREFLIGHT ONLY: phases 0 and 1 done. Read-only for the working tree and"
+  echo "the containers: no file was written, no container touched, no nginx conf"
+  echo "changed. The one thing that did run is git fetch in phase 1a, which"
+  echo "updates remote-tracking refs so the ancestor test judges against the real"
+  echo "origin/main. It does not move HEAD and does not check anything out."
   printf 'Warnings: %s. Log: %s\n' "$WARNINGS" "$LOG"
   hr
   exit 0
