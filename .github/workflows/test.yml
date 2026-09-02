@@ -12,7 +12,7 @@ jobs:
   # https://github.com/Apolloccrypt/paramant-sdk (with the cross-impl
   # conformance suite). This workflow now covers the relay only.
   shell-syntax:
-    name: shell — bash -n
+    name: shell, bash -n
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,7 +30,7 @@ jobs:
           echo "All shell scripts parse OK."
 
   undefined-names:
-    name: static — every name must exist
+    name: static, every name must exist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,7 +45,7 @@ jobs:
         run: npx --yes eslint@9 .
 
   frontend-cache-bust:
-    name: frontend — cache-bust guard
+    name: frontend, cache-bust guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,6 +55,22 @@ jobs:
   relay-crypto-tests:
     name: relay - crypto suite (@paramant/core)
     runs-on: ubuntu-latest
+    # The route suites (test/route-*.test.js) boot a real relay.js, and the
+    # envelope store is redis-only (relay.js:5650), without a server every
+    # /v2/envelopes route answers 503 and the whole ParaSign lifecycle is
+    # untestable. This is also what makes the FLEET-WIDE half of the
+    # envelope-create limiter testable: two relay processes, one budget.
+    # Same image tag as docker-compose.yml runs in production.
+    services:
+      redis:
+        image: redis:7.4.8-alpine
+        ports:
+          - 6399:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -94,8 +110,9 @@ jobs:
       # parasign-sandbox-live-guard, the only guard on "a psk_live_ key must
       # never reach the sandbox auto-signer". They run here instead, against the
       # engine this job builds, and test/_requires.js now fails them outright if
-      # it is missing. This job has no redis service, so that one precondition is
-      # declared by name rather than silently swallowed.
+      # it is missing. These four need the engine but not redis, and the redis
+      # service now on this job is not exposed to them, so that one precondition
+      # stays declared by name rather than silently swallowed.
       - name: Relay ParaSign engine suites
         working-directory: relay
         env:
@@ -123,6 +140,49 @@ jobs:
         # one-off (BILLING_MODE empty, production) or opens subscriptions.
         run: node --test test/inbound-hash-verify.test.js test/deep-health-gate.test.js test/billing-stance-boot.test.js
 
+      # The route layer of relay.js. Until 2026-09-02 the 6488 lines and 68
+      # routes of relay.js were loaded by NO unit test at all, the coverage
+      # table simply did not list the file. These suites boot it (test/
+      # _relay-server.js) and drive it over HTTP: the auth gate, the ParaSign
+      # envelope lifecycle end to end with real ML-DSA-65 signatures and an
+      # offline verification of the receipt, ParaSend burn-on-read and the
+      # per-tier ceilings, entitlement persistence across a restart (#315), and
+      # the rate limiters including the redis-backed fleet-wide one. They live
+      # here and not in the unit job below because relay.js requires `redis` and
+      # @paramant/core at load, and this is the job that installs both.
+      #
+      # parasign-signs-quota rides along here because it needs the same redis and
+      # nothing else. It was the LAST suite in the repo that asserted nothing in
+      # any CI job: it ran only in the no-install unit job, where it has no redis
+      # and therefore skipped every time, so its five checks on the monthly
+      # signs cap (the metering that was once stuck behind a dead `&& false`)
+      # have never actually run on a pull request. With a redis service they do.
+      - name: Relay route suites (a booted relay.js) and the redis-backed units
+        working-directory: relay
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+        run: |
+          set -o pipefail
+          node --test test/route-*.test.js test/parasign-signs-quota.test.js 2>&1 | tee /tmp/relay-routes.log
+          # The same gate as the unit job below: a suite that runs and asserts
+          # NOTHING still reports green, and that is how four ParaSign suites
+          # came to mean nothing for weeks. This job has redis AND the engine,
+          # so nothing here has an excuse to be silent. The expected set is
+          # empty, by name.
+          # `|| true`: GitHub runs this block under `bash -e`, and grep exits 1
+          # when it matches nothing. Finding no silent suite is the GOOD case, so
+          # without this the step fails exactly when the gate is satisfied.
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/relay-routes.log \
+                   | sed 's/^# //; s/: SKIPPED.*//' | sort || true)
+          echo "--- route suites that asserted nothing in this job:"
+          echo "${silent:-(none)}" | sed 's/^/      /'
+          if [ -n "$silent" ]; then
+            echo "::error::a route suite asserted nothing. It has redis and the"
+            echo "engine here, so a skip means a broken precondition, not a"
+            echo "missing dependency. Fix the suite; do not add it to a list."
+            exit 1
+          fi
+
   relay-unit-tests:
     name: relay - unit suite (no native deps)
     runs-on: ubuntu-latest
@@ -139,12 +199,17 @@ jobs:
       # parasign-* suites are excluded for the same reason: they need the
       # ML-DSA-65 engine, which this job deliberately does not build. They used
       # to run here and silently skip, which is what made "ok 24" mean nothing.
+      # The route-*.test.js suites are excluded for both reasons at once: they
+      # boot a real relay.js (which requires `redis` and @paramant/core at load)
+      # and the envelope ones need a reachable redis server. They run in the
+      # crypto job above, which installs the deps and has a redis service.
       # A declared skip is better than a silent one, but it still exits 0 and
       # still shows up as a green check. Two suites assert nothing at all in this
       # job, by name and on purpose, and that is fine as long as it stays two and
       # stays those two. What is not fine is a third joining them quietly, which
       # is exactly how four ParaSign suites came to report "ok" over nothing for
-      # weeks. So the skips are counted, named, and held to a list.
+      # weeks. So the skips are counted, named, and held to a list, and that
+      # list is now empty: every suite that runs here asserts something.
       - name: Relay unit suite
         working-directory: relay
         env:
@@ -156,17 +221,22 @@ jobs:
         run: |
           set -o pipefail
           node --test $(ls test/*.test.js | grep -vE \
-            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index') \
+            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-signs-quota|route-') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
           # summary() in test/_requires.js.
+          # `|| true`: under `bash -e` a grep that matches nothing exits 1, and
+          # since the expected set below is now empty, no match is the good case.
           silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/relay-units.log \
-                   | sed 's/^# //; s/: SKIPPED.*//' | sort)
-          # ONE suite, not two. parasign-store also lacks redis here, but it has a
-          # memory fallback and still runs three checks, so it is not silent.
-          # Measured, not assumed: the first version of this list said two and
-          # this gate caught it on the first run.
-          expected=$'parasign-signs-quota'
+                   | sed 's/^# //; s/: SKIPPED.*//' | sort || true)
+          # EMPTY, and it is meant to stay empty. parasign-signs-quota used to be
+          # the one name here: it needs redis, this job has none, so it skipped
+          # on every run and its five checks never ran anywhere. It now runs in
+          # the crypto job against a real redis service and is excluded from the
+          # glob above, which leaves nothing in this job that asserts nothing.
+          # parasign-store also lacks redis here but has a memory fallback and
+          # still runs three checks, so it is not silent either.
+          expected=''
           echo "--- suites that asserted nothing in this job:"
           echo "${silent:-(none)}" | sed 's/^/      /'
           if [ "$silent" != "$expected" ]; then
