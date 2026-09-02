@@ -43,8 +43,24 @@ NGINX_SITES=/etc/nginx/sites-enabled
 
 # The two server confs the runbook names. Phase 5 edits these and nothing else:
 # a wildcard loop over sites-enabled would silently rewrite a conf nobody
-# reviewed. Override only if the server names them differently.
-NGINX_CONFS="${PARAMANT_NGINX_CONFS:-paramant-public.conf paramant-live.conf}"
+# reviewed.
+#
+# The names are not the same on every machine. The run of 03-09 stopped in
+# phase 2b because production carries paramant-public.conf but no
+# paramant-live.conf: the backend conf there is called paramant.conf. So a slot
+# is a LIST of candidates separated by "|", and the server takes the first
+# candidate that is really in sites-enabled. Slots are separated by whitespace,
+# exactly as before, and PARAMANT_NGINX_CONFS still overrides the whole thing.
+#
+#   paramant-public.conf              slot 1, one candidate
+#   paramant-live.conf|paramant.conf  slot 2, live first, paramant.conf next
+#
+# paramant.conf is an assumption, drawn from deploy/signup-fix-deploy.sh, which
+# edits /etc/nginx/sites-enabled/paramant.conf on this same server. The script
+# does not trust it: it looks on the server, logs the name it resolved to, and
+# stops when a slot has no candidate at all.
+NGINX_CONF_SLOTS="${PARAMANT_NGINX_CONFS:-paramant-public.conf paramant-live.conf|paramant.conf}"
+NGINX_SLOT_COUNT="$(printf '%s' "$NGINX_CONF_SLOTS" | wc -w | tr -d ' ')"
 
 # Present on the server by design, absent from the repo. Same list as
 # scripts/check-prod-drift.sh: these are never pruned from the docroot.
@@ -275,6 +291,53 @@ remote() {
 # remote_soft: same, but the caller judges the exit code itself.
 remote_soft() { _remote_run "$@"; }
 
+# -------------------------------------------- resolving the nginx conf names --
+#
+# Every remote block that touches an nginx conf needs the same answer: given a
+# slot like "paramant-live.conf|paramant.conf", which of those names is really
+# in sites-enabled on THIS server? Only the server can answer that, so the
+# answer travels with the block. remote_nginx prepends the function below to
+# the body, which means the server runs exactly this text, and so does
+# tests/deploy-3.1-dryrun.test.sh when it extracts a block.
+NGINX_RESOLVE_SNIPPET="$(cat <<'RESOLVER'
+# resolve_conf_slots <sites-dir> <slots>: per slot, take the first candidate
+# that exists in sites-enabled. Prints one line per slot, either
+#   nginxconf <slot> resolved to <name>
+# or, when no candidate of that slot is there,
+#   nginxconf <slot> ABSENT, none of these is in <dir>: <candidates>
+# A slot is named by its first candidate, so the log reads the same whichever
+# name the server happens to use. Sets RESOLVED_CONFS to the chosen names in
+# slot order and RESOLVED_MISSING to the number of slots that resolved to
+# nothing. It never exits: the caller decides what an absent slot means.
+resolve_conf_slots() {
+  rc_sites="$1"; rc_slots="$2"
+  RESOLVED_CONFS=""
+  RESOLVED_MISSING=0
+  for rc_slot in $rc_slots; do
+    rc_chosen=""
+    rc_oldifs="$IFS"
+    IFS='|'
+    for rc_cand in $rc_slot; do
+      if [ -e "$rc_sites/$rc_cand" ]; then rc_chosen="$rc_cand"; break; fi
+    done
+    IFS="$rc_oldifs"
+    if [ -z "$rc_chosen" ]; then
+      echo "nginxconf ${rc_slot%%|*} ABSENT, none of these is in $rc_sites: $(printf '%s' "$rc_slot" | tr '|' ' ')"
+      RESOLVED_MISSING=$((RESOLVED_MISSING + 1))
+      continue
+    fi
+    echo "nginxconf ${rc_slot%%|*} resolved to $rc_chosen"
+    RESOLVED_CONFS="${RESOLVED_CONFS:+$RESOLVED_CONFS }$rc_chosen"
+  done
+}
+RESOLVER
+)"
+
+# remote_nginx: remote(), with resolve_conf_slots() already defined in the body.
+remote_nginx() {
+  { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+}
+
 # expect: assert against the output of the last remote call. Skipped, loudly,
 # under --dry-run, because there was no measurement to judge.
 expect() {
@@ -492,7 +555,8 @@ printf '  run TS        %s\n' "$TS"
 printf '  target        %s\n' "$PROD_HOST"
 printf '  compose dir   %s\n' "$COMPOSE_DIR"
 printf '  docroot       %s\n' "$DOCROOT"
-printf '  nginx confs   %s\n' "$NGINX_CONFS"
+printf '  nginx confs   %s\n' "$NGINX_CONF_SLOTS"
+printf '                %s slot(s); the first candidate present on the server wins\n' "$NGINX_SLOT_COUNT"
 printf '  deploy ref    %s\n' "$DEPLOY_REF"
 if [ -n "$EXPECTED_HEAD" ]; then
   printf '  expected head %s (PARAMANT_EXPECTED_HEAD)\n' "$EXPECTED_HEAD"
@@ -813,10 +877,10 @@ EOF
   expect_count "after tags for this TS" 6 "six rollback images really exist on the host, not just six lines of text"
 
   step "2b. back up .env, compose state, docroot and the nginx confs"
-  remote "backups" "$COMPOSE_DIR" "$TS" "$BACKUP_DIR" "$DOCROOT" "$NGINX_BACKUP_DIR" "$NGINX_SITES" "$NGINX_CONFS" <<'EOF'
+  remote_nginx "backups" "$COMPOSE_DIR" "$TS" "$BACKUP_DIR" "$DOCROOT" "$NGINX_BACKUP_DIR" "$NGINX_SITES" "$NGINX_CONF_SLOTS" <<'EOF'
 set -euo pipefail
 cd "$1"
-TS="$2"; BK="$3"; DOCROOT="$4"; NGBK="$5"; NGSITES="$6"; CONFS="$7"
+TS="$2"; BK="$3"; DOCROOT="$4"; NGBK="$5"; NGSITES="$6"; SLOTS="$7"
 mkdir -p "$BK" "$NGBK"
 
 echo "before .env bytes = $(stat -c%s .env)"
@@ -832,15 +896,16 @@ tar czf "$BK/docroot-pre-3.1-$TS.tgz" -C "$(dirname "$DOCROOT")" "$(basename "$D
 echo "after docroot tar bytes = $(stat -c%s "$BK/docroot-pre-3.1-$TS.tgz")"
 echo "after docroot tar entries = $(tar tzf "$BK/docroot-pre-3.1-$TS.tgz" | wc -l)"
 
+# Which name does each slot have on THIS server? The backup is filed under the
+# resolved name and phase 8 resolves the same way, so a rollback looks for the
+# file that is really there.
+resolve_conf_slots "$NGSITES" "$SLOTS"
+
 # sites-enabled entries are usually symlinks into sites-available. cp -a of a
 # symlink copies the link, not the file, which is not a backup: resolve first.
 n=0
-for name in $CONFS; do
+for name in $RESOLVED_CONFS; do
   link="$NGSITES/$name"
-  if [ ! -e "$link" ]; then
-    echo "nginxconf $name ABSENT"
-    continue
-  fi
   target="$(readlink -f "$link")"
   echo "nginxconf $name -> $target ($(stat -c%s "$target") bytes)"
   cp -a "$target" "$NGBK/$name.pre-3.1-$TS"
@@ -848,6 +913,7 @@ for name in $CONFS; do
   n=$((n + 1))
 done
 echo "after nginx conf backups = $n"
+echo "after nginx slots unresolved = $RESOLVED_MISSING"
 
 if [ -x deploy/ops/backup-full-state.sh ]; then
   echo "--- deploy/ops/backup-full-state.sh ---"
@@ -864,9 +930,10 @@ EOF
   expect_min "after .env backup bytes" 1 ".env backup is a real file with content"
   expect_min "after docroot tar bytes" 1 "docroot tar is a real file with content"
   expect_min "after docroot tar entries" 1 "docroot tar holds entries"
-  expect_count "after nginx conf backups" 2 "both named nginx confs were resolved and backed up"
+  expect_count "after nginx conf backups" "$NGINX_SLOT_COUNT" \
+    "every nginx conf slot resolved to a name on the server and was backed up"
   expect_not 'nginxconf [a-z.-]+ ABSENT' \
-    "both named nginx confs exist on the server (set PARAMANT_NGINX_CONFS if they are named differently)"
+    "every nginx conf slot has a candidate on the server (set PARAMANT_NGINX_CONFS if they are named differently)"
 }
 
 # =============================================================== PHASE 3 =====
@@ -1224,19 +1291,22 @@ EOF
   fi
 
   step "5c. the four nginx changes, by hand, keeping the ParaID deny"
-  remote "nginx edits" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_CONFS" <<'EOF'
+  remote_nginx "nginx edits" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_CONF_SLOTS" <<'EOF'
 set -euo pipefail
-TS="$1"; SITES="$2"; NGBK="$3"; CONFS="$4"
+TS="$1"; SITES="$2"; NGBK="$3"; SLOTS="$4"
 
-# Resolve the two named confs to real files. A symlink is not the file.
+# Which name does each slot have here? Same question as phase 2b, answered the
+# same way, so the confs that are edited are the confs that were backed up.
+resolve_conf_slots "$SITES" "$SLOTS"
+if [ "$RESOLVED_MISSING" -ne 0 ]; then
+  echo "FATAL $RESOLVED_MISSING nginx conf slot(s) have no candidate in $SITES"
+  exit 1
+fi
+
+# Resolve the named confs to real files. A symlink is not the file.
 TARGETS=""
-for name in $CONFS; do
-  link="$SITES/$name"
-  if [ ! -e "$link" ]; then
-    echo "FATAL named nginx conf $name does not exist in $SITES"
-    exit 1
-  fi
-  t="$(readlink -f "$link")"
+for name in $RESOLVED_CONFS; do
+  t="$(readlink -f "$SITES/$name")"
   echo "target $name -> $t"
   TARGETS="$TARGETS $t"
 done
@@ -1439,7 +1509,7 @@ else
 fi
 
 if [ "$(count "$PARAID_RE")" -eq 0 ]; then
-  echo "FATAL the ParaID deny is not present; the 01-09 server edit this runbook relies on is gone"
+  echo "FATAL the ParaID deny is not present in the resolved conf(s) $RESOLVED_CONFS; the 01-09 server edit this runbook relies on is gone"
   exit 1
 fi
 if [ "$(count "$OUT_RE")" -eq 0 ]; then
@@ -1877,10 +1947,10 @@ phase_8() {
   phase 8 "Rollback to $ROLLBACK_TS (server, WRITE)" "Step 8"
 
   step "8a. the manifest, the saved images and the backups this rollback needs"
-  remote "rollback preconditions" "$COMPOSE_DIR" "$ROLLBACK_TS" "$BACKUP_DIR" "$NGINX_BACKUP_DIR" "$NGINX_CONFS" <<'EOF'
+  remote_nginx "rollback preconditions" "$COMPOSE_DIR" "$ROLLBACK_TS" "$BACKUP_DIR" "$NGINX_BACKUP_DIR" "$NGINX_SITES" "$NGINX_CONF_SLOTS" <<'EOF'
 set -euo pipefail
 cd "$1"
-TS="$2"; BK="$3"; NGBK="$4"; CONFS="$5"
+TS="$2"; BK="$3"; NGBK="$4"; SITES="$5"; SLOTS="$6"
 M="$BK/rollback-images-$TS.txt"
 [ -f "$M" ] || { echo "FATAL no manifest $M"; exit 1; }
 echo "manifest lines = $(wc -l < "$M")"
@@ -1909,7 +1979,11 @@ for f in "$BK/.env-pre-3.1-$TS" "$BK/docroot-pre-3.1-$TS.tgz"; do
     absent=$((absent + 1))
   fi
 done
-for name in $CONFS; do
+# The backups were filed under the name phase 2b resolved, so resolve again
+# instead of guessing: on this server the slot may well be paramant.conf.
+resolve_conf_slots "$SITES" "$SLOTS"
+absent=$((absent + RESOLVED_MISSING))
+for name in $RESOLVED_CONFS; do
   f="$NGBK/$name.pre-3.1-$TS"
   if [ -f "$f" ]; then
     echo "  backup present $f ($(stat -c%s "$f") bytes)"
@@ -1970,12 +2044,18 @@ EOF
   expect_count "after recreated services" 6 "all six services came back on their saved images"
 
   step "8c. restore the nginx confs and the docroot"
-  remote "rollback nginx and docroot" "$ROLLBACK_TS" "$BACKUP_DIR" "$DOCROOT" "$NGINX_BACKUP_DIR" "$NGINX_SITES" "$NGINX_CONFS" "$DOCROOT_IGNORE" <<'EOF'
+  remote_nginx "rollback nginx and docroot" "$ROLLBACK_TS" "$BACKUP_DIR" "$DOCROOT" "$NGINX_BACKUP_DIR" "$NGINX_SITES" "$NGINX_CONF_SLOTS" "$DOCROOT_IGNORE" <<'EOF'
 set -euo pipefail
-TS="$1"; BK="$2"; DOCROOT="$3"; NGBK="$4"; SITES="$5"; CONFS="$6"; IGNORE="$7"
+TS="$1"; BK="$2"; DOCROOT="$3"; NGBK="$4"; SITES="$5"; SLOTS="$6"; IGNORE="$7"
+
+resolve_conf_slots "$SITES" "$SLOTS"
+if [ "$RESOLVED_MISSING" -ne 0 ]; then
+  echo "FATAL $RESOLVED_MISSING nginx conf slot(s) have no candidate in $SITES"
+  exit 1
+fi
 
 n=0
-for name in $CONFS; do
+for name in $RESOLVED_CONFS; do
   b="$NGBK/$name.pre-3.1-$TS"
   [ -f "$b" ] || { echo "FATAL missing nginx backup $b"; exit 1; }
   target="$(readlink -f "$SITES/$name")"
@@ -2032,7 +2112,7 @@ tar xzf "$TAR" -C "$(dirname "$DOCROOT")"
 echo "after docroot files = $(find "$DOCROOT" -type f | wc -l)"
 EOF
   expect_not 'FATAL' "nginx confs and docroot restored, nginx tested clean before the reload"
-  expect_count "restored nginx confs" 2 "both named nginx confs came back"
+  expect_count "restored nginx confs" "$NGINX_SLOT_COUNT" "every resolved nginx conf came back"
   expect 'reloaded nginx' "nginx reloaded on the restored conf"
 
   step "8d. health after the rollback"
