@@ -13,6 +13,16 @@
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <script src="/js/qrcode.min.js?v=1"></script>
+<style>
+/* Een auth-scherm is op een telefoon één taak. Kop, één zin en de knop moeten
+   samen in de eerste 844px bij 390px breed passen; met de standaard
+   sectiepadding stond de knop eronder. Alleen op deze pagina, alleen bestaande
+   tokens, design-system.css blijft ongemoeid. */
+@media (max-width: 600px) {
+  .section-lg { padding-top: var(--space-5); padding-bottom: var(--space-3); }
+  .section { padding: var(--space-5) 0; border-top: none; }
+}
+</style>
 </head>
 <body>
 
@@ -48,8 +58,8 @@
 <section class="section-lg">
   <div class="eyebrow"><span class="bar"></span>step 3 of 5</div>
   <h1>Choose how you <em>sign in</em>.</h1>
-  <p class="lede">
-    Pick one. You can add the other later. This is the only real choice in setup.
+  <p class="lede mt-3">
+    Pick one now and add the other later; after this you save your backup codes and the account is ready to use.
   </p>
 </section>
 
@@ -59,9 +69,9 @@
   <div class="card" style="border-left:3px solid #B2FF3F">
     <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use a passkey &middot; Recommended</div>
     <p style="margin:0 0 16px">
-      A passkey is like a key only your device has. You unlock it with your
-      fingerprint, face, or device PIN. Nothing to remember, nothing to type.
-      Best if you mostly use one phone or laptop.
+      A passkey lives on this device and nowhere else. You unlock it with your
+      fingerprint, your face or your device PIN, so there is nothing to remember
+      and nothing to type. Best if you work mostly from one phone or one laptop.
     </p>
     <button type="button" class="btn btn-primary" id="passkey-register-btn">Set up a passkey</button>
     <p id="passkey-status" class="small" aria-live="polite"></p>
@@ -70,10 +80,11 @@
   <div class="card mt-3">
     <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use an authenticator app</div>
     <p style="margin:0 0 16px">
-      An app on your phone shows a fresh 6-digit code every 30 seconds. You type
-      that code to sign in. Good if you switch between many devices.
+      An app on your phone shows a fresh 6-digit code every 30 seconds and you
+      type that code to sign in. Better if you move between several computers,
+      or if colleagues share one workstation.
     </p>
-    <button type="button" class="btn btn-secondary" id="start-btn">Use an authenticator app instead</button>
+    <button type="button" class="btn btn-secondary" id="start-btn">Set up an app instead</button>
   </div>
 </section>
 
@@ -91,7 +102,9 @@
   </div>
 
   <p style="margin-top:16px">
-    The setup link has expired (14-day limit), been used already, or is invalid.
+    Setup links last 14 days and work once. This one has expired, has already
+    been used, or was not copied in full. Start again and we send a fresh link
+    to the same email address.
   </p>
 
   <div class="cta-row" style="margin-top:24px">
@@ -112,7 +125,7 @@
     <div class="qr-card">
       <div id="qr-code"></div>
       <p class="qr-caption">
-        Open your authenticator app and scan this code.
+        Open your authenticator app, choose to add an account, and scan this code.
       </p>
     </div>
 
@@ -134,7 +147,7 @@
           <button type="button" class="btn btn-small btn-secondary" id="copy-secret">Copy</button>
         </div>
         <p class="small mt-2">
-          Enter this key by hand in your authenticator app instead.
+          Type this key into your authenticator app by hand instead. It works the same way.
         </p>
       </div>
     </div>
@@ -160,7 +173,7 @@
   </div>
 
   <form id="verify-form" class="form-card">
-    <label for="verify-code">6-digit code from your authenticator</label>
+    <label for="verify-code">6-digit code your app is showing now</label>
     <input type="text" id="verify-code" required inputmode="numeric"
            pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
            placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
@@ -185,7 +198,9 @@
   <div class="warning-box">
     <strong>Shown once. Save them now.</strong>
     <p>
-      These one-time codes get you back in if you ever lose your authenticator or your phone. We can't recover them for you, so keep them safe.
+      Each code signs you in once if you lose your phone or your authenticator app.
+      They are generated on our side and shown here only, so we cannot show them again
+      or recover them for you. Save them somewhere you can reach without your phone.
     </p>
   </div>
 
@@ -202,7 +217,7 @@
   <div class="form-checkbox mt-4">
     <input type="checkbox" id="saved-confirm">
     <label for="saved-confirm">
-      I have saved my codes somewhere safe.
+      I have saved my codes somewhere I can reach without my phone.
     </label>
   </div>
 
@@ -221,7 +236,7 @@
 
   <div class="warning-box">
     <strong>Shown once. Save them now.</strong>
-    <p>Each code signs you in once if you lose access to your passkey device.</p>
+    <p>Each code signs you in once if you lose the device your passkey lives on. This is the only time they are shown.</p>
   </div>
 
   <div id="passkey-backup-codes" class="backup-grid"></div>
@@ -241,25 +256,29 @@
 <section id="state-welcome" class="section hidden">
   <div class="eyebrow"><span class="bar"></span>all set</div>
   <h2>You're all set.</h2>
-  <p class="lede">What would you like to do first?</p>
+  <p class="lede mt-3">Your account is active. Two things you can do right now.</p>
   <div class="grid2 mt-3">
     <a href="/parashare" class="card" style="border-left:3px solid #B2FF3F;text-decoration:none;display:block">
       <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Send a file</div>
-      <p class="small" style="margin:0">Encrypt and send something, private end to end.</p>
+      <p class="small" style="margin:0">Encrypt a file in your browser and send a link that burns after one read.</p>
     </a>
     <a href="/sign" class="card" style="text-decoration:none;display:block">
       <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Sign a document</div>
-      <p class="small" style="margin:0">Add your legally-binding signature to a PDF.</p>
+      <p class="small" style="margin:0">Sign a PDF on this device. The private key never reaches the relay.</p>
     </a>
   </div>
   <p class="small mt-3">You can always come back to this from your <a href="/dashboard">dashboard</a>.</p>
 </section>
 
+<p class="small" style="color:var(--ink-dim);margin-top:24px">
+  Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+</p>
 </main>
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/auth-setup.js?v=1"></script>
+<script src="/js/auth-setup.js?v=2"></script>
 <script type="module" src="/js/passkey.js?v=3"></script>
 
 <footer class="legal-strip">

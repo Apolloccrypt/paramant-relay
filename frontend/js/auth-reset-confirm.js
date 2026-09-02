@@ -5,7 +5,7 @@
 
   if (!token || token === 'reset-confirm') {
     document.getElementById('initial-view').innerHTML =
-      '<p class="form-subtitle" style="color:#dc2626">Invalid link. Please request a new reset.</p>' +
+      '<p class="form-subtitle" style="color:#dc2626">This link is incomplete, so we cannot tell which account it belongs to. Mail clients sometimes break a long link across two lines.</p>' +
       '<p class="footer-text mt-4"><a href="/auth/request-reset">Request a reset link</a></p>';
     return;
   }
@@ -32,13 +32,13 @@
         document.getElementById('initial-view').style.display = 'none';
         document.getElementById('expired-view').style.display = '';
       } else {
-        errorDiv.textContent = 'Error: ' + (data.error || 'unknown error. Try again.');
+        errorDiv.textContent = 'The reset did not go through, so your current authenticator still works. ' + (data.error ? 'The relay reported: ' + data.error + '.' : 'Try again in a moment.');
         errorDiv.classList.add('visible');
         confirmBtn.disabled = false;
         confirmBtn.textContent = 'Yes, reset my authenticator';
       }
     } catch (err) {
-      errorDiv.textContent = 'Network error. Please try again.';
+      errorDiv.textContent = 'We could not reach Paramant. Check your connection and try again.';
       errorDiv.classList.add('visible');
       confirmBtn.disabled = false;
       confirmBtn.textContent = 'Yes, reset my authenticator';

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Backup code sign-in — Paramant</title>
+<title>Sign in with a backup code · Paramant</title>
 <link rel="canonical" href="https://paramant.app/auth/backup">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -12,6 +12,16 @@
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
+<style>
+/* Een auth-scherm is op een telefoon één taak. Kop, één zin en de knop moeten
+   samen in de eerste 844px bij 390px breed passen; met de standaard
+   sectiepadding stond de knop eronder. Alleen op deze pagina, alleen bestaande
+   tokens, design-system.css blijft ongemoeid. */
+@media (max-width: 600px) {
+  .section-lg { padding-top: var(--space-5); padding-bottom: var(--space-3); }
+  .section { padding: var(--space-5) 0; border-top: none; }
+}
+</style>
 </head>
 <body>
 
@@ -47,8 +57,9 @@
 <section class="section-lg">
   <div class="eyebrow"><span class="bar"></span>backup recovery</div>
   <h1>Use a <em>backup code</em>.</h1>
-  <p class="lede">
-    Single-use. After signing in, review your account security.
+  <p class="lede mt-3">
+    Use one of the codes you saved when you set up your account; each code works
+    once and gets you in without your authenticator app.
   </p>
 </section>
 
@@ -62,7 +73,7 @@
     <input type="text" id="code" name="code" required autocomplete="off"
            placeholder="XXXX-YYYY-ZZZZ" spellcheck="false">
     <p class="small mt-2">
-      Format: 12 characters in 3 groups of 4, with dashes.
+      Twelve characters, three groups of four, separated by dashes. Capitals do not matter.
     </p>
 
     <button type="submit" class="btn btn-primary mt-3">
@@ -73,22 +84,27 @@
   </form>
 
   <div class="warning-box mt-4">
-    <strong>After sign-in:</strong>
+    <strong>Do this once you are in</strong>
     <p>
-      Visit <a href="/account">/account</a> to regenerate backup codes or set up a new authenticator if your app is permanently lost.
+      A used code is gone. Open <a href="/account">your account settings</a> to issue a fresh set of
+      backup codes, and to link a new authenticator app if the old one is lost for good.
     </p>
   </div>
 
   <p class="footer-text mt-4">
-    <a href="/auth/login">Back to regular sign-in</a>
+    <a href="/auth/login">Back to the normal sign-in</a>
   </p>
 </section>
 
+<p class="small" style="color:var(--ink-dim);margin-top:24px">
+  Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+</p>
 </main>
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/auth-backup.js?v=1"></script>
+<script src="/js/auth-backup.js?v=2"></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
