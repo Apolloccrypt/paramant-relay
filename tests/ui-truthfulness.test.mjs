@@ -363,57 +363,114 @@ console.log('ui-truthfulness: the account page resolves plans from the same sour
 // The messaging guide (docs/brand/messaging.md, section 10) allows a sentence on
 // the site only when it already ships somewhere and a test fails when it stops
 // shipping. These three answers were copied onto /help from /sign, /pricing and
-// /security. A copy drifts silently: the source page can be reworded and the
-// copy keeps promising the old thing. So each assertion is a pair, the quote and
-// the page it was quoted from, and the pair fails together.
+// / (the rules grid). A copy drifts silently: the source page can be reworded
+// and the copy keeps promising the old thing. So each assertion is a pair, the
+// quote and the page it was quoted from, and the pair fails together.
+//
+// Every quote is matched inside the markup a visitor actually sees. An earlier
+// version of this block asserted the docs buyer line against the whole file, and
+// deleting the visible paragraph left the test green: the same words also sit in
+// four meta tags. A pin that a meta description can satisfy pins nothing.
 const docsHtml = read('frontend/docs.html');
 const helpHtml = read('frontend/help/index.html');
 const securityHtml = read('frontend/security.html');
 const developerHtml = read('frontend/developer.html');
+const homeGrid = read('frontend/index.html');
+// The three answers on /help, without their surrounding page.
+const helpAnswers = [...helpHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
+assert.equal(helpAnswers.split('\n').length, 3,
+  'help/index.html must keep the three buyer answers in the "Asked most often" block');
 
 // /docs is where an evaluating buyer sends their IT, and it must say so before
 // it starts talking about pip install. It absorbed traffic that belonged on
-// /pricing, so it also has to name the price boundary of the API once.
-assert.match(docsHtml, /Your IT can check everything here/,
-  'docs.html must open with the line that tells a buyer what this page is for');
-assert.match(docsHtml, /The ParaSign API is available from ParaSign Pro/,
-  'docs.html must state which plan the ParaSign API needs');
-assert.match(developerHtml, /API access is included from ParaSign Pro/,
-  'developer.html must state which plan the ParaSign API needs');
-// Both of those are only true while /pricing sells API access on ParaSign Pro.
+// /pricing, so it also has to name the price boundary of the API once, and it
+// gives the buyer a button of the same weight as the developer's Quick start.
+assert.match(docsHtml, /<p class="docs-buyer">Evaluating Paramant\? Your IT can check everything here\./,
+  'docs.html must open with the visible line that tells a buyer what this page is for');
+assert.match(docsHtml, /<p class="lede">[^<]*The ParaSign API is available from ParaSign Pro/,
+  'docs.html must state in the visible lede which plan the ParaSign API needs');
+const docsActions = (docsHtml.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
+assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
+  'the developer keeps the primary button on /docs: Quick start');
+assert.match(docsActions, /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
+  'the buyer gets a real button to /pricing beside it, not only a text link');
+assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API access is included from ParaSign Pro/,
+  'developer.html must state in its visible lede which plan the ParaSign API needs');
+// /developer is noindex and only reachable once signed in, so it addresses the
+// developer reading it, never the buyer who sent them.
+assert.doesNotMatch(developerHtml, /your IT can check/i,
+  'developer.html talks to the developer on the screen, not to their buyer');
+// Both plan lines are only true while /pricing sells API access on ParaSign Pro.
 assert.match(pricing, /Unlimited transfers - API access/,
   'pricing.html must still list API access on the ParaSign Pro tier');
 
 // Answer 1: signing without an account. Quoted from /sign, which is pinned above.
-assert.match(helpHtml, /Signing a document needs an account/i,
+assert.match(helpAnswers, /Signing a document needs an account/i,
   'help/index.html must answer whether an account is required');
-assert.match(helpHtml, /open a signing request someone sent you/i,
+assert.match(helpAnswers, /open a signing request someone sent you/i,
   'help/index.html must say what an invited signer can do without an account');
-assert.match(signHtml, /Free accounts sign 2 documents a month/i,
-  'sign.html is the source of the free signing limit quoted on /help');
-assert.match(helpHtml, /free accounts sign 2 documents a month/i,
-  'help/index.html must answer what the free tier gives');
 
-// Answer 2: cost. The sentence the whole free-versus-paid split rests on. If the
-// pricing model ever gates cryptography behind a tier, this is what fails first.
-assert.match(pricing, /Pay for volume, never for security/,
+// Answer 2: cost. A support page that will not name a number sends someone back
+// to the search box, so /help names the free allowance and the first paid price
+// exactly as /pricing prints them, and both halves are pinned to that page.
+// Scoped to the ParaSign grid: /help names "ParaSign Community" and quotes its
+// allowance, and pricing.html carries a second Community card for ParaSend. A
+// bare match on the tier name stays green while the ParaSign one is renamed.
+const parasignGrid = pricing.slice(pricing.indexOf('<!-- TIER CARDS: PARASIGN -->'));
+assert.ok(parasignGrid.length > 0 && parasignGrid.length < pricing.length,
+  'pricing.html must keep the ParaSign tier grid this block reads from');
+assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}?<li>2 signatures per month<\/li>/,
+  'pricing.html is the source of the ParaSign Community allowance quoted on /help');
+assert.match(pricing, /&euro;49<span/,
+  'pricing.html is the source of the ParaSign Pro price quoted on /help');
+assert.match(pricing, /charged &euro;59\.29\/mo incl\. 21% btw/,
+  'pricing.html is the source of the incl. btw figure quoted on /help');
+assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures per month\./,
+  'help/index.html must name the free allowance, not just promise that free exists');
+assert.match(helpAnswers, /ParaSign Pro at &euro;49 a month excl\. btw \(&euro;59\.29 incl\.\)/,
+  'help/index.html must name the first paid price the way /pricing prints it');
+// Proof 3 of the messaging guide, quoted from /pricing. The slogan that follows
+// it there ("Pay for volume, never for security") stays on the page that sells;
+// /help is support voice and an unverifiable sales line is the last thing
+// someone stuck on this page needs.
+assert.match(pricing, /Every plan gets the same encryption, the same post-quantum signatures and the same public proof log\. Pay for volume, never for security\./,
   'pricing.html must keep the sentence the free-versus-paid split rests on');
-assert.match(helpHtml, /Pay for volume, never for security/,
-  'help/index.html must quote the pricing promise, not paraphrase it');
+assert.match(helpAnswers, /Every plan gets the same encryption, the same post-quantum signatures and the same public proof log\./,
+  'help/index.html must quote the same-crypto fact, not paraphrase it');
+assert.doesNotMatch(helpAnswers, /Pay for volume, never for security/,
+  'help/index.html must not carry the sales line; it is a support page');
 
-// Answer 3: where the data lives. Quoted from the Jurisdiction and privacy table
-// on /security, word for word, and never broadened past what that table says.
+// Answer 3: where the data lives. Three sentences a person can read, not the
+// Jurisdiction and privacy table flattened into prose. The claim is scoped to
+// the data path and names the Resend exception in the same breath, exactly as
+// proof 1 of the messaging guide requires. The unqualified "no US company" row
+// on /security is an open contradiction (guide section 9) and is deliberately
+// not repeated here.
 assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
-  'security.html must keep the server location row');
-assert.match(securityHtml, /Not applicable: no US infrastructure, no US company/,
-  'security.html must keep the CLOUD Act row');
-assert.match(helpHtml, /Hetzner Nuremberg, Germany/,
+  'security.html must keep the server location row /help quotes');
+assert.match(homeGrid, /No US provider in the data path\. Email goes out via Resend, as <a href="\/privacy">\/privacy<\/a> sets out\./,
+  'index.html is the source of the data-path wording and its Resend exception');
+assert.match(helpAnswers, /Hetzner Nuremberg, Germany/,
   'help/index.html must answer where the data lives');
-assert.match(helpHtml, /Not applicable: no US infrastructure, no US company/,
-  'help/index.html must quote the CLOUD Act row exactly');
+assert.match(helpAnswers, /no US provider is in the data path/,
+  'help/index.html must scope the claim to the data path');
+assert.match(helpAnswers, /Email goes out via Resend, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+  'help/index.html must name the Resend exception in the same breath, with the /privacy link');
+assert.doesNotMatch(helpAnswers, /no US company/i,
+  'help/index.html must not repeat the unqualified no-US-company row from /security');
 
 // No sales voice on a support page. Someone here has already signed up.
 assert.doesNotMatch(helpHtml, /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class/i,
   'help/index.html must stay in support voice');
+
+// The tone rule is site-wide, but these two articles kept em-dashes in the H1
+// and the tab title after an earlier pass cleaned only their ledes.
+for (const slug of ['index', 'api-key-vs-totp', 'lost-authenticator']) {
+  const html = read(`frontend/help/${slug}.html`);
+  assert.doesNotMatch(html, /\u2014|&mdash;|\u2013|&ndash;/,
+    `help/${slug}.html must carry no em-dash or en-dash, in the H1, the title or anywhere else`);
+}
+assert.doesNotMatch(docsHtml, /\u2014|&mdash;|\u2013|&ndash;/,
+  'docs.html must carry no em-dash or en-dash');
 
 console.log('ui-truthfulness: /docs and /help answer a buyer with sentences that ship elsewhere');

@@ -84,8 +84,14 @@ tr:last-child td{border-bottom:none}
 .docs-hero .docs-buyer{font-size:13px;line-height:1.7;color:#0B3A6A;margin:0 0 12px;max-width:640px;padding-left:10px;border-left:2px solid #B2FF3F}
 .docs-hero .docs-buyer a{color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px}
 .docs-hero .lede a{color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px}
-.docs-hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:18px}
-.docs-hero-cta-primary{font-weight:700}
+.docs-hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:4px}
+.docs-hero-btn{display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;line-height:1;padding:12px 20px;border:1px solid #1D4ED8;border-radius:2px;text-decoration:none;transition:background .12s,color .12s,border-color .12s}
+.docs-hero-btn-primary{background:#1D4ED8;color:#fff}
+.docs-hero-btn-primary:hover{background:#0B3A6A;border-color:#0B3A6A;color:#fff}
+.docs-hero-btn-secondary{background:#fff;color:#1D4ED8}
+.docs-hero-btn-secondary:hover{background:rgba(29,78,216,0.07);color:#0B3A6A}
+.docs-hero-actions .docs-hero-cta{margin-left:6px}
+@media(max-width:640px){.docs-hero-btn{flex:1 1 100%}.docs-hero-actions .docs-hero-cta{margin-left:0;width:100%}}
 .docs-hero-cta:hover{color:#0B3A6A}
 @media(max-width:900px){.docs-hero-inner{padding:0 24px}}
 </style>
@@ -215,7 +221,8 @@ tr:last-child td{border-bottom:none}
     <p class="docs-buyer">Evaluating Paramant? Your IT can check everything here. Plans and prices are on <a href="/pricing">Pricing</a>.</p>
     <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from ParaSign Pro; see <a href="/pricing">pricing</a>.</p>
     <div class="docs-hero-actions">
-      <a href="#quickstart" class="docs-hero-cta docs-hero-cta-primary">Quick start →</a>
+      <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Quick start</a>
+      <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">See plans and prices</a>
       <a href="/signup" class="docs-hero-cta">Create account</a>
     </div>
   </div>
@@ -277,7 +284,7 @@ tr:last-child td{border-bottom:none}
   <div class="content">
     <!-- ── What's new in 3.0.0 ──────────────────────────────────── -->
     <h2 id="whats-new">What's new in 3.0.0</h2>
-    <p>Version 3.0.0 keeps the wire format, API surface and crypto guarantees of 2.5.x: every 2.5.x client stays compatible: and focuses on the operator and self-host experience. The headline change is structural: the post-quantum primitives now live in their own audited library.</p>
+    <p>Version 3.0.0 keeps the wire format, API surface and crypto guarantees of 2.5.x, so every 2.5.x client stays compatible. It focuses on the operator and self-host experience. The headline change is structural: the post-quantum primitives now live in their own audited library.</p>
     <ul>
       <li><strong>paramant-core crypto split (M5b).</strong> Server-side ML-DSA-65 signing is now provided by <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: a standalone, audit-ready Rust library (BUSL-1.1) the relay consumes through its <code>@paramant/core</code> NAPI binding. Client-side ML-KEM-768 still runs in the browser/SDK; the relay never holds a key. See <a href="#crypto">Crypto stack</a>.</li>
       <li><strong>Document workspace.</strong> The user dashboard starts document flows, shows account-owned signing requests and exposes owner actions without adding a new trust surface.</li>
@@ -288,7 +295,7 @@ tr:last-child td{border-bottom:none}
       <li><strong>Crypto-mode negotiation (ADR R006, accepted).</strong> <code>/v2/capabilities</code> advertises a compact <em>core</em> mode (2 algorithms) by default; extended algorithm sets are opt-in. See <a href="#crypto">Crypto stack</a>.</li>
       <li><strong>Add-on architecture (ADR R007, draft).</strong> A specification for container-isolated integrations: storage mirrors, SIEM exporters, SSO: that work on ciphertext and metadata only, never plaintext or keys.</li>
       <li><strong>Static front-end serving (ADR R011).</strong> An opt-in <code>SERVE_FRONTEND</code> static handler lets a single relay serve its own UI for plug-and-play self-hosting. See <a href="#selfhost-docker">Self-hosting</a>.</li>
-      <li><strong>Documented design decisions.</strong> Architecture Decision Records R001–R011 capture the choices behind 3.0.0: from the hotfix flow to the crypto split: in the repository under <code>docs/adrs/</code>.</li>
+      <li><strong>Documented design decisions.</strong> Architecture Decision Records R001 to R011 capture the choices behind 3.0.0, from the hotfix flow to the crypto split. They live in the repository under <code>docs/adrs/</code>.</li>
     </ul>
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
