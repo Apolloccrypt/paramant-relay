@@ -117,6 +117,112 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
 ---
 
+### 2026-09-03: login lockout and TOTP replay (internal review of #367)
+
+Two decisions came out of reviewing the site-claims work in #367, both about
+authentication, and both recorded here because the reasoning matters more than
+the diff.
+
+#### 1. A rate limit keyed on an email address is a lockout, not a limit
+
+`/api/user/login` incremented `paramant:user:ratelimit:email:<email>` before it
+called `findUserByEmail`, refused at eleven inside fifteen minutes, and never
+deleted the key on a successful sign-in. The address is request input. Eleven
+posts spread over three IP addresses (the per-IP cap is five) put the owner of
+that address on `429` for the full window, from any browser, with no way to
+clear it. The relay carried the same shape one layer down: `userMfaAttemptOk`
+counted attempts against a caller-supplied `user_id` and refused at ten.
+
+**The rule now:** a counter keyed on an identity the attacker gets to name may
+impose cost on that identity, never denial.
+
+| Layer | Keyed on | Counts | Over the threshold |
+|-------|----------|--------|--------------------|
+| `admin/lib/login-ratelimit.js` | IP address | attempts | refused, 429, 5 per 15 min |
+| `admin/lib/login-ratelimit.js` | email (hashed) | failures only | proof-of-work, 428, after 10 |
+| `relay/lib/auth-throttle.js` | `user_id` | failures only | delay, 250 ms per failure, capped at 2 s |
+
+A successful sign-in clears the per-account counters at both layers. The
+proof-of-work is the 2^18 challenge already used by signup and password reset;
+the relay layer has no client to run one, so it throttles instead. The request
+that asks for the proof is refunded to the per-IP counter, because it was never
+evaluated: charging for the quote as well as the answer would leave an honest
+user two real attempts out of five.
+
+What the proof-of-work is worth, measured rather than assumed: a native solver
+on this repository finds a nonce in roughly 150 to 250 ms; a browser doing the
+same work through WebCrypto takes one to two seconds. So it prices automated
+guessing per attempt and it keeps a stranger from switching an account off. It
+is NOT the thing that stops guessing. That is the per-IP refusal, which is why
+that one stayed a refusal.
+
+**What was given up.** There is no longer any per-account ceiling that refuses.
+A distributed attacker with many IP addresses can keep guessing one address
+indefinitely, at a couple of hundred milliseconds of CPU per attempt plus five
+attempts per IP per fifteen minutes. The per-IP limit is what makes that
+expensive; the proof-of-work only prices each attempt. Against a six-digit TOTP
+with a one-slot window under two algorithms (roughly six in a million per guess)
+it is a botnet-scale cost for a poor return, and it is the price of not handing
+every passer-by a way to switch off somebody else's account. If the trade needs
+revisiting, raise the difficulty for a hot address; do not reintroduce the
+refusal.
+
+**Both deadlines are configurable**, `PARAMANT_REDIS_DEADLINE_MS` (relay.js) and
+`PARAMANT_TOTP_REPLAY_TIMEOUT_MS` (lib/totp.js), default 1000 ms each, both
+documented in `deploy/.env.example`. A value of zero or a non-number is ignored
+and the default applies: an unbounded guard does not fail closed, it hangs.
+
+The e-mail counter is hashed (`paramant:user:loginfail:<sha256>`), so the
+rate-limit namespace no longer stores addresses in plaintext, and the namespace
+is new, so no counter written under the old shape survives a deploy still
+holding somebody out.
+
+#### 2. TOTP single-use now fails closed
+
+`relay/lib/totp.js` guarded replay with a per-slot `SET NX`, and swallowed a
+store error with `.catch(() => 'OK')`. The comment above it called that a
+deliberate choice: availability over replay protection, so a Redis blip could
+not block a legitimate first use.
+
+It is not defensible on this endpoint. The NX key is the only thing between an
+observed six-digit code and its replay inside the same 30-second slot, on the
+path that mints admin-panel sessions. And the availability it bought was
+imaginary: the session store is the same Redis, so a login that skips the replay
+check still cannot be issued a session.
+
+A store failure now yields `{ valid: false, error: 'replay_store_unavailable' }`.
+`/v2/user/verify-totp` and both `/v2/user/signing-key` routes answer `503` and
+log `totp_replay_store_unavailable`; the admin login passes the 503 through as
+`totp_unavailable` rather than dressing it up as a wrong code, and does not
+count it as a failed attempt. A refused replay is `error: 'replay'`, a wrong code
+carries no error at all, so the three cases stay distinguishable.
+
+**A store that never answers is an outage too.** Fail-closed only means
+something if a decision arrives. node-redis queues commands while it
+reconnects, so against an unreachable server a call neither resolves nor
+rejects. Measured on a booted relay with the server killed underneath it, the
+verify path did not fail open OR closed: it hung, with no answer at all after
+twelve seconds. Two bounded waits fix that on this path: the replay `set`
+inside `verifyTotpGeneric` (`storeTimeoutMs`, 1s) and the secret read in front
+of it (`redisDeadline` in relay.js, 1s). A timeout is reported exactly like a
+thrown error, so the route answers 503 in about a second.
+
+**Still open, and deliberately not fixed here.** That queue-forever behaviour is
+a property of the relay's redis client, not of this path. Every other
+redis-backed route in relay.js still inherits it and will still hang in an
+outage. The fix is a client-level one (`disableOfflineQueue`, or a command
+deadline applied globally) which changes the failure mode of every call site at
+once, so it belongs in its own change with its own review, not smuggled in
+behind an auth fix.
+
+Pinned by `relay/test/verify-totp.test.js` (a throwing store, a synchronously
+throwing store and a store that never answers, none of which may validate a
+code), `relay/test/route-user-mfa-lockout.test.js` (a real relay, a real redis,
+and the connection cut underneath it mid-suite), `relay/test/auth-throttle.test.js`
+and `admin/test/login-ratelimit.test.js`.
+
+---
+
 ### 2026-04-20 — Admin panel hardening + email security
 
 **Scope:** TOTP reset flow abuse protection, error response hardening,

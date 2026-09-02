@@ -29,6 +29,7 @@ const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const rateLimit     = require('./lib/rate-limit');
+const authThrottle  = require('./lib/auth-throttle');
 const authGate      = require('./lib/auth-gate');
 const userSigning   = require('./lib/user-signing');
 const userWebauthn  = require('./lib/user-webauthn');
@@ -71,6 +72,28 @@ if (RELAY_REDIS_URL) {
     .then(() => console.log('[relay/redis] connected'))
     .catch(e => console.error('[relay/redis] connect failed:', e.message));
 }
+// A redis call that answers inside a deadline, or an outage. node-redis queues
+// commands while it reconnects, so against an unreachable server a GET neither
+// resolves nor rejects: the route waits, forever. On an auth path that is worse
+// than an error, because fail-closed means DECIDING and a decision has to
+// arrive. Used by the TOTP verify path, where the secret read sits in front of
+// the single-use guard and would otherwise hang before the guard can fail
+// closed. The rest of the relay still inherits the queue; see SECURITY.md.
+const REDIS_DEADLINE_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_REDIS_DEADLINE_MS || '', 10);
+  // A deployment with a slow or distant redis may need more room; one that
+  // would rather refuse than wait may want less. Zero or nonsense is not an
+  // opt-out, because "wait forever" is the failure this exists to prevent.
+  return Number.isFinite(raw) && raw > 0 ? raw : 1000;
+})();
+function redisDeadline(promise, ms = REDIS_DEADLINE_MS) {
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('redis_deadline_exceeded')), ms);
+  });
+  return Promise.race([Promise.resolve(promise), deadline]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
 const PORT       = parseInt(process.env.PORT       || '3000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
@@ -1404,17 +1427,23 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of mfaRateLimits) 
 // their own 6-digit TOTP (10^6 space). Cap attempts per user in a sliding window;
 // reset on success so legit retries never lock out. In-memory, mirrors
 // checkMfaRateLimit; fails open on nothing (pure counter).
-const USER_MFA_MAX = 10;
+const USER_MFA_MAX = 10;            // failures before the delay starts, not a cap
 const USER_MFA_WINDOW_MS = 300_000; // 5 min
-const userMfaAttempts = new Map(); // user_id → { count, resetAt }
-function userMfaAttemptOk(user_id) {
-  const now = Date.now();
-  const b = userMfaAttempts.get(user_id) || { count: 0, resetAt: now + USER_MFA_WINDOW_MS };
-  if (now > b.resetAt) { b.count = 0; b.resetAt = now + USER_MFA_WINDOW_MS; }
-  if (b.count >= USER_MFA_MAX) return false;
-  b.count++; userMfaAttempts.set(user_id, b); return true;
+const userMfaAttempts = new Map(); // user_id → { count, resetAt } (failures)
+// Counts FAILURES, not attempts, and answers with a delay rather than a refusal.
+// Was: an increment on the way IN plus a 429 at USER_MFA_MAX, which meant ten
+// posts naming somebody else's user_id locked that account out of verify-totp
+// and consume-backup for the whole window. The user_id is request input, so a
+// refusal keyed on it is a weapon aimed at the account, not at the guesser.
+// lib/auth-throttle.js holds the (unit-tested) decision; the Map and its sweep
+// stay here, as with the other limiters.
+function userMfaDelayMs(user_id) {
+  return authThrottle.throttleDelayMs(
+    authThrottle.failureCount(userMfaAttempts, user_id),
+    { threshold: USER_MFA_MAX });
 }
-function userMfaAttemptReset(user_id) { userMfaAttempts.delete(user_id); }
+function userMfaNoteFailure(user_id) { authThrottle.noteFailure(userMfaAttempts, user_id, USER_MFA_WINDOW_MS); }
+function userMfaAttemptReset(user_id) { authThrottle.clearFailures(userMfaAttempts, user_id); }
 setInterval(() => { const now = Date.now(); for (const [k, v] of userMfaAttempts) if (now > v.resetAt + USER_MFA_WINDOW_MS) userMfaAttempts.delete(k); }, 300_000);
 
 // Per-IP rate limit for the public /v2/claim/reveal (max 20/min) — a claim token
@@ -2851,13 +2880,34 @@ const server = http.createServer(async (req, res) => {
     try {
       const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
-      if (!userMfaAttemptOk(user_id)) { res.writeHead(429); return res.end(J({ error: "too_many_attempts" })); }
-      const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      // Throttle, never refuse: see userMfaDelayMs.
+      await authThrottle.sleep(userMfaDelayMs(user_id));
+      // Bounded, so an unreachable redis answers 503 here instead of parking the
+      // request in front of the single-use guard that is supposed to fail closed.
+      let secret;
+      try {
+        secret = await redisDeadline(userTotp.getUserTotpSecret(redisClient, user_id));
+      } catch (e) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "login", stage: "secret_read" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      // The single-use guard could not reach Redis. Fail closed: this is the
+      // endpoint that mints admin-panel sessions, and without the NX key an
+      // observed code can be replayed inside its own 30-second slot. 503, not
+      // 401, so the caller can tell "service down" from "wrong code", and not a
+      // counted failure either.
+      if (result && result.error === totpLib.REPLAY_STORE_UNAVAILABLE) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "login" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
+      if (!result || !result.valid) userMfaNoteFailure(user_id);
       if (result && result.valid) {
         userMfaAttemptReset(user_id);
         // Dual-verify accepted this code. If it validated under SHA-1, record a
@@ -2900,9 +2950,13 @@ const server = http.createServer(async (req, res) => {
     try {
       const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !code) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
-      if (!userMfaAttemptOk(user_id)) { res.writeHead(429); return res.end(J({ error: "too_many_attempts" })); }
+      // Same treatment as verify-totp. The delay is what bounds the argon2 work
+      // a wrong code triggers now that the refusal is gone; the per-IP caps on
+      // the admin side bound it from the other end.
+      await authThrottle.sleep(userMfaDelayMs(user_id));
       const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
       if (result && (result.valid || result.success)) userMfaAttemptReset(user_id);
+      else userMfaNoteFailure(user_id);
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
@@ -3035,6 +3089,11 @@ const server = http.createServer(async (req, res) => {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      if (totpResult.error === totpLib.REPLAY_STORE_UNAVAILABLE) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "signing-key" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
       // Store (server-side pk_hash computation — never trust client)
       let result;
@@ -3106,6 +3165,11 @@ const server = http.createServer(async (req, res) => {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
       });
+      if (totpResult.error === totpLib.REPLAY_STORE_UNAVAILABLE) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "signing-key" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
       if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       let result;

@@ -16,6 +16,7 @@ const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
 const { buildRecipientParties, RECIPIENT_EMAIL_RE } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
+const loginRate = require('./lib/login-ratelimit');
 const { billingStubGone } = require('./lib/billing-stub');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
@@ -972,14 +973,36 @@ api.post("/user/login", async (req, res) => {
   if (!email || !totp) return res.status(400).json({ error: "missing_fields" });
 
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
-  const ipKey    = `paramant:user:ratelimit:ip:${ip}`;
-  const emailKey = `paramant:user:ratelimit:email:${email.toLowerCase()}`;
-  const ipCount    = await redis().incr(ipKey);    if (ipCount    === 1) await redis().expire(ipKey,    900);
-  const emailCount = await redis().incr(emailKey); if (emailCount === 1) await redis().expire(emailKey, 900);
-  if (ipCount > 5 || emailCount > 10) return res.status(429).json({ error: "rate_limited" });
+
+  // Per IP: a hard refusal, unchanged. The IP is the caller's own resource.
+  const ipHit = await loginRate.hitIp(redis(), ip);
+  if (!ipHit.allowed) return res.status(429).json({ error: "rate_limited" });
+
+  // Per e-mail: failures only, and never a refusal. The address is caller input,
+  // so a 429 keyed on it locks out its owner rather than the guesser -- which is
+  // exactly what the counter this replaces did, from eleven posts over three
+  // IPs. Past the threshold the next attempt costs a proof-of-work instead, the
+  // same 2^18 challenge signup and password reset already ask for. See
+  // lib/login-ratelimit.js.
+  const failures = await loginRate.emailFailures(redis(), email);
+  if (loginRate.powRequired(failures)) {
+    const { challenge_id, nonce } = req.body || {};
+    const proof = await pow.verifyChallenge(challenge_id, nonce);
+    if (!proof.valid) {
+      // 428, not 429: the attempt is not refused, it is priced. The login page
+      // solves the challenge and posts again by itself. Hand the IP its attempt
+      // back first: nothing was evaluated here, and charging for the quote as
+      // well as the answer would leave an honest user two real tries out of five.
+      await loginRate.refundIp(redis(), ip);
+      return res.status(428).json({ error: "pow_required", reason: proof.reason });
+    }
+  }
 
   const user = await findUserByEmail(email);
-  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+  if (!user) {
+    await loginRate.noteEmailFailure(redis(), email);
+    return res.status(401).json({ error: "invalid_credentials" });
+  }
 
   const activeRaw = await redis().get(`paramant:user:totp_active:${user.key}`);
   if (activeRaw !== "true") {
@@ -998,17 +1021,36 @@ api.post("/user/login", async (req, res) => {
       // enumeration oracle. Was: 403 totp_setup_required, which leaked the
       // fact that the email belongs to a real account with admin-required
       // TOTP not yet set up.
+      await loginRate.noteEmailFailure(redis(), email);
       return res.status(401).json({ error: "invalid_credentials" });
     }
     // Same 401 for TOTP-not-configured so this branch also does not leak
     // account existence. Was: 403 totp_not_configured.
+    await loginRate.noteEmailFailure(redis(), email);
     return res.status(401).json({ error: "invalid_credentials" });
   }
 
   const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });
-  if (!verifyRes.ok) return res.status(401).json({ error: "invalid_credentials" });
+  // The relay's single-use guard could not reach Redis and now fails closed.
+  // Pass the 503 through instead of dressing it up as a wrong code, and do not
+  // count it against the address: nobody failed, the service is down. During
+  // such an outage no sign-in can succeed anyway, because the session store is
+  // that same Redis.
+  if (verifyRes.status === 503) return res.status(503).json({ error: "totp_unavailable" });
+  if (!verifyRes.ok) {
+    await loginRate.noteEmailFailure(redis(), email);
+    return res.status(401).json({ error: "invalid_credentials" });
+  }
   const result = await verifyRes.json();
-  if (!result.valid) return res.status(401).json({ error: "invalid_credentials" });
+  if (!result.valid) {
+    await loginRate.noteEmailFailure(redis(), email);
+    return res.status(401).json({ error: "invalid_credentials" });
+  }
+
+  // A correct code proves who is at the keyboard, so the failures collected in
+  // this address's name stop counting right here. Without this the owner keeps
+  // paying for the guesser's score for the rest of the window.
+  await loginRate.clearEmailFailures(redis(), email);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(

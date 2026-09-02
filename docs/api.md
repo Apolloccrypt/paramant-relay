@@ -738,6 +738,42 @@ curl -X POST https://paramant.app/api/user/auth/login \
 # {"ok":true}
 ```
 
+**Rate limits on this endpoint.** Two counters, and they are deliberately not
+the same kind of thing:
+
+| Keyed on | Counts | Window | Over the limit |
+|----------|--------|--------|----------------|
+| IP address | every attempt | 15 min | `429 rate_limited` after 5 |
+| Email address | failed sign-ins only | 15 min | `428 pow_required` after 10, never a refusal |
+
+The per-IP counter is a hard refusal, because the IP address is the caller's own
+resource. The per-email counter is not, because the address is request input:
+anyone can name yours. It counts only attempts that actually failed, a
+successful sign-in deletes it, and once it is over the threshold the next
+attempt has to carry a solved proof-of-work (`challenge_id` + `nonce` from
+`GET /api/captcha/challenge`, the same 2^18 challenge signup uses) instead of
+being turned away. The request that asks for the proof is not charged to the
+per-IP counter, so the five attempts stay five real attempts.
+
+Be clear about what that proof buys. It is a fixed 2^18 challenge: measured on
+this repository a native solver finds a nonce in roughly 150 to 250 ms, and a
+browser doing the same work through WebCrypto takes one to two seconds. It makes
+each automated guess measurably more expensive and it stops a stranger from
+switching your account off, but it is not the brake on guessing. The brake is
+the per-IP limit above: five attempts per IP per fifteen minutes.
+
+```bash
+# after ten failed attempts on this address
+curl -X POST https://paramant.app/api/user/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","totp_code":"123456","challenge_id":"...","nonce":12345}'
+```
+
+A `503 totp_unavailable` means the single-use guard behind TOTP verification
+could not reach Redis. The code was not rejected and nothing is wrong with the
+account; verification fails closed rather than accepting a code it cannot mark
+as spent. See SECURITY.md.
+
 ### POST /api/user/auth/login-with-backup
 
 ```bash
@@ -894,7 +930,9 @@ They are not accessible from the public internet.
 | 404 | `not_found` | Resource does not exist |
 | 409 | `totp_already_configured` | TOTP is fully activated; cannot re-enroll without a reset |
 | 409 | `email_already_registered` | Signup attempted for an email that already has an account |
-| 429 | `rate_limited` | Too many requests from this IP or email address |
+| 428 | `pow_required` | This email address has collected enough failed sign-ins that the next attempt must carry a solved proof-of-work. Not a refusal: solve `GET /api/captcha/challenge` and post again |
+| 429 | `rate_limited` | Too many requests from this IP address |
+| 503 | `totp_unavailable` | The TOTP single-use guard could not reach Redis. Verification fails closed; retry when the relay reports healthy |
 | 500 | `internal` | Unexpected server error; check relay logs |
 
 ### POST /admin/api/admin/force-totp

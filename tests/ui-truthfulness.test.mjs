@@ -146,14 +146,42 @@ assert.doesNotMatch(resetConfirm, /arrives within a minute|within a minute/i,
 assert.match(resetConfirm, /someone who briefly had your mailbox open/i,
   'reset-confirm must say why the reset takes two emails');
 
-// 4. The sign-in rate limit is per IP (5/900s) AND per email address (10/900s),
-//    admin/server.js. The email counter is account-wide, so "this device" points
-//    the reader at the wrong cause.
+// 4. The sign-in 429 is now per IP and ONLY per IP (5 per 900s,
+//    admin/lib/login-ratelimit.js). The per-email counter that used to share
+//    that status code counted attempts rather than failures, so a stranger
+//    naming your address could put you on 429 for fifteen minutes; it counts
+//    failures now, clears on a success, and asks for a proof-of-work instead of
+//    refusing. The page has to point at the cause that exists, and must not keep
+//    telling people their account can be rate-limited shut.
 const loginJs = read('frontend/js/auth-login.js');
 assert.doesNotMatch(loginJs, /attempts from this device/i,
-  'the 429 text must not blame the device: the limit is also per account');
-assert.match(loginJs, /counted per account and per internet connection/i,
-  'the 429 text must name both counters, because either one can be the cause');
+  'the 429 text must not blame the device: the limit is per internet connection');
+assert.doesNotMatch(loginJs, /counted per account and per internet connection/i,
+  'there is no per-account refusal any more, so the 429 text must not claim one');
+assert.match(loginJs, /counts the connection, not your account/i,
+  'the 429 text must name the counter that can actually cause it');
+assert.match(loginJs, /nobody can trigger it by guessing at your email address/i,
+  'and must say the thing that changed, because it is what a locked-out reader is looking for');
+
+// 4a. The 428 is the priced attempt, not a refusal, and the page handles it by
+//     solving the challenge and posting again. The message is only for the case
+//     where that fails, so it may not read as a lockout either.
+assert.match(loginJs, /res\.status === 428/,
+  'the login page must handle the proof-of-work request rather than showing the user a dead end');
+assert.match(loginJs, /ParamantCaptcha\.getCaptchaProof/,
+  'and it must solve it with the proof-of-work helper the page loads');
+assert.match(loginJs, /extra verification this sign-in needs/i,
+  'and when the challenge itself fails, the message must be about the verification, not about being blocked');
+assert.ok(read('frontend/auth/login.html').includes('/js/pow-captcha.js'),
+  'the login page must actually load the proof-of-work helper it calls');
+
+// 4b. A 503 means the TOTP single-use guard could not reach Redis and verification
+//     failed closed. Nothing is wrong with the code or the account, and the page
+//     has to say so rather than leaving the reader to conclude their code is bad.
+assert.match(loginJs, /res\.status === 503/,
+  'the login page must handle the fail-closed 503 separately from a wrong code');
+assert.match(loginJs, /Nothing is wrong with your account or your code/i,
+  'the 503 text must say the outage is ours, not theirs');
 
 // 4b. POST /api/user/auth/request-totp-reset sends a CONFIRMATION mail whose
 //     token is { EX: 3600 } (admin/server.js:1890). The 14 day setup token is

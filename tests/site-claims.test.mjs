@@ -256,9 +256,16 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
 });
 
 // 6 ── The authentication numbers on the security page. Session cookie
-// Max-Age, TOTP step, and the two login rate limits all live in code. The
-// sentence "after ten consecutive failures an account locks for thirty
-// minutes" had no code behind it (searched 2 September 2026) and is gone.
+// Max-Age, TOTP step, and the login limits all live in code. The sentence
+// "after ten consecutive failures an account locks for thirty minutes" had no
+// code behind it (searched 2 September 2026) and is gone.
+//
+// The per-email half is no longer a limit at all, and the page has to say so.
+// It used to be a counter on the address, incremented before authentication and
+// refusing at eleven, which meant a stranger could put the owner of an address
+// on 429 for fifteen minutes. It counts failures now, a success clears it, and
+// past the threshold the attempt costs a proof-of-work instead of being
+// refused. So the page may claim exactly one hard limit, the per-IP one.
 test('the authentication numbers on the security page are the ones the code enforces', () => {
   const srv = read('admin/server.js');
   const sec = visible(page('security'));
@@ -275,15 +282,27 @@ test('the authentication numbers on the security page are the ones the code enfo
   const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
   const perIp = Number(/b\.count >= (\d+)/.exec(fn)[1]);
   const winMin = Number(/(\d+) \* 60_000/.exec(fn)[1]);
-  // /api/user/login: per-IP and per-email counters in Redis with a TTL.
-  const login = srv.slice(srv.indexOf('paramant:user:ratelimit:ip:'));
-  const ttlSec = Number(/expire\(ipKey,\s*(\d+)\)/.exec(login)[1]);
-  const lim = /ipCount > (\d+) \|\| emailCount > (\d+)/.exec(login);
-  assert.equal(Number(lim[1]), perIp, 'both login paths must cap the same per-IP count');
-  assert.equal(ttlSec, winMin * 60, 'both login paths must use the same window');
-  const perEmail = Number(lim[2]);
-  assert.match(sec, new RegExp(`rate-limited to ${WORDS[perIp]} per IP per ${WORDS[winMin]} minutes and ${WORDS[perEmail]} per email per ${WORDS[winMin]} minutes`),
-    `security: login limits must read ${perIp}/IP and ${perEmail}/email per ${winMin} minutes`);
+  // /api/user/login: the limiter now lives in admin/lib/login-ratelimit.js.
+  const rl = read('admin/lib/login-ratelimit.js');
+  const ipLimit = Number(/const IP_LIMIT = (\d+);/.exec(rl)[1]);
+  const windowS = Number(/const WINDOW_S = (\d+);/.exec(rl)[1]);
+  const powAt = Number(/const EMAIL_FAIL_THRESHOLD = (\d+);/.exec(rl)[1]);
+  assert.equal(ipLimit, perIp, 'both login paths must cap the same per-IP count');
+  assert.equal(windowS, winMin * 60, 'both login paths must use the same window');
+
+  assert.match(sec, new RegExp(`rate-limited to ${WORDS[perIp]} per IP per ${WORDS[winMin]} minutes`),
+    `security: the per-IP login limit must read ${perIp} per ${winMin} minutes`);
+  assert.match(sec, new RegExp(`past ${WORDS[powAt]} inside ${WORDS[winMin]} minutes the next attempt has to carry a proof-of-work`),
+    `security: the per-email threshold must read ${powAt} and must be described as a cost, not a refusal`);
+
+  // The page must not sell the per-email counter as a limit again, and the
+  // handler must not implement one. A refusal keyed on an address is a lockout
+  // whatever it is called.
+  assert.doesNotMatch(sec, /per email per/i, 'security: there is no per-email refusal to advertise');
+  const handler = srv.slice(srv.indexOf('api.post("/user/login"'), srv.indexOf('api.post("/user/login-with-backup"'));
+  assert.doesNotMatch(handler, /paramant:user:ratelimit:email:|emailCount\s*>/,
+    'the login handler must not refuse on a per-email attempt counter');
+  assert.match(handler, /clearEmailFailures/, 'a successful sign-in must clear the failures counted on that address');
 
   assert.doesNotMatch(srv, /consecutive failures|lockout_minutes|LOCKOUT_MS/i, 'no login lockout is implemented; if one is added, put the sentence back with its numbers');
   assert.doesNotMatch(sec, /consecutive failures|account locks/i, 'security: must not promise an account lockout the code does not implement');
@@ -785,11 +804,12 @@ test('no page promises an account lockout, and the login limits are the enforced
   const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
   const perIp = Number(/b\.count >= (\d+)/.exec(fn)[1]);
   const winMin = Number(/(\d+) \* 60_000/.exec(fn)[1]);
-  const login = srv.slice(srv.indexOf('paramant:user:ratelimit:ip:'));
-  const lim = /ipCount > (\d+) \|\| emailCount > (\d+)/.exec(login);
-  const perEmail = Number(lim[2]);
-  assert.equal(Number(lim[1]), perIp);
-  assert.equal(Number(/expire\(ipKey,\s*(\d+)\)/.exec(login)[1]), winMin * 60);
+  // The /api/user/login limiter moved into a module in #368, when the per-email
+  // half stopped being a refusal. The numbers are read from there now.
+  const rl = read('admin/lib/login-ratelimit.js');
+  const perEmail = Number(/const EMAIL_FAIL_THRESHOLD = (\d+);/.exec(rl)[1]);
+  assert.equal(Number(/const IP_LIMIT = (\d+);/.exec(rl)[1]), perIp);
+  assert.equal(Number(/const WINDOW_S = (\d+);/.exec(rl)[1]), winMin * 60);
   // No lockout anywhere in the server code, or the pages should say so again.
   for (const src of ['admin/server.js', 'relay/relay.js']) {
     assert.doesNotMatch(read(src), /consecutive fail|lockout_minutes|LOCKOUT_MS|account_locked/i,
@@ -809,8 +829,17 @@ test('no page promises an account lockout, and the login limits are the enforced
   // And the page that used to promise it now states what the code does.
   const help = visible(page('help/session-issues'));
   if (!help.includes('There is no account lock')) problems.push('help/session-issues: must say there is no account lock');
-  for (const phrase of [`${perIp} attempts from one IP address`, `${perEmail} for one email address`, `${winMin} minutes`]) {
+  for (const phrase of [`${perIp} attempts from one IP address`, `${winMin} minutes`]) {
     if (!help.includes(phrase)) problems.push(`help/session-issues: must state "${phrase}"`);
+  }
+  // The per-email number is no longer a refusal, so the page states it as the
+  // point where an attempt starts costing work. Naming it as a second limit
+  // would put the lockout back in the reader's head.
+  if (!help.includes(`past ${word(perEmail)} inside ${word(winMin)} minutes`)) {
+    problems.push(`help/session-issues: must state the ${perEmail}-failure threshold as a cost, not a limit`);
+  }
+  if (/for one email address/.test(help)) {
+    problems.push('help/session-issues: there is no per-email refusal to state any more');
   }
 
   // "No lockout" is not the same as "nobody can lock you out". The email
@@ -823,17 +852,20 @@ test('no page promises an account lockout, and the login limits are the enforced
   // page to carry the caveat exactly while they hold.
   const handler = srv.slice(srv.indexOf('api.post("/user/login"'));
   const body = handler.slice(0, handler.indexOf('\napi.'));
-  const emailKeyed = /const emailKey = `paramant:user:ratelimit:email:\$\{email\.toLowerCase\(\)\}`/.test(body);
+  // Three properties, read out rather than asserted, because the whole point of
+  // this branch is that the page follows whichever way they fall. #368 turned
+  // all three off: the counter counts failures, it runs after authentication,
+  // and a success deletes it. If any of them comes back the caveat comes back
+  // with it, on the page, in the reader's language.
+  const emailKeyed = /paramant:user:ratelimit:email:/.test(body);
+  const authAt = body.indexOf('findUserByEmail');
+  assert.ok(authAt > 0, 'the login handler must still look the account up');
   // indexOf returns -1 for "not found", and -1 sorts before every real offset,
   // so a counter that was deleted outright would read as "counted first". Both
   // offsets are required to exist before they are compared.
   const incrAt = body.indexOf('redis().incr(emailKey)');
-  const authAt = body.indexOf('findUserByEmail');
-  assert.ok(emailKeyed, 'the per-email login counter must still be keyed on the address');
-  assert.ok(incrAt > 0, 'the login handler must still count attempts per address');
-  assert.ok(authAt > 0, 'the login handler must still look the account up');
-  const beforeAuth = incrAt < authAt;
-  const neverCleared = !new RegExp(`del\\(\\s*emailKey`).test(body);
+  const beforeAuth = incrAt > 0 && incrAt < authAt;
+  const neverCleared = !/clearEmailFailures|del\(\s*emailKey/.test(body);
   const shared = emailKeyed && beforeAuth && neverCleared;
 
   const CAVEAT = 'attempts someone else makes on your address count against you too';

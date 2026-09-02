@@ -172,12 +172,91 @@ test('match-only mode (no store) verifies without touching a replay store', asyn
   assert.strictEqual(r.algorithm, 'sha256');
 });
 
-test('a store error fails OPEN so a Redis blip never locks out first use', async () => {
+// The single-use guard used to be `.catch(() => 'OK')`: a Redis error reported
+// success and the code was accepted. On the endpoint that mints admin-panel
+// sessions that is a replay window handed out for free, and the availability it
+// bought was imaginary, because the session store is the same Redis. It fails
+// closed now, with an error a call site can turn into a 503 instead of a 401.
+test('a store error fails CLOSED and says so, rather than accepting the code', async () => {
   const secret = freshSecret();
-  const throwingStore = { async set() { throw new Error('redis down'); } };
   const code = totp.totpCode(secret, slotNow(), 'sha256');
-  const r = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10' }, throwingStore);
-  assert.strictEqual(r.valid, true, 'store error => .catch(=>OK) => valid');
+
+  const throwingStore = { async set() { throw new Error('redis down'); } };
+  const thrown = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10' }, throwingStore);
+  assert.strictEqual(thrown.valid, false, 'an unreachable replay store must not validate a code');
+  assert.strictEqual(thrown.error, totp.REPLAY_STORE_UNAVAILABLE, 'and it is reported as an outage, not a bad code');
+
+  // A store that throws synchronously never returns a promise to attach a
+  // handler to; it must not take the process down either.
+  const syncThrowingStore = { set() { throw new Error('redis down, synchronously'); } };
+  const sync = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10b' }, syncThrowingStore);
+  assert.strictEqual(sync.valid, false, 'a synchronous throw is an outage too');
+  assert.strictEqual(sync.error, totp.REPLAY_STORE_UNAVAILABLE);
+
+  // The outage answer must stay distinguishable from a refused replay, or the
+  // call sites cannot tell 503 from 401.
+  const store = fakeReplayStore();
+  const first = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10c' }, store);
+  const replay = await totp.verifyTotpGeneric(code, secret, { replayKey: 't10c' }, store);
+  assert.strictEqual(first.valid, true, 'first use is accepted');
+  assert.strictEqual(replay.valid, false, 'the same code is refused the second time');
+  assert.strictEqual(replay.error, 'replay', 'a refused replay is not an outage');
+
+  // And a wrong code stays a plain no-match: no error field, so it can never be
+  // mistaken for a service problem.
+  const wrong = await totp.verifyTotpGeneric('000000', secret, { replayKey: 't10d' }, fakeReplayStore());
+  assert.strictEqual(wrong.valid, false);
+  assert.strictEqual(wrong.error, undefined, 'a wrong code carries no error code');
+});
+
+test('a store that never answers is an outage too, and the guard says so in time', async () => {
+  const secret = freshSecret();
+  const code = totp.totpCode(secret, slotNow(), 'sha256');
+
+  // This is what an unreachable Redis actually looks like from here: node-redis
+  // queues the command while it reconnects, so set() neither resolves nor
+  // rejects. Without a bound the guard waits with it and the route hangs, which
+  // is not fail-closed, it is no decision at all.
+  const hangingStore = { set() { return new Promise(() => {}); } };
+  const t0 = Date.now();
+  const r = await totp.verifyTotpGeneric(code, secret, { replayKey: 't11', storeTimeoutMs: 40 }, hangingStore);
+  const elapsed = Date.now() - t0;
+  assert.strictEqual(r.valid, false, 'a store that never answers must not validate a code');
+  assert.strictEqual(r.error, totp.REPLAY_STORE_UNAVAILABLE, 'and it reads as an outage');
+  assert.ok(elapsed < 1000, `the wait is bounded, took ${elapsed}ms`);
+
+  // A slow but working store still gets its answer through: the bound is a
+  // deadline, not a race the store normally loses.
+  const slowStore = { set() { return new Promise((res) => setTimeout(() => res('OK'), 10)); } };
+  const slow = await totp.verifyTotpGeneric(code, secret, { replayKey: 't11b', storeTimeoutMs: 500 }, slowStore);
+  assert.strictEqual(slow.valid, true, 'a slow store inside the deadline is still a valid first use');
+
+  assert.ok(totp.REPLAY_STORE_TIMEOUT_MS > 0 && totp.REPLAY_STORE_TIMEOUT_MS <= 2000,
+    'the default deadline stays inside any sane request budget');
+});
+
+test('the replay deadline is configurable, and cannot be configured away', () => {
+  const { execFileSync } = require('child_process');
+  const read = (env) => Number(execFileSync(process.execPath,
+    ['-e', "process.stdout.write(String(require('../lib/totp').REPLAY_STORE_TIMEOUT_MS))"],
+    { cwd: __dirname, env: { ...process.env, ...env } }).toString());
+
+  assert.strictEqual(read({ PARAMANT_TOTP_REPLAY_TIMEOUT_MS: '' }), 1000, 'unset means one second');
+  assert.strictEqual(read({ PARAMANT_TOTP_REPLAY_TIMEOUT_MS: '2500' }), 2500, 'a slow store can be given more room');
+
+  // Zero, negative and nonsense are not an opt-out. An unbounded guard does not
+  // fail closed, it hangs, which is the failure this deadline exists to prevent,
+  // so a bad value falls back to the default instead of switching it off.
+  for (const bad of ['0', '-1', 'off', 'nope']) {
+    assert.strictEqual(read({ PARAMANT_TOTP_REPLAY_TIMEOUT_MS: bad }), 1000, `"${bad}" cannot disable the bound`);
+  }
+});
+
+test('the fail-open catch is gone from the source, not just from the behaviour', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'totp.js'), 'utf8');
+  const guard = src.slice(src.indexOf('async function verifyTotpGeneric'));
+  assert.doesNotMatch(guard, /\.catch\(\(\)\s*=>\s*'OK'\)/, "the .catch(() => 'OK') fail-open must not come back");
+  assert.match(guard, /REPLAY_STORE_UNAVAILABLE/, 'a store failure is surfaced');
 });
 
 test('matchTotpSlot returns the exact matched counter slot and algorithm', () => {

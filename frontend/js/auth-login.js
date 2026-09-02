@@ -26,6 +26,19 @@
     }
   }
 
+  // One sign-in POST. `proof`, when present, is a solved proof-of-work; the
+  // server asks for one only after this address has failed often enough.
+  function postLogin(email, totp, proof) {
+    const body = { email: email, totp: totp };
+    if (proof) { body.challenge_id = proof.challenge_id; body.nonce = proof.nonce; }
+    return fetch('/api/user/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    });
+  }
+
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     errorDiv.classList.remove('visible');
@@ -36,12 +49,18 @@
     const totp = document.getElementById('totp').value.trim();
 
     try {
-      const res = await fetch('/api/user/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, totp }),
-        credentials: 'include',
-      });
+      let res = await postLogin(email, totp, null);
+
+      // 428: this address has collected enough failed sign-ins that the next
+      // attempt has to carry a proof-of-work. It is a price, not a refusal, so
+      // pay it here and post again. Nobody is locked out by it; the only cost
+      // is the second or two the challenge takes.
+      if (res.status === 428) {
+        submitBtn.textContent = 'Verifying...';
+        let proof = null;
+        try { proof = await ParamantCaptcha.getCaptchaProof(); } catch (_) { proof = null; }
+        if (proof) res = await postLogin(email, totp, proof);
+      }
 
       if (res.ok) {
         // Login succeeded. If the authenticator app used a SHA-1 code, show a
@@ -58,8 +77,14 @@
       } else if (res.status === 403) {
         errorDiv.innerHTML = 'This account has no authenticator app linked to it yet. <a href="/auth/request-reset">Email me a setup link</a>, or <a href="/signup">create an account</a>.';
         errorDiv.classList.add('visible');
+      } else if (res.status === 428) {
+        errorDiv.textContent = 'We could not run the extra verification this sign-in needs. Refresh the page and try again.';
+        errorDiv.classList.add('visible');
       } else if (res.status === 429) {
-        errorDiv.textContent = 'Too many sign-in attempts. Sign-in is paused for up to 15 minutes. Attempts are counted per account and per internet connection, so someone else on your network can set this off too.';
+        errorDiv.textContent = 'Too many sign-in attempts from this internet connection. Sign-in from here is paused for up to 15 minutes. The limit counts the connection, not your account, so someone else on your network can set it off, and nobody can trigger it by guessing at your email address.';
+        errorDiv.classList.add('visible');
+      } else if (res.status === 503) {
+        errorDiv.textContent = 'Sign-in is temporarily unavailable. Nothing is wrong with your account or your code. Try again in a few minutes.';
         errorDiv.classList.add('visible');
       } else {
         errorDiv.textContent = 'Sign-in did not go through. Nothing changed on your account. Try again in a moment.';
