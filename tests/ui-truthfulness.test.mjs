@@ -511,3 +511,152 @@ console.log('ui-truthfulness: the homepage does not overclaim signatures and quo
 console.log('ui-truthfulness: the free plan is Community everywhere and the founder line matches /about');
 console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');
 console.log('ui-truthfulness: the account page resolves plans from the same source and never upsells a customer');
+
+// ── /docs and /help now answer a buyer, and quote pages instead of paraphrasing ─
+// The messaging guide (docs/brand/messaging.md, section 10) allows a sentence on
+// the site only when it already ships somewhere and a test fails when it stops
+// shipping. These three answers were copied onto /help from /sign, /pricing and
+// / (the rules grid). A copy drifts silently: the source page can be reworded
+// and the copy keeps promising the old thing. So each assertion is a pair, the
+// quote and the page it was quoted from, and the pair fails together.
+//
+// Every quote is matched inside the markup a visitor actually sees. An earlier
+// version of this block asserted the docs buyer line against the whole file, and
+// deleting the visible paragraph left the test green: the same words also sit in
+// four meta tags. A pin that a meta description can satisfy pins nothing.
+const docsHtml = read('frontend/docs.html');
+const helpHtml = read('frontend/help/index.html');
+const securityHtml = read('frontend/security.html');
+const developerHtml = read('frontend/developer.html');
+const homeGrid = read('frontend/index.html');
+// Everything below </head>: the page a visitor reads, meta tags excluded. The
+// sales-voice and key-location gates below run against this, not against the
+// three answers alone, so a slogan cannot slip back in through the lede, an
+// article card or the footer.
+const helpBody = helpHtml.slice(helpHtml.indexOf('</head>'));
+// The three answers on /help, without their surrounding page.
+const helpAnswers = [...helpHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
+assert.equal(helpAnswers.split('\n').length, 3,
+  'help/index.html must keep the three buyer answers in the "Asked most often" block');
+
+// /docs is where an evaluating buyer sends their IT, and it must say so before
+// it starts talking about pip install. It absorbed traffic that belonged on
+// /pricing, so it also has to name the price boundary of the API once, and it
+// gives the buyer a button of the same weight as the developer's Quick start.
+assert.match(docsHtml, /<p class="docs-buyer">Evaluating Paramant\? Your IT can check everything here\./,
+  'docs.html must open with the visible line that tells a buyer what this page is for');
+assert.match(docsHtml, /<p class="lede">[^<]*The ParaSign API is available from ParaSign Pro/,
+  'docs.html must state in the visible lede which plan the ParaSign API needs');
+const docsActions = (docsHtml.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
+assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
+  'the developer keeps the primary button on /docs: Quick start');
+assert.match(docsActions, /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
+  'the buyer gets a real button to /pricing beside it, not only a text link');
+assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API access is included from ParaSign Pro/,
+  'developer.html must state in its visible lede which plan the ParaSign API needs');
+// /developer is noindex and only reachable once signed in, so it addresses the
+// developer reading it, never the buyer who sent them.
+assert.doesNotMatch(developerHtml, /your IT can check/i,
+  'developer.html talks to the developer on the screen, not to their buyer');
+// Both plan lines are only true while /pricing sells API access on ParaSign Pro.
+assert.match(pricing, /Unlimited transfers - API access/,
+  'pricing.html must still list API access on the ParaSign Pro tier');
+
+// Answer 1: signing without an account. Quoted from /sign, which is pinned above.
+assert.match(helpAnswers, /Signing a document needs an account/i,
+  'help/index.html must answer whether an account is required');
+assert.match(helpAnswers, /open a signing request someone sent you/i,
+  'help/index.html must say what an invited signer can do without an account');
+
+// Answer 2: cost. A support page that will not name a number sends someone back
+// to the search box, so /help names the free allowance and the first paid price
+// exactly as /pricing prints them, and both halves are pinned to that page.
+// Scoped to the ParaSign grid: /help names "ParaSign Community" and quotes its
+// allowance, and pricing.html carries a second Community card for ParaSend. A
+// bare match on the tier name stays green while the ParaSign one is renamed.
+const parasignGrid = pricing.slice(pricing.indexOf('<!-- TIER CARDS: PARASIGN -->'));
+assert.ok(parasignGrid.length > 0 && parasignGrid.length < pricing.length,
+  'pricing.html must keep the ParaSign tier grid this block reads from');
+assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}?<li>2 signatures per month<\/li>/,
+  'pricing.html is the source of the ParaSign Community allowance quoted on /help');
+assert.match(pricing, /&euro;49<span/,
+  'pricing.html is the source of the ParaSign Pro price quoted on /help');
+assert.match(pricing, /charged &euro;59\.29\/mo incl\. 21% btw/,
+  'pricing.html is the source of the incl. btw figure quoted on /help');
+assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures per month\./,
+  'help/index.html must name the free allowance, not just promise that free exists');
+assert.match(helpAnswers, /ParaSign Pro at &euro;49 a month excl\. btw \(&euro;59\.29 incl\.\)/,
+  'help/index.html must name the first paid price the way /pricing prints it');
+// Proof 3 of the messaging guide, quoted from /pricing. The slogan that follows
+// it there ("Pay for volume, never for security") stays on the page that sells;
+// /help is support voice and an unverifiable sales line is the last thing
+// someone stuck on this page needs.
+assert.match(pricing, /Every plan gets the same encryption, the same post-quantum signatures and the same public proof log\. Pay for volume, never for security\./,
+  'pricing.html must keep the sentence the free-versus-paid split rests on');
+assert.match(helpAnswers, /Every plan gets the same encryption, the same post-quantum signatures and the same public proof log\./,
+  'help/index.html must quote the same-crypto fact, not paraphrase it');
+assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
+  'help/index.html must not carry the sales line anywhere in the body; it is a support page');
+
+// Answer 3: where the data lives. Three sentences a person can read, not the
+// Jurisdiction and privacy table flattened into prose. The claim is scoped to
+// the data path and names the Resend exception in the same breath, exactly as
+// proof 1 of the messaging guide requires. The unqualified "no US company" row
+// on /security is an open contradiction (guide section 9) and is deliberately
+// not repeated here.
+assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
+  'security.html must keep the server location row /help quotes');
+assert.match(homeGrid, /No US provider in the data path\. Email goes out via Resend, as <a href="\/privacy">\/privacy<\/a> sets out\./,
+  'index.html is the source of the data-path wording and its Resend exception');
+assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
+  'help/index.html must answer where the documents live, and say they are ciphertext there');
+assert.match(helpAnswers, /no US provider is in the data path/,
+  'help/index.html must scope the claim to the data path');
+assert.match(helpAnswers, /Email goes out via Resend, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+  'help/index.html must name the Resend exception in the same breath, with the /privacy link');
+assert.doesNotMatch(helpAnswers, /no US company/i,
+  'help/index.html must not repeat the unqualified no-US-company row from /security');
+
+// A private key never reaches a server, and the whole site says so: "Generated
+// on your device, never sent" (index.html), "relay holds only ciphertext, never
+// keys" and "No plaintext, no keys" (security.html), "we never hold decryption
+// keys, anywhere" (trust.html), "The relay never sees plaintext and never holds
+// a private key" (docs.html). An answer that puts keys in a rack in Nuremberg
+// contradicts all five at once, and it is the sentence a security reviewer
+// would quote back. So /help may name a key only in the negative: any sentence
+// that mentions a key and a piece of infrastructure must be saying the key is
+// not there.
+assert.match(homeGrid, /Generated on your device, never sent/,
+  'index.html is the source of the promise that a key never reaches a server');
+assert.match(securityHtml, /relay holds only ciphertext, never keys/,
+  'security.html is the source of the promise that the relay holds no keys');
+assert.match(docsHtml, /The relay never sees plaintext and never holds a private key\./,
+  'docs.html is the source of the sentence /help quotes about plaintext and keys');
+assert.match(helpAnswers, /The relay never sees plaintext and never holds a private key\./,
+  'help/index.html must say where the keys are not, in the words docs.html uses');
+for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/)) {
+  if (!/\bkeys?\b/i.test(sentence)) continue;
+  if (!/\b(server|servers|relay|Hetzner|Nuremberg|hosted|infrastructure|data centre|data center)\b/i.test(sentence)) continue;
+  assert.match(sentence, /\bnever\b|\bno\b|\bnot\b/i,
+    `help/index.html puts a key on infrastructure without denying it: "${sentence.trim()}"`);
+  assert.doesNotMatch(sentence, /\bkeys?\b[^.]{0,60}?\b(?:live|sit|reside|are stored|are kept|are held|stay)\b/i,
+    `help/index.html must not say a key lives on a server: "${sentence.trim()}"`);
+  assert.doesNotMatch(sentence, /\b(?:live|sit|reside|stored|kept|held)\b[^.]{0,60}?\bkeys?\b/i,
+    `help/index.html must not say a server holds a key: "${sentence.trim()}"`);
+}
+
+// No sales voice on a support page. Someone here has already signed up.
+assert.doesNotMatch(helpBody, /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class/i,
+  'help/index.html must stay in support voice');
+
+// The tone rule is site-wide, but these two articles kept em-dashes in the H1
+// and the tab title after an earlier pass cleaned only their ledes.
+for (const slug of ['index', 'api-key-vs-totp', 'lost-authenticator']) {
+  const html = read(`frontend/help/${slug}.html`);
+  assert.doesNotMatch(html, /\u2014|&mdash;|\u2013|&ndash;/,
+    `help/${slug}.html must carry no em-dash or en-dash, in the H1, the title or anywhere else`);
+}
+assert.doesNotMatch(docsHtml, /\u2014|&mdash;|\u2013|&ndash;/,
+  'docs.html must carry no em-dash or en-dash');
+
+console.log('ui-truthfulness: /docs and /help answer a buyer with sentences that ship elsewhere');

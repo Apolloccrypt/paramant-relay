@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>API key vs TOTP — PARAMANT Help</title>
-<meta property="og:title" content="API key vs TOTP — PARAMANT Help">
-<meta property="og:description" content="The difference between Paramant API keys and TOTP codes — when to use each, and how they work together.">
+<title>API key vs TOTP &middot; PARAMANT Help</title>
+<meta property="og:title" content="API key vs TOTP &middot; PARAMANT Help">
+<meta property="og:description" content="The difference between Paramant API keys and TOTP codes: when to use each, and how they work together.">
 <meta property="og:url" content="https://paramant.app/help/api-key-vs-totp">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/help/api-key-vs-totp">
-<meta name="description" content="The difference between Paramant API keys and TOTP codes — when to use each, and how they work together.">
+<meta name="description" content="The difference between Paramant API keys and TOTP codes: when to use each, and how they work together.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -138,7 +138,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/api-key-vs-totp#webpage",
       "url": "https://paramant.app/help/api-key-vs-totp",
-      "name": "API key vs TOTP — PARAMANT Help",
+      "name": "API key vs TOTP \u00b7 PARAMANT Help",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -146,7 +146,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "The difference between Paramant API keys and TOTP codes — when to use each, and how they work together."
+      "description": "The difference between Paramant API keys and TOTP codes: when to use each, and how they work together."
     },
     {
       "@type": "BreadcrumbList",
@@ -217,9 +217,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     API key vs TOTP
   </div>
 
-  <h1>API key vs <em>TOTP</em> — what's the difference?</h1>
+  <h1>API key vs <em>TOTP</em>: what's the difference?</h1>
 
-  <p class="lead">Paramant uses two credential types for different purposes. Understanding which one you need — and when you need both — prevents most authentication problems.</p>
+  <p class="lead">Paramant uses two credential types for different purposes. Knowing which one you need, and when you need both, prevents most authentication problems.</p>
 
   <h2>The short version</h2>
 
@@ -248,7 +248,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>When you need just the API key</h2>
 
-  <p>Machine-to-machine calls — IoT devices, CI pipelines, server scripts — use the API key alone. The key goes in the <code>Authorization</code> header on every request. No TOTP code is required because the machine cannot open an authenticator app.</p>
+  <p>Machine-to-machine calls use the API key alone. That covers IoT devices, CI pipelines and server scripts. The key goes in the <code>Authorization</code> header on every request. No TOTP code is required because the machine cannot open an authenticator app.</p>
 
   <div class="tip"><p>Use a <strong>dedicated API key</strong> for each integration so you can revoke one without affecting the others. Create additional keys in <a href="/dashboard">Dashboard &rarr; API keys</a>.</p></div>
 
@@ -266,7 +266,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>Why not just use a password?</h2>
 
-  <p>Paramant has no passwords. The API key functions as one — it is long, random, and machine-generated — but it also serves as the credential for API calls. Combining it with TOTP gives you two-factor authentication without a separate password to manage or a password reset flow to abuse.</p>
+  <p>Paramant has no passwords. The API key functions as one, long, random and machine-generated, and it also serves as the credential for API calls. Combining it with TOTP gives you two-factor authentication without a separate password to manage or a password reset flow to abuse.</p>
 
   <h2>Key rotation</h2>
 
