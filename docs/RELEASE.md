@@ -88,21 +88,36 @@ That suite is the checklist. If it passes, every copy agrees.
 
 ### 3. Run what CI runs
 
+These mirror `.github/workflows/test.yml`. When that file changes, change these
+with it; the exclusion lists are the part that drifts.
+
 ```bash
-# relay unit suite, exactly as test.yml runs it
-cd relay && RELAY_TEST_SKIP=redis node --test $(ls test/*.test.js | grep -vE \
-  'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index')
+# relay unit suite (installs nothing, so no redis and no engine)
+cd relay && RELAY_TEST_SKIP=redis node --test --test-reporter=tap \
+  $(ls test/*.test.js | grep -vE \
+  'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-signs-quota|route-')
 cd ../admin && node --test test/*.test.js
 cd ..
 
-# root integration suites, no browser
-node --test $(grep -L "from 'playwright'" tests/*.mjs | grep -vE 'transfer-canary|parasign-canary')
+# root integration suites, no browser. CI installs the root deps first, and so
+# must you: tests/heartbeat-lib.test.mjs imports @noble/post-quantum.
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
+node --test $(grep -L "from 'playwright'" tests/*.mjs)
 
 # the static gates
 tests/static-sanity.sh
 npx --yes eslint@9 .
 find . -name '*.sh' -not -path './node_modules/*' -print0 | xargs -0 -n1 bash -n
 ```
+
+The route suites and the crypto suite are not in that list. They need a booted
+`relay.js`, a redis service and the built `@paramant/core`, which is why they
+live in their own CI jobs; run them there rather than locally.
+
+`--test-reporter=tap` on the first command is not cosmetic. Two steps in
+`test.yml` parse TAP diagnostic lines to catch a suite that runs and asserts
+nothing, and Node's default reporter for a non-TTY changed from tap to spec
+between Node 20 and Node 24. Under spec those gates see nothing and pass.
 
 Node 24 is the supported line (`.nvmrc`, and `engines` allows 22 and 24). If
 your machine is on something else, run the suites in the image instead:

@@ -16,11 +16,12 @@ how they move into a version section.
 
 ## [3.1.0] - unreleased
 
-268 commits since the `v3.0.0` tag (2026-06-24), of which 52 arrived through a
+277 commits since the `v3.0.0` tag (2026-06-24), of which 58 arrived through a
 numbered pull request and the rest were pushed to `main` directly. Compiled from
-`git log v3.0.0..origin/main` on 2026-09-02; PR numbers are given where the
-commit carried one. Numbers written as "finding #n" are security findings or
-issues, not pull requests.
+`git log v3.0.0..origin/main` on 2026-09-02 and rebased onto `main` the same
+day, which brought six more PRs in; PR numbers are given where the commit
+carried one. Numbers written as "finding #n" are security findings or issues,
+not pull requests.
 
 Not yet tagged. Tagging and publishing are one step, described in
 `docs/RELEASE.md`; a tag that is not deployed is worse than no tag.
@@ -84,7 +85,10 @@ Not yet tagged. Tagging and publishing are one step, described in
   and a CLI backfill for the index.
 - A one-time usage-purpose question on the dashboard, shown in the admin user
   list.
-- `/about` and `/trust` pages.
+- `/about` and `/trust` pages, and a ParaSign product page at `/parasign`
+  (#325).
+- `docs/brand/messaging.md`: who we sell to, what we promise and how each
+  promise is proven (#331).
 
 ### Changed
 
@@ -98,6 +102,8 @@ Not yet tagged. Tagging and publishing are one step, described in
 - The relay is called source-available (BUSL-1.1) rather than open source.
 - The billing docs say Mollie, not Stripe, and document `/v2/billing/checkout`
   and its webhook.
+- The homepage speaks to a buyer: Community as the gift, the business plans as
+  the product (#328).
 
 ### Fixed
 
@@ -136,6 +142,13 @@ Not yet tagged. Tagging and publishing are one step, described in
   silently drift the crypto build (#270).
 - A drift gate that builds the real production Dockerfile on every pull request.
   It is what caught #313 before merge.
+- `relay.js` finally has unit tests: the route suites boot a real `relay.js` and
+  exercise its critical paths (#341). Point 3 of the toekomstbestendigheid
+  report was that 6488 lines and 68 routes were loaded by no unit test at all;
+  this is the first bite out of it.
+- The heartbeat cannot be green without evidence (#338), and the site's ten
+  heaviest claims are pinned to the code that makes them true (#327). Both turn
+  a page that merely loads into a page that has to prove something.
 - Published relay images are signed with cosign and carry an SBOM and SLSA
   provenance.
 - Suites that assert nothing are held to a named list instead of reporting green
