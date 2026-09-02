@@ -1,4 +1,5 @@
-# PARAMANT self-hosted relay stack — v3.0.0
+# PARAMANT self-hosted relay stack. The version lives in package.json, not in
+# this header; see docs/RELEASE.md.
 # One codebase (relay/), five sector containers, system nginx as TLS terminator.
 #
 # Quick start:

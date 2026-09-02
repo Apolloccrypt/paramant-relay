@@ -1,10 +1,15 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
 # Build tools (python3, make, g++) are required only to compile argon2 native
 # bindings. They are NOT present in the final runtime image.
-# Pinned by digest — tag node:22-alpine3.21 resolved 2026-04-24
+# Pinned by digest. Tag node:24-alpine3.24 resolved 2026-09-02 (Node 24.20.0,
+# Alpine 3.24.1). Node 24 is the newest LTS line; the digest previously pinned
+# here was node:25-alpine3.21, and Node 25 went end-of-life, so the image that
+# production would get on its next deploy ran an unsupported runtime. Alpine
+# 3.24 also matches the rust:1.98-alpine builder stage below, so the musl the
+# .node binding is compiled against is the musl it is loaded on.
 # -- @paramant/core binding builder ------------------------------------------
 # Compiles the paramant-core-node napi binding for musl, so it loads inside the
-# node:22-alpine runtime (a glibc build would not). Pinned to a paramant-core
+# node:24-alpine runtime (a glibc build would not). Pinned to a paramant-core
 # commit for reproducibility; bump PARAMANT_CORE_COMMIT when upgrading.
 #
 # rust:1.98-alpine (Alpine 3.24, libclang 22). Earlier bumps past 1.95 (#222,
@@ -20,7 +25,7 @@ RUN apk add --no-cache musl-dev gcc g++ make cmake ninja clang clang-dev llvm-de
 ENV LIBCLANG_PATH=/usr/lib
 # musl defaults to static linking, which cannot produce a cdylib; link
 # dynamically against musl libc so the .node addon builds and loads in the
-# (also-musl) node:22-alpine runtime.
+# (also-musl) node:24-alpine runtime.
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 ARG PARAMANT_CORE_COMMIT=b90b3c52af5c3c30053766bfa108924aff4f9eec
@@ -36,7 +41,7 @@ RUN git clone https://github.com/Apolloccrypt/paramant-core.git \
  && cp target/release/libparamant_core_node.so /pkg/paramant-core.node \
  && printf '{\n  "name": "@paramant/core",\n  "version": "0.5.0-alpha.1",\n  "main": "paramant-core.node",\n  "files": ["paramant-core.node"]\n}\n' > /pkg/package.json
 
-FROM node:25-alpine3.21@sha256:32509199057d74a987fdd88cde00fdfd48ef52469adbd6bd11969fc701477761 AS build
+FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS build
 
 RUN apk add --no-cache python3 make g++
 
@@ -52,10 +57,15 @@ RUN node -e "const fs=require('fs');for(const f of ['package.json','package-lock
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 # Lean image: no build tools, no npm, no compilers — only the relay and its deps.
-FROM node:25-alpine3.21@sha256:32509199057d74a987fdd88cde00fdfd48ef52469adbd6bd11969fc701477761
+FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+
+# Image version. Default matches relay/package.json; CI passes it explicitly as
+# a build-arg so a tagged build labels itself with the tag it was cut from.
+# tests/version-consistency.test.mjs fails if this default and package.json drift.
+ARG IMAGE_VERSION=3.1.0
 
 LABEL org.opencontainers.image.title="paramant-relay" \
-      org.opencontainers.image.version="3.0.0" \
+      org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.description="Post-quantum encrypted file relay — RAM-only, burn-on-read" \
       org.opencontainers.image.source="https://github.com/Apolloccrypt/paramant-relay" \
       org.opencontainers.image.licenses="BUSL-1.1"
@@ -64,6 +74,9 @@ WORKDIR /app
 
 # Copy only compiled node_modules from build stage — no build tools follow
 COPY --from=build /app/node_modules ./node_modules
+# relay.js reads its VERSION from here, so package.json is part of the runtime
+# image, not just the build stage.
+COPY package.json ./
 COPY relay.js ./
 COPY parasign.js ./
 COPY envelope.js ./

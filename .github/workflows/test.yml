@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       # The sibling of `bash -n`, for JavaScript. bash -n and node --check both
       # parse; neither resolves names. An hourly setInterval swept a Map that no
       # longer existed and took production down 425 times before anyone looked.
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       # @paramant/core is the Rust NAPI binding in the sibling paramant-core
       # repo. Until it is published to npm it is a dev file-link, so build it
       # here (as paramant-core's own CI does) to gate the relay crypto suite's
@@ -190,7 +190,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       # Pure-JS units: account-split schema (keys-table), static-serve, envelope
       # binding, webauthn helpers. No @paramant/core build and no Redis, so the
       # relay/test suite that previously had zero CI coverage now gates here.
@@ -289,7 +289,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Admin unit suite
         working-directory: admin
         run: node --test test/*.test.js

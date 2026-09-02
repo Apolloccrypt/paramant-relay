@@ -1,8 +1,14 @@
-# Pinned by digest — tag node:22-alpine3.21 resolved 2026-04-24
-FROM node:25-alpine3.21@sha256:32509199057d74a987fdd88cde00fdfd48ef52469adbd6bd11969fc701477761
+# Pinned by digest. Tag node:24-alpine3.24 resolved 2026-09-02 (Node 24.20.0,
+# Alpine 3.24.1). Node 24 is the newest LTS line; this was node:25-alpine3.21,
+# and Node 25 is end-of-life. Kept in lockstep with relay/Dockerfile.
+FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+
+# See relay/Dockerfile: default matches admin/package.json, CI overrides it per
+# build, and tests/version-consistency.test.mjs holds the two together.
+ARG IMAGE_VERSION=3.1.0
 
 LABEL org.opencontainers.image.title="paramant-admin" \
-      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.description="PARAMANT admin panel" \
       org.opencontainers.image.licenses="BUSL-1.1"
 

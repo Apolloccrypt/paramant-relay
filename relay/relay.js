@@ -37,7 +37,18 @@ const entitlements  = require('./lib/entitlements'); // product+tier separation 
 const quota         = require('./lib/quota');
 const keysTable     = require('./lib/keys-table');
 
-const VERSION    = '3.1.0';
+// Single source of truth for the relay version: relay/package.json, held equal
+// to the root package.json, both Docker labels and the deploy check by
+// tests/version-consistency.test.mjs. This used to be a literal, and that
+// literal said 3.1.0 while relay/package.json and the image label both said
+// 3.0.0 -- four places, three answers, which is what made a tag meaningless.
+// package.json is COPY'd into the runtime stage of relay/Dockerfile for exactly
+// this read; the fallback only covers a stripped deployment and is deliberately
+// loud rather than a plausible wrong number.
+const VERSION    = (() => {
+  try { return require('./package.json').version; }
+  catch { return '0.0.0-unknown'; }
+})();
 // Per-restart nonce: stream-next hashes non-precomputable even if API key is known
 const STREAM_NONCE = crypto.randomBytes(32);
 

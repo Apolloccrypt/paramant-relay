@@ -49,6 +49,11 @@ jobs:
             VERSION="$(git rev-parse --short HEAD)"
             IS_RELEASE=false
           fi
+          # The OCI image.version label. On a tag it is the tag; on main it is
+          # whatever relay/package.json says, which the version-consistency
+          # suite holds equal to the root package.json. Never the short sha:
+          # a label reading "c45d1c6" is not a version anyone can compare.
+          echo "label_version=$(node -p "require('./relay/package.json').version")" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
           echo "push_latest=$([[ "$GITHUB_REF" == refs/heads/main || "$IS_RELEASE" == true ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -64,6 +69,8 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.push_latest == 'true' && 'mtty001/relay:latest' || '' }}
             ${{ steps.meta.outputs.is_release == 'true' && format('mtty001/relay:{0}', steps.meta.outputs.version) || format('mtty001/relay:sha-{0}', steps.meta.outputs.version) }}
+          build-args: |
+            IMAGE_VERSION=${{ steps.meta.outputs.is_release == 'true' && steps.meta.outputs.version || steps.meta.outputs.label_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # In-registry SLSA build provenance attestation, attached to the image
