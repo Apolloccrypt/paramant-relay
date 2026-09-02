@@ -376,6 +376,11 @@ const helpHtml = read('frontend/help/index.html');
 const securityHtml = read('frontend/security.html');
 const developerHtml = read('frontend/developer.html');
 const homeGrid = read('frontend/index.html');
+// Everything below </head>: the page a visitor reads, meta tags excluded. The
+// sales-voice and key-location gates below run against this, not against the
+// three answers alone, so a slogan cannot slip back in through the lede, an
+// article card or the footer.
+const helpBody = helpHtml.slice(helpHtml.indexOf('</head>'));
 // The three answers on /help, without their surrounding page.
 const helpAnswers = [...helpHtml.matchAll(/<p class="buyer-qa-a">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join('\n');
 assert.equal(helpAnswers.split('\n').length, 3,
@@ -437,8 +442,8 @@ assert.match(pricing, /Every plan gets the same encryption, the same post-quantu
   'pricing.html must keep the sentence the free-versus-paid split rests on');
 assert.match(helpAnswers, /Every plan gets the same encryption, the same post-quantum signatures and the same public proof log\./,
   'help/index.html must quote the same-crypto fact, not paraphrase it');
-assert.doesNotMatch(helpAnswers, /Pay for volume, never for security/,
-  'help/index.html must not carry the sales line; it is a support page');
+assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
+  'help/index.html must not carry the sales line anywhere in the body; it is a support page');
 
 // Answer 3: where the data lives. Three sentences a person can read, not the
 // Jurisdiction and privacy table flattened into prose. The claim is scoped to
@@ -450,8 +455,8 @@ assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
   'security.html must keep the server location row /help quotes');
 assert.match(homeGrid, /No US provider in the data path\. Email goes out via Resend, as <a href="\/privacy">\/privacy<\/a> sets out\./,
   'index.html is the source of the data-path wording and its Resend exception');
-assert.match(helpAnswers, /Hetzner Nuremberg, Germany/,
-  'help/index.html must answer where the data lives');
+assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
+  'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpAnswers, /no US provider is in the data path/,
   'help/index.html must scope the claim to the data path');
 assert.match(helpAnswers, /Email goes out via Resend, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
@@ -459,8 +464,36 @@ assert.match(helpAnswers, /Email goes out via Resend, as <a class="buyer-qa-inli
 assert.doesNotMatch(helpAnswers, /no US company/i,
   'help/index.html must not repeat the unqualified no-US-company row from /security');
 
+// A private key never reaches a server, and the whole site says so: "Generated
+// on your device, never sent" (index.html), "relay holds only ciphertext, never
+// keys" and "No plaintext, no keys" (security.html), "we never hold decryption
+// keys, anywhere" (trust.html), "The relay never sees plaintext and never holds
+// a private key" (docs.html). An answer that puts keys in a rack in Nuremberg
+// contradicts all five at once, and it is the sentence a security reviewer
+// would quote back. So /help may name a key only in the negative: any sentence
+// that mentions a key and a piece of infrastructure must be saying the key is
+// not there.
+assert.match(homeGrid, /Generated on your device, never sent/,
+  'index.html is the source of the promise that a key never reaches a server');
+assert.match(securityHtml, /relay holds only ciphertext, never keys/,
+  'security.html is the source of the promise that the relay holds no keys');
+assert.match(docsHtml, /The relay never sees plaintext and never holds a private key\./,
+  'docs.html is the source of the sentence /help quotes about plaintext and keys');
+assert.match(helpAnswers, /The relay never sees plaintext and never holds a private key\./,
+  'help/index.html must say where the keys are not, in the words docs.html uses');
+for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/)) {
+  if (!/\bkeys?\b/i.test(sentence)) continue;
+  if (!/\b(server|servers|relay|Hetzner|Nuremberg|hosted|infrastructure|data centre|data center)\b/i.test(sentence)) continue;
+  assert.match(sentence, /\bnever\b|\bno\b|\bnot\b/i,
+    `help/index.html puts a key on infrastructure without denying it: "${sentence.trim()}"`);
+  assert.doesNotMatch(sentence, /\bkeys?\b[^.]{0,60}?\b(?:live|sit|reside|are stored|are kept|are held|stay)\b/i,
+    `help/index.html must not say a key lives on a server: "${sentence.trim()}"`);
+  assert.doesNotMatch(sentence, /\b(?:live|sit|reside|stored|kept|held)\b[^.]{0,60}?\bkeys?\b/i,
+    `help/index.html must not say a server holds a key: "${sentence.trim()}"`);
+}
+
 // No sales voice on a support page. Someone here has already signed up.
-assert.doesNotMatch(helpHtml, /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class/i,
+assert.doesNotMatch(helpBody, /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class/i,
   'help/index.html must stay in support voice');
 
 // The tone rule is site-wide, but these two articles kept em-dashes in the H1
