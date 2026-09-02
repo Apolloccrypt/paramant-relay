@@ -71,7 +71,7 @@ jobs:
       # (and review the diff) when adopting a new paramant-core.
       - name: Build @paramant/core (sibling checkout, pinned)
         env:
-          PARAMANT_CORE_SHA: 45a3d3521adda7924692d58be5db60d5b094371f
+          PARAMANT_CORE_SHA: b90b3c52af5c3c30053766bfa108924aff4f9eec
         run: |
           git clone --no-checkout https://github.com/Apolloccrypt/paramant-core.git "${GITHUB_WORKSPACE}/../paramant-core"
           cd "${GITHUB_WORKSPACE}/../paramant-core"

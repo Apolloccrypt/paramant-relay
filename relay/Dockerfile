@@ -7,13 +7,13 @@
 # node:22-alpine runtime (a glibc build would not). Pinned to a paramant-core
 # commit for reproducibility; bump PARAMANT_CORE_COMMIT when upgrading.
 #
-# Pinned to rust:1.95-alpine. The 1.96-alpine bump (#222) moved to a newer Alpine
-# whose clang/liboqs toolchain makes the vendored `oqs` crate fail to compile
-# (E0609: no field `alg_version`/`length_signature`/… on `OQS_SIG` — bindgen no
-# longer generates those fields). 1.95-alpine is the exact base that built the
-# live relay images; revert until paramant-core's oqs crate supports the newer
-# liboqs. NOTE: CI's crypto suite does not build via this musl Dockerfile, so it
-# stayed green through the bump — this base must be verified by an actual image build.
+# rust:1.98-alpine (Alpine 3.24, libclang 22). Earlier bumps past 1.95 (#222,
+# #313) failed here with E0609 "no field `alg_version`/… on `OQS_SIG`": bindgen
+# 0.71 turns the forward-declared OQS_SIG into an opaque struct under libclang
+# 22. paramant-core now builds oqs-sys with bindgen 0.72 (oqs 0.11.0, liboqs
+# 0.13.0), which resolves it. NOTE: CI's crypto suite builds on ubuntu/glibc,
+# not via this musl Dockerfile; paramant-core's `musl-node-binding` job pins
+# the same digest, and any base bump must still be verified by an image build.
 FROM rust:1.98-alpine@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS paramant-core-binding
 
 RUN apk add --no-cache musl-dev gcc g++ make cmake ninja clang clang-dev llvm-dev perl nasm git bash
@@ -23,12 +23,12 @@ ENV LIBCLANG_PATH=/usr/lib
 # (also-musl) node:22-alpine runtime.
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
-ARG PARAMANT_CORE_COMMIT=dc454d47880ab54e6f1483433580abab894b854e
+ARG PARAMANT_CORE_COMMIT=b90b3c52af5c3c30053766bfa108924aff4f9eec
 WORKDIR /build
 RUN git clone https://github.com/Apolloccrypt/paramant-core.git \
  && cd paramant-core && git checkout "${PARAMANT_CORE_COMMIT}" \
- # --locked: build against paramant-core's committed Cargo.lock (oqs 0.10.1 +
- # vendored liboqs 0.12.0) so a transitive bump can't silently drift the crypto
+ # --locked: build against paramant-core's committed Cargo.lock (oqs 0.11.0 +
+ # vendored liboqs 0.13.0) so a transitive bump can't silently drift the crypto
  # build. paramant-core's CI has a musl job pinned to this same base that proves
  # the lockfile builds here; keep the two in lockstep when bumping the base.
  && cargo build --locked --release -p paramant-core-node \
