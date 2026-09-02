@@ -792,8 +792,12 @@ for svc in $SVCS; do
     echo "skip $svc (not running)"
     continue
   fi
+  # Tag by image ID, not by the name compose recorded: on production the
+  # recorded name (paramant-relay-<svc>:latest) no longer resolves to an
+  # image, but the running container's image ID always does.
   img="$(docker inspect --format '{{.Config.Image}}' "$cid")"
-  docker tag "$img" "paramant-rollback/$svc:$TS"
+  iid="$(docker inspect --format '{{.Image}}' "$cid")"
+  docker tag "$iid" "paramant-rollback/$svc:$TS"
   echo "$svc|$img|paramant-rollback/$svc:$TS" >> "$MANIFEST"
 done
 ln -sfn "$MANIFEST" "$BK/rollback-images-latest.txt"
