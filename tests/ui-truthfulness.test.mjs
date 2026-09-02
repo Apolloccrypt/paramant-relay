@@ -73,3 +73,38 @@ assert.match(signHtml, /open a signing request someone sent you/i,
   'sign.html must say what an invited signer can still do without an account');
 assert.match(signJs, /function showSessionRequirement/,
   'sign-flow.js must have the session-requirement control');
+
+
+// ── The homepage now that it sells instead of describes ──────────────────────
+// It states two things a page can be wrong about at real cost: what a signature
+// is worth, and what it costs. Both are pinned here, because the homepage is
+// the one page that repeats claims owned by another file.
+const home = read('frontend/index.html').replace(/<!--[\s\S]*?-->/g, '');
+
+// 1. Same overclaim rule as sign.html. An open-mode signature commits to "key K
+// signed slot i of document D" and to nothing about who holds K, so the page
+// that sells it may not promise identity or legal effect either.
+assert.doesNotMatch(home, /identity verified|verified signer|signer verified|legally binding/i,
+  'index.html must not claim a verified identity or legal effect ParaSign cannot deliver');
+
+// 2. "No account" is true only for someone opening an invitation. Signing a
+// document you started yourself needs an account (sign.html says so up front,
+// and the relay gates POST /v2/envelopes on an API key while leaving
+// POST /v2/envelopes/:id/sign public). A homepage that drops the scope turns a
+// true sentence into a false one at the first click.
+for (const m of home.matchAll(/[^.<>]*\bno account\b[^.<>]*/gi)) {
+  assert.match(m[0], /invite|invitation|sent you|the link/i,
+    `index.html scopes "no account" to the invited signer, not to signing in general: "${m[0].trim()}"`);
+}
+
+// 3. Every price the homepage names must also stand on the pricing page. Two
+// pages quoting money is two places to be wrong; this makes the second one
+// follow the first instead of drifting away from it.
+const pricing = read('frontend/pricing.html');
+const homePrices = [...new Set([...home.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
+assert.ok(homePrices.length >= 6, `expected the homepage to quote its tiers, found ${homePrices.length} prices`);
+const drifted = homePrices.filter((p) => !pricing.includes(`&euro;${p}`));
+assert.deepEqual(drifted, [],
+  `these prices are on the homepage but not on /pricing: ${drifted.join(', ')}`);
+
+console.log('ui-truthfulness: the homepage does not overclaim signatures and quotes the real prices');

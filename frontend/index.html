@@ -5,19 +5,19 @@
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B3A6A">
-<title>PARAMANT · Encrypted File Relay. Burn on Read.</title>
+<title>ParaSign by Paramant &middot; sign and send documents in the EU</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Post-quantum encrypted file relay. ML-KEM-768 + ML-DSA-65. Burn-on-read. EU/DE. Send files, sign documents, deploy your own.">
-<meta property="og:title" content="Paramant · Encrypted file relay">
-<meta property="og:description" content="Post-quantum encrypted file relay. Burn on read. EU/DE.">
+<meta name="description" content="Get documents signed and send files safely, straight from your browser. ParaSign and ParaSend by Paramant, built and hosted in the EU. Free to start.">
+<meta property="og:title" content="ParaSign by Paramant &middot; sign and send documents in the EU">
+<meta property="og:description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU. Free to start.">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://paramant.app/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Paramant · Encrypted file relay">
-<meta name="twitter:description" content="Post-quantum encrypted file relay. Burn on read. EU/DE.">
+<meta name="twitter:title" content="ParaSign by Paramant &middot; sign and send documents in the EU">
+<meta name="twitter:description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU. Free to start.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -28,177 +28,84 @@
 <link rel="stylesheet" href="/parapear.css?v=1">
 <link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
-/* Homepage: compact 50/50 launchpad. Existing design tokens + classes only;
-   design-system.css, nav.css and nav.js are untouched. */
-.home-hero { text-align: center; max-width: 64ch; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-3); }
-.home-hero h1 { font-size: clamp(30px, 5.2vw, 50px); line-height: 1.05; letter-spacing: -0.025em; color: var(--navy); margin: 0 0 var(--space-3); }
-.home-hero .lede { font-size: 16px; line-height: 1.55; color: var(--ink-dim); max-width: 58ch; margin: 0 auto; }
-.hero-badges { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0; margin: var(--space-4) 0 0; }
-.hero-badges li { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 999px; padding: 5px 11px; background: var(--bone); }
-.hero-badges a { display: block; margin: -5px -11px; padding: 5px 11px; border-radius: 999px; color: inherit; text-decoration: none; }
-.hero-badges li:hover { border-color: var(--navy); }
-.hero-badges li:hover a { color: var(--navy); }
-.home-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 1040px; margin: var(--space-5) auto var(--space-6); padding: 0 var(--space-4); }
-.path { position: relative; display: flex; flex-direction: column; border: 1px solid var(--ink-hair); background: #fff; padding: var(--space-5); }
-.path-dev { background: var(--bone); }
-.path h2 { font-size: clamp(20px, 2.5vw, 26px); line-height: 1.12; letter-spacing: -0.015em; color: var(--navy); margin: 0; max-width: 22ch; }
-.path > p { font-size: 15px; line-height: 1.55; color: var(--ink-dim); margin: var(--space-3) 0 0; max-width: 34ch; }
-.path-cta { margin-top: auto; }
-.path-cta-sub { display: inline-block; margin-top: var(--space-2); font-size: 13px; color: var(--ink-dim); text-decoration: underline; }
-.path-cta-sub:hover { color: var(--navy); }
-.path-breadth { margin: var(--space-2) 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: .02em; color: var(--ink-dim); }
-@media (max-width: 760px) { .home-split { grid-template-columns: 1fr; } }
+/* Homepage for a buyer, not for a cryptographer. Existing design tokens and
+   classes only; design-system.css, nav.css and nav.js are untouched. The order
+   of the page IS the argument: what it is, the two products, how it works,
+   what it costs, why you can check it, and one line for developers. */
 
-/* State-aware hero: the logged-out pitch is the default (and what scrapers
-   see); js/home-auth.js reveals the logged-in welcome + quick actions. */
-.home-state[hidden] { display: none; }
-.home-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; margin: var(--space-4) 0 0; }
+/* ── Hero ── */
+.home-hero { text-align: center; max-width: 1040px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-5); }
+.home-hero h1 { font-size: clamp(30px, 5vw, 50px); line-height: 1.06; letter-spacing: -0.025em; color: var(--navy); margin: 0 auto var(--space-4); max-width: 20ch; }
+.home-hero .lede { font-size: 17px; line-height: 1.55; color: var(--ink-dim); max-width: 58ch; margin: 0 auto; }
+.home-hero .lede strong { color: var(--navy); font-weight: 600; }
+.home-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; margin: var(--space-5) 0 0; }
 .home-act-ghost { background: transparent; color: var(--navy); border: 1px solid var(--ink-hair); }
 .home-act-ghost:hover { border-color: var(--navy); background: var(--bone); }
 .home-hi-name { color: var(--cobalt); }
+.home-state[hidden] { display: none; }
+.hero-note { margin: var(--space-4) 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
 
-/* ── Homepage panel animations: now the centrepiece of each panel: a larger,
-   centred "screen" playing the loop, so the security is felt, not read. Pure
-   CSS keyframes (no JS, CSP-safe), ~10s loops, deep-navy base with lime
-   (#B2FF3F) on the "it works" beats. prefers-reduced-motion shows a static
-   completed frame. design-system.css and nav.css are untouched. ── */
-.path-anim { margin: var(--space-4) auto var(--space-5); width: clamp(210px, 82%, 300px);
-  aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
-  background: #0a1626; box-shadow: 0 4px 18px rgba(11,58,106,.22), inset 0 0 0 1px rgba(178,255,63,.10);
-  user-select: none; --lime: #B2FF3F; --doc: #e7edf6; --ln: #56789f; --dim: #88a6cb; }
-.path-anim svg { display: block; width: 100%; height: 100%; }
-.path-anim text { font-family: var(--mono); font-weight: 600; letter-spacing: -.02em; }
-@media (max-width: 760px) { .path-anim { width: clamp(200px, 70vw, 280px); } }
+/* ── Shared section furniture ── */
+.home-sec { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
+.sec-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
+.sec-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.sec-eyebrow span { display: inline-block; width: 22px; height: 2px; background: var(--lime); }
+.sec-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
+.sec-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
+.sec-more { text-align: center; margin-top: var(--space-5); }
+.sec-link { display: inline-block; font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 3px; }
+.sec-link:hover { color: var(--cobalt); }
 
-/* LEFT: two pillars in one loop: (1) SIGN the document (ML-DSA-65 curve →
-   "✓ signed"), then (2) SEND it: encrypt flicker → through the relay's RAM →
-   to the recipient → "✓ delivered · burn-on-read". ~10s. Base state
-   (reduced-motion) = a signed document under the SIGN label. */
-.l-sig { stroke-dasharray: 66; stroke-dashoffset: 0; }
-.l-badge, .l-signed, .l-phase1 { opacity: 1; }
-.l-relay, .l-recv { opacity: .3; }
-.l-enc, .l-delivered, .l-phase2 { opacity: 0; }
-@media (prefers-reduced-motion: no-preference) {
-  .l-phase1    { animation: l-phase1 10s ease-in-out infinite; }
-  .l-phase2    { animation: l-phase2 10s ease-in-out infinite; }
-  .l-doc       { animation: l-doc 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
-  .l-sig       { animation: l-sig 10s ease-in-out infinite; }
-  .l-badge     { animation: l-badge 10s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
-  .l-signed    { animation: l-signed 10s ease-in-out infinite; }
-  .l-enc       { animation: l-enc 10s steps(1, end) infinite; }
-  .l-relay     { animation: l-relay 10s ease-in-out infinite; }
-  .l-recv      { animation: l-recv 10s ease-in-out infinite; }
-  .l-delivered { animation: l-delivered 10s ease-in-out infinite; }
-}
-/* phase 1 = sign (≈0–48%) · phase 2 = send (≈48–100%) */
-@keyframes l-phase1 { 0% { opacity: 0; } 4% { opacity: 1; } 44% { opacity: 1; } 49% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes l-phase2 { 0%, 46% { opacity: 0; } 51% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes l-doc {
-  0%   { opacity: 0; transform: translate(0,0) scale(.9); }
-  4%   { opacity: 1; transform: translate(0,0) scale(1); }
-  56%  { opacity: 1; transform: translate(0,0) scale(1); }
-  74%  { opacity: 1; transform: translate(86px,6px) scale(.42); }
-  82%  { opacity: 0; transform: translate(86px,6px) scale(.42); }
-  100% { opacity: 0; transform: translate(0,0) scale(.9); } }
-@keyframes l-sig { 0%, 8% { stroke-dashoffset: 66; } 26% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
-@keyframes l-badge { 0%, 26% { opacity: 0; transform: scale(.4); } 34% { opacity: 1; transform: scale(1); } 100% { opacity: 1; transform: scale(1); } }
-@keyframes l-signed { 0%, 30% { opacity: 0; transform: translateY(2px); } 38% { opacity: 1; transform: translateY(0); } 46% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes l-enc { 0%, 49% { opacity: 0; } 50% { opacity: .95; } 52% { opacity: .35; } 54% { opacity: .9; } 56% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes l-relay { 0%, 56% { opacity: .28; } 62% { opacity: 1; } 72% { opacity: 1; } 82% { opacity: .4; } 100% { opacity: .28; } }
-@keyframes l-recv { 0%, 66% { opacity: .28; } 74% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: .28; } }
-@keyframes l-delivered { 0%, 76% { opacity: 0; transform: translateY(2px); } 84% { opacity: 1; transform: translateY(0); } 93% { opacity: 1; } 100% { opacity: 0; } }
+/* ── Two products ── */
+.prod-grid { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: 0; padding: 0; }
+.prod-grid li { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--ink-hair); border-top: 2px solid var(--lime); padding: var(--space-5); }
+.prod-name { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.prod-grid h3 { font-size: 20px; line-height: 1.18; letter-spacing: -0.015em; color: var(--navy); margin: 8px 0 var(--space-3); }
+.prod-lines { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.prod-lines li { display: block; background: none; border: 0; padding: 0 0 0 18px; position: relative; font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 6px; }
+.prod-lines li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 2px; background: var(--lime); }
+.prod-cta { margin-top: auto; }
+@media (max-width: 760px) { .prod-grid { grid-template-columns: 1fr; } }
 
-/* RIGHT: a terminal cycling through three of the ten CLI tools, ~10s loop,
-   one tool block at a time: type the command, show the ✓ result, hold, next.
-   Base state (reduced-motion) = the first tool block, no typing, static caret. */
-.cli { position: relative; font-family: var(--mono); font-size: clamp(5.6px, 0.86vw, 7px); line-height: 1.6; color: #cfe0f2; padding: 9px 9px; height: 100%; box-sizing: border-box; letter-spacing: -.02em; }
-.cli .c-line { white-space: nowrap; overflow: hidden; }
-.cli .c-cmd { color: #e7edf6; } .cli .c-key { color: #9db8d6; } .cli .c-ok { color: var(--lime); } .cli .c-prompt { color: var(--lime); }
-.c-stack { position: relative; height: calc(2 * 1.6em); margin-bottom: .45em; }
-.c-block { position: absolute; inset: 0; }
-.c-b2, .c-b3 { opacity: 0; }                /* base: first tool block visible */
-.c-caret { display: inline-block; width: .55ch; background: var(--lime); color: transparent; }
-@media (prefers-reduced-motion: no-preference) {
-  .c-b1 { animation: cb1 10s ease infinite; }
-  .c-b2 { animation: cb2 10s ease infinite; }
-  .c-b3 { animation: cb3 10s ease infinite; }
-  .c-b1 > .c-line:first-child { animation: ctype1 10s steps(28, end) infinite; }
-  .c-b2 > .c-line:first-child { animation: ctype2 10s steps(28, end) infinite; }
-  .c-b3 > .c-line:first-child { animation: ctype3 10s steps(28, end) infinite; }
-  .c-b1 .c-cout { animation: cout1 10s ease infinite; }
-  .c-b2 .c-cout { animation: cout2 10s ease infinite; }
-  .c-b3 .c-cout { animation: cout3 10s ease infinite; }
-  .c-caret { animation: c-blink 1.05s steps(1, end) infinite; }
-}
-/* block visibility windows: b1 ≈0–31%, b2 ≈34–64%, b3 ≈67–97% */
-@keyframes cb1 { 0% { opacity: 0; } 2% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes cb2 { 0%, 33% { opacity: 0; } 35% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes cb3 { 0%, 66% { opacity: 0; } 68% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
-/* command types in (clip-path reveal), then the ✓ result line appears */
-@keyframes ctype1 { 0% { clip-path: inset(0 100% 0 0); } 12% { clip-path: inset(0 0 0 0); } 34% { clip-path: inset(0 0 0 0); } 35% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes ctype2 { 0%, 34% { clip-path: inset(0 100% 0 0); } 45% { clip-path: inset(0 0 0 0); } 67% { clip-path: inset(0 0 0 0); } 68% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes ctype3 { 0%, 67% { clip-path: inset(0 100% 0 0); } 78% { clip-path: inset(0 0 0 0); } 98% { clip-path: inset(0 0 0 0); } 99% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
-@keyframes cout1 { 0%, 14% { opacity: 0; } 19% { opacity: 1; } 31% { opacity: 1; } 34% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes cout2 { 0%, 47% { opacity: 0; } 52% { opacity: 1; } 64% { opacity: 1; } 67% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes cout3 { 0%, 80% { opacity: 0; } 85% { opacity: 1; } 97% { opacity: 1; } 99% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes c-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+/* ── Three steps ── */
+.step-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
+.step-grid li { background: #fff; padding: var(--space-5) var(--space-4); }
+.step-n { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--navy); opacity: .5; }
+.step-grid h3 { font-size: 16px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 6px 0 6px; }
+.step-grid p { font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin: 0; }
+@media (max-width: 760px) { .step-grid { grid-template-columns: 1fr; } }
 
-/* ── ParaRules band: our policy, stated as the differentiator. Existing tokens
-   only; light ground, hairline grid, lime eyebrow + a "signature" underline on
-   the link. design-system.css / nav.css untouched. ── */
-.home-compare { text-align: center; max-width: 1040px; margin: calc(-1 * var(--space-2)) auto var(--space-6); padding: 0 var(--space-4); font-size: 14px; color: var(--ink-dim); }
-.home-compare a { color: var(--navy); border-bottom: 1px solid var(--lime); padding-bottom: 2px; text-decoration: none; }
-.home-compare a:hover { color: var(--cobalt); }
-.home-rules { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
-.rules-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
-.rules-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
-.rules-eyebrow span { display: inline-block; width: 22px; height: 2px; background: var(--lime); }
-.rules-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
-.rules-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
-.rules-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
+/* ── What it costs ── */
+.price-grid { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: 0; padding: 0; }
+.price-grid > li { background: #fff; border: 1px solid var(--ink-hair); padding: var(--space-5); }
+.price-grid h3 { font-size: 17px; line-height: 1.2; letter-spacing: -0.01em; color: var(--navy); margin: 0 0 var(--space-2); }
+.price-sub { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 var(--space-4); }
+.tiers { list-style: none; margin: 0; padding: 0; }
+.tiers li { display: grid; grid-template-columns: 8.5ch auto; gap: var(--space-3); align-items: baseline; padding: 10px 0; border-top: 1px solid var(--ink-hair); }
+.tiers li:first-child { border-top: 0; }
+.tier-price { font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: -.01em; color: var(--navy); }
+.tier-what { font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
+.tier-what b { color: var(--navy); font-weight: 600; }
+.price-foot { margin: var(--space-4) 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.5; letter-spacing: .02em; color: var(--ink-dim); }
+@media (max-width: 760px) { .price-grid { grid-template-columns: 1fr; } }
+
+/* ── Why you can check it ── */
+.pq-core { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px 14px; width: fit-content; max-width: 100%; margin: 0 auto var(--space-5); padding: var(--space-3) var(--space-4); background: #0a1626; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
+.pq-core strong { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; font-weight: 600; color: #B2FF3F; }
+.pq-core span { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: #88a6cb; }
+.rules-grid { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
 .rules-grid li { background: #fff; padding: var(--space-4); }
 .rules-grid .r-n { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--navy); opacity: .5; }
 .rules-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 6px 0 4px; }
 .rules-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
-.rules-cta { text-align: center; margin-top: var(--space-5); }
-.rules-link { display: inline-block; font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 3px; }
-.rules-link:hover { color: var(--cobalt); }
-@media (max-width: 760px) { .rules-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 480px) { .rules-grid { grid-template-columns: 1fr; } }
-
-/* ── Capability map: one PQ core, three jobs (move / record / prove). Core bar
-   in the deep-navy panel style, three cards hanging off it via a lime top
-   accent. Existing tokens only; design-system.css and nav.css untouched. ── */
-.home-pillars { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
-.pillars-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
-.pillars-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
-.pillars-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
-.pillars-core { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px 14px; width: fit-content; max-width: 100%; margin: 0 auto; padding: var(--space-3) var(--space-4); background: #0a1626; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
-.pillars-core strong { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; font-weight: 600; color: #B2FF3F; }
-.pillars-core span { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: #88a6cb; }
-.pillars-stem { width: 2px; height: 22px; background: var(--ink-hair); margin: 0 auto; }
-.pillars-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin: 0; padding: 0; }
-.pillars-grid li { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--ink-hair); border-top: 2px solid #B2FF3F; padding: var(--space-4); }
-.p-job { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
-.pillars-grid h3 { font-size: 17px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 8px 0 6px; }
-.pillars-grid li > p { font-size: 13px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-3); }
-.p-tags { margin-top: auto; font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: .02em; color: var(--ink-dim); }
-.p-link { display: inline-block; margin-top: var(--space-2); font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 3px; width: fit-content; }
-.p-link:hover { color: var(--cobalt); }
-@media (max-width: 760px) { .pillars-grid { grid-template-columns: 1fr; } }
-
-/* ── Verify links in the rules grid + the honest in-development band. Dashed
-   hairline cards mark not-yet-live work; same tokens, nothing new. ── */
 .r-verify { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .05em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 2px; }
 .r-verify:hover { color: var(--cobalt); }
-.home-soon { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
-.soon-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin: 0; padding: 0; }
-.soon-grid li { border: 1px dashed var(--ink-hair); background: transparent; padding: var(--space-4); }
-.soon-chip { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--ink-hair); border-radius: 2px; padding: 3px 8px; background: var(--bone); }
-.soon-chip.soon-beta { background: var(--cobalt); color: #fff; border-color: transparent; }
-.soon-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 10px 0 4px; }
-.soon-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 var(--space-2); }
-@media (max-width: 760px) { .soon-grid { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .rules-grid { grid-template-columns: 1fr; } }
+
+/* ── Developers: one line, no section of its own ── */
+.home-dev { max-width: 1040px; margin: 0 auto var(--space-7); padding: 0 var(--space-4); text-align: center; font-size: 14px; line-height: 1.6; color: var(--ink-dim); }
+.home-dev a { color: var(--navy); border-bottom: 1px solid var(--lime); padding-bottom: 2px; text-decoration: none; }
+.home-dev a:hover { color: var(--cobalt); }
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -208,7 +115,7 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/#webpage",
       "url": "https://paramant.app/",
-      "name": "PARAMANT · Encrypted File Relay. Burn on Read.",
+      "name": "ParaSign by Paramant · sign and send documents in the EU",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -216,15 +123,21 @@
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Post-quantum encrypted file relay. ML-KEM-768 + ML-DSA-65. Burn-on-read. EU/DE. Send files, sign documents, deploy your own."
+      "description": "Get documents signed and send files safely, straight from your browser. ParaSign and ParaSend by Paramant, built and hosted in the EU. Free to start."
     },
     {
       "@type": "SoftwareApplication",
       "@id": "https://paramant.app/#software",
-      "name": "Paramant",
-      "applicationCategory": "SecurityApplication",
+      "name": "ParaSign by Paramant",
+      "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web browser",
       "url": "https://paramant.app/",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "url": "https://paramant.app/pricing"
+      },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       }
@@ -234,7 +147,7 @@
       "@id": "https://paramant.app/#organization",
       "name": "Paramant",
       "url": "https://paramant.app/",
-      "description": "Post-quantum encrypted file transfer and document signing, built and hosted in the Netherlands.",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU, built and hosted in the Netherlands and Germany.",
       "areaServed": "EU",
       "knowsLanguage": [
         "nl",
@@ -295,20 +208,13 @@
 
 <section class="home-hero">
   <div class="home-state" data-home="out">
-    <h1>Send it. Sign it. Prove it.</h1>
-    <p class="lede">One encrypted relay for files and documents. End-to-end post-quantum crypto, RAM-only servers in Germany, and a public transparency log, so you never have to take our word for it.</p>
+    <h1>Get documents signed and send files safely, from your browser.</h1>
+    <p class="lede">Paramant is for <strong>small professional firms</strong> that would rather not put client files on an American cloud: legal, accountancy and healthcare practices in the EU. Send a contract out for signature, or send a file that is gone the moment it has been read. Everything runs on servers in Germany.</p>
     <div class="home-actions">
       <a class="btn btn-lime" href="/sign">Sign a document</a>
-      <a class="btn home-act-ghost" href="/parashare">Send securely</a>
-      <a class="btn home-act-ghost" href="/pricing">View pricing</a>
+      <a class="btn home-act-ghost" href="/pricing">See pricing</a>
     </div>
-    <ul class="hero-badges" aria-label="At a glance">
-      <li><a href="https://github.com/Apolloccrypt/paramant-relay">Source-available</a></li>
-      <li><a href="/pricing">Free for community</a></li>
-      <li><a href="/security">Fully auditable</a></li>
-      <li><a href="/security">EU-sovereign</a></li>
-      <li><a href="/crypto-agility">Post-quantum</a></li>
-    </ul>
+    <p class="hero-note">Free to start &middot; no card required &middot; the person you invite needs no account</p>
   </div>
   <div class="home-state" data-home="in" hidden>
     <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
@@ -321,149 +227,114 @@
   </div>
 </section>
 
-<section class="home-split" id="products" aria-label="Two ways to use Paramant">
-  <div class="path path-human">
-    <h2>Sign and send, right in your browser.</h2>
-    <div class="path-anim" role="img" aria-label="Phase one: a document is signed with a post-quantum ML-DSA-65 signature. Phase two: the same document is encrypted, sent through the relay's memory and delivered to the recipient, then burned after one read.">
-      <svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <text class="l-phase l-phase1" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SIGN</text>
-        <text class="l-phase l-phase2" x="80" y="13" fill="#7f9cc0" font-size="7.5" letter-spacing="1.4" text-anchor="middle">SEND</text>
-        <g class="l-relay">
-          <rect x="71" y="50" width="20" height="20" rx="2.5" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.3"/>
-          <path d="M75 50v-3 M81 50v-3 M87 50v-3 M75 70v3 M81 70v3 M87 70v3" stroke="#B2FF3F" stroke-width="1" stroke-linecap="round"/>
-          <text x="81" y="63" fill="#B2FF3F" font-size="6" text-anchor="middle">RAM</text>
-        </g>
-        <g class="l-recv">
-          <rect x="116" y="48" width="30" height="32" rx="3" fill="#0e2138" stroke="#B2FF3F" stroke-width="1.4"/>
-          <path d="M123 62 h16 M123 68 h11" stroke="#88a6cb" stroke-width="1.4" stroke-linecap="round"/>
-        </g>
-        <g class="l-doc">
-          <rect x="22" y="32" width="42" height="54" rx="3" fill="#e7edf6" stroke="#cdd9e8" stroke-width="1"/>
-          <path d="M30 43 h26 M30 50 h26 M30 57 h19" stroke="#56789f" stroke-width="1.6" stroke-linecap="round"/>
-          <path class="l-sig" d="M30 74 q5 -7 9 0 t9 0 q4 -5 7 -2" stroke="#B2FF3F" stroke-width="1.9" stroke-linecap="round"/>
-          <g class="l-badge">
-            <circle cx="57" cy="39" r="7" fill="#0a1626" stroke="#B2FF3F" stroke-width="1.3"/>
-            <path d="M53.6 39 l2.4 2.4 L60.6 36.2" stroke="#B2FF3F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </g>
-          <g class="l-enc">
-            <rect x="27" y="38" width="6" height="6" fill="#B2FF3F"/><rect x="41" y="50" width="6" height="6" fill="#B2FF3F"/>
-            <rect x="52" y="44" width="6" height="6" fill="#B2FF3F"/><rect x="34" y="64" width="6" height="6" fill="#B2FF3F"/>
-            <rect x="47" y="72" width="6" height="6" fill="#B2FF3F"/>
-          </g>
-        </g>
-        <text class="l-signed" x="43" y="104" fill="#B2FF3F" font-size="9" text-anchor="middle">&#10003; signed</text>
-        <text class="l-delivered" x="80" y="104" fill="#B2FF3F" font-size="7.5" text-anchor="middle">&#10003; delivered &#183; burn-on-read</text>
-      </svg>
-    </div>
-    <div class="path-cta">
-      <a class="btn btn-lime" href="/dashboard">Open document workspace</a>
-      <a class="path-cta-sub" href="/pararules">or read the ParaRules</a>
-      <p class="path-breadth">Sign &#183; co-sign &#183; send &#183; burn-on-read</p>
-    </div>
+<section class="home-sec" id="products" aria-labelledby="products-h">
+  <div class="sec-intro">
+    <p class="sec-eyebrow"><span></span>two products</p>
+    <h2 id="products-h">One for signing. One for sending.</h2>
+    <p class="sec-lede">Both run on the same core, and both work in a plain browser. Nothing to install for you, nothing to install for the other side.</p>
   </div>
-  <div class="path path-dev">
-    <h2>Drop post-quantum crypto into your stack.</h2>
-    <div class="path-anim path-anim-cli" role="img" aria-label="Terminal cycling through Paramant command-line tools: s3-migrate moves an S3 object encrypted with ML-KEM-768 and burned on read; db-backup ships an encrypted off-site database dump; package-sign signs a release with ML-DSA-65. Ten encrypted CLI tools in total.">
-      <div class="cli" aria-hidden="true">
-        <div class="c-stack">
-          <div class="c-block c-b1">
-            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant s3-migrate</span> <span class="c-key">s3://bucket</span></div>
-            <div class="c-line c-cout"><span class="c-ok">&#10003; migrated</span> <span class="c-key">&#183; ML-KEM-768 &#183; burn</span></div>
-          </div>
-          <div class="c-block c-b2">
-            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant db-backup</span> <span class="c-key">--pg &#8594; vault</span></div>
-            <div class="c-line c-cout"><span class="c-ok">&#10003; encrypted off-site</span></div>
-          </div>
-          <div class="c-block c-b3">
-            <div class="c-line"><span class="c-prompt">$</span> <span class="c-cmd">paramant package-sign</span> <span class="c-key">app.tgz</span></div>
-            <div class="c-line c-cout"><span class="c-ok">&#10003; signed</span> <span class="c-key">&#183; ML-DSA-65</span></div>
-          </div>
-        </div>
-        <div class="c-line c-promptline"><span class="c-prompt">$</span> <span class="c-caret">_</span></div>
-      </div>
-    </div>
-    <div class="path-cta">
-      <a class="btn btn-lime" href="/developer">Open developer settings</a>
-      <a class="path-cta-sub" href="/docs">or read the docs</a>
-      <p class="path-breadth">10 encrypted CLI tools &#183; backups, migrations, signing, CI</p>
-    </div>
-  </div>
-</section>
-
-<p class="home-compare">Weighing the options? <a href="/vs">See how Paramant compares to Zivver, Tresorit, WeTransfer and SFTP &rarr;</a></p>
-
-<section class="home-pillars" aria-labelledby="pillars-h">
-  <div class="pillars-intro">
-    <p class="rules-eyebrow"><span></span>live today</p>
-    <h2 id="pillars-h">Three ways in. One crypto core.</h2>
-    <p class="pillars-lede">Everything below is running now, on the same audited post-quantum core. No roadmap promises on this list.</p>
-  </div>
-  <p class="pillars-core"><strong>paramant-core</strong><span>PQ primitives &#183; ML-KEM-768 &#183; ML-DSA-65 &#183; SPHINCS+ &#183; Falcon</span></p>
-  <div class="pillars-stem" aria-hidden="true"></div>
-  <ul class="pillars-grid">
+  <ul class="prod-grid">
     <li>
-      <span class="p-job">ParaSend</span>
-      <h3>Send files that vanish.</h3>
-      <p>End-to-end encrypted transfer through a relay that only ever holds ciphertext in RAM. Burned on read. Dedicated relays for finance, legal and IoT traffic.</p>
-      <p class="p-tags">burn-on-read &#183; sector relays &#183; no account for receivers</p>
-      <a class="p-link" href="/parashare">Send a file <span aria-hidden="true">&rarr;</span></a>
+      <span class="prod-name">ParaSign</span>
+      <h3>Get a document signed.</h3>
+      <ul class="prod-lines">
+        <li>Upload the PDF, place the fields, and mail it to whoever has to sign.</li>
+        <li>They sign with the link from that email. Signing an invitation needs no account.</li>
+        <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
+      </ul>
+      <div class="prod-cta"><a class="btn btn-lime" href="/sign">Sign a document</a></div>
     </li>
     <li>
-      <span class="p-job">ParaSign</span>
-      <h3>Sign PDFs in your browser.</h3>
-      <p>A full PDF editor: place text, dates and annotations, manage pages, then sign. Co-signing with routing order. Your key never leaves your device, and every signature comes with a verifiable .psign receipt.</p>
-      <p class="p-tags">HiDPI editor + annotations &#183; co-sign &#183; offline-verifiable receipts</p>
-      <a class="p-link" href="/sign">Open ParaSign <span aria-hidden="true">&rarr;</span></a>
-    </li>
-    <li>
-      <span class="p-job">Developers</span>
-      <h3>Build on the core.</h3>
-      <p>Open SDK in JavaScript and Python (Apache-2.0), a /v1 signing API, and a self-host installer. Run your own relay, or the whole OS.</p>
-      <p class="p-tags">paramant-sdk npm + PyPI &#183; /v1 signing API</p>
-      <a class="p-link" href="/developer">Get an API key <span aria-hidden="true">&rarr;</span></a>
-      <a class="p-link" href="/docs#v1-envelopes">Read the /v1 API docs <span aria-hidden="true">&rarr;</span></a>
+      <span class="prod-name">ParaSend</span>
+      <h3>Send a file that disappears.</h3>
+      <ul class="prod-lines">
+        <li>The file is encrypted in your browser before it leaves your device.</li>
+        <li>The relay only ever holds the encrypted blob in RAM, never on a disk.</li>
+        <li>It is burned on the first read, so there is nothing left to leak later.</li>
+      </ul>
+      <div class="prod-cta"><a class="btn home-act-ghost" href="/parashare">Send a file</a></div>
     </li>
   </ul>
 </section>
 
-<section class="home-rules" aria-labelledby="rules-h">
-  <div class="rules-intro">
-    <p class="rules-eyebrow"><span></span>our policy</p>
-    <h2 id="rules-h">Rules you can check. Every one has a proof.</h2>
-    <p class="rules-lede">Everyone has a privacy policy. The ParaRules come with a verify link each: a log, a header, a repo. Not a promise.</p>
+<section class="home-sec" aria-labelledby="how-h">
+  <div class="sec-intro">
+    <p class="sec-eyebrow"><span></span>how it works</p>
+    <h2 id="how-h">Three steps, and you are done.</h2>
+    <p class="sec-lede">No plugin, no client software, no onboarding call. The whole thing happens in the tab you already have open.</p>
   </div>
+  <ol class="step-grid">
+    <li>
+      <span class="step-n">01</span>
+      <h3>Pick the file</h3>
+      <p>Drop a PDF in your browser. It is encrypted on your own device, before anything is uploaded.</p>
+    </li>
+    <li>
+      <span class="step-n">02</span>
+      <h3>Send the link</h3>
+      <p>The other side opens the link from the email and signs or reads it there. They do not have to sign up for anything.</p>
+    </li>
+    <li>
+      <span class="step-n">03</span>
+      <h3>Keep the proof</h3>
+      <p>You get a receipt that can be checked without us, and a line in a public log that shows when it happened.</p>
+    </li>
+  </ol>
+</section>
+
+<section class="home-sec" aria-labelledby="cost-h">
+  <div class="sec-intro">
+    <p class="sec-eyebrow"><span></span>what it costs</p>
+    <h2 id="cost-h">Free to start. Then a flat price per month.</h2>
+    <p class="sec-lede">Prices are per month excluding btw. You can stay on the free tier as long as you like; there is no card and no time limit.</p>
+  </div>
+  <ul class="price-grid">
+    <li>
+      <h3>ParaSign</h3>
+      <p class="price-sub">Getting documents signed.</p>
+      <ul class="tiers">
+        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Free</b> &middot; 2 signatures per month, unlimited receiving</span></li>
+        <li><span class="tier-price">&euro;49</span><span class="tier-what"><b>Pro</b> &middot; 100 signatures per month, then &euro;0.40 each up to 1,000</span></li>
+        <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures per month, named support, exportable audit log</span></li>
+        <li><span class="tier-price">Talk</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, SLA with service credits, self-hosting licence</span></li>
+      </ul>
+      <p class="price-foot">&euro;59.29 and &euro;361.79 per month incl. 21% btw &middot; yearly is cheaper</p>
+    </li>
+    <li>
+      <h3>ParaSend</h3>
+      <p class="price-sub">Sending files that burn on read.</p>
+      <ul class="tiers">
+        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Free</b> &middot; 1 hour link expiry, burn on first read, 10 uploads per hour</span></li>
+        <li><span class="tier-price">&euro;15</span><span class="tier-what"><b>Pro</b> &middot; 24 hour expiry, up to 10 reads per link, send history, webhooks</span></li>
+        <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, signed DPA, SLA 99.9%, per-tenant limits</span></li>
+      </ul>
+      <p class="price-foot">&euro;18.15 per month incl. 21% btw &middot; yearly is cheaper</p>
+    </li>
+  </ul>
+  <div class="sec-more">
+    <a class="sec-link" href="/pricing">See the full pricing page <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</section>
+
+<section class="home-sec" aria-labelledby="trust-h">
+  <div class="sec-intro">
+    <p class="sec-eyebrow"><span></span>why you can trust it</p>
+    <h2 id="trust-h">Rules you can check. Every one has a proof.</h2>
+    <p class="sec-lede">Everyone has a privacy policy. The ParaRules come with a verify link each: a log, a header, a repo. Not a promise.</p>
+  </div>
+  <p class="pq-core"><strong>paramant-core</strong><span>ML-KEM-768 encryption &middot; ML-DSA-65 signatures &middot; FIPS 203/204</span></p>
   <ol class="rules-grid">
     <li><span class="r-n">01</span><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
-    <li><span class="r-n">02</span><h3>Your browser talks only to us</h3><p>No third-party requests. No fonts, CDNs, analytics or pixels.</p><a class="r-verify" href="/pararules">verify: open devtools <span aria-hidden="true">&rarr;</span></a></li>
     <li><span class="r-n">03</span><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
     <li><span class="r-n">04</span><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the chain.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
-    <li><span class="r-n">05</span><h3>Quantum-ready by default</h3><p>FIPS 203/204 today, not &ldquo;soon&rdquo;.</p><a class="r-verify" href="/crypto-agility">verify: KAT vectors <span aria-hidden="true">&rarr;</span></a></li>
     <li><span class="r-n">06</span><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, receipts anyone can check offline.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
   </ol>
-  <div class="rules-cta">
-    <a class="rules-link" href="/pararules">Read all nine ParaRules <span aria-hidden="true">&rarr;</span></a>
+  <div class="sec-more">
+    <a class="sec-link" href="/pararules">Read all nine ParaRules <span aria-hidden="true">&rarr;</span></a>
   </div>
 </section>
 
-<section class="home-soon" aria-labelledby="soon-h">
-  <div class="rules-intro">
-    <p class="rules-eyebrow"><span></span>in development</p>
-    <h2 id="soon-h">What&rsquo;s next. Labeled honestly.</h2>
-    <p class="rules-lede">In development means exactly that: not live, no dates promised. It ships when it verifies.</p>
-  </div>
-  <ul class="soon-grid">
-    <li>
-      <span class="soon-chip">In development</span>
-      <h3>Mandate credentials</h3>
-      <p>Prove you may sign or act on behalf of an organization: a scoped, revocable credential, checkable offline.</p>
-    </li>
-    <li>
-      <span class="soon-chip">In development</span>
-      <h3>Registered delivery</h3>
-      <p>Send a document and get an offline-verifiable proof of filing, anchored in the public transparency log.</p>
-    </li>
-  </ul>
-</section>
+<p class="home-dev">Building on it instead of clicking? There is an SDK, a signing API and a self-host installer: <a href="/docs">read the developer docs &rarr;</a></p>
 
 </main>
 <footer>

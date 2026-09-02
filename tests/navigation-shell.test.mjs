@@ -31,7 +31,12 @@ await publicPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
 await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Security,Pricing,Docs');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 ok('public navigation has four clear destinations', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Security','Pricing','Docs']), publicDesktop.join(', '));
-ok('public homepage actions enter real product routes', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/parashare','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+// The signed-out hero now offers ONE primary action and one secondary, not
+// three. Three equal buttons is three decisions before the visitor knows what
+// the product is; ParaSend keeps its own call to action further down the page,
+// where it is next to the three lines that explain it.
+ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('the homepage still routes to ParaSend from its own section', JSON.stringify(await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/parashare']), await publicPage.locator('#products').innerText());
 const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
   background: getComputedStyle(node).backgroundColor,
   backdropFilter: getComputedStyle(node).backdropFilter,
