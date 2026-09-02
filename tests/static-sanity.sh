@@ -221,6 +221,30 @@ else
   printf "   WARN  %s not found or not executable, style guard skipped\n" "$STYLE"
 fi
 
+# ── 11. Test files keep one declaration per top-level name ──────────────
+# Every suite is a flat top-level script, so each open pull request appends to
+# the SAME namespace. On 2026-09-02 five of them did within the hour and main
+# went red on the last merge: const tiers twice in relay/test/pricing-page.test.js,
+# const pricingVisible twice in tests/ui-truthfulness.test.mjs. Each branch was
+# green alone; the collision existed only in the merge.
+# scripts/check-test-declarations.sh parses every suite (a duplicate const is a
+# SyntaxError, so the whole file stops running) and separately reports duplicate
+# top-level var/function names, which are legal, silent, and change what the
+# assertions above them measure.
+echo ""
+echo "11. Test-scope guard (scripts/check-test-declarations.sh)..."
+SCOPE="$ROOT/scripts/check-test-declarations.sh"
+if [ -x "$SCOPE" ]; then
+  if SCOPE_OUT="$("$SCOPE" 2>&1)"; then
+    printf '%s\n' "$SCOPE_OUT" | sed 's/^/   /'
+  else
+    printf '%s\n' "$SCOPE_OUT" | sed 's/^/   /'
+    FAIL=$((FAIL + 1))
+  fi
+else
+  printf "   WARN  %s not found or not executable, test-scope guard skipped\n" "$SCOPE"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "════════ RESULT ════════"
