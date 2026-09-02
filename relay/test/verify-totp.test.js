@@ -209,6 +209,32 @@ test('a store error fails CLOSED and says so, rather than accepting the code', a
   assert.strictEqual(wrong.error, undefined, 'a wrong code carries no error code');
 });
 
+test('a store that never answers is an outage too, and the guard says so in time', async () => {
+  const secret = freshSecret();
+  const code = totp.totpCode(secret, slotNow(), 'sha256');
+
+  // This is what an unreachable Redis actually looks like from here: node-redis
+  // queues the command while it reconnects, so set() neither resolves nor
+  // rejects. Without a bound the guard waits with it and the route hangs, which
+  // is not fail-closed, it is no decision at all.
+  const hangingStore = { set() { return new Promise(() => {}); } };
+  const t0 = Date.now();
+  const r = await totp.verifyTotpGeneric(code, secret, { replayKey: 't11', storeTimeoutMs: 40 }, hangingStore);
+  const elapsed = Date.now() - t0;
+  assert.strictEqual(r.valid, false, 'a store that never answers must not validate a code');
+  assert.strictEqual(r.error, totp.REPLAY_STORE_UNAVAILABLE, 'and it reads as an outage');
+  assert.ok(elapsed < 1000, `the wait is bounded, took ${elapsed}ms`);
+
+  // A slow but working store still gets its answer through: the bound is a
+  // deadline, not a race the store normally loses.
+  const slowStore = { set() { return new Promise((res) => setTimeout(() => res('OK'), 10)); } };
+  const slow = await totp.verifyTotpGeneric(code, secret, { replayKey: 't11b', storeTimeoutMs: 500 }, slowStore);
+  assert.strictEqual(slow.valid, true, 'a slow store inside the deadline is still a valid first use');
+
+  assert.ok(totp.REPLAY_STORE_TIMEOUT_MS > 0 && totp.REPLAY_STORE_TIMEOUT_MS <= 2000,
+    'the default deadline stays inside any sane request budget');
+});
+
 test('the fail-open catch is gone from the source, not just from the behaviour', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'totp.js'), 'utf8');
   const guard = src.slice(src.indexOf('async function verifyTotpGeneric'));

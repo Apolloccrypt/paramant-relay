@@ -105,10 +105,18 @@ function matchTotpSlot(token, secret, opts = {}) {
 // So a store failure now yields { valid:false, error:'replay_store_unavailable' },
 // which call sites answer with 503 and a log line, distinct from the 401 a wrong
 // code gets. A refused replay yields { valid:false, error:'replay' }.
+//
+// A STORE THAT NEVER ANSWERS IS ALSO AN OUTAGE. node-redis queues commands while
+// it reconnects, so against an unreachable server `set` neither resolves nor
+// rejects: it waits. Fail-closed has to cover that case too, or the guard simply
+// hangs instead of deciding, so the wait is bounded (`storeTimeoutMs`, 1s) and a
+// timeout is reported exactly like a thrown error. A SET that lands after the
+// timeout does no harm: it marks a slot used, which is the safe direction.
 const REPLAY_STORE_UNAVAILABLE = 'replay_store_unavailable';
+const REPLAY_STORE_TIMEOUT_MS = 1000;
 
 async function verifyTotpGeneric(token, secret, opts = {}, store = null) {
-  const { window = 1, replayKey, algorithm, algorithms, now } = opts;
+  const { window = 1, replayKey, algorithm, algorithms, now, storeTimeoutMs = REPLAY_STORE_TIMEOUT_MS } = opts;
   const matched = matchTotpSlot(token, secret, { window, algorithm, algorithms, now: now ?? Date.now() });
   if (matched === null) return { valid: false };
   if (replayKey && store) {
@@ -116,10 +124,17 @@ async function verifyTotpGeneric(token, secret, opts = {}, store = null) {
     let ok;
     // try/catch as well as .catch: a store whose set() throws synchronously
     // never returns a promise to attach a handler to.
+    let timer = null;
     try {
-      ok = await Promise.resolve(store.set(slotKey, '1', { NX: true, EX: 90 }));
+      const call = Promise.resolve(store.set(slotKey, '1', { NX: true, EX: 90 }));
+      const TIMED_OUT = Symbol('replay_store_timeout');
+      const deadline = new Promise((resolve) => { timer = setTimeout(() => resolve(TIMED_OUT), storeTimeoutMs); });
+      ok = await Promise.race([call, deadline]);
+      if (ok === TIMED_OUT) return { valid: false, error: REPLAY_STORE_UNAVAILABLE };
     } catch {
       return { valid: false, error: REPLAY_STORE_UNAVAILABLE };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
     if (ok === null) return { valid: false, error: 'replay' };
   }
@@ -129,6 +144,7 @@ async function verifyTotpGeneric(token, secret, opts = {}, store = null) {
 module.exports = {
   ALPHABET,
   REPLAY_STORE_UNAVAILABLE,
+  REPLAY_STORE_TIMEOUT_MS,
   base32Encode,
   base32Decode,
   totpCode,

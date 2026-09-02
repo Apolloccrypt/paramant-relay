@@ -100,3 +100,29 @@ test('relay.js uses the throttle and no longer refuses on a named user_id', () =
   const notes = relay.match(/(?<!function )userMfaNoteFailure\(user_id\)/g) || [];
   assert.equal(notes.length, 2, 'and both record their failures');
 });
+
+test('every replay-guarded route turns a store outage into a 503, not a 401', () => {
+  const relay = fs.readFileSync(path.join(__dirname, '..', 'relay.js'), 'utf8');
+
+  // lib/totp.js fails closed on a store error, which is only worth anything if
+  // the routes tell that apart from a wrong code. A 401 here would read to the
+  // user as "your code is bad" and to a monitor as nothing at all.
+  const guards = relay.match(/totpLib\.REPLAY_STORE_UNAVAILABLE/g) || [];
+  const calls = relay.match(/replayKey: `paramant:user:replay:\$\{user_id\}`/g) || [];
+  assert.ok(calls.length >= 3, 'verify-totp plus both signing-key routes use the replay guard');
+  assert.equal(guards.length, calls.length,
+    'every call site that passes a replayKey must handle the outage it can now return');
+
+  const outages = relay.match(/writeHead\(503[\s\S]{0,160}?replay_store_unavailable/g) || [];
+  assert.ok(outages.length >= calls.length,
+    `every guarded route answers 503 replay_store_unavailable, found ${outages.length} for ${calls.length} call sites`);
+
+  // The verify path has one more: the secret read sits in front of the guard and
+  // would otherwise queue forever against a dead redis, so the guard never gets
+  // to fail closed at all.
+  assert.match(relay, /redisDeadline\(userTotp\.getUserTotpSecret/,
+    'the redis read in front of the guard must be bounded, or an outage hangs instead of deciding');
+  assert.match(relay, /function redisDeadline/, 'and the bound has to exist');
+  assert.match(relay, /log\("error", "totp_replay_store_unavailable"/,
+    'an outage that nobody logs is an outage nobody fixes');
+});

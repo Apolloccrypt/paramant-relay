@@ -180,9 +180,29 @@ log `totp_replay_store_unavailable`; the admin login passes the 503 through as
 count it as a failed attempt. A refused replay is `error: 'replay'`, a wrong code
 carries no error at all, so the three cases stay distinguishable.
 
-Pinned by `relay/test/verify-totp.test.js` (a throwing store, sync and async, must
-not validate), `relay/test/auth-throttle.test.js` and
-`admin/test/login-ratelimit.test.js`.
+**A store that never answers is an outage too.** Fail-closed only means
+something if a decision arrives. node-redis queues commands while it
+reconnects, so against an unreachable server a call neither resolves nor
+rejects. Measured on a booted relay with the server killed underneath it, the
+verify path did not fail open OR closed: it hung, with no answer at all after
+twelve seconds. Two bounded waits fix that on this path: the replay `set`
+inside `verifyTotpGeneric` (`storeTimeoutMs`, 1s) and the secret read in front
+of it (`redisDeadline` in relay.js, 1s). A timeout is reported exactly like a
+thrown error, so the route answers 503 in about a second.
+
+**Still open, and deliberately not fixed here.** That queue-forever behaviour is
+a property of the relay's redis client, not of this path. Every other
+redis-backed route in relay.js still inherits it and will still hang in an
+outage. The fix is a client-level one (`disableOfflineQueue`, or a command
+deadline applied globally) which changes the failure mode of every call site at
+once, so it belongs in its own change with its own review, not smuggled in
+behind an auth fix.
+
+Pinned by `relay/test/verify-totp.test.js` (a throwing store, a synchronously
+throwing store and a store that never answers, none of which may validate a
+code), `relay/test/route-user-mfa-lockout.test.js` (a real relay, a real redis,
+and the connection cut underneath it mid-suite), `relay/test/auth-throttle.test.js`
+and `admin/test/login-ratelimit.test.js`.
 
 ---
 

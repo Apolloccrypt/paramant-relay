@@ -72,6 +72,22 @@ if (RELAY_REDIS_URL) {
     .then(() => console.log('[relay/redis] connected'))
     .catch(e => console.error('[relay/redis] connect failed:', e.message));
 }
+// A redis call that answers inside a deadline, or an outage. node-redis queues
+// commands while it reconnects, so against an unreachable server a GET neither
+// resolves nor rejects: the route waits, forever. On an auth path that is worse
+// than an error, because fail-closed means DECIDING and a decision has to
+// arrive. Used by the TOTP verify path, where the secret read sits in front of
+// the single-use guard and would otherwise hang before the guard can fail
+// closed. The rest of the relay still inherits the queue; see SECURITY.md.
+const REDIS_DEADLINE_MS = 1000;
+function redisDeadline(promise, ms = REDIS_DEADLINE_MS) {
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('redis_deadline_exceeded')), ms);
+  });
+  return Promise.race([Promise.resolve(promise), deadline]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
 const PORT       = parseInt(process.env.PORT       || '3000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
@@ -2860,7 +2876,16 @@ const server = http.createServer(async (req, res) => {
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
       // Throttle, never refuse: see userMfaDelayMs.
       await authThrottle.sleep(userMfaDelayMs(user_id));
-      const secret = await userTotp.getUserTotpSecret(redisClient, user_id);
+      // Bounded, so an unreachable redis answers 503 here instead of parking the
+      // request in front of the single-use guard that is supposed to fail closed.
+      let secret;
+      try {
+        secret = await redisDeadline(userTotp.getUserTotpSecret(redisClient, user_id));
+      } catch (e) {
+        log("error", "totp_replay_store_unavailable", { account: String(user_id).slice(0, 12), endpoint: "login", stage: "secret_read" });
+        res.writeHead(503, { "Content-Type": "application/json" });
+        return res.end(J({ error: "replay_store_unavailable" }));
+      }
       if (!secret) { res.writeHead(404); return res.end(J({ error: "no_totp_setup" })); }
       const result = await verifyTotpGeneric(totp, secret, {
         window: 1,
