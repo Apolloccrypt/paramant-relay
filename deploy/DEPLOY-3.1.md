@@ -1,5 +1,14 @@
 # Deploy runbook: main (3.1.0) to production
 
+> `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
+> (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
+> the measurement for each one, and stops at the first result the runbook did
+> not predict. `--preflight-only` does the checks and nothing else,
+> `--dry-run` prints every remote command instead of running it, and
+> `--rollback <TS>` is step 8. This file stays the readable source: the script
+> follows it, it does not replace it, and a step that is argued out here is
+> argued out here only.
+
 Target: `116.203.86.81` (Hetzner). Mick runs this by hand over SSH, from the
 NUC, where the production key lives (`~/.ssh/paramant_prod_claude`, see
 `scripts/check-prod-drift.sh`). Nothing in this file runs on its own. Every
@@ -39,10 +48,28 @@ What main brings that touches the deploy, with the PR that did it:
 - **#323** seventeen norms and sector pages removed (nginx: the `/compliance/*` locations go).
 - this PR: the recurring layer needs an explicit `BILLING_MODE`.
 
-`docker-compose.yml` is byte-identical between `41501bb` and main
-(`git diff 41501bb origin/main -- docker-compose.yml` is empty). Every
-environment variable this runbook mentions already has its line in the
-`x-relay-env` block; nothing has to be added to the compose file, only to `.env`.
+`docker-compose.yml` is **no longer** byte-identical between `41501bb` and
+main, and that matters for this deploy. Two changes:
+
+- #340 rewrote the version header comment.
+- This PR adds `PARAMANT_INLINE_RECEIPT_HEADER` and the three
+  `PARAMANT_RECEIPT_*` variables from #342 to the `x-relay-env` block.
+
+That second one is not cosmetic. There is **no `env_file`** in
+`docker-compose.yml`: `.env` only fills in `${VAR}` references inside the
+compose file itself, so a variable without its own line in `x-relay-env`
+never reaches a container, however carefully it is written into `.env`. The
+four receipt variables had no line, so setting the inline-receipt opt-in in
+`.env` alone would have done nothing at all.
+
+Nothing has to be done by hand for this: step 3 pulls the new compose file
+with the rest of main, and the step 4 recreate is what makes the containers
+read it. `deploy/deploy-3.1.sh` proves it before recreating anything, with
+`docker compose config` on the server: the flag has to render as
+`PARAMANT_INLINE_RECEIPT_HEADER: "1"` on all five relays, or the deploy stops
+there rather than at the smoke test with 3.1.0 already live.
+
+Every other environment variable this runbook mentions already had its line.
 
 ## The brake, and why the deploy is now allowed
 
@@ -77,8 +104,14 @@ test key plus mode, then deploy) collapsed to: deploy now, decide later.
 
 ## A second brake: the delivery receipt moved out of the download header
 
-**Precondition, not a step: `Apolloccrypt/paramant-sdk` PR #5 must be released
-to PyPI before main reaches production.**
+**This precondition is dropped, and the version in it was wrong. It used to
+read: `Apolloccrypt/paramant-sdk` PR #5 must be released to PyPI before main
+reaches production. The release in question is **3.3.0**, not 3.2.1, and it
+cannot reach PyPI: the project has no trusted publisher configured, which is a
+setting in PyPI and not something this repository can fix. Reported
+2026-09-02; not measured here. Waiting on it would hold the deploy for an
+unknown time, so the deploy is decoupled from it and takes the first of the
+two ways out below. `deploy/deploy-3.1.sh` does that automatically.**
 
 Relay PR #342 takes the signed ParaSend delivery receipt out of the
 `X-Paramant-Receipt` response header. It had to go: 18551 bytes for that one
@@ -89,8 +122,8 @@ from `GET /v2/transfers/:receipt_id/receipt`.
 The out-of-tree Python SDK reads that header (`sdk-py/paramant_sdk.py:681`) and
 turns an absent one into `receipt = None`, without an error. So a `3.2.0`
 client against a deployed main keeps working and silently stops getting proof
-of delivery. `paramant-sdk` 3.2.1 reads both shapes and fails loudly; that is
-the release this deploy waits for.
+of delivery. `paramant-sdk` 3.3.0 reads both shapes and fails loudly; that is
+the release this deploy no longer waits for.
 
 Two ways out if the release is not ready and the deploy cannot wait:
 
@@ -102,6 +135,12 @@ Two ways out if the release is not ready and the deploy cannot wait:
   comment, the production conf does not.
 - Or hold main. The default is off on purpose, because on a default nginx the
   fat header is a 502 rather than a feature.
+
+This deploy takes the first way out, so the follow-up is a real step and not a
+footnote: **once 3.3.0 is on PyPI, take `PARAMANT_INLINE_RECEIPT_HEADER` back
+out of `/opt/paramant-relay/.env` and recreate the relays.** That is one line
+and a `docker compose up -d --no-deps`, no deploy. The raised
+`proxy_buffer_size` may stay; #342 calls it a margin rather than a fix.
 
 Either way the flag is temporary: the old header is removed after
 **2026-12-01**. While it is off, every download carries
@@ -374,6 +413,17 @@ this brake exists to prevent.
 Trigger: any of the stop conditions in step 6, or clear breakage in the first
 thirty minutes.
 
+From the NUC, with the `TS` that step 2 printed:
+
+```bash
+bash deploy/deploy-3.1.sh --rollback 20260902-1830
+```
+
+That reads the manifest of step 2, retags the saved images, recreates the
+containers without rebuilding, restores `.env`, the nginx confs and the
+docroot, and re-runs the smoke tests. By hand, on the server, the equivalent
+is the 3.0.0 script, which asks before it restores `.env`:
+
 ```bash
 cd /opt/paramant-relay
 COMPOSE_DIR=/opt/paramant-relay BACKUP_DIR=/home/paramant/backups bash scripts/rollback-3.0.0.sh
@@ -413,7 +463,12 @@ fast path.
 
 ## What this runbook does not do
 
-- It does not deploy. Every command above is for Mick to run.
+- It does not deploy by itself. Every command above is one Mick runs, by hand
+  or through `deploy/deploy-3.1.sh`, which runs exactly these steps and
+  nothing more.
+- It does not automate step 7. Watching the logs, minting the canary key,
+  tagging the release and writing the deploy down stay hand work, because each
+  needs a judgement the script cannot make.
 - It does not set `BILLING_MODE`. The recurring layer stays off until there is
   a test key and a deliberate second change.
 - It does not remove the ParaID nginx deny. Harmless while it stays, and its

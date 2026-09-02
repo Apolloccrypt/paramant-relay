@@ -59,6 +59,16 @@ x-relay-env: &relay-env
   REDIS_URL: "${RELAY_REDIS_URL}"
   ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
   INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
+  # ParaSend delivery receipts (#342). The relay reads these by name, so they
+  # need a line here: .env only substitutes ${VAR} into this file, there is no
+  # env_file, and a variable that is not listed never reaches a container.
+  # Empty is the documented default for all four: the inline header is off
+  # unless the value is exactly 1, and the caps fall back to their built-in
+  # numbers when the variable is empty.
+  PARAMANT_INLINE_RECEIPT_HEADER: "${PARAMANT_INLINE_RECEIPT_HEADER:-}"
+  PARAMANT_RECEIPT_PER_ACCOUNT_MAX: "${PARAMANT_RECEIPT_PER_ACCOUNT_MAX:-}"
+  PARAMANT_RECEIPT_UNCAPPED_MAX: "${PARAMANT_RECEIPT_UNCAPPED_MAX:-}"
+  PARAMANT_RECEIPT_TOTAL_MAX: "${PARAMANT_RECEIPT_TOTAL_MAX:-}"
   PARAMANT_WIRE_VERSION: "${PARAMANT_WIRE_VERSION:-1}"
   # Opt-in static frontend serving (plug-and-play self-host). Default false:
   # production serves frontend/ via nginx and ignores this + the ro mount below.
