@@ -3,7 +3,8 @@
 # posture.sh - measure the security posture of Paramant from the outside.
 #
 # It logs in nowhere and changes nothing. Every check is a black-box measurement
-# against the live hostnames plus two repo-local audits (npm, cargo).
+# against the live hostnames, plus npm audit over the three lockfiles and the
+# Rust lockfile against the advisory database.
 #
 # The rule this script is built on, learned the expensive way from the old
 # heartbeat: a monitoring step never gets an escape of its own. A missing tool,
