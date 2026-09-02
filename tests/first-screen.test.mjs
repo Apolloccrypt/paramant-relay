@@ -22,7 +22,7 @@
 //      and obvious on a laid-out page; /pricing shipped that defect.
 //
 // The one claim measured on a text range rather than an element is the SES
-// scope note on /parasign. Its paragraph runs from y=737 to y=911, so the block
+// scope note on /parasign. Its paragraph runs from y=753 to y=950, so the block
 // does not fit and never was meant to: what has to be readable before a buyer
 // signs is the sentence that says the signature is a Simple Electronic
 // Signature, and that is measured on its own line boxes.
@@ -41,10 +41,13 @@
 // installed by `playwright install --with-deps`; the resolved family is named in
 // every failure message, so a run on a machine without it says so.
 //
-// Two claims do not fit in DejaVu and are pinned differently, at BELOW, with the
-// reason next to each. Both are real: the pages fit on a narrow face and hang
-// over the edge on a wide one. Their pin holds the measured position, so they
-// cannot drift further while they wait to be fixed.
+// Two claims used to hang over the edge in DejaVu and were pinned in place
+// rather than at the fold: the SES sentence on /parasign at y=863 and the third
+// answer on /help at y=860. Both are fixed in the CSS of those two pages, in
+// their mobile media queries and without touching a word of the copy, so every
+// claim in this file now holds the same line: bottom <= 844. `at` records the
+// position each one was pulled back to, and a failure names it alongside the
+// value it drifted to.
 //
 // Run: node --test tests/first-screen.test.mjs
 import { chromium } from 'playwright';
@@ -165,14 +168,13 @@ const PAGES = [
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For legal, finance and healthcare practices' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
-      // Not the paragraph, which runs to y=911 by design. The sentence.
-      // BELOW. In Cantarell this sentence ends at 800 and the reviewers read it on
-      // the first screen. In DejaVu the paragraph reflows and it ends at 863,
-      // 19px over the edge, so on a wide face a buyer scrolls to find out that a
-      // ParaSign signature is not a qualified one. The pin holds the measured
-      // position rather than the fold, so it cannot slide further while the page
-      // waits for a fix; raising it is a decision, not a maintenance edit.
-      { name: 'the SES scope statement', css: '.scope-note p', phrase: 'Simple Electronic Signature (SES)', below: 863 },
+      // Not the paragraph, which runs to y=950 by design. The sentence.
+      // It ended at 863 in DejaVu, 19px over the edge, so on a wide face a buyer
+      // scrolled to find out that a ParaSign signature is not a qualified one.
+      // parasign.html now closes the gap under the section rule and above the
+      // buttons on a phone, which lifts it to 815. The sentence itself is
+      // untouched and still matches about.html:254 word for word.
+      { name: 'the SES scope statement', css: '.scope-note p', phrase: 'Simple Electronic Signature (SES)', at: 815 },
       { name: 'the free limit', css: 'p.ps-fine', text: '2 signatures a month' },
     ],
   },
@@ -231,10 +233,12 @@ const PAGES = [
     claims: [
       { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Signing a document needs an account' },
       { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is free' },
-      // BELOW, for the same reason: 819 in Cantarell, 860 in DejaVu. The third
-      // answer is where the page says the documents live in Germany, which is
-      // the answer the buyer this page was rewritten for came to read.
-      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner Nuremberg', below: 860 },
+      // The third answer is where the page says the documents live in Germany,
+      // which is the answer the buyer this page was rewritten for came to read.
+      // It ended at 860 in DejaVu; the Q&A block, its heading and the space
+      // between a question and its answer are tighter on a phone, which lifts it
+      // to 822 with all three answers intact.
+      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner Nuremberg', at: 822 },
     ],
   },
   {
@@ -277,18 +281,9 @@ for (const spec of PAGES) {
         assert.equal(hit.href, claim.href,
           `${spec.slug}: ${hit.name} points at ${hit.href}, not ${claim.href}`);
       }
-      if (claim.below) {
-        // Already over the edge, measured and named above. Two pixels of room for
-        // a Chromium rounding change, and nothing else.
-        assert.ok(hit.bottom <= claim.below + 2,
-          `${spec.slug}: ${hit.name} ends at y=${hit.bottom}, was ${claim.below}. It is already ${hit.bottom - FOLD.height}px below the ${FOLD.height}px first screen and it just moved further down (top y=${hit.top}, font ${hit.font}).`);
-        assert.ok(hit.bottom > FOLD.height,
-          `${spec.slug}: ${hit.name} now ends at y=${hit.bottom} and fits the ${FOLD.height}px first screen. Someone fixed it: drop the below:${claim.below} pin and let this claim hold the fold like the rest.`);
-      } else {
-        assert.ok(hit.bottom <= FOLD.height,
-          `${spec.slug}: ${hit.name} ends at y=${hit.bottom}, ${hit.bottom - FOLD.height}px past the ${FOLD.height}px first screen (top y=${hit.top}, font ${hit.font}). A phone reader has to scroll for it.`);
-      }
-      t.diagnostic(`${spec.slug} ${hit.name}: top ${hit.top}, bottom ${hit.bottom}${claim.below ? ' (below the fold, pinned in place)' : ''}`);
+      assert.ok(hit.bottom <= FOLD.height,
+        `${spec.slug}: ${hit.name} ends at y=${hit.bottom}, ${hit.bottom - FOLD.height}px past the ${FOLD.height}px first screen (top y=${hit.top}, font ${hit.font})${claim.at ? `. It was measured at y=${claim.at} when the CSS that pulled it onto the screen was written, so it moved ${hit.bottom - claim.at}px down since` : ''}. A phone reader has to scroll for it.`);
+      t.diagnostic(`${spec.slug} ${hit.name}: top ${hit.top}, bottom ${hit.bottom}${claim.at ? ` (was ${claim.at} when pulled onto the screen)` : ''}`);
     }
 
     // Equal to the viewport, not merely no wider than it: a page narrower than
