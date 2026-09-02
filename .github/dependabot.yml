@@ -32,6 +32,25 @@ updates:
       - "dependencies"
       - "docker"
       - "relay"
+    # The Node line is a paired decision, not a dependency bump. `engines`
+    # (">=22 <25"), `.nvmrc`, the `node-version` steps in every CI job and both
+    # Dockerfiles have to move together, and only to a line that is in Active
+    # LTS. #340 set that grid deliberately: "it makes adopting Node 26 a
+    # deliberate bump rather than an accident". Dependabot opened #343 and #346
+    # (24 -> 26) anyway. Node 26 is the next even line but does not enter Active
+    # LTS until late October 2026, and all three package manifests say
+    # ">=22 <25". Nothing in CI enforces `engines` (no engine-strict), so that
+    # image would have built green and only disagreed with its own manifest at
+    # runtime.
+    #
+    # Scoped to "node" on purpose: the rust builder still gets its majors (#313
+    # was a real break that had to be seen), and node minor/patch bumps, Alpine
+    # rebuilds and digest updates all still come through. When a new even line
+    # reaches Active LTS, bump it by hand together with `engines`, `.nvmrc` and
+    # the CI node-version steps; docs/RELEASE.md carries that checklist.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
 
   # Docker – admin image base
   - package-ecosystem: "docker"
@@ -42,6 +61,12 @@ updates:
       - "dependencies"
       - "docker"
       - "admin"
+    # Same Node-line rule as the relay entry above, and for the same reason:
+    # admin/Dockerfile is kept in lockstep with relay/Dockerfile, so a major
+    # here that does not land there splits the two images apart.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
