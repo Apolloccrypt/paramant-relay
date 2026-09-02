@@ -27,10 +27,12 @@
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
+.ps-hero{padding:var(--space-10) 0 var(--space-6)}
 .ps-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
 .ps-band h2{font-size:var(--text-2xl);letter-spacing:-.02em;margin-bottom:var(--space-2)}
 .mono-eyebrow{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)}
 .ps-lede{font-size:var(--text-md);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.ps-who{font-size:var(--text-base);color:var(--navy);font-weight:700;line-height:1.7;max-width:680px;margin-top:var(--space-3)}
 .ps-band p{font-size:var(--text-base);color:var(--ink);line-height:1.8;max-width:680px;margin-top:var(--space-4)}
 .ps-band p a,.ps-band li a{color:var(--cobalt)}
 .ps-band p strong{color:var(--navy)}
@@ -68,6 +70,17 @@
 .scope-note p{margin-top:0}
 @media(max-width:1023px){.community{grid-template-columns:1fr;gap:var(--space-4)}}
 @media(max-width:640px){.check-grid,.tier-grid{grid-template-columns:1fr}}
+/* Mobile is the design target and the house .sec-head is not, at this width:
+   it keeps the section number in its own grid column, which leaves the H1 about
+   160px to wrap in. On /parasign that cost six lines of headline and pushed the
+   buttons and the eIDAS note clean off the first screen. On a narrow screen the
+   number stacks above the headline instead of standing beside it. Page-local on
+   purpose: design-system.css is shared with pages this PR does not touch. */
+@media(max-width:640px){
+  .ps-hero{padding-top:var(--space-6)}
+  #main-content .sec-head{grid-template-columns:1fr;row-gap:var(--space-2)}
+  #main-content .sec-head .num{font-size:var(--text-xl);line-height:1}
+}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -168,19 +181,27 @@
   <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 
-<!-- HERO -->
-<section style="padding:var(--space-10) 0 var(--space-6)" id="main-content" tabindex="-1">
+<!-- HERO. Four things and no more, in the order docs/brand/messaging.md sets:
+     what you can do here, who it is for, the split with its real number, and
+     the one limit a lawyer asks about before anything else. The algorithm names
+     are the reason section 04 is true; section 6 of the guide keeps them out of
+     the H1 and out of the opening paragraph, so they live down there. -->
+<section class="ps-hero" id="main-content" tabindex="-1">
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
-      <h1 class="paramant-h2">ParaSign</h1>
-      <span class="mono-eyebrow">Get documents signed, by Paramant</span>
+      <h1 class="paramant-h2">Sign documents in your browser, prove it years later.</h1>
+      <span class="mono-eyebrow">ParaSign &middot; document signing by Paramant</span>
     </div>
-    <p class="ps-lede">Send a contract, a quote or a consent form out for signature and get it back signed, without leaving your browser and without the document passing through anyone else's cloud. Everyone you send it to can check the result later, on their own, without an account and without us.</p>
-    <p class="ps-fine">Free on the <a href="#plans">Community plan</a> &middot; business plans from &euro;49 a month &middot; the person you invite needs no account, only the link in their email.</p>
+    <p class="ps-lede">Send a contract out for signature and get it back signed, without it passing through anyone else's cloud. Anyone can check the result later, without us.</p>
+    <p class="ps-who">For legal, finance and healthcare practices in the EU that sign contracts and client documents.</p>
     <div class="ps-actions">
       <a href="/sign" class="btn btn-primary">Sign a document &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+    </div>
+    <p class="ps-fine">Free on the <a href="#plans">Community plan</a>: 2 signatures a month, no card, forever. Business plans from &euro;49 a month excl. btw. The person you invite needs no account, only the link in their email.</p>
+    <div class="scope-note">
+      <p><strong>What this is, before you read on.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES). What the proof does show, and what it does not, is in <a href="#proof">section 04</a>.</p>
     </div>
   </div>
 </section>
@@ -218,6 +239,8 @@
     <span class="mono-eyebrow">02 / What it costs</span>
     <h2 style="margin-top:var(--space-2)">Community is free. Companies pay.</h2>
     <p>Two halves, and the split is the point. Individuals sign for nothing on the Community plan. Organisations that sign at volume buy a business plan, and those plans are what pay for the free one.</p>
+    <p><strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. Businesses pay for the higher limits (longer links, more reads, more devices, a dedicated relay), not to unlock features, and that is what keeps the Community plan free.</p>
+    <p><strong>Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</strong></p>
 
     <div class="community">
       <div>
@@ -225,8 +248,8 @@
         <h3>&euro;0, forever</h3>
         <p>No card, no clock, no trial that quietly ends. It is called <strong>Community</strong> on the <a href="/pricing">pricing page</a> too.</p>
         <ul>
-          <li>2 signatures per month</li>
-          <li>Unlimited receiving</li>
+          <li>2 signatures a month</li>
+          <li>No limit on receiving</li>
           <li>Full post-quantum crypto</li>
           <li>Public verification log</li>
           <li>No card required</li>
@@ -234,10 +257,11 @@
         <div class="ps-actions">
           <a href="/signup" class="btn btn-primary">Start free &rarr;</a>
         </div>
+        <p class="ps-fine">Receiving is not metered. The tier table in relay/lib/tiers.js has no inbound or receiving dimension at all, so being invited, opening an invitation and fetching the document back are not counted against anything, on any plan. Putting your own signature on one is: that counts against the 2 a month above, whoever sent it to you.</p>
       </div>
       <div>
         <div class="k" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--navy)">Why it is free</div>
-        <p>Paramant is built by <strong>Mick Beer</strong>, privacy and security researcher and founder of Paramantis Solutions B.V. (see the <a href="/about">about page</a>). The Community plan is his way of giving something back: whoever needs to sign a document without handing it to an American cloud can do that here, at no cost, with the same cryptography a paying customer gets.</p>
+        <p>Paramant is built by <strong>Mick Beer, privacy and security researcher</strong>, founder of Paramantis Solutions B.V. (see the <a href="/about">about page</a>). The Community plan is his way of giving something back: whoever needs to sign a document without handing it to an American cloud can do that here, at no cost, with the same cryptography a paying customer gets.</p>
         <p>It is not a limited edition of the product. Community gets the same signatures, the same encryption and the same public proof log as Business. What a paid plan buys is volume, an API, support and accountability. Never security.</p>
       </div>
     </div>
@@ -250,8 +274,9 @@
         <div class="tier-price">&euro;49<span>/month</span></div>
         <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;59.29/mo incl. 21% btw</span><br>Annual &euro;499 excl.</div>
         <ul>
-          <li>100 signatures per month, then &euro;0.40 each, up to 1,000</li>
-          <li>Unlimited transfers</li>
+          <li>100 signatures a month, then &euro;0.40 each, up to 1,000</li>
+          <li>500 ParaSend transfers a month</li>
+          <li>Up to 500 ParaSend retrievals an hour through the API</li>
           <li>API access</li>
         </ul>
       </div>
@@ -260,7 +285,7 @@
         <div class="tier-price">&euro;299<span>/month</span></div>
         <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;361.79/mo incl. 21% btw</span><br>Annual &euro;2,990 excl.</div>
         <ul>
-          <li>1,000 signatures per month</li>
+          <li>1,000 signatures a month</li>
           <li>Named support, response within one business day</li>
           <li>Exportable audit log with CT tree head</li>
         </ul>
@@ -296,7 +321,7 @@
 </section>
 
 <!-- THE PROOF, LAST -->
-<section class="ps-band">
+<section class="ps-band" id="proof">
   <div class="container-md">
     <span class="mono-eyebrow">04 / How it works, and how to check it</span>
     <h2 style="margin-top:var(--space-2)">The technique is the evidence, not the pitch</h2>
@@ -304,7 +329,7 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">ML-DSA-65 (FIPS 204)</div>
-        <p>Signatures are post-quantum, generated in your browser. The algorithm register on the <a href="/crypto-agility">crypto agility page</a> lists ML-DSA-65 as the loaded default.</p>
+        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. The algorithm register on the <a href="/crypto-agility">crypto agility page</a> lists it as the loaded default.</p>
       </div>
       <div class="check-card">
         <div class="k">You own your keys</div>
@@ -320,15 +345,20 @@
       </div>
       <div class="check-card">
         <div class="k">Verification without us</div>
-        <p>A .psign envelope verifies offline, against the published key. Check one on the <a href="/verify">verify page</a>: no account, no API key, no call home.</p>
+        <p>A signed document verifies without contacting us. Check a .psign envelope on the <a href="/verify">verify page</a>: no account, no API key, no call home.</p>
       </div>
       <div class="check-card">
-        <div class="k">Source-available, EU jurisdiction</div>
-        <p>The relay is source-available on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>, and runs under EU jurisdiction. Who is behind it is on the <a href="/about">about page</a>.</p>
+        <div class="k">Source-available code</div>
+        <p>The relay is source-available on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>. Who is behind it is on the <a href="/about">about page</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">EU soil, EU law</div>
+        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out. The subprocessors are listed there, and ParaRule 5 states the same claim in full on <a href="/pararules">ParaRules</a>.</p>
       </div>
     </div>
     <div class="scope-note">
-      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES). We state exactly what it is and what it is not.</p>
+      <p><strong>What the proof covers.</strong> A completed signature shows that the key in the envelope signed this exact document, and that the entry sits in the public log. It does not show who holds that key. To bind a signature to a named email address, send the document as a signing request rather than signing in open mode.</p>
+      <p><strong>And what it is not.</strong> A ParaSign signature is a Simple Electronic Signature (SES), stated in full at the <a href="#main-content">top of this page</a>. We say exactly what it is and what it is not, in the same place a buyer decides.</p>
     </div>
     <div class="ps-actions">
       <a href="/sign" class="btn btn-primary">Sign a document &rarr;</a>
