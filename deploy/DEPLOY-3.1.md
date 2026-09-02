@@ -213,7 +213,7 @@ finds out.
 ```bash
 ssh -i ~/.ssh/paramant_prod_claude root@116.203.86.81
 
-cd /opt/paramant-relay && git rev-parse --short HEAD        # expect 41501bb
+cd /opt/paramant-relay && git rev-parse --short HEAD        # see "Which commit do we expect here" below
 docker compose ls                                            # which compose project, which file
 docker compose ps                                            # six containers plus redis, all healthy
 
@@ -224,6 +224,44 @@ for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADM
 done
 grep -c '^INTERNAL_AUTH_TOKEN=' .env
 ```
+
+### Which commit do we expect here
+
+`41501bb` is where **this runbook** starts: the stand of 8 August, before any
+3.1 deploy ran. It is not where the checkout stands after a deploy. After step
+3 the checkout is on main, so a gate that only ever accepts `41501bb` makes the
+whole procedure single-use: the second deploy stops on this line, and so does
+every resume of a run that died halfway through step 5.
+
+So `deploy/deploy-3.1.sh` treats the expected commit as a parameter with three
+sources, most specific first.
+
+| source | when it applies | what it demands |
+|---|---|---|
+| `PARAMANT_EXPECTED_HEAD=<commit>` | you set it | the checkout equals it, and nothing else is consulted |
+| `/home/paramant/backups/deployed-head` | the file exists on the server | the checkout equals what that file names, **and** that commit is an ancestor of the deploy ref (`git merge-base --is-ancestor`, after a `git fetch`) |
+| `41501bb` | no marker, so no deploy has ever finished here | the checkout equals `41501bb`, the runbook's own starting point |
+
+The marker is written by step 7, by the script, with the commit the checkout is
+actually on. The ancestor test is what keeps the second and later runs honest:
+equal to the marker says nothing moved the checkout outside a deploy, and
+ancestor of the ref says the fast-forward pull in step 3 can reach the ref from
+here. Both have to hold; either alone lets a deploy start from a commit the ref
+does not contain.
+
+A short sha and a full sha of the same commit count as equal. Anything shorter
+than seven characters is not an identification and never matches.
+
+If the checkout has moved and you know why, say so:
+`PARAMANT_EXPECTED_HEAD=<commit> bash deploy/deploy-3.1.sh`. That is the escape
+hatch, and it is deliberately explicit: it accepts equality and skips the
+ancestor test, so it is the one place where a human overrules the measurement.
+
+The rollback (step 8) does **not** rewrite the marker. It restores images,
+`.env`, nginx and the docroot and leaves the checkout where it stands, and the
+marker names the checkout. If you move the checkout back by hand afterwards,
+either write that commit into the marker or run the next deploy with
+`PARAMANT_EXPECTED_HEAD`.
 
 What has to be true before step 2:
 
@@ -358,6 +396,30 @@ The ParaID deny may stay: the route is gone from the relay (#319), so the
 deny answers 404 for a path that would answer 404 anyway. Remove it in a later
 round, not in this one.
 
+### Running step 5 twice
+
+All four nginx changes are idempotent, and the script reads each one as being
+in one of three states before it edits anything:
+
+| state | what the conf carries | what happens |
+|---|---|---|
+| `todo` | the old shape (`auth_request` on `/sign`, a `/compliance` location, `try_files /dicom.html`) | the edit runs |
+| `done` | the old shape is gone and the wanted shape is there (`location = /sign` without `auth_request`, no `/compliance` locations, `location = /dicom { return 404; }`) | reported as **already applied**, no error |
+| `unknown` | neither shape | `FATAL`, because this is not the conf the runbook describes and editing it further would be editing blind |
+
+Only `unknown` stops the deploy. The older script read "nothing to do" as
+`FATAL` outright, which meant the second deploy died on an edit that had simply
+already succeeded. The removal of the docroot files main deleted (step 5b)
+already worked this way: a file that is already gone is counted as *already
+absent*, not as a failure.
+
+What is asserted after the edits does not change, and that is where the weight
+sits: no `auth_request` on `/sign`, zero `/compliance` locations, `/dicom`
+answering `return 404`, the ParaID deny still present, `proxy_buffer_size 32k`
+inside **every** `location ~ ^/v2/outbound` block, and `nginx -t` clean before
+the reload. A run that changed nothing still tests and reloads nginx, so a hand
+edit made between deploys cannot hide behind "already applied".
+
 ## Step 6: smoke tests
 
 In the order `deploy.sh` runs them, plus the two the 3.0.0 runbook used.
@@ -426,6 +488,18 @@ Stop and roll back (step 8) on: a relay that does not reach `healthy`,
    date in `CHANGELOG.md`.
 5. Write the deploy down in the vault (`Sessies/2026-09/`), with the
    `billing_config` line as it was logged.
+
+`deploy/deploy-3.1.sh` does one write of its own here, before the summary: it
+records the commit the checkout ended on in
+`/home/paramant/backups/deployed-head`. That file is the whole reason a second
+deploy can start (see "Which commit do we expect here" under step 1). Doing it
+by hand comes down to:
+
+```bash
+cd /opt/paramant-relay && git rev-parse HEAD > /home/paramant/backups/deployed-head
+```
+
+Without it the next run has no marker, falls back to `41501bb`, and stops.
 
 ## Deciding on the recurring layer, later, not today
 

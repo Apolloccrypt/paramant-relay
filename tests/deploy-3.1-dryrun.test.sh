@@ -193,7 +193,7 @@ check_has   "$PRE" 'REPORT ONLY'                        "the token step reports 
 # ---------------------------------------------------- 6. the runbook's checks --
 echo ""
 echo "6. The assertions the runbook demands are in the script"
-check_has "$FULL" 'checkout_head = 41501bb'                      "asserts the checkout is on 41501bb"
+check_has "$FULL" 'checkout_head = 41501bb'                      "falls back to 41501bb when the server has no deployed-head marker"
 check_has "$FULL" 'services seen = 6'                            "asserts all six services were seen"
 check_has "$FULL" '"recurring":false'                            "asserts billing_config recurring:false"
 check_has "$FULL" '"mode_source":"inferred"'                     "asserts billing_config mode_source:inferred"
@@ -206,7 +206,7 @@ check_has "$FULL" 'rsync -rc --no-times'                         "rsyncs the doc
 check_lacks "$FULL" 'rsync -rc[^|]*--delete'                     "never rsyncs the docroot with --delete"
 check_has "$FULL" 'diff-filter=D'                                "derives the stale docroot files from git, not a wildcard"
 check_has "$FULL" 'after paraid deny'                            "measures the ParaID deny before and after"
-check_has "$FULL" 'after edited files = 2'                       "asserts both named nginx confs were rewritten"
+check_has "$FULL" 'after edited files'                           "measures how many nginx confs were rewritten"
 check_has "$FULL" 'readlink -f'                                  "resolves sites-enabled symlinks before backing up or editing"
 check_has "$FULL" 'nginx -t'                                     "runs nginx -t before reloading"
 check_has "$FULL" 'auth-smoke\.sh'                               "runs tests/auth-smoke.sh"
@@ -248,6 +248,265 @@ check_has "$FULL"   'after outbound blocks with buffer'  "phase 5 reports blocks
 check_has "$SCRIPT" 'REFUSED'                            "phase 5b refuses a deletion that resolves outside the docroot"
 check_has "$FULL"   'after refused outside docroot'      "phase 5b reports how many deletions it refused"
 check_has "$SCRIPT" 'NOT PROVEN'                         "phase 6h says NOT PROVEN when the header block is under 16 KB"
+
+echo ""
+echo "6f. The expected starting commit is a parameter, so a second deploy runs"
+# The old phase 1a asserted `checkout_head = 41501bb` and nothing else. After
+# the first successful deploy the checkout is on main, so every later run, and
+# every resume of a run that died in phase 5, stopped on that one line. These
+# checks are the four situations the parameter has to cover.
+check_has "$SCRIPT" 'PARAMANT_EXPECTED_HEAD'   "the expected commit can be given explicitly"
+check_has "$SCRIPT" 'DEPLOYED_HEAD_FILE'       "the script knows where the deployed-head marker lives"
+check_has "$FULL"   'deployed_marker'          "phase 1a reads the marker off the server"
+check_has "$FULL"   'merge-base --is-ancestor' "phase 1a asks whether the checkout is an ancestor of the deploy ref"
+check_has "$FULL"   'git fetch origin'         "that ancestor question is asked after a fetch, not against stale refs"
+check_has "$FULL"   'after deployed marker'    "phase 7 writes the marker the next run reads"
+check_lacks "$SCRIPT" 'expect "checkout_head = \$EXPECT_PROD_COMMIT"' \
+  "the hard-coded one-commit gate is gone from phase 1a"
+
+# The decision itself is a pure function, so every case can be put through it
+# here without a server. Same trick as q_args above.
+if eval "$(sed -n '/^sha_eq()/,/^}/p' "$SCRIPT")" 2>/dev/null \
+   && eval "$(sed -n '/^head_gate_verdict()/,/^}/p' "$SCRIPT")" 2>/dev/null \
+   && declare -F head_gate_verdict >/dev/null; then
+  pass "head_gate_verdict() and sha_eq() could be extracted from the script"
+
+  # Synthetic commits. Never a real sha, so nothing here can be mistaken for
+  # a value read off the server.
+  A=aaaaaaa1111222233334444555566667777888899
+  B=bbbbbbb1111222233334444555566667777888899
+  OLD=41501bb
+
+  gate() {   # override marker head fallback ancestor -> prints "<rc> <text>"
+    local out rc=0
+    out="$(head_gate_verdict "$1" "$2" "$3" "$4" "$5")" || rc=$?
+    printf '%s %s\n' "$rc" "$out"
+  }
+  gate_is() {   # name, want-rc, want-word, args...
+    local name="$1" wrc="$2" word="$3"; shift 3
+    local got; got="$(gate "$@")"
+    if [ "${got%% *}" = "$wrc" ] && printf '%s' "$got" | grep -q "$word"; then
+      pass "$name"
+    else
+      fail "$name (got: $got)"
+    fi
+  }
+
+  echo ""
+  echo "6f-1. First deploy: no marker, so the runbook's own starting commit applies"
+  gate_is "no marker and the checkout is on $OLD: OK" 0 'first deploy' \
+          "" none "$OLD" "$OLD" unknown
+  gate_is "no marker and the checkout is somewhere else: STOP" 1 'must be on' \
+          "" none "$A" "$OLD" yes
+  gate_is "an empty marker file reads as no marker at all" 0 'first deploy' \
+          "" "" "$OLD" "$OLD" unknown
+
+  echo ""
+  echo "6f-2. Second deploy: the marker is the expectation, plus an ancestor test"
+  gate_is "the checkout matches the marker and is an ancestor of the ref: OK" 0 'last deploy recorded' \
+          "" "$A" "$A" "$OLD" yes
+  gate_is "the checkout matches the marker but is NOT an ancestor: STOP" 1 'not an ancestor' \
+          "" "$A" "$A" "$OLD" no
+  gate_is "the ref could not be resolved on the server: STOP, not a pass" 1 'could not decide' \
+          "" "$A" "$A" "$OLD" unknown
+  gate_is "the checkout drifted away from the marker: STOP" 1 'outside a deploy' \
+          "" "$A" "$B" "$OLD" yes
+  gate_is "a marker never makes $OLD acceptable again by itself" 1 'outside a deploy' \
+          "" "$A" "$OLD" "$OLD" yes
+  gate_is "the marker may be written short and still match a full sha" 0 'last deploy recorded' \
+          "" "${A:0:7}" "$A" "$OLD" yes
+
+  echo ""
+  echo "6f-3. PARAMANT_EXPECTED_HEAD overrides both, on equality alone"
+  gate_is "the override matches: OK, no marker consulted" 0 'PARAMANT_EXPECTED_HEAD names' \
+          "$A" none "$A" "$OLD" no
+  gate_is "the override matches while the marker says otherwise: OK" 0 'PARAMANT_EXPECTED_HEAD names' \
+          "$A" "$B" "$A" "$OLD" unknown
+  gate_is "the override does not match: STOP, even on the runbook commit" 1 'PARAMANT_EXPECTED_HEAD names' \
+          "$A" none "$OLD" "$OLD" yes
+  gate_is "a short override matches a full checkout sha" 0 'PARAMANT_EXPECTED_HEAD names' \
+          "${A:0:7}" none "$A" "$OLD" yes
+
+  echo ""
+  echo "6f-4. Nonsense answers are stops, never passes"
+  gate_is "an empty checkout sha: STOP" 1 'never printed' \
+          "" none "" "$OLD" yes
+  if sha_eq abc abc; then
+    fail "sha_eq accepts a 3-character prefix; that is not an identification"
+  else
+    pass "sha_eq refuses anything shorter than 7 characters"
+  fi
+  if sha_eq "$A" "$B"; then fail "sha_eq matched two different commits"
+  else pass "sha_eq refuses two different commits"; fi
+else
+  fail "could not extract head_gate_verdict() from the script to test it"
+fi
+
+echo ""
+echo "6f-5. The whole script, run with the override set"
+OVR="$WORK/override.txt"
+( cd "$ROOT" && PARAMANT_EXPECTED_HEAD=deadbee1234567 bash "$SCRIPT" --dry-run --preflight-only >"$OVR" 2>&1 )
+OVR_RC=$?
+[ "$OVR_RC" -eq 0 ] && pass "--dry-run with PARAMANT_EXPECTED_HEAD set exits 0" \
+                    || fail "--dry-run with PARAMANT_EXPECTED_HEAD set exits $OVR_RC"
+check_has   "$OVR" 'expected head deadbee1234567' "the header names the override it will gate on"
+check_lacks "$OVR" 'no marker in'                 "with the override set, the marker fallback is not announced"
+check_has   "$PRE" 'deployed-head'                "without the override, the header names the marker file"
+
+echo ""
+echo "6g. Phase 5c is idempotent: an edit that is already applied is not FATAL"
+# The old 5c stopped with FATAL as soon as an edit had nothing to do, so the
+# second deploy died on the nginx step even though the conf was exactly right.
+# This runs the REAL 5c remote block, extracted from the script, against
+# synthetic confs, with nginx and systemctl stubbed. Three passes:
+#
+#   1. the conf in its pre-3.1 shape        -> edits applied, files rewritten
+#   2. the same conf, run again             -> already applied, nothing rewritten
+#   3. a conf with neither shape            -> FATAL, which is still correct
+NG="$WORK/ng"
+mkdir -p "$NG/bin" "$NG/sites" "$NG/bk"
+cat > "$NG/bin/nginx" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+cat > "$NG/bin/systemctl" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+chmod +x "$NG/bin/nginx" "$NG/bin/systemctl"
+
+# The 5c body, verbatim from the script.
+sed -n '/^  remote "nginx edits"/,/^EOF$/p' "$SCRIPT" | sed '1d;$d' > "$NG/5c.sh"
+if [ -s "$NG/5c.sh" ]; then
+  pass "the 5c remote block could be extracted from the script"
+else
+  fail "could not extract the 5c remote block from the script"
+fi
+
+make_conf() {   # file, sign-shape(old|new|absent), dicom-shape, compliance(yes|no), buffers(yes|no)
+  local f="$1" sign="$2" dicom="$3" comp="$4" buf="$5"
+  {
+    echo 'server {'
+    echo '    server_name paramant.app;'
+    case "$sign" in
+      old)    echo '    location = /sign { auth_request /api/user/check; error_page 401 = @login_redirect; try_files /sign.html =404; }' ;;
+      new)    echo '    location = /sign { try_files /sign.html =404; }' ;;
+      absent) : ;;
+    esac
+    if [ "$comp" = yes ]; then
+      echo '    location = /compliance { try_files /compliance/index.html =404; }'
+      echo '    location = /compliance/nis2 { try_files /compliance/nis2.html =404; }'
+      echo '    location = /compliance/iec62443 { try_files /compliance/iec62443.html =404; }'
+      echo '    location = /compliance/nen7510 { try_files /compliance/nen7510.html =404; }'
+    fi
+    case "$dicom" in
+      old)    echo '    location = /dicom { try_files /dicom.html =404; }' ;;
+      new)    echo '    location = /dicom { return 404; }' ;;
+      absent) : ;;
+    esac
+    echo '    location = /v1/paraid/issue-document { deny all; }'
+    echo '    location ~ ^/v2/outbound {'
+    if [ "$buf" = yes ]; then
+      echo '        proxy_buffer_size 32k;'
+      echo '        proxy_buffers 8 32k;'
+      echo '        proxy_busy_buffers_size 64k;'
+    fi
+    echo '        proxy_pass http://relay;'
+    echo '    }'
+    echo '}'
+  } > "$f"
+}
+
+field_5c() { printf '%s\n' "$1" | sed -n "s/^$2 = //p" | head -1; }
+
+# sites-enabled is symlinks into sites-available on the real server, so the
+# fixture is too: that is also what exercises the readlink -f resolution.
+mkdir -p "$NG/available"
+make_conf "$NG/available/paramant-public.conf" old old yes no
+make_conf "$NG/available/paramant-live.conf"   old old yes no
+ln -sfn "$NG/available/paramant-public.conf" "$NG/sites/paramant-public.conf"
+ln -sfn "$NG/available/paramant-live.conf"   "$NG/sites/paramant-live.conf"
+
+echo ""
+echo "6g-1. First run: the conf is in its pre-3.1 shape, so there is work to do"
+OUT1="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0000 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" 2>&1)"; RC1=$?
+if [ "$RC1" -eq 0 ]; then pass "5c exits 0 on a conf that still needs the edits"; else
+  fail "5c exits $RC1 on a conf that still needs the edits"
+  printf '%s\n' "$OUT1" | sed 's/^/        /' | head -20
+fi
+# Everything after this run is the END state the deploy is actually for.
+for want in "after sign gated:0" "after compliance:0" "after dicom try_files:0"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUT1" "$f")" = "$v" ]; then pass "5c leaves $f at $v"; else
+    fail "5c left $f at '$(field_5c "$OUT1" "$f")', expected $v"; fi
+done
+if [ "$(field_5c "$OUT1" 'after edited files')" = "2" ]; then
+  pass "5c rewrote both confs on the first run"
+else
+  fail "5c rewrote $(field_5c "$OUT1" 'after edited files') conf(s) on the first run, expected 2"
+fi
+if [ "$(field_5c "$OUT1" 'after outbound blocks with buffer')" \
+   = "$(field_5c "$OUT1" 'after outbound locations')" ]; then
+  pass "every /v2/outbound block came out with the buffer"
+else
+  fail "the buffer landed in $(field_5c "$OUT1" 'after outbound blocks with buffer') of $(field_5c "$OUT1" 'after outbound locations') blocks"
+fi
+
+echo ""
+echo "6g-2. Second run on the same confs: already applied, not FATAL"
+OUT2="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0001 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" 2>&1)"; RC2=$?
+if [ "$RC2" -eq 0 ]; then pass "a second 5c on an already-edited conf exits 0"; else
+  fail "a second 5c on an already-edited conf exits $RC2 (this is the bug)"
+  printf '%s\n' "$OUT2" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT2" | grep -q FATAL; then
+  fail "a second 5c still prints FATAL"
+  printf '%s\n' "$OUT2" | grep FATAL | sed 's/^/        /'
+else
+  pass "a second 5c prints no FATAL"
+fi
+for want in "before sign state:done" "before compliance state:done" "before dicom state:done" \
+            "before edits pending:0" "before everything already applied:yes" \
+            "after edited files:0"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUT2" "$f")" = "$v" ]; then pass "second run reports $f = $v"; else
+    fail "second run reports $f = '$(field_5c "$OUT2" "$f")', expected $v"; fi
+done
+if printf '%s\n' "$OUT2" | grep -q 'reloaded nginx'; then
+  pass "a second 5c still tests and reloads nginx, so a hand edit cannot hide"
+else
+  fail "a second 5c never reloaded nginx"
+fi
+
+echo ""
+echo "6g-3. A conf with neither the old nor the wanted shape is still FATAL"
+make_conf "$NG/available/paramant-public.conf" absent absent no yes
+make_conf "$NG/available/paramant-live.conf"   absent absent no yes
+OUT3="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0002 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" 2>&1)"; RC3=$?
+if [ "$RC3" -ne 0 ]; then pass "5c stops on a conf that is not the one the runbook describes"; else
+  fail "5c accepted a conf carrying neither shape"; fi
+if printf '%s\n' "$OUT3" | grep -q "FATAL 'sign'"; then
+  pass "it names which edit it could not place"
+else
+  fail "the FATAL does not name the edit"
+  printf '%s\n' "$OUT3" | sed 's/^/        /' | head -20
+fi
+if [ "$(field_5c "$OUT3" 'before sign state')" = unknown ]; then
+  pass "the unrecognisable conf reads as state unknown, not as done"
+else
+  fail "state for an absent /sign location is '$(field_5c "$OUT3" 'before sign state')', expected unknown"
+fi
+
+# And the script must read the already-applied answer, not just print it.
+check_has "$SCRIPT" 'before everything already applied' \
+  "phase 5c reports whether every edit was already applied"
+check_has "$SCRIPT" 'already applied' \
+  "the script has an already-applied verdict instead of a FATAL"
+check_has "$FULL"   'before edits pending'  "the dry run shows the pending-edit count"
+check_has "$FULL"   'before sign state'     "the dry run shows the per-edit state read"
 
 echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"

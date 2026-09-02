@@ -16,6 +16,12 @@
 #
 # Flags combine: --dry-run --preflight-only, --dry-run --rollback <TS>.
 #
+# The commit the production checkout must be on before phase 3 moves it is a
+# parameter, not a constant. PARAMANT_EXPECTED_HEAD=<commit> wins; without it
+# the script reads the deployed-head marker phase 7 wrote on the server; with
+# no marker either it falls back to the runbook's starting commit. So a second
+# deploy, and a resume of a failed one, no longer stop on the first gate.
+#
 # Secrets: this script never prints a key value. Environment variables are
 # reported as "empty" or "set, prefix <first 5 chars>", which is the shape the
 # runbook's own step 1 uses. No remote block runs under set -x, and no read of
@@ -45,7 +51,35 @@ NGINX_CONFS="${PARAMANT_NGINX_CONFS:-paramant-public.conf paramant-live.conf}"
 DOCROOT_IGNORE="dist paramant-mark.svg developer.js docs/paramant-investor-brief.html"
 
 DEPLOY_REF="${DEPLOY_REF:-origin/main}"
+
+# Where the production checkout has to stand before phase 3 moves it.
+#
+# 41501bb is where the RUNBOOK starts: the stand of 08-08, before any 3.1
+# deploy ran. Hard-coding it as the only acceptable answer made the script
+# single-use: after the first successful deploy the checkout is on main, phase
+# 1a stops on "expected 41501bb", and the same script can never be run again,
+# not even to resume a deploy that failed halfway through phase 5.
+#
+# So the expected commit is a parameter with three sources, most specific first:
+#
+#   1. PARAMANT_EXPECTED_HEAD, if set. An explicit answer from whoever is
+#      running the deploy, for the case where they know what the checkout is
+#      on and why. Hard equality, no ancestor test.
+#   2. the deployed-head marker, if the server has one. Phase 7 writes the
+#      commit it left the checkout on into $BACKUP_DIR/deployed-head. Phase 1a
+#      of the NEXT run reads it back and demands two things: the checkout is
+#      still on that commit (nothing moved it outside a deploy), AND that
+#      commit is an ancestor of the deploy ref (so phase 3a's --ff-only pull
+#      can actually reach the ref from here).
+#   3. EXPECT_PROD_COMMIT. No marker means no deploy has ever recorded one, so
+#      this is the first run and the runbook's own starting point applies.
+#
+# A rollback (phase 8) deliberately does NOT rewrite the marker: it restores
+# images, .env, nginx and the docroot, and leaves the checkout where it is. The
+# marker names the checkout, so it stays true.
 EXPECT_PROD_COMMIT="${EXPECT_PROD_COMMIT:-41501bb}"   # runbook: where we start
+EXPECTED_HEAD="${PARAMANT_EXPECTED_HEAD:-}"           # explicit override, wins
+DEPLOYED_HEAD_FILE="${PARAMANT_DEPLOYED_HEAD_FILE:-$BACKUP_DIR/deployed-head}"
 EXPECT_VERSION="3.1.0"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
 HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app iot.paramant.app relay.paramant.app"
@@ -100,6 +134,7 @@ ROLLBACK_TS=""
 REMOTE_OUT=""
 REMOTE_RC=0
 PREV_HEAD=""
+DEPLOYED_HEAD=""
 WARNINGS=0
 SUMMARY=""
 
@@ -297,6 +332,83 @@ expect_min() {
   ok "$what ($field = $got)"
 }
 
+# ------------------------------------------------ the starting commit gate --
+
+# sha_eq: two git object names are the same commit when one is a prefix of the
+# other. The server prints both a short and a full sha, the marker holds a full
+# one, and PARAMANT_EXPECTED_HEAD may be either, so a plain [ a = b ] would
+# reject a correct answer for being spelled shorter. Fewer than 7 characters is
+# not an answer at all and never matches.
+sha_eq() {
+  local a="$1" b="$2" n
+  [ -n "$a" ] && [ -n "$b" ] || return 1
+  n=${#a}
+  [ ${#b} -lt "$n" ] && n=${#b}
+  [ "$n" -ge 7 ] || return 1
+  [ "${a:0:$n}" = "${b:0:$n}" ]
+}
+
+# head_gate_verdict: is the commit the production checkout stands on an
+# acceptable starting point? Pure: it reads no file, opens no connection and
+# touches no global, so tests/deploy-3.1-dryrun.test.sh can extract it and put
+# every case through it without a server.
+#
+#   $1 override   PARAMANT_EXPECTED_HEAD, empty when unset
+#   $2 marker     what $DEPLOYED_HEAD_FILE holds, "none" when the file is absent
+#   $3 head       the sha the production checkout is on (full)
+#   $4 fallback   EXPECT_PROD_COMMIT, the runbook's first-deploy commit
+#   $5 ancestor   yes | no | unknown: is head an ancestor of the deploy ref
+#
+# Prints "OK <sentence>" and returns 0, or "STOP <sentence>" and returns 1.
+head_gate_verdict() {
+  local override="$1" marker="$2" head="$3" fallback="$4" ancestor="$5"
+  local short="${head:0:7}"
+
+  if [ -z "$head" ]; then
+    printf 'STOP the server never printed the commit its checkout is on\n'
+    return 1
+  fi
+
+  # 1. An explicit answer wins, and is judged on equality alone. Someone who
+  #    sets this has looked at the server; the script does not second-guess it.
+  if [ -n "$override" ]; then
+    if sha_eq "$head" "$override"; then
+      printf 'OK checkout is on %s, which PARAMANT_EXPECTED_HEAD names\n' "$short"
+      return 0
+    fi
+    printf 'STOP checkout is on %s, but PARAMANT_EXPECTED_HEAD names %s\n' "$short" "$override"
+    return 1
+  fi
+
+  # 2. A marker means a previous run finished phase 7 and wrote down what it
+  #    left the checkout on. Both halves have to hold.
+  if [ -n "$marker" ] && [ "$marker" != none ]; then
+    if ! sha_eq "$head" "$marker"; then
+      printf 'STOP checkout is on %s, but the last deploy recorded %s; something moved the checkout outside a deploy, so the rollback images no longer match the source\n' \
+        "$short" "${marker:0:7}"
+      return 1
+    fi
+    case "$ancestor" in
+      yes) printf 'OK checkout is on %s, the commit the last deploy recorded, and that commit is an ancestor of the deploy ref\n' "$short"
+           return 0 ;;
+      no)  printf 'STOP checkout %s is not an ancestor of the deploy ref; the ref does not contain what is deployed, so the fast-forward pull in phase 3a cannot succeed\n' "$short"
+           return 1 ;;
+      *)   printf 'STOP could not decide whether %s is an ancestor of the deploy ref; the server could not resolve the ref\n' "$short"
+           return 1 ;;
+    esac
+  fi
+
+  # 3. No marker: nothing has ever deployed from here, so the runbook's own
+  #    starting point is the only acceptable answer.
+  if sha_eq "$head" "$fallback"; then
+    printf 'OK no deployed-head marker yet, so this is the first deploy, and the checkout is on %s as the runbook says\n' "$fallback"
+    return 0
+  fi
+  printf 'STOP no deployed-head marker, so this is a first deploy and the checkout must be on %s; it is on %s. Set PARAMANT_EXPECTED_HEAD if you know why it moved\n' \
+    "$fallback" "$short"
+  return 1
+}
+
 # ------------------------------------------------- the static sanity reading --
 
 # One implementation, used on the local checkout in phase 0 and on the server
@@ -382,6 +494,12 @@ printf '  compose dir   %s\n' "$COMPOSE_DIR"
 printf '  docroot       %s\n' "$DOCROOT"
 printf '  nginx confs   %s\n' "$NGINX_CONFS"
 printf '  deploy ref    %s\n' "$DEPLOY_REF"
+if [ -n "$EXPECTED_HEAD" ]; then
+  printf '  expected head %s (PARAMANT_EXPECTED_HEAD)\n' "$EXPECTED_HEAD"
+else
+  printf '  expected head %s if the server has one, else %s (first deploy)\n' \
+    "$DEPLOYED_HEAD_FILE" "$EXPECT_PROD_COMMIT"
+fi
 printf '  log           %s\n' "$LOG"
 
 if [ "$DRY_RUN" -eq 0 ]; then
@@ -473,11 +591,42 @@ phase_1() {
   fi
 
   step "1a. checkout, compose project and container health"
-  remote "layout and health" "$COMPOSE_DIR" "$SERVICES" <<'EOF'
+  note "the expected starting commit is a parameter: PARAMANT_EXPECTED_HEAD wins,"
+  note "else the deployed-head marker a previous run wrote, else $EXPECT_PROD_COMMIT"
+  remote "layout and health" "$COMPOSE_DIR" "$SERVICES" "$DEPLOYED_HEAD_FILE" "$DEPLOY_REF" <<'EOF'
 set -euo pipefail
 cd "$1"
+MARKER="$3"; REF="$4"
 echo "checkout_head = $(git rev-parse --short HEAD)"
+echo "checkout_head_long = $(git rev-parse HEAD)"
 echo "checkout_dir = $PWD"
+
+# What the last finished deploy recorded, if any. An empty or whitespace-only
+# file is not an answer, so it reads as absent.
+m=none
+if [ -f "$MARKER" ]; then
+  m="$(tr -d '[:space:]' < "$MARKER")"
+  [ -n "$m" ] || m=none
+fi
+echo "deployed_marker = $m"
+
+# Refs only. fetch updates remote-tracking refs; it does not move HEAD, does
+# not touch the working tree and does not check anything out. Phase 3a is still
+# the only place that moves the checkout. Without this the ancestor test below
+# would judge against a stale origin/main.
+git fetch origin >/dev/null 2>&1 || echo "fetch = failed"
+if ref_sha="$(git rev-parse --verify --quiet "$REF^{commit}")"; then
+  echo "deploy_ref_sha = $ref_sha"
+  if git merge-base --is-ancestor HEAD "$ref_sha" 2>/dev/null; then
+    echo "head_is_ancestor_of_ref = yes"
+  else
+    echo "head_is_ancestor_of_ref = no"
+  fi
+else
+  echo "deploy_ref_sha = unknown"
+  echo "head_is_ancestor_of_ref = unknown"
+fi
+
 docker compose ls 2>&1 | sed 's/^/compose_ls /' || true
 found=0
 for svc in $2; do
@@ -493,8 +642,32 @@ done
 echo "services seen = $found"
 EOF
 
-  expect "checkout_head = $EXPECT_PROD_COMMIT" \
-    "production checkout is on $EXPECT_PROD_COMMIT, the commit the runbook measured"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): the starting commit gate\n'
+    if [ -n "$EXPECTED_HEAD" ]; then
+      printf '        PARAMANT_EXPECTED_HEAD is set, so the checkout must equal it and nothing else is consulted\n'
+    else
+      printf '        no marker in %s (first deploy): [would match /checkout_head = %s/]\n' \
+        "$DEPLOYED_HEAD_FILE" "$EXPECT_PROD_COMMIT"
+      printf '        with a marker (second deploy and after): the checkout must equal the marker AND be an ancestor of %s\n' \
+        "$DEPLOY_REF"
+    fi
+  else
+    local gate_head gate_marker gate_anc gate_out gate_rc=0
+    gate_head="$(remote_field 'checkout_head_long')"
+    gate_marker="$(remote_field 'deployed_marker')"
+    gate_anc="$(remote_field 'head_is_ancestor_of_ref')"
+    gate_out="$(head_gate_verdict "$EXPECTED_HEAD" "$gate_marker" "$gate_head" \
+                "$EXPECT_PROD_COMMIT" "$gate_anc")" || gate_rc=$?
+    if [ "$gate_rc" -eq 0 ]; then
+      ok "${gate_out#OK }"
+      # Phase 5b diffs the docroot against the commit that was deployed. That
+      # is this one, read from the server, not a constant from August.
+      PREV_HEAD="$gate_head"
+    else
+      die "${gate_out#STOP }"
+    fi
+  fi
   expect_count "services seen" 6 "all six services have a container"
   expect_not 'container [a-z-]+ MISSING' "no service is missing a container"
   expect_not 'unhealthy' "no container reports unhealthy"
@@ -716,17 +889,24 @@ EOF
 
   expect_not 'FATAL working tree not clean' "server working tree was clean before the pull"
   if [ "$DRY_RUN" -eq 0 ]; then
-    local after_head want
-    PREV_HEAD="$(remote_field 'before HEAD long')"
+    local after_head before_head want
+    before_head="$(remote_field 'before HEAD long')"
     after_head="$(remote_field 'after HEAD long')"
     want="$(git rev-parse "$DEPLOY_REF")"
     [ -n "$after_head" ] || die "could not read the server HEAD after the pull"
     [ "$after_head" = "$want" ] \
       || die "server is on $after_head after the pull, expected $want ($DEPLOY_REF, the commit phase 0 tested)"
     ok "server checkout is on ${after_head:0:7}, the commit phase 0 tested"
-    if ! printf '%s\n' "$REMOTE_OUT" | grep -q "before HEAD = $EXPECT_PROD_COMMIT"; then
-      warn "server was not on $EXPECT_PROD_COMMIT before the pull; the rollback images are still correct, but the runbook's starting point was different"
+    # Phase 7 writes this into the deployed-head marker, which is what the NEXT
+    # run's phase 1a gate reads back.
+    DEPLOYED_HEAD="$after_head"
+    # Phase 1a already judged the starting commit against the marker, the
+    # override or the runbook constant. All that is left is that nothing moved
+    # the checkout between phase 1 and here.
+    if [ -n "$PREV_HEAD" ] && [ -n "$before_head" ] && [ "$before_head" != "$PREV_HEAD" ]; then
+      die "the checkout was on ${PREV_HEAD:0:7} in phase 1a and on ${before_head:0:7} at the pull; something moved it mid-deploy"
     fi
+    PREV_HEAD="$before_head"
   fi
 
   step "3b. static sanity on the server, same reading rule as phase 0"
@@ -983,15 +1163,24 @@ echo "after already absent = $absent"
 echo "after refused outside docroot = $outside"
 echo "after docroot files = $(find "$DOCROOT" -type f | wc -l)"
 EOF
-  expect_min "before deleted-in-git count" 1 \
-    "git names at least one frontend file deleted since the deployed commit"
   expect_count "after refused outside docroot" 0 \
     "no deletion resolved to a path outside the docroot"
   if [ "$DRY_RUN" -eq 0 ]; then
-    local rm_n ab_n
+    local rm_n ab_n del_n
+    del_n="$(remote_field 'before deleted-in-git count')"
     rm_n="$(remote_field 'after removed')"
     ab_n="$(remote_field 'after already absent')"
-    ok "pruned $rm_n stale docroot file(s), $ab_n were already gone"
+    [ -n "$del_n" ] || die "the server never printed 'before deleted-in-git count'"
+    # An empty list is an answer: between the deployed commit and the ref, main
+    # deleted no frontend file. Demanding at least one only held for the first
+    # deploy, where the runbook had already counted them. On a resume, or on a
+    # deploy of a ref that deleted nothing, a hard minimum stops a run that has
+    # nothing wrong with it. Already absent is likewise OK and always was.
+    if [ "$del_n" -eq 0 ]; then
+      ok "git names no frontend file deleted since the deployed commit, so there is nothing to prune"
+    else
+      ok "pruned $rm_n of $del_n stale docroot file(s), $ab_n were already gone"
+    fi
   fi
 
   step "5c. the three nginx changes, by hand, keeping the ParaID deny"
@@ -1012,11 +1201,19 @@ for name in $CONFS; do
   TARGETS="$TARGETS $t"
 done
 
-count() { grep -hcE -- "$1" $TARGETS 2>/dev/null | awk '{s+=$1} END{print s+0}'; }
+# grep exits 1 when it matches nothing, and pipefail turns that into a failed
+# pipeline. The count IS the answer here, and zero is a perfectly good answer,
+# so grep's verdict is swallowed: without this, reading a count into a variable
+# ends the block under set -e the moment a pattern is already gone.
+count() { grep -hcE -- "$1" $TARGETS 2>/dev/null | awk '{s+=$1} END{print s+0}' || true; }
 
 SIGN_RE='location = /sign[[:space:]]*\{[^}]*auth_request'
 COMP_RE='^[[:space:]]*location = /compliance(/(nis2|iec62443|nen7510))?[[:space:]]*\{'
 DICOM_RE='location = /dicom[[:space:]]*\{[[:space:]]*try_files /dicom\.html'
+# The wanted END state of each edit, so an edit with nothing left to do can be
+# told apart from a conf that was never the shape the runbook describes.
+SIGN_LOC_RE='location = /sign[[:space:]]*\{'
+DICOM404_RE='location = /dicom[[:space:]]*\{[[:space:]]*return 404'
 PARAID_RE='paraid/issue'
 OUT_RE='^[[:space:]]*location[[:space:]]*~[[:space:]]*\^/v2/outbound[[:space:]]*\{'
 BUF_RE='proxy_buffer_size 32k'
@@ -1066,15 +1263,64 @@ read -r _obt _obw <<< "$(count_blocks)"
 echo "before outbound locations = $_obt"
 echo "before outbound blocks with buffer = $_obw"
 
-# Each edit must have something to do. A zero here means the server conf is not
-# the shape the runbook describes, and guessing further would be editing blind.
-for pair in "sign:$(count "$SIGN_RE")" "compliance:$(count "$COMP_RE")" "dicom:$(count "$DICOM_RE")"; do
-  n="${pair#*:}"
-  if [ "$n" -eq 0 ]; then
-    echo "FATAL nothing to change for '${pair%%:*}': the server conf does not match the pattern the runbook names"
-    exit 1
+# Each edit is in one of three states, and only one of them is a stop:
+#
+#   todo     the old shape is present, so there is work to do
+#   done     the old shape is gone AND the wanted end shape is there, so a
+#            previous run already applied this edit. Not an error: it is what
+#            every deploy after the first one looks like.
+#   unknown  neither shape is present. The conf is not what the runbook
+#            describes, and editing further would be editing blind.
+#
+# The old gate read "todo" as the only acceptable state, which made a second
+# deploy FATAL on an edit that had simply already succeeded.
+#
+# Removal-only edits (compliance) have no wanted end shape other than absence,
+# so for those "gone" is "done", the same rule 5b already uses for a file that
+# is already absent.
+state() {   # old-count, wanted-count, has-wanted-shape(yes|no)
+  if [ "$1" -gt 0 ]; then echo todo
+  elif [ "$3" = no ]; then echo done
+  elif [ "$2" -gt 0 ]; then echo done
+  else echo unknown
+  fi
+}
+
+_b_sign="$(count "$SIGN_RE")";     _b_signloc="$(count "$SIGN_LOC_RE")"
+_b_comp="$(count "$COMP_RE")"
+_b_dicom="$(count "$DICOM_RE")";   _b_dicom404="$(count "$DICOM404_RE")"
+
+SIGN_STATE="$(state "$_b_sign" "$_b_signloc" yes)"
+COMP_STATE="$(state "$_b_comp" 0 no)"
+DICOM_STATE="$(state "$_b_dicom" "$_b_dicom404" yes)"
+echo "before sign location = $_b_signloc"
+echo "before dicom 404 = $_b_dicom404"
+echo "before sign state = $SIGN_STATE"
+echo "before compliance state = $COMP_STATE"
+echo "before dicom state = $DICOM_STATE"
+
+unknown=0
+for pair in "sign:$SIGN_STATE" "compliance:$COMP_STATE" "dicom:$DICOM_STATE"; do
+  if [ "${pair#*:}" = unknown ]; then
+    echo "FATAL '${pair%%:*}': the conf carries neither the shape the runbook edits nor the shape the edit leaves behind, so this conf is not the one the runbook describes"
+    unknown=$((unknown + 1))
   fi
 done
+[ "$unknown" -eq 0 ] || exit 1
+
+pending=0
+for st in "$SIGN_STATE" "$COMP_STATE" "$DICOM_STATE"; do
+  [ "$st" = todo ] && pending=$((pending + 1))
+done
+# A /v2/outbound block without the buffer is a fourth thing still to do.
+pending=$((pending + _obt - _obw))
+echo "before edits pending = $pending"
+if [ "$pending" -eq 0 ]; then
+  echo "before everything already applied = yes"
+else
+  echo "before everything already applied = no"
+fi
+
 if [ "$(count "$PARAID_RE")" -eq 0 ]; then
   echo "FATAL the ParaID deny is not present; the 01-09 server edit this runbook relies on is gone"
   exit 1
@@ -1152,7 +1398,27 @@ echo "reloaded nginx"
 EOF
 
   expect_not 'FATAL' "nginx edits applied and the config tests clean"
-  expect_count "after edited files" 2 "both named confs were really rewritten"
+  # How many files were rewritten depends on what was left to do, so the exact
+  # count of 2 only holds on a run that found work in both confs. What always
+  # holds is the END state, and that is asserted hard just below: no
+  # auth_request on /sign, no /compliance locations, /dicom answering 404, and
+  # a buffer inside every /v2/outbound block. Those four are the deploy.
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): both named confs were rewritten, unless every edit was already applied\n'
+  else
+    local pend edited
+    pend="$(remote_field 'before everything already applied')"
+    edited="$(remote_field 'after edited files')"
+    [ -n "$pend" ] && [ -n "$edited" ] \
+      || die "could not read the nginx edit state from the server"
+    if [ "$pend" = yes ]; then
+      ok "nginx: already applied. All three edits and the outbound buffers were in place before this run, so nothing was rewritten (edited files = $edited)"
+    else
+      [ "$edited" -ge 1 ] \
+        || die "$(remote_field 'before edits pending') nginx edit(s) were still pending but no conf was rewritten"
+      ok "nginx: $(remote_field 'before edits pending') pending edit(s), $edited conf(s) rewritten"
+    fi
+  fi
   expect_count "after sign gated" 0 "/sign is no longer behind auth_request"
   expect_count "after compliance" 0 "the /compliance locations are gone"
   expect_count "after dicom try_files" 0 "/dicom no longer serves the page"
@@ -1396,6 +1662,42 @@ EOF
 phase_7() {
   phase 7 "Summary" "Step 7, what to do after the deploy"
 
+  step "7a. record the deployed commit, so the next run's phase 1a has a gate"
+  note "without this marker the next run falls back to $EXPECT_PROD_COMMIT and stops:"
+  note "that is exactly the poort that made this script single-use"
+  remote "record deployed head" "$COMPOSE_DIR" "$BACKUP_DIR" "$DEPLOYED_HEAD_FILE" <<'EOF'
+set -euo pipefail
+cd "$1"
+BK="$2"; MARKER="$3"
+mkdir -p "$BK"
+if [ -f "$MARKER" ]; then
+  echo "before deployed marker = $(tr -d '[:space:]' < "$MARKER")"
+else
+  echo "before deployed marker = none"
+fi
+# The checkout is the source the containers were built from, so the checkout is
+# what the marker names. Read it here rather than being told, so the file can
+# never claim something the server is not on.
+head="$(git rev-parse HEAD)"
+tmp="$MARKER.tmp.$$"
+printf '%s\n' "$head" > "$tmp"
+chmod 644 "$tmp"
+mv -f "$tmp" "$MARKER"
+echo "after deployed marker = $(tr -d '[:space:]' < "$MARKER")"
+echo "after deployed marker short = $(git rev-parse --short HEAD)"
+EOF
+
+  if [ "$DRY_RUN" -eq 0 ]; then
+    local wrote
+    wrote="$(remote_field 'after deployed marker')"
+    [ -n "$wrote" ] \
+      || die "could not write $DEPLOYED_HEAD_FILE; the next deploy would fall back to $EXPECT_PROD_COMMIT and stop on phase 1a"
+    if [ -n "$DEPLOYED_HEAD" ] && [ "$wrote" != "$DEPLOYED_HEAD" ]; then
+      die "the marker says $wrote but phase 3 left the checkout on $DEPLOYED_HEAD"
+    fi
+    ok "deployed-head marker written: ${wrote:0:7} in $DEPLOYED_HEAD_FILE (the next run gates on this, not on $EXPECT_PROD_COMMIT)"
+  fi
+
   echo
   echo "Result lines, in order:"
   printf '%s\n' "$SUMMARY"
@@ -1624,6 +1926,12 @@ EOF
   echo
   echo "The checkout stays on main; the images are what run. Decide separately"
   echo "whether to move the checkout back."
+  echo
+  echo "The deployed-head marker is left as it is on purpose: it names the"
+  echo "COMMIT THE CHECKOUT IS ON, and this rollback did not move the checkout."
+  echo "If you do move it back by hand, either update"
+  printf '%s\n' "  $DEPLOYED_HEAD_FILE to match, or run the next deploy with"
+  echo "  PARAMANT_EXPECTED_HEAD=<the commit you moved to>."
 }
 
 # ------------------------------------------------------------------- driver --
