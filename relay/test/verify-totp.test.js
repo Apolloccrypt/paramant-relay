@@ -235,6 +235,23 @@ test('a store that never answers is an outage too, and the guard says so in time
     'the default deadline stays inside any sane request budget');
 });
 
+test('the replay deadline is configurable, and cannot be configured away', () => {
+  const { execFileSync } = require('child_process');
+  const read = (env) => Number(execFileSync(process.execPath,
+    ['-e', "process.stdout.write(String(require('../lib/totp').REPLAY_STORE_TIMEOUT_MS))"],
+    { cwd: __dirname, env: { ...process.env, ...env } }).toString());
+
+  assert.strictEqual(read({ PARAMANT_TOTP_REPLAY_TIMEOUT_MS: '' }), 1000, 'unset means one second');
+  assert.strictEqual(read({ PARAMANT_TOTP_REPLAY_TIMEOUT_MS: '2500' }), 2500, 'a slow store can be given more room');
+
+  // Zero, negative and nonsense are not an opt-out. An unbounded guard does not
+  // fail closed, it hangs, which is the failure this deadline exists to prevent,
+  // so a bad value falls back to the default instead of switching it off.
+  for (const bad of ['0', '-1', 'off', 'nope']) {
+    assert.strictEqual(read({ PARAMANT_TOTP_REPLAY_TIMEOUT_MS: bad }), 1000, `"${bad}" cannot disable the bound`);
+  }
+});
+
 test('the fail-open catch is gone from the source, not just from the behaviour', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'totp.js'), 'utf8');
   const guard = src.slice(src.indexOf('async function verifyTotpGeneric'));

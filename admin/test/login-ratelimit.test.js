@@ -28,6 +28,7 @@ function fakeRedis() {
   const ttl = new Map();
   return {
     async incr(k) { const n = (Number(store.get(k)) || 0) + 1; store.set(k, String(n)); return n; },
+    async decr(k) { const n = (Number(store.get(k)) || 0) - 1; store.set(k, String(n)); return n; },
     async expire(k, s) { ttl.set(k, s); return 1; },
     async get(k) { return store.has(k) ? store.get(k) : null; },
     async del(k) { ttl.delete(k); return store.delete(k) ? 1 : 0; },
@@ -43,7 +44,10 @@ async function attemptLogin(r, { ip, email, code, secret, proof }) {
   const hit = await loginRate.hitIp(r, ip);
   if (!hit.allowed) return { status: 429, why: 'ip' };
   const failures = await loginRate.emailFailures(r, email);
-  if (loginRate.powRequired(failures) && !proof) return { status: 428, why: 'pow_required' };
+  if (loginRate.powRequired(failures) && !proof) {
+    await loginRate.refundIp(r, ip);
+    return { status: 428, why: 'pow_required' };
+  }
   if (code !== secret) {
     await loginRate.noteEmailFailure(r, email);
     return { status: 401, why: 'bad_code' };
@@ -128,6 +132,49 @@ test('the per-IP limit still refuses, and still costs the caller and not a victi
   assert.equal(out.status, 200);
 });
 
+test('a priced attempt does not eat the IP budget it never used', async () => {
+  const r = fakeRedis();
+  const addr = 'target@example.com';
+  const ip = '198.51.100.20';
+  for (let i = 0; i < loginRate.EMAIL_FAIL_THRESHOLD; i++) await loginRate.noteEmailFailure(r, addr);
+
+  // Under proof-of-work each real sign-in costs two requests: the one that is
+  // answered 428, and the one that carries the proof. Charging the IP for both
+  // would leave two real tries out of five, and the honest user would meet a 429
+  // while doing exactly what the page told them to.
+  for (let i = 0; i < loginRate.IP_LIMIT; i++) {
+    const quote = await attemptLogin(r, { ip, email: addr, code: '000000', secret: '123456' });
+    assert.equal(quote.status, 428, `quote ${i + 1} asks for the proof`);
+  }
+  assert.equal(Number(r._store.get(loginRate.ipKey(ip))) || 0, 0, 'a quote leaves the budget where it was');
+
+  // So all five attempts are still there for attempts that are actually made.
+  for (let i = 0; i < loginRate.IP_LIMIT; i++) {
+    const paid = await attemptLogin(r, { ip, email: addr, code: '000000', secret: '123456', proof: true });
+    assert.equal(paid.status, 401, `attempt ${i + 1} of ${loginRate.IP_LIMIT} is evaluated, not refused`);
+  }
+  const over = await attemptLogin(r, { ip, email: addr, code: '000000', secret: '123456', proof: true });
+  assert.equal(over.status, 429, 'and the sixth real attempt still meets the per-IP limit');
+});
+
+test('a refund never hands an IP more budget than it started with', async () => {
+  const r = fakeRedis();
+  const ip = '198.51.100.21';
+  // No key yet: DECR would create it at -1 with no TTL, which is a bigger budget
+  // than a fresh IP gets. A refund of nothing must be nothing.
+  await loginRate.refundIp(r, ip);
+  assert.equal(r._store.has(loginRate.ipKey(ip)), false, 'refunding an unused IP creates no counter');
+
+  await loginRate.hitIp(r, ip);
+  await loginRate.refundIp(r, ip);
+  await loginRate.refundIp(r, ip);
+  assert.equal(Number(r._store.get(loginRate.ipKey(ip))) || 0, 0, 'a double refund cannot go below zero');
+  for (let i = 0; i < loginRate.IP_LIMIT; i++) {
+    assert.equal((await loginRate.hitIp(r, ip)).allowed, true, 'the budget is exactly the normal one');
+  }
+  assert.equal((await loginRate.hitIp(r, ip)).allowed, false, 'and no larger');
+});
+
 test('the failure key carries no address and does not inherit the old counters', () => {
   const addr = 'Someone@Example.COM ';
   const k = loginRate.emailFailKey(addr);
@@ -172,6 +219,10 @@ test('the login handler counts failures after authenticating, never attempts bef
   // Past the threshold: priced, not refused, and the relay 503 is passed on
   // rather than reported as a wrong code.
   assert.match(handler, /status\(428\)/, 'over the threshold the answer is 428 pow_required');
+  const iRefund = handler.indexOf('refundIp');
+  const i428 = handler.indexOf('status(428)');
+  assert.ok(iRefund > 0 && iRefund < i428 && i428 - iRefund < 300,
+    'the 428 path must hand the IP its attempt back, or proof-of-work halves the budget');
   assert.match(handler, /pow\.verifyChallenge/, 'and the existing proof-of-work is what is asked for');
   assert.match(handler, /status\(503\)/, 'a replay-store outage is passed through as 503');
 });

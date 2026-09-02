@@ -752,8 +752,15 @@ anyone can name yours. It counts only attempts that actually failed, a
 successful sign-in deletes it, and once it is over the threshold the next
 attempt has to carry a solved proof-of-work (`challenge_id` + `nonce` from
 `GET /api/captcha/challenge`, the same 2^18 challenge signup uses) instead of
-being turned away. So a stranger can make signing in cost you a second of CPU,
-and cannot make it impossible.
+being turned away. The request that asks for the proof is not charged to the
+per-IP counter, so the five attempts stay five real attempts.
+
+Be clear about what that proof buys. It is a fixed 2^18 challenge: measured on
+this repository a native solver finds a nonce in roughly 150 to 250 ms, and a
+browser doing the same work through WebCrypto takes one to two seconds. It makes
+each automated guess measurably more expensive and it stops a stranger from
+switching your account off, but it is not the brake on guessing. The brake is
+the per-IP limit above: five attempts per IP per fifteen minutes.
 
 ```bash
 # after ten failed attempts on this address

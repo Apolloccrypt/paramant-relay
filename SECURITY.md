@@ -144,16 +144,33 @@ impose cost on that identity, never denial.
 
 A successful sign-in clears the per-account counters at both layers. The
 proof-of-work is the 2^18 challenge already used by signup and password reset;
-the relay layer has no client to run one, so it throttles instead.
+the relay layer has no client to run one, so it throttles instead. The request
+that asks for the proof is refunded to the per-IP counter, because it was never
+evaluated: charging for the quote as well as the answer would leave an honest
+user two real attempts out of five.
+
+What the proof-of-work is worth, measured rather than assumed: a native solver
+on this repository finds a nonce in roughly 150 to 250 ms; a browser doing the
+same work through WebCrypto takes one to two seconds. So it prices automated
+guessing per attempt and it keeps a stranger from switching an account off. It
+is NOT the thing that stops guessing. That is the per-IP refusal, which is why
+that one stayed a refusal.
 
 **What was given up.** There is no longer any per-account ceiling that refuses.
 A distributed attacker with many IP addresses can keep guessing one address
-indefinitely, at one 2^18 challenge per attempt plus five attempts per IP per
-fifteen minutes. Against a six-digit TOTP with a one-slot window under two
-algorithms (roughly six in a million per guess) that is a botnet-scale cost for
-a poor return, and it is the price of not handing every passer-by a way to
-switch off somebody else's account. If the trade needs revisiting, raise the
-proof-of-work difficulty for a hot address; do not reintroduce the refusal.
+indefinitely, at a couple of hundred milliseconds of CPU per attempt plus five
+attempts per IP per fifteen minutes. The per-IP limit is what makes that
+expensive; the proof-of-work only prices each attempt. Against a six-digit TOTP
+with a one-slot window under two algorithms (roughly six in a million per guess)
+it is a botnet-scale cost for a poor return, and it is the price of not handing
+every passer-by a way to switch off somebody else's account. If the trade needs
+revisiting, raise the difficulty for a hot address; do not reintroduce the
+refusal.
+
+**Both deadlines are configurable**, `PARAMANT_REDIS_DEADLINE_MS` (relay.js) and
+`PARAMANT_TOTP_REPLAY_TIMEOUT_MS` (lib/totp.js), default 1000 ms each, both
+documented in `deploy/.env.example`. A value of zero or a non-number is ignored
+and the default applies: an unbounded guard does not fail closed, it hangs.
 
 The e-mail counter is hashed (`paramant:user:loginfail:<sha256>`), so the
 rate-limit namespace no longer stores addresses in plaintext, and the namespace

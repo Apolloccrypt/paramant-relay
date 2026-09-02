@@ -990,7 +990,10 @@ api.post("/user/login", async (req, res) => {
     const proof = await pow.verifyChallenge(challenge_id, nonce);
     if (!proof.valid) {
       // 428, not 429: the attempt is not refused, it is priced. The login page
-      // solves the challenge and posts again by itself.
+      // solves the challenge and posts again by itself. Hand the IP its attempt
+      // back first: nothing was evaluated here, and charging for the quote as
+      // well as the answer would leave an honest user two real tries out of five.
+      await loginRate.refundIp(redis(), ip);
       return res.status(428).json({ error: "pow_required", reason: proof.reason });
     }
   }

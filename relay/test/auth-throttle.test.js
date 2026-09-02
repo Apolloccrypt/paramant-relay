@@ -123,6 +123,15 @@ test('every replay-guarded route turns a store outage into a 503, not a 401', ()
   assert.match(relay, /redisDeadline\(userTotp\.getUserTotpSecret/,
     'the redis read in front of the guard must be bounded, or an outage hangs instead of deciding');
   assert.match(relay, /function redisDeadline/, 'and the bound has to exist');
+
+  // Configurable per deployment, but never off: a value of zero or a non-number
+  // has to fall back to the default, because an unbounded deadline is the
+  // failure it exists to prevent. deploy/.env.example documents both names, and
+  // tests/env-documented.test.mjs is what keeps that true.
+  assert.match(relay, /process\.env\.PARAMANT_REDIS_DEADLINE_MS/, 'the deadline reads its environment');
+  const decl = relay.slice(relay.indexOf('const REDIS_DEADLINE_MS'), relay.indexOf('function redisDeadline'));
+  assert.match(decl, /Number\.isFinite\(raw\) && raw > 0 \? raw : 1000/,
+    'zero, a negative and a non-number must all fall back to the 1000 ms default');
   assert.match(relay, /log\("error", "totp_replay_store_unavailable"/,
     'an outage that nobody logs is an outage nobody fixes');
 });

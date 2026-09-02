@@ -70,6 +70,23 @@ async function hitIp(redisClient, ip) {
   return { allowed: count <= IP_LIMIT, count };
 }
 
+// Give an IP its attempt back. A request that was answered with a price quote
+// (428 pow_required) was never evaluated: no account was looked up, no code was
+// checked. Counting it would halve the budget under proof-of-work, because each
+// real attempt then costs two requests, the quote and the answer, and the honest
+// user would be refused after two tries instead of five. The IP limit is the one
+// that has to keep working, so it is spent on attempts only.
+async function refundIp(redisClient, ip) {
+  const k = ipKey(ip);
+  // DECR on a missing key creates it at -1 with no TTL, which would hand that IP
+  // a larger budget than it started with. Only ever refund a counter that is
+  // actually there.
+  const raw = await redisClient.get(k);
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return;
+  await redisClient.decr(k);
+}
+
 // How many failed sign-ins this address has collected inside the window. A READ,
 // never a write: merely naming an address must not move its counter.
 async function emailFailures(redisClient, email) {
@@ -94,7 +111,9 @@ async function clearEmailFailures(redisClient, email) {
 }
 
 // Past the threshold the next attempt on this address costs a proof-of-work.
-// Cost, not denial: the owner still signs in, one 2^18 challenge later.
+// Cost, not denial: the owner still signs in, one 2^18 challenge later, which is
+// a second or two in a browser and 150 to 250 ms for a native solver. That
+// prices a guess; it does not stop one. Stopping one is the per-IP limit's job.
 function powRequired(failures) {
   return failures >= EMAIL_FAIL_THRESHOLD;
 }
@@ -103,5 +122,5 @@ module.exports = {
   IP_LIMIT, WINDOW_S, EMAIL_FAIL_THRESHOLD,
   IP_PREFIX, EMAIL_FAIL_PREFIX,
   normalizeEmail, ipKey, emailFailKey,
-  hitIp, emailFailures, noteEmailFailure, clearEmailFailures, powRequired,
+  hitIp, refundIp, emailFailures, noteEmailFailure, clearEmailFailures, powRequired,
 };

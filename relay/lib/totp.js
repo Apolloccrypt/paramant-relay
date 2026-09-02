@@ -113,7 +113,12 @@ function matchTotpSlot(token, secret, opts = {}) {
 // timeout is reported exactly like a thrown error. A SET that lands after the
 // timeout does no harm: it marks a slot used, which is the safe direction.
 const REPLAY_STORE_UNAVAILABLE = 'replay_store_unavailable';
-const REPLAY_STORE_TIMEOUT_MS = 1000;
+const REPLAY_STORE_TIMEOUT_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_TOTP_REPLAY_TIMEOUT_MS || '', 10);
+  // Same rule as PARAMANT_REDIS_DEADLINE_MS in relay.js: tunable, but never
+  // zero and never unbounded. An unbounded guard does not fail closed, it hangs.
+  return Number.isFinite(raw) && raw > 0 ? raw : 1000;
+})();
 
 async function verifyTotpGeneric(token, secret, opts = {}, store = null) {
   const { window = 1, replayKey, algorithm, algorithms, now, storeTimeoutMs = REPLAY_STORE_TIMEOUT_MS } = opts;

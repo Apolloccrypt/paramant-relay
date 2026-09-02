@@ -79,7 +79,13 @@ if (RELAY_REDIS_URL) {
 // arrive. Used by the TOTP verify path, where the secret read sits in front of
 // the single-use guard and would otherwise hang before the guard can fail
 // closed. The rest of the relay still inherits the queue; see SECURITY.md.
-const REDIS_DEADLINE_MS = 1000;
+const REDIS_DEADLINE_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_REDIS_DEADLINE_MS || '', 10);
+  // A deployment with a slow or distant redis may need more room; one that
+  // would rather refuse than wait may want less. Zero or nonsense is not an
+  // opt-out, because "wait forever" is the failure this exists to prevent.
+  return Number.isFinite(raw) && raw > 0 ? raw : 1000;
+})();
 function redisDeadline(promise, ms = REDIS_DEADLINE_MS) {
   let timer = null;
   const deadline = new Promise((_, reject) => {
