@@ -15,10 +15,12 @@ const entitlements = require('./entitlements');
 function parasendTier(keyData) { return entitlements.getEntitlements(keyData || {}).parasend.tier; }
 function parasignTier(keyData) { return entitlements.getEntitlements(keyData || {}).parasign.tier; }
 
-// "Pro+" on ParaSend: pro or enterprise (community is the free floor -> denied).
+// "Pro+" on ParaSend: pro, the legacy business row, or enterprise (community is
+// the free floor -> denied). business is on the list because it is a PAID tier
+// above pro's numbers; it is resolved, never sold (entitlements.PARASEND_LADDER).
 function isParasendProPlus(keyData) {
   const t = parasendTier(keyData);
-  return t === 'pro' || t === 'enterprise';
+  return t === 'pro' || t === 'business' || t === 'enterprise';
 }
 
 // "Pro+" on ParaSign: pro, business or enterprise (free is the floor -> denied).

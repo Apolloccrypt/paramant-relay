@@ -17,7 +17,7 @@ test('ParaSend Pro+: community/free denied, pro/business/enterprise allowed', ()
   assert.strictEqual(tg.isParasendProPlus({ plan: 'community' }), false);
   assert.strictEqual(tg.isParasendProPlus({ plan: 'free' }), false);
   assert.strictEqual(tg.isParasendProPlus({ plan: 'pro' }), true);
-  assert.strictEqual(tg.isParasendProPlus({ plan: 'business' }), true);   // -> parasend enterprise
+  assert.strictEqual(tg.isParasendProPlus({ plan: 'business' }), true);   // -> parasend business
   assert.strictEqual(tg.isParasendProPlus({ plan: 'enterprise' }), true);
   assert.strictEqual(tg.isParasendProPlus(null), false);                  // malformed never over-grants
   assert.strictEqual(tg.isParasendProPlus({ plan_parasend: 'bogus' }), false);
