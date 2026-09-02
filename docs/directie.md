@@ -15,8 +15,10 @@ python3 scripts/directie/signalen.py --repo eigenaar/repo
 ```
 
 Exitcode 0 als niets rood is, 1 als er iets rood is, 2 als het script zelf
-struikelt. Een volledige run duurt ongeveer twintig seconden, vrijwel helemaal
-wachten op GitHub.
+struikelt. Een volledige run duurde hier gemeten 12 tot 17 seconden over vier
+runs, vrijwel helemaal wachten op GitHub. Dat loopt op met het aantal open
+pull requests en met het aantal runs dat langsgelopen moet worden voor een
+kanarie-uitslag: elk daarvan kost een API-aanroep.
 
 Nodig: Python 3, `gh` (ingelogd) en `curl`. Verder niets, met opzet. Zonder
 `gh`-login sterft het script niet, maar worden de GitHub-signalen oranje met
@@ -54,9 +56,16 @@ De drie kanaries zijn geen losse workflows. Ze zijn stappen in de `live`-job van
 `.github/workflows/product-heartbeat.yml`. Het script leest daarom de
 workflowbestanden, zoekt op naam naar de stappen, pakt per kanarie de laatste
 afgeronde run waarin die stap echt een uitslag gaf (een overgeslagen stap telt
-niet mee), en rapporteert die conclusie met het tijdstip. Wordt een kanarie ooit
-een eigen workflow, dan blijft dat werken. Verdwijnt hij helemaal, dan wordt het
-signaal oranje in plaats van stilletjes groen.
+niet mee), en rapporteert die conclusie met het tijdstip.
+
+Het kijkt daarvoor eerst naar de `schedule`- en `workflow_dispatch`-runs, want
+alleen daar draait de live-job. Een kale lijst van de laatste twintig runs
+bestaat op een drukke dag bijna helemaal uit pull-request-runs waarin de
+kanariestappen zijn overgeslagen, en dan zou een levende kanarie vals oranje
+worden gemeld. Levert die eerste ronde niets op, dan volgt een breed net over
+alle events. Wordt een kanarie ooit een eigen workflow, dan blijft dat werken.
+Verdwijnt hij helemaal, dan wordt het signaal oranje in plaats van stilletjes
+groen.
 
 ## Drempels
 
@@ -68,8 +77,9 @@ iets rood is hoort daar gevoerd te worden, niet verspreid over de code.
 
 ## JSON
 
-De JSON-uitvoer heeft `gegenereerd`, `repo`, `samenvatting` (aantallen per
-ernst) en `signalen`. Elk signaal heeft `sleutel`, `naam`, `ernst`, `meting`,
+De JSON-uitvoer heeft `gegenereerd` (UTC), `repo`, `wortel` (het pad naar de
+werkkopie waarin `.github/workflows` gelezen is), `samenvatting` (aantallen
+per ernst) en `signalen`. Elk signaal heeft `sleutel`, `naam`, `ernst`, `meting`,
 `voorstel` en `details`. In `details` staat onder meer `bron`: het commando
 waar de meting vandaan komt, zodat elke regel terug te leiden is naar iets wat
 je zelf kunt nadraaien.

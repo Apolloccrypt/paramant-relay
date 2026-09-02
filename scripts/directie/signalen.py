@@ -429,9 +429,75 @@ def jobs_van_run(repo: str, run_id: int, cache: dict) -> list[dict]:
     return jobs
 
 
+def kanarie_runs(repo: str, bestand: str, cache: dict, breed: bool = False) -> list[dict]:
+    """De runs waarin een kanarie een uitslag kan hebben gegeven.
+
+    De kanaries hangen in de live-job, en die draait alleen op schedule en op
+    workflow_dispatch. Een kale --limit 20 bestaat op een drukke dag bijna
+    helemaal uit pull_request-runs waarin de kanariestappen zijn overgeslagen,
+    en dan wordt een levende kanarie vals oranje gemeld. Daarom eerst die twee
+    eventlijsten. Het brede net (limiet 50, alle events) is de terugval voor
+    het geval een kanarie ooit ergens anders gaat draaien, en wordt alleen
+    getrokken als de eerste ronde niets oplevert."""
+    sleutel = (bestand, breed)
+    if sleutel in cache:
+        return cache[sleutel]
+    velden = "databaseId,conclusion,status,createdAt,updatedAt,event,url"
+    vragen = (
+        [["--limit", "50"]] if breed else
+        [["--event", "schedule", "--limit", "25"],
+         ["--event", "workflow_dispatch", "--limit", "25"]]
+    )
+    gezien: set = set()
+    runs: list[dict] = []
+    for extra in vragen:
+        data, fout = gh_json([
+            "run", "list", "--repo", repo, "--workflow", bestand,
+            *extra, "--json", velden,
+        ])
+        if fout is not None:
+            continue
+        for run in data or []:
+            nummer = run.get("databaseId")
+            if nummer in gezien:
+                continue
+            gezien.add(nummer)
+            runs.append(run)
+    runs.sort(key=lambda r: r.get("createdAt") or "", reverse=True)
+    cache[sleutel] = runs
+    return runs
+
+
+def zoek_uitslag(repo: str, patroon, runs: list[dict], bestand: str, cache_jobs: dict) -> dict | None:
+    """De jongste afgeronde run waarin de stap echt een uitslag gaf. Een
+    overgeslagen stap telt niet: die zegt alleen dat de job niet aan de beurt
+    was, niet dat de kanarie leeft."""
+    for run in runs:
+        if (run.get("status") or "") != "completed":
+            continue
+        for job in jobs_van_run(repo, run.get("databaseId"), cache_jobs):
+            for stap in job.get("steps") or []:
+                if not patroon.search(stap.get("name") or ""):
+                    continue
+                conclusie = (stap.get("conclusion") or "").lower()
+                if conclusie in {"", "skipped"}:
+                    continue
+                return {
+                    "run_id": run.get("databaseId"),
+                    "url": run.get("url"),
+                    "event": run.get("event"),
+                    "job": job.get("name"),
+                    "stap": stap.get("name"),
+                    "conclusie": conclusie,
+                    "afgerond": stap.get("completed_at") or job.get("completed_at"),
+                    "workflow": bestand,
+                }
+    return None
+
+
 def signalen_kanaries(repo: str, repo_wortel: str) -> list[dict]:
     workflows = lees_workflows(repo_wortel)
-    cache_runs: dict[str, list] = {}
+    cache_runs: dict = {}
     cache_jobs: dict[int, list] = {}
     uit: list[dict] = []
 
@@ -446,47 +512,20 @@ def signalen_kanaries(repo: str, repo_wortel: str) -> list[dict]:
             ))
             continue
 
-        wf = treffers[0]
-        bestand = wf["bestand"]
-        if bestand not in cache_runs:
-            data, fout = gh_json([
-                "run", "list", "--repo", repo, "--workflow", bestand, "--limit", "20",
-                "--json", "databaseId,conclusion,status,createdAt,updatedAt,event,url",
-            ])
-            cache_runs[bestand] = [] if fout is not None else (data or [])
-        runs = cache_runs[bestand]
-
-        gevonden = None
-        for run in runs:
-            if (run.get("status") or "") != "completed":
-                continue
-            for job in jobs_van_run(repo, run.get("databaseId"), cache_jobs):
-                for stap in job.get("steps") or []:
-                    if not patroon.search(stap.get("name") or ""):
-                        continue
-                    conclusie = (stap.get("conclusion") or "").lower()
-                    if conclusie in {"", "skipped"}:
-                        continue
-                    gevonden = {
-                        "run_id": run.get("databaseId"),
-                        "url": run.get("url"),
-                        "event": run.get("event"),
-                        "job": job.get("name"),
-                        "stap": stap.get("name"),
-                        "conclusie": conclusie,
-                        "afgerond": stap.get("completed_at") or job.get("completed_at"),
-                        "workflow": bestand,
-                    }
-                    break
-                if gevonden:
-                    break
-            if gevonden:
-                break
+        bestand = treffers[0]["bestand"]
+        gevonden = zoek_uitslag(
+            repo, patroon, kanarie_runs(repo, bestand, cache_runs), bestand, cache_jobs,
+        )
+        if gevonden is None:
+            gevonden = zoek_uitslag(
+                repo, patroon,
+                kanarie_runs(repo, bestand, cache_runs, breed=True), bestand, cache_jobs,
+            )
 
         if gevonden is None:
             uit.append(signaal(
                 f"kanarie-{sleutel}", f"kanarie {sleutel}", ORANJE,
-                f"staat in {bestand} maar heeft in de laatste 20 runs geen uitslag gegeven",
+                f"staat in {bestand} maar gaf in geen van de recente runs een uitslag",
                 f"Start {bestand} handmatig met gh workflow run en kijk of {sleutel} weer meet.",
                 workflow=bestand, bron="gh api actions/runs/<id>/jobs",
             ))
@@ -557,7 +596,7 @@ def signaal_homepage() -> dict:
             url=PRODUCTIE_HOME, bron="curl",
         )
     status, seconden = meting["status"], meting["seconden"]
-    if status >= 400 or status is None:
+    if status is None or status >= 400:
         ernst, voorstel = ROOD, f"De homepage geeft {status}, repareer dat voor alles anders."
     elif seconden > HOMEPAGE_ROOD_S:
         ernst, voorstel = ROOD, f"De homepage doet er {seconden:.2f} s over, zoek uit wat er traag is."
