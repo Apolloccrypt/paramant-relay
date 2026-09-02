@@ -581,10 +581,16 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
   // rate limits with their own source (nginx-selfhost.conf, the envelope
   // create limiter), not the tier table.
   //
-  // pricing, parasign and parasend carry the same stale sentence and are
-  // corrected in their own PRs (#336, #339). Drop them from this list once
-  // those land; the exclusion is the only reason this scan is not global.
-  const DEFERRED = new Set(['pricing', 'parasign', 'parasend']);
+  // parasign and parasend carry the same stale sentence and are corrected in
+  // their own PR (#339). Drop them from this list once that lands; the
+  // exclusion is the only reason this scan is not global.
+  //
+  // pricing came off this list in #336: its Community card now names the two
+  // limits the relay enforces (transfers_month and file_mb out of tiers.js,
+  // refused with 402 and 413) instead of the per-IP rate on the deprecated
+  // /v2/anon-inbound, and relay/test/pricing-page.test.js reads both figures
+  // out of tiers.js so they cannot drift back.
+  const DEFERRED = new Set(['parasign', 'parasend']);
   for (const slug of publicPages()) {
     if (DEFERRED.has(slug)) continue;
     for (const m of visible(page(slug)).matchAll(/\d+\s*uploads?\s*(?:\/|\s+(?:per|an|a)\s+)(?:hour|day)/gi)) {

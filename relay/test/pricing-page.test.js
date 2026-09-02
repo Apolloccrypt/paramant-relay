@@ -5,7 +5,8 @@
 // server catalog, no-JS href pointing at sign-in), states that checkout
 // charges incl. 21% btw, shows the incl-btw amount up-front on every paid card,
 // keeps one primary monthly CTA per tier with the yearly option demoted to a
-// secondary link, and no longer claims a 5 MB file limit. It also checks the
+// secondary link, and states the Community limits the relay actually enforces
+// (transfers_month and file_mb out of relay/lib/tiers.js). It also checks the
 // dead billing/checkout.html stub now redirects to /pricing with no "no charge"
 // copy. Run: node relay/test/pricing-page.test.js (exits non-zero on failure).
 
@@ -14,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const catalog = require('../lib/billing-catalog');
 const entitlements = require('../lib/entitlements');
+const tiers = require('../lib/tiers');
 
 const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'pricing.html'), 'utf8');
 
@@ -122,9 +124,51 @@ assert(/excl\. btw/.test(html), 'missing "excl. btw" mention');
 assert(/incl\. 21% btw/.test(html), 'missing "incl. 21% btw" checkout notice');
 ok('page states excl. btw and that checkout charges incl. 21% btw');
 
-// The outdated 5 MB file-limit claim is gone.
-assert(!/5\s?MB/i.test(html), 'pricing page still claims a 5 MB limit');
-ok('no 5 MB claim left on the pricing page');
+// The Community limits on the page are the ones the relay actually enforces.
+//
+// This block used to say the opposite: "the outdated 5 MB file-limit claim is
+// gone", asserting that "5 MB" appears nowhere on the page. That rule outlived
+// its reason. relay/relay.js refuses a larger blob with 413 `Max 5MB` against
+// MAX_BLOB (default 5242880), and relay/lib/tiers.js gives every tier
+// file_mb 5. The limit is real, so a test forbidding the page to name it was
+// holding a true sentence off the page.
+//
+// What the page said instead was worse than silence: "10 uploads per hour per
+// IP" is ANON_RATE_PER_HOUR on /v2/anon-inbound, which relay.js deprecated on
+// 2026-05-28 and advertises with Sunset 2026-12-31. A visitor read a rate limit
+// on a dying anonymous endpoint as the allowance on the account they were about
+// to create, and never saw the monthly cap that actually stops them (402
+// monthly_transfer_quota_reached, transfers_month from the plan).
+//
+// Both figures are read out of tiers.js here, so the page cannot drift from the
+// relay without this test going red.
+// Comments stripped: the WHY-note in pricing.html quotes the very wording this
+// block forbids, which is exactly how it stays forbidden for the next reader.
+const htmlVisible = html.replace(/<!--[\s\S]*?-->/g, '');
+const communityTransfers = tiers.tierLimit('community', 'transfers_month');
+const communityFileMb = tiers.tierLimit('community', 'file_mb');
+const proTransfers = tiers.tierLimit('pro', 'transfers_month');
+assert(new RegExp(`<li>${communityTransfers} transfers per month</li>`).test(html),
+  `the Community card must name the transfers_month limit from tiers.js (${communityTransfers})`);
+assert(new RegExp(`<li>${communityFileMb} MB per file</li>`).test(html),
+  `the Community card must name the file_mb limit from tiers.js (${communityFileMb} MB)`);
+assert(new RegExp(`${communityTransfers} transfers per month, ${communityFileMb} MB per file`).test(html),
+  'the lead must carry the same two Community limits as the card');
+assert(new RegExp(`<li>${proTransfers} transfers per month</li>`).test(html),
+  `the ParaSend Pro card must name its transfers_month limit from tiers.js (${proTransfers})`);
+assert(!/uploads per hour/i.test(htmlVisible),
+  'the page must not sell the anonymous per-IP rate of a deprecated endpoint as an account limit');
+ok('Community and Pro transfer limits on the page come from relay/lib/tiers.js');
+
+// ParaShare has no signature algorithm of its own. frontend/crypto-agility.html
+// lists it with Default SIG "n/a" on a pre-v1 hybrid wire format, so the claim
+// that its receipts are ML-DSA-65 signed was contradicted by our own register.
+assert(!/ParaShare use ML-KEM-768 plus ECDH P-256 hybrid key exchange with ML-DSA-65 signed receipts/.test(html),
+  'the page must not claim ML-DSA-65 signed receipts for ParaShare; the crypto register says n/a');
+const agility = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'crypto-agility.html'), 'utf8');
+assert(/<td>ParaShare \(webapp\)<\/td>\s*<td>ML-KEM-768 \+ ECDH P-256<\/td>\s*<td>n\/a<\/td>/.test(agility),
+  'crypto-agility.html is the source for ParaShare\'s algorithms and must still list SIG as n/a');
+ok('the ParaShare crypto claim matches the register on /crypto-agility');
 
 // Every paid card shows the incl-btw amount up-front, next to the excl price,
 // so the amount on Mollie's page does not surprise the buyer.

@@ -507,6 +507,129 @@ for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
 assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
   'if the homepage names the founder it must also name the accountable company registration');
 
+// 6. What /pricing promises, and in what order. relay/test/pricing-page.test.js
+// checks the numbers against the catalog; tests/pricing-fold.test.mjs measures
+// where they land on a phone. This checks the sentences themselves.
+//
+// Body only, and it matters. The same sentences sit in the meta description,
+// the og: and twitter: descriptions and the JSON-LD, all of which stand before
+// every element in the body, so an ordering check run over the whole file
+// passes even when the visible page has lost the sentence entirely. Verified by
+// replacing only the hero paragraph: the head copies kept an earlier version of
+// this file green.
+const pricingVisible = pricing.slice(pricing.indexOf('<body')).replace(/<!--[\s\S]*?-->/g, '');
+
+// What the page sells, before what it costs. A visitor who lands here from a
+// search engine has seen no other page, so "Pricing" plus a table says nothing.
+assert.match(pricingVisible, /Sign documents and send files that vanish after one read\./,
+  'pricing.html must say what the product does above the prices');
+
+// The promise carries its own number. "Free forever" on its own reads as
+// generous until the table says two signatures a month, and a buyer who finds
+// that out one screen later has been sold to rather than told.
+assert.match(pricingVisible, /Community is &euro;0 a month, forever:<\/strong> 2 signatures per month, 10 transfers per month, 5 MB per file, no card\./,
+  'the free promise on pricing.html must carry the limits it actually means');
+// And they must be the limits the relay enforces, not the per-IP rate on the
+// deprecated anonymous endpoint. relay/test/pricing-page.test.js reads the
+// numbers out of relay/lib/tiers.js; this keeps the phrase off the page.
+assert.doesNotMatch(pricingVisible, /uploads per hour/,
+  'pricing.html must not sell the anonymous per-IP rate as an account limit');
+assert.ok(
+  pricingVisible.indexOf('Sign documents and send files that vanish after one read.') <
+  pricingVisible.indexOf('Community is &euro;0 a month, forever:'),
+  'the product line must stand above the free/paid split',
+);
+assert.ok(
+  pricingVisible.indexOf('Community is &euro;0 a month, forever:') <
+  pricingVisible.indexOf('class="tier-card"'),
+  'the free/paid split must stand above the first tier card, not under the tables',
+);
+
+// The words a lawyer cannot read, kept out of the lead paragraph. They are not
+// banned from the page: the same facts stand under the tables, where a reader
+// has asked for the detail.
+const heroEnd = pricingVisible.indexOf('id="plans"');
+assert.ok(heroEnd > 0, 'pricing.html must still have the plans section the hero links to');
+const heroText = pricingVisible.slice(0, heroEnd);
+for (const rx of [/post-quantum signatures/, /public proof log/, /dedicated relay/, /a connection to their own software/, /\ban API\b/]) {
+  assert.doesNotMatch(heroText, rx,
+    `the first screen of pricing.html must not open on ${rx.source}`);
+}
+
+// The lead names two amounts, and they buy two different products: &euro;15 is
+// ParaSend Pro (sending) and &euro;49 is ParaSign Pro (signing). Named as one
+// figure, "from &euro;15 a month" anchors an office that came here to sign, and
+// the table then asks &euro;49. Both are read off the Pro cards themselves
+// rather than typed in here, and relay/test/pricing-page.test.js binds those
+// cards to relay/lib/billing-catalog.js, so the chain runs lead -> card ->
+// catalog and no link in it can move on its own.
+const proCardPrice = (heading) => {
+  const start = pricingVisible.indexOf(heading);
+  assert.ok(start > 0, `pricing.html must still have the "${heading}" section`);
+  const section = pricingVisible.slice(start, pricingVisible.indexOf('</section>', start));
+  const m = /<div class="tier-name">Pro<\/div>\s*<div class="tier-price">&euro;([\d.,]+)/.exec(section);
+  assert.ok(m, `the "${heading}" section must still have a Pro card with a price`);
+  return m[1];
+};
+const sending = proCardPrice('ParaSend · Send a file that disappears');
+const signing = proCardPrice('ParaSign · Get a document signed');
+assert.notEqual(sending, signing,
+  'sending and signing are priced separately; if their Pro cards ever agree, the lead below is no longer a split');
+assert.match(heroText, new RegExp(`from <strong>&euro;${sending} a month</strong> for sending`),
+  `the lead must name the ParaSend Pro price (&euro;${sending}) as the price of SENDING`);
+assert.match(heroText, new RegExp(`<strong>&euro;${signing} a month</strong> for signing`),
+  `the lead must name the ParaSign Pro price (&euro;${signing}) as the price of SIGNING`);
+// And it must not go back to quoting one figure for both products.
+assert.doesNotMatch(heroText, /pay for the business plans, from <strong>&euro;\d+ a month<\/strong> excl/,
+  'the lead must not price both products with one amount');
+
+// One term for the free limit, on both pages a buyer reads in the same minute.
+// /pricing said "2 signatures per month" and /signup said "sign 2 documents a
+// month", which reads as two different products.
+const signupVisible = read('frontend/signup.html').replace(/<!--[\s\S]*?-->/g, '');
+for (const [label, html] of [['pricing.html', pricingVisible], ['signup.html', signupVisible]]) {
+  assert.match(html, /2 signatures per month/,
+    `${label} must name the free limit in the site's one term: "2 signatures per month"`);
+  assert.doesNotMatch(html, /\d+ documents a month/,
+    `${label} uses "documents a month" for the signature limit; the term is "2 signatures per month"`);
+}
+assert.doesNotMatch(signupVisible, /class="tier-card"|privacy and security researcher/,
+  'signup.html must not carry tier tables or a founder block; it has already made the sale');
+
+// One legal class for a ParaSign signature, site-wide. /about pins the wording;
+// the pricing FAQ used to promise a higher class (AES), which is the single
+// claim a law firm checks first, and it sat on the page where they pay.
+assert.match(pricingVisible, /A ParaSign signature is a Simple Electronic Signature \(SES\) under eIDAS, not an advanced \(AES\) or a qualified \(QES\) signature\./,
+  'pricing.html must state the same signature class as /about');
+assert.doesNotMatch(pricingVisible, /Signatures are advanced \(AES\)/,
+  'pricing.html must not claim a higher signature class than /about gives');
+assert.match(about, /a Simple Electronic Signature \(SES\)/,
+  'about.html must keep the SES wording the pricing FAQ is aligned to');
+
+// Compliance is the customer's, not the tool's. The page said "all tiers meet
+// NIS2 and GDPR requirements by design" a few hundred pixels above "Paramant
+// itself holds no third-party certification for those frameworks".
+assert.doesNotMatch(pricingVisible, /meet NIS2 and GDPR requirements by design/,
+  'pricing.html must not promise compliance as a property of the product');
+assert.match(pricingVisible, /The architecture is built to support your NIS2 and GDPR work\. Paramant itself holds no third-party certification for those frameworks\./,
+  'pricing.html must say what the architecture does and what Paramant does not hold');
+
+// Who is behind it, on the page where a buyer decides to upload client files.
+// The name stood at 1128px, a screen and a half down; pricing-fold.test.mjs
+// measures where it lands now, this pins that it is there at all and that it
+// carries the accountable registration beside it.
+assert.match(pricingVisible, /Mick Beer<\/strong>, privacy and security researcher, founder of\s+Paramantis Solutions B\.V\. \(KvK 42115132\)/,
+  'pricing.html must name the founder with the title /about gives him and the company registration');
+
+// The free cards send a visitor to /signup. They used to send them to
+// /dashboard, a page nobody without an account can open.
+const freeCardCtas = [...pricingVisible.matchAll(/<div class="tier-name">Community<\/div>[\s\S]*?<a href="([^"]+)"[^>]*class="btn btn-primary"/g)].map((m) => m[1]);
+assert.ok(freeCardCtas.length >= 2, 'pricing.html must still have Community cards with a primary action');
+assert.deepEqual([...new Set(freeCardCtas)], ['/signup'],
+  `the Community cards must send a visitor to /signup, not to a page they cannot open: ${freeCardCtas.join(', ')}`);
+
+console.log('ui-truthfulness: /pricing says what it sells, with the number, above the tables');
+
 console.log('ui-truthfulness: the homepage does not overclaim signatures and quotes the real prices');
 console.log('ui-truthfulness: the free plan is Community everywhere and the founder line matches /about');
 console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');
