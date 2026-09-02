@@ -1,5 +1,14 @@
 # Deploy runbook: main (3.1.0) to production
 
+> `deploy/deploy-3.1.sh` executes this runbook. One command from the NUC
+> (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
+> the measurement for each one, and stops at the first result the runbook did
+> not predict. `--preflight-only` does the checks and nothing else,
+> `--dry-run` prints every remote command instead of running it, and
+> `--rollback <TS>` is step 8. This file stays the readable source: the script
+> follows it, it does not replace it, and a step that is argued out here is
+> argued out here only.
+
 Target: `116.203.86.81` (Hetzner). Mick runs this by hand over SSH, from the
 NUC, where the production key lives (`~/.ssh/paramant_prod_claude`, see
 `scripts/check-prod-drift.sh`). Nothing in this file runs on its own. Every
@@ -374,6 +383,17 @@ this brake exists to prevent.
 Trigger: any of the stop conditions in step 6, or clear breakage in the first
 thirty minutes.
 
+From the NUC, with the `TS` that step 2 printed:
+
+```bash
+bash deploy/deploy-3.1.sh --rollback 20260902-1830
+```
+
+That reads the manifest of step 2, retags the saved images, recreates the
+containers without rebuilding, restores `.env`, the nginx confs and the
+docroot, and re-runs the smoke tests. By hand, on the server, the equivalent
+is the 3.0.0 script, which asks before it restores `.env`:
+
 ```bash
 cd /opt/paramant-relay
 COMPOSE_DIR=/opt/paramant-relay BACKUP_DIR=/home/paramant/backups bash scripts/rollback-3.0.0.sh
@@ -413,7 +433,12 @@ fast path.
 
 ## What this runbook does not do
 
-- It does not deploy. Every command above is for Mick to run.
+- It does not deploy by itself. Every command above is one Mick runs, by hand
+  or through `deploy/deploy-3.1.sh`, which runs exactly these steps and
+  nothing more.
+- It does not automate step 7. Watching the logs, minting the canary key,
+  tagging the release and writing the deploy down stay hand work, because each
+  needs a judgement the script cannot make.
 - It does not set `BILLING_MODE`. The recurring layer stays off until there is
   a test key and a deliberate second change.
 - It does not remove the ParaID nginx deny. Harmless while it stays, and its
