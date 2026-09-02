@@ -26,15 +26,15 @@ SKIP_DIRS = {"node_modules", "vendor"}
 # Keep in step with PRIVATE in tests/seo-contract.test.mjs and apply_seo_head.py.
 PRIVATE = {
     "404", "account", "admin", "all-systems-go", "claim", "co-sign", "dashboard",
-    "developer", "get", "ontvang", "request-key", "setup",
+    "developer", "get", "ontvang", "parashare", "request-key", "setup",
     "auth/backup", "auth/login", "auth/request-reset", "auth/reset-confirm",
     "auth/setup", "billing/checkout", "signup/verified"}
 
 # Crawl priority. Not a ranking factor, but it tells a crawler where to spend
 # its budget on a 60-page site: the product and the money pages first.
 PRIORITY = [
-    (0.9, {"index", "pricing", "sign", "parashare", "verify", "vault", "download"}),
-    (0.8, {"security", "sovereignty", "trust", "architecture", "docs", "vs", "about"}),
+    (0.9, {"index", "pricing", "sign", "verify", "vault", "download"}),
+    (0.8, {"security", "trust", "architecture", "docs", "vs", "about"}),
 ]
 DEFAULT_PRIORITY = 0.6
 

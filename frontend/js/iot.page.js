@@ -1,3 +1,3 @@
 'use strict';
-window.location.replace('/ot');
+window.location.replace('/docs#compliance-iec62443');
 

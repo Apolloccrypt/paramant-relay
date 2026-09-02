@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
 [![Security Audit](https://img.shields.io/badge/security_audit-passed%202026--04--19%20%E2%80%94%20low%20risk-brightgreen.svg)](SECURITY.md)
 [![Relays](https://img.shields.io/badge/relays-5%20live-brightgreen.svg)](https://paramant.app/status)
-[![Jurisdiction](https://img.shields.io/badge/jurisdiction-EU%2FDE%20only-blue.svg)](https://paramant.app/compliance/nis2)
+[![Jurisdiction](https://img.shields.io/badge/jurisdiction-EU%2FDE%20only-blue.svg)](https://paramant.app/security)
 [![Docker](https://img.shields.io/badge/Docker-mtty001%2Frelay-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/mtty001/relay)
 
 **Post-quantum encrypted file relay. Burn-on-read. EU jurisdiction. Self-hostable in 2 minutes.**
@@ -252,7 +252,7 @@ python3 paramant-receiver.py \
 paramant-referral referral.json --type fhir --from gp-001 --to cardiology-umcg
 ```
 
-→ [NEN 7510 compliance](https://paramant.app/compliance/nen7510) · [DICOM setup guide](docs/dicom-guide.md)
+→ [DICOM setup guide](docs/dicom-guide.md)
 
 ---
 
@@ -266,7 +266,7 @@ paramant-notary deed.pdf --sign --receipt
 paramant-legal summons.pdf --case ROT-2026-1234 --proof
 ```
 
-→ [Legal compliance](https://paramant.app/compliance/nis2)
+→ [Compliance in the docs](https://paramant.app/docs#compliance-nis2)
 
 ---
 
@@ -282,7 +282,7 @@ paramant-firmware update-v2.1.bin \
   --sign --device-group bodycams.txt --version 2.1
 ```
 
-→ [IEC 62443 compliance](https://paramant.app/compliance/iec62443)
+→ [IEC 62443 in the docs](https://paramant.app/docs#compliance-iec62443)
 
 ---
 
@@ -607,9 +607,9 @@ open https://relay.paramant.app/ct/
 
 | Regulation | Status | Details |
 |------------|--------|---------|
-| NIS2 (EU 2022/2555) | Self-assessed | [Compliance page](https://paramant.app/compliance/nis2) |
-| NEN 7510 (Healthcare NL) | Self-assessed* | [Compliance page](https://paramant.app/compliance/nen7510) |
-| IEC 62443 (Industrial IoT) | Self-assessed | [Compliance page](https://paramant.app/compliance/iec62443) |
+| NIS2 (EU 2022/2555) | Self-assessed | [Docs](https://paramant.app/docs#compliance-nis2) |
+| NEN 7510 (Healthcare NL) | Self-assessed* | [Docs](https://paramant.app/docs#compliance-nen7510) |
+| IEC 62443 (Industrial IoT) | Self-assessed | [Docs](https://paramant.app/docs#compliance-iec62443) |
 | DORA (Finance EU) | Partial | Transit encryption supports DORA Art. 6 (ICT risk management); broader DORA scope not covered |
 | EU CRA 2027 | Designed for | paramant-cra tool + CT log |
 | GDPR Art. 28 | Available | [DPA](https://paramant.app/dpa) |

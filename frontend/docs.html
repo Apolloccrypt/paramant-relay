@@ -215,19 +215,7 @@ tr:last-child td{border-bottom:none}
     <li class="nav-dropdown">
       <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
       <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Standards</li>
-        <li role="none"><a href="/compliance/nis2" role="menuitem">NIS2 (EU 2022/2555)</a></li>
-        <li role="none"><a href="/compliance/iec62443" role="menuitem">IEC 62443 (Industrial IoT)</a></li>
-        <li role="none"><a href="/compliance/nen7510" role="menuitem">NEN 7510 (Dutch Healthcare)</a></li>
-        <li class="nav-subheader" role="presentation">Sovereignty</li>
-        <li role="none"><a href="/sovereignty" role="menuitem">Jurisdiction</a></li>
-        <li role="none"><a href="/government" role="menuitem">Government &amp; public sector</a></li>
-        <li class="nav-subheader" role="presentation">OT</li>
-        <li role="none"><a href="/ot" role="menuitem">OT guide</a></li>
-        <li role="none"><a href="/ot-vs-data-diodes" role="menuitem">OT vs data diodes</a></li>
         <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/hndl" role="menuitem">HNDL threat</a></li>
-        <li role="none"><a href="/quantum-urgency" role="menuitem">Quantum urgency</a></li>
         <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
         <li class="nav-subheader" role="presentation">Legal</li>
         <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
@@ -297,15 +285,6 @@ tr:last-child td{border-bottom:none}
   <div class="nav-mobile-group">
     <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
     <div class="nav-mobile-group-items">
-      <a href="/compliance/nis2">NIS2 (EU 2022/2555)</a>
-      <a href="/compliance/iec62443">IEC 62443 (Industrial IoT)</a>
-      <a href="/compliance/nen7510">NEN 7510 (Dutch Healthcare)</a>
-      <a href="/sovereignty">Jurisdiction</a>
-      <a href="/government">Government &amp; public sector</a>
-      <a href="/ot">OT guide</a>
-      <a href="/ot-vs-data-diodes">OT vs data diodes</a>
-      <a href="/hndl">HNDL threat</a>
-      <a href="/quantum-urgency">Quantum urgency</a>
       <a href="/crypto-agility">Crypto agility</a>
       <a href="/dpa">Data Processing Agreement</a>
           <a href="/terms">Terms of Service</a>
@@ -514,7 +493,6 @@ data = gp.receive(hash_)</pre>
 from paramant_sdk import GhostPipe
 gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
 hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
-    <p><a href="/compliance/nen7510" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">NEN 7510 compliance page →</a></p>
 
     <h3><span class="sector-badge">legal</span>Legal &amp; Notary: eIDAS, KNB</h3>
     <p>Send signed deeds and court documents that are cryptographically gone after receipt. The CT log provides tamper-evident proof of delivery without storing content.</p>
@@ -534,7 +512,6 @@ gp = GhostPipe(api_key="pgp_xxx", device="plc-factory-01", sector="iot")
 while True:
     gp.send(read_plc_state(), ttl=60)
     time.sleep(15)</pre></div>
-    <p><a href="/compliance/iec62443" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">IEC 62443 compliance page →</a></p>
 
     <h3><span class="sector-badge">finance</span>Finance: NIS2, DORA, ISO 20022</h3>
     <p>ISO 20022 payment file relay with per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code>: EU jurisdiction, no US Cloud Act, no metadata retention.</p>
@@ -980,10 +957,10 @@ python3 scripts/paramant-admin.py sync</pre>
     <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Sectors are routing domains: they provide traffic isolation and sector-specific compliance documentation. The crypto stack and API surface are identical.</p>
     <table>
       <tr><th>Sector</th><th>URL</th><th>Primary use</th><th>Compliance</th></tr>
-      <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td><a href="/compliance/nen7510" style="color:var(--cobalt)">NEN 7510</a>, GDPR</td></tr>
+      <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td>NEN 7510, GDPR</td></tr>
       <tr><td><span class="sector-badge">legal</span></td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>AVG, eIDAS</td></tr>
-      <tr><td><span class="sector-badge">finance</span></td><td>finance.paramant.app</td><td>ISO 20022, compliance data</td><td><a href="/compliance/nis2" style="color:var(--cobalt)">NIS2</a>, DORA</td></tr>
-      <tr><td><span class="sector-badge">iot</span></td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td><a href="/compliance/iec62443" style="color:var(--cobalt)">IEC 62443</a></td></tr>
+      <tr><td><span class="sector-badge">finance</span></td><td>finance.paramant.app</td><td>ISO 20022, compliance data</td><td>NIS2, DORA</td></tr>
+      <tr><td><span class="sector-badge">iot</span></td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td>IEC 62443</td></tr>
     </table>
 
     <!-- ── Security ─────────────────────────────────────────────── -->
@@ -1025,7 +1002,6 @@ python3 scripts/paramant-admin.py sync</pre>
       <li>Zero-downtime key revocation: immediate incident response capability</li>
     </ul>
     <p><strong>DORA (EU 2022/2554)</strong> applies to financial entities. The finance.paramant.app sector is designed with DORA in mind: per-transaction Merkle proof, no US Cloud Act jurisdiction, ISO 20022 compatible.</p>
-    <p><a href="/compliance/nis2" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full NIS2 compliance documentation →</a></p>
 
     <h2 id="compliance-nen7510">NEN 7510 (Healthcare)</h2>
     <p>NEN 7510 is the Dutch standard for information security in healthcare. The health.paramant.app sector is designed for NEN 7510 compliance:</p>
@@ -1036,7 +1012,6 @@ python3 scripts/paramant-admin.py sync</pre>
       <li>Key-based access control: per-user API keys with revocation</li>
       <li>Hetzner DE: EU GDPR jurisdiction, suitable for patient data routing</li>
     </ul>
-    <p><a href="/compliance/nen7510" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full NEN 7510 compliance documentation →</a></p>
 
     <h2 id="compliance-iec62443">IEC 62443 (Industrial / OT)</h2>
     <p>IEC 62443 is the international standard for operational technology security. The iot.paramant.app sector supports IEC 62443 deployments:</p>
@@ -1047,7 +1022,6 @@ python3 scripts/paramant-admin.py sync</pre>
       <li>Network segmentation: OT side connects outbound only; IT side receives inbound only</li>
       <li>ML-DSA-65 device signatures: cryptographic device authentication</li>
     </ul>
-    <p><a href="/compliance/iec62443" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">View full IEC 62443 compliance documentation →</a></p>
 
     <!-- ── FAQ ──────────────────────────────────────────────────── -->
     <!-- Operator scripts -->
@@ -1135,7 +1109,6 @@ python3 scripts/paramant-admin.py sync</pre>
           <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
           <a href="/license">License</a>
-          <a href="/compliance/nis2">Compliance overview</a>
         </div>
       </div>
     </div>

@@ -335,7 +335,7 @@ print(d['risk'], d['total'], d['critical'], d['high'], d['medium'], d['low'], d[
     echo -e "  ${CYAN}2.${RESET} Re-encrypt unprotected backups:           ${CYAN}paramant-migrate --backup${RESET}"
     echo -e "  ${CYAN}3.${RESET} Check supplier chain TLS posture:         ${CYAN}paramant-supply-chain --scan${RESET}"
     echo ""
-    echo -e "  More info: ${CYAN}https://paramant.app/hndl${RESET}"
+    echo -e "  More info: ${CYAN}https://paramant.app/crypto-agility${RESET}"
     echo ""
     echo -e "${RED}$(printf '─%.0s' {1..64})${RESET}"
     echo ""
