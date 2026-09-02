@@ -602,3 +602,92 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
+
+// 12 ── The free-versus-paid block on /about. It is the block a buyer reads to
+// decide, and it repeats numbers that live on /pricing: signature allowance,
+// link expiry, read count, device count, the Enterprise SLA. Nothing pinned it,
+// so /about could drift away from /pricing (or be edited outright) and every
+// test stayed green. This reads each number out of the /pricing tier card that
+// owns it and requires /about to say the same.
+test('the tier block on /about repeats the numbers /pricing charges for', () => {
+  const pricing = page('pricing');
+  const about = page('about');
+
+  // The two product blocks, split on their own headings, then the tier cards
+  // inside each one, keyed by the tier name /pricing prints. #336 renamed both
+  // headings and put ParaSign first, so the split finds the headings by their
+  // product prefix and orders them by position rather than assuming either.
+  const HEAD = /<h3[^>]*>(ParaSign|ParaSend)\s*(?:&middot;|\u00b7)[^<]*<\/h3>/g;
+  const marks = [...pricing.matchAll(HEAD)].map((m) => ({ product: m[1], at: m.index }));
+  assert.equal(marks.length, 2,
+    `pricing.html must carry one heading per product, found ${marks.length}`);
+  const section = (product) => {
+    const i = marks.findIndex((m) => m.product === product);
+    assert.notEqual(i, -1, `pricing.html no longer has a ${product} block`);
+    return pricing.slice(marks[i].at, i + 1 < marks.length ? marks[i + 1].at : undefined);
+  };
+  const tiers = (html) => {
+    const out = {};
+    for (const card of html.split('class="tier-card').slice(1)) {
+      const name = /<div class="tier-name">([^<]+)</.exec(card)?.[1];
+      if (name) out[name] = card;
+    }
+    return out;
+  };
+  const send = tiers(section('ParaSend'));
+  const sign = tiers(section('ParaSign'));
+  // The free tier is called Community on /pricing since #328, and the guide
+  // (docs/brand/messaging.md section 3) makes that name the rule rather than a
+  // preference. /about has to use the same word or a reader cannot find the
+  // card the sentence is about.
+  for (const [label, set, names] of [['ParaSend', send, ['Community', 'Pro', 'Enterprise']],
+                                     ['ParaSign', sign, ['Community', 'Pro', 'Business', 'Enterprise']]]) {
+    for (const n of names) assert.ok(set[n], `pricing.html no longer has a ${label} ${n} tier`);
+  }
+
+  // Each fact is a phrase lifted WHOLE out of the /pricing card that owns it,
+  // not a number plus a unit this file spells itself. #359 reworded "2
+  // signatures per month" to "2 signatures a month" and a hand-spelled unit
+  // went stale on a rewording that changed no number at all.
+  const phrase = (card, re, what) => {
+    const m = re.exec(card);
+    assert.ok(m, `pricing.html no longer states ${what}`);
+    return m[1].trim();
+  };
+  const facts = [
+    [phrase(sign.Community, /<li>(\d+ signatures? (?:a|per) month)<\/li>/, 'the ParaSign Community signature allowance'), 'ParaSign Community'],
+    [phrase(send.Community, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Community link expiry'), 'ParaSend Community'],
+    [phrase(send.Pro, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Pro link expiry'), 'ParaSend Pro'],
+    [phrase(send.Pro, /<li>(Up to \d+ reads per link)<\/li>/, 'the ParaSend Pro read limit'), 'ParaSend Pro'],
+    [phrase(send.Pro, /<li>(Up to \d+ registered devices)<\/li>/, 'the ParaSend Pro device limit'), 'ParaSend Pro'],
+    [phrase(send.Enterprise, /<li>SLA ([\d.]+%),/, 'the ParaSend Enterprise SLA'), 'ParaSend Enterprise'],
+  ];
+  for (const [expected, tier] of facts) {
+    assert.ok(about.toLowerCase().includes(expected.toLowerCase()),
+      `about: the ${tier} line must say "${expected}", because that is what pricing.html sells`);
+  }
+
+  // Free means free, in the same two words on both pages.
+  assert.match(sign.Community, /<div class="tier-price">&euro;0<\/div>/);
+  assert.match(send.Community, /<div class="tier-price">&euro;0<\/div>/);
+  assert.ok((about.match(/&euro;0, forever/g) || []).length >= 2,
+    'about: both free tiers must be named as costing &euro;0, forever');
+  assert.match(about, /No card required/,
+    'about: the free tier must say no card is required, as pricing.html does');
+
+  // And the paid tiers are named the way /pricing names them, so a reader can
+  // find the card the sentence is about.
+  for (const name of ['ParaSign Community', 'ParaSend Community',
+                      'ParaSign Pro', 'ParaSign Business', 'ParaSign Enterprise',
+                      'ParaSend Pro', 'ParaSend Enterprise']) {
+    assert.ok(about.includes(name), `about: the tier block must name ${name} the way /pricing does`);
+  }
+  // Scoped to /about in the first version of this check, which is exactly how
+  // security.html kept "ParaSign Free and ParaSend Free cost &euro;0" through a
+  // review. The three pages of this round are checked together; the sitewide
+  // sweep lives in tests/ui-truthfulness.test.mjs.
+  for (const slug of ['about', 'security', 'trust']) {
+    assert.doesNotMatch(page(slug), /Para(Sign|Send) Free/,
+      `${slug}: the free plan is called Community, which is what /pricing prints on the card`);
+  }
+});

@@ -48,7 +48,32 @@
 .person-card{border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone);padding:var(--space-6);margin-top:var(--space-5);max-width:680px}
 .person-card p{margin-top:0}
 .person-card p + p{margin-top:var(--space-4)}
-@media(max-width:640px){.check-grid{grid-template-columns:1fr}}
+.person-name{font-size:var(--text-xl);font-weight:600;color:var(--navy);letter-spacing:-.02em}
+.person-title{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--cobalt);margin-top:var(--space-2);margin-bottom:var(--space-4)}
+.split-head{font-size:var(--text-md);font-weight:600;color:var(--navy);margin-top:var(--space-6)}
+.split-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-4)}
+.split-card{background:var(--bone);padding:var(--space-5)}
+.split-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
+.split-card p{margin-top:var(--space-3);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
+.split-note{font-size:var(--text-sm);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.about-cta{margin-top:var(--space-5)}
+.about-byline{border-left:3px solid var(--cobalt);padding-left:var(--space-4);margin-top:var(--space-5);max-width:680px}
+.about-byline .n{font-size:var(--text-md);font-weight:600;color:var(--navy);letter-spacing:-.02em}
+.about-byline .t{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--cobalt);margin-top:4px}
+.about-for{font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
+.hero-cta{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-5)}
+@media(max-width:640px){
+.check-grid{grid-template-columns:1fr}
+.split-grid{grid-template-columns:1fr}
+/* Mobile first: the page name comes before the section number, and the hero
+   starts near the top of the screen instead of a third of the way down. */
+#main-content{padding-top:var(--space-5) !important}
+#main-content .sec-head{grid-template-columns:1fr;column-gap:0;row-gap:var(--space-2);align-items:start;padding-bottom:var(--space-3);margin-bottom:var(--space-4)}
+#main-content .sec-head h1{order:1}
+#main-content .sec-head .num{display:none}
+#main-content .sec-head .mono-eyebrow{order:3}
+.about-lede{margin-top:var(--space-3)}
+}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -147,7 +172,16 @@
       <h1 class="paramant-h2">About Paramant</h1>
       <span class="mono-eyebrow">Company, mission, and how to check us</span>
     </div>
-    <p class="about-lede">Paramant is privacy-first, post-quantum document signing and encrypted transfer, built to stay verifiable and to keep working under EU jurisdiction. You should not have to trust us. You should be able to check.</p>
+    <p class="about-lede">Sign and send documents so that only you and the person you send them to can read them, and so that anyone can check later that the document is genuine and unchanged. The servers stand in Germany, under EU law.</p>
+    <p class="about-for">For small offices that sign and send confidential papers, and for the person who has to check a supplier before it goes near client files.</p>
+    <div class="about-byline">
+      <div class="n">Mick Beer</div>
+      <div class="t">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
+    </div>
+    <div class="hero-cta">
+      <a href="/pricing" class="btn btn-primary">See pricing &rarr;</a>
+      <a href="/security" class="btn btn-secondary">See the evidence &rarr;</a>
+    </div>
   </div>
 </section>
 
@@ -161,10 +195,41 @@
   </div>
 </section>
 
+<!-- BEHIND PARAMANT -->
+<section class="about-band">
+  <div class="container-md">
+    <span class="mono-eyebrow">02 / Who is behind Paramant</span>
+    <h2 style="margin-top:var(--space-2)">Behind Paramant</h2>
+    <div class="person-card">
+      <div class="person-name">Mick Beer</div>
+      <div class="person-title">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
+      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party; the founder is the origin of the work, not the service itself.</p>
+      <p>The Community plan is his way of giving something back to society; the business plans pay for it. That is the whole arrangement, and it is why the Community plan is not a trial and has no end date.</p>
+      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take us at our word, you can verify it. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
+    </div>
+
+    <div class="split-head">Free for everyone, paid for organisations</div>
+    <div class="split-grid">
+      <div class="split-card free">
+        <div class="k">Free for everyone</div>
+        <p><strong>ParaSign Community.</strong> &euro;0, forever. 2 signatures a month, unlimited receiving, full post-quantum crypto, public verification log. No card required.</p>
+        <p><strong>ParaSend Community.</strong> &euro;0, forever. AES-256-GCM with a browser-generated key, 1 hour link expiry, burn on first read. No card required.</p>
+      </div>
+      <div class="split-card paid">
+        <div class="k">For organisations</div>
+        <p><strong>ParaSign Pro</strong> adds volume and API access. <strong>ParaSign Business</strong> adds named support and an exportable audit log. <strong>ParaSign Enterprise</strong> adds a dedicated relay instance, an SLA and a self-hosting licence.</p>
+        <p><strong>ParaSend Pro.</strong> 24 hour link expiry, up to 10 reads per link, up to 50 registered devices, send history and webhooks. <strong>ParaSend Enterprise</strong> adds a dedicated relay and an SLA of 99.95%.</p>
+      </div>
+    </div>
+    <p class="split-note">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</p>
+    <p class="about-cta"><a href="/pricing" class="btn btn-primary">See pricing &rarr;</a></p>
+  </div>
+</section>
+
 <!-- HOW YOU CAN CHECK US -->
 <section class="about-band">
   <div class="container-md">
-    <span class="mono-eyebrow">02 / Technique &amp; transparency</span>
+    <span class="mono-eyebrow">03 / Technique &amp; transparency</span>
     <h2 style="margin-top:var(--space-2)">How you can check us</h2>
     <p>Every claim on this site is meant to be checkable, not taken on faith. Four things make that possible:</p>
     <div class="check-grid">
@@ -187,19 +252,6 @@
     </div>
     <div class="scope-note">
       <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES). We state exactly what it is and what it is not.</p>
-    </div>
-  </div>
-</section>
-
-<!-- BEHIND PARAMANT -->
-<section class="about-band">
-  <div class="container-md">
-    <span class="mono-eyebrow">03 / Who is behind Paramant</span>
-    <h2 style="margin-top:var(--space-2)">Behind Paramant</h2>
-    <div class="person-card">
-      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party; the founder is the origin of the work, not the service itself.</p>
-      <p>The Community plan is his way of giving something back to society; the business plans pay for it. That is the whole arrangement, and it is why the Community plan is not a trial and has no end date.</p>
-      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take us at our word, you can verify it. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
     </div>
   </div>
 </section>

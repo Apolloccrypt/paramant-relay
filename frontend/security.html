@@ -36,9 +36,14 @@ html{scroll-behavior:smooth}
 .page-hero--navy .eyebrow{background:var(--lime);color:var(--navy)}
 .page-hero--navy h1{color:var(--bone)}
 .page-hero--navy .lede{color:rgba(248,250,252,.8)}
+.hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:20px}
+.page-hero--navy .btn-secondary{color:var(--bone);border-color:rgba(248,250,252,.45)}
+.page-hero--navy .btn-secondary:hover{background:var(--bone);color:var(--navy);border-color:var(--bone)}
+.hero-by{color:rgba(248,250,252,.7);font-size:var(--text-sm);line-height:1.7;margin-top:16px;max-width:620px}
 main{max-width:780px;margin:0 auto;padding:48px 48px 120px}
 h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
+.page-hero-inner .lede + .lede{margin-top:18px;font-size:var(--text-base)}
 h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:56px}
 h3{font-size:var(--text-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;margin-top:40px}
 p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
@@ -226,13 +231,73 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
 <section class="page-hero page-hero--navy">
 <div class="page-hero-inner">
-  <span class="eyebrow">DEFENSE IN DEPTH</span>
+  <span class="eyebrow">EVIDENCE</span>
   <h1>Security</h1>
-  <p class="lede">We treat security as infrastructure, not a feature. Every component is designed assuming the relay is compromised. This page documents how, what was audited, and how to report issues.</p>
+  <p class="lede">Break into our own server and you still cannot read the documents on it: they are encrypted on your device before they leave it, and the key never reaches us. That holds for the web app, ParaShare and the official SDKs. The Chromium and Outlook extensions still encrypt on our server, which means we can read what you upload through them until that is changed; the detail is further down this page.</p>
+  <p class="lede">This is the evidence under everything the rest of the site promises, and it covers every plan: the Community tier gets exactly the same protection as the paid ones.</p>
+  <p class="hero-by">Paramant is a product of Paramantis Solutions B.V. in Harderwijk, the Netherlands, KvK 42115132, founded by Mick Beer, privacy and security researcher.</p>
+  <div class="hero-cta">
+    <a href="/pricing" class="btn btn-primary">See pricing &rarr;</a>
+    <a href="/verify" class="btn btn-secondary">Verify a document &rarr;</a>
+  </div>
 </div>
 </section>
 
 <main id="main-content">
+
+  <h2 id="why-trust" style="margin-top:0">Why you can trust us</h2>
+  <p>Four things carry this product. Each one says what it means for you, and where you check it yourself. The technical detail that makes them true starts below.</p>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Your documents stay under EU law</div>
+      <p style="margin:0 0 10px">Server location: Hetzner Nuremberg, Germany. Legal jurisdiction: EU / Germany (GDPR). No US provider in the data path: your files and your keys stay in the EU and never reach a US company. Transactional email is the one exception in the chain and goes via Resend, a US provider, which receives the address, the message and the invite link but never the document. See the subprocessor list on <a href="/privacy">privacy</a>.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">Check the jurisdiction table &rarr;</a></p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">The key stays on your device</div>
+      <p style="margin:0 0 10px">ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. The relay holds only ciphertext.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="/crypto-agility">Check the algorithm registry &rarr;</a></p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">The proof outlives the supplier</div>
+      <p style="margin:0 0 10px">Every signature is entered into a public, append-only log. A signed document verifies without contacting us.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="/ct-log">Read the CT log &rarr;</a> &nbsp; <a href="/verify">Verify a document &rarr;</a></p>
+    </div>
+    <div class="card">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">You can read the code</div>
+      <p style="margin:0 0 10px">The relay is source-available under BUSL-1.1. You can read exactly what it does with your file and run it on your own server.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="https://github.com/Apolloccrypt/paramant-relay">Open the repository &rarr;</a> &nbsp; <a href="/trust">How to verify a deployment &rarr;</a></p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;border-left:3px solid var(--lime)">
+    <p style="margin:0;line-height:1.8">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user. The Community tier is not a weaker version of the product; it is the same product with lower limits. <a href="/pricing">See pricing &rarr;</a></p>
+  </div>
+
+  <h3>The limit, stated up front</h3>
+  <div class="card">
+    <p style="margin:0"><strong>Compliance documentation, not certification.</strong> The IEC 62443, NEN 7510 and NIS2 materials are architecture documents, security controls mappings and technical reference materials aligned to those frameworks. This is documentation you can use as input for your own compliance process. Paramant does not hold third-party certification for these frameworks.</p>
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="jurisdiction">Jurisdiction &amp; privacy</h2>
+  <div class="card">
+    <table class="table">
+      <tbody>
+        <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
+        <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
+        <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU. Transactional email goes via Resend, a US provider, which never receives the document. See <a href="/privacy">privacy</a>.</td></tr>
+        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
+        <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised.</td></tr>
+        <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
 
   <h3>Core principle</h3>
   <div class="card">
@@ -244,7 +309,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) and the WebApp tools (ParaShare), each of which encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
   </div>
 
-  <p style="font-size:var(--text-sm);color:var(--ink-dim)">For the full audit history, patch timeline, and cryptographic architecture, see the <a href="/architecture">architecture page</a>.</p>
+  <h3 id="audits">What was audited</h3>
+  <div class="card">
+    <p style="margin:0 0 12px;line-height:1.8">Three external security audits in April 2026 reviewed the relay code: two by R. Zwarts, one by Ryan Williams of Smart Cyber Solutions. Together they produced 40 findings, 4 of them critical. Dates, finding counts and the commit that resolved each set are in the audit table on the <a href="/docs#audits">docs page</a>, and every finding is written up in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a> in the public repository.</p>
+    <p style="margin:0;line-height:1.8">The Smart Cyber Solutions review is published in full, finding by finding, as the <a href="/docs/security-audit-2026-04.md">April 2026 audit report</a>. What is not published is the raw pentest output behind it. A further external review of the v3.0.0 and open-core architecture is planned.</p>
+  </div>
+
+  <p style="font-size:var(--text-sm);color:var(--ink-dim)">For the cryptographic architecture in full, see the <a href="/architecture">architecture page</a>.</p>
 
   <hr class="divider">
 
@@ -378,24 +449,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </tbody>
   </table>
 
-  <hr class="divider">
-
-  <h2>Jurisdiction &amp; privacy</h2>
-  <div class="card">
-    <table class="table">
-      <tbody>
-        <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
-        <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
-        <tr><td>US CLOUD Act</td><td>Not applicable: no US infrastructure, no US company</td></tr>
-        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for ParaShare), view count. Deleted on burn.</td></tr>
-        <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised.</td></tr>
-        <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <hr class="divider">
-
   <h2 id="responsible-disclosure">Responsible disclosure</h2>
   <div class="card">
     <p style="margin-bottom:16px">Report to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, encrypted with our <a href="/.well-known/openpgp-key.asc">PGP key</a> if the details are sensitive. Do not open a public GitHub issue before coordinating.</p>
@@ -423,8 +476,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <hr class="divider">
 
+  <h2 id="next">What to do next</h2>
+  <p>Every plan gets what this page describes. ParaSign Community and ParaSend Community cost &euro;0, forever, with no card required; the paid plans buy higher limits, API access, a dedicated relay and an SLA, never better cryptography.</p>
+  <div class="hero-cta">
+    <a href="/pricing" class="btn btn-primary">See pricing &rarr;</a>
+    <a href="/verify" class="btn btn-secondary">Verify a document &rarr;</a>
+  </div>
+
+  <hr class="divider">
+
   <h2 id="customer-transparency">Customer transparency</h2>
-  <p>Security is also about knowing what the vendor can and cannot do. The <a href="/trust">Trust &amp; Transparency page</a> documents, in plain terms, how license-check works, what Paramant can see of your relay (and what it never can), how to verify your deployment, and which remote actions are possible versus structurally impossible. Each claim there is tagged as live today or planned, with links to the public protocol specifications.</p>
+  <p>Security is also about knowing what the vendor can and cannot do. The <a href="/trust">Trust &amp; Verification page</a> documents, in plain terms, how license-check works, what Paramant can see of your relay (and what it never can), how to verify your deployment, and which remote actions are possible versus structurally impossible. Each claim there is tagged as live today or planned, with links to the public protocol specifications.</p>
 
 </main>
 

@@ -423,6 +423,11 @@ const TIER_NAME_SHAPES = [
   /tier named <strong>Free<\/strong>/,
   /\bthe Free tier\b/,
   /<div class="tier-name">Free<\/div>/,
+  // "ParaSign Free" and "ParaSend Free" name a product tier and nothing else,
+  // so they cannot be a false positive. They were missing from this list, and
+  // security.html carried both through a full review because the only check
+  // that forbade them was scoped to /about.
+  /\bPara(Sign|Send) Free\b/,
 ];
 // vs.html describes COMPETITORS' pricing (WeTransfer has a tier it calls Free);
 // paramant-ot-brief.html prices its own tier, named Evaluation, at "Free".
@@ -839,7 +844,7 @@ for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['pa
 // not in it, and DNS is not a row. A page that names Bunny and then sends the
 // reader to that table has offered a checkpoint that fails when checked.
 const securityJurisdiction = (read('frontend/security.html')
-  .match(/<h2>Jurisdiction[\s\S]*?<\/table>/) || [''])[0];
+  .match(/<h2[^>]*>Jurisdiction[\s\S]*?<\/table>/) || [''])[0];
 assert.ok(securityJurisdiction, 'security.html must keep its Jurisdiction and privacy table');
 assert.ok(!/Bunny/i.test(securityJurisdiction),
   'the /security jurisdiction table now names Bunny; the product pages may point at it again');
@@ -853,8 +858,17 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
   assert.doesNotMatch(text, /no US (company|provider) in the chain|no US company\b/i,
     `${name}.html claims more than the data path, which /privacy does not support`);
 }
-assert.ok(security.includes('Not applicable: no US infrastructure, no US company'),
-  'security.html must keep the US CLOUD Act row that proof 1 is measured against');
+// The row used to read "Not applicable: no US infrastructure, no US company",
+// and this assertion pinned it, because /security was the one page where the
+// table qualified the broader claim. Section 9.2 of the guide names that row
+// as the one that has to move to the data-path wording in its own PR with its
+// own test. This is that PR. What proof 1 is measured against on /security is
+// now the same sentence / and /pararules carry, with its Resend exception; the
+// window check that keeps the two together lives further down this file.
+assert.ok(!/no US company/i.test(security),
+  'security.html must no longer claim "no US company", which is broader than /privacy supports');
+assert.ok(security.includes('No US provider in the data path'),
+  'security.html must carry proof 1 in the data-path wording the guide fixes');
 
 // Proof 2. The three /about sentences the signing claim rests on.
 for (const claim of [
@@ -1014,3 +1028,283 @@ for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
 }
 
 console.log('ui-truthfulness: the messaging guide claims are pinned to the pages that make them true');
+
+// Everything below runs inside its own scope. Four PRs merged into this file
+// in parallel on 2 September and two of them collided on a top-level const
+// (tiers, pricingVisible), which is a SyntaxError: not one assertion in the
+// file runs, on any branch. A block that declares nothing at module level
+// cannot do that to the next branch.
+{
+  // ── The pages that carry the promise: /about, /security, /trust ─────────────
+  // The messaging guide (docs/brand/messaging.md) allows a sentence on the site
+  // only if it already ships and a test fails when it stops shipping. These are
+  // the sentences the buyer-facing copy on /about and /security now rests on.
+  // Every one of them was already on a page before this file pinned it; nothing
+  // here was written for marketing.
+  const securityRaw = read('frontend/security.html');
+  const trustRaw = read('frontend/trust.html');
+
+  // The founder. Name and title are the only ones the site can support, so they
+  // are pinned as one string: no award, no year count, no prior employer.
+  assert.match(about, /Mick Beer/,
+    'about.html must name the founder');
+  assert.match(about, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./i,
+    'about.html must carry the exact founder title, and no other qualification');
+  assert.match(about, /founded by Mick Beer, privacy and security researcher/,
+    'about.html must keep the founder sentence it has shipped with');
+  assert.match(about, /Paramantis Solutions B\.V\. is the contracting and responsible party/,
+    'about.html must keep saying the company, not the person, is the responsible party');
+
+  // Proof 2 of the guide: the key stays with the signer and the proof outlives
+  // us. These three sentences are what /security now points at as evidence.
+  assert.match(about, /ML-DSA-65 \(FIPS 204\), generated in your browser\. The private key never reaches the relay\./,
+    'about.html must keep the private-key sentence');
+  assert.match(about, /Every signature is entered into a public, append-only log\./,
+    'about.html must keep the transparency-log sentence');
+  assert.match(about, /A signed document verifies without contacting us\./,
+    'about.html must keep the offline-verification sentence');
+
+  // The eIDAS limit. It is the sentence a lawyer reads to decide whether the rest
+  // of the page is measured, so it may never be softened or moved to a footnote.
+  // It is pinned on /about only. /about calls a ParaSign signature a Simple
+  // Electronic Signature, the /pricing FAQ calls it advanced (AES), and those are
+  // different levels under eIDAS. Until that is settled in its own round, the
+  // wording stays on the one page that has always carried it and is not copied
+  // onto a second one.
+  assert.match(about, /Simple Electronic Signature \(SES\)/,
+    'about.html must state that a ParaSign signature is a Simple Electronic Signature');
+  assert.match(about, /not a notarised legal signature under eIDAS or any qualified-trust regime \(QES\)/,
+    'about.html must state what the signature is not');
+  assert.doesNotMatch(securityRaw, /Simple Electronic Signature|advanced \(AES\)/,
+    'security.html must not carry a second, competing eIDAS level while /about and /pricing disagree');
+  assert.doesNotMatch(about + securityRaw, /qualified electronic signature|legally binding|eIDAS-certified/i,
+    '/about and /security must not claim a qualified signature or legal effect');
+
+  // Proof 3: the same cryptography on every plan. This is the sentence the whole
+  // free-versus-paid split rests on. If cryptography is ever gated behind a tier,
+  // this is the assertion that must fail first.
+  const SAME_CRYPTO = /Every plan gets the same encryption, the same post-quantum signatures and the same public proof log\. Pay for volume, never for security\. And pay per organisation, not per user\./;
+  assert.match(pricing, SAME_CRYPTO, 'pricing.html must keep the same-crypto-every-plan sentence');
+  assert.match(securityRaw, SAME_CRYPTO, 'security.html must keep the same-crypto-every-plan sentence');
+
+  // Proof 1: EU jurisdiction. /security is where the buyer checks it, so the row
+  // and the claim above it have to agree.
+  assert.match(securityRaw, /Hetzner Nuremberg, Germany/,
+    'security.html must name the server location');
+  // The old row read "Not applicable: no US infrastructure, no US company",
+  // which is broader than /privacy allows: transactional email goes out through
+  // Resend, a US provider. The guide (section 9.2) says that row is the one that
+  // has to move to the data-path wording, and it may never be written without
+  // its one exception in the same breath.
+  assert.match(securityRaw, /No US provider in the data path/,
+    'security.html must state the jurisdiction claim about the data path, not about the whole chain');
+  assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Resend)/,
+    'security.html must not claim "no US company" without naming the Resend exception beside it');
+  // "In the same breath" is the whole point of the wording, so it is measured
+  // as a window and not as "somewhere on the page": an earlier version of this
+  // check let a card drop Resend entirely, because the jurisdiction table lower
+  // down still carried the word.
+  const WINDOW = 420;
+  for (const [label, html] of [['security.html', securityRaw]]) {
+    let at = -1, seen = 0;
+    while ((at = html.indexOf('No US provider in the data path', at + 1)) !== -1) {
+      seen += 1;
+      assert.match(html.slice(at, at + WINDOW), /Resend/,
+        `${label} states the data-path claim without naming the Resend exception within ${WINDOW} characters of it`);
+    }
+    assert.ok(seen >= 2,
+      `${label} must carry the data-path wording in both the card and the jurisdiction row, found ${seen}`);
+  }
+
+  // The certification limit, stated in the same voice as the proofs.
+  assert.match(securityRaw, /Paramant does not hold third-party certification for these frameworks\./,
+    'security.html must state that the compliance material is not a certification');
+  assert.match(pricing, /Paramant does not hold third-party certification for these frameworks\./,
+    'pricing.html must keep the certification limit it has shipped with');
+
+  // House style on the commercial pages, from the messaging guide: no marketing
+  // words we cannot back, no invented social proof, no em-dashes.
+  const commercial = about + securityRaw + trustRaw;
+  assert.doesNotMatch(commercial, /revolutionary|seamless|cutting-edge|military-grade|enterprise-grade|world-class|next-generation|effortless|trusted by \d/i,
+    'the commercial pages must not use the banned marketing vocabulary');
+  assert.doesNotMatch(commercial, /\u2014/,
+    'the commercial pages must not use em-dashes (U+2014)');
+
+  console.log('ui-truthfulness: /about, /security and /trust say only what the site can back');
+
+
+  // The first screen of each page. The complaint that sent this work back was
+  // that a buyer reaches the bottom of a phone screen without knowing what is
+  // sold, who sells it, or what to do next. These assert that the answers are in
+  // the markup before the first section heading, not a screen and a half down.
+  const aboveFold = (html) => html.slice(0, html.indexOf('<!-- WHAT PARAMANT IS -->') + 1 || html.length);
+  const aboutHero = aboveFold(about);
+  assert.match(aboutHero, /Sign and send documents so that only you and the person you send them to can read them/,
+    'about.html must open in plain language, before the word post-quantum');
+  assert.match(aboutHero, /For small offices that sign and send confidential papers/,
+    'about.html must say who it is for in the hero');
+  assert.match(aboutHero, /Mick Beer/, 'about.html must name the founder in the hero');
+  assert.match(aboutHero, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./,
+    'about.html must carry the founder title in the hero');
+  assert.match(aboutHero, /href="\/pricing" class="btn btn-primary"/,
+    'about.html must offer a next step in the hero');
+  // Nobody can promise ten years. The lede used to end on "the cryptography is
+  // post-quantum, which is the proof that it still holds up in ten years", which
+  // is not a proof and not checkable, on the page whose whole argument is that
+  // everything on it is checkable.
+  assert.doesNotMatch(about, /holds up in ten years|proof that it still holds/i,
+    'about.html must not promise how long the cryptography holds; nothing on the site backs it');
+  // The give-back sentence, in the exact words the messaging guide fixes for it
+  // (section 5, sentence three of the founder paragraph). It is the split the
+  // whole site is built on, and it is quoted, not paraphrased.
+  assert.match(about, /The Community plan is his way of giving something back to society; the business plans pay for it\./,
+    'about.html must carry the give-back sentence in the words docs/brand/messaging.md fixes');
+  // The earlier draft explained the free plan with a jurisdiction claim ("should
+  // not depend on a US subscription"). The guide forbids that beside his name:
+  // the jurisdiction claim is proof 1 and needs its Resend exception with it.
+  assert.doesNotMatch(about, /US subscription/i,
+    'about.html must not hang the jurisdiction claim off the founder paragraph');
+
+  // The section number must not land under the H1 on a phone, where it reads as
+  // a stray "00".
+  assert.match(about, /#main-content \.sec-head \.num\{display:none\}/,
+    'about.html must hide the section number in the mobile hero override');
+
+  // /security: the first screen. The buttons used to sit at roughly y=11400 on a
+  // 390px phone, fourteen screens down, and the page never said who was behind
+  // it. Sliced at the first <main>, so a next step that drifts below the hero
+  // fails here.
+  const heroOf = (html) => html.slice(html.indexOf('<section class="page-hero'), html.indexOf('<main'));
+  const securityHero = heroOf(securityRaw);
+  assert.match(securityHero, /href="\/pricing" class="btn btn-primary"/,
+    'security.html must offer a next step in the first screen, not only at the foot of the page');
+  assert.match(securityHero, /href="\/verify" class="btn btn-secondary"/,
+    'security.html must offer the verify step in the first screen');
+  assert.match(securityHero, /Paramantis Solutions B\.V\. in Harderwijk, the Netherlands, KvK 42115132, founded by Mick Beer, privacy and security researcher/,
+    'security.html says "why you can trust us", so it must name who that is, under the lede');
+
+  // The hero promise is bounded where the code is bounded. It used to read "Even
+  // if our own server is broken into, nobody can read your documents" flat out,
+  // while ten screens lower the page says the Chromium and Outlook extensions
+  // take a server-side encryption path. For an extension user the flat version
+  // is untrue today, so the exception travels with the promise.
+  assert.match(securityHero, /That holds for the web app, ParaShare and the official SDKs\./,
+    'security.html must scope the zero-knowledge promise in the hero');
+  assert.match(securityHero, /The Chromium and Outlook extensions still encrypt on our server/,
+    'security.html must name the extension exception in the same breath as the promise');
+  // And say what that costs the reader. "Treat those uploads as relay-side" is
+  // the internal word for it, and it tells someone who does not already know
+  // what a relay is precisely nothing.
+  assert.match(securityHero, /which means we can read what you upload through them until that is changed/,
+    'security.html must say in plain words what the extension exception means: we can read those uploads');
+  // The claim this round makes about itself: relay does not appear above the
+  // fold undefined. Asserted rather than asserted-in-the-PR-text. The same word
+  // is fine lower down, where the page defines it.
+  assert.doesNotMatch(securityHero, /\brelay\b/i,
+    'security.html must not use "relay" in the first screen; it is undefined there');
+
+  assert.doesNotMatch(securityHero, /nobody can read your documents: they are encrypted on your device before they leave it, and the key never reaches us\. This page shows/,
+    'the unqualified version of the promise must not come back');
+
+  // /security promises "who audited it" in the hero and the meta description says
+  // "independent audit". Both have to resolve on the page itself: /architecture
+  // points back here for the audit material, so a pointer there is a loop.
+  assert.match(securityRaw, /Three external security audits in April 2026 reviewed the relay code/,
+    'security.html must state the audits its hero promises');
+  // The previous round asserted "The audit reports themselves are not
+  // published." That was false: docs/security-audit-2026-04.md is the full
+  // Smart Cyber Solutions writeup and it ships in the site tree as
+  // frontend/docs/security-audit-2026-04.md. Only the raw pentest output is
+  // missing, which is what that document itself calls the "Raw report". These
+  // pin what /docs#audits actually says: three audits, forty findings, four
+  // critical, all resolved.
+  assert.match(securityRaw, /Together they produced 40 findings, 4 of them critical\./,
+    'security.html must quote the finding counts the /docs#audits table adds up to');
+  assert.match(securityRaw, /the raw pentest output behind it is not published|What is not published is the raw pentest output/,
+    'security.html must name what is actually unpublished: the raw pentest output, not the reports');
+  assert.doesNotMatch(securityRaw + trustRaw, /The audit reports themselves are not published/,
+    'the April 2026 report IS published at /docs/security-audit-2026-04.md; that sentence was untrue');
+  assert.match(securityRaw, /href="\/docs\/security-audit-2026-04\.md"/,
+    'security.html must link the published audit report it points at');
+  // The auditor names were pinned on /trust only, so replacing them on
+  // /security with "an independent firm" left the suite green. Pinned on both.
+  assert.match(securityRaw, /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
+    'security.html must name the auditors it credits');
+  assert.match(securityRaw, /href="\/docs#audits"/,
+    'security.html must link the audit table that carries the counts');
+  assert.doesNotMatch(securityRaw, /full audit history[^<]*<a href="\/architecture"/,
+    'security.html must not send the reader to /architecture for audit material it sends back');
+
+  // /trust: tab title and H1 say the same thing, and the audit claim names its
+  // auditors and where the outcome is.
+  // The literal head strings belong to #334 and tests/seo-contract.test.mjs
+  // pins them there. What this file guards is that the H1 and the head agree;
+  // see the structural check further down.
+  assert.match(trustRaw, /<h1>Trust &amp; Verification<\/h1>/, 'trust.html H1 names the page');
+  assert.match(trustRaw, /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
+    'trust.html must name the auditors it credits');
+  assert.match(trustRaw, /Together they produced 40 findings, 4 of them critical\./,
+    'trust.html must quote the same finding counts /docs#audits adds up to');
+  assert.match(trustRaw, /href="\/docs\/security-audit-2026-04\.md"/,
+    'trust.html must link the published audit report');
+  const trustHero = heroOf(trustRaw);
+  assert.match(trustHero, /For organisations that run Paramant on their own server/,
+    'trust.html must name its audience in the hero, not a screen below it');
+  assert.doesNotMatch(trustHero, /\brelay\b/i,
+    'trust.html must not use "relay" in the first screen; it is undefined there');
+
+  // One name for one page. The H1 and the <title> said "Trust & Verification"
+  // while the social card and the structured data still said "Trust &
+  // Transparency", and no test in tests/ compares a title with its og:title.
+  // #334 owns the head wording and tests/seo-contract.test.mjs pins the literal
+  // strings, so this checks the RELATION instead: the four places that name the
+  // page must name it the same, and that name must be the one the H1 uses.
+  // Punctuation and case are not the point; "Transparency" versus
+  // "Verification" was.
+  const pageName = (re, label) => {
+    const m = re.exec(trustRaw);
+    assert.ok(m, `trust.html must carry ${label}`);
+    return m[1].replace(/&amp;|&/g, 'and').replace(/&middot;|\u00b7/g, '').replace(/[^a-z]+/gi, ' ').trim().toLowerCase();
+  };
+  const trustNames = {
+    title: pageName(/<title>([^<]*)<\/title>/, 'a title'),
+    og: pageName(/<meta property="og:title" content="([^"]*)"/, 'an og:title'),
+    twitter: pageName(/<meta name="twitter:title" content="([^"]*)"/, 'a twitter:title'),
+    jsonld: pageName(/"name": "([^"]*Paramant[^"]*)"/, 'a JSON-LD WebPage name'),
+  };
+  for (const [where, name] of Object.entries(trustNames)) {
+    assert.equal(name, trustNames.title,
+      `trust.html ${where} calls the page "${name}", the title calls it "${trustNames.title}"`);
+  }
+  const trustH1 = /<h1>([^<]*)<\/h1>/.exec(trustRaw)[1].replace(/&amp;|&/g, 'and').replace(/[^a-z]+/gi, ' ').trim().toLowerCase();
+  for (const word of trustH1.split(' ')) {
+    assert.ok(trustNames.title.includes(word),
+      `the /trust H1 says "${trustH1}" but the title says "${trustNames.title}"; the word "${word}" is missing`);
+  }
+  assert.doesNotMatch(trustRaw, /Trust &(amp;)? Transparency|Trust and transparency/i,
+    'trust.html must not keep the old page name anywhere');
+
+  // The hero addresses "anyone who has to check a supplier". That reader used to
+  // get one text link in the middle of a paragraph as the only way onward.
+  assert.match(trustHero, /href="\/security" class="btn btn-primary"/,
+    'trust.html must give the reviewer a real next step in the hero');
+  assert.match(trustHero, /href="\/pricing" class="btn btn-secondary"/,
+    'trust.html must offer pricing from the hero as well');
+
+  // "the operator who runs the relay" was the first sentence under the hero, and
+  // relay is not a word a supplier reviewer knows.
+  const trustFirstScreen = trustRaw.slice(0, trustRaw.indexOf('<h3>How to read this page</h3>'));
+  assert.doesNotMatch(trustFirstScreen, /the operator who runs the relay/,
+    'trust.html must not open on undefined jargon; say which server is meant');
+
+  // /pricing sells four ParaSign tiers. "Businesses pay for Pro or Enterprise"
+  // silently dropped Business, and the sentence sat on the page that exists to
+  // be checkable.
+  for (const name of ['ParaSign Community', 'ParaSend Community', 'ParaSign Pro, Business and Enterprise']) {
+    assert.ok(trustRaw.includes(name), `trust.html must name the plans as /pricing names them: "${name}"`);
+  }
+  assert.doesNotMatch(trustRaw, /Businesses pay for Pro or Enterprise/,
+    'trust.html must not name two of the three paid ParaSign tiers as if they were all of them');
+
+  console.log('ui-truthfulness: the trust pages answer who, what and what next above the fold');
+}
