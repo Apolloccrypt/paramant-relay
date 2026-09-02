@@ -5080,7 +5080,8 @@ const server = http.createServer(async (req, res) => {
     catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
     const order = billingCatalog.resolveOrder({ product: body.product, plan: body.plan, interval: body.interval });
     if (order.error) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: order.error })); }
-    const mode = mollie.billingMode();
+    const stance = mollie.billingStance();
+    const mode = stance.mode;
     const origin = process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app';
     try {
       // A Mollie customer, and a payment marked as the FIRST of a series. Both
@@ -5089,32 +5090,21 @@ const server = http.createServer(async (req, res) => {
       // the tier is granted, and the money never comes in again. That is what
       // made every sale a one-off.
       //
-      // The customer is reused when the account already has one and Mollie still
-      // knows it. A stale or foreign id must not break a checkout, so a failed
-      // lookup falls through to creating a new one rather than erroring out: the
-      // buyer's payment matters more than tidiness in our own records.
-      let customerId = null;
-      try {
-        const _rec = _billingRecordOf(accountId);
-        const stored = _rec && _rec[billingRecurring.CUSTOMER_FIELD];
-        if (stored) {
-          try { const c = await mollie.getCustomer(mode, stored); if (c && c.id) customerId = c.id; }
-          catch { customerId = null; }
-        }
-        if (!customerId) {
-          const created = await mollie.createCustomer(mode, {
-            name: (_rec && _rec.label) || undefined,
-            email: (_rec && _rec.email) || undefined,
-            metadata: { accountId },
-          });
-          if (created && created.id) { customerId = created.id; _setMolliePointer(accountId, billingRecurring.CUSTOMER_FIELD, created.id); }
-        }
-      } catch (ce) {
-        // No customer means no mandate means no renewal. The sale still goes
-        // through as a one-off rather than failing in the buyer's face, but this
-        // is an alert: money will come in once and never again.
-        log('error', 'billing_customer_failed', { account: String(accountId).slice(0, 12), err: ce.message, status: ce.status });
+      // Only when BILLING_MODE was set by hand (stance.recurring). With it
+      // empty, as production has run since billing exists, the customer step is
+      // skipped and the payload below is byte for byte the one-off payment of
+      // 2026-08-08. See mollie.billingStance for why an inferred mode is not
+      // enough to open mandates against a real account.
+      const cust = await billingRecurring.ensureCustomer(accountId, {
+        recurring: stance.recurring, mode,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveCustomer: (aid, id) => _setMolliePointer(aid, billingRecurring.CUSTOMER_FIELD, id),
+        mollie,
+      });
+      if (cust.result === 'failed') {
+        log('error', 'billing_customer_failed', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
       }
+      const customerId = cust.customerId;
       const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: order.amount },
         description: `Paramant ${order.product} ${order.plan} (${order.interval})`,
@@ -5123,7 +5113,7 @@ const server = http.createServer(async (req, res) => {
         metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval },
       }, customerId ? { customerId, sequenceType: 'first' } : {}));
       const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
-      log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode });
+      log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
     } catch (e) {
@@ -5150,7 +5140,8 @@ const server = http.createServer(async (req, res) => {
       log('warn', 'billing_webhook_bad_id', { raw_id: String(paymentId).slice(0, 24) });
       res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_payment_id' }));
     }
-    const mode = mollie.billingMode();
+    const stance = mollie.billingStance();
+    const mode = stance.mode;
     let payment;
     try { payment = await mollie.getPayment(mode, paymentId); }
     catch (e) {
@@ -5181,9 +5172,12 @@ const server = http.createServer(async (req, res) => {
     // a subscription nothing asks for the next period. Deliberately AFTER the
     // grant and never able to undo it: a buyer who paid keeps what he paid for
     // even if Mollie refuses the subscription, and the error level is the
-    // signal that this account will not renew by itself.
+    // signal that this account will not renew by itself. With BILLING_MODE
+    // empty (stance.recurring false) this is a silent skip: the 08-08 webhook
+    // granted and stopped there, and so does this one.
     if (outcome.result === 'granted') {
       const sub = await billingRecurring.ensureSubscription(payment, outcome, {
+        recurring: stance.recurring,
         mode,
         webhookUrl: `${process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app'}/v2/billing/webhook`,
         getAccount: (aid) => _billingRecordOf(aid),
@@ -6442,11 +6436,22 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   // Say it once, loudly, at boot: without a key for the active billing mode
   // every checkout and every webhook fails, and the only earlier symptom was a
   // 503 on a public endpoint that nobody watches. Never log the key itself.
+  //
+  // The stance is the second half of that line. BILLING_MODE empty means
+  // one-off payments only, as on 2026-08-08; 'live' or 'test' by hand turns on
+  // customers, mandates and subscriptions. warn, not info, when it is inferred:
+  // it is a legitimate stance, but one nobody has decided on yet, and the
+  // decision belongs in .env at deploy time, not in a key prefix.
   {
-    const _bm = mollie.billingMode();
-    const _bk = mollie.apiKeyFor(_bm);
-    log(_bk ? 'info' : 'error', 'billing_config', {
-      mode: _bm, key_present: !!_bk, key_prefix: _bk ? _bk.slice(0, 5) : null });
+    const _bs = mollie.billingStance();
+    const _bk = mollie.apiKeyFor(_bs.mode);
+    log(!_bk ? 'error' : (_bs.recurring ? 'info' : 'warn'), 'billing_config', {
+      mode: _bs.mode, mode_source: _bs.source, recurring: _bs.recurring,
+      key_present: !!_bk, key_prefix: _bk ? _bk.slice(0, 5) : null,
+      stance: _bs.recurring
+        ? `${_bs.mode}: one-off payments plus customers, mandates and subscriptions (BILLING_MODE=${_bs.mode})`
+        : `${_bs.mode}: one-off payments only, no customers or subscriptions (BILLING_MODE not set)`,
+    });
   }
   // Register to the relay registry after a short delay to let the server fully bind
   if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);

@@ -29,6 +29,10 @@ const PLAN = { product: 'parasign', plan: 'pro', interval: 'monthly' };
 const ORDER = catalog.resolveOrder(PLAN);
 const PAID_UNTIL = new Date('2026-10-01T12:00:00.000Z');
 
+// Every ensureSubscription call below passes recurring: true. That flag is the
+// brake from mollie.billingStance(): it is only true when BILLING_MODE was set
+// by hand, and without it the layer is a no-op (see billing-stance.test.js).
+// This suite tests the layer in its enabled state.
 const mollieFake = (over) => Object.assign({
   mollieInterval: (i) => (i === 'monthly' ? '1 month' : i === 'yearly' ? '12 months' : null),
   validMandates: async () => [{ id: 'mdt_1', status: 'valid' }],
@@ -97,7 +101,7 @@ test('a startDate that is not in the future is refused: Mollie would collect at 
 test('an already expired period cannot become the start of the next one', async () => {
   let created = 0;
   const r = await rec.ensureSubscription(paidPayment(), grant({ paidUntil: new Date('2026-01-01T00:00:00.000Z') }), {
-    mode: 'test', now: new Date('2026-09-01T00:00:00.000Z'),
+    recurring: true, mode: 'test', now: new Date('2026-09-01T00:00:00.000Z'),
     getAccount: async () => ({}), saveSubscription: async () => {},
     mollie: mollieFake({ createSubscription: async () => { created++; return { id: 'sub_x' }; } }),
   });
@@ -130,7 +134,7 @@ test('a recurring collection does not create another subscription', async () => 
   let created = 0;
   const r = await rec.ensureSubscription(
     paidPayment({ id: 'tr_renewal', sequenceType: 'recurring' }), grant(),
-    { mode: 'test', getAccount: async () => ({}), mollie: mollieFake({ createSubscription: async () => { created++; return { id: 'sub_x' }; } }) },
+    { recurring: true, mode: 'test', getAccount: async () => ({}), mollie: mollieFake({ createSubscription: async () => { created++; return { id: 'sub_x' }; } }) },
   );
   assert.strictEqual(r.result, 'skipped');
   assert.strictEqual(r.reason, 'recurring_collection');
@@ -140,7 +144,7 @@ test('a recurring collection does not create another subscription', async () => 
 test('an account that already has a subscription for this product is left alone', async () => {
   let created = 0;
   const r = await rec.ensureSubscription(paidPayment(), grant(), {
-    mode: 'test',
+    recurring: true, mode: 'test',
     getAccount: async () => ({ mollie_subscription_parasign: 'sub_existing' }),
     mollie: mollieFake({ createSubscription: async () => { created++; return { id: 'sub_x' }; } }),
   });
@@ -151,7 +155,7 @@ test('an account that already has a subscription for this product is left alone'
 
 test('a subscription for the OTHER product does not block this one', async () => {
   const r = await rec.ensureSubscription(paidPayment(), grant(), {
-    mode: 'test',
+    recurring: true, mode: 'test',
     getAccount: async () => ({ mollie_subscription_parasend: 'sub_send' }),
     saveSubscription: async () => {},
     mollie: mollieFake(),
@@ -164,7 +168,7 @@ test('a subscription for the OTHER product does not block this one', async () =>
 
 test('a first payment without a customer id is flagged, not thrown', async () => {
   const r = await rec.ensureSubscription(paidPayment({ customerId: null }), grant(), {
-    mode: 'test', getAccount: async () => ({}), mollie: mollieFake(),
+    recurring: true, mode: 'test', getAccount: async () => ({}), mollie: mollieFake(),
   });
   assert.strictEqual(r.result, 'failed');
   assert.strictEqual(r.level, 'error');
@@ -174,7 +178,7 @@ test('a first payment without a customer id is flagged, not thrown', async () =>
 test('no valid mandate refuses rather than creating a subscription Mollie will reject', async () => {
   let created = 0;
   const r = await rec.ensureSubscription(paidPayment(), grant(), {
-    mode: 'test', getAccount: async () => ({}),
+    recurring: true, mode: 'test', getAccount: async () => ({}),
     mollie: mollieFake({
       validMandates: async () => [],
       createSubscription: async () => { created++; return { id: 'sub_x' }; },
@@ -187,7 +191,7 @@ test('no valid mandate refuses rather than creating a subscription Mollie will r
 
 test('a Mollie failure is reported, never thrown at the webhook', async () => {
   const r = await rec.ensureSubscription(paidPayment(), grant(), {
-    mode: 'test', getAccount: async () => ({}),
+    recurring: true, mode: 'test', getAccount: async () => ({}),
     mollie: mollieFake({ createSubscription: async () => { throw new Error('mollie_subscription_failed'); } }),
   });
   assert.strictEqual(r.result, 'failed');
@@ -197,7 +201,7 @@ test('a Mollie failure is reported, never thrown at the webhook', async () => {
 test('the customer id on the payment beats a stale one on the account', async () => {
   let billedCustomer = null;
   await rec.ensureSubscription(paidPayment({ customerId: 'cst_fresh' }), grant(), {
-    mode: 'test',
+    recurring: true, mode: 'test',
     getAccount: async () => ({ mollie_customer_id: 'cst_stale' }),
     saveSubscription: async () => {},
     mollie: mollieFake({ createSubscription: async (m, cust) => { billedCustomer = cust; return { id: 'sub_1' }; } }),
@@ -210,7 +214,7 @@ test('the customer id on the payment beats a stale one on the account', async ()
 test('cancelling stops the collection and leaves the paid period untouched', async () => {
   const account = { mollie_customer_id: 'cst_1', mollie_subscription_parasign: 'sub_1', paid_until_parasign: PAID_UNTIL.toISOString(), plan_parasign: 'pro' };
   const r = await rec.cancelForProduct('acct_1', 'parasign', {
-    mode: 'test',
+    recurring: true, mode: 'test',
     getAccount: async () => account,
     saveSubscription: async (a, p, id) => { account[rec.subscriptionFieldOf(p)] = id; },
     mollie: mollieFake(),
@@ -224,7 +228,7 @@ test('cancelling stops the collection and leaves the paid period untouched', asy
 test('a failed cancel keeps the pointer, so the next attempt still finds it', async () => {
   const account = { mollie_customer_id: 'cst_1', mollie_subscription_parasign: 'sub_1' };
   const r = await rec.cancelForProduct('acct_1', 'parasign', {
-    mode: 'test',
+    recurring: true, mode: 'test',
     getAccount: async () => account,
     saveSubscription: async (a, p, id) => { account[rec.subscriptionFieldOf(p)] = id; },
     mollie: mollieFake({ cancelSubscription: async () => { throw new Error('mollie_cancel_failed'); } }),
@@ -235,7 +239,7 @@ test('a failed cancel keeps the pointer, so the next attempt still finds it', as
 
 test('cancelling what was never subscribed is a no-op, not an error', async () => {
   const r = await rec.cancelForProduct('acct_1', 'parasign', {
-    mode: 'test', getAccount: async () => ({ mollie_customer_id: 'cst_1' }), mollie: mollieFake(),
+    recurring: true, mode: 'test', getAccount: async () => ({ mollie_customer_id: 'cst_1' }), mollie: mollieFake(),
   });
   assert.strictEqual(r.result, 'noop');
   assert.strictEqual(r.reason, 'no_subscription');

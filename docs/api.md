@@ -754,7 +754,7 @@ curl -X POST https://relay.paramant.app/v2/billing/checkout \
 | `plan` | `pro` (parasend); `pro` or `business` (parasign) |
 | `interval` | `monthly`, `yearly` |
 
-Redirect the buyer to `checkout_url` to complete the payment; Mollie then redirects back to `/dashboard?billing=return`. `mode` is `live` or `test`, controlled by `BILLING_MODE` and which Mollie key (`MOLLIE_API_KEY` / `MOLLIE_TEST_API_KEY`) is configured.
+Redirect the buyer to `checkout_url` to complete the payment; Mollie then redirects back to `/dashboard?billing=return`. `mode` is `live` or `test`, controlled by `BILLING_MODE` and which Mollie key (`MOLLIE_API_KEY` / `MOLLIE_TEST_API_KEY`) is configured. The recurring layer (a Mollie customer, a `sequenceType: first` payment and a subscription created after the grant) runs only when `BILLING_MODE` is set explicitly to `live` or `test`; with `BILLING_MODE` empty the relay creates plain one-off payments, and the `billing_config` log line at boot says which stance is active.
 
 Errors: `401 unauthorized` (missing or invalid API key), `400 bad_json` / `unknown_product` / `unknown_plan` / `unknown_interval`, `502 checkout_failed` (Mollie unreachable or rejected the payment).
 
