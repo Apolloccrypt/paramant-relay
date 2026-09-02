@@ -20,6 +20,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const page = (slug) => read(`frontend/${slug}.html`);
+// Every .html under frontend/, subdirectories included, so a claim cannot hide
+// on a page nobody thought to list.
+const allPages = (dir = path.join(ROOT, 'frontend'), prefix = '') =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    if (e.isDirectory()) return ['node_modules', 'vendor'].includes(e.name) ? [] : allPages(path.join(dir, e.name), `${prefix}${e.name}/`);
+    return e.isFile() && e.name.endsWith('.html') ? [`${prefix}${e.name.slice(0, -5)}`] : [];
+  });
 
 // Comments out, strings intact. The obvious /\/\/.*$/gm cuts a line at the
 // first "//", which inside 'https://relay.paramant.app/health' deletes the
@@ -240,12 +247,12 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   const free = hours(ttl('community')), pro = hours(ttl('pro')), ent = hours(ttl('enterprise'));
   assert.equal(free, 1); assert.equal(pro, 24); assert.equal(ent, 7 * 24);
   const pricing = visible(page('pricing'));
-  assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Free must say ${free} hour link expiry`);
+  assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Community must say ${free} hour link expiry`);
   assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Pro must say ${pro} hour link expiry`);
   assert.ok(pricing.includes(`${ent / 24} day link expiry`), `pricing: Enterprise must say ${ent / 24} day link expiry`);
   const priv = visible(page('privacy'));
-  assert.ok(priv.includes(`${free} hour for Free, ${pro} hours for Pro, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
-  assert.ok(priv.includes(`Free tier blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
+  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Pro, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
+  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
 });
 
 // 6 ── The authentication numbers on the security page. Session cookie
@@ -416,10 +423,21 @@ test('the IP-logging row says what the deploy configuration does and promises no
 });
 
 // 10 ── "10 encrypted CLI tools" on the homepage is the developer catalogue.
-test('the CLI tool count on the homepage is the size of the developer catalogue', () => {
+test('any CLI tool count the site states is the size of the developer catalogue', () => {
   const n = (read('admin/lib/developer-tools.js').match(/^\s*\{ name: 'paramant-/gm) || []).length;
   assert.ok(n > 0);
-  const html = page('index');
-  assert.ok(html.includes(`${n} encrypted CLI tools`), `index: must say "${n} encrypted CLI tools"`);
-  assert.ok(html.includes(`${cap(WORDS[n])} encrypted CLI tools in total`), `index: the terminal aria-label must count ${cap(WORDS[n])}`);
+  // Every page, not just the homepage: the claim used to live there and was
+  // removed with the rest of the developer pitch, because paramant-solutions is
+  // private and a visitor cannot actually get the tools. The invariant is not
+  // "a page must say this" but "no page may say it wrong".
+  const wrong = [];
+  for (const slug of allPages()) {
+    const html = read(`frontend/${slug}.html`);
+    for (const m of html.matchAll(/(\d+|[A-Za-z]+) encrypted CLI tools/g)) {
+      const stated = m[1];
+      const ok = stated === String(n) || stated.toLowerCase() === WORDS[n];
+      if (!ok) wrong.push(`${slug}: "${m[0]}" but the catalogue holds ${n}`);
+    }
+  }
+  assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}\n`);
 });
