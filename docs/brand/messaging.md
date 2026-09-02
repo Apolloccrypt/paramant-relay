@@ -82,13 +82,18 @@ It ships on /pricing in these words, and this is the sourced version:
 > devices, a dedicated relay), not to unlock features, and that is what keeps
 > the Community plan free.
 
+**A monthly allowance is written "a month", never "per month".** One limit, one
+spelling, on every page that repeats it. `relay/test/pricing-page.test.js` fails
+a page that drifts back, and the number checks around it accept both spellings
+on purpose so a real limit change fails on the number instead.
+
 **The free plan is called Community.** Not Free, not Starter, not Basic. It is
 Community on both products and `tests/ui-truthfulness.test.mjs` fails when a
 page calls it anything else.
 
 **Free for everyone** (name the tiers as /pricing names them):
 
-- ParaSign Community. EUR 0, forever. 2 signatures per month, unlimited
+- ParaSign Community. EUR 0, forever. 2 signatures a month, no limit on
   receiving, full post-quantum crypto, public verification log, no card
   required.
 - ParaSend Community. EUR 0, forever, no card required. AES-256-GCM with a
@@ -97,10 +102,10 @@ page calls it anything else.
 **For organisations** (same names, same prices, always excl. btw with the incl.
 figure beside it, exactly as /pricing does it):
 
-- ParaSign Pro. EUR 49/month excl. btw (EUR 59.29 incl.). 100 signatures per
+- ParaSign Pro. EUR 49/month excl. btw (EUR 59.29 incl.). 100 signatures a
   month, then EUR 0.40 each up to 1,000. API access. Annual EUR 499 excl.
 - ParaSign Business. EUR 299/month excl. btw (EUR 361.79 incl.). 1,000
-  signatures per month, named support with a response within one business day,
+  signatures a month, named support with a response within one business day,
   exportable audit log with CT tree head (CSV or JSON). Annual EUR 2,990 excl.
 - ParaSign Enterprise. "Let's talk", per organisation. Dedicated relay instance,
   sector relay, SLA with service credits, self-hosting licence, audit support.

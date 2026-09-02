@@ -1,7 +1,7 @@
 'use strict';
 // ParaSign Pro perk delivery. The pricing page (frontend/pricing.html, ParaSign
 // Pro card) promises, per perk:
-//   1. "100 signatures per month, then EUR 0.40 each, up to 1,000"
+//   1. "100 signatures a month, then EUR 0.40 each, up to 1,000"
 //   2. "Unlimited transfers - API access"
 //
 // These prove, per perk, what a per-product grant of parasign=pro (the exact

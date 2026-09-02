@@ -527,7 +527,7 @@ assert.match(pricingVisible, /Sign documents and send files that vanish after on
 // The promise carries its own number. "Free forever" on its own reads as
 // generous until the table says two signatures a month, and a buyer who finds
 // that out one screen later has been sold to rather than told.
-assert.match(pricingVisible, /Community is &euro;0 a month, forever:<\/strong> 2 signatures per month, 10 transfers per month, 5 MB per file, no card\./,
+assert.match(pricingVisible, /Community is &euro;0 a month, forever:<\/strong> 2 signatures a month, 10 transfers a month, 5 MB per file, no card\./,
   'the free promise on pricing.html must carry the limits it actually means');
 // And they must be the limits the relay enforces, not the per-IP rate on the
 // deprecated anonymous endpoint. relay/test/pricing-page.test.js reads the
@@ -584,14 +584,14 @@ assert.doesNotMatch(heroText, /pay for the business plans, from <strong>&euro;\d
   'the lead must not price both products with one amount');
 
 // One term for the free limit, on both pages a buyer reads in the same minute.
-// /pricing said "2 signatures per month" and /signup said "sign 2 documents a
+// /pricing said "2 signatures a month" and /signup said "sign 2 documents a
 // month", which reads as two different products.
 const signupVisible = read('frontend/signup.html').replace(/<!--[\s\S]*?-->/g, '');
 for (const [label, html] of [['pricing.html', pricingVisible], ['signup.html', signupVisible]]) {
-  assert.match(html, /2 signatures per month/,
-    `${label} must name the free limit in the site's one term: "2 signatures per month"`);
+  assert.match(html, /2 signatures a month/,
+    `${label} must name the free limit in the site's one term: "2 signatures a month"`);
   assert.doesNotMatch(html, /\d+ documents a month/,
-    `${label} uses "documents a month" for the signature limit; the term is "2 signatures per month"`);
+    `${label} uses "documents a month" for the signature limit; the term is "2 signatures a month"`);
 }
 assert.doesNotMatch(signupVisible, /class="tier-card"|privacy and security researcher/,
   'signup.html must not carry tier tables or a founder block; it has already made the sale');
@@ -700,13 +700,13 @@ assert.match(helpAnswers, /open a signing request someone sent you/i,
 const parasignGrid = pricing.slice(pricing.indexOf('<!-- TIER CARDS: PARASIGN -->'));
 assert.ok(parasignGrid.length > 0 && parasignGrid.length < pricing.length,
   'pricing.html must keep the ParaSign tier grid this block reads from');
-assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}?<li>2 signatures per month<\/li>/,
+assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}?<li>2 signatures a month<\/li>/,
   'pricing.html is the source of the ParaSign Community allowance quoted on /help');
 assert.match(pricing, /&euro;49<span/,
   'pricing.html is the source of the ParaSign Pro price quoted on /help');
 assert.match(pricing, /charged &euro;59\.29\/mo incl\. 21% btw/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
-assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures per month\./,
+assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
 assert.match(helpAnswers, /ParaSign Pro at &euro;49 a month excl\. btw \(&euro;59\.29 incl\.\)/,
   'help/index.html must name the first paid price the way /pricing prints it');
@@ -818,7 +818,8 @@ const { default: tiers } = await import('../relay/lib/tiers.js');
 const parasign = visible('frontend/parasign.html');
 const parasend = visible('frontend/parasend.html');
 const aboutVisible = visible('frontend/about.html');
-const pricingVisible = visible('frontend/pricing.html');
+// pricingVisible above is the same page as markup; this is its plain text.
+const pricingText = visible('frontend/pricing.html');
 const security = visible('frontend/security.html');
 const signVisibleText = visible('frontend/sign.html');
 
@@ -868,13 +869,13 @@ for (const claim of [
 // Proof 3. The sentence the whole free-versus-paid split rests on. If the
 // pricing model ever gates cryptography behind a tier, this is what fails first.
 const SPLIT = 'Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.';
-for (const [name, text] of [['pricing', pricingVisible], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['parasend', parasend]]) {
   assert.ok(text.includes(SPLIT), `${name}.html lost the pay-for-volume sentence`);
 }
 // The other half of the split: the free plan is permanent, it is called
 // Community, and the reason it stays free is named in the same sentence.
 const FREE_FOREVER = 'not to unlock features, and that is what keeps the Community plan free';
-for (const [name, text] of [['pricing', pricingVisible], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['parasend', parasend]]) {
   assert.ok(text.includes(FREE_FOREVER), `${name}.html lost the Community-plan promise`);
 }
 // /sign carries the same split in one line, next to the account requirement,
@@ -958,11 +959,45 @@ const shareRow = registerRow('ParaShare (webapp)');
 assert.ok(shareRow && shareRow.length >= 4, 'crypto-agility.html no longer registers ParaShare (webapp)');
 const [, shareKem, shareSig, shareWire] = shareRow;
 assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the register changed; /parasend quotes it');
-if (shareSig === 'n/a') {
+
+// These used to sit inside `if (shareSig === 'n/a')`, which made the register
+// the only thing under test: move the webapp to ML-DSA-65 in the register and
+// the guard simply stopped running, so /parasend and /pricing could go on
+// saying "signature n/a" and "no default signature algorithm" with nothing red.
+// The check now runs on whatever the SIG column holds and works in both
+// directions: the register's value has to be what the pages say, and a value
+// this test has no wording for fails loudly instead of passing quietly.
+// In its own scope: two parallel PRs each adding a top-level const under one
+// name is what stopped this file parsing on main, so nothing here reaches it.
+(function registerSignatureWording() {
+  const SIG_ON_PAGE = {
+    'n/a': { parasend: 'signature n/a', pricing: 'no default signature algorithm' },
+    'ML-DSA-65': { parasend: 'signature ML-DSA-65', pricing: 'ML-DSA-65 as its default signature algorithm' },
+  };
+  const wanted = SIG_ON_PAGE[shareSig];
+  assert.ok(wanted,
+    `crypto-agility.html now gives ParaShare (webapp) SIG "${shareSig}". /parasend and /pricing both ` +
+    `describe that column in words, and this test has no wording for the new value, so update both ` +
+    `pages and SIG_ON_PAGE together.`);
+  assert.ok(parasend.includes(wanted.parasend),
+    `the register gives ParaShare (webapp) SIG "${shareSig}", so /parasend must say "${wanted.parasend}"`);
+  assert.ok(pricing.includes(wanted.pricing),
+    `the register gives ParaShare (webapp) SIG "${shareSig}", so /pricing must say "${wanted.pricing}"`);
+  // The other direction: no page may carry the wording for a SIG the register
+  // does not give the webapp.
+  for (const [sig, wording] of Object.entries(SIG_ON_PAGE)) {
+    if (sig === shareSig) continue;
+    assert.ok(!parasend.includes(wording.parasend),
+      `/parasend describes ParaShare as "${wording.parasend}" while the register says "${shareSig}"`);
+    assert.ok(!pricing.includes(wording.pricing),
+      `/pricing describes ParaShare as "${wording.pricing}" while the register says "${shareSig}"`);
+  }
+})();
+assert.ok(parasend.includes(`the webapp on the ${shareWire} wire`),
+  '/parasend must state the wire format the register gives the webapp, not a better one');
+if (shareSig !== 'ML-DSA-65') {
   assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts/,
     'the register gives ParaShare no signature, so /parasend may not sell it ML-DSA-65 signed receipts');
-  assert.ok(parasend.includes(`the webapp on the ${shareWire} wire`),
-    '/parasend must state the wire format the register gives the webapp, not a better one');
 }
 assert.doesNotMatch(parasend, /proof that the file came from you/,
   '/parasend may not promise sender proof on a path the register gives no signature');

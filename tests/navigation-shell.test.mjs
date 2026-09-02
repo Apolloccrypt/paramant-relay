@@ -36,7 +36,17 @@ ok('public navigation has four clear destinations', JSON.stringify(publicDesktop
 // the product is; ParaSend keeps its own call to action further down the page,
 // where it is next to the three lines that explain it.
 ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
-ok('the homepage still routes to ParaSend from its own section', JSON.stringify(await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/parashare']), await publicPage.locator('#products').innerText());
+// Both product PAGES have to be reachable from the homepage, not just the two
+// apps. /parasend shipped with no inbound link anywhere on the site and
+// /parasign had exactly one, from /sign: a product page nothing links to is a
+// page a buyer never sees. So the two-products section now leads with the page
+// that explains the product and keeps the app as the second action, and this
+// pins the order: explain first, app second, per card.
+await (async () => {
+  const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
+  ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/parasign','/sign','/parasend','/parashare']), await publicPage.locator('#products').innerText());
+  ok('the homepage still routes to ParaSend from its own section', ctas.includes('/parashare'), await publicPage.locator('#products').innerText());
+})();
 const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
   background: getComputedStyle(node).backgroundColor,
   backdropFilter: getComputedStyle(node).backdropFilter,

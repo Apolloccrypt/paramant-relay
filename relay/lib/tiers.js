@@ -61,7 +61,7 @@ const TIER_LIMITS = Object.freeze({
   }),
   business: Object.freeze({
     transfers_month: 2000,
-    signs_month: 1000,     // matches the pricing page: ~1,000 signatures per month
+    signs_month: 1000,     // matches the pricing page: ~1,000 signatures a month
     file_mb: 5,            // mirrors current MAX_BLOB global 5 MB
     devices: 100,
     view_ttl_ms: 604_800_000, // 7 d
