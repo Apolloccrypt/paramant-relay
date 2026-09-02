@@ -430,11 +430,85 @@ test('OFFLINE VERIFICATION: the receipt checks out without asking the relay anyt
 
   // (d) and the whole thing is tamper-evident: change one character of the
   //     document hash and the notary signature no longer holds.
-  const tampered = { ...unsigned, document_hash: 'f' + unsigned.document_hash.slice(1) };
+  //
+  //     The tamper must be a REAL change. This check used to write a literal
+  //     'f' over the first character of the hash, which is a no-op on the 1 run
+  //     in 16 where a sha3-256 hex hash already starts with 'f' -- the receipt
+  //     was then unmodified, verified correctly, and the suite failed with
+  //     "true !== false" (~6% of CI runs, measured at 9/100 locally). Flip to a
+  //     character the original demonstrably is not, and assert that it differs.
+  const flipped = (unsigned.document_hash[0] === 'f' ? '0' : 'f') + unsigned.document_hash.slice(1);
+  assert.notStrictEqual(flipped, unsigned.document_hash, 'the tamper must actually change the hash');
+  const tampered = { ...unsigned, document_hash: flipped };
   assert.strictEqual(eng.verify(
     Buffer.from(notary_signature, 'base64'),
     Buffer.from(parasign.canonicalJSON(tampered), 'utf8'),
     Buffer.from(psign.notary.relay_public_key, 'base64')), false,
     'a tampered receipt must not verify');
+  did();
+});
+
+// (d) above proves ONE field is under the notary signature. This proves EVERY
+// field is: it walks the receipt, sabotages exactly one leaf at a time with a
+// value that is provably different, and demands the notary signature breaks on
+// each. A field the relay adds to the receipt but leaves outside the signed
+// bytes -- the thing that would make a receipt forgeable in the field -- fails
+// here by name instead of hiding behind a check that only ever touched the
+// document hash.
+test('OFFLINE VERIFICATION: every notary-signed field is covered, one sabotage at a time', async () => {
+  if (!ready()) return;
+  IP = nextIp();
+  const { id, docHash: dh } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
+  for (const i of [0, 1]) {
+    const s = signForParty(id, dh, i);
+    assert.strictEqual((await submit(id, { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
+  }
+  const psign = (await receipt(id, OWNER)).json;
+  const { notary_signature, ...unsigned } = psign;
+
+  const sig = Buffer.from(notary_signature, 'base64');
+  const pk = Buffer.from(psign.notary.relay_public_key, 'base64');
+  const verifies = (obj) => eng.verify(sig, Buffer.from(parasign.canonicalJSON(obj), 'utf8'), pk);
+
+  // Sanity: the untouched receipt still verifies, so a `false` below is the
+  // sabotage talking and not a broken harness.
+  assert.strictEqual(verifies(unsigned), true, 'the unmodified receipt must verify');
+
+  // Every leaf path in the signed object, arrays included.
+  const leaves = [];
+  (function walk(node, path) {
+    if (node !== null && typeof node === 'object') {
+      const keys = Array.isArray(node) ? node.map((_, i) => i) : Object.keys(node);
+      if (keys.length === 0) { leaves.push(path); return; }
+      for (const k of keys) walk(node[k], path.concat(k));
+      return;
+    }
+    leaves.push(path);
+  })(unsigned, []);
+
+  // A receipt that quietly shrinks to a handful of fields must not pass this
+  // test by having nothing left to sabotage.
+  assert.ok(leaves.length >= 25, `expected a substantial receipt, got ${leaves.length} fields`);
+
+  // A value of the same shape that is provably not the original.
+  const otherValue = (v) => {
+    if (typeof v === 'string') return v === 'paramant-tampered' ? 'paramant-tampered-2' : 'paramant-tampered';
+    if (typeof v === 'number') return v + 1;
+    if (typeof v === 'boolean') return !v;
+    return 'paramant-tampered'; // null / undefined
+  };
+
+  for (const path of leaves) {
+    const copy = JSON.parse(JSON.stringify(unsigned));
+    let node = copy;
+    for (const k of path.slice(0, -1)) node = node[k];
+    const last = path[path.length - 1];
+    const before = node[last];
+    node[last] = otherValue(before);
+    const label = path.join('.');
+    assert.notDeepStrictEqual(node[last], before, `sabotage of ${label} must change the value`);
+    assert.strictEqual(verifies(copy), false,
+      `${label} is NOT covered by the notary signature: the receipt still verifies after it was changed`);
+  }
   did();
 });
