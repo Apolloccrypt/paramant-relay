@@ -36,6 +36,10 @@ html{scroll-behavior:smooth}
 .page-hero--navy .eyebrow{background:var(--lime);color:var(--navy)}
 .page-hero--navy h1{color:var(--bone)}
 .page-hero--navy .lede{color:rgba(248,250,252,.8)}
+.page-hero--navy .lede a{color:var(--lime);text-decoration:underline}
+.hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:20px}
+.page-hero--navy .btn-secondary{color:var(--bone);border-color:rgba(248,250,252,.45)}
+.page-hero--navy .btn-secondary:hover{background:var(--bone);color:var(--navy);border-color:var(--bone)}
 main{max-width:780px;margin:0 auto;padding:48px 48px 120px}
 h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
 .lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
@@ -242,16 +246,26 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 <div class="page-hero-inner">
   <span class="eyebrow">TRANSPARENCY</span>
   <h1>Trust &amp; Verification</h1>
-  <p class="lede">How Paramant works with your relay. What we can see, what we can do, and how you verify both — without taking our word for it.</p>
+  <p class="lede">For organisations that run Paramant on their own server, and for anyone who has to check a supplier before it goes near client documents. What we can see, what we can do, and how you verify both, without taking our word for it. If you use the hosted service at paramant.app, the <a href="/security">security page</a> is the shorter answer.</p>
+  <div class="hero-cta">
+    <a href="/security" class="btn btn-primary">See the evidence &rarr;</a>
+    <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+  </div>
 </div>
 </section>
 
 <main id="main-content">
 
+  <h3>Who this page is for</h3>
+  <div class="card">
+    <p style="margin:0 0 12px;line-height:1.8">Everything below is written for the two readers named above: the person who runs the server that passes the files on, and the reviewer who has to sign off on it. It answers what Paramant can and cannot do to a server it does not own.</p>
+    <p style="margin:0;line-height:1.8">Free for everyone, paid for organisations. ParaSign Community and ParaSend Community cost &euro;0, forever, with no card required. Organisations pay for the higher limits: ParaSign Pro, Business and Enterprise, ParaSend Pro and Enterprise. A dedicated relay, an SLA and a self-hosting licence are what ParaSign Enterprise and ParaSend Enterprise pay for. Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. <a href="/pricing">See pricing &rarr;</a></p>
+  </div>
+
   <h3>How to read this page</h3>
   <div class="card">
     <p style="margin:0 0 12px;line-height:1.8">Paramant is moving from a single self-hosted binary to an open-core product: the relay stays open and runs entirely on your server, while Paramant operates a central licensing and management plane. That transition is partly live and partly still on paper.</p>
-    <p style="margin:0;line-height:1.8">So every claim below is tagged. <span class="badge badge-live">Live</span> means it works today on the public relay. <span class="badge badge-planned">Planned</span> means it is specified in a public design document (an ADR) but not yet implemented — we mark it so you are never told a capability exists before it does.</p>
+    <p style="margin:0;line-height:1.8">So every claim below is tagged. <span class="badge badge-live">Live</span> means it works today on the public relay. <span class="badge badge-planned">Planned</span> means it is specified in a public design document (an ADR) but not yet implemented. We mark it so you are never told a capability exists before it does.</p>
   </div>
 
   <!-- ───────────────────── License-check ───────────────────── -->
@@ -261,18 +275,18 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 
   <p><strong>Planned <span class="badge badge-planned">Planned</span></strong> to sell tiers with capabilities beyond a user-count, the design adds an <em>online</em> license-check. Under that model your relay calls a Paramant licensing endpoint at startup and every 6 hours. The request carries your license-key, a relay-identity (the fingerprint of the ML-DSA-65 public key your relay generates on first boot), the relay version, and a telemetry block that is off by default.</p>
 
-  <p>The response is a <strong>signed capability-set</strong> — which features your tier unlocks — valid for a few hours. Your relay verifies the ML-DSA-65 signature against an embedded Paramant licensing key; an unsigned or invalid response is rejected. If the licensing endpoint is unreachable, the relay keeps using its last cached capability-set for up to 7 days, then degrades to Community mode. There are no surprise lockouts: an outage on our side cannot instantly disable your relay.</p>
+  <p>The response is a <strong>signed capability-set</strong> that says which features your tier unlocks, and it is valid for a few hours. Your relay verifies the ML-DSA-65 signature against an embedded Paramant licensing key; an unsigned or invalid response is rejected. If the licensing endpoint is unreachable, the relay keeps using its last cached capability-set for up to 7 days, then degrades to Community mode. There are no surprise lockouts: an outage on our side cannot instantly disable your relay.</p>
 
   <p class="see-also">Full wire-protocol specification: ADR R013 (Draft) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
 
   <!-- ───────────────────── What we see ───────────────────── -->
   <h2 id="what-we-see">What Paramant sees of your relay</h2>
 
-  <p>With today's offline license, the answer is simple: <strong>nothing at runtime</strong> — the relay makes no licensing call. The breakdown below describes the <span class="badge badge-planned">Planned</span> online model, so you can judge it before it ships.</p>
+  <p>With today's offline license, the answer is simple: <strong>nothing at runtime</strong>. The relay makes no licensing call. The breakdown below describes the <span class="badge badge-planned">Planned</span> online model, so you can judge it before it ships.</p>
 
   <h3>Always (each check-in)</h3>
   <ul>
-    <li>Your license-key — how we identify your subscription</li>
+    <li>Your license-key: how we identify your subscription</li>
     <li>Your relay's identity fingerprint (ML-DSA-65 public-key hash)</li>
     <li>Your relay's version number</li>
     <li>The timestamp of the check-in</li>
@@ -280,17 +294,17 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 
   <h3>Only if you opt in (telemetry, off by default)</h3>
   <ul>
-    <li>Aggregate user count — a number, never identities</li>
-    <li>Aggregate transfer count per 24h — a number, never hashes</li>
+    <li>Aggregate user count: a number, never identities</li>
+    <li>Aggregate transfer count per 24h: a number, never hashes</li>
     <li>Error rates (5xx rate, auth-failure rate)</li>
     <li>Uptime</li>
   </ul>
 
-  <h3>Never — even with telemetry on</h3>
+  <h3>Never, even with telemetry on</h3>
   <ul>
-    <li>File content — we do not hold your decryption keys, anywhere</li>
+    <li>File content: we do not hold your decryption keys, anywhere</li>
     <li>Identities of your users (emails, names)</li>
-    <li>File hashes — they would link to specific transfers</li>
+    <li>File hashes: they would link to specific transfers</li>
     <li>Source or destination addresses of your transfers</li>
     <li>CT-log content beyond aggregate counts</li>
   </ul>
@@ -300,10 +314,10 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
   <!-- ───────────────────── Verify ───────────────────── -->
   <h2 id="verify-deployment">How to verify your deployment</h2>
 
-  <p>You do not have to trust these statements — the public surface lets you check them.</p>
+  <p>You do not have to trust these statements. The public surface lets you check them.</p>
 
   <h3>1. Source <span class="badge badge-live">Live</span></h3>
-  <p>Everything that runs on your server is in the public <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub repository</a> under BUSL-1.1: the relay, the admin panel, the SDKs, and the license-<em>client</em> code that does the check-in. You can read exactly what your relay does — including every field it would send — and build it yourself:</p>
+  <p>Everything that runs on your server is in the public <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub repository</a> under BUSL-1.1: the relay, the admin panel, the SDKs, and the license-<em>client</em> code that does the check-in. You can read exactly what your relay does, including every field it would send, and build it yourself:</p>
   <pre><code>git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 git checkout v3.0.0
@@ -324,7 +338,7 @@ docker compose build   # build locally instead of pulling the published image</c
   <!-- ───────────────────── Remote actions ───────────────────── -->
   <h2 id="remote-actions">What Paramant can do remotely</h2>
 
-  <p>The remote-action model below is <span class="badge badge-planned">Planned</span> — specified, not yet implemented. The structural limits in "Not possible", however, hold <span class="badge badge-live">Live</span> today, because they follow from the architecture rather than from policy.</p>
+  <p>The remote-action model below is <span class="badge badge-planned">Planned</span>: specified, not yet implemented. The structural limits in "Not possible", however, hold <span class="badge badge-live">Live</span> today, because they follow from the architecture rather than from policy.</p>
 
   <p>In the design, every remote action is recorded to <strong>your relay's own CT log</strong>, where you can verify it independently: you see what was done, when, and by which Paramant role (Owner or Support). Our internal audit-trail additionally records which individual acted, but that record is private to us.</p>
 
@@ -334,22 +348,22 @@ docker compose build   # build locally instead of pulling the published image</c
     <dd>A time-boxed key for debugging an issue you reported. You can revoke it immediately from your admin panel.</dd>
 
     <dt>Offer an update</dt>
-    <dd>Make a new release available to your relay. How it applies follows your tier: a banner you act on, an opt-in update window, or explicit approval — never a silent push you did not agree to.</dd>
+    <dd>Make a new release available to your relay. How it applies follows your tier: a banner you act on, an opt-in update window, or explicit approval. Never a silent push you did not agree to.</dd>
 
     <dt>Set drain mode</dt>
-    <dd>Ask the relay to refuse new uploads, finish in-flight transfers, then idle — used ahead of maintenance.</dd>
+    <dd>Ask the relay to refuse new uploads, finish in-flight transfers, then idle. Used ahead of maintenance.</dd>
 
     <dt>Adjust your capability-set</dt>
     <dd>Apply a tier change (trial extension, upgrade after payment). It takes effect on the next check-in.</dd>
   </dl>
 
-  <h3>Not possible — structurally <span class="badge badge-live">Live</span></h3>
+  <h3>Not possible, structurally <span class="badge badge-live">Live</span></h3>
   <ul>
-    <li>Read your file content — we never hold decryption keys, anywhere</li>
-    <li>Rewrite your CT log after the fact — Merkle-tree integrity prevents it</li>
-    <li>Bypass your local TOTP or admin key — there is no backdoor in the source, and the source is public</li>
-    <li>Reach your users' data or another deployment — relays are isolated by design</li>
-    <li>Switch off your audit log — CT-log writes are not gated by any capability</li>
+    <li>Read your file content: we never hold decryption keys, anywhere</li>
+    <li>Rewrite your CT log after the fact: Merkle-tree integrity prevents it</li>
+    <li>Bypass your local TOTP or admin key: there is no backdoor in the source, and the source is public</li>
+    <li>Reach your users' data or another deployment: relays are isolated by design</li>
+    <li>Switch off your audit log: CT-log writes are not gated by any capability</li>
   </ul>
 
   <p class="see-also">Remote-action protocol: the management-plane ADR (R014, in progress) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
@@ -359,34 +373,34 @@ docker compose build   # build locally instead of pulling the published image</c
 
   <p>Paramant follows the open-core model used by HashiCorp, GitLab, Elastic and Sentry: the software you run is open; the service operating it is not.</p>
 
-  <h3>Open — BUSL-1.1, public on GitHub <span class="badge badge-live">Live</span></h3>
+  <h3>Open: BUSL-1.1, public on GitHub <span class="badge badge-live">Live</span></h3>
   <ul>
-    <li>The relay — everything that runs on your server</li>
+    <li>The relay: everything that runs on your server</li>
     <li>The SDKs and CLI tools</li>
-    <li>The frontend — admin panel, setup wizard, dashboard</li>
-    <li>The license-<em>client</em> — the check-in code on your relay</li>
+    <li>The frontend: admin panel, setup wizard, dashboard</li>
+    <li>The license-<em>client</em>: the check-in code on your relay</li>
     <li>All ADRs, including the licensing and management-plane protocols</li>
     <li>The cryptographic specification and test vectors</li>
   </ul>
   <p><a href="https://github.com/Apolloccrypt/paramant-relay">View the public repository &rarr;</a></p>
 
-  <h3>Closed — operated privately by Paramant</h3>
+  <h3>Closed: operated privately by Paramant</h3>
   <ul>
-    <li>The license-<em>server</em> — the service side of the check-in</li>
+    <li>The license-<em>server</em>: the service side of the check-in</li>
     <li>The internal fleet-management dashboard</li>
     <li>The customer and billing databases</li>
     <li>Support tooling and email templates</li>
   </ul>
-  <p>The <em>protocols</em> are public; only our implementation of the server side is private — the same way GitLab keeps its operations private while its core stays open. Because the protocol and the client are open, you can audit exactly what your relay says to us and what it accepts back.</p>
+  <p>The <em>protocols</em> are public; only our implementation of the server side is private, the same way GitLab keeps its operations private while its core stays open. Because the protocol and the client are open, you can audit exactly what your relay says to us and what it accepts back.</p>
 
   <p class="see-also">The open-core split is documented in the open-core ADR (R016) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
 
   <!-- ───────────────────── Independent verification ───────────────────── -->
   <h2 id="independent">Independent verification</h2>
 
-  <p>Three external security audits in April 2026 reviewed the relay code; the findings and patch timeline are on the <a href="/docs#audits">docs page</a>. A further external review of the v3.0.0 and open-core architecture is <span class="badge badge-planned">planned</span>; results will be published there when complete.</p>
+  <p>Three external security audits in April 2026 reviewed the relay code: two by R. Zwarts, one by Ryan Williams of Smart Cyber Solutions. Together they produced 40 findings, 4 of them critical. Dates, finding counts and the resolving commits are in the audit table on the <a href="/docs#audits">docs page</a>; every finding is written up in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a>. The Smart Cyber Solutions review is published in full as the <a href="/docs/security-audit-2026-04.md">April 2026 audit report</a>; the raw pentest output behind it is not published. A further external review of the v3.0.0 and open-core architecture is <span class="badge badge-planned">planned</span>; results will be published there when complete.</p>
 
-  <p>If you are running your own audit, the public surface — relay, SDKs, frontend and the protocol specifications — is enough to verify every claim on this page for yourself.</p>
+  <p>If you are running your own audit, the public surface (relay, SDKs, frontend and the protocol specifications) is enough to verify every claim on this page for yourself.</p>
 
   <!-- ───────────────────── Questions ───────────────────── -->
   <h2 id="questions">Questions</h2>
