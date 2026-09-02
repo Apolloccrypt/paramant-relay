@@ -206,7 +206,7 @@ td{color:var(--cobalt)}
     <p style="margin-top:10px">The system is built around three hard guarantees. First, encryption is purely client-side: files are encrypted using ML-KEM-768 key encapsulation and AES-256-GCM symmetric encryption inside a Rust/WASM module that runs in the browser, before any data leaves the device. Second, the relay is RAM-only: encrypted blobs are never written to disk, making forensic recovery impossible. Third, burn-on-read: each blob is destroyed immediately after the first successful download. The relay cannot be compelled to hand over content it no longer holds.</p>
     <p style="margin-top:10px">PARAMANT runs five sector relays, each tuned to its compliance domain: health (NEN 7510, HL7 FHIR, DICOM), legal (eIDAS, KNB), finance (NIS2, DORA, ISO 20022), industrial IoT (IEC 62443, EU CRA), and general. Each sector is a separate container — a breach in one does not expose another.</p>
     <p style="margin-top:10px">Deployment takes two minutes: one docker compose command on any Ubuntu 22.04+ server. A Raspberry Pi installer and a bootable NixOS image (paramantOS) are available for dedicated hardware. The community edition is permanently free for up to 5 API keys per relay instance.</p>
-    <p style="margin-top:10px">PARAMANT was independently security-audited in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. Twenty findings across two audits — including 4 critical — were fully resolved before public release. All findings are publicly documented.</p>
+    <p style="margin-top:10px">PARAMANT was independently security-audited in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. Forty findings across three audits, including 4 critical. Every finding and its status is publicly documented.</p>
     <p style="margin-top:10px">Incorporated in the Netherlands. Infrastructure on Hetzner Nuremberg, DE. EU/GDPR jurisdiction only, no US CLOUD Act exposure.</p>
   </div>
 
@@ -221,7 +221,7 @@ td{color:var(--cobalt)}
       <dt>Version</dt>       <dd>v3.0.0 (May 2026)</dd>
       <dt>Live relays</dt>   <dd>5 (relay &middot; health &middot; finance &middot; legal &middot; iot)</dd>
       <dt>Encryption</dt>    <dd>ML-KEM-768 + AES-256-GCM (NIST FIPS 203 / SP 800-38D)</dd>
-      <dt>Audit</dt>         <dd>April 2026 — all findings resolved, publicly documented</dd>
+      <dt>Audit</dt>         <dd>April 2026 — findings and their status publicly documented</dd>
       <dt>License</dt>       <dd>BUSL-1.1 — source available, free &le; 5 keys</dd>
       <dt>Contact</dt>       <dd><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></dd>
     </dl>

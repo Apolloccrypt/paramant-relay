@@ -8,13 +8,13 @@
 <meta property="og:title" content="Crypto agility · Paramant">
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="The history of cryptography is a history of algorithms being broken.">
-<meta property="og:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
+<meta property="og:description" content="Paramant's crypto agility: 3 KEMs and 17 signatures from NIST FIPS 203, 204, 205, 206, selectable per relay. Clients pick, the relay validates, nothing is hardcoded.">
 <meta property="og:url" content="https://paramant.app/crypto-agility">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PARAMANT · Crypto Agility">
-<meta name="twitter:description" content="Paramant's crypto agility: 3 KEMs and 18 signatures from NIST FIPS 203, 204, 205, 206 loaded in production. Clients pick, the relay validates, nothing is hardcoded.">
+<meta name="twitter:description" content="Paramant's crypto agility: 3 KEMs and 17 signatures from NIST FIPS 203, 204, 205, 206, selectable per relay. Clients pick, the relay validates, nothing is hardcoded.">
 <link rel="canonical" href="https://paramant.app/crypto-agility">
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
@@ -293,7 +293,7 @@ FLAGS    1 byte    reserved for future features</pre>
   <!-- ── 04 What is loaded today ── -->
   <section>
     <h2><span class="s-num">04</span>What is loaded today</h2>
-    <p class="section-sub">3 KEMs plus 18 signatures, covering FIPS 203, 204, 205, and 206.</p>
+    <p class="section-sub">3 KEMs plus 17 signatures, covering FIPS 203, 204, 205, and 206.</p>
 
     <h3 style="font-size:13px;font-weight:600;margin-top:26px;margin-bottom:6px;color:var(--ink)">KEM registry (FIPS 203, ML-KEM)</h3>
     <table class="algo-table">
@@ -360,7 +360,7 @@ FLAGS    1 byte    reserved for future features</pre>
     </p>
 
     <div class="summary" style="margin-top:24px">
-      <p><strong>Total</strong>: 3 KEMs plus 18 signatures loaded in production.</p>
+      <p><strong>Total</strong>: 3 KEMs plus 17 signatures available. The default core mode loads ML-KEM-768 and ML-DSA-65; extended mode loads all of them.</p>
     </div>
   </section>
 
