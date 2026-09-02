@@ -122,10 +122,25 @@ opt-in is on, because then there is nothing to announce.
 
 ### GET /v2/transfers/:receipt_id/receipt (fetch a delivery receipt)
 
-Requires the same API key that made the download. The receipt is kept for
-**15 minutes** and can be read more than once in that window. An unknown,
-expired, or foreign id all answer with the same 404, so the route cannot be
-used to probe whether a transfer existed.
+Requires the same API key that made the download. An unknown, expired, or
+foreign id all answer with the same 404, so the route cannot be used to probe
+whether a transfer existed.
+
+**How long you have, exactly.** Fetch the receipt right after the download.
+Three things can take it away, and all three answer with the same 404:
+
+| | |
+|---|---|
+| **Time** | 15 minutes from the download. |
+| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your tier's hourly download ceiling: community 100, pro 1000, business 4000, enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
+| **A relay without redis** | A relay configured with `REDIS_URL` keeps receipts in redis, so they survive a restart of the relay process. A relay without one keeps them in memory, and then a restart or a deploy loses every outstanding receipt. |
+
+If none of that is acceptable for your use, the receipt can still be delivered
+inline on the download itself: ask the operator to run the relay with
+`PARAMANT_INLINE_RECEIPT_HEADER=1`, which restores the `X-Paramant-Receipt`
+header alongside the reference. That header is around 18 KB, so it needs
+`proxy_buffer_size` raised on any proxy in front of the relay, and it is
+removed after 2026-12-01.
 
 ```bash
 curl https://relay.paramant.app/v2/transfers/$RECEIPT_ID/receipt \

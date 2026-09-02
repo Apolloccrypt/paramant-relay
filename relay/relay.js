@@ -1661,16 +1661,46 @@ setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap)
 // a backstop that takes from the LARGEST holder, which can never be the small
 // tenant it would be protecting.
 //
+// Where it lives. REDIS when the relay has one, which is what the envelope
+// store already runs on, and the in-process Map only as the fallback for a
+// relay without redis. A Map alone means every restart 404s every outstanding
+// receipt: a deploy in the middle of somebody's download window silently costs
+// them their proof of delivery, and a restart is a thing operators do on
+// purpose. With redis the receipt survives the process that issued it.
+//
 // Memory. The stored form is the receipt JSON, not its base64url wrapper: the
 // wrapper is 4/3 the size and re-encoding it on the way out is deterministic,
 // so the hash stays stable and about 4.6 KB per receipt is not held. That puts
-// a receipt at roughly 14 KB, so the ceiling below is a worst case of about
-// 56 MB, reached only when 20 accounts each hold a full 200 at once. Both caps
-// are overridable so the eviction rule itself is testable without driving
-// thousands of downloads.
+// a receipt at roughly 14 KB.
+//
+// The per-account cap is DERIVED from the tier's own outbound ceiling: two
+// hours of downloading at the rate that tier pays for. A flat 200 was wrong for
+// exactly the tier that pays most, business at 2000 downloads an hour would
+// lose its oldest receipts after six minutes of steady use, inside the 15
+// minute window it was promised. Enterprise has no outbound ceiling to double,
+// so it takes an explicit one.
+//
+//   community  50/h  ->   100      pro   500/h  ->  1000
+//   business 2000/h  ->  4000      enterprise   -> RECEIPT_UNCAPPED_TIER_MAX
+//
+// The global backstop applies to the Map path only, where the memory is this
+// process's. With redis the bound is the TTL, the per-account cap, and redis'
+// own maxmemory policy.
 const RECEIPT_TTL_MS = 15 * 60 * 1000;
-const RECEIPT_PER_ACCOUNT_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_PER_ACCOUNT_MAX || '200', 10) || 200);
-const RECEIPT_TOTAL_MAX = Math.max(RECEIPT_PER_ACCOUNT_MAX, parseInt(process.env.PARAMANT_RECEIPT_TOTAL_MAX || '4000', 10) || 4000);
+const RECEIPT_TTL_S = Math.round(RECEIPT_TTL_MS / 1000);
+const RECEIPT_UNCAPPED_TIER_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_UNCAPPED_MAX || '10000', 10) || 10000);
+// A fixed override, for tests that need to drive the eviction rule without
+// making thousands of downloads. Unset in production, where the tier decides.
+const RECEIPT_PER_ACCOUNT_OVERRIDE = parseInt(process.env.PARAMANT_RECEIPT_PER_ACCOUNT_MAX || '0', 10) || 0;
+function receiptCapFor(plan) {
+  if (RECEIPT_PER_ACCOUNT_OVERRIDE > 0) return RECEIPT_PER_ACCOUNT_OVERRIDE;
+  const rate = tiers.tierLimitNum(plan, 'outbound_per_hour');
+  const cap = Number.isFinite(rate) ? rate * 2 : RECEIPT_UNCAPPED_TIER_MAX;
+  return Math.max(1, Math.min(cap, RECEIPT_UNCAPPED_TIER_MAX));
+}
+const RECEIPT_TOTAL_MAX = Math.max(1, parseInt(process.env.PARAMANT_RECEIPT_TOTAL_MAX || '4000', 10) || 4000);
+const RECEIPT_RK = (id) => `paramant:receipt:${id}`;
+const RECEIPT_AK = (owner) => `paramant:receipts:acct:${owner}`;
 const deliveryReceipts = new Map(); // receipt_id -> { json, hash, apiKey, owner, expiresAt }
 const receiptsByOwner = new Map();  // owner (account_id) -> Set<receipt_id>, insertion ordered
 function _dropReceipt(id) {
@@ -1688,12 +1718,35 @@ function _dropOldestOf(owner) {
   _dropReceipt(oldest.value);
   return true;
 }
-function storeDeliveryReceipt(json, hash, apiKey, owner) {
+async function storeDeliveryReceipt(json, hash, apiKey, owner, plan) {
   const id = crypto.randomBytes(16).toString('hex');
   const bucket = owner || apiKey || '_anonymous';
+  const cap = receiptCapFor(plan);
+  if (redisClient && redisClient.isReady) {
+    try {
+      const ak = RECEIPT_AK(bucket);
+      await redisClient.set(RECEIPT_RK(id), JSON.stringify({ json, hash, apiKey: apiKey || null }), { EX: RECEIPT_TTL_S });
+      await redisClient.zAdd(ak, { score: Date.now(), value: id });
+      await redisClient.expire(ak, RECEIPT_TTL_S);
+      // The cap is per account and enforced against that account's own index,
+      // so a busy tenant can only ever drop its own oldest.
+      const over = (await redisClient.zCard(ak)) - cap;
+      if (over > 0) {
+        const stale = await redisClient.zRange(ak, 0, over - 1);
+        if (stale.length) {
+          await redisClient.del(stale.map(RECEIPT_RK));
+          await redisClient.zRemRangeByRank(ak, 0, over - 1);
+        }
+      }
+      return id;
+    } catch (e) {
+      // Never fail a download over its receipt: fall through to the Map.
+      log('warn', 'receipt_store_redis_failed', { err: e.message });
+    }
+  }
   // Sets preserve insertion order and every entry has the same TTL, so the head
   // of a bucket is always that owner's entry closest to expiring.
-  while ((receiptsByOwner.get(bucket)?.size || 0) >= RECEIPT_PER_ACCOUNT_MAX) {
+  while ((receiptsByOwner.get(bucket)?.size || 0) >= cap) {
     if (!_dropOldestOf(bucket)) break;
   }
   // Global backstop. Take from whoever holds the most, never from whoever
@@ -1709,6 +1762,24 @@ function storeDeliveryReceipt(json, hash, apiKey, owner) {
   return id;
 }
 setInterval(() => { const now = Date.now(); for (const [id, r] of deliveryReceipts) if (now > r.expiresAt) _dropReceipt(id); }, 60_000).unref?.();
+
+// Read one back. Redis first, so a receipt issued by a process that has since
+// been restarted is still there; the Map is the fallback for a relay with no
+// redis. Returns { json, hash, apiKey } or null.
+async function fetchDeliveryReceipt(id) {
+  if (redisClient && redisClient.isReady) {
+    try {
+      const raw = await redisClient.get(RECEIPT_RK(id));
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      log('warn', 'receipt_fetch_redis_failed', { err: e.message });
+    }
+  }
+  const rec = deliveryReceipts.get(id);
+  if (!rec) return null;
+  if (Date.now() > rec.expiresAt) { _dropReceipt(id); return null; }
+  return rec;
+}
 
 // Deprecation window for the fat header. Nothing in this repo reads it outside
 // its own tests, but an out-of-tree client might, so an operator can put it back
@@ -4714,7 +4785,9 @@ const server = http.createServer(async (req, res) => {
     if (receiptHeader) {
       const receiptHash = crypto.createHash('sha3-256').update(receiptHeader).digest('hex');
       const _receiptKey = entry.apiKey || apiKey || null;
-      const receiptId = storeDeliveryReceipt(receiptJson, receiptHash, _receiptKey, _receiptKey ? acctOf(_receiptKey) : null);
+      const _receiptPlan = (_receiptKey && apiKeys.get(_receiptKey)?.plan) || keyData?.plan || 'community';
+      const receiptId = await storeDeliveryReceipt(receiptJson, receiptHash, _receiptKey,
+        _receiptKey ? acctOf(_receiptKey) : null, _receiptPlan);
       outHeaders['X-Paramant-Receipt-Id'] = receiptId;
       outHeaders['X-Paramant-Receipt-Hash'] = 'sha3-256:' + receiptHash;
       outHeaders['X-Paramant-Receipt-Url'] = `/v2/transfers/${receiptId}/receipt`;
@@ -4743,12 +4816,9 @@ const server = http.createServer(async (req, res) => {
   // to probe whether a transfer existed.
   const rcptm = path.match(/^\/v2\/transfers\/([a-f0-9]{32})\/receipt$/);
   if (rcptm && req.method === 'GET') {
-    const rec = deliveryReceipts.get(rcptm[1]);
+    const rec = await fetchDeliveryReceipt(rcptm[1]);
     const gone = { error: 'Not found. Expired, or never issued.' };
-    if (!rec || Date.now() > rec.expiresAt) {
-      if (rec) deliveryReceipts.delete(rcptm[1]);
-      res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone));
-    }
+    if (!rec) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
     if (rec.apiKey && rec.apiKey !== apiKey) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(J({ ok: true, receipt: Buffer.from(rec.json).toString('base64url'), receipt_hash: 'sha3-256:' + rec.hash }));

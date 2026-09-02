@@ -23,7 +23,9 @@ const { test, before, after } = require('node:test');
 const assert = require('assert');
 const crypto = require('crypto');
 const { boot, killAll } = require('./_relay-server');
-const { summary } = require('./_requires');
+const { requireRedis, summary } = require('./_requires');
+
+const DEFAULT_REDIS = 'redis://127.0.0.1:6399';
 
 const PRO = 'pgp_pro_key_for_the_transfer_suite';
 const COMMUNITY = 'pgp_community_key_for_the_transfer_suite';
@@ -296,6 +298,103 @@ test('a busy tenant cannot evict a quiet tenant\'s receipt', async () => {
   assert.deepStrictEqual(survivors, busy.slice(-4), 'and they are the newest, not an arbitrary four');
   srv2.stop();
   did();
+});
+
+test('the global backstop takes from the biggest holder, never from the quiet one', async () => {
+  // The per-account cap bounds one tenant. The GLOBAL cap is what happens when
+  // the store is full anyway, and an oldest-first global eviction there would
+  // reintroduce exactly the cross-tenant channel the per-account cap closes:
+  // the quiet tenant's single receipt is, by definition, the oldest one.
+  const SMALL = 'pgp_small_holder_receipt_suite';
+  const HUGE = 'pgp_huge_holder_receipt_suite';
+  const srv2 = await boot({
+    tag: 'transfer-receipt-backstop',
+    // Per-account room for 6 each but only 5 slots in the whole store, so the
+    // two caps cannot both be satisfied and the GLOBAL backstop is the rule
+    // under test rather than the per-account one.
+    env: { PARAMANT_RECEIPT_PER_ACCOUNT_MAX: '6', PARAMANT_RECEIPT_TOTAL_MAX: '5' },
+    users: { api_keys: [
+      { key: SMALL, plan: 'pro', active: true, email: 'small@example.test', account_id: 'acct_small' },
+      { key: HUGE, plan: 'pro', active: true, email: 'huge@example.test', account_id: 'acct_huge' },
+    ] },
+  });
+  const put = async (key) => {
+    const b = blob(`backstop-${crypto.randomBytes(4).toString('hex')}`);
+    assert.strictEqual((await srv2.post('/v2/inbound', {
+      headers: { 'X-Api-Key': key }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+    })).status, 200);
+    const r = await srv2.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': key } });
+    assert.strictEqual(r.status, 200);
+    return r.headers['x-paramant-receipt-id'];
+  };
+  const alive = async (id, key) =>
+    (await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': key } })).status === 200;
+
+  // The quiet tenant goes FIRST, so under an oldest-first global rule it is the
+  // first thing evicted. That is the regression this test exists for.
+  const small = [await put(SMALL), await put(SMALL)];
+  const huge = [];
+  for (let i = 0; i < 6; i++) huge.push(await put(HUGE));
+
+  for (const id of small) {
+    assert.ok(await alive(id, SMALL),
+      'the store filled up and the small holder still has both of its receipts');
+  }
+  const hugeAlive = [];
+  for (const id of huge) if (await alive(id, HUGE)) hugeAlive.push(id);
+  assert.strictEqual(hugeAlive.length, 3,
+    'the biggest holder paid for the whole overflow: 5 slots, 2 of them the small holder\'s');
+  assert.deepStrictEqual(hugeAlive, huge.slice(-3), 'and it lost its oldest, not an arbitrary set');
+  srv2.stop();
+  did();
+});
+
+test('with redis, a receipt outlives the process that issued it', async () => {
+  // The store used to be a bare in-process Map, so every restart 404d every
+  // outstanding receipt. A deploy in the middle of somebody's 15 minute window
+  // silently cost them their proof of delivery, and restarting is a thing
+  // operators do on purpose. The envelope store already runs on redis; so does
+  // this now, with the Map kept only as the fallback for a relay without one.
+  const rc = await requireRedis(DEFAULT_REDIS);
+  if (!rc) return;
+  // The client is closed in a finally: an open redis connection keeps the test
+  // runner alive, so a FAILING assertion would hang the run instead of
+  // reporting, which is a worse outcome than the failure itself.
+  try {
+  const KEY = 'pgp_restart_receipt_suite';
+  const env = { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS };
+  // usersFile mode: restart() re-reads users.json from the same scratch dir, so
+  // the key has to be on disk and not only in USERS_JSON.
+  let srv2 = await boot({
+    tag: 'transfer-receipt-restart',
+    env,
+    usersFile: true,
+    users: { api_keys: [{ key: KEY, plan: 'pro', active: true, email: 'restart@example.test', account_id: 'acct_restart' }] },
+  });
+  const b = blob('restart-receipt');
+  assert.strictEqual((await srv2.post('/v2/inbound', {
+    headers: { 'X-Api-Key': KEY }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+  })).status, 200);
+  const dl = await srv2.get(`/v2/outbound/${b.hash}`, { headers: { 'X-Api-Key': KEY } });
+  assert.strictEqual(dl.status, 200);
+  const id = dl.headers['x-paramant-receipt-id'];
+  const hash = dl.headers['x-paramant-receipt-hash'];
+  assert.ok(id, 'the download was receipted');
+
+  const before = await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': KEY } });
+  assert.strictEqual(before.status, 200, before.text);
+
+  srv2 = await srv2.restart();
+  const after = await srv2.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': KEY } });
+  assert.strictEqual(after.status, 200, 'a restart must not take an outstanding receipt away');
+  assert.deepStrictEqual(after.json, before.json, 'and it is the same receipt, byte for byte');
+  assert.strictEqual(after.json.receipt_hash, hash,
+    'still matching the hash the download promised, across the process boundary');
+  srv2.stop();
+  did();
+  } finally {
+    try { await rc.quit(); } catch (_) { /* already gone */ }
+  }
 });
 
 test('the fat header comes back only when an operator asks for it, and it is deprecated', async () => {
