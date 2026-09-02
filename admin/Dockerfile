@@ -1,7 +1,7 @@
 # Pinned by digest. Tag node:24-alpine3.24 resolved 2026-09-02 (Node 24.20.0,
 # Alpine 3.24.1). Node 24 is the newest LTS line; this was node:25-alpine3.21,
 # and Node 25 is end-of-life. Kept in lockstep with relay/Dockerfile.
-FROM node:24-alpine3.24@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+FROM node:26-alpine3.24@sha256:2d984a15c9b54fd0aeb608b8e0d0d83529eb34d2966db27a1fb4f1edc3d298a3
 
 # See relay/Dockerfile: default matches admin/package.json, CI overrides it per
 # build, and tests/version-consistency.test.mjs holds the two together.
