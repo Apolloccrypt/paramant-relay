@@ -9,6 +9,77 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Every ParaSend limit now reads the product tier, not the unified `plan`.**
+  Billing writes a purchase with `setProductPlan` ->
+  `entitlements.applyProductTier`, which sets `plan_parasend` (or
+  `plan_parasign`) and deliberately leaves the unified `plan` alone. Three
+  enforcement points still resolved their ceiling off `plan` and so could not
+  see a paid ParaSend upgrade at all: the link TTL and the read count on
+  `POST /v2/inbound`, and the device cap on `POST /v2/pubkey`. The moment
+  self-serve billing goes live that would hold a ParaSend Pro customer to a
+  1 hour link, 1 read and 5 devices while `/pricing` sells him 24 hours, 10
+  reads and 50 devices. It is not visible today only because billing still runs
+  through the admin route, which sets `plan` as well. All six ParaSend ceilings
+  (TTL, max views, devices, transfers per month, blob size, downloads per hour)
+  now come from `getEntitlements(record).parasend`, and the ParaSign quotas from
+  `.parasign`. `outbound_per_hour` was the one dimension the entitlement layer
+  did not carry and has been added, mirroring `lib/tiers.js` like the rest.
+- **A key with no plan no longer gets the Pro ceiling.** The device cap
+  defaulted to `pro` (50 devices) and the DID-registration pubkey TTL to `pro`
+  (30 days) for a record with no plan on file, the mirror image of the default
+  already fixed on the inbound ceilings. A missing plan is not evidence of a
+  paid one; both now fall to Community, 5 devices and 7 days.
+- **The device cap counted nothing.** Registered pubkeys are stored under
+  `<device_id>:<account_id>`, but the cap counted entries ending in
+  `:<api_key>`, which equals the account id only for a key that has none. For
+  every real account the tally stayed 0 and the cap never fired at any tier.
+  It now counts the suffix the route writes, so the ceiling is enforced.
+
+  Because the cap never fired, accounts can be over it today, and a tier change
+  can put an account over it at any time. The cap governs how many devices an
+  account may HAVE, so it applies only to a registration that would ADD one:
+  `POST /v2/pubkey` for a device the account already holds skips the cap
+  entirely and answers on the device itself (`409` while the entry is live,
+  `200` renewing an entry whose TTL has passed but which the hourly sweep has
+  not reached). Without that skip an account over its cap got `429` on every
+  re-registration, which is the normal path rather than an edge: a Community
+  device pubkey lives 7 days, so devices come back to this route routinely, and
+  such an account would have lost them one at a time. **The change an operator
+  will see: an account over its tier's device count keeps every device it has
+  and is refused its next NEW one.**
+- **The device-pubkey TTL table had the same hole as `outbound_per_hour`.** It
+  held three rows (`free`, `pro`, `enterprise`) behind a `?? free` fallback, so
+  `community` and `business` were not in it and reached the free row by
+  accident. Every tier name a caller can produce now has its own row.
+- **A 402 over quota now names the tier that decided.** The transfer and sign
+  quota declines reported the unified `plan`, telling a paying customer he was
+  on a tier he was not being held to. Same for `GET /v2/admin/usage`, which
+  reported limits derived from `plan` while the gates enforced the product
+  tier; it now reports the enforced numbers and carries `parasend_tier` and
+  `parasign_tier` alongside `plan`.
+
+- **`GET /v2/admin/usage` reported an uncapped file size for a tier that is
+  capped.** The Enterprise row says `file_mb` is unlimited, but `POST /v2/inbound`
+  takes the lower of that and the operator's `MAX_BLOB`, so the gate enforces
+  5 MB while both usage routes reported `-1`. They now report
+  `min(MAX_BLOB, tier file_mb)`, which is what an upload is actually held to.
+  Genuinely uncapped dimensions, such as Enterprise devices, still report `-1`.
+- **A legacy `business` plan no longer gets the Enterprise ParaSend ceilings.**
+  `derivePlanParasend` mapped `business` up to `enterprise` on a "never silently
+  downgrade" reading. But `business` is a ParaSign tier name: an account whose
+  unified plan says `business` never bought ParaSend, and mapping it up handed
+  it the whole enterprise row, uncapped devices and downloads per hour, 100 reads
+  per link, a 365 day device-pubkey TTL and the 10000-receipt retention. That is
+  a silent upgrade, and the enterprise row is also where the resource ceilings
+  come off. Mapping it down to `pro` would have been the opposite error (2000
+  transfers a month cut to 500, a 7 day link cut to 24 hours). It now resolves to
+  its own row with exactly the numbers it has always had: 2000 transfers, 100
+  devices, a 7 day link, 25 reads, 2000 downloads an hour, 4000 receipts. The row
+  is resolved but never sold: `POST /v2/admin/keys/set-product-plan` still
+  rejects `business` as a ParaSend tier, and `/pricing` sells Community, Pro and
+  Enterprise as before.
+
 ### Changed
 - **The ParaSend delivery receipt moved out of the response header.**
   `GET /v2/outbound/:hash` used to answer with `X-Paramant-Receipt`, the whole

@@ -553,14 +553,45 @@ curl -X POST https://iot.paramant.app/v2/attest \
 
 ---
 
-## Rate limits
+## ParaSend limits per tier
 
-| Tier | Uploads/day | Retention |
-|------|-------------|-----------|
-| Free (pgp_) | 10 | 1 hour |
-| Community (plk_) | unlimited | 1 hour |
-| Professional | unlimited | 24 hours |
-| Enterprise | unlimited | configurable |
+Every ceiling below is enforced from one source, the account's **ParaSend**
+tier. That tier is its own axis: it is carried by `plan_parasend` on the account
+and is independent of the ParaSign tier, so buying one product does not move the
+other. A ParaSend purchase raises `plan_parasend` alone, and every gate reads
+that, so the limits a customer is held to are the limits the pricing page sold
+him. An account with no tier on file is held to Community.
+
+| | Community | Pro | Enterprise |
+|---|---|---|---|
+| Transfers per month | 10 | 500 | 1,000,000 |
+| Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
+| Reads per link (max views) | 1 | 10 | 100 |
+| Registered devices | 5 | 50 | unlimited |
+| Max blob size | 5 MB | 5 MB | 5 MB (relay `MAX_BLOB`) |
+| Downloads per hour | 50 | 500 | unlimited |
+
+Notes:
+
+- **Downloads per hour** is a sliding one-hour window per API key on
+  `GET /v2/outbound/:hash`; over it the relay answers `429`. It also sets how
+  many delivery receipts your account keeps (twice this number, see above).
+- **Max blob size** is the lower of the tier's ceiling and the operator's
+  `MAX_BLOB`, which is 5 MB on the hosted relay and bounds relay memory. The
+  operator's value is always the last word, which is why an Enterprise account
+  is held to 5 MB as well and why `GET /v2/admin/usage` reports 5 rather than
+  "uncapped" for it.
+- **Reads per link** and **link lifetime** are ceilings, not defaults: a request
+  asking for more gets the ceiling back in the upload response, so the clamp is
+  visible to the caller. Asking for less is honoured as asked.
+- **Registered devices** is a ceiling on how many device public keys an account
+  may hold, not a limit on requests. A device the account already holds may
+  always re-register, so an account that is over the ceiling keeps its existing
+  devices working and is refused only a new one.
+- A legacy `business` plan is a ParaSign tier name. On ParaSend it keeps its own
+  row (2000 transfers a month, 100 devices, a 7 day link, 25 reads, 2000
+  downloads an hour) rather than being raised to Enterprise or cut to Pro. It is
+  resolved, never sold: ParaSend cannot be bought or granted at that tier.
 
 ---
 
