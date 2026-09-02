@@ -95,9 +95,49 @@ Response headers:
 |--------|-------|
 | `X-Paramant-Burned` | `true` if blob was destroyed |
 | `X-Paramant-Hash` | SHA-256 hex of the blob |
-| `X-Paramant-Receipt` | Base64url-encoded signed delivery receipt |
+| `X-Paramant-Receipt-Id` | 32 hex characters. Fetch the receipt with it |
+| `X-Paramant-Receipt-Hash` | `sha3-256:<hex>` over the receipt bytes you will get back |
+| `X-Paramant-Receipt-Url` | `/v2/transfers/<receipt_id>/receipt` |
 
-The `X-Paramant-Receipt` value is a base64url-encoded JSON object:
+The receipt is handed over by reference, not by value. It carries a full
+ML-DSA-65 signature and an inclusion proof, so the payload is around 18 KB:
+too large for a response header. Node's default `maxHeaderSize` is 16 KB and
+nginx's default `proxy_buffer_size` is 4k/8k, so a receipt in the header meant
+`UND_ERR_HEADERS_OVERFLOW` on the client and 502 at the proxy.
+
+**Deprecated:** `X-Paramant-Receipt`, which carried that payload inline. It is
+off by default from 2026-09 and will be removed after **2026-12-01**. An
+operator can put it back for the transition with
+`PARAMANT_INLINE_RECEIPT_HEADER=1`, and must then also raise
+`proxy_buffer_size` on any proxy in front of the relay.
+
+---
+
+### GET /v2/transfers/:receipt_id/receipt (fetch a delivery receipt)
+
+Requires the same API key that made the download. The receipt is kept for
+**15 minutes** and can be read more than once in that window. An unknown,
+expired, or foreign id all answer with the same 404, so the route cannot be
+used to probe whether a transfer existed.
+
+```bash
+curl https://relay.paramant.app/v2/transfers/$RECEIPT_ID/receipt \
+  -H "X-Api-Key: pgp_your_key"
+```
+
+```json
+{
+  "ok": true,
+  "receipt": "<base64url>",
+  "receipt_hash": "sha3-256:9c1f…"
+}
+```
+
+`receipt_hash` is identical to the `X-Paramant-Receipt-Hash` the download
+carried, over the exact `receipt` string returned here, so the handover is
+verifiable end to end.
+
+`receipt` decodes to:
 
 ```json
 {
@@ -123,7 +163,7 @@ Public. No API key required.
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
   -H "Content-Type: application/json" \
-  -d '{"receipt":"<base64url from X-Paramant-Receipt>"}'
+  -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 ```
 
 Success:

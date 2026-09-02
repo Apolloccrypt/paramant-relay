@@ -424,7 +424,7 @@ curl https://relay.paramant.app/v2/pubkey
 
 # Verify a delivery receipt
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
-  -d '{"receipt":"<base64url from X-Paramant-Receipt header>"}'
+  -d '{"receipt":"<base64url from GET /v2/transfers/:receipt_id/receipt>"}'
 # {"valid":true,"blob_hash":"a3f2…","burn_confirmed":true}
 ```
 
@@ -582,7 +582,7 @@ Every transfer is appended to a public SHA3-256 Merkle tree. The trust model mir
 | What you can prove | How |
 |-------------------|-----|
 | A specific blob was uploaded | `merkle_proof` in `POST /v2/inbound` response |
-| A specific blob was delivered and burned | `X-Paramant-Receipt` header on `GET /v2/outbound` |
+| A specific blob was delivered and burned | `GET /v2/transfers/:receipt_id/receipt`, referenced by `X-Paramant-Receipt-Id` on `GET /v2/outbound` |
 | Receipt is genuine and unmodified | `POST /v2/verify-receipt` |
 | Log has not been forked | `GET /v2/sth/consistency?from=N&to=M` |
 | Peer relays agree on the tree | `GET /v2/sth/peers` |

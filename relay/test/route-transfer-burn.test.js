@@ -159,13 +159,109 @@ test('the download carries a signed delivery receipt with a burn confirmation', 
   await upload(PRO, b);
   const r = await download(PRO, b.hash);
   assert.strictEqual(r.status, 200);
-  const raw = r.headers['x-paramant-receipt'];
-  assert.ok(raw, 'every delivery is receipted');
-  const receipt = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+  // The download hands over a REFERENCE now; the receipt itself is fetched.
+  const id = r.headers['x-paramant-receipt-id'];
+  assert.match(id || '', /^[0-9a-f]{32}$/, 'every delivery is receipted');
+  assert.strictEqual(r.headers['x-paramant-receipt-url'], `/v2/transfers/${id}/receipt`);
+
+  const fetched = await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': PRO } });
+  assert.strictEqual(fetched.status, 200, fetched.text);
+  // The hash in the header is over the exact bytes that come back, so the
+  // handover cannot be tampered with in between.
+  assert.strictEqual(fetched.json.receipt_hash, r.headers['x-paramant-receipt-hash']);
+  assert.strictEqual('sha3-256:' + crypto.createHash('sha3-256').update(fetched.json.receipt).digest('hex'),
+    r.headers['x-paramant-receipt-hash'], 'the advertised hash really is the hash of the receipt');
+
+  const receipt = JSON.parse(Buffer.from(fetched.json.receipt, 'base64url').toString('utf8'));
   assert.strictEqual(receipt.blob_hash, b.hash);
   assert.strictEqual(receipt.burn_confirmed, true);
   assert.ok(receipt.signature, 'the receipt is signed by the relay identity');
   assert.ok(receipt.inclusion_proof, 'and carries the CT inclusion proof for the blob');
+
+  // And it is still the thing /v2/verify-receipt was built to check.
+  const verified = await srv.post('/v2/verify-receipt', {
+    headers: { 'X-Api-Key': PRO }, body: { receipt: fetched.json.receipt },
+  });
+  assert.strictEqual(verified.status, 200, verified.text);
+  assert.strictEqual(verified.json.valid, true, 'the fetched receipt verifies as delivered');
+  did();
+});
+
+test('a download answers with less than 8 KB of response headers', async () => {
+  // PR #341, finding 2. X-Paramant-Receipt carried the whole signed receipt:
+  // 18551 bytes for that one header, 19560 for the block. Two hard consequences,
+  // neither of them theoretical:
+  //   Node's default maxHeaderSize is 16384, so fetch() and a default
+  //   http.request threw UND_ERR_HEADERS_OVERFLOW on every single download.
+  //   nginx's default proxy_buffer_size is 4k/8k and that one buffer must hold
+  //   the whole upstream header block, so a proxied download is a 502.
+  // 8 KB is the ceiling here because it is the larger of the two nginx defaults:
+  // stay under it and the smallest realistic proxy still passes the response.
+  const b = blob('header-size');
+  await upload(PRO, b);
+  const r = await download(PRO, b.hash);
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.headers['x-paramant-receipt-id'], 'measured on a download that really is receipted');
+
+  // Reconstruct the wire bytes of the header block: "Name: value\r\n" each,
+  // plus the closing CRLF. The status line is a few dozen bytes on top.
+  let bytes = 2;
+  for (const [name, value] of Object.entries(r.headers)) {
+    for (const v of Array.isArray(value) ? value : [value]) {
+      bytes += Buffer.byteLength(`${name}: ${v}\r\n`);
+    }
+  }
+  assert.ok(bytes < 8192,
+    `a download must fit a default proxy buffer, got ${bytes} bytes of headers`);
+  assert.ok(!('x-paramant-receipt' in r.headers),
+    'and the fat header is gone by default, not merely smaller');
+  did();
+});
+
+test('a receipt reference is single-tenant, and unknown or foreign ids give one 404', async () => {
+  const b = blob('receipt-auth');
+  await upload(PRO, b);
+  const id = (await download(PRO, b.hash)).headers['x-paramant-receipt-id'];
+
+  const foreign = await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': OTHER } });
+  const unknown = await srv.get(`/v2/transfers/${'0'.repeat(32)}/receipt`, { headers: { 'X-Api-Key': OTHER } });
+  assert.strictEqual(foreign.status, 404, 'another tenant may not read the receipt for a delivery it did not make');
+  assert.deepStrictEqual(foreign.json, unknown.json,
+    'and it answers exactly like an id that never existed, so it is no oracle');
+
+  const noKey = await srv.get(`/v2/transfers/${id}/receipt`);
+  assert.strictEqual(noKey.status, 401, 'the route sits behind the same auth gate as the download');
+
+  // The owner can still read it, and more than once: nothing was consumed.
+  for (let i = 0; i < 2; i++) {
+    assert.strictEqual((await srv.get(`/v2/transfers/${id}/receipt`, { headers: { 'X-Api-Key': PRO } })).status, 200);
+  }
+  did();
+});
+
+test('the fat header comes back only when an operator asks for it, and it is deprecated', async () => {
+  // The removal is not silent: an out-of-tree client that still reads
+  // X-Paramant-Receipt gets one release to move, behind an explicit opt-in.
+  const legacy = await boot({
+    tag: 'transfer-legacy-receipt',
+    env: { PARAMANT_INLINE_RECEIPT_HEADER: '1' },
+    users: { api_keys: [{ key: PRO, plan: 'pro', active: true, email: 'pro@example.test', account_id: 'acct_pro' }] },
+  });
+  const b = blob('legacy-header');
+  assert.strictEqual((await legacy.post('/v2/inbound', {
+    headers: { 'X-Api-Key': PRO }, body: { hash: b.hash, payload: b.payload.toString('base64') },
+  })).status, 200);
+  // Reading it back needs room Node does not give by default. That IS the bug:
+  // a client cannot ask for this without knowing about it first.
+  const r = await legacy.get(`/v2/outbound/${b.hash}`, {
+    headers: { 'X-Api-Key': PRO }, maxHeaderSize: 96 * 1024,
+  });
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.headers['x-paramant-receipt'], 'the opt-in really puts the old header back');
+  assert.ok(Buffer.byteLength(r.headers['x-paramant-receipt']) > 16384,
+    'and it is still the header that does not fit, which is why it is going away');
+  assert.ok(r.headers['x-paramant-receipt-id'], 'the reference is served alongside it during the window');
+  legacy.stop();
   did();
 });
 

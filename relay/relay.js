@@ -185,14 +185,14 @@ const ALLOWED = {
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
-               '/v2/sth','/v2/verify-receipt','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
+               '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
-               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt',
+               '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/v2/transfers',
                '/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
   full:       null,
@@ -1635,6 +1635,47 @@ function outboundRateOk(apiKey, plan) {
   return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
+
+// ── Delivery receipt store (PR #341, finding 2) ─────────────────────────
+// The signed delivery receipt used to ride out on the download itself, in the
+// X-Paramant-Receipt response header. It carries a full ML-DSA-65 signature and
+// an inclusion proof, so that header measured 18551 bytes and the response
+// header block 19560. Node's own default maxHeaderSize is 16384, so a client
+// using fetch() or a default http.request could not download a blob at all
+// (UND_ERR_HEADERS_OVERFLOW), and nginx's default proxy_buffer_size of 4k/8k
+// answers 502 on an upstream header block that size.
+//
+// So the receipt is handed over by REFERENCE instead: the download carries a
+// receipt id and the hash of the receipt bytes, and the bytes themselves are
+// fetched from GET /v2/transfers/:receipt_id/receipt. Same receipt, same
+// signature, same verification through POST /v2/verify-receipt.
+//
+// Kept in RAM like everything else on this relay, and deliberately short-lived:
+// a client fetches its receipt in the same breath as the download. The cap
+// bounds the memory a burst of downloads can pin (a receipt is about 18 KB).
+const RECEIPT_TTL_MS = 15 * 60 * 1000;
+const RECEIPT_MAX = 1000;
+const deliveryReceipts = new Map(); // receipt_id -> { payload, hash, apiKey, expiresAt }
+function storeDeliveryReceipt(payload, hash, apiKey) {
+  const id = crypto.randomBytes(16).toString('hex');
+  // Oldest-first eviction: Map preserves insertion order and every entry has
+  // the same TTL, so the head is always the one closest to expiring.
+  while (deliveryReceipts.size >= RECEIPT_MAX) {
+    const oldest = deliveryReceipts.keys().next();
+    if (oldest.done) break;
+    deliveryReceipts.delete(oldest.value);
+  }
+  deliveryReceipts.set(id, { payload, hash, apiKey: apiKey || null, expiresAt: Date.now() + RECEIPT_TTL_MS });
+  return id;
+}
+setInterval(() => { const now = Date.now(); for (const [id, r] of deliveryReceipts) if (now > r.expiresAt) deliveryReceipts.delete(id); }, 60_000).unref?.();
+
+// Deprecation window for the fat header. Nothing in this repo reads it outside
+// its own tests, but an out-of-tree client might, so an operator can put it back
+// for one release with PARAMANT_INLINE_RECEIPT_HEADER=1. It is off by default
+// because on a default nginx the fat header is a 502, not a feature. To be
+// removed after 2026-12-01; see docs/api.md.
+const INLINE_RECEIPT_HEADER = process.env.PARAMANT_INLINE_RECEIPT_HEADER === '1';
 
 // Serialized async write queue for users.json — prevents lost-update race.
 // _writeUsersJson: low-level write (caller must already hold the snapshot).
@@ -4614,10 +4655,43 @@ const server = http.createServer(async (req, res) => {
       'X-Paramant-Burned':  burned ? 'true' : 'false',
       'X-Paramant-Hash':    outm[1],
     };
-    if (receiptHeader) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+    // The receipt travels by reference, not by value: an id to fetch it with and
+    // the hash of the exact bytes that will come back, so the handover itself is
+    // verifiable. The payload is ~18 KB and does not fit in a response header
+    // that Node clients or a default nginx will accept (see the store above).
+    if (receiptHeader) {
+      const receiptHash = crypto.createHash('sha3-256').update(receiptHeader).digest('hex');
+      const receiptId = storeDeliveryReceipt(receiptHeader, receiptHash, entry.apiKey || apiKey || null);
+      outHeaders['X-Paramant-Receipt-Id'] = receiptId;
+      outHeaders['X-Paramant-Receipt-Hash'] = 'sha3-256:' + receiptHash;
+      outHeaders['X-Paramant-Receipt-Url'] = `/v2/transfers/${receiptId}/receipt`;
+      // DEPRECATED, off by default, removed after 2026-12-01.
+      if (INLINE_RECEIPT_HEADER) outHeaders['X-Paramant-Receipt'] = receiptHeader;
+    }
     res.writeHead(200, outHeaders);
     if (burned) return res.end(blob, () => { try { blob.fill(0); } catch {} });
     return res.end(blob);
+  }
+
+  // ── GET /v2/transfers/:receipt_id/receipt ─ the delivery receipt, by reference ─
+  // Answers with the exact base64url payload GET /v2/outbound/:hash used to put
+  // in its X-Paramant-Receipt header, so a client that already decodes that
+  // string, or posts it to /v2/verify-receipt, needs no other change.
+  // The id is 16 random bytes handed only to the caller that did the download,
+  // and the receipt is additionally bound to that caller's API key. An unknown,
+  // expired, or foreign id answers with ONE 404, so the route can never be used
+  // to probe whether a transfer existed.
+  const rcptm = path.match(/^\/v2\/transfers\/([a-f0-9]{32})\/receipt$/);
+  if (rcptm && req.method === 'GET') {
+    const rec = deliveryReceipts.get(rcptm[1]);
+    const gone = { error: 'Not found. Expired, or never issued.' };
+    if (!rec || Date.now() > rec.expiresAt) {
+      if (rec) deliveryReceipts.delete(rcptm[1]);
+      res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone));
+    }
+    if (rec.apiKey && rec.apiKey !== apiKey) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J(gone)); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, receipt: rec.payload, receipt_hash: 'sha3-256:' + rec.hash }));
   }
 
   // ── GET /v2/status/:hash ─────────────────────────────────────────────────────
@@ -6122,7 +6196,8 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /v2/verify-receipt — Verify a signed delivery receipt ───────────────
   // Verifies the ML-DSA-65 signature and re-walks the inclusion proof.
-  // Receipt must be base64url-encoded JSON (as returned in X-Paramant-Receipt header).
+  // Receipt must be base64url-encoded JSON, as returned by
+  // GET /v2/transfers/:receipt_id/receipt (before 2026-09, the X-Paramant-Receipt header).
   if (path === '/v2/verify-receipt' && req.method === 'POST') {
     try {
       const body = await readBody(req, 65536);

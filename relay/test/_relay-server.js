@@ -184,7 +184,7 @@ function makeHandle(child, port, dir, env, log, bootOpts) {
     // One request. `body` may be a string, a Buffer or a plain object (which is
     // sent as JSON). Returns the parsed JSON when the answer is JSON, and the
     // raw text either way.
-    req(method, p, { headers = {}, body } = {}) {
+    req(method, p, { headers = {}, body, maxHeaderSize } = {}) {
       const hdr = { ...headers };
       let payload = null;
       if (body !== undefined && body !== null) {
@@ -201,14 +201,14 @@ function makeHandle(child, port, dir, env, log, bootOpts) {
         const r = http.request(base + p, {
           method,
           headers: hdr,
-          // GET /v2/outbound/:hash answers with an X-Paramant-Receipt header of
-          // about 18.5 KB (a base64 ML-DSA-65 signature over the delivery
-          // receipt, measured 2026-09-02). Node's own default maxHeaderSize is
-          // 16 KB and undici's fetch() caps earlier, so a plain fetch() of a
-          // download throws UND_ERR_HEADERS_OVERFLOW. Raised here so the test
-          // client is not the thing under test; the size itself is a finding,
-          // reported with this PR, not a fixture.
-          maxHeaderSize: 96 * 1024,
+          // NO maxHeaderSize override by default, on purpose. This client is
+          // held to Node's own 16 KB limit, the same one a caller using fetch()
+          // has, so any route that grows a header block past it fails here
+          // instead of only in production. GET /v2/outbound/:hash used to answer
+          // with 19560 bytes of headers and threw UND_ERR_HEADERS_OVERFLOW on
+          // every download (PR #341, finding 2). A test that needs the old
+          // behaviour asks for the room explicitly.
+          ...(maxHeaderSize ? { maxHeaderSize } : {}),
         }, (res) => {
           const chunks = [];
           res.on('data', (c) => chunks.push(c));
