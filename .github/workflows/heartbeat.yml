@@ -158,7 +158,7 @@ jobs:
       # episode, which is the noise this is supposed to prevent.
       - name: Open or update the issue when production is down
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -207,7 +207,7 @@ jobs:
 
       - name: Close the issue when production is healthy again
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const open = await github.rest.issues.listForRepo({
