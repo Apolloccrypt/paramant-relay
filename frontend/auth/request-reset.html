@@ -9,75 +9,24 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=22">
+<link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 </head>
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/pararules" role="menuitem">ParaRules</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -87,60 +36,10 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 
 <main class="page-main">
@@ -168,7 +67,10 @@
 
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=14" defer></script>
-<script src="/js/nav-auth.js?v=4" defer></script>
+<script src="/js/nav-auth.js?v=5" defer></script>
 <script src="/js/auth-request-reset.js?v=1"></script>
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+</footer>
 </body>
 </html>

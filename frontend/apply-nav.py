@@ -9,71 +9,14 @@ NEW_NAV = '''\
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Products</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/parashare" role="menuitem">ParaShare</a></li>
-        <li role="none"><a href="/dashboard" role="menuitem">Dashboard</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="/download" role="menuitem">ParamantOS</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/pararules" role="menuitem">ParaRules</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -85,129 +28,59 @@ NEW_NAV = '''\
 
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Products</button>
-    <div class="nav-mobile-group-items">
-      <a href="/parashare">ParaShare</a>
-      <a href="/dashboard">Dashboard</a>
-    </div>
-  </div>
-
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="/download">ParamantOS</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/pararules">ParaRules</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>'''
 
-# Footer template — restructured from the previous 36-link site-map to a
-# 23-link trust anchor across four functional columns. Removed every link
-# already reachable from the main nav (products, pricing, vs, compliance
-# specifics, use cases). Brand block at the bottom unchanged.
+# Footer template - the site-map footer is gone. What stays is the company
+# behind the product plus the legal documents a visitor has a right to find.
+# Everything else (status, press, self-host, partners) is reachable from the
+# four nav links or from the pages they lead to; a footer is not a second
+# navigation.
 NEW_FOOTER = '''\
 <footer>
   <div class="container-lg">
-    <div class="footer-grid">
+    <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.7;max-width:220px">Encrypted file relay. RAM-only. Burn-on-read.</p>
-        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">FIPS 203 / 204 &middot; Hetzner DE<br>GDPR &middot; no US CLOUD Act<br>BUSL-1.1 &middot; &copy; 2026 PARAMANT</p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Trust</div>
+        <div class="footer-col-label">Company</div>
         <div class="footer-links">
-          <a href="/status">Status</a>
-          <a href="/security">Security</a>
-          <a href="/ct-log">CT Log</a>
-          <a href="/license">License</a>
-          <a href="/press">Press kit</a>
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
         </div>
       </div>
       <div>
         <div class="footer-col-label">Legal</div>
         <div class="footer-links">
+          <a href="/privacy">Privacy Policy</a>
           <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Self-host</div>
-        <div class="footer-links">
-          <a href="/docs#self-hosting">Deploy guide</a>
-          <a href="/install.sh">install.sh</a>
-          <a href="/install-pi.sh">install-pi.sh</a>
-          <a href="/download">ParamantOS</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank">GitHub</a>
-          <a href="https://hub.docker.com/r/mtty001/relay" target="_blank">Docker Hub</a>
-          <a href="https://github.com/Apolloccrypt/paramant-relay/releases" target="_blank">Releases</a>
-        </div>
-      </div>
-      <div>
-        <div class="footer-col-label">Connect</div>
-        <div class="footer-links">
-          <a href="mailto:privacy@paramant.app">Contact</a>
-          <a href="/signup">Create account</a>
-          <a href="/auth/login">Sign in</a>
-          <a href="/help">Help</a>
-          <a href="/partners">Partners</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/license">License</a>
         </div>
       </div>
     </div>
   </div>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=19">'
+# Pages with the shared nav but no footer (auth, account, download, signup)
+# still owe the visitor the three legal documents. One line, three links, no
+# second navigation.
+LEGAL_STRIP = '''\
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+</footer>'''
+
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=23">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=19">'
 NAV_JS    = '<script src="/nav.js?v=14" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=5" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -221,6 +94,35 @@ ADD_NAV_TO = {
     'security/acknowledgements.html',
     'signup/verified.html',
 }
+
+
+# Application shells that deliberately keep their own, narrower nav. The
+# marketing nav is for visitors; these pages are for people already inside the
+# product, so the generator leaves them alone.
+KEEP_OWN_NAV = {
+    'co-sign.html',
+    'developer.html',
+}
+
+
+def inject_legal_strip(html):
+    """Give footerless pages one line with privacy, dpa and terms.
+
+    Pages that already carry a real <footer> keep it. The strip uses
+    <footer class="legal-strip">, which the plain <footer> replacement above
+    never matches, so stamping stays idempotent and edits here still
+    propagate on the next run."""
+    if 'class="legal-strip"' in html:
+        return re.sub(r'<footer class="legal-strip">.*?</footer>', LEGAL_STRIP,
+                      html, flags=re.DOTALL)
+    if re.search(r'<footer\b', html):
+        return html
+    body_close = html.rfind('</body>')
+    if body_close == -1:
+        # download.html has no </body> at all. The strip still belongs on the
+        # page, so append it rather than skip the page.
+        return html.rstrip() + '\n' + LEGAL_STRIP + '\n'
+    return html[:body_close] + LEGAL_STRIP + '\n' + html[body_close:]
 
 
 def inject_design_system(html):
@@ -311,6 +213,8 @@ def process(fpath):
     with open(fpath, encoding='utf-8') as f:
         original = f.read()
     rel = os.path.relpath(fpath, frontend).replace(os.sep, '/')
+    if rel in KEEP_OWN_NAV:
+        return False
     content = original
     if '<nav class="nav">' not in content:
         if rel not in ADD_NAV_TO:
@@ -321,6 +225,7 @@ def process(fpath):
     updated = re.sub(r'<nav class="nav">.*?</nav>', NEW_NAV, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated)
     updated = re.sub(r'<footer>.*?</footer>', NEW_FOOTER, updated, flags=re.DOTALL)
+    updated = inject_legal_strip(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
     updated = inject_nav_auth_js(updated)
