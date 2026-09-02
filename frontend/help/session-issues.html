@@ -304,9 +304,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">"Account locked" after multiple failed attempts</div>
+    <div class="issue-header">"Too many login attempts"</div>
     <div class="issue-body">
-      <p>Accounts are temporarily locked after 10 consecutive failed login attempts within 15 minutes. The lock lifts automatically after 30 minutes. If you cannot wait, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email to request an early unlock.</p>
+      <p>There is no account lock. Login attempts are rate limited instead: more than <strong>5 attempts from one IP address</strong>, or more than <strong>10 for one email address</strong>, inside <strong>15 minutes</strong> are answered with a 429. The counter clears by itself once the fifteen minutes are up, so there is nothing to unlock and nobody can lock you out by guessing at your address. If you are still refused after that, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email.</p>
     </div>
   </div>
 

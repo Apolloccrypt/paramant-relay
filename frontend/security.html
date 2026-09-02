@@ -332,7 +332,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tr><td>HKDF-SHA256</td><td>Key derivation from shared secrets</td><td>RFC 5869</td></tr>
       <tr><td>AES-256-GCM</td><td>Symmetric encryption + authentication</td><td>NIST SP 800-38D</td></tr>
       <tr><td>ML-DSA-65</td><td>Digital signatures (relay identity)</td><td>NIST FIPS 204</td></tr>
-      <tr><td>Argon2id</td><td>Password-based blob encryption</td><td>RFC 9106</td></tr>
+      <tr><td>Argon2id</td><td>Password gate on a transfer (hash, optional module)</td><td>RFC 9106</td></tr>
       <tr><td>SHA3-256</td><td>CT log Merkle hashing</td><td>NIST FIPS 202</td></tr>
     </tbody>
   </table>
@@ -359,7 +359,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding</div>
-      <p style="margin:0">ParaShare authenticated uploads are padded to a fixed 5 MB block for DPI masking. An observer on the network cannot infer file size, type, or content.</p>
+      <p style="margin:0">ParaShare authenticated uploads are padded to a fixed 5 MB block for DPI masking. A single block reveals no file size, type or content. A transfer that needs more than one block sends its chunk count in the clear, so the number of blocks is visible and the size can be placed within an order of magnitude (audit finding 5, accepted).</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">ML-DSA-65 relay identity</div>
@@ -373,7 +373,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div><span class="check">&#10003;</span><span>Read file contents: relay holds only ciphertext, never keys</span></div>
       <div><span class="check">&#10003;</span><span>Substitute a registered public key (after TOFU or PSS is used)</span></div>
       <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
-      <div><span class="check">&#10003;</span><span>Identify ParaShare transfer size: authenticated transfers look identical (fixed 5 MB padding)</span></div>
+      <div><span class="check">&#10003;</span><span>Read an exact ParaShare file size: every block is a fixed 5 MB, and only the block count is visible</span></div>
       <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed immediately on download</span></div>
       <div><span class="check">&#10003;</span><span>Forge CT log entries: Merkle chain is append-only and tamper-evident</span></div>
       <div><span class="check">&#10003;</span><span>Break ML-KEM-768: NIST FIPS 203, post-quantum secure</span></div>
@@ -390,7 +390,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="grid2" style="margin-top:20px">
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For humans</div>
-      <p style="margin:0">Sign in at paramant.app or through a browser extension with your email address and the current 6-digit code from your authenticator app. Sessions last one hour. TOTP verification uses SHA-256 HMAC, matching the cryptographic posture of the transport layer. Compatible authenticator apps are listed at <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
+      <p style="margin:0">Sign in at paramant.app or through a browser extension with your email address and the current 6-digit code from your authenticator app. Sessions last one hour. TOTP verification accepts SHA-256 and SHA-1 HMAC, so every standard authenticator app works; SHA-1 is the RFC 6238 default and several common apps offer nothing else. Compatible authenticator apps are listed at <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For machines</div>
@@ -402,12 +402,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Session security</div>
-      <p style="margin:0">After TOTP verification, a 256-bit session token is issued as an httpOnly Secure SameSite=Strict cookie. The token lives in Redis with a one-hour sliding expiry. API keys never touch the browser.</p>
+      <p style="margin:0">After TOTP verification, a 256-bit session token is issued as an httpOnly Secure SameSite=Lax cookie. Lax, not Strict, so an invited signer arriving from a link in their mail client is not bounced back to the login screen; a cross-site POST still carries no cookie. The token lives in Redis with a one-hour sliding expiry. API keys never touch the browser.</p>
     </div>
   </div>
 
   <h3>Rate limiting and replay protection</h3>
-  <p>TOTP codes expire thirty seconds after issue. Each code can be used exactly once across the system, enforced atomically in Redis. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes.</p>
+  <p>TOTP codes expire thirty seconds after issue. Each code is marked used the first time it is accepted, with an atomic single-use key in Redis. If Redis cannot be reached the check is skipped rather than failing the login, so replay protection is only as available as Redis is. Login attempts are rate-limited to five per IP per fifteen minutes and ten per email per fifteen minutes.</p>
 
   <h3>Compared to alternatives</h3>
   <p>Most encrypted file transfer services use password authentication with optional two-factor as an upgrade. Paramant reverses this. TOTP is required for human access from day one. The surface for credential theft is close to zero because there is nothing to phish, stuff, or reset.</p>

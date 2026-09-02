@@ -277,7 +277,7 @@ input:focus{border-color:var(--cobalt)}
       <tr><td>End-to-end encryption of content</td><td>File payloads encrypted client-side with ML-KEM-768 + ECDH P-256 hybrid (NIST FIPS 203). Relay holds only ciphertext.</td></tr>
       <tr><td>Encryption at rest</td><td>Ghost Pipe and ParaShare payloads remain RAM-only. ParaSign request documents are stored only as browser-encrypted AES-256-GCM capsules; the relay does not receive the decryption key.</td></tr>
       <tr><td>Data minimisation</td><td>Filenames not stored in plaintext (enc_meta ciphertext only); device IDs hashed SHA3-256 in CT log; no logging of payload content</td></tr>
-      <tr><td>Access control</td><td>API key authentication on all relay endpoints; admin panel protected with TOTP MFA and per-IP rate limiting (5 attempts/min)</td></tr>
+      <tr><td>Access control</td><td>API key authentication on all relay endpoints; admin panel protected with TOTP MFA and per-IP rate limiting (5 attempts per 15 minutes)</td></tr>
       <tr><td>Audit logging</td><td>Certificate Transparency log — transfer hashes and device key commitments, no payload content; tamper-evident Merkle tree</td></tr>
       <tr><td>Integrity and availability</td><td>auditd (49 CIS L2 rules), AIDE daily file integrity check, AppArmor enforcing, CIS Ubuntu 24.04 L2 benchmark — 114 checks</td></tr>
       <tr><td>Infrastructure hardening</td><td>Docker containers: read-only FS, no-new-privileges, cap_drop ALL, non-root user; HSTS max-age=63072000</td></tr>
