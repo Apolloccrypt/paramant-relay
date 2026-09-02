@@ -444,7 +444,7 @@ hash_, receipt = gp.send(open("deed.pdf","rb").read())
 gp.verify_receipt(receipt)  <span class="cm"># ML-DSA-65 signed</span></pre></div>
 
     <h3><span class="sector-badge">iot</span>Industrial IoT: IEC 62443</h3>
-    <p>PLC and sensor data relay without VPN or direct OT internet exposure. Acts as a post-quantum data diode: OT side pushes outbound only, IT side receives. Fixed 5 MB padding defeats traffic analysis.</p>
+    <p>PLC and sensor data relay without VPN or direct OT internet exposure. Acts as a post-quantum data diode: OT side pushes outbound only, IT side receives. Every block is a fixed 5 MB, so payload size is hidden inside a block; the block count of a multi-block transfer is not.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># PLC telemetry: outbound only, no VPN, no inbound port</span>
 from paramant_sdk import GhostPipe
@@ -845,7 +845,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
       <tr><td>HKDF-SHA256</td><td>Key derivation from hybrid KEM output</td><td>RFC 5869</td></tr>
       <tr><td>SHA3-256</td><td>CT log Merkle hashing · DID hashes</td><td>NIST FIPS 202</td></tr>
       <tr><td>ML-DSA-65</td><td>Relay identity signatures (relay-to-relay auth)</td><td>NIST FIPS 204</td></tr>
-      <tr><td>Argon2id</td><td>Password-protected blob derive</td><td>RFC 9106</td></tr>
+      <tr><td>Argon2id</td><td>Password gate on a transfer (hash, optional module)</td><td>RFC 9106</td></tr>
     </table>
     <p>Browser-side encryption runs as <strong>Rust/WASM</strong> compiled from <code>crypto-wasm/</code>. The WASM binary is SHA-256 verified at runtime before first use. The relay JS code has no access to decryption keys at any point.</p>
     <p>The two halves of the stack run different builds of the same Rust crypto. <strong>ML-KEM-768 key encapsulation stays client-side</strong> (browser WASM / SDK): the relay never performs a key exchange and never holds a private key. <strong>ML-DSA-65 runs server-side</strong> for the relay identity keypair, signed delivery receipts and signed tree heads (STH), and for verifying device and receipt signatures. Since the M5b migration (2026-05-27) that server-side ML-DSA-65 is provided by <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: a standalone, audit-ready Rust crypto library (BUSL-1.1) consumed by the relay through its <code>@paramant/core</code> NAPI binding.</p>
@@ -856,7 +856,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
     <p>Two-step burn: first the blob is zeroed in-place, then the Map entry is deleted. This prevents a brief window where a partial read could occur.</p>
 
     <h2 id="padding">5 MB fixed padding (ParaShare)</h2>
-    <p>ParaShare authenticated blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. An observer on the network cannot determine the size, type, or content of the transferred file. This is effective DPI masking for classified data flows.</p>
+    <p>ParaShare authenticated blobs are padded to exactly 5,242,880 bytes (5 MiB) with cryptographically random bytes before upload. The block size tells an observer nothing about the file, but a transfer larger than one block is sent as several blocks and its <code>total_chunks</code> travels in the clear, so the number of blocks is visible and the file size can be placed within an order of magnitude. That is finding 5 of the April 2026 audit, an accepted trade-off.</p>
 
     <h2 id="ct-log">Certificate Transparency log</h2>
     <p>Every transfer hash and device registration is appended to a public Merkle tree. The root hash changes with every write and is publicly verifiable. Anyone can prove a transfer occurred without learning what was transferred.</p>
@@ -969,7 +969,7 @@ python3 scripts/paramant-admin.py sync</pre>
     <ul>
       <li>Acts as a quantum-safe data diode: PLCs/sensors push data without opening inbound ports</li>
       <li>No VPN, no certificates on OT side: works with Raspberry Pi and any Linux device</li>
-      <li>Fixed 5MB padding: traffic analysis cannot distinguish heartbeats from payloads</li>
+      <li>Fixed 5 MB blocks: a single-block heartbeat and a single-block payload look identical on the wire; a multi-block transfer still shows its block count</li>
       <li>Network segmentation: OT side connects outbound only; IT side receives inbound only</li>
       <li>ML-DSA-65 device signatures: cryptographic device authentication</li>
     </ul>
@@ -1015,7 +1015,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How does 5MB padding protect me?</div>
-      <div class="faq-a">All transfers: regardless of actual file size: appear as identical 5 MiB blobs on the network. A passive observer cannot determine whether you transferred a 1 KB heartbeat or a 4.9 MB DICOM scan. This defeats traffic analysis and DPI-based content classification.</div>
+      <div class="faq-a">Every block is padded to the same 5 MiB, so a passive observer cannot tell a 1 KB heartbeat from a 4.9 MB DICOM scan: both are one block. The block size tells an observer nothing about the file, but a transfer larger than one block is sent as several blocks and its <code>total_chunks</code> travels in the clear, so the number of blocks is visible and the file size can be placed within an order of magnitude. That is finding 5 of the April 2026 audit, an accepted trade-off.</div>
     </div>
 
     <div class="faq-item">

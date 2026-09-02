@@ -691,3 +691,438 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
       `${slug}: the free plan is called Community, which is what /pricing prints on the card`);
   }
 });
+
+// 13 ── The file size a page tells you it will take. relay.js MAX_BLOB and the
+// file_mb column in tiers.js are the only two numbers that decide it, and they
+// are 5 MB. Two help pages said "Files up to 5 GB are supported": a thousand
+// times the ceiling, on the two pages a buyer reads while deciding whether the
+// product fits their attachment. Test 4 did not catch it because it scans for a
+// size in MB, and these two said GB. This one reads the ceiling out of the code
+// and then refuses any file-size figure on the site that is not it.
+test('the file size the site promises is the ceiling relay.js and tiers.js enforce', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const declared = [...tiersSrc.matchAll(/file_mb:\s*(-?[\d_]+|UNLIMITED)/g)].map((m) => m[1]);
+  assert.ok(declared.length >= 4, 'tiers.js must declare file_mb on every tier row');
+  const capped = [...new Set(declared.filter((v) => /^\d/.test(v)).map((v) => Number(v.replace(/_/g, ''))))];
+  assert.equal(capped.length, 1, `every capped tier must share one file_mb, found ${capped.join(', ')}`);
+  const mb = capped[0];
+  const blob = Number(/MAX_BLOB\s*=\s*parseInt\(process\.env\.MAX_BLOB\s*\|\|\s*'(\d+)'\)/.exec(read('relay/relay.js'))[1]);
+  assert.equal(blob, mb * 1048576, 'MAX_BLOB and tiers.js file_mb must be the same ceiling');
+  // And it is still the relay that refuses a larger upload, or the number is a
+  // constant nobody reads (same reasoning as test 11).
+  assert.match(read('relay/relay.js'), /Max \$\{Math\.round\(planMaxSize\/1048576\)\}MB/,
+    'relay.js must still refuse an oversized upload');
+
+  const problems = [];
+  // The two help pages that quote a supported file size have to quote this one.
+  for (const slug of ['help/gmail-extension', 'help/iot-integration']) {
+    if (!visible(page(slug)).includes(`${mb} MB are supported`)) {
+      problems.push(`${slug}: must say "Files up to ${mb} MB are supported"`);
+    }
+  }
+  // Nowhere on the site may a Paramant file size be stated in gigabytes. The
+  // competitor comparison on /vs quotes other vendors' gigabyte allowances and
+  // is the one page this sweep leaves alone.
+  const GB = [/\b(\d+(?:[.,]\d+)?)\s*GB\b[^.<]{0,40}\b(?:are supported|per file|file size|file limit|maximum)/i,
+              /\b(?:files?|uploads?|attachments?)\b[^.<]{0,40}\b(\d+(?:[.,]\d+)?)\s*GB\b/i];
+  for (const slug of publicPages()) {
+    if (slug === 'vs') continue;
+    const text = visible(page(slug));
+    for (const re of GB) {
+      const m = re.exec(text);
+      if (m) problems.push(`${slug}: states a file size of "${m[0].trim()}", and the relay refuses anything over ${mb} MB`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 14 ── "The API accepts up to 60 uploads per minute per API key" (/help/iot-
+// integration). Two things wrong at once. The 60 a minute is an nginx zone
+// keyed on $binary_remote_addr, so it is per IP address and not per key, and it
+// is the general API zone: uploads sit in a stricter one. The ceiling that IS
+// per key is outbound_per_hour in tiers.js, and it counts retrievals, not
+// uploads. A device operator sizing a fleet off that sentence sizes it wrong.
+test('the rate limits the IoT page quotes are the ones the configuration sets', () => {
+  const conf = read('deploy/nginx-selfhost.conf');
+  const zone = (name) => {
+    const m = new RegExp(`limit_req_zone\\s+(\\S+)\\s+zone=${name}:[^ ]+\\s+rate=(\\d+)r/m`).exec(conf);
+    assert.ok(m, `deploy/nginx-selfhost.conf must define the ${name} zone`);
+    return { key: m[1], rate: Number(m[2]) };
+  };
+  const api = zone('api');
+  const inbound = zone('inbound');
+  assert.equal(api.key, '$binary_remote_addr', 'the API zone is keyed per IP, not per API key');
+  assert.ok(inbound.rate < api.rate, 'uploads must sit in a stricter zone than general API traffic');
+
+  const tiersSrc = read('relay/lib/tiers.js');
+  const perHour = (tier) => {
+    const block = tiersSrc.slice(tiersSrc.indexOf(`${tier}:`));
+    return Number(/outbound_per_hour:\s*([\d_]+)/.exec(block)[1].replace(/_/g, ''));
+  };
+  const community = perHour('community');
+  const pro = perHour('pro');
+  assert.match(read('relay/relay.js'), /Outbound rate limit exceeded/, 'relay.js must still enforce outbound_per_hour');
+
+  const iot = visible(page('help/iot-integration'));
+  const problems = [];
+  const says = (phrase, why) => { if (!iot.includes(phrase)) problems.push(`help/iot-integration: must say "${phrase}" (${why})`); };
+  says(`${api.rate} requests a minute`, 'the general API zone rate');
+  says('per IP address, not per API key', 'the zone is keyed on the client address');
+  says(`${community} downloads an hour`, 'the Community outbound_per_hour');
+  says(`${pro} an hour`, 'the Pro outbound_per_hour');
+  if (/\d+\s*uploads? per minute/i.test(iot)) problems.push('help/iot-integration: the per-minute figure is a request rate per IP, not an upload rate per key');
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 15 ── The account lockout. PR #327 struck "after ten consecutive failures an
+// account locks for thirty minutes" from /security because no code implements
+// it, and test 6 keeps it off that one page. The identical promise survived on
+// /help/session-issues, with an email address to write to for an early unlock
+// that nobody can grant, and /dpa quoted the login limiter as "5 attempts/min"
+// when the window is fifteen minutes. So the sweep goes sitewide.
+test('no page promises an account lockout, and the login limits are the enforced ones', () => {
+  const srv = read('admin/server.js');
+  const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
+  const perIp = Number(/b\.count >= (\d+)/.exec(fn)[1]);
+  const winMin = Number(/(\d+) \* 60_000/.exec(fn)[1]);
+  const login = srv.slice(srv.indexOf('paramant:user:ratelimit:ip:'));
+  const lim = /ipCount > (\d+) \|\| emailCount > (\d+)/.exec(login);
+  const perEmail = Number(lim[2]);
+  assert.equal(Number(lim[1]), perIp);
+  assert.equal(Number(/expire\(ipKey,\s*(\d+)\)/.exec(login)[1]), winMin * 60);
+  // No lockout anywhere in the server code, or the pages should say so again.
+  for (const src of ['admin/server.js', 'relay/relay.js']) {
+    assert.doesNotMatch(read(src), /consecutive fail|lockout_minutes|LOCKOUT_MS|account_locked/i,
+      `${src}: no login lockout is implemented; if one is added, put the sentence back with its numbers`);
+  }
+
+  const LOCKOUT = [/consecutive fail/i, /accounts? (?:are|is) (?:temporarily )?locked/i,
+                   /the lock lifts/i, /request an early unlock/i, /account locks/i];
+  const problems = [];
+  for (const slug of publicPages()) {
+    const text = visible(page(slug));
+    for (const re of LOCKOUT) {
+      const m = re.exec(text);
+      if (m) problems.push(`${slug}: promises a lockout ("${m[0]}") that no code implements`);
+    }
+  }
+  // And the page that used to promise it now states what the code does.
+  const help = visible(page('help/session-issues'));
+  if (!help.includes('There is no account lock')) problems.push('help/session-issues: must say there is no account lock');
+  for (const phrase of [`${perIp} attempts from one IP address`, `${perEmail} for one email address`, `${winMin} minutes`]) {
+    if (!help.includes(phrase)) problems.push(`help/session-issues: must state "${phrase}"`);
+  }
+
+  // "No lockout" is not the same as "nobody can lock you out". The email
+  // counter is keyed on the ADDRESS alone, it is incremented before the code is
+  // checked, and a successful login never clears it, so someone else's attempts
+  // on your address spend your budget and hold you at 429 for the rest of the
+  // window. The first version of this row said the opposite in a subordinate
+  // clause and nothing pinned it, which is the whole failure mode this file
+  // exists for. Read the three properties out of the handler and require the
+  // page to carry the caveat exactly while they hold.
+  const handler = srv.slice(srv.indexOf('api.post("/user/login"'));
+  const body = handler.slice(0, handler.indexOf('\napi.'));
+  const emailKeyed = /const emailKey = `paramant:user:ratelimit:email:\$\{email\.toLowerCase\(\)\}`/.test(body);
+  // indexOf returns -1 for "not found", and -1 sorts before every real offset,
+  // so a counter that was deleted outright would read as "counted first". Both
+  // offsets are required to exist before they are compared.
+  const incrAt = body.indexOf('redis().incr(emailKey)');
+  const authAt = body.indexOf('findUserByEmail');
+  assert.ok(emailKeyed, 'the per-email login counter must still be keyed on the address');
+  assert.ok(incrAt > 0, 'the login handler must still count attempts per address');
+  assert.ok(authAt > 0, 'the login handler must still look the account up');
+  const beforeAuth = incrAt < authAt;
+  const neverCleared = !new RegExp(`del\\(\\s*emailKey`).test(body);
+  const shared = emailKeyed && beforeAuth && neverCleared;
+
+  const CAVEAT = 'attempts someone else makes on your address count against you too';
+  if (shared) {
+    if (!help.includes(CAVEAT)) {
+      problems.push(`help/session-issues: the ${perEmail}-per-address counter is spent by anyone who knows the address, and the page must say so`);
+    }
+    // And no page may deny it, in any of the shapes that denial takes.
+    const DENIES = [/nobody can lock you out/i, /no ?one can lock you out/i,
+                    /cannot be locked out by/i, /only your own attempts count/i];
+    for (const slug of publicPages()) {
+      const text = visible(page(slug));
+      for (const re of DENIES) {
+        const m = re.exec(text);
+        if (m) problems.push(`${slug}: "${m[0]}" is not true while the counter is keyed on the address alone`);
+      }
+    }
+  } else if (help.includes(CAVEAT)) {
+    problems.push('help/session-issues: the per-address counter is no longer shared, so drop the caveat');
+  }
+  // /dpa quotes the same limiter in its access-control row.
+  const dpa = visible(page('dpa'));
+  const perMin = /per-IP rate limiting \((\d+) attempts?\/min\)/.exec(dpa);
+  if (perMin) problems.push(`dpa: says ${perMin[1]} attempts a minute; checkLoginRateLimit is ${perIp} per ${winMin} minutes`);
+  if (!dpa.includes(`${perIp} attempts per ${winMin} minutes`)) {
+    problems.push(`dpa: the access-control row must state ${perIp} attempts per ${winMin} minutes`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 16 ── The session cookie. /security described it as SameSite=Strict. It is
+// Lax, and deliberately so: the comment above setUserCookie in admin/server.js
+// explains that a Strict cookie is not sent on the top-level navigation from an
+// emailed invite, which is the one flow ParaSign is built around. (That comment
+// cites ADR R018 for the decision, but docs/adrs/R018-parasign-invite-webauthn.md
+// says nothing about SameSite, so the comment is the source, not the ADR.)
+// Describing a security control as stricter than it is, is the wrong direction
+// to be wrong in.
+test('the session cookie described on /security is the cookie admin/server.js sets', () => {
+  const srv = read('admin/server.js');
+  const set = /paramant_user_session=\$\{token\};([^`]*)`/.exec(srv);
+  assert.ok(set, 'admin/server.js must set the session cookie from a template literal');
+  const attrs = set[1];
+  const sameSite = /SameSite=(\w+)/.exec(attrs)[1];
+  const maxAge = Number(/Max-Age=(\d+)/.exec(attrs)[1]);
+  const bits = Number(/const sessionToken = crypto\.randomBytes\((\d+)\)/.exec(srv)[1]) * 8;
+  assert.equal(maxAge, 3600);
+  // Sliding, because every authenticated read pushes the Redis TTL back out.
+  assert.match(srv, /expire\(`paramant:user:session:\$\{token\}`,\s*3600\)/,
+    'the session TTL must be refreshed on use for "sliding" to be true');
+
+  const sec = visible(page('security'));
+  const problems = [];
+  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry']) {
+    if (!sec.includes(phrase)) problems.push(`security: the session row must say "${phrase}"`);
+  }
+  // Nowhere may the site claim an attribute value the code does not set.
+  for (const slug of publicPages()) {
+    for (const m of visible(page(slug)).matchAll(/SameSite=(\w+)/g)) {
+      if (m[1] !== sameSite) problems.push(`${slug}: claims SameSite=${m[1]}, admin/server.js sets SameSite=${sameSite}`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 17 ── Which HMAC a TOTP code is checked with. /security said "SHA-256 HMAC,
+// matching the cryptographic posture of the transport layer". totp.js dual-
+// verifies: the default algorithm list is SHA-256 AND SHA-1, deliberately, so
+// that Google Authenticator and the iCloud Keychain authenticator work at all.
+// /help/authenticator-apps already said both. /security said one, which reads
+// as a stronger guarantee than the login path gives.
+test('the TOTP algorithms named on the site are the ones totp.js accepts', () => {
+  const totp = stripJsComments(read('relay/lib/totp.js'));
+  const list = /const algs = algorithms \|\| \(algorithm \? \[algorithm\] : \[([^\]]+)\]\)/.exec(totp);
+  assert.ok(list, 'totp.js must build its default algorithm list in one place');
+  const algs = list[1].split(',').map((s) => s.trim().replace(/['"]/g, ''));
+  assert.deepEqual(algs, ['sha256', 'sha1'], 'the default TOTP algorithm set changed; update the pages with it');
+  const label = (a) => (a === 'sha256' ? 'SHA-256' : 'SHA-1');
+
+  const problems = [];
+  // Every page that names a TOTP HMAC has to name all of them.
+  for (const slug of ['security', 'help/authenticator-apps']) {
+    const text = visible(page(slug));
+    for (const a of algs) {
+      if (!text.includes(label(a))) problems.push(`${slug}: TOTP accepts ${label(a)} too, and the page does not say so`);
+    }
+  }
+  for (const slug of publicPages()) {
+    const text = visible(page(slug));
+    const m = /TOTP[^.]{0,60}\bSHA-256\b[^.]{0,60}\./i.exec(text);
+    if (m && !/SHA-1/i.test(m[0])) problems.push(`${slug}: "${m[0].trim()}" names one algorithm where the code accepts two`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 18 ── "Each code can be used exactly once across the system, enforced
+// atomically in Redis." The NX key is real and it is atomic. The absolute is
+// not: verifyTotpGeneric ends the store call with .catch(() => 'OK'), so when
+// Redis is unreachable the replay check is skipped and the code is accepted
+// again. That is a deliberate availability choice, and the page has to say it
+// rather than sell the failure mode as a guarantee.
+test('the single-use TOTP guarantee is stated with the fail-open the code has', () => {
+  const totp = stripJsComments(read('relay/lib/totp.js'));
+  const guard = /store\.set\(slotKey, '1', \{ NX: true, EX: (\d+) \}\)(\.catch\(\(\) => 'OK'\))?/.exec(totp);
+  assert.ok(guard, 'totp.js must guard replay with a per-slot NX key');
+  const failsOpen = Boolean(guard[2]);
+
+  const sec = visible(page('security'));
+  const problems = [];
+  if (failsOpen) {
+    if (!/If Redis cannot be reached the check is skipped/.test(sec)) {
+      problems.push('security: the replay guard fails open on a Redis error, and the page must say so');
+    }
+    for (const slug of publicPages()) {
+      const m = /used exactly once across the system/i.exec(visible(page(slug)));
+      if (m) problems.push(`${slug}: claims "${m[0]}" while the replay store call falls back to accepting the code`);
+    }
+  } else if (/the check is skipped/.test(sec)) {
+    problems.push('security: the .catch fail-open is gone, so drop the caveat and state the guarantee');
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 19 ── Argon2id in the crypto tables. /security listed it as "Password-based
+// blob encryption" and /docs as "Password-protected blob derive". Neither is
+// what relay.js does: the password is hashed with Argon2id into pw_hash and
+// compared on retrieval, and the blob key is not derived from it at any point.
+// It is also an optional module (a bare try/require, 501 when it is absent),
+// which a table of primitives that carries the product should not hide.
+test('the Argon2id row says what relay.js uses Argon2id for', () => {
+  const relay = stripJsComments(read('relay/relay.js'));
+  assert.match(relay, /pw_hash = await argon2Lib\.hash\(password/, 'Argon2id must still hash the transfer password');
+  assert.match(relay, /argon2Lib\.verify\(entry\.pw_hash/, 'Argon2id must still verify it on retrieval');
+  assert.match(relay, /try \{ argon2Lib = require\('argon2'\); \} catch/, 'Argon2id must still be an optional module');
+  assert.match(relay, /Argon2id not available on this relay/, 'a relay without the module must refuse the password option');
+  // The key that encrypts a blob never comes out of argon2.
+  assert.doesNotMatch(relay, /argon2Lib\.hash\([^)]*\)[^;]*(?:deriveKey|createCipheriv)/,
+    'if the blob key is ever derived from the password, this row can say "derive" again');
+
+  const problems = [];
+  const ROW = /<tr><td>Argon2id<\/td><td>([^<]*)<\/td>/;
+  for (const slug of ['security', 'docs']) {
+    const m = ROW.exec(page(slug));
+    if (!m) { problems.push(`${slug}: the crypto table must still carry the Argon2id row`); continue; }
+    const role = m[1];
+    if (/encryption|encrypt|derive/i.test(role)) problems.push(`${slug}: Argon2id is described as "${role}"; it hashes a password and never encrypts or derives`);
+    if (!/hash/i.test(role)) problems.push(`${slug}: the Argon2id row must say it is a hash`);
+    if (!/optional/i.test(role)) problems.push(`${slug}: the Argon2id row must say the module is optional`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 20 ── The padding claim. /security and /docs said an observer "cannot infer
+// (or determine) file size, type, or content". Finding 5 of the audit this site
+// publishes says the opposite and calls it an accepted trade-off: total_chunks
+// travels in the clear, so the number of 5 MB blocks is visible and the size
+// follows to an order of magnitude. The site was contradicting its own report.
+test('the 5 MB padding claim matches audit finding 5 and what ParaShare sends', () => {
+  const audit = read('docs/security-audit-2026-04.md');
+  // /security and /trust link a reader to /docs/security-audit-2026-04.md, which
+  // is the copy under frontend/. This row is bounded by a finding in the repo
+  // copy, so the two have to be the same bytes: a drift between them would mean
+  // the test reads one report and the visitor reads another.
+  assert.equal(read('frontend/docs/security-audit-2026-04.md'), audit,
+    'frontend/docs/security-audit-2026-04.md must be byte-identical to docs/security-audit-2026-04.md');
+  for (const slug of ['security', 'trust']) {
+    assert.match(page(slug), /href="\/docs\/security-audit-2026-04\.md"/,
+      `${slug}: must still link the published report this row is bounded by`);
+  }
+  const row = /\|\s*5\s*\|\s*\*\*Metadata size leakage\*\*[^|]*\|\s*(\S+)\s*\|([^|]*)\|/.exec(audit);
+  assert.ok(row, 'audit finding 5 (metadata size leakage) must still be in the report');
+  assert.match(row[2], /Accepted tradeoff/, 'finding 5 is the accepted trade-off this claim is bounded by');
+  // And the chunk count really is sent to the relay in the clear.
+  assert.match(read('frontend/js/parashare.page.js'), /total_chunks:\s*totalChunks/,
+    'ParaShare must still send total_chunks, or this caveat can go');
+
+  const problems = [];
+  const ABSOLUTE = /(?:cannot|can not|can't)\s+(?:infer|determine|tell)[^.]{0,40}\b(?:size|type|content)/i;
+  for (const slug of publicPages()) {
+    const text = visible(page(slug));
+    const m = ABSOLUTE.exec(text);
+    if (m) problems.push(`${slug}: "${m[0].trim()}" is finding 5, an accepted leak, stated as impossible`);
+  }
+  // The two pages that explain the padding carry the bound.
+  for (const slug of ['security', 'docs']) {
+    if (!/block count|number of blocks|chunk count/i.test(visible(page(slug)))) {
+      problems.push(`${slug}: the padding section must say the block count of a multi-block transfer is visible`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 21 ── "no IP rate limit" as a paid-plan benefit on the homepage. There is no
+// per-IP ceiling a paid plan lifts: the only per-IP rate in the product is
+// ANON_RATE_PER_HOUR on the deprecated /v2/anon-inbound, the same fossil test 11
+// hunts, and it does not read a plan at all. What a paid plan really raises is
+// outbound_per_hour, per API key, which is the number /parasend already sells.
+test('the hourly ceiling a paid plan buys is outbound_per_hour, and no page sells a lifted IP limit', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const perHour = (tier) => {
+    const block = tiersSrc.slice(tiersSrc.indexOf(`${tier}:`));
+    const m = /outbound_per_hour:\s*([\d_]+|UNLIMITED)/.exec(block);
+    assert.ok(m, `tiers.js ${tier} must declare outbound_per_hour`);
+    return m[1] === 'UNLIMITED' ? Infinity : Number(m[1].replace(/_/g, ''));
+  };
+  const community = perHour('community');
+  const pro = perHour('pro');
+  assert.ok(pro > community, 'a paid plan must actually raise the hourly ceiling');
+  const relay = stripJsComments(read('relay/relay.js'));
+  assert.match(relay, /const max = parasendLimitsOf\(rec\)\.limits\.outbound_per_hour/,
+    'relay.js must read the ceiling off the ParaSend entitlement');
+  // The per-IP rate that does exist belongs to the deprecated anonymous route
+  // and reads no plan, so no tier can lift it.
+  assert.match(relay, /ANON_RATE_PER_HOUR/, 'the per-IP rate is the anon-inbound one');
+  assert.doesNotMatch(relay, /ANON_RPH[^;]*plan/, 'the anonymous per-IP rate must not read a plan');
+
+  const problems = [];
+  const idx = visible(page('index'));
+  if (!idx.includes(`up to ${pro} retrievals an hour through the API instead of ${community}`)) {
+    problems.push(`index: the paid-plan line must say up to ${pro} retrievals an hour instead of ${community}`);
+  }
+  for (const slug of publicPages()) {
+    const m = /no IP rate limit|IP rate limit (?:is )?(?:lifted|removed)/i.exec(visible(page(slug)));
+    if (m) problems.push(`${slug}: sells "${m[0]}", and no tier lifts a per-IP rate`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 22 ── "No third-party requests. Your browser talks only to us. No fonts,
+// CDNs, analytics or pixels." (/parasend) and "No tracking." (/pricing). Both
+// are true today and nothing held them there: one Google Fonts stylesheet, one
+// analytics snippet or one tracking pixel added to a shared header would leave
+// the sentences standing. This walks every public page and fails on any
+// subresource, of any kind, that is not served from paramant.app.
+//
+// A tag scan alone is not enough. Audit finding 17 was a font stylesheet on
+// drop.html, and the two ways a page reaches off-origin without a tag are a
+// bare `@import "https://..."` (no url(), so a url() scan misses it) and a
+// runtime call in an inline script. Both are checked here, along with the
+// worker and socket constructors that fetch code or open a connection.
+//
+// The page set is the public list plus /ontvang and /parashare. Those two are
+// in PRIVATE because they are one-shot flows with no place in the sitemap, but
+// a recipient reaches them by opening a share link, without an account and
+// without a login: a third-party request there is as public as one anywhere,
+// and drop.html was exactly that kind of page.
+test('no page a visitor can open loads anything from a third party, which is what /parasend promises', () => {
+  const TAGS = 'script|link|img|iframe|source|video|audio|embed|object|track|image';
+  const ATTR = /\b(?:src|href|srcset|poster|data)\s*=\s*"([^"]*)"/gi;
+  const ABS = String.raw`(?:https?:)?\/\/`;
+  // Off-origin without a tag: a bare @import, and anything an inline script
+  // fetches, opens or loads at runtime.
+  const RUNTIME = [
+    [new RegExp(String.raw`@import\s+(?:url\(\s*)?['"]?(${ABS}[^'")\s;]+)`, 'gi'), 'a stylesheet @import of'],
+    [new RegExp(String.raw`\bfetch\(\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'an inline fetch() of'],
+    [new RegExp(String.raw`\.open\(\s*['"][A-Z]+['"]\s*,\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'an XMLHttpRequest to'],
+    [new RegExp(String.raw`new\s+(?:WebSocket|EventSource|Worker|SharedWorker)\(\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'a connection or worker from'],
+    [new RegExp(String.raw`importScripts\(\s*['"\`](${ABS}[^'"\`]+)`, 'gi'), 'an importScripts() of'],
+    [new RegExp(String.raw`url\(\s*['"]?(${ABS}[^)'"]+)`, 'gi'), 'a stylesheet rule loading'],
+  ];
+  const ours = (url) => {
+    const host = /^(?:https?:)?\/\/([^/?#]+)/.exec(url);
+    return !host || host[1] === 'paramant.app' || host[1].endsWith('.paramant.app');
+  };
+  // Reachable without an account: every public page, plus the two share-link
+  // landing pages that PRIVATE excludes from the sitemap but not from a visitor.
+  const reachable = [...new Set([...publicPages(), 'ontvang', 'parashare'])].sort();
+  assert.ok(reachable.includes('ontvang') && reachable.includes('parashare'),
+    'the two share-link landing pages must be in the scan');
+
+  const problems = [];
+  for (const slug of reachable) {
+    const html = page(slug).replace(/<!--[\s\S]*?-->/g, '');
+    for (const tag of html.matchAll(new RegExp(`<(?:${TAGS})\\b[^>]*>`, 'gi'))) {
+      for (const a of tag[0].matchAll(ATTR)) {
+        const url = a[1].trim();
+        if (/^(?:https?:)?\/\//.test(url) && !ours(url)) problems.push(`${slug}: loads ${url}`);
+      }
+    }
+    for (const [re, what] of RUNTIME) {
+      for (const m of html.matchAll(re)) {
+        if (!ours(m[1])) problems.push(`${slug}: ${what} ${m[1]}`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+
+  // And the two pages that make the promise still make it.
+  assert.match(visible(page('parasend')), /No third-party requests/, 'parasend: the promise must still be on the page');
+  assert.match(visible(page('parasend')), /No fonts, CDNs, analytics or pixels/, 'parasend: name what is not loaded');
+  assert.match(visible(page('pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
+});

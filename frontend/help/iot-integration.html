@@ -330,7 +330,7 @@ print(resp.json()["url"])</div>
 
   <h2>Rate limits</h2>
 
-  <p>The API accepts up to <strong>60 uploads per minute</strong> per API key. For high-frequency sensor data, batch readings into a single file before uploading rather than sending one file per measurement. Files up to 5 GB are supported.</p>
+  <p>Request rate limits are per IP address, not per API key: the nginx configuration in this repository puts general API traffic in a <strong>60 requests a minute</strong> zone and uploads in a stricter one (<code>nginx-selfhost.conf</code>). The ceiling that is per key applies to retrieval, not upload: <strong>50 downloads an hour</strong> on Community and <strong>500 an hour</strong> on Pro (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>), answered with a 429. For high-frequency sensor data, batch readings into a single file before uploading rather than sending one file per measurement. Files up to 5 MB are supported.</p>
 
   <hr class="divider">
 
