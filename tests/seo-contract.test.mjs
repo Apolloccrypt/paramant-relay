@@ -392,8 +392,11 @@ test('every public page names the company and the founder in its Organization no
 //              local in all three modes; the file does not.
 //   verify     frontend/verify.html checks a signature in the browser with no
 //              account and no upload.
-//   download   the banner on frontend/download.html: March 2026 build, 21
-//              protections missing, web app recommended.
+//   download   frontend/download.html says the desktop app is not maintained.
+//              The old pin promised a download and then counted 21 missing
+//              protections, a number nothing in this repo could check. The
+//              page now leads with the fact that can be checked: the last
+//              release is v0.2.1 of 28 March 2026 and none has followed.
 //   trust      frontend/trust.html tags every claim live or planned.
 //   signup     the ParaSign Community card on frontend/pricing.html.
 //
@@ -422,8 +425,8 @@ const PINNED = {
     desc: 'Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file.',
   },
   download: {
-    title: 'Download the Paramant desktop app',
-    desc: 'The Paramant desktop app. The current build is from March 2026 and misses 21 protections the web app has, so the web app is the one we recommend.',
+    title: 'The Paramant desktop app is no longer maintained',
+    desc: 'The Paramant desktop app was last built in March 2026 and is no longer maintained. Paramant runs in your browser instead, with nothing to install.',
   },
   trust: {
     title: 'Trust and verification · Paramant',
