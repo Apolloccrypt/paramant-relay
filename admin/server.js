@@ -1973,6 +1973,25 @@ api.get("/user/session/verify", async (req, res) => {
 
 // ── Account management ────────────────────────────────────────────────────────
 
+// Per-product tiers, in ONE place, because three endpoints answer the same
+// question and the dashboard and the account page must not read two different
+// truths. The unified `plan` alone cannot say whether a customer is paying:
+// setProductPlan (relay.js, the Mollie webhook path) writes ONLY
+// plan_parasign / plan_parasend and by design never touches `plan`
+// (relay/lib/entitlements.js applyProductTier). So someone who buys ParaSign
+// Pro self-serve keeps plan "community", and a page reading only `plan` tells a
+// paying customer he is on the free plan. The paid_until pair travels with them
+// so a client can apply the same expiry rule as effectiveProductTier: a stored
+// tier above the floor is paid only while its period has not run out.
+function productPlanFields(rec) {
+  return {
+    plan_parasign: rec?.plan_parasign ?? null,
+    plan_parasend: rec?.plan_parasend ?? null,
+    paid_until_parasign: rec?.paid_until_parasign ?? null,
+    paid_until_parasend: rec?.paid_until_parasend ?? null,
+  };
+}
+
 // GET /api/user/me
 // JSON identity + account-summary endpoint backing the client-side /dashboard.
 // Same authUser cookie middleware as /api/user/account. Returns just what the
@@ -1990,6 +2009,7 @@ api.get("/user/me", authUser, async (req, res) => {
       email,
       label: user?.label || null,
       plan: (user && user.plan) || "standard",
+      ...productPlanFields(user),
       created_at: user?.created_at || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
@@ -2219,6 +2239,7 @@ api.get("/user/account", authUser, async (req, res) => {
       email,
       label: user?.label || null,
       plan: user?.plan || null,
+      ...productPlanFields(user),
       created_at: user?.created_at || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
@@ -2828,6 +2849,7 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
   res.json({
     current_plan: currentKey?.plan || 'community',
+    ...productPlanFields(currentKey),
     period: billing?.period || null,
     amount_eur: billing?.amount_eur ?? 0,
     next_billing_date: billing?.next_billing_date || null,

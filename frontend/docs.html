@@ -536,7 +536,7 @@ curl https://paramant.app/v1/envelopes/env_.../receipt \
     <table>
       <tr><th>Field</th><th>Value</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
-      <tr><td>Tier</td><td>Pro or higher on ParaSend <em>or</em> ParaSign. Free/community &rarr; <code>403</code>.</td></tr>
+      <tr><td>Tier</td><td>Pro or higher on ParaSend <em>or</em> ParaSign. Community &rarr; <code>403</code>.</td></tr>
       <tr><td>Query</td><td><code>?limit=</code> (default 100, max 1000)</td></tr>
     </table>
     <pre>GET /v2/user/history?limit=100
@@ -851,7 +851,7 @@ python3 scripts/paramant-admin.py sync</pre>
     <h2 id="retention">Retention policy</h2>
     <table>
       <tr><th>Plan</th><th>Default TTL</th><th>Maximum TTL</th><th>Max file size</th></tr>
-      <tr><td>Free (pgp_)</td><td>1 hour</td><td>1 hour</td><td>5 MB (padded)</td></tr>
+      <tr><td>Community (pgp_)</td><td>1 hour</td><td>1 hour</td><td>5 MB (padded)</td></tr>
       <tr><td>Pro</td><td>1 hour</td><td>24 hours</td><td>5 MB</td></tr>
       <tr><td>Enterprise</td><td>1 hour</td><td>7 days</td><td>5 MB</td></tr>
     </table>
@@ -987,7 +987,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How do I get a pgp_ API key?</div>
-      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: create a free account to receive your API key with TOTP protection. Free plan: 10 uploads/hour per IP, 1-hour TTL, burn-on-first-read. See <a href="/pricing">/pricing</a> for tier details.</div>
+      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: create a free account to receive your API key with TOTP protection. Community plan: 10 uploads/hour per IP, 1-hour TTL, burn-on-first-read. See <a href="/pricing">/pricing</a> for tier details.</div>
     </div>
 
   </div>

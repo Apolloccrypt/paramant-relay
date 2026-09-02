@@ -1,6 +1,11 @@
 # CDN/DNS Migration: Cloudflare to Bunny.net
 
-**Status**: Planned for Q2 2026
+**Status**: Done. Verified 2026-09-02 from outside the network: the nameservers
+for paramant.app are `kiki.bunny.net` and `coco.bunny.net`, the A record points
+straight at Hetzner (116.203.86.81), and no response carries a Cloudflare
+header (`server: nginx`, no `cf-ray`). The migration date itself is not recorded
+here; what is recorded is that the end state below has been reached. See also
+CHANGELOG "Cloudflare removed - relay now served directly from Hetzner DE".
 **Triggered by**: GitHub Issue #20 (sovereignty claim vs Cloudflare dependency)
 **Owner**: Mick Beer
 

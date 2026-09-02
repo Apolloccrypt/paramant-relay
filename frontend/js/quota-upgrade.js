@@ -47,11 +47,11 @@
   // All interpolated values are server-controlled and coerced (Number) or
   // validated (reset_date shape) -- no user input reaches this HTML.
 
-  // Free plan, third signature blocked: the purchase moment.
+  // Community plan, third signature blocked: the purchase moment.
   function freeSignHtml(data) {
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
       '<strong>You\'ve used both signatures this month.</strong>' +
-      '<span>Free gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
+      '<span>Community gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
       '<span><strong>Pro - EUR 49/month</strong><br>100 signatures per month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.</span>' +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">Upgrade to Pro</a>' +
@@ -79,7 +79,7 @@
       ? 'You have used all ' + limit + ' ' + p.unit + ' included in your plan this month.'
       : 'You have used all ' + p.unit + ' included in your plan this month.';
     return '<div class="pa-quota-upsell" role="status">' +
-      '<strong>Free monthly limit reached.</strong>' +
+      '<strong>Community monthly limit reached.</strong>' +
       '<span>' + used + ' Upgrade to ' + p.upgrade + ' (' + p.price +
       ') for a higher limit, or wait until your quota resets next month.</span>' +
       '<a class="btn btn-primary" href="/pricing">View plans</a>' +

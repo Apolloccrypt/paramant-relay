@@ -38,11 +38,11 @@ assert(!q.isQuota402(200, { error: 'monthly_sign_quota_reached' }));
 assert(!q.isQuota402(402, null));
 ok('isQuota402 accepts the three quota errors and nothing else');
 
-// ── Free sign 402: the upgrade card, copy verbatim ──────────────────────────
+// ── Community sign 402: the upgrade card, copy verbatim ─────────────────────
 const free = q.html({ error: 'monthly_sign_quota_reached', plan: 'free', limit: 2, used: 2, reset_date: '2026-08-01' });
 for (const s of [
   "You've used both signatures this month.",
-  'Free gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
+  'Community gives you 2 per month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
   'Pro - EUR 49/month',
   '100 signatures per month, then EUR 0.40 each, up to 1,000. Unlimited transfers. API access.',
   'Upgrade to Pro',
@@ -75,7 +75,7 @@ ok('pro hard cap renders the upgrade card verbatim, linking to /pricing');
 
 // ── Old backend: transfers keep the prior notice ────────────────────────────
 const legacy = q.html({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: 'free', limit: 10 });
-assert(legacy.includes('Free monthly limit reached.'), 'transfer 402 keeps the legacy notice');
+assert(legacy.includes('Community monthly limit reached.'), 'transfer 402 keeps the legacy notice');
 assert(legacy.includes('ParaSend Pro'), 'transfer 402 keeps the ParaSend upgrade');
 assert(legacy.includes('all 10 transfers'), 'transfer 402 keeps the limit interpolation');
 ok('transfer 402 falls back to the existing notice');
