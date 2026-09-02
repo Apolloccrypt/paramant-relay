@@ -38,6 +38,9 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-hero h1 small { display: block; font-size: 14px; font-weight: 400; color: var(--ink-dim); margin-top: var(--space-1); letter-spacing: 0; }
 .dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 4px 10px; border: 1px solid var(--ink-hair); border-radius: 999px; background: var(--bone); }
 .dh-hero .dh-plan strong { color: var(--ink); font-weight: 600; }
+.dh-hero .dh-plan-up { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 1px; }
+.dh-hero .dh-plan-up:hover { color: var(--navy); }
+.dh-start-kicker { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .75; }
 
 /* Onboarding hint (ParaPear, dismissible once) */
 .dh-onb { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); border-radius: 16px; background: var(--bone); border: 1px solid var(--ink-hair); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.04); }
@@ -290,10 +293,9 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     <header class="dh-hero" aria-labelledby="dh-h1">
       <div>
         <h1 id="dh-h1">Important documents, under control.</h1>
-        <p class="dh-mission">Send, sign and prove important documents. Private by design.</p>
-        <span class="dh-person" data-dh="email"></span>
+        <p class="dh-mission">ParaSign gets a document signed. ParaSend sends a file that burns on read. Both run on servers in Germany.</p>
       </div>
-      <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
+      <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span><a class="dh-plan-up" href="/pricing" data-dh="upgrade-link" hidden>Upgrade</a></span>
     </header>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
@@ -318,21 +320,24 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
     <section class="dh-start" aria-label="Start a document workflow">
       <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Request signatures">
         <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
+        <span class="dh-start-kicker">ParaSign</span>
         <h2>Request signatures</h2>
-        <p>Send a secure document, invite the right people and follow every signature.</p>
+        <p>Send a secure document, invite the right people and follow every signature. They sign with the link from that email and need no account.</p>
         <span class="dh-start-link">Start a request &rarr;</span>
-      </a>
-      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Sign a document yourself">
-        <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
-        <h2>Sign it yourself</h2>
-        <p>Add your signature and download the result immediately.</p>
-        <span class="dh-start-link">Open signing &rarr;</span>
       </a>
       <a class="dh-start-card" href="/parashare" aria-label="Send a file securely">
         <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
-        <h2>Send securely</h2>
-        <p>Deliver a file privately without adding a signature workflow.</p>
+        <span class="dh-start-kicker">ParaSend</span>
+        <h2>Send a file that disappears</h2>
+        <p>Encrypted in your browser, held in RAM, burned on the first read. No signature workflow attached.</p>
         <span class="dh-start-link">Send a file &rarr;</span>
+      </a>
+      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Sign a document yourself">
+        <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
+        <span class="dh-start-kicker">ParaSign</span>
+        <h2>Sign it yourself</h2>
+        <p>Add your signature and download the result immediately.</p>
+        <span class="dh-start-link">Open signing &rarr;</span>
       </a>
     </section>
 
@@ -447,6 +452,6 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/dashboard.js?v=4" defer></script>
+<script src="/js/dashboard.js?v=5" defer></script>
 </body>
 </html>

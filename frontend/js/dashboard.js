@@ -61,14 +61,36 @@
     if (errMsg && detail) errMsg.textContent = detail;
   }
 
+  // The relay stores a plan ID ('community', 'pro', ...). /pricing sells tiers
+  // by NAME, and there is no tier called Community on it: the free ParaSign and
+  // ParaSend tiers are both called Free. A dashboard badge reading COMMUNITY
+  // PLAN sends the customer to a pricing page where that word does not appear,
+  // so the badge speaks the pricing page's language and the ID stays internal.
+  var PLAN_NAMES = {
+    community: 'Free',
+    free:      'Free',
+    standard:  'Free',
+    dev:       'Free',
+    pro:       'Pro',
+    business:  'Business',
+    enterprise:'Enterprise',
+  };
+  var FREE_PLANS = { community: 1, free: 1, standard: 1, dev: 1 };
+
   function render(data) {
     var email = data.email || '';
     var plan  = data.plan  || 'standard';
+    var planId = String(plan).toLowerCase();
+    var planName = PLAN_NAMES[planId] || plan;
 
     txt('email',        email);
     txt('email-full',   email || '--');
-    txt('plan',         plan);
-    txt('plan-strong',  plan);
+    txt('plan',         planName);
+    txt('plan-strong',  planName);
+
+    // A free plan gets one visible way up. A paid plan does not need selling to.
+    var upgrade = root.querySelector('[data-dh="upgrade-link"]');
+    if (upgrade) upgrade.hidden = !FREE_PLANS[planId];
     txt('created',      fmtDate(data.created_at));
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));

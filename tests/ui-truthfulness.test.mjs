@@ -107,4 +107,26 @@ const drifted = homePrices.filter((p) => !pricing.includes(`&euro;${p}`));
 assert.deepEqual(drifted, [],
   `these prices are on the homepage but not on /pricing: ${drifted.join(', ')}`);
 
+// ── The dashboard, which is the homepage for anyone who signed up ────────────
+// Mick's phone showed a badge reading "COMMUNITY PLAN" over a Start card, while
+// /pricing sells Free, Pro, Business and Enterprise and never once says
+// Community. The badge was the raw relay plan ID leaking into the interface, so
+// the one number a customer wants to check (which plan am I on, what does the
+// next one cost) could not be looked up on the page that sells it.
+const dashboardJs = read('frontend/js/dashboard.js');
+const planMap = (dashboardJs.match(/var PLAN_NAMES = \{[\s\S]*?\};/) || [''])[0];
+const planNames = [...planMap.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+assert.ok(planNames.length >= 4, `expected the plan-name map in dashboard.js, found ${planNames.length} entries`);
+const unsold = [...new Set(planNames)].filter((name) => !new RegExp(`>\\s*${name}\\s*<`).test(pricing));
+assert.deepEqual(unsold, [],
+  `the dashboard shows these plan names, but /pricing does not sell them: ${unsold.join(', ')}`);
+
+// The signed-in address is in the nav. A second copy in the hero was the first
+// thing under the H1 on a phone, above both product actions.
+const dashboard = read('frontend/dashboard.html').replace(/<!--[\s\S]*?-->/g, '');
+const hero = (dashboard.match(/<header class="dh-hero"[\s\S]*?<\/header>/) || [''])[0];
+assert.doesNotMatch(hero, /data-dh="email"/,
+  'the dashboard hero must not repeat the email address the nav already shows');
+
 console.log('ui-truthfulness: the homepage does not overclaim signatures and quotes the real prices');
+console.log('ui-truthfulness: the dashboard names the plans /pricing actually sells');
