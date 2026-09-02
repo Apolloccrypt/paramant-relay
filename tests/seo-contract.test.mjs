@@ -253,3 +253,257 @@ test('robots.txt disallows the login path the redirect points at', () => {
     `${dir} is where the login redirect sends a crawler, so robots.txt must disallow it`,
   );
 });
+
+// ── What a shared link says, and who it says is behind it ────────────────────
+// Added 2026-09-02. Two things had drifted page by page and nothing failed when
+// they did.
+//
+// 1. og:title, twitter:title and <title> disagreed on 20 of 38 public pages,
+//    and og:description/twitter:description disagreed with the meta description
+//    on more. A link pasted in Signal, LinkedIn or WhatsApp then advertised a
+//    different page than the one Google shows. These are the same sentence in
+//    three places, so they are asserted as one.
+//
+// 2. The Organization node named no founder and no legal entity, and it existed
+//    on the homepage only while every other page pointed a publisher @id at it.
+//    The name, the title, the company and the town are all printed on the site:
+//    the footer apply-nav.py stamps carries Paramantis Solutions B.V.,
+//    Harderwijk and KvK 42115132, and /about carries "founded by Mick Beer,
+//    privacy and security researcher". Nothing here is asserted that a reader
+//    cannot check on the page itself, which is why it can be pinned at all.
+//
+// If the founder or the legal name ever has to leave the site, this test is the
+// thing that fails first, and the sentence goes out of the pages and out of
+// here in the same commit.
+const entities = (s) => s
+  .replace(/&middot;/g, '·').replace(/&mdash;/g, String.fromCharCode(0x2014))
+  .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+  .replace(/&amp;/g, '&').trim();
+
+const attr = (html, re) => entities((html.match(re) || [, ''])[1] || '');
+
+// The JSON-LD WebPage node is the fifth copy of the same sentence and it was
+// the one that drifted: /trust shipped "Trust & Verification" in the title and
+// "Trust & Transparency" in og:title and in the WebPage name at the same time,
+// and nothing failed. Structured data that names the page something else is a
+// second answer to the same question, and the crawler picks.
+function webPageNodes(html) {
+  return [...html.matchAll(rx.ld)].flatMap((m) => {
+    let parsed;
+    try { parsed = JSON.parse(m[1].trim()); } catch { return []; }
+    return (parsed['@graph'] || [parsed]).filter((n) => n['@type'] === 'WebPage');
+  });
+}
+
+test('the title, Open Graph, Twitter cards and JSON-LD say the same thing', () => {
+  const problems = [];
+  for (const slug of publicPages()) {
+    const html = read(slug);
+    const title = entities((html.match(rx.title) || [, ''])[1]);
+    const desc = attr(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
+    const pairs = [
+      ['og:title', attr(html, /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["']/i), title],
+      ['twitter:title', attr(html, /<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']*)["']/i), title],
+      ['og:description', attr(html, /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["']/i), desc],
+      ['twitter:description', attr(html, /<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']*)["']/i), desc],
+    ];
+    for (const [name, got, want] of pairs) {
+      if (!got) problems.push(`${slug}: no ${name}`);
+      else if (got !== want) problems.push(`${slug}: ${name} is "${got}" but the page says "${want}"`);
+    }
+    const pages = webPageNodes(html);
+    if (!pages.length) problems.push(`${slug}: no WebPage node in the JSON-LD`);
+    for (const node of pages) {
+      if (entities(String(node.name || '')) !== title) {
+        problems.push(`${slug}: JSON-LD WebPage name is "${node.name}" but the page says "${title}"`);
+      }
+      if (node.description !== undefined && entities(String(node.description)) !== desc) {
+        problems.push(`${slug}: JSON-LD WebPage description is "${node.description}" but the page says "${desc}"`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+test('every public page names the company and the founder in its Organization node', () => {
+  const problems = [];
+  for (const slug of publicPages()) {
+    const html = read(slug);
+    const blocks = [...html.matchAll(rx.ld)].map((m) => m[1].trim());
+    const nodes = blocks.flatMap((b) => {
+      let parsed;
+      try { parsed = JSON.parse(b); } catch { return []; }
+      return parsed['@graph'] || [parsed];
+    });
+    const org = nodes.find((n) => n['@type'] === 'Organization');
+    if (!org) { problems.push(`${slug}: no Organization node in the JSON-LD`); continue; }
+    if (org.legalName !== 'Paramantis Solutions B.V.') {
+      problems.push(`${slug}: Organization legalName is "${org.legalName}", the footer says Paramantis Solutions B.V.`);
+    }
+    if (org.founder?.name !== 'Mick Beer') {
+      problems.push(`${slug}: Organization founder is "${org.founder?.name}", /about says Mick Beer`);
+    }
+    if (org.founder?.jobTitle !== 'Privacy and security researcher') {
+      problems.push(`${slug}: founder jobTitle is "${org.founder?.jobTitle}", /about says privacy and security researcher`);
+    }
+    if (org.address?.addressLocality !== 'Harderwijk' || org.address?.addressCountry !== 'NL') {
+      problems.push(`${slug}: Organization address is not Harderwijk, NL`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// ── The sentence itself, not only its consistency ───────────────────────────
+// The gate above pins <title>, og:title and twitter:title to each other. That
+// is not enough on its own: replacing all three with the same false sentence
+// passes it. Measured on 2026-09-02, "Paramant is ISO 27001 certified and free
+// forever" on frontend/index.html kept every test in this file and in
+// ui-truthfulness green. These three gates pin the content.
+
+// The sentence a buyer reads first, on the pages that carry a claim. Pinned
+// word for word on purpose: these are the sentences a search result and a chat
+// preview show, so changing one should be a deliberate edit in two files, not a
+// side effect of editing a page. Every claim below is printed on the site, and
+// the source is named beside it. docs/brand/messaging.md is the guide these
+// follow; it landed in #331 and is on main.
+//
+//   index      "Get documents signed and send files safely, straight from your
+//              browser." is the homepage H1 and lede (#328). "Built and hosted
+//              in the EU" is the same page's rules grid: Hetzner Germany, Bunny
+//              DNS. "Paramantis Solutions B.V." is the footer apply-nav.py
+//              stamps on every page. "The Community plan is free, forever" is
+//              frontend/pricing.html, quoted in the guide, section 3.
+//   pricing    "The Community plan is free, forever" is on
+//              frontend/pricing.html. EUR 15/mo is the ParaSend Pro card and
+//              EUR 49/month the ParaSign Pro card, so the two floors are named
+//              per product: an unsplit "from 15 euro" reads as if signing
+//              starts there, and it starts at 49. Both are excl. btw, which is
+//              the basis the whole page prices on.
+//   about      frontend/about.html: "founded by Mick Beer, privacy and security
+//              researcher", plus the footer entity and town.
+//   sign       frontend/sign.html: "the file and your private key stay in this
+//              browser, and the relay only ever sees a hash" on the account
+//              step, "Private key stays on your device" on the mode chooser,
+//              and the self-contained downloads that verify offline. The
+//              sentence says "the document text", not "the file": in Request
+//              signatures the ENCRYPTED document does go to Paramant, because
+//              that is how a recipient gets it ("Paramant delivers the
+//              encrypted document with the request"). Plaintext and key stay
+//              local in all three modes; the file does not.
+//   verify     frontend/verify.html checks a signature in the browser with no
+//              account and no upload.
+//   download   the banner on frontend/download.html: March 2026 build, 21
+//              protections missing, web app recommended.
+//   trust      frontend/trust.html tags every claim live or planned.
+//   signup     the ParaSign Community card on frontend/pricing.html.
+//
+// The title is pinned as well as the description. A title is the one sentence
+// that gets shared, and the gate above only pins the copies to each other: all
+// four saying the same false thing passed it.
+const PINNED = {
+  index: {
+    title: 'ParaSign by Paramant · sign and send documents in the EU',
+    desc: 'Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.',
+  },
+  pricing: {
+    title: 'Pricing · What is free, and what businesses pay · Paramant',
+    desc: 'The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V.',
+  },
+  about: {
+    title: 'About Paramant · Founded by Mick Beer',
+    desc: 'Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.',
+  },
+  sign: {
+    title: 'Sign a PDF in your browser · Paramant',
+    desc: 'Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.',
+  },
+  verify: {
+    title: 'Check whether a signed document was changed · Paramant',
+    desc: 'Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file.',
+  },
+  download: {
+    title: 'Download the Paramant desktop app',
+    desc: 'The Paramant desktop app. The current build is from March 2026 and misses 21 protections the web app has, so the web app is the one we recommend.',
+  },
+  trust: {
+    title: 'Trust and verification · Paramant',
+    desc: 'What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.',
+  },
+  signup: {
+    title: 'Create a free Paramant account',
+    desc: 'Create a Paramant account. ParaSign Community gives 2 signatures a month, unlimited receiving and full post-quantum crypto, forever. No card required.',
+  },
+};
+
+test('the pages that carry the offer say exactly what they are pinned to say', () => {
+  const problems = [];
+  for (const [slug, want] of Object.entries(PINNED)) {
+    const html = read(slug);
+    const title = entities((html.match(rx.title) || [, ''])[1]);
+    const desc = attr(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
+    if (title !== want.title) problems.push(`${slug}: title is "${title}", pinned to "${want.title}"`);
+    if (desc !== want.desc) problems.push(`${slug}: description is "${desc}", pinned to "${want.desc}"`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// A certification we do not hold is the cheapest sentence to write and the most
+// expensive one to be caught with. Paramant holds none of these: /about states
+// a ParaSign signature is a Simple Electronic Signature and explicitly not
+// eIDAS-qualified, and no page on the site claims an audit or an ISO number.
+// Anything on this list is a claim the site cannot back, so it may not appear
+// in the one sentence a search result or a chat preview shows.
+const FORBIDDEN_CLAIMS = [
+  /ISO\s?\d{4,5}/i, /SOC\s?2/i, /\bcertified\b/i, /\bcertification\b/i,
+  /\baccredited\b/i, /\bqualified electronic signature\b/i, /\bQES\b/,
+  /\bunbreakable\b/i, /\bmilitary[- ]grade\b/i, /\bguaranteed\b/i,
+  /\b100%\s*(secure|private|safe)\b/i, /\bfully compliant\b/i,
+];
+
+test('no title or description claims something the site cannot back', () => {
+  const problems = [];
+  for (const slug of publicPages()) {
+    const html = read(slug);
+    const title = entities((html.match(rx.title) || [, ''])[1]);
+    const desc = attr(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
+    for (const re of FORBIDDEN_CLAIMS) {
+      if (re.test(title)) problems.push(`${slug}: title matches ${re}, and nothing on the site backs that`);
+      if (re.test(desc)) problems.push(`${slug}: description matches ${re}, and nothing on the site backs that`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// Internal vocabulary. "The relay" is what we call our own server; a buyer
+// reading a Google result or a WhatsApp preview has never seen the word. An
+// algorithm name in the first sentence spends the only line we get on something
+// the reader cannot act on. The names stay on the pages, where there is room to
+// explain them; they stay out of the title and out of the sentence that is read
+// before the page is opened.
+const INTERNAL = [
+  /ML-DSA/i, /ML-KEM/i, /SPHINCS/i, /\bFIPS\b/i, /\.prmnt\b/i,
+  /\brelay\b/i, /open-core/i, /\bAES-\d/i, /\benvelope\b/i,
+];
+
+// Pages whose reader is an engineer by the time they arrive: they are linked
+// from the docs and from /security, not from an ad or a shared link, and the
+// vocabulary is the subject of the page rather than a shortcut in it.
+const TECHNICAL = new Set(['architecture', 'crypto-agility', 'ct-log', 'docs/paramant-ot-brief']);
+
+test('the preview text a buyer reads first is free of internal vocabulary', () => {
+  const problems = [];
+  for (const slug of publicPages()) {
+    if (TECHNICAL.has(slug)) continue;
+    const html = read(slug);
+    const title = entities((html.match(rx.title) || [, ''])[1]);
+    const desc = attr(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
+    // The first sentence is the part that survives truncation in a search
+    // result; the rest of the description may carry a technical detail.
+    const lead = desc.split(/(?<=\.)\s/)[0] || desc;
+    for (const re of INTERNAL) {
+      if (re.test(title)) problems.push(`${slug}: title carries ${re}, which is our vocabulary and not the reader's`);
+      if (re.test(lead)) problems.push(`${slug}: the first sentence of the description carries ${re}`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
