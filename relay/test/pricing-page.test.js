@@ -164,6 +164,45 @@ for (const s of ['2 signatures per month', '100 signatures per month, then &euro
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
 ok('parasign.html carries the same quota lines and the btw convention');
 
+// The free plan is called Community on /parasign, because that is what it is:
+// a give-back, not a trial. /pricing lists the same plan under the name Free
+// (PR #328 introduces the Community wording on the homepage the same way). Two
+// names for one plan is fine only while the page says so; a visitor who goes
+// looking for "Community" on the pricing page and finds four tiers, none of
+// them called that, has been sent on a walk. So: if /parasign says Community,
+// it must also name the tier /pricing sells, and /pricing must still sell it.
+if (/\bCommunity\b/.test(parasignHtml)) {
+  assert(/tier named <strong>Free<\/strong>/.test(parasignHtml),
+    'parasign.html calls the free plan Community, so it must also name the /pricing tier it maps to');
+  assert(/>\s*Free\s*</.test(html),
+    '/pricing must actually carry a tier named Free for that bridge to be true');
+  ok('parasign.html bridges Community to the tier /pricing calls Free');
+}
+
+// Every tier name the product page prints must be a tier /pricing sells, so the
+// two pages cannot drift into different product line-ups.
+const parasignTiers = [...parasignHtml.matchAll(/<div class="tier-name">([^<]+)<\/div>/g)].map(m => m[1].trim());
+assert(parasignTiers.length >= 3, 'expected the business tiers on parasign.html, found ' + parasignTiers.length);
+for (const name of parasignTiers) {
+  assert(new RegExp('>\\s*' + name + '\\s*<').test(html),
+    'parasign.html shows the tier "' + name + '", but /pricing does not sell it');
+}
+ok('parasign.html only names tiers /pricing sells (' + parasignTiers.join(', ') + ')');
+
+// A biography is the easiest thing on a sales page to embellish and the hardest
+// for a reader to check. The founder line may say what /about already says and
+// nothing more, and naming him obliges the page to name the accountable company.
+const aboutHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'about.html'), 'utf8');
+for (const claim of ['Mick Beer', 'privacy and security researcher', 'Paramantis Solutions B.V.']) {
+  if (parasignHtml.includes(claim)) {
+    assert(aboutHtml.includes(claim),
+      'parasign.html claims "' + claim + '" about the founder, but /about does not say it');
+  }
+}
+assert(!/\bMick Beer\b/.test(parasignHtml) || /KvK 42115132/.test(parasignHtml),
+  'if parasign.html names the founder it must also name the accountable company registration');
+ok('the founder line on parasign.html matches /about and carries the registration');
+
 // The dead stub checkout page no longer serves the "no charge" lie; it redirects.
 const checkoutHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'billing', 'checkout.html'), 'utf8');
 assert(!/no charge/i.test(checkoutHtml), 'checkout.html must not claim "no charge"');

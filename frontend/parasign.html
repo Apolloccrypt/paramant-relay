@@ -4,17 +4,17 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ParaSign &middot; Post-quantum e-signing by Paramant</title>
+<title>ParaSign &middot; get documents signed, by Paramant</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Post-quantum e-signing in your browser: ML-DSA-65 (FIPS 204), a key that never leaves your device, and a .psign receipt anyone can verify offline.">
-<meta property="og:title" content="ParaSign &middot; Post-quantum e-signing by Paramant">
-<meta property="og:description" content="Post-quantum e-signing in your browser: ML-DSA-65 (FIPS 204), a key that never leaves your device, and a .psign receipt anyone can verify offline.">
+<meta name="description" content="Send a document out for signature and get a receipt anyone can check, from your browser. Free on the Community plan, business plans for firms that sign more.">
+<meta property="og:title" content="ParaSign &middot; get documents signed, by Paramant">
+<meta property="og:description" content="Send a document out for signature and get a receipt anyone can check, from your browser. Free on the Community plan, business plans for firms that sign more.">
 <meta property="og:url" content="https://paramant.app/parasign">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ParaSign &middot; Post-quantum e-signing by Paramant">
-<meta name="twitter:description" content="Post-quantum e-signing in your browser: ML-DSA-65 (FIPS 204), a key that never leaves your device, and a .psign receipt anyone can verify offline.">
+<meta name="twitter:title" content="ParaSign &middot; get documents signed, by Paramant">
+<meta name="twitter:description" content="Send a document out for signature and get a receipt anyone can check, from your browser. Free on the Community plan, business plans for firms that sign more.">
 <link rel="canonical" href="https://paramant.app/parasign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -23,7 +23,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=22">
+<link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
@@ -40,9 +40,15 @@
 .check-card .k{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);font-weight:700}
 .check-card p{margin-top:var(--space-2);font-size:var(--text-sm);color:var(--ink);line-height:1.65;max-width:none}
 .check-card a{color:var(--cobalt)}
-.tier-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
+.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);margin-top:var(--space-5)}
 .tier-card{background:var(--bone);padding:var(--space-5);display:flex;flex-direction:column}
-.tier-card.featured{background:var(--lime)}
+.community{background:var(--lime);border:1px solid var(--ink-hair);padding:var(--space-6);margin-top:var(--space-5);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:var(--space-6)}
+.community h3{font-size:var(--text-xl);letter-spacing:-.01em;color:var(--navy);margin:var(--space-2) 0 0}
+.community p{max-width:none;margin-top:var(--space-3);font-size:var(--text-sm);line-height:1.75}
+.community ul{list-style:none;margin:var(--space-4) 0 0;padding:0}
+.community li{font-family:var(--mono);font-size:var(--text-xs);color:var(--navy);padding:var(--space-2) 0;border-bottom:1px solid rgba(11,58,106,.18);line-height:1.5}
+.community li:last-child{border-bottom:none}
+.community li::before{content:'+ ';font-weight:700}
 .tier-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt)}
 .tier-price{font-family:var(--mono);font-size:var(--text-2xl);font-weight:700;color:var(--navy);margin-top:var(--space-2)}
 .tier-price span{font-size:var(--text-sm);color:var(--ink-dim);font-weight:400}
@@ -60,7 +66,7 @@
 .ps-steps strong{color:var(--navy)}
 .scope-note{background:var(--bone);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);padding:var(--space-4) var(--space-5);margin-top:var(--space-5);max-width:680px}
 .scope-note p{margin-top:0}
-@media(max-width:1023px){.tier-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1023px){.community{grid-template-columns:1fr;gap:var(--space-4)}}
 @media(max-width:640px){.check-grid,.tier-grid{grid-template-columns:1fr}}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
@@ -71,7 +77,7 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/parasign#webpage",
       "url": "https://paramant.app/parasign",
-      "name": "ParaSign - Post-quantum e-signing by Paramant",
+      "name": "ParaSign - get documents signed, by Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -79,7 +85,7 @@
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Post-quantum e-signing in your browser: ML-DSA-65 (FIPS 204), a key that never leaves your device, and a .psign receipt anyone can verify offline."
+      "description": "Send a document out for signature and get a receipt anyone can check, from your browser. Free on the Community plan, business plans for firms that sign more."
     },
     {
       "@type": "SoftwareApplication",
@@ -107,71 +113,17 @@
   <span class="">eu/de · ram only</span>
 </div>
 <nav class="nav">
-  <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-
-    <li><a href="/#products" class="nav-link">Products</a></li>
-
-    <li><a href="/dashboard" class="nav-link nav-link-strong">Dashboard</a></li>
-
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Developers</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs" role="menuitem">Docs</a></li>
-        <li role="none"><a href="/docs#api" role="menuitem">API reference</a></li>
-        <li role="none"><a href="/ct-log" role="menuitem">CT Log</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay" role="menuitem">GitHub</a></li>
-        <li role="none"><a href="https://hub.docker.com/r/mtty001/relay" role="menuitem">Docker Hub</a></li>
-        <li role="none"><a href="/changelog" role="menuitem">Changelog</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Self-host</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/docs#self-hosting" role="menuitem">Deploy guide</a></li>
-        <li role="none"><a href="/setup" role="menuitem">Relay setup wizard</a></li>
-        <li role="none"><a href="/install.sh" role="menuitem">install.sh</a></li>
-        <li role="none"><a href="/install-pi.sh" role="menuitem">install-pi.sh</a></li>
-        <li role="none"><a href="https://pypi.org/project/paramant-sdk/" role="menuitem">SDK · PyPI</a></li>
-        <li role="none"><a href="https://www.npmjs.com/package/paramant-sdk" role="menuitem">SDK · npm</a></li>
-        <li role="none"><a href="https://github.com/Apolloccrypt/paramant-relay/releases" role="menuitem">Releases</a></li>
-      </ul>
-    </li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">Compliance</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li class="nav-subheader" role="presentation">Post-quantum</li>
-        <li role="none"><a href="/crypto-agility" role="menuitem">Crypto agility</a></li>
-        <li class="nav-subheader" role="presentation">Legal</li>
-        <li role="none"><a href="/dpa" role="menuitem">Data Processing Agreement</a></li>
-      </ul>
-    </li>
-
-    <li><a href="/vs" class="nav-link">Compare</a></li>
-
-    <li class="nav-dropdown">
-      <button class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">About</button>
-      <ul class="nav-dropdown-menu" role="menu">
-        <li role="none"><a href="/status" role="menuitem">Status</a></li>
-        <li role="none"><a href="/security" role="menuitem">Security</a></li>
-        <li role="none"><a href="/pararules" role="menuitem">ParaRules</a></li>
-        <li role="none"><a href="/trust" role="menuitem">Trust</a></li>
-        <li role="none"><a href="/sla" role="menuitem">SLA</a></li>
-        <li role="none"><a href="/partners" role="menuitem">Partners</a></li>
-        <li role="none"><a href="/license" role="menuitem">License</a></li>
-        <li role="none"><a href="/press" role="menuitem">Press kit</a></li>
-        <li role="none"><a href="mailto:privacy@paramant.app" role="menuitem">Contact</a></li>
-      </ul>
-    </li>
-
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">HELP</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -181,64 +133,10 @@
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Products</a>
-
-  <a href="/dashboard" class="nav-mobile-standalone">Dashboard</a>
-
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Developers</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs">Docs</a>
-      <a href="/docs#api">API reference</a>
-      <a href="/ct-log">CT Log</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>
-      <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub</a>
-      <a href="/changelog">Changelog</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Self-host</button>
-    <div class="nav-mobile-group-items">
-      <a href="/docs#self-hosting">Deploy guide</a>
-      <a href="/setup">Relay setup wizard</a>
-      <a href="/install.sh">install.sh</a>
-      <a href="/install-pi.sh">install-pi.sh</a>
-      <a href="https://pypi.org/project/paramant-sdk/">SDK · PyPI</a>
-      <a href="https://www.npmjs.com/package/paramant-sdk">SDK · npm</a>
-      <a href="https://github.com/Apolloccrypt/paramant-relay/releases">Releases</a>
-    </div>
-  </div>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">Compliance</button>
-    <div class="nav-mobile-group-items">
-      <a href="/crypto-agility">Crypto agility</a>
-      <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
-    </div>
-  </div>
-
-  <a href="/vs" class="nav-mobile-standalone">Compare</a>
-
-  <div class="nav-mobile-group">
-    <button class="nav-mobile-group-btn" aria-expanded="false">About</button>
-    <div class="nav-mobile-group-items">
-      <a href="/status">Status</a>
-      <a href="/security">Security</a>
-      <a href="/trust">Trust</a>
-      <a href="/pararules">ParaRules</a>
-      <a href="/sla">SLA</a>
-      <a href="/partners">Partners</a>
-      <a href="/license">License</a>
-      <a href="/press">Press kit</a>
-      <a href="mailto:privacy@paramant.app">Contact</a>
-    </div>
-  </div>
-
-  <a href="/help" class="nav-mobile-standalone">Help</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 
 <!-- HERO -->
@@ -247,9 +145,10 @@
     <div class="sec-head">
       <span class="num">00</span>
       <h1 class="paramant-h2">ParaSign</h1>
-      <span class="mono-eyebrow">Post-quantum e-signing by Paramant</span>
+      <span class="mono-eyebrow">Get documents signed, by Paramant</span>
     </div>
-    <p class="ps-lede">Sign PDFs in your browser with an ML-DSA-65 (FIPS 204) signature. Your key never leaves your device, and every completed signature comes with a .psign receipt that anyone can verify offline, with or without the Paramant relay.</p>
+    <p class="ps-lede">Send a contract, a quote or a consent form out for signature and get it back signed, without leaving your browser and without the document passing through anyone else's cloud. Everyone you send it to can check the result later, on their own, without an account and without us.</p>
+    <p class="ps-fine">Free on the <a href="#plans">Community plan</a> &middot; business plans from &euro;49 a month &middot; the person you invite needs no account, only the link in their email.</p>
     <div class="ps-actions">
       <a href="/sign" class="btn btn-primary">Sign a document &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
@@ -262,7 +161,7 @@
   <div class="container-md">
     <span class="mono-eyebrow">01 / What it does</span>
     <h2 style="margin-top:var(--space-2)">Sign, co-sign, prove</h2>
-    <p>ParaSign is the signing half of Paramant. It runs on the same post-quantum core as ParaSend, and the document you sign stays private: the plaintext and the private key never leave your browser.</p>
+    <p>ParaSign is the signing half of Paramant. The document you sign stays private: the plaintext and your signing key never leave your browser, so there is no copy of the contract sitting on our side waiting to be asked for.</p>
     <div class="check-grid">
       <div class="check-card">
         <div class="k">PDF editor and visible seal</div>
@@ -270,19 +169,11 @@
       </div>
       <div class="check-card">
         <div class="k">Co-signing with routing order</div>
-        <p>Add each person who needs to sign. Every invitation is bound to the exact email address you enter, and the encrypted document travels with the request.</p>
+        <p>Add each person who needs to sign, in the order they should sign. Every invitation is bound to the exact email address you enter, and the encrypted document travels with the request.</p>
       </div>
       <div class="check-card">
-        <div class="k">Any file type, by hash</div>
-        <p>Files that are not PDFs get a hash-only attestation: you sign the SHA3-256 of the bytes and recipients verify by re-hashing the same file.</p>
-      </div>
-      <div class="check-card">
-        <div class="k">Public transparency log</div>
-        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/ct-log">CT Log</a>.</p>
-      </div>
-      <div class="check-card">
-        <div class="k">Offline verification</div>
-        <p>A signed document verifies without contacting us. Check one on the <a href="/verify">verify page</a>: no account, no API key.</p>
+        <div class="k">Any file type, by fingerprint</div>
+        <p>Files that are not PDFs get a hash-only attestation: you sign a fingerprint of the bytes and recipients verify by re-hashing the same file.</p>
       </div>
       <div class="check-card">
         <div class="k">Developer API from Pro</div>
@@ -293,24 +184,39 @@
 </section>
 
 <!-- WHAT IT COSTS -->
-<section class="ps-band">
+<section class="ps-band" id="plans">
   <div class="container-md">
     <span class="mono-eyebrow">02 / What it costs</span>
-    <h2 style="margin-top:var(--space-2)">Priced by signature volume, not by feature</h2>
-    <p>Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</p>
-    <div class="tier-grid">
-      <div class="tier-card">
-        <div class="tier-name">Free</div>
-        <div class="tier-price">&euro;0</div>
-        <div class="tier-note">Forever &middot; no card required</div>
+    <h2 style="margin-top:var(--space-2)">Community is free. Companies pay.</h2>
+    <p>Two halves, and the split is the point. Individuals sign for nothing on the Community plan. Organisations that sign at volume buy a business plan, and those plans are what pay for the free one.</p>
+
+    <div class="community">
+      <div>
+        <span class="mono-eyebrow">Community</span>
+        <h3>&euro;0, forever</h3>
+        <p>No card, no clock, no trial that quietly ends. On the <a href="/pricing">pricing page</a> this plan is the tier named <strong>Free</strong>.</p>
         <ul>
           <li>2 signatures per month</li>
           <li>Unlimited receiving</li>
           <li>Full post-quantum crypto</li>
           <li>Public verification log</li>
+          <li>No card required</li>
         </ul>
+        <div class="ps-actions">
+          <a href="/signup" class="btn btn-primary">Start free &rarr;</a>
+        </div>
       </div>
-      <div class="tier-card featured">
+      <div>
+        <div class="k" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--navy)">Why it is free</div>
+        <p>Paramant is built by <strong>Mick Beer</strong>, privacy and security researcher and founder of Paramantis Solutions B.V. (see the <a href="/about">about page</a>). The Community plan is his way of giving something back: whoever needs to sign a document without handing it to an American cloud can do that here, at no cost, with the same cryptography a paying customer gets.</p>
+        <p>It is not a limited edition of the product. Community gets the same signatures, the same encryption and the same public proof log as Business. What a paid plan buys is volume, an API, support and accountability. Never security.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:var(--text-md);margin-top:var(--space-8);color:var(--navy)">Business plans</h3>
+    <p>For firms that sign at volume, need the API, or have to answer to an auditor. Names and prices are the ones on the <a href="/pricing">pricing page</a>; checkout lives there.</p>
+    <div class="tier-grid">
+      <div class="tier-card">
         <div class="tier-name">Pro</div>
         <div class="tier-price">&euro;49<span>/month</span></div>
         <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;59.29/mo incl. 21% btw</span><br>Annual &euro;499 excl.</div>
@@ -342,7 +248,7 @@
         </ul>
       </div>
     </div>
-    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;59.29/mo or &euro;603.79/yr, Business &euro;361.79/mo or &euro;3,617.90/yr. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;59.29/mo or &euro;603.79/yr, Business &euro;361.79/mo or &euro;3,617.90/yr. Pricing is per organisation, not per user. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
   </div>
 </section>
 
@@ -353,31 +259,39 @@
     <h2 style="margin-top:var(--space-2)">Three steps to a signed document</h2>
     <p>Signing a document needs a Paramant account, because the signing key is bound to it. Opening a signing request someone sent you does not: invited signers follow the personal link in their email.</p>
     <ol class="ps-steps">
-      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The free tier covers 2 signatures a month.</li>
-      <li><strong><a href="/sign">Open ParaSign</a> and pick your document.</strong> PDFs get a visible signature stamp you place on any page; other file types are attested by hash. Add co-signers if you need them, then sign. Your key is unlocked with Face ID, Touch ID or a security key the moment you sign, and it is never exported.</li>
+      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The Community plan covers 2 signatures a month.</li>
+      <li><strong><a href="/sign">Open ParaSign</a> and pick your document.</strong> PDFs get a visible signature stamp you place on any page; other file types are attested by fingerprint. Add co-signers if you need them, then sign. Your key is unlocked with Face ID, Touch ID or a security key the moment you sign, and it is never exported.</li>
       <li><strong>Download and share.</strong> You get the stamped PDF and the .psign envelope. Anyone can check them on the <a href="/verify">verify page</a>, offline, without an account.</li>
     </ol>
   </div>
 </section>
 
-<!-- WHY TRUST IT -->
+<!-- THE PROOF, LAST -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">04 / Why you can trust it</span>
-    <h2 style="margin-top:var(--space-2)">Every claim has a place to check it</h2>
-    <p>You should not have to trust us. You should be able to check. Each point below links to where you can.</p>
+    <span class="mono-eyebrow">04 / How it works, and how to check it</span>
+    <h2 style="margin-top:var(--space-2)">The technique is the evidence, not the pitch</h2>
+    <p>None of the above is worth anything if you have to take our word for it. This is the machinery underneath, and next to every claim is the place you can go and check it yourself.</p>
     <div class="check-grid">
       <div class="check-card">
-        <div class="k">Post-quantum signatures</div>
-        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. The algorithm register on the <a href="/crypto-agility">crypto agility page</a> lists it as the loaded default.</p>
+        <div class="k">ML-DSA-65 (FIPS 204)</div>
+        <p>Signatures are post-quantum, generated in your browser. The algorithm register on the <a href="/crypto-agility">crypto agility page</a> lists ML-DSA-65 as the loaded default.</p>
       </div>
       <div class="check-card">
         <div class="k">You own your keys</div>
-        <p>Generated on your device, never sent. We see only the public half. How that works is on the <a href="/security">security page</a>.</p>
+        <p>The private key is generated on your device and never sent. We see only the public half. How that works is on the <a href="/security">security page</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">Verifiable, not trust-me</div>
-        <p>A public CT log and receipts anyone can check offline. Open the <a href="/ct-log">CT Log</a> or the <a href="/verify">verify page</a>.</p>
+        <div class="k">SHA3-256 for non-PDF files</div>
+        <p>A hash-only attestation signs the SHA3-256 digest of the bytes. Re-hash the same file and the signature either matches or it does not.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Public transparency log</div>
+        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/ct-log">CT Log</a>.</p>
+      </div>
+      <div class="check-card">
+        <div class="k">Verification without us</div>
+        <p>A .psign envelope verifies offline, against the published key. Check one on the <a href="/verify">verify page</a>: no account, no API key, no call home.</p>
       </div>
       <div class="check-card">
         <div class="k">Source-available, EU jurisdiction</div>
@@ -402,6 +316,13 @@
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
         <div class="footer-col-label">Legal</div>
         <div class="footer-links">
           <a href="/privacy">Privacy Policy</a>
@@ -416,6 +337,6 @@
 </footer>
 
 <script src="/nav.js?v=14" defer></script>
-<script src="/js/nav-auth.js?v=4" defer></script>
+<script src="/js/nav-auth.js?v=5" defer></script>
 </body>
 </html>
