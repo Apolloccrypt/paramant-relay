@@ -250,6 +250,74 @@ check_has "$FULL"   'after refused outside docroot'      "phase 5b reports how m
 check_has "$SCRIPT" 'NOT PROVEN'                         "phase 6h says NOT PROVEN when the header block is under 16 KB"
 
 echo ""
+echo "6d. The CI gate on main is one verdict per required workflow"
+# The old gate was `gh run list --branch main -L 5`: five runs of whichever
+# workflows happened to run last, with a stop on any `failure` among them. On
+# 2026-09-02 that stopped --preflight-only on a red `heartbeat` run, which is
+# the hourly alarm reporting that its own two canary secrets are missing, and it
+# waved through two runs that were still in_progress because "in progress" is
+# not the string "failure".
+check_lacks "$SCRIPT" 'gh run list --branch main -L 5' \
+  "the mixed-workflow 'last 5 runs on main' gate is gone from the script"
+
+# The gated list must be exactly the workflows that run on a push to main
+# without a paths: filter. It is derived here from .github/workflows rather than
+# copied, so a new push-gated workflow that nobody adds to the gate fails this
+# test instead of quietly deploying ungated.
+DERIVED=""
+for _f in "$ROOT"/.github/workflows/*.yml; do
+  [ -f "$_f" ] || continue
+  _blk="$(awk '/^on:/                              {inon=1; next}
+               inon && /^[^[:space:]#]/            {inon=0}
+               inon && /^  push:/                  {inpush=1; next}
+               inon && inpush && /^  [^[:space:]]/ {inpush=0}
+               inpush' "$_f")"
+  [ -n "$_blk" ] || continue                                    # no push trigger
+  printf '%s\n' "$_blk" | grep -qE 'branches:.*[][ ,]main([][ ,]|$)|^[[:space:]]*-[[:space:]]*main[[:space:]]*$' || continue
+  printf '%s\n' "$_blk" | grep -qE '^[[:space:]]*paths:' && continue   # path-gated: may not run at all
+  DERIVED="$DERIVED $(basename "$_f")"
+done
+DERIVED="$(printf '%s\n' $DERIVED | sort | tr '\n' ' ' | sed 's/^ *//; s/ *$//')"
+GATED="$(sed -n 's/^REQUIRED_WORKFLOWS="\${PARAMANT_REQUIRED_WORKFLOWS:-\(.*\)}"$/\1/p' "$SCRIPT" \
+         | tr ' ' '\n' | sort | tr '\n' ' ' | sed 's/^ *//; s/ *$//')"
+if [ -z "$DERIVED" ]; then
+  fail "no push-to-main workflow was derived from .github/workflows; the derivation is not looking at anything"
+elif [ "$DERIVED" = "$GATED" ]; then
+  pass "the gated list is exactly the push-to-main workflows without a paths: filter ($GATED)"
+else
+  fail "the gated list does not match .github/workflows"
+  printf '        gated:   %s\n' "$GATED"
+  printf '        derived: %s\n' "$DERIVED"
+fi
+
+# Every required workflow really is asked about, by name, in the dry run.
+for _wf in test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat.yml; do
+  check_has "$FULL" "gh run list --workflow $_wf --branch main --status completed -L 1" \
+    "the dry run reads the last completed run of $_wf on main"
+done
+
+# And the three excluded ones are not. The space after --workflow anchors these:
+# "--workflow product-heartbeat.yml" does not match "--workflow heartbeat.yml".
+check_lacks "$FULL" 'gh run list --workflow heartbeat\.yml' \
+  "heartbeat.yml is not gated on (schedule only, red by design without its canary secrets)"
+check_lacks "$FULL" 'gh run list --workflow docker-publish\.yml' \
+  "docker-publish.yml is not gated on (path-gated on relay/**)"
+check_lacks "$FULL" 'gh run list --workflow build-image\.yml' \
+  "build-image.yml is not gated on (path-gated on relay/**)"
+check_has "$SCRIPT" 'Deliberately NOT in the list' \
+  "the script writes down why each excluded workflow is excluded"
+
+echo ""
+echo "6e. A required run still in flight is waited on, not read as not-failing"
+check_has "$FULL"   'status in_progress'       "the gate asks GitHub which runs have not finished"
+check_has "$SCRIPT" 'in_progress queued'       "queued counts as unfinished too"
+check_has "$FULL"   'gh run watch'             "an unfinished run of a required workflow is waited on"
+check_has "$SCRIPT" 'CI_WAIT_SECONDS:-900'     "that wait is capped at 15 minutes"
+check_has "$SCRIPT" 'STILL RUNNING after'      "a run still going after the wait blocks instead of passing"
+check_has "$SCRIPT" 'conclusion // "NONE"'     "a workflow with no completed run on main is NONE, not a pass"
+check_has "$SCRIPT" 'headSha'                  "in-flight runs are matched against the sha that would be deployed"
+
+echo ""
 echo "6b. Rollback restores in an order that cannot half-fail"
 check_has "$RB" 'missing backups = 0'    "rollback refuses to start when a backup it needs is absent"
 check_has "$RB" 'restore \.env first'    "rollback restores .env before recreating the containers"

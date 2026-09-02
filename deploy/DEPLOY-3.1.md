@@ -149,7 +149,42 @@ finds out.
 
 ## Before you start (laptop or NUC, read-only)
 
-1. CI on main is green: `gh run list --branch main -L 5`.
+1. CI on main is green, judged per workflow. `gh run list --branch main -L 5`
+   is not the check: that window mixes workflows, so one red run of something
+   that is red on purpose reads as "main is broken". On 2026-09-02 it stopped
+   `--preflight-only` on a red `heartbeat` run, which is the hourly alarm
+   reporting that its own two canary secrets are absent, and it waved through
+   two runs that were still `in_progress`, because "in progress" is not the
+   string "failure".
+
+   ```bash
+   for wf in test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat.yml; do
+     printf '%-24s ' "$wf"
+     gh run list --workflow "$wf" --branch main --status completed -L 1 \
+       --json conclusion --jq '.[0].conclusion // "NONE"'
+   done
+   ```
+
+   Every one must print `success`. `NONE` (no completed run on main) blocks too.
+   That list is every workflow in `.github/workflows` that runs on a push to
+   `main` without a `paths:` filter. Not on it, on purpose:
+
+   * `heartbeat.yml` does not run on push at all (schedule and
+     `workflow_dispatch`, gated on `vars.HEARTBEAT_ENABLED`) and is red by its
+     own design while the two canary secrets are missing: it has no skip, a
+     missing secret fails and names the secret. Gating the deploy on it would
+     mean no deploy until the alarm has its secrets.
+   * `docker-publish.yml` and `build-image.yml` are path-gated on `relay/**`, so
+     a commit that touches only the frontend produces no run at all and a hard
+     "must be success" would block every such deploy. Neither is what this
+     runbook deploys: step 4 recreates from the server's own checkout.
+
+   A run of a required workflow that is still `in_progress` or `queued` on the
+   sha you would deploy is not a pass, it is an answer that has not arrived.
+   Wait for it with `gh run watch <id>`, at most 15 minutes, then judge what it
+   became. `deploy/deploy-3.1.sh` phase 0a does exactly this and stops when a
+   required workflow is still running after the wait.
+
 2. Local suites on the commit you will deploy, from the repo root:
    ```bash
    tests/static-sanity.sh                                   # the gate deploy.sh runs first
