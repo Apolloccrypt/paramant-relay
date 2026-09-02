@@ -102,6 +102,11 @@ test('the algorithm counts on the site are what bootstrap.js registers, and the 
     const text = visible(page(slug)) + page(slug); // meta descriptions count too
     assert.match(text, new RegExp(`\\b${kems} KEMs\\b`), `${slug}: must state ${kems} KEMs`);
     assert.match(text, new RegExp(`\\b${sigs} signature`), `${slug}: must state ${sigs} signatures`);
+    // A stale count elsewhere on the same page is the failure this exists for.
+    for (const m of text.matchAll(/\b(\d+) (KEMs|signatures?)\b/g)) {
+      const want = m[2] === 'KEMs' ? kems : sigs;
+      assert.equal(Number(m[1]), want, `${slug}: says "${m[0]}", bootstrap.js registers ${want}`);
+    }
     assert.doesNotMatch(text, /\d+ (KEMs|signatures)[^.]*loaded in production/i,
       `${slug}: must not claim the extended set is loaded in production; the default mode is core`);
     assert.match(text, /default core mode loads ML-KEM-768 and ML-DSA-65/,
