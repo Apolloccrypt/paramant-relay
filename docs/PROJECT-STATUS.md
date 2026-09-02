@@ -12,6 +12,7 @@ nothing here is a snapshot.
 
 | Question | Answer lives in |
 |---|---|
+| How a new developer gets the repo running on day one | `docs/ONBOARDING.md` |
 | What is in each version, and what changed since the last one | `CHANGELOG.md` |
 | How a release is cut, tagged, published and deployed | `docs/RELEASE.md` |
 | How to deploy the current release | `deploy/DEPLOY-3.1.md` |

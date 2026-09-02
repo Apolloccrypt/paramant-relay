@@ -11,6 +11,10 @@
 
 Data is encrypted client-side with ML-KEM-768 + AES-256-GCM, relayed through RAM only, and destroyed after one download. Nothing is ever written to disk. Every transfer is recorded in a public Merkle tree — proving delivery without storing content.
 
+**New here?** Read [`docs/ONBOARDING.md`](docs/ONBOARDING.md) first: what Paramant is, the
+repo map with the test that guards each directory, local setup with the commands and
+the counts they print, the rules of the house, and the traps of the first week.
+
 ---
 
 ## Quick start
