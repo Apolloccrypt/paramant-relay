@@ -30,6 +30,10 @@ REDIRECTS = {"iot"}
 PRIVATE = {
     "404", "account", "admin", "all-systems-go", "claim", "co-sign", "dashboard",
     "developer", "get", "ontvang", "request-key", "setup",
+    # /parashare sits behind the same nginx auth_request the test's PRIVATE set
+    # names it for. It was in this list's counterpart and not in this list, so
+    # the two files disagreed about one page.
+    "parashare",
     "auth/backup", "auth/login", "auth/request-reset", "auth/reset-confirm",
     "auth/setup", "billing/checkout", "signup/verified"}
 
@@ -39,6 +43,22 @@ PRIVATE = {
 SOFTWARE = {
     "index", "parashare", "parasign", "sign", "verify", "vault", "download",
     "co-sign"}
+
+# Where a page ships a SoftwareApplication node that is more specific than the
+# generic one, it is written down here instead of by hand in the HTML, or the
+# next run of this script quietly reverts it. The homepage sells ParaSign by
+# name (#328) and offers the Community plan at EUR 0, which is what
+# frontend/pricing.html prints on the ParaSign Community card.
+SOFTWARE_OVERRIDES = {
+    "index": {
+        "name": "ParaSign by Paramant",
+        "applicationCategory": "BusinessApplication",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "EUR",
+            "url": ORIGIN + "/pricing"}},
+}
 
 
 def pages():
@@ -66,7 +86,7 @@ def find(pattern, html, group=1):
 def clean(text):
     """Collapse an HTML fragment into one line of plain sentence text."""
     text = re.sub(r"<[^>]+>", " ", text)
-    text = (text.replace("&mdash;", "-").replace("&middot;", "-")
+    text = (text.replace("&mdash;", "-").replace("&middot;", "\u00b7")
                 .replace("&amp;", "&").replace("&nbsp;", " ")
                 .replace("&quot;", '"').replace("&#39;", "'"))
     return re.sub(r"\s+", " ", text).strip()
@@ -99,13 +119,35 @@ def trim(text, limit=158):
     return cut.rsplit(" ", 1)[0].rstrip(" ,;:-.") + "..."
 
 
+# Every field here is already printed on the site: the legal name, the town and
+# the KvK number come from the footer that apply-nav.py stamps on every page,
+# the founder and his title come from /about, and the server location comes from
+# the jurisdiction table on /security. Nothing is asserted that a reader cannot
+# check on the page itself. The old description said "built and hosted in the
+# Netherlands", which contradicted /security: the company is Dutch, the servers
+# are Hetzner Nuremberg.
 ORG = {
     "@type": "Organization",
     "@id": f"{ORIGIN}/#organization",
     "name": "Paramant",
+    "legalName": "Paramantis Solutions B.V.",
     "url": ORIGIN + "/",
-    "description": "Post-quantum encrypted file transfer and document signing, "
-                   "built and hosted in the Netherlands.",
+    "description": "Document signing and encrypted file transfer for "
+                   "professional firms in the EU. Dutch company, servers in "
+                   "Germany.",
+    "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"},
+    "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"},
+    "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"},
+    "email": "privacy@paramant.app",
     "areaServed": "EU",
     "knowsLanguage": ["nl", "en"]}
 
@@ -143,17 +185,24 @@ def graph_for(slug, title, desc):
         nodes.append({"@type": "BreadcrumbList", "@id": url + "#breadcrumb", "itemListElement": items})
 
     if slug in SOFTWARE:
-        nodes.append({
+        app = {
             "@type": "SoftwareApplication",
             "@id": url + "#software",
             "name": "Paramant",
             "applicationCategory": "SecurityApplication",
             "operatingSystem": "Web browser",
-            "url": url,
-            "publisher": {"@id": f"{ORIGIN}/#organization"}})
+            "url": url}
+        app.update(SOFTWARE_OVERRIDES.get(slug, {}))
+        app["publisher"] = {"@id": f"{ORIGIN}/#organization"}
+        nodes.append(app)
+
+    # The Organization node goes on every public page, not just the homepage.
+    # Every other page already pointed a publisher @id at it while the node
+    # itself existed on one URL only, so a crawler landing on /pricing or
+    # /about saw a dangling reference and no founder at all.
+    nodes.append(ORG)
 
     if slug == "index":
-        nodes.append(ORG)
         nodes.append({
             "@type": "WebSite",
             "@id": f"{ORIGIN}/#website",
