@@ -97,13 +97,63 @@ function isRecurringPayment(payment) {
   return !!(payment && payment.sequenceType === 'recurring');
 }
 
+// The switch on this whole file. deps.recurring comes from mollie.billingStance()
+// and is only true when BILLING_MODE was set by hand. When it is false the relay
+// bills exactly as it did on 2026-08-08: a one-off payment, no customer, no
+// sequenceType, no subscription. Production has run with BILLING_MODE empty and
+// a live key since billing exists, so an inferred 'live' must never be enough
+// to start opening mandates against a real account.
+function recurringAllowed(deps) {
+  return !!(deps && deps.recurring === true);
+}
+
+// Before a checkout: the Mollie customer the mandate will hang on. A payment
+// without a customerId cannot become a mandate, so this is the first of the
+// three things a subscription needs, and the one that decides whether the
+// checkout is recurring at all.
+//
+// deps: { recurring, mode, getAccount(accountId), saveCustomer(accountId, id),
+//         mollie: { getCustomer, createCustomer } }
+// Returns { customerId: string|null, result, reason? } and NEVER throws: the
+// buyer's payment matters more than tidiness in our own records, so a failed
+// lookup or create falls through to a one-off checkout and the caller logs it.
+async function ensureCustomer(accountId, deps) {
+  const d = deps || {};
+  const m = d.mollie || {};
+  if (!recurringAllowed(d)) return { customerId: null, result: 'skipped', reason: 'recurring_disabled' };
+  if (!accountId) return { customerId: null, result: 'skipped', reason: 'no_account' };
+  try {
+    const rec = typeof d.getAccount === 'function' ? await d.getAccount(accountId) : null;
+    // Reuse the stored customer when Mollie still knows it. A stale or foreign
+    // id must not break a checkout, so a failed lookup creates a new one.
+    const stored = rec && rec[CUSTOMER_FIELD];
+    if (stored) {
+      try { const c = await m.getCustomer(d.mode, stored); if (c && c.id) return { customerId: c.id, result: 'reused' }; }
+      catch { /* fall through to create */ }
+    }
+    const created = await m.createCustomer(d.mode, {
+      name: (rec && rec.label) || undefined,
+      email: (rec && rec.email) || undefined,
+      metadata: { accountId },
+    });
+    if (!created || !created.id) return { customerId: null, result: 'failed', level: 'error', reason: 'no_customer_id' };
+    if (typeof d.saveCustomer === 'function') await d.saveCustomer(accountId, created.id);
+    return { customerId: created.id, result: 'created' };
+  } catch (e) {
+    // No customer means no mandate means no renewal. The sale still goes through
+    // as a one-off rather than failing in the buyer's face, but this is an
+    // alert: money will come in once and never again.
+    return { customerId: null, result: 'failed', level: 'error', reason: e.message, status: e.status };
+  }
+}
+
 // After a grant: make sure the buyer will be asked again when the period ends.
 //
 // deps: {
 //   getAccount(accountId) -> record | null
 //   saveSubscription(accountId, product, subscriptionId) -> void   (async ok)
 //   mollie: { validMandates, createSubscription, mollieInterval }
-//   mode, webhookUrl
+//   mode, webhookUrl, recurring (from mollie.billingStance(); false = 08-08 behaviour)
 // }
 // Returns { result, reason, subscriptionId? } and NEVER throws: a failure here
 // must not undo an entitlement the buyer has already paid for. The caller logs
@@ -114,6 +164,9 @@ async function ensureSubscription(payment, grant, deps) {
   const accountId = grant && grant.account;
   const product = grant && grant.product;
   if (!accountId || !product) return { result: 'skipped', reason: 'no_grant' };
+  // Not a failure and not logged as one: the grant stands, and nothing
+  // recurring was promised in this stance.
+  if (!recurringAllowed(d)) return { result: 'skipped', reason: 'recurring_disabled' };
 
   // A renewal collected BY the subscription must never create a second one.
   if (isRecurringPayment(payment)) return { result: 'skipped', reason: 'recurring_collection' };
@@ -200,5 +253,5 @@ async function cancelForProduct(accountId, product, deps) {
 module.exports = {
   CUSTOMER_FIELD, PRODUCT_SUBSCRIPTION_FIELD, subscriptionFieldOf,
   startDateFor, subscriptionPayload, isFirstPayment, isRecurringPayment,
-  ensureSubscription, cancelForProduct,
+  recurringAllowed, ensureCustomer, ensureSubscription, cancelForProduct,
 };

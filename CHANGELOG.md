@@ -101,6 +101,16 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implementation deferred to later phases.
 
 ### Changed
+- **Recurring billing needs an explicit `BILLING_MODE`.** The customer, mandate
+  and subscription layer (`relay/lib/billing-recurring.js`) now runs only when
+  `BILLING_MODE` is set by hand to `live` or `test`. With it empty, as production
+  has run since billing exists, `billingMode()` still infers the mode from the
+  key, but the relay creates plain one-off payments exactly as the 2026-08-08
+  code did: no customer, no `sequenceType`, no subscription. The `billing_config`
+  line at boot now carries `mode_source`, `recurring` and a one-sentence
+  `stance`, at `warn` when the mode is inferred. Pinned by
+  `relay/test/billing-stance.test.js` and `billing-stance-boot.test.js`.
+  Deploy runbook: `deploy/DEPLOY-3.1.md`.
 - `mldsa65.js` migrated to the `@paramant/core` binding (matches the `mlkem768.js`
   M5b pattern). Byte-compatible via paramant-core ADR-0021 cross-impl KAT. Covers
   all ML-DSA-65 use in the relay (STH-signing + receipt/signature verify) through

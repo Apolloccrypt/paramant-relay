@@ -26,6 +26,34 @@ function apiKeyFor(mode) {
   return (mode === 'test' ? process.env.MOLLIE_TEST_API_KEY : process.env.MOLLIE_API_KEY) || '';
 }
 
+// The stance this deployment bills in: which Mollie account (mode) and whether
+// the recurring layer (customer, first payment, subscription) may run at all.
+//
+// billingMode() infers 'live' from the mere presence of a live key. That
+// inference was fine for the code of 2026-08-08, which only ever created
+// one-off payments. It is not enough to open mandates and subscriptions
+// against a real Mollie account, because nobody decided that: production runs
+// with BILLING_MODE empty and a live_ key, and a deploy of the recurring layer
+// would have started collecting money on an inference, with code that has
+// never seen a real Mollie answer.
+//
+// So the recurring layer needs BILLING_MODE set by hand. 'live' means real
+// money, 'test' means the test account. Empty (or anything else) means exactly
+// what it meant on 08-08: one-off payments in the inferred mode, no customer,
+// no sequenceType, no subscription. Flipping it is a deploy-time decision, made
+// in .env, and the boot log says which stance is active.
+function billingStance() {
+  const explicit = (process.env.BILLING_MODE || '').toLowerCase();
+  const recurring = explicit === 'live' || explicit === 'test';
+  const mode = billingMode();
+  return {
+    mode,
+    recurring,
+    source: recurring ? 'explicit' : 'inferred',
+    key_present: !!apiKeyFor(mode),
+  };
+}
+
 function _request(method, path, apiKey, bodyObj) {
   return new Promise((resolve, reject) => {
     const body = bodyObj ? JSON.stringify(bodyObj) : null;
@@ -151,7 +179,7 @@ async function cancelSubscription(mode, customerId, subscriptionId) {
 }
 
 module.exports = {
-  MOLLIE_HOST, billingMode, apiKeyFor, createPayment, getPayment,
+  MOLLIE_HOST, billingMode, billingStance, apiKeyFor, createPayment, getPayment,
   createCustomer, getCustomer, validMandates, mollieInterval,
   createSubscription, cancelSubscription,
 };
