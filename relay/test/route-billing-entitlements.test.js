@@ -79,28 +79,26 @@ test('#315: a paid period on disk is still bounded after a restart', async () =>
   did();
 });
 
-// KNOWN FAILING, ON PURPOSE. This is the rule the paid_until field exists for,
-// and the account-level read path does not honour it today. Marked todo so the
-// run stays green while the finding stays visible; when the bug is fixed this
-// turns into "ok ... # TODO" and the flag can go.
-//
-// THE BUG: lib/entitlements.js:328-344 mergeAccountRecord() copies plan_parasign
-// and plan_parasend off the api-key records onto the merged account record, but
-// NOT their paid_until_* fields. Its own doc comment says why those fields can
-// only live on the key records ("the accounts summary never carries the
-// per-product plans"), so the merged record always arrives at getEntitlements
-// with a paid tier and no period, and entitlements.js:137 correctly reads "no
-// recorded period" as "never expired". The result is that an expired
-// subscription keeps granting on every account-level gate:
+// WAS KNOWN FAILING (PR #341, finding 1), now the rule this whole field exists
+// for. The bug had two halves, both of them a DROP of paid_until_* while the
+// tier travelled on:
+//   keys-table.parseAccountFields() rehydrated plan_parasign off users.json but
+//     not paid_until_parasign, so the in-memory key record already had a paid
+//     tier and no period before any merge ran;
+//   entitlements.mergeAccountRecord() copied the per-product plans off the key
+//     records onto the merged account record and left the periods behind, and
+//     the same drop sat in keys-table.rebuildKeyIndexes() for the accounts
+//     summary.
+// Either half is enough: the record reaches getEntitlements with a paid tier and
+// no period, and entitlements.js:137 correctly reads "no recorded period" as
+// "never expired". So an expired subscription kept granting on every
+// account-level gate:
 //   relay.js:5316  GET /v2/admin/entitlements/:account_id
 //   relay.js:5990  the signs-quota gate on POST /v2/envelopes/:id/sign
 //   relay.js:1804  the plan a newly minted psk_ key inherits
-// Reading the SAME record directly (without the merge) does expire correctly,
-// which is how you can tell it is the merge and not the date logic:
-//   getEntitlements(keyRec).parasign.tier                      -> 'free'
-//   getEntitlements(mergeAccountRecord(acct,[keyRec])).parasign.tier -> 'business'
-test('#315: a period that HAS passed stops granting, and stops granting again after a restart',
-  { todo: 'mergeAccountRecord drops paid_until_* (lib/entitlements.js:328-344)' }, async () => {
+// Fixed by making tier and period travel together in all three places
+// (entitlements.mergeProductGrantInto).
+test('#315: a period that HAS passed stops granting, and stops granting again after a restart', async () => {
   let srv = await withUsers('paid-until-expired', [{
     key: 'pgp_lapsed', plan: 'community', active: true, parasign: true,
     account_id: 'acct_lapsed', email: 'lapsed@example.test',
@@ -123,20 +121,48 @@ test('#315: a period that HAS passed stops granting, and stops granting again af
   did();
 });
 
-// The same fact, stated as something that is true TODAY, so the finding above is
-// not just a comment: the two read paths disagree about the same record. This
-// test is the evidence for the bug report, and it is expected to be deleted in
-// the same commit that fixes mergeAccountRecord.
-test('FINDING: the account-level read path loses the paid period the key record carries', () => {
+// The inverse of the finding that used to stand here: the two read paths must
+// give the SAME answer about the same record. The direct read was always right;
+// it was the merged one that over-granted. Stated as a property, so it holds for
+// a lapsed period, a live one, and no period at all -- that last row is the edge
+// entitlements.js:137 protects and it must keep granting.
+test('the merged read path answers exactly like a direct read of the same record', () => {
   const ent = require('../lib/entitlements');
-  const keyRec = { plan: 'community', parasign: true, plan_parasign: 'business', paid_until_parasign: PAST };
-  assert.strictEqual(ent.getEntitlements(keyRec).parasign.tier, 'free',
-    'read straight off the key record, an expired period does fall to the floor');
-  const merged = ent.mergeAccountRecord({ account_id: 'acct', plan: 'community' }, [keyRec]);
-  assert.ok(!('paid_until_parasign' in merged),
-    'the merge drops the period field entirely - this is the bug, in one line');
-  assert.strictEqual(ent.getEntitlements(merged).parasign.tier, 'business',
-    'so the account-level path still grants a tier that was paid for until ' + PAST);
+  const cases = [
+    ['expired', { plan: 'community', parasign: true, plan_parasign: 'business', paid_until_parasign: PAST }, 'free'],
+    ['live',    { plan: 'community', parasign: true, plan_parasign: 'business', paid_until_parasign: FUTURE }, 'business'],
+    ['bare',    { plan: 'community', parasign: true, plan_parasign: 'business' }, 'business'],
+  ];
+  for (const [tag, keyRec, expect] of cases) {
+    assert.strictEqual(ent.getEntitlements(keyRec).parasign.tier, expect,
+      `${tag}: precondition, the direct read is the answer we trust`);
+    const merged = ent.mergeAccountRecord({ account_id: 'acct', plan: 'community' }, [keyRec]);
+    assert.strictEqual(merged.paid_until_parasign, keyRec.paid_until_parasign,
+      `${tag}: the merge carries the period with the tier (or carries neither)`);
+    assert.strictEqual(ent.getEntitlements(merged).parasign.tier, expect,
+      `${tag}: and the account-level path lands on the same tier`);
+  }
+  // A lapsed grant must not outrank a live lower one, or fixing the drop would
+  // introduce a downgrade: the account really does still hold ParaSign Pro.
+  const lapsedPlusLive = ent.mergeAccountRecord({ account_id: 'acct', plan: 'community' }, [
+    { plan_parasign: 'business', paid_until_parasign: PAST },
+    { plan_parasign: 'pro', parasign: true },
+  ]);
+  assert.strictEqual(ent.getEntitlements(lapsedPlusLive).parasign.tier, 'pro',
+    'an expired business grant falls away, the live pro grant on the sibling key stays');
+  did();
+});
+
+// The same divergence one layer lower: users.json -> in-memory record. Before
+// the fix parseAccountFields returned the tier without the date, so the expiry
+// could not be enforced no matter what the merge did.
+test('a key loaded from users.json keeps the paid period it was stored with', () => {
+  const kt = require('../lib/keys-table');
+  const lapsed = kt.parseAccountFields({ key: 'k', plan: 'community', parasign: true, plan_parasign: 'business', paid_until_parasign: PAST });
+  assert.strictEqual(lapsed.paid_until_parasign, PAST, 'the period is rehydrated with the tier it bounds');
+  const bare = kt.parseAccountFields({ key: 'k', plan: 'community', parasign: true, plan_parasign: 'business' });
+  assert.ok(!('paid_until_parasign' in bare),
+    'and a key with no period on file stays absent, not an explicit null that could read as expired');
   did();
 });
 

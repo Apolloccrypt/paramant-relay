@@ -312,6 +312,57 @@ function getEntitlements(account, now) {
   };
 }
 
+// ── Per-product grant merging ────────────────────────────────────────────────
+// A grant is a PAIR: the tier that was paid for and the period it was paid for.
+// Merging only the tier is what let an expired subscription keep granting: the
+// merged record arrived at getEntitlements with a paid tier and no period, and
+// "no recorded period" correctly means "never expires". So the two fields must
+// always travel together, here and in keys-table.rebuildKeyIndexes.
+//
+// _grantOf ranks one record's grant for a product:
+//   rank       the tier it is entitled to RIGHT NOW (a lapsed period ranks as
+//              the floor tier, so it can never outrank a live lower tier)
+//   storedRank the tier on file, which breaks a tie between two floored records
+//              so the paid history is not thrown away
+//   paidUntil  null means unbounded
+function _grantOf(rec, product, at) {
+  const ladder = product === 'parasign' ? PARASIGN_TIERS : PARASEND_TIERS;
+  const norm = product === 'parasign' ? normaliseParasignTier : normaliseParasendTier;
+  return {
+    rank: ladder.indexOf(effectiveProductTier(rec, product, at).tier),
+    storedRank: ladder.indexOf(norm(rec[PRODUCT_PLAN_FIELD[product]])),
+    paidUntil: parsePaidUntil(rec[PRODUCT_PAID_UNTIL_FIELD[product]]),
+  };
+}
+
+// Does grant `a` beat grant `b`? Effective tier first, then the tier on file,
+// then the more generous period: no recorded period beats a date, and a later
+// date beats an earlier one.
+function _outranksGrant(a, b) {
+  if (a.rank !== b.rank) return a.rank > b.rank;
+  if (a.storedRank !== b.storedRank) return a.storedRank > b.storedRank;
+  if ((a.paidUntil === null) !== (b.paidUntil === null)) return a.paidUntil === null;
+  if (a.paidUntil === null) return false;
+  return a.paidUntil > b.paidUntil;
+}
+
+// Copy `source`'s grant for one product onto `target` IN PLACE when it is the
+// better of the two, tier AND period together. A source with no tier on file
+// carries no grant and is skipped. Clearing is deliberate: when the winning
+// record has no period, any period already on the target goes, or the target
+// would keep a date that belongs to a tier it no longer carries.
+function mergeProductGrantInto(target, source, product, now) {
+  const planField = PRODUCT_PLAN_FIELD[product];
+  const paidField = PRODUCT_PAID_UNTIL_FIELD[product];
+  if (!target || !source || !planField || source[planField] == null) return target;
+  const at = typeof now === 'number' ? now : Date.now();
+  if (target[planField] != null && !_outranksGrant(_grantOf(source, product, at), _grantOf(target, product, at))) return target;
+  target[planField] = source[planField];
+  if (source[paidField] == null) delete target[paidField];
+  else target[paidField] = source[paidField];
+  return target;
+}
+
 // mergeAccountRecord(acctRec, keyRecs) -> one record safe to hand to
 // getEntitlements, or null when the account is unknown.
 //
@@ -325,20 +376,14 @@ function getEntitlements(account, now) {
 //
 // The HIGHEST tier any key of the account holds wins, so a stale free key can
 // never hold a paid account down. Never mutates its inputs.
-function mergeAccountRecord(acctRec, keyRecs) {
+function mergeAccountRecord(acctRec, keyRecs, now) {
   const keys = Array.isArray(keyRecs) ? keyRecs.filter(Boolean) : [];
   if (!acctRec && keys.length === 0) return null;
   const merged = Object.assign({}, acctRec || {});
-  const higher = (order, cur, next) => {
-    if (!next || order.indexOf(next) < 0) return cur;
-    if (!cur || order.indexOf(cur) < 0) return next;
-    return order.indexOf(next) > order.indexOf(cur) ? next : cur;
-  };
   for (const rec of keys) {
     if (!merged.plan) merged.plan = rec.plan;
-    merged.plan_parasign = higher(PARASIGN_TIERS, merged.plan_parasign, rec.plan_parasign);
-    merged.plan_parasend = higher(PARASEND_TIERS, merged.plan_parasend, rec.plan_parasend);
     if (rec.parasign) merged.parasign = true;
+    for (const product of PRODUCTS) mergeProductGrantInto(merged, rec, product, now);
   }
   return merged;
 }
@@ -395,6 +440,7 @@ module.exports = {
   effectiveProductTier,
   getEntitlements,
   mergeAccountRecord,
+  mergeProductGrantInto,
   transfersQuota,
   signsQuota,
   signsOverage,

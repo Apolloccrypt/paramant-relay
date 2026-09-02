@@ -1812,11 +1812,18 @@ function mintParasignKey(accountId, opts = {}) {
   // The new key inherits the account's EFFECTIVE per-product tiers, resolved
   // over every key the account holds. Minting used to pass the legacy `plan`
   // only, which silently issued a free-tier ParaSign key to a paying account.
+  // EFFECTIVE, not the tier on file: the new key record carries no paid_until,
+  // so re-issuing a lapsed tier here would turn an expired subscription into a
+  // permanent one. A record with no per-product tier at all is left undefined,
+  // so buildParasignKeyRecord still derives from the legacy plan as before.
   const eff = entitlementRecordOf(accountId) || {};
+  const _effTier = (product) => (eff[entitlements.PRODUCT_PLAN_FIELD[product]] == null
+    ? undefined
+    : entitlements.effectiveProductTier(eff, product).tier);
   const built = keysTable.buildParasignKeyRecord({
     accountId, plan, email, label: opts.label, test: !!opts.test,
-    planParasign: opts.planParasign || eff.plan_parasign,
-    planParasend: opts.planParasend || eff.plan_parasend,
+    planParasign: opts.planParasign || _effTier('parasign'),
+    planParasend: opts.planParasend || _effTier('parasend'),
     randomHex: crypto.randomBytes(32).toString('hex'),
   });
   const { key, record, usersEntry } = built;
