@@ -108,11 +108,31 @@ function toB64(u8) {
   return btoa(s);
 }
 
+// The meter never stands alone: the percentage is written next to it and onto
+// the track itself, so a screen reader hears the same number the eye reads.
+function setEncProgress(pct) {
+  const rounded = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  const readout = $('enc-pct');
+  const track = $('enc-progress-track');
+  if (readout) readout.textContent = rounded + '%';
+  if (track) track.setAttribute('aria-valuenow', String(rounded));
+}
+
 async function copyLink() {
+  // The confirmation belongs on the button, not in the link box: overwriting
+  // the link with "Copied!" hides the thing you just asked to see.
   const url = $('session-link').textContent;
-  await navigator.clipboard.writeText(url).catch(()=>{});
-  $('session-link').textContent = '✓ Copied!';
-  setTimeout(() => { $('session-link').textContent = url; }, 2000);
+  const button = $('ps-copy-btn');
+  let copied = true;
+  await navigator.clipboard.writeText(url).catch(() => { copied = false; });
+  if (!button) return;
+  if (button._resetTimer) clearTimeout(button._resetTimer);
+  button.textContent = copied ? 'Copied' : 'Copy failed';
+  button.classList.toggle('is-copied', copied);
+  button._resetTimer = setTimeout(() => {
+    button.textContent = 'Copy link';
+    button.classList.remove('is-copied');
+  }, 2000);
 }
 
 // ── Fingerprint localStorage (TOFU) ──
@@ -337,6 +357,7 @@ async function confirmFingerprint() {
           ((fileIndex + (i / totalChunks)) / totalFiles) * 85
         );
         $('enc-progress').style.width = globalPct + '%';
+        setEncProgress(globalPct);
         const mbDone = Math.round((i * CHUNK_PLAIN) / 1024 / 1024);
         const mbTotal = Math.round(file.size / 1024 / 1024);
         $('enc-status').textContent = (totalFiles > 1 ? 'File ' + (fileIndex+1) + '/' + totalFiles + ' — ' : '') +
@@ -398,6 +419,7 @@ async function confirmFingerprint() {
     }
 
     $('enc-progress').style.width = '100%';
+    setEncProgress(100);
     $('enc-status').textContent = 'Notifying receiver...';
 
     const isVault = files.length > 1;

@@ -275,6 +275,9 @@
   function renderDocuments() {
     var list = document.getElementById('dh-documents');
     if (!list) return;
+    // The skeleton is gone the moment real rows exist, so aria-busy has to go
+    // with it or a screen reader keeps announcing a list that already landed.
+    list.setAttribute('aria-busy', 'false');
     renderDocumentCounts();
     var visible = documents.filter(function (doc) { return documentMatches(doc, documentFilter); });
     if (!visible.length) {

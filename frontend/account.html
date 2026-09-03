@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}html[data-theme="auto"],html[data-theme="auto"] body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Your account · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
@@ -25,19 +24,13 @@
 /* Plan bands in the billing section: what this plan is, in one line. The
    Community band is dark like the dashboard band so the same message reads as
    the same message on both pages. */
-.acct-plan-band { border-radius: 10px; padding: 18px 20px; margin: 0 0 20px; }
-.acct-plan-band.free { background: #0a1626; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
-.acct-plan-band.paid { background: rgba(255,255,255,.76); border: 1px solid rgba(11,58,106,.09); }
-.acct-plan-kicker { margin: 0 0 8px; font-family: IBM Plex Mono, monospace; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
-.acct-plan-band.free .acct-plan-kicker { color: #B2FF3F; }
-.acct-plan-band.paid .acct-plan-kicker { color: #1D4ED8; }
-.acct-plan-lede { margin: 0 0 10px; font-size: 15px; line-height: 1.6; }
-.acct-plan-band.free .acct-plan-lede { color: #F8FAFC; }
-.acct-plan-band.paid .acct-plan-lede { color: #0B3A6A; }
-.acct-plan-adds { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: rgba(248,250,252,.72); }
-.acct-plan-band.free a.acct-plan-cta { display: inline-block; font-family: IBM Plex Mono, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #0a1626; background: #B2FF3F; text-decoration: none; padding: 10px 16px; border-radius: 4px; }
-.acct-plan-band.free a.acct-plan-cta:hover { background: #F8FAFC; }
-.acct-plan-band.free .acct-plan-lede a { color: #B2FF3F; }
+/* The plan bands are shared with the dashboard and live in /app-2026.css, so
+   the same message reads as the same message on both pages. Only the spacing
+   is set here. */
+.acct-plan-band { padding: 18px 20px; margin: 0 0 20px; }
+.acct-plan-lede { margin: 0 0 10px; font-size: 15px; line-height: 1.62; }
+.acct-plan-adds { margin: 0 0 14px; font-size: 13px; line-height: 1.62; }
+.acct-plan-kicker { margin: 0 0 10px; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
 .nav-help {
   display: inline-flex;
   align-items: center;
@@ -101,35 +94,53 @@
 
 /* ---- Modern account surface: dashboard-style soft cards, design tokens only ---- */
 main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
-.acct-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding-bottom: var(--space-4); border-bottom: 1px solid var(--ink-hair); margin-bottom: var(--space-5); }
-.acct-hero h1 { font-family: var(--sans); font-size: clamp(24px, 3.2vw, 32px); font-weight: 600; letter-spacing: -.018em; color: var(--ink); margin: 0; line-height: 1.1; }
-.acct-hero h1 em { font-style: normal; color: var(--cobalt); }
-.acct-session { font-family: var(--sans); font-size: 13px; color: var(--ink-dim); margin-top: 8px; }
-.acct-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 5px 12px; border: 1px solid var(--ink-hair); border-radius: 999px; white-space: nowrap; }
-.acct-plan strong { color: var(--ink); font-weight: 600; }
+main.acct .btn { width: auto; }
+.acct-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
+.acct-hero h1 { font-family: var(--sans); font-size: clamp(26px, 3.4vw, 38px); font-weight: 600; letter-spacing: -.028em; color: var(--ink-1); margin: 0; line-height: 1.08; }
+.acct-hero h1 em { font-style: normal; color: var(--accent); }
+.acct-session { font-family: var(--sans); font-size: 13px; line-height: 1.6; color: var(--ink-2); margin-top: 10px; }
+.acct-plan { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding: 7px 14px; border: 1px solid var(--line-2); border-radius: var(--r-pill); background: var(--surface); white-space: nowrap; }
+.acct-plan::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sig-done); box-shadow: 0 0 0 3px var(--sig-done-bg); }
+.acct-plan strong { color: var(--ink-1); font-weight: 600; }
 
-.acct-card { background: var(--bone); border: 1px solid rgba(11,58,106,0.06); border-radius: 16px; box-shadow: 0 1px 2px rgba(11,58,106,0.05), 0 4px 14px rgba(11,58,106,0.04); padding: var(--space-5); margin-bottom: var(--space-4); }
-.acct-card.danger { border-color: rgba(200,30,30,0.22); box-shadow: 0 1px 2px rgba(200,30,30,0.05); }
-.acct-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
-.acct-card > h2 { font-family: var(--sans); font-size: 18px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 4px; }
-.acct-lead { font-family: var(--sans); font-size: 13.5px; line-height: 1.6; color: var(--ink-dim); margin: 0 0 var(--space-4); max-width: 70ch; }
-.acct-block h3 { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
-.acct-block p { font-family: var(--sans); font-size: 13px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 12px; }
+.acct-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); box-shadow: var(--sh-1); padding: var(--space-5); margin-bottom: var(--space-4); }
+.acct-card.danger { border-color: var(--sig-stop-line); box-shadow: none; }
+.acct-kicker { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.acct-card > h2 { font-family: var(--sans); font-size: 19px; font-weight: 600; letter-spacing: -.018em; color: var(--ink-1); margin: 0 0 5px; }
+.acct-lead { font-family: var(--sans); font-size: 14px; line-height: 1.62; color: var(--ink-2); margin: 0 0 var(--space-4); max-width: 62ch; }
+.acct-block h3 { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink-1); margin: 0 0 6px; }
+.acct-block p { font-family: var(--sans); font-size: 13px; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px; }
 .acct-grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-5); }
-.acct-divider { border: 0; border-top: 1px solid var(--ink-hair); margin: var(--space-4) 0; }
+.acct-divider { border: 0; border-top: 1px solid var(--line); margin: var(--space-4) 0; }
 .acct-field { display: flex; flex-direction: column; gap: 8px; max-width: 440px; margin-top: var(--space-3); }
+/* These two inputs sit outside .form-card, so nothing had given them a size.
+   tests/app-contrast.test.mjs measured them at 22px on a phone. */
+main.acct input[type="text"], main.acct input[type="email"], main.acct input[type="password"] {
+  width: 100%; max-width: 440px; min-height: var(--tap); padding: 11px 13px;
+  border: 1px solid var(--line-2); border-radius: var(--r-1);
+  background: var(--surface); color: var(--ink-1); font: 15px/1.4 var(--sans);
+  transition: border-color var(--d-1) var(--e-standard);
+}
+main.acct input:hover { border-color: var(--ink-3); }
+main.acct input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+main.acct input::placeholder { color: var(--ink-3); }
 .acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
 .acct-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: var(--space-2); }
 .acct-card .info-row:first-of-type { border-top: 0; }
 .acct-advanced > summary { display:flex; flex-direction:column; gap:3px; cursor:pointer; list-style:none; }
 .acct-advanced > summary::-webkit-details-marker { display:none; }
-.acct-advanced > summary::after { content:'Show'; align-self:flex-start; margin-top:8px; color:var(--cobalt); font:600 12px/1 var(--sans); }
+.acct-advanced > summary { min-height: var(--tap); }
+.acct-advanced > summary:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-1); }
+.acct-advanced > summary::after { content:'Show'; align-self:flex-start; margin-top:10px; color:var(--accent); font:600 12px/1 var(--sans); }
 .acct-advanced[open] > summary::after { content:'Hide'; }
-.acct-advanced > summary strong { color:var(--ink); font:600 16px/1.25 var(--sans); }
-.acct-advanced > summary span { color:var(--ink-dim); font:13px/1.5 var(--sans); }
-.acct-advanced-body { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--ink-hair); }
+.acct-advanced > summary strong { color:var(--ink-1); font:600 16px/1.25 var(--sans); }
+.acct-advanced > summary span { color:var(--ink-2); font:13px/1.55 var(--sans); }
+.acct-advanced-body { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line); }
 @media (max-width: 680px) { .acct-grid2 { grid-template-columns: 1fr; gap: var(--space-4); } main.acct { padding: var(--space-5) var(--space-3) var(--space-6); } }
 </style>
+<meta name="theme-color" content="#FBFAF7">
+<link rel="stylesheet" href="/app-2026.css?v=2">
+<script src="/js/theme.js?v=1"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -241,7 +252,7 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
   <div class="acct-inline">
     <input type="text" id="account-passkey-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
            placeholder="TOTP code" autocomplete="one-time-code" style="max-width:150px">
-    <button type="button" class="btn btn-primary btn-small" id="account-passkey-btn">Activate passkey</button>
+    <button type="button" class="btn btn-secondary btn-small" id="account-passkey-btn">Activate passkey</button>
   </div>
   <p id="account-passkey-status" class="small" aria-live="polite" style="margin-top:8px"></p>
 </section>
@@ -302,6 +313,23 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
     <button type="button" class="btn btn-secondary btn-small" id="sign-out">Sign out (this browser)</button>
   </div>
   <p class="small mt-2">Signing out clears the session on that device. Your account stays active.</p>
+</section>
+
+
+<section class="acct-card" id="appearance-section">
+  <div class="acct-kicker">Appearance &middot; light and dark</div>
+  <h2>Appearance.</h2>
+  <p class="acct-lead">
+    Light is the default and it stays light until you change it here. Your choice is kept in this
+    browser only, and it applies to the pages behind your sign-in: your dashboard, signing,
+    sending, this page and the sign-in screens. The public pages stay light.
+  </p>
+  <fieldset class="theme-choice" id="theme-choice">
+    <legend>Appearance</legend>
+    <label><input type="radio" name="appearance" value="auto"><span>Follow my system</span></label>
+    <label><input type="radio" name="appearance" value="light"><span>Light</span></label>
+    <label><input type="radio" name="appearance" value="dark"><span>Dark</span></label>
+  </fieldset>
 </section>
 
 
@@ -370,9 +398,10 @@ main.acct { max-width: 880px; margin: 0 auto; padding: var(--space-6) var(--spac
 <script src="/js/nav-auth.js?v=5" defer></script>
 <script src="/js/account.inline1.js?v=2"></script>
 
-<script type="module" src="/js/account.inline2.js?v=2"></script>
+<script type="module" src="/js/account.inline2.js?v=3"></script>
 <script type="module" src="/js/passkey.js?v=3"></script>
 <script type="module" src="/js/signing-enrol.js?v=14"></script>
+<script src="/js/account-theme.js?v=1" defer></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>

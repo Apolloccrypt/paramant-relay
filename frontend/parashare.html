@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}html[data-theme="auto"],html[data-theme="auto"] body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Encrypted file transfer · Paramant</title>
 <meta property="og:site_name" content="Paramant">
@@ -11,7 +11,6 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
@@ -23,73 +22,100 @@
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-main{max-width:640px;margin:0 auto;padding:24px 24px 32px;position:relative;z-index:10}
-h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.sub{font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:32px;line-height:1.7}
-.hero-block{border:1px solid var(--ink-hair);padding:24px 28px;margin-bottom:40px}
+main{max-width:660px;margin:0 auto;padding:clamp(24px,5vh,44px) 24px 48px;position:relative;z-index:10}
+h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-height:1.08;margin-bottom:10px;color:var(--ink-1)}
+.sub{font-size:15px;color:var(--ink-2);margin-bottom:28px;line-height:1.62;max-width:58ch}
+.hero-block{border:1px solid var(--line);border-radius:var(--r-2);padding:24px 28px;margin-bottom:36px}
 
 /* Stepper at the top of the flow -- gives the user a "you are here" sense */
 .ps-stepper{list-style:none;margin:0 0 28px;padding:0;display:flex;gap:0;position:relative}
 .ps-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;min-width:0}
-.ps-step-dot{width:11px;height:11px;border-radius:50%;background:var(--bone-2);border:1.5px solid var(--ink-hair);transition:background .25s var(--ease-sharp),border-color .25s var(--ease-sharp),transform .25s var(--ease-sharp);position:relative;z-index:2}
-.ps-step.active .ps-step-dot{background:var(--lime);border-color:var(--lime);transform:scale(1.25);box-shadow:0 0 0 4px rgba(178,255,63,.18)}
-.ps-step.done .ps-step-dot{background:var(--cobalt);border-color:var(--cobalt)}
-.ps-step-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);text-align:center;line-height:1.3;transition:color .25s var(--ease-sharp)}
-.ps-step.active .ps-step-label{color:var(--navy);font-weight:600}
-.ps-step.done .ps-step-label{color:var(--cobalt)}
-.ps-step:not(:last-child)::after{content:"";position:absolute;top:5px;left:calc(50% + 8px);right:calc(-50% + 8px);height:1.5px;background:var(--ink-hair);z-index:1;transition:background .25s var(--ease-sharp)}
-.ps-step.done:not(:last-child)::after{background:var(--cobalt)}
+.ps-step-dot{width:10px;height:10px;border-radius:50%;background:var(--surface);border:1.5px solid var(--line-2);transition:background var(--d-2) var(--e-standard),border-color var(--d-2) var(--e-standard),transform var(--d-2) var(--e-standard);position:relative;z-index:2}
+.ps-step.active .ps-step-dot{background:var(--accent);border-color:var(--accent);transform:scale(1.2);box-shadow:0 0 0 4px var(--accent-soft)}
+.ps-step.done .ps-step-dot{background:var(--sig-done);border-color:var(--sig-done)}
+.ps-step-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);text-align:center;line-height:1.3;transition:color var(--d-2) var(--e-standard)}
+.ps-step.active .ps-step-label{color:var(--ink-1)}
+.ps-step.done .ps-step-label{color:var(--ink-2)}
+.ps-step:not(:last-child)::after{content:"";position:absolute;top:4.5px;left:calc(50% + 8px);right:calc(-50% + 8px);height:1px;background:var(--line-2);z-index:1;transition:background var(--d-2) var(--e-standard)}
+.ps-step.done:not(:last-child)::after{background:var(--sig-done)}
 @media (max-width:560px){.ps-step-label{font-size:9px;letter-spacing:.06em}.ps-stepper{gap:2px}}
 
 /* Inline along-the-way guide -- explains what is happening at each step */
-.ps-guide{font-family:var(--sans);font-size:var(--text-sm);line-height:1.6;color:var(--ink-dim);padding:12px 14px;border-left:2px solid var(--lime);background:rgba(178,255,63,.06);margin-bottom:18px;border-radius:0 6px 6px 0}
-.ps-guide strong{color:var(--ink);font-weight:600}
-.ps-guide .ps-guide-kicker{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);margin-bottom:4px;font-weight:700}
+.ps-guide{font-family:var(--sans);font-size:13.5px;line-height:1.62;color:var(--ink-2);padding:13px 15px;border:1px solid var(--line);border-left:2px solid var(--mark);background:var(--surface-sunk);margin-bottom:18px;border-radius:0 var(--r-1) var(--r-1) 0}
+.ps-guide strong{color:var(--ink-1);font-weight:600}
+.ps-guide .ps-guide-kicker{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;font-weight:600}
 
 /* Slim API-key row -- shown when key was auto-fetched from /api/user/account/key */
-.ps-key-slim{display:none;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:16px;font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);flex-wrap:wrap}
+.ps-key-slim{display:none;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface-sunk);margin-bottom:16px;font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap}
 .ps-key-slim .ps-key-status{display:inline-flex;align-items:center;gap:8px}
-.ps-key-slim .ps-key-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--lime);flex-shrink:0}
-.ps-key-slim .ps-key-mask{color:var(--navy);font-weight:600}
-.ps-key-slim .ps-key-change{background:transparent;border:none;padding:4px 6px;color:var(--cobalt);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
-.ps-key-slim .ps-key-change:hover{color:var(--navy)}
+.ps-key-slim .ps-key-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex-shrink:0}
+.ps-key-slim .ps-key-mask{color:var(--ink-1);font-weight:600}
+.ps-key-slim .ps-key-change{background:transparent;border:none;min-height:36px;padding:4px 6px;color:var(--accent);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
+.ps-key-slim .ps-key-change:hover{color:var(--accent-hov)}
 #step-setup.has-saved-key .ps-key-card{display:none}
 #step-setup.has-saved-key .ps-key-slim{display:flex}
 
-.card{border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:16px}
-.card-head{padding:14px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
-.card-head-title{font-size:var(--text-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
-.dot{width:6px;height:6px;background:var(--lime)}
-.dot.red{background:var(--cobalt)}
-.dot.amber{background:var(--cobalt)}
-.card-body{padding:20px 18px}
+/* design-system.css puts 32px of padding on every .card; here the padding
+   belongs to .card-head and .card-body, so it is reset. */
+.card{border:1px solid var(--line);border-radius:var(--r-2);background:var(--surface);box-shadow:var(--sh-1);overflow:hidden;margin-bottom:14px;padding:0}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.card-head-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+/* Section 3 of the direction: the beacon only beats where something is really
+   being measured. A card head is a section marker, so its dot is a static
+   colour swatch. design-system.css v4 puts status-pulse and a navy ring on
+   every .dot, and both are reset here. The one live beacon on this screen is
+   #waiting-dot, which beats for as long as the relay is really waiting. */
+.dot{width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex:0 0 auto;border:0;animation:none}
+.dot.red{background:var(--sig-stop)}
+.dot.amber{background:var(--sig-wait)}
+#waiting-dot{animation:status-pulse 2.4s var(--e-standard) infinite}
+.card-body{padding:18px}
 
-input[type=text],input[type=password],input[type=file]{width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:10px 12px;font-family:var(--mono);font-size:var(--text-sm);outline:none;margin-bottom:10px}
-input:focus{border-color:var(--cobalt)}
+input[type=text],input[type=password],input[type=file]{width:100%;min-height:var(--tap);background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-1);color:var(--ink-1);padding:11px 13px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;transition:border-color var(--d-1) var(--e-standard)}
+input[type=text]:hover,input[type=password]:hover,input[type=file]:hover,select:hover{border-color:var(--ink-3)}
+input:focus{border-color:var(--accent);box-shadow:var(--ring)}
 input[type=file]{cursor:pointer}
-select{width:100%;background:var(--bone);border:1px solid var(--ink-hair);color:var(--ink);padding:10px 12px;font-family:var(--mono);font-size:var(--text-sm);outline:none;margin-bottom:10px;cursor:pointer}
-select:focus{border-color:var(--cobalt)}
+select{width:100%;min-height:var(--tap);background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-1);color:var(--ink-1);padding:11px 13px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;cursor:pointer;transition:border-color var(--d-1) var(--e-standard)}
+select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
-.btn{width:100%;padding:11px;background:var(--cobalt);color:var(--bone);border:none;font-family:var(--mono);font-size:var(--text-sm);font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
-.btn:hover{opacity:.85}
-.btn:disabled{background:rgba(29,78,216,.2);color:var(--ink-dim);cursor:not-allowed}
-.btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
-.btn-outline:hover{background:var(--bone-2)}
-.btn-green{background:var(--cobalt);color:var(--bone)}
-.btn-red{background:rgba(29,78,216,.08);color:var(--cobalt);border:1px solid rgba(29,78,216,.2)}
+.btn{width:100%;min-height:var(--tap);padding:12px 18px;background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);border-radius:var(--r-1);font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;cursor:pointer;margin-top:8px;transition:background var(--d-1) var(--e-standard),border-color var(--d-1) var(--e-standard)}
+.btn:hover{background:var(--accent-hov);border-color:var(--accent-hov);opacity:1}
+.btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.btn:disabled{background:var(--surface-sunk);border-color:var(--line-2);color:var(--ink-3);cursor:not-allowed;opacity:1}
+.btn-outline{background:transparent;color:var(--ink-1);border:1px solid var(--line-2)}
+.btn-outline:hover{background:var(--line-ghost);border-color:var(--ink-3)}
+.btn-green{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-red{background:transparent;color:var(--sig-stop);border:1px solid var(--sig-stop-line)}
+.btn-red:hover{background:var(--sig-stop-bg);border-color:var(--sig-stop);color:var(--sig-stop)}
 
-.fingerprint{font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--navy);text-align:center;padding:20px;background:var(--bone-2);border:1px solid var(--ink-hair);margin:16px 0}
-.status-line{font-size:var(--text-sm);color:var(--ink-dim);padding:8px 0;display:flex;align-items:center;gap:8px}
-.status-line.ok{color:var(--cobalt)}
-.status-line.err{color:var(--cobalt)}
-.share-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:12px;font-size:var(--text-sm);color:var(--navy);word-break:break-all;line-height:1.7;cursor:pointer;margin:12px 0}
-.share-box:hover{border-color:var(--cobalt)}
-.progress-bar-wrap{background:var(--bone-2);border:1px solid var(--ink-hair);height:4px;overflow:hidden;margin:12px 0}
-.progress-bar{height:100%;background:var(--cobalt);width:0%;transition:width .3s}
-.label{font-size:var(--text-xs);color:var(--ink-dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block}
-.tag{display:inline-block;font-size:var(--text-xs);padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px;margin-top:4px}
-.tag.green{border-color:rgba(11,58,106,.25);color:var(--navy)}
-.warn{border:1px solid rgba(29,78,216,.2);color:var(--ink);background:rgba(29,78,216,.04);padding:12px 14px;font-size:var(--text-sm);line-height:1.7;margin:12px 0}
+.fingerprint{font-family:var(--mono);font-size:clamp(17px,4vw,22px);font-weight:600;letter-spacing:.1em;color:var(--ink-1);text-align:center;padding:20px;background:var(--surface-sunk);border:1px solid var(--line);border-radius:var(--r-1);margin:16px 0;word-break:break-all}
+.status-line{font-size:13px;line-height:1.6;color:var(--ink-2);padding:8px 0;display:flex;align-items:center;gap:8px}
+.status-line.ok{color:var(--sig-done)}
+.status-line.err{color:var(--sig-stop)}
+.share-box{flex:1 1 240px;min-width:0;background:var(--surface-sunk);border:1px solid var(--line);border-radius:var(--r-1);padding:12px 13px;font-family:var(--mono);font-size:12.5px;color:var(--ink-1);word-break:break-all;line-height:1.6;margin:0}
+.ps-linkrow{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin:12px 0 8px}
+/* One thing big in view after sending: the link, with a real 44px copy target
+   next to it instead of a click-anywhere box nobody sees. */
+.ps-copy{flex:0 0 auto;min-height:var(--tap);padding:0 18px;border:1px solid var(--accent);border-radius:var(--r-1);background:var(--accent);color:var(--accent-ink);font:600 14px/1 var(--sans);cursor:pointer;transition:background var(--d-1) var(--e-standard),border-color var(--d-1) var(--e-standard)}
+.ps-copy:hover{background:var(--accent-hov);border-color:var(--accent-hov)}
+.ps-copy:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-copy.is-copied{background:var(--mark);border-color:var(--mark);color:var(--mark-on)}
+.ps-meta{margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;line-height:1.6;color:var(--ink-3)}
+.ps-dim{color:var(--ink-3)}
+.ps-progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.ps-progress-head .status-line{padding-bottom:6px}
+.ps-pct{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink-1);font-variant-numeric:tabular-nums}
+/* Burn-on-read is not a fault, so it never gets the fault colour. */
+.ps-caution{display:flex;gap:9px;align-items:flex-start;margin:0 0 12px;padding:11px 13px;border:1px solid var(--line-2);border-left:3px solid var(--sig-wait);border-radius:var(--r-1);background:var(--sig-wait-bg);font:12.5px/1.6 var(--sans);color:var(--ink-1)}
+.ps-caution::before{content:"!";flex:0 0 auto;width:16px;height:16px;margin-top:1px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--sig-wait);border-radius:50%;font:700 10px/1 var(--mono);color:var(--sig-wait)}
+
+.share-box:hover{border-color:var(--line-2)}
+.progress-bar-wrap{background:var(--line-2);border:0;border-radius:var(--r-0);height:3px;overflow:hidden;margin:4px 0 12px}
+.progress-bar{height:100%;background:var(--accent);width:0%;transition:width var(--d-3) var(--e-standard)}
+.label{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;display:block}
+.tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:4px 9px;border:1px solid var(--line-2);border-radius:var(--r-0);color:var(--ink-2);margin-right:4px;margin-top:4px}
+.tag.green{border-color:var(--line-2);border-left:2px solid var(--mark);color:var(--ink-1)}
+.warn{border:1px solid var(--line-2);border-left:3px solid var(--sig-wait);border-radius:var(--r-1);color:var(--ink-1);background:var(--sig-wait-bg);padding:12px 14px;font-size:13px;line-height:1.62;margin:12px 0}
 
 /* === Globe HUD (hidden by default; Ctrl+G to open) === */
 #globe-overlay{position:fixed;inset:0;z-index:0;background:#060c10;display:none}
@@ -173,7 +199,8 @@ select:focus{border-color:var(--cobalt)}
   border-top-color:var(--lime);animation:globeSpin .8s linear infinite}
 
 @media(max-width:640px){
-  main{padding:32px 16px 48px}
+  main{padding:24px 16px 44px}
+  .ps-copy{flex:1 1 100%}
   .hero-block{padding:18px 16px}
   h1{font-size:20px}
   .fingerprint{font-size:18px;letter-spacing:.08em}
@@ -290,6 +317,9 @@ select:focus{border-color:var(--cobalt)}
   ]
 }
 </script>
+<meta name="theme-color" content="#FBFAF7">
+<link rel="stylesheet" href="/app-2026.css?v=2">
+<script src="/js/theme.js?v=1"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -368,7 +398,7 @@ select:focus{border-color:var(--cobalt)}
   <div class="card ps-key-card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>
     <div class="card-body">
-      <span class="label">API key</span>
+      <label class="label" for="api-key">API key</label>
       <input type="password" id="api-key" placeholder="pgp_..." autocomplete="off" data-input="onKeyInput">
       <div class="status-line" id="key-status">Enter your API key to continue</div>
     </div>
@@ -377,7 +407,7 @@ select:focus{border-color:var(--cobalt)}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
     <div class="card-body">
-      <span class="label">Select file(s) &mdash; select multiple for vault mode</span>
+      <label class="label" for="file-input">Select file(s) &mdash; select multiple for vault mode</label>
       <input type="file" id="file-input" multiple data-change="onFileSelect">
       <div class="status-line" id="file-status">No file selected</div>
       <div id="vault-list" style="margin-top:8px;display:none"></div>
@@ -387,14 +417,14 @@ select:focus{border-color:var(--cobalt)}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Self-destruct</div></div>
     <div class="card-body">
-      <span class="label">Link expires after</span>
+      <label class="label" for="ttl-select">Link expires after</label>
       <select id="ttl-select">
         <option value="30000">30 seconds</option>
         <option value="300000">5 minutes</option>
         <option value="3600000" selected>1 hour</option>
         <option value="86400000">24 hours</option>
       </select>
-      <div class="status-line" id="ttl-status" style="color:rgba(248,250,252,.65)">Relay permanently deletes blobs after expiry</div>
+      <p class="ps-meta" id="ttl-status">Relay permanently deletes blobs after expiry</p>
     </div>
   </div>
 
@@ -414,7 +444,11 @@ select:focus{border-color:var(--cobalt)}
     <div class="card-head"><div class="dot amber" id="waiting-dot"></div><div class="card-head-title" id="waiting-title">Waiting for receiver...</div></div>
     <div class="card-body">
       <span class="label">One-time session link</span>
+      <div class="ps-linkrow">
       <div class="share-box" id="session-link" data-click="copyLink">—</div>
+      <button type="button" class="ps-copy" id="ps-copy-btn" data-click="copyLink">Copy link</button>
+      </div>
+      <p class="ps-meta" id="ps-link-meta">The link carries no key and no file name. It only says where to connect.</p>
       <div class="status-line" id="waiting-status">Share this link with the receiver</div>
     </div>
   </div>
@@ -423,7 +457,7 @@ select:focus{border-color:var(--cobalt)}
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Receiver connected — verify fingerprint</div></div>
     <div class="card-body">
       <p class="status-line" style="margin-bottom:6px">Call or message the receiver via a <strong>separate channel</strong> (phone, Signal, etc.) and ask: <em>"What is your fingerprint?"</em></p>
-      <p class="status-line" style="margin-bottom:8px;color:var(--cobalt);font-size:10px">⚠ A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
+      <p class="ps-caution">A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
       <div class="fingerprint" id="fp-display">—</div>
       <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Matches stored fingerprint from a previous session</div>
       <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ First contact with this receiver — verify carefully</div>
@@ -455,9 +489,12 @@ select:focus{border-color:var(--cobalt)}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
     <div class="card-body">
-      <div class="status-line" id="enc-status">Initializing...</div>
-      <div class="progress-bar-wrap"><div class="progress-bar" id="enc-progress"></div></div>
-      <div class="status-line" id="enc-detail" style="color:rgba(248,250,252,.65)"></div>
+      <div class="ps-progress-head">
+        <span class="status-line" id="enc-status">Initializing...</span>
+        <span class="ps-pct" id="enc-pct" aria-live="polite">0%</span>
+      </div>
+      <div class="progress-bar-wrap" role="progressbar" id="enc-progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="enc-progress"></div></div>
+      <div class="status-line ps-dim" id="enc-detail"></div>
     </div>
   </div>
 </div>
@@ -565,7 +602,7 @@ select:focus{border-color:var(--cobalt)}
 <script type="module" src="/js/parashare.inline1.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/quota-upgrade.js?v=4" defer></script>
-<script src="/js/parashare.page.js?v=2" defer></script>
+<script src="/js/parashare.page.js?v=3" defer></script>
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
 <footer>

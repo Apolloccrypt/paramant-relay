@@ -261,6 +261,7 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>Signature placement template</strong> (<code>parasign.placement.tpl.v1</code>): where you last put a seal on a page, so the next document opens the same way</li>
 <li><strong>Seen signing fingerprints</strong> (<code>paramant_fp_&hellip;</code>): a marker per signing key you have already been shown, so a known key is not flagged as new</li>
 <li><strong>Dismissed key-setup notice</strong> (<code>paramant.keysetup.dismissed.v1</code>): that you closed the signing-key banner on your dashboard</li>
+<li><strong>Appearance</strong> (<code>paramant.theme.v1</code>): whether you asked the app screens to follow your system, stay light or go dark. Light without it. Nothing is sent to us; the choice lives in this browser and on this device only.</li>
 <li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
 <li><strong>ParaSign signing vault</strong> (IndexedDB): if you sign documents, your post-quantum signing key (ML-DSA-65) is generated and kept in your browser&rsquo;s IndexedDB, encrypted either with your passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) or, if your passkey provider cannot do that, with a passphrase (PBKDF2 &rarr; AES-256-GCM). The private key never leaves your device; only its public half is registered to your account.</li>
 </ul>

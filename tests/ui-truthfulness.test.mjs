@@ -1806,3 +1806,39 @@ console.log('ui-truthfulness: ParaSend and ParaSign are the only two product nam
 })();
 
 console.log('ui-truthfulness: the rules page is Our rules on /rules, with /pararules redirected');
+
+// ── The appearance choice: the key, the values, and the three promises ───────
+//
+// The inventory of localStorage keys is not here: tests/site-claims.test.mjs
+// row 28 reads every key the frontend writes against the list on /privacy and
+// fails on either side drifting. One inventory is enough. What this adds is the
+// half that gate cannot see: that the key /privacy names is the key this
+// feature writes, and that the three sentences beside the switch on /account
+// are true of the code underneath them.
+(() => {
+  const themeJs = read('frontend/js/theme.js');
+  assert.match(themeJs, /var KEY = 'paramant\.theme\.v1';/,
+    'the appearance key was renamed; /privacy, docs/site-claims.md and tests/app-theme.test.mjs name the old one');
+  assert.match(themeJs, /var CHOICES = \['auto', 'light', 'dark'\];/,
+    'the three appearance choices are what /account offers and what app-theme measures');
+
+  const privacyPage = read('frontend/privacy.html');
+  assert.ok(privacyPage.includes('<code>paramant.theme.v1</code>'),
+    '/privacy must name the appearance key in its local-storage list');
+  assert.ok(read('docs/site-claims.md').includes('`paramant.theme.v1`'),
+    'docs/site-claims.md must record what the appearance key is for');
+
+  // "Kept in this browser only" is a claim about the network, so read the code
+  // back: nothing in theme.js may reach off the machine.
+  assert.doesNotMatch(themeJs, /fetch\(|XMLHttpRequest|navigator\.sendBeacon/,
+    'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
+
+  assert.match(account, /Light is the default and it stays light until you change it here/,
+    '/account must say that light is the default, because app-2026.css makes it so');
+  assert.match(account, /kept in this\s+browser only/,
+    '/account must say the choice never leaves the browser');
+  assert.match(account, /The public pages stay light\./,
+    '/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
+})();
+
+console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');
