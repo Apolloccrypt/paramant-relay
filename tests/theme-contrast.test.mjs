@@ -59,14 +59,17 @@ const SIZES = [[390, 844], [1440, 900]];
 // Alles wat hier niet in staat is een regressie. Het formaat is pagina +
 // selector, want de kleurwaarden veranderen mee met het merk en de plek niet.
 //
-// Geen van de vijf komt uit het ontwerpsysteem: alle vijf staan als letterlijke
-// kleur in het style-blok van de pagina zelf, en alle vijf stonden er al voor
+// Geen van de vier komt uit het ontwerpsysteem: alle vier staan als letterlijke
+// kleur in het style-blok van de pagina zelf, en alle vier stonden er al voor
 // deze tak. Ze horen bij de groep die zo'n scherm onder handen neemt, niet bij
 // een tokenronde die geen woord tekst en geen pagina-CSS aanraakt.
 //
 // De statusregel van /parashare stond hier ook, op rgba(248,250,252,.65),
-// bijna-wit op bijna-wit. #381 heeft hem opgelost, dus hij is hier weg. Zo
-// hoort deze lijst te bewegen: korter, nooit langer.
+// bijna-wit op bijna-wit. #381 heeft hem opgelost, dus hij is hier weg. De
+// mono-kicker van de homepage stond hier ook, op 4.31:1 tegen het tweede
+// papier (#F3F0E8). #389 heeft --hp-ink-3 van #66727F naar #5F6B78 gezet en
+// daarmee haalt hij 4.78:1 tegen dat papier en 5.12:1 tegen #FAF8F3, dus hij
+// is hier weg. Zo hoort deze lijst te bewegen: korter, nooit langer.
 const KNOWN_LIGHT = [
   // about.html geeft de primaire knop cobalt tekst op een cobalt vlak.
   { slug: '/about', sel: 'a.btn.btn-primary' },
@@ -80,13 +83,6 @@ const KNOWN_LIGHT = [
   // tekstkleur mee te kantelen. Vier gevallen, alle vier in dat style-blok.
   { slug: '/docs', sel: 'code' },
   { slug: '/docs', sel: 'a' },
-  // index.html kreeg met #382 een eigen palet in zijn kritieke CSS, met
-  // --hp-ink-3 op #66727F. Op het lichte papier (#FAF8F3) haalt dat 4.69:1, op
-  // het tweede papier (#F3F0E8) 4.31:1, en daar staat de mono-kicker boven elke
-  // sectie. Gemeten op main, dus hij kwam met die homepage mee en niet hiermee.
-  // Eén hex lost het op: #5F6B78 geeft 4.71:1 op het tweede papier. Dat is een
-  // wijziging aan de homepage van #382 en hoort in die tak, niet in deze.
-  { slug: '/', sel: 'p.hp-kicker' },
 ];
 
 const server = http.createServer((req, res) => {
