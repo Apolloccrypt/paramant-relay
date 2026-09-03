@@ -1,7 +1,9 @@
 // DocuSign-style sign flow on /sign. Doc-first state machine.
 //
-// Steps: pick document -> (PDF: place stamp) -> identity -> review & sign -> done.
-// Non-PDF inputs go through a hash-only path that skips the placement step.
+// Steps: pick document -> place stamp -> identity -> review & sign -> done.
+// The document must be a PDF, checked on the magic bytes. The hash-only path
+// below is the fallback for a file that CLAIMS to be a PDF and then will not
+// parse; it is no longer something a visitor can select on purpose.
 //
 // Reuses /vendor/parasign-bridge.js (ml_dsa65 + sha3_256 + vault helpers),
 // /vendor/pdfjs (preview render) and /vendor/pdf-lib (stamp baking). All
@@ -234,6 +236,9 @@ function enterRecipients() {
     const subject = $('ds-invite-subject'); if (subject) subject.value = state.inviteSubject;
   }
   renderRecipients();
+  // Last, so it wins over the label and the hint this function just set: with
+  // no session, Send is a sign-in.
+  applySessionToSendButton();
 }
 
 function commitInviteDeliveryFromDom() {
@@ -417,6 +422,44 @@ function clearDocError() {
   const el = $('ds-doc-error'); if (el) el.hidden = true;
 }
 
+// What the first bytes actually are, in the word a person uses for them.
+//
+// accept="application/pdf,.pdf" is a hint the file picker MAY honour, and iOS
+// Safari does not: the photo library is offered whatever the attribute says. A
+// 6.5MB camera JPEG walked in as a "document" and got as far as Co-signers. The
+// MIME type on the File object is no better, because it comes from the same
+// place. Magic bytes are the one check that cannot be talked out of it.
+//
+// Returns a phrase to drop into "This is ___, not a PDF.", or null when the
+// bytes are not something we can name.
+function describeFileType(bytes, name) {
+  const b = bytes;
+  const at = (offset, ...sig) => sig.every((v, i) => b[offset + i] === v);
+  if (b.length >= 4 && at(0, 0x89, 0x50, 0x4E, 0x47)) return 'a PNG image';
+  if (b.length >= 3 && at(0, 0xFF, 0xD8, 0xFF)) return 'a JPEG image';
+  if (b.length >= 3 && at(0, 0x47, 0x49, 0x46)) return 'a GIF image';
+  if (b.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'a WebP image';
+  // ISO base media: the brand at offset 8 says which flavour. HEIC is what an
+  // iPhone hands over when the camera roll is not set to "most compatible".
+  if (b.length >= 12 && at(4, 0x66, 0x74, 0x79, 0x70)) {
+    const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
+    if (['heic', 'heix', 'heim', 'heis', 'hevc', 'mif1', 'msf1'].includes(brand)) return 'a HEIC photo';
+    return 'a video or media file';
+  }
+  // A zip container. Word, Excel, PowerPoint and OpenDocument are all zips, and
+  // only the extension separates them from a plain archive at this depth.
+  if (b.length >= 4 && at(0, 0x50, 0x4B, 0x03, 0x04)) {
+    const ext = String(name || '').toLowerCase().split('.').pop();
+    if (ext === 'docx' || ext === 'doc' || ext === 'odt') return 'a Word document';
+    if (ext === 'xlsx' || ext === 'ods') return 'a spreadsheet';
+    if (ext === 'pptx' || ext === 'odp') return 'a presentation';
+    return 'a ZIP archive';
+  }
+  // The old Office compound-document container (.doc, .xls, .ppt).
+  if (b.length >= 8 && at(0, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)) return 'a Word document';
+  return null;
+}
+
 async function onDocChosen(file) {
   clearDocError();
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -424,6 +467,18 @@ async function onDocChosen(file) {
   // of silently enabling Continue on a 0-byte document (QA).
   if (!bytes.length) {
     showDocError('That file is empty (0 bytes). Pick a file that has content.');
+    return;
+  }
+  // PDF or nothing, decided on the bytes. A refused file does not become
+  // state.doc, does not get named on screen and does not advance the step: the
+  // visitor stays on the picker with the reason in front of him, instead of
+  // three steps deep into a flow that cannot end.
+  const looksPdf = bytes.length >= 5
+    && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2D;
+  if (!looksPdf) {
+    const what = describeFileType(bytes, file.name);
+    showDocError((what ? 'This is ' + what + ', not a PDF. ' : 'This file is not a PDF. ')
+      + 'ParaSign signs PDF documents. Export or print your file to PDF first.');
     return;
   }
   state.doc = { bytes, name: file.name, size: file.size };
@@ -3251,6 +3306,13 @@ function wireNav() {
     else setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only');
   });
   $('ds-recipients-continue').addEventListener('click', () => {
+    // Signed out: this button is the sign-in, and nothing below it should run.
+    // Whatever was typed here is lost by the navigation; applySessionToSendButton
+    // has already said so on screen, above the button.
+    if ($('ds-recipients-continue').dataset.signInFirst === '1') {
+      location.href = '/auth/login?next=/sign';
+      return;
+    }
     commitRecipientsFromDom();
     commitInviteDeliveryFromDom();
     // Audit 1.1: every envelope is email-bound, so every co-signer needs a
@@ -3388,57 +3450,109 @@ function init() {
   showSessionRequirement();
 }
 
-// The page is now served to everyone (nginx no longer gates /sign), so a
-// visitor without a session can reach it. Signing still needs an account,
-// because a Paramant signature is made with a key bound to a passkey on the
-// device and that key has to be enrolled first.
+// What the probe answered, kept so every later step can ask the same question
+// without a second round trip. 'unknown' until it has answered at all: nothing
+// on this page may claim "you are not signed in" before it has.
+let sessionState = 'unknown';   // 'unknown' | 'in' | 'out'
+
+function showServiceNote() {
+  const note = $('ds-service-note');
+  const errors = (typeof self !== 'undefined') && self.paramantErrors;
+  if (note && errors) { note.textContent = errors.SUPPORT_FAILURE_MESSAGE; note.hidden = false; }
+}
+
+// Everything that changes when the visitor has no session. Called from the
+// probe, so it may land after the flow has already moved a step or two; each
+// piece is therefore written to be safe at any point in the flow.
+function applySignedOut() {
+  const bar = $('ds-signedout');
+  if (bar) bar.hidden = false;
+  const el = $('step-anon');
+  // The mode picker stays visible underneath: a visitor should still see what
+  // the three workflows are before deciding whether the account is worth it.
+  if (el) el.hidden = false;
+  applySessionToSendButton();
+}
+
+// The one irreversible action in the invite flow is "Send for signature": it
+// creates the envelope, uploads the capsule and mails the links, and all three
+// need a session. Offering that button to a signed-out visitor is offering a
+// button whose only possible answer is 401, three steps after the moment we
+// already knew. So it becomes the sign-in.
+//
+// The prepared state does NOT survive it, and the button says so rather than
+// pretending. The document lives in this page as raw bytes; a scanned contract
+// or a phone photo is megabytes and sessionStorage is about 5MB per origin, so
+// stashing it would fail on exactly the files people bring. The recipients and
+// the message are small enough to keep, but keeping half a flow and silently
+// dropping the other half is worse than one honest sentence.
+function applySessionToSendButton() {
+  const cont = $('ds-recipients-continue');
+  if (!cont) return;
+  const gate = sessionState === 'out' && state.signingMode === 'invite';
+  cont.dataset.signInFirst = gate ? '1' : '';
+  if (!gate) return;
+  cont.textContent = 'Sign in to send';
+  cont.disabled = false;
+  if (!$('step-recipients').hidden) {
+    showRecipientsHint('Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file and the recipients again afterwards.', false);
+  }
+}
+
+// The page is served to everyone (nginx no longer gates /sign), so a visitor
+// without a session can reach it. Signing still needs an account, because a
+// Paramant signature is made with a key bound to a passkey on the device and
+// that key has to be enrolled first.
 //
 // Where the message goes matters more than what it says. Failing at the last
 // step with "please sign in" would move the dead end to a worse place: after
 // the visitor has chosen a file, placed a stamp and pressed Sign. So the
-// requirement is stated up front, next to what the product does.
+// requirement is stated up front, and #ds-signedout keeps stating it for every
+// step after that.
+//
+// One probe, /api/user/session/verify, the same endpoint the nav bar and the
+// homepage read. /api/user/check answered the same question in a different
+// shape and made /sign the only page in the app with its own idea of what a
+// session is.
 //
 // Someone arriving on an invitation link is NOT stopped: that path carries its
-// own invite token and does not need a session, so the notice stays hidden
-// whenever the URL names an envelope. A network failure also leaves it hidden,
-// because guessing "not signed in" from a failed fetch would show the notice to
-// exactly the paying customer whose connection blipped.
+// own invite token and does not need a session, so nothing is shown whenever
+// the URL names an envelope. A network failure also shows nothing, because
+// guessing "not signed in" from a failed fetch would show the notice to exactly
+// the paying customer whose connection blipped.
 async function showSessionRequirement() {
-  const el = $('step-anon');
-  if (!el) return;
   const q = new URLSearchParams(location.search);
   if (q.get('envelope') || q.get('e') || q.get('invite') || q.get('token') || location.hash.length > 1) return;
-  let status = 0;
+  let res;
   try {
-    const r = await fetch('/api/user/check', { credentials: 'same-origin', cache: 'no-store' });
-    status = r.status;
+    res = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
   } catch {
     // A thrown fetch is the browser being offline, and the browser says so
-    // better than we can. Silence, as before: guessing "not signed in" from a
-    // dead connection would show the account notice to the paying customer
-    // whose wifi dropped.
+    // better than we can. Silence: guessing "not signed in" from a dead
+    // connection would show the account notice to the paying customer whose
+    // wifi dropped.
     return;
   }
-  // The probe answered, but it answered that IT is broken. authUser returns 503
-  // session_store_unavailable when redis is unreachable, and a proxy in front
-  // can return any 5xx of its own. None of those mean "no account": a koper
-  // review found a signed-in user reading "Signing a document needs an account"
-  // because the answer was a failure rather than a refusal. Say what actually
-  // happened, in the shared sentence, and leave the account notice hidden.
-  if (status >= 500) {
-    const note = $('ds-service-note');
-    const errors = (typeof self !== 'undefined') && self.paramantErrors;
-    if (note && errors) { note.textContent = errors.SUPPORT_FAILURE_MESSAGE; note.hidden = false; }
-    try { console.error('[paramant] session probe', status); } catch { /* no console is never why a flow dies */ }
+  // The probe answered, but it answered that IT is broken. The endpoint reads
+  // redis, and a proxy in front can return any 5xx of its own. None of those
+  // mean "no account": a koper review found a signed-in user reading "Signing a
+  // document needs an account" because the answer was a failure rather than a
+  // refusal. Say what actually happened, and leave the account notice hidden.
+  if (res.status >= 500) {
+    showServiceNote();
+    try { console.error('[paramant] session probe', res.status); } catch { /* no console is never why a flow dies */ }
     return;
   }
-  // 401/403 is the one answer that means what the notice says: this browser has
-  // no session. Anything else (200, and any 4xx that is not a refusal) leaves
-  // both the notice and the service line hidden.
-  if (status !== 401 && status !== 403) return;
-  el.hidden = false;
-  // The mode picker stays visible underneath: a visitor should still see what
-  // the three workflows are before deciding whether the account is worth it.
+  // 401/403 is a refusal: this browser has no session. A healthy answer is 200
+  // with an authenticated flag. Anything else (a 404 from a static host, a
+  // gateway's own 4xx) leaves both the bar and the service line hidden.
+  if (res.status === 401 || res.status === 403) { sessionState = 'out'; applySignedOut(); return; }
+  if (!res.ok) return;
+  let data = null;
+  try { data = await res.json(); } catch { return; }
+  if (!data || typeof data.authenticated !== 'boolean') return;
+  sessionState = data.authenticated ? 'in' : 'out';
+  if (sessionState === 'out') applySignedOut();
 }
 
 // What the finished proof does and does not say. An open-mode envelope has no

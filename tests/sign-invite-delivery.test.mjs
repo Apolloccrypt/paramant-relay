@@ -73,7 +73,7 @@ await directPage.close();
 // a healthy answer gets neither.
 async function probeSays(status, body) {
   const probe = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await probe.route('**/api/user/check', (route) => route.fulfill({
+  await probe.route('**/api/user/session/verify', (route) => route.fulfill({
     status, contentType: 'application/json', body: body || '{}',
   }));
   await probe.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
@@ -81,6 +81,7 @@ async function probeSays(status, body) {
   await probe.waitForTimeout(300);
   const seen = await probe.evaluate(() => ({
     anon: !document.getElementById('step-anon').hidden,
+    bar: !document.getElementById('ds-signedout').hidden,
     service: !document.getElementById('ds-service-note').hidden,
     serviceText: document.getElementById('ds-service-note').textContent,
     support: self.paramantErrors.SUPPORT_FAILURE_MESSAGE,
@@ -88,14 +89,14 @@ async function probeSays(status, body) {
   await probe.close();
   return seen;
 }
-const probe401 = await probeSays(401, '{"error":"unauthenticated"}');
-ok('no session still gets the account notice', probe401.anon === true && probe401.service === false, JSON.stringify(probe401));
+const probeOut = await probeSays(200, '{"authenticated":false}');
+ok('no session gets the account notice and the bar', probeOut.anon === true && probeOut.bar === true && probeOut.service === false, JSON.stringify(probeOut));
 const probe503 = await probeSays(503, '{"error":"session_store_unavailable"}');
 ok('a broken probe is a service failure, not a missing account',
-  probe503.anon === false && probe503.service === true && probe503.serviceText === probe503.support,
+  probe503.anon === false && probe503.bar === false && probe503.service === true && probe503.serviceText === probe503.support,
   JSON.stringify(probe503));
-const probe200 = await probeSays(200, '');
-ok('a signed-in visitor is told nothing at all', probe200.anon === false && probe200.service === false, JSON.stringify(probe200));
+const probeIn = await probeSays(200, '{"authenticated":true,"email":"owner@example.com"}');
+ok('a signed-in visitor is told nothing at all', probeIn.anon === false && probeIn.bar === false && probeIn.service === false, JSON.stringify(probeIn));
 
 await page.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
 ok('landing leads with the request-signatures workflow', await page.locator('.ds-mode-card').first().getAttribute('data-mode') === 'invite' && await page.locator('.ds-mode-card').first().getAttribute('class').then((value) => value.includes('primary')), await page.locator('.ds-mode-card').first().innerText());
@@ -103,7 +104,24 @@ ok('technical stepper stays hidden until a workflow is chosen', await page.locat
 ok('landing has no phone-width overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 if (process.env.PARAMANT_SIGN_SCREENSHOT_PATH) await stableScreenshot(page, { path:process.env.PARAMANT_SIGN_SCREENSHOT_PATH, fullPage:true });
 await page.locator('.ds-mode-card[data-mode="invite"]').click();
-await page.locator('#ds-doc-input').setInputFiles({ name: 'agreement-demo.txt', mimeType: 'text/plain', buffer: Buffer.from('agreement document for invite delivery') });
+// A .txt used to go straight to the recipients through the hash-only path.
+// /sign refuses anything that is not a PDF now (tests/sign-signed-out.test.mjs
+// covers the refusal), so the delivery run takes the road a customer takes.
+await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  while (!window.PDFLib) await sleep(20);
+  const source = await window.PDFLib.PDFDocument.create();
+  source.addPage([300, 400]).drawText('Agreement', { x: 30, y: 350, size: 14 });
+  const transfer = new DataTransfer();
+  transfer.items.add(new File([await source.save()], 'agreement-demo.pdf', { type: 'application/pdf' }));
+  const input = document.getElementById('ds-doc-input');
+  input.files = transfer.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await page.locator('#step-place:not([hidden])').waitFor({ timeout: 15000 });
+await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="0"] canvas').waitFor();
+await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="0"]').click({ position: { x: 150, y: 120 } });
+await page.locator('#ds-place-continue').click();
 await page.locator('#step-recipients:not([hidden])').waitFor();
 await page.locator('#ds-add-recipient').click();
 await page.locator('[data-field="label"]').fill('Signer Demo');
@@ -130,11 +148,10 @@ ok('successful retry clears the warning', /all email invitations/i.test(await pa
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 
 // ── PDF variant: the requester points at the spot where the other party signs ──
-// The .txt run above is the hash-only half of the invite flow: nothing can be
-// pointed at, so it must still go straight to the recipients. Everything below
-// is the PDF half, which is where /sign's promise ("show them where to sign")
-// either exists or does not.
-ok('a hash-only invite asks for no position', envelopeCreates.length === 1 && envelopeCreates[0].requested_appearance === undefined, JSON.stringify(Object.keys(envelopeCreates[0] || {})));
+// The run above is the delivery half: what the email does, what a partial
+// failure says, what a retry sends. Everything below is /sign's promise ("show
+// them where to sign"), measured on the bytes that leave the browser.
+ok('the delivery run created exactly one signing request', envelopeCreates.length === 1, JSON.stringify(envelopeCreates.map((e) => e.recipients?.length)));
 
 const pdfCreates = [];
 const pdfPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
