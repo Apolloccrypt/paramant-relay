@@ -217,7 +217,7 @@ td{color:var(--cobalt)}
 
   <div class="blurb">
     <strong>50 words</strong>
-    <p>PARAMANT is a post-quantum encrypted file relay built for regulated industries. Files are encrypted client-side with ML-KEM-768 before upload, stored in RAM only, and destroyed after one download. Nothing is written to disk. EU/DE jurisdiction. Self-hostable. NIS2, NEN7510, and IEC 62443 ready.</p>
+    <p>PARAMANT is a post-quantum encrypted file relay built for regulated industries. Files are encrypted client-side with ML-KEM-768 before upload, stored in RAM only, and destroyed after the link's last read, the first on Community. Nothing is written to disk. EU/DE jurisdiction. Self-hostable. NIS2, NEN7510, and IEC 62443 ready.</p>
   </div>
 
   <div class="blurb">
@@ -228,7 +228,7 @@ td{color:var(--cobalt)}
   <div class="blurb">
     <strong>300 words</strong>
     <p>PARAMANT Ghost Pipe is a post-quantum secure file relay designed for healthcare providers, legal professionals, industrial operators, and financial institutions operating under strict data sovereignty requirements. It solves a specific problem: sending sensitive files between parties where neither party trusts the relay — and where the jurisdiction of storage matters.</p>
-    <p style="margin-top:10px">The system is built around three hard guarantees. First, encryption is purely client-side: files are encrypted using ML-KEM-768 key encapsulation and AES-256-GCM symmetric encryption inside a Rust/WASM module that runs in the browser, before any data leaves the device. Second, the relay is RAM-only: encrypted blobs are never written to disk, making forensic recovery impossible. Third, burn-on-read: each blob is destroyed immediately after the first successful download. The relay cannot be compelled to hand over content it no longer holds.</p>
+    <p style="margin-top:10px">The system is built around three hard guarantees. First, encryption is purely client-side: files are encrypted using ML-KEM-768 key encapsulation and AES-256-GCM symmetric encryption inside a Rust/WASM module that runs in the browser, before any data leaves the device. Second, the relay is RAM-only: encrypted blobs are never written to disk, making forensic recovery impossible. Third, burn-on-read: each blob is destroyed after the last read its link allows, which on the Community plan is the first successful download. The relay cannot be compelled to hand over content it no longer holds.</p>
     <p style="margin-top:10px">PARAMANT runs five sector relays, each tuned to its compliance domain: health (NEN 7510, HL7 FHIR, DICOM), legal (eIDAS, KNB), finance (NIS2, DORA, ISO 20022), industrial IoT (IEC 62443, EU CRA), and general. Each sector is a separate container — a breach in one does not expose another.</p>
     <p style="margin-top:10px">Deployment takes two minutes: one docker compose command on any Ubuntu 22.04+ server. A Raspberry Pi installer and a bootable NixOS image (paramantOS) are available for dedicated hardware. The community edition is permanently free for up to 5 API keys per relay instance.</p>
     <p style="margin-top:10px">PARAMANT was independently security-audited in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. Forty findings across three audits, including 4 critical. Every finding and its status is publicly documented.</p>

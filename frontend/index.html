@@ -355,7 +355,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
       <h1>Get documents signed and send files safely, from your browser.</h1>
-      <p class="lede">Made for <strong>small professional firms</strong> in the EU: legal, finance, health. A contract signed, or a file that is gone the moment it has been read.</p>
+      <p class="lede">Made for <strong>small professional firms</strong> in the EU: legal, finance, health. A contract signed, or a file that deletes itself when the reading is done.</p>
       <div class="home-actions">
         <a class="hp-btn hp-btn-fill" href="/sign">Sign a document</a>
         <a class="hp-btn hp-btn-line" href="/pricing">Business plans</a>
@@ -366,7 +366,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
-      <p class="lede">Pick up an open request, get a new document signed with ParaSign, or send a file that burns on read with ParaSend.</p>
+      <p class="lede">Pick up an open request, get a new document signed with ParaSign, or send a file with the ParaSend web app, which burns it on the first read.</p>
       <div class="home-actions">
         <a class="hp-btn hp-btn-fill" href="/dashboard">Open documents</a>
         <a class="hp-btn hp-btn-line" href="/sign">Start signing</a>
@@ -468,7 +468,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
         <ul class="prod-lines">
           <li>The file is encrypted in your browser before it leaves your device.</li>
           <li>Our server only ever holds the sealed file in memory, never on a disk.</li>
-          <li>It is burned on the first read, so there is nothing left to leak later.</li>
+          <li>It is wiped after its last read, so there is nothing left to leak later.</li>
         </ul>
         <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-line" href="/parashare">Send a file</a></div>
       </li>
@@ -520,7 +520,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
       </li>
       <li>
         <h3>ParaSend</h3>
-        <p class="price-sub">Sending files that burn on read.</p>
+        <p class="price-sub">Sending files that burn on read, one read on Community and up to ten on Pro.</p>
         <ul class="tiers">
           <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 10 transfers a month, 5 MB per file, 1 hour link expiry, burn on first read</span></li>
           <li><span class="tier-price">&euro;15</span><span class="tier-what"><b>Pro</b> &middot; 24 hour expiry, up to 10 reads per link, send history, notices to your own systems</span></li>
@@ -541,7 +541,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
     <h2 id="trust-h" class="hp-h2">Rules you can check. Every one has a proof.</h2>
     <p class="hp-lede">Everyone has a privacy policy. Our rules come with a verify link each: a log, a header, a repo. Not a promise. Four of the nine are below.</p>
     <ol class="rules-grid">
-      <li><h3>We never had it</h3><p>Encrypted in your browser before it leaves you, never written to a disk, gone after it is read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
+      <li><h3>We never had it</h3><p>Encrypted in your browser before it leaves you, never written to a disk, gone after its last read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>Verifiable, not trust-me</h3><p>The code is public, every receipt can be checked without us, and a public log shows when it happened.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>

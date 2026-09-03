@@ -348,7 +348,7 @@ gp.receive_setup()  <span class="cm"># register this device's keys (once)</span>
 <span class="cm"># Send: returns (blob hash, inclusion proof). Share the hash with the receiver.</span>
 hash_, proof = gp.send(open("document.pdf", "rb").read(), ttl=3600)
 
-<span class="cm"># Receive: burn-on-read, one download only.</span>
+<span class="cm"># Receive: burn-on-read. One download on Community, more on a paid plan.</span>
 data, proof = gp.receive(hash_)</pre>
     </div>
 
@@ -361,7 +361,7 @@ curl -X POST https://health.paramant.app/v2/inbound \
   -H "Content-Type: application/json" \
   -d '{"hash":"sha256_of_payload","payload":"base64_5mb_blob","ttl_ms":3600000}'
 
-<span class="cm"># Retrieve (one-time: blob is burned after this)</span>
+<span class="cm"># Retrieve (Community: one-time, the blob is burned after this)</span>
 curl https://health.paramant.app/v2/outbound/abc123... \
   -H "X-Api-Key: pgp_your_key" -o received.bin</pre>
     </div>
@@ -463,7 +463,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob from an authenticated client (RAM-only)</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Deprecated. Anonymous upload retained for sdk-js 3.x backward compatibility; removed in a future major release. New integrations must use <code>/v2/inbound</code>.</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn: one retrieval only</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn: spends one read of the link</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live stats: blobs in flight, ACK rate</td><td>Key</td></tr>
@@ -487,16 +487,17 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
 {
   "hash":    "sha256_of_padded_payload",
   "payload": "base64_encoded_5mb_blob",
-  "ttl_ms":  3600000
+  "ttl_ms":  3600000,
+  "max_views": 1
 }
 
 <span class="cm">200: { "ok": true, "hash": "...", "ttl_ms": 3600000 }
 409: hash already exists
 503: relay at capacity (memory limit)</span></pre>
-    <p>TTL is clamped to plan maximum. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
+    <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Pro 24 hours and up to 10 reads, Business 7 days and 25 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>One retrieval only.</strong> After this call the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
+    <p><strong>Spends one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Pro. On the last read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
@@ -1023,7 +1024,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">What is Ghost Pipe?</div>
-      <div class="faq-a">Ghost Pipe is the relay protocol: a WebSocket-based, post-quantum encrypted transfer protocol where data is stored in RAM only, destroyed after one download, and padded to a fixed size. It is designed for adversarial environments where the relay itself may be compromised.</div>
+      <div class="faq-a">Ghost Pipe is the relay protocol: a WebSocket-based, post-quantum encrypted transfer protocol where data is stored in RAM only, destroyed after the last read the link allows (one on Community, up to 10 reads on Pro), and padded to a fixed size. It is designed for adversarial environments where the relay itself may be compromised.</div>
     </div>
 
     <div class="faq-item">
