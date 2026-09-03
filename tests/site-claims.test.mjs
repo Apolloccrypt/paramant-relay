@@ -1669,50 +1669,49 @@ test('every page that says the signature is not eIDAS-qualified names the level 
   assert.deepEqual(qes, [], `\n  ${qes.join('\n  ')}\n`);
 });
 
-// 35 ── "Transient" was doing work it cannot do. Three console lines in the
-// admin service write a full client IP and one of them writes the account email
-// next to it, into a container log Docker rotates on size and not on time; and
-// scripts/access-log-visitors.mjs reads an edge access log full of client
-// addresses that no page described at all. The nginx configuration in this
-// repository really does log nothing, which is how both survived a review.
-// Verified by sabotage in both directions: adding a fourth console line with
-// ${ip} to admin/server.js turns this red, so does changing the admin log
-// rotation in docker-compose.yml, and so does deleting the section on /privacy.
-test('the logs that hold an IP address are the ones /privacy names', () => {
-  // Line based on purpose. The first version of this matched a whole template
-  // literal with a backtick character class, and it found three lines locally
-  // and none in CI, which is the worst kind of pin: green where it is cheap and
-  // red where it counts. A log call is one line in this file, so read it as one
-  // line and skip the ones that are commented out.
-  const ipMarker = '$' + '{ip}';
-  const emailMarker = '$' + '{norm}';
-  const ipLines = read('admin/server.js').split('\n').map((l) => l.trim())
-    .filter((l) => !l.startsWith('//') && /^console\.(?:log|warn|error)\(/.test(l) && l.includes(ipMarker));
-  assert.equal(ipLines.length, 3,
-    `admin/server.js now writes ${ipLines.length} log lines with a full client IP; /privacy says three`);
-  const withEmail = ipLines.filter((l) => l.includes(emailMarker));
-  assert.equal(withEmail.length, 1,
-    `${withEmail.length} of those lines also write the account email; /privacy says one`);
-
-  const compose = read('docker-compose.yml');
-  const adminBlock = compose.slice(compose.indexOf('\n  admin:'));
-  const size = /max-size:\s*"(\d+)m"/.exec(adminBlock);
-  const count = /max-file:\s*"(\d+)"/.exec(adminBlock);
-  assert.ok(size && count, 'the admin service must still declare its json-file rotation');
-  const priv = visible(page('privacy'));
-  assert.ok(priv.includes(`rotates on size (${size[1]} MB, ${count[1]} files kept)`),
-    `privacy: the admin log rotation must say ${size[1]} MB and ${count[1]} files, which is what docker-compose.yml sets`);
-  assert.ok(priv.includes('The pending-signup line writes the account email address next to the IP'),
-    'privacy: the one line that also writes an email address must be named');
-
+// 35 ── The edge access log, which no page described. /privacy said an IP is
+// "processed only transiently", and the web server config in this repository
+// backs that up: it logs nothing. The edge in front of it is not in this
+// repository and it logs everything, which is how the sentence survived every
+// review: scripts/access-log-visitors.mjs exists to read those files and its
+// own test cites real ones. So the page named a property of the half of the
+// stack that is checked in.
+//
+// The admin half of this block is gone, and deliberately. When it was written,
+// three console lines in admin/server.js wrote a full client IP and one of them
+// the account email; #374 landed first and masked all three at the call site.
+// That claim now belongs to admin/test/log-redact.test.js and to row 9, which
+// pin it at the source. Repeating it here would be a second, weaker copy of
+// somebody else's pin. What is left here is the guard that /privacy cannot go
+// back to describing raw admin lines, plus the log that is genuinely only
+// described because of this pull request.
+//
+// Verified by sabotage in both directions: deleting the section on /privacy,
+// putting "only transiently" back, and taking the access-log reader out of
+// scripts/ each turn this red.
+test('the access log that holds a client address is the one /privacy names', () => {
   const reader = read('scripts/access-log-visitors.mjs');
   assert.match(reader, /access\.log/, 'scripts/access-log-visitors.mjs must still be the tool that reads the edge access log');
+  assert.match(reader, /remote_addr|\bip\b/i, 'the reader must still work on client addresses; if it stopped, say so on /privacy');
+
+  const priv = visible(page('privacy'));
+  assert.ok(priv.includes('<h2>Logs that hold an address</h2>'),
+    'privacy: the section naming the log must still be on the page');
   assert.ok(priv.includes('Our own edge writes a server access log with the client address'),
     'privacy: the edge access log must be described, because a script in this repository reads it');
   assert.ok(priv.includes('The nginx configuration in this repository logs nothing; the edge in front of it does'),
     'privacy: the difference between the config in this repository and the edge must be stated');
-  assert.ok(priv.includes('<h2>Logs that hold an IP address</h2>'),
-    'privacy: the section naming both logs must still be on the page');
   assert.doesNotMatch(priv, /an IP is processed only transiently/,
-    'privacy: "only transiently" is not true of either log named in this block');
+    'privacy: "only transiently" is not true of the edge access log');
+
+  // The admin lines are masked at the call site now (#374). /privacy describes
+  // that masking, so it may not go back to claiming raw lines, and the sentence
+  // it does carry has to stay true of the helper that does the masking.
+  const redact = read('admin/lib/log-redact.js');
+  assert.match(redact, /function maskIpForLog\s*\(/, 'admin/lib/log-redact.js must still mask a client address for the process log');
+  assert.match(redact, /function maskEmailForLog\s*\(/, 'admin/lib/log-redact.js must still mask an email address for the process log');
+  assert.ok(priv.includes('an address is truncated to its network before it is written'),
+    'privacy: the admin log entry must describe the masking admin/lib/log-redact.js applies');
+  assert.doesNotMatch(priv, /Three operational lines write the client IP/,
+    'privacy: the admin lines no longer write a client IP; #374 masked them at the call site');
 });

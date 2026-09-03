@@ -278,11 +278,11 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>Network edge</h2>
 <p>TLS is terminated by <strong>our own edge (Caddy)</strong>, running on the same Hetzner infrastructure in Germany, with post-quantum key exchange. There is no third-party reverse proxy or CDN in front of the site: your connection reaches our server and nowhere else. Short-lived connection metadata (IP, timestamp) is processed transiently for security and abuse-prevention as described above, never for analytics.</p>
 
-<h2>Logs that hold an IP address</h2>
-<p>Two logs hold a full client address, and neither is bounded by a timer. We name them rather than let the word &ldquo;transient&rdquo; do work it cannot do.</p>
+<h2>Logs that hold an address</h2>
+<p>One log holds a full client address, and it is not bounded by a timer. We name it rather than let the word &ldquo;transient&rdquo; do work it cannot do.</p>
 <ul>
-<li><strong>Admin service log.</strong> Three operational lines write the client IP: a duplicate signup attempt, a pending signup, and a rate-limited request to reset a second factor. The pending-signup line writes the account email address next to the IP. They go to the container log, which rotates on size (5 MB, 3 files kept), so the bound is volume and not time.</li>
 <li><strong>Edge access log.</strong> Our own edge writes a server access log with the client address, the timestamp, the path and the user agent. We read it to tell real visitors apart from scanners, never to build a profile of a person, and it is not exported to anyone. The nginx configuration in this repository logs nothing; the edge in front of it does.</li>
+<li><strong>Admin service log, for contrast.</strong> Three operational lines write about a signup attempt, a pending signup and a rate-limited request to reset a second factor. They used to carry the full address, and one of them the account email in plain text. They no longer do: an address is truncated to its network before it is written (203.0.113.x for IPv4, the first three groups for IPv6) and an email keeps one character and its domain (d***@example.com). What lands in the container log is what is left after that.</li>
 </ul>
 <p>Neither log is used for analytics, profiling or advertising, and neither is shared with a third party.</p>
 
